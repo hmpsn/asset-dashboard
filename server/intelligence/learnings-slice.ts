@@ -136,6 +136,22 @@ export async function assembleLearnings(
     log.debug({ err, workspaceId }, 'assembleLearnings: scoringConfig optional, degrading gracefully');
   }
 
+  // A6 (audit #22): cross-workspace platform priors as the FALLBACK tier. Only populated
+  // when this workspace's OWN availability is no_data/degraded — `ready` keeps its own
+  // learnings (availability stays authoritative) and `disabled` suppresses priors too.
+  // These are anonymized aggregates (no workspace ids/titles/urls); the assembler reads
+  // them as a labeled benchmark, never as this workspace's own results.
+  let platformPriors: LearningsSlice['platformPriors'];
+  if (availability === 'no_data' || availability === 'degraded') {
+    try {
+      const { getPlatformPriors } = await import('../platform-learnings-priors.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const priors = getPlatformPriors();
+      if (priors.length > 0) platformPriors = priors;
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleLearnings: platform priors optional, degrading gracefully');
+    }
+  }
+
   return {
     availability,
     summary: summary ?? null,
@@ -150,6 +166,7 @@ export async function assembleLearnings(
     winRateByActionType: Object.fromEntries(
       (summary?.overall.topActionTypes ?? []).map(t => [t.type, t.winRate]),
     ),
+    platformPriors,
     scoringConfig,
   };
 }

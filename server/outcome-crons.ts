@@ -14,6 +14,7 @@ import type * as OutcomeTracking from './outcome-tracking.js';
 import type * as ActivityLog from './activity-log.js';
 import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
+import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
 
 const log = createLogger('outcome-crons');
 
@@ -32,6 +33,7 @@ let backfillInterval: ReturnType<typeof setInterval> | null = null;
 let decayScanInterval: ReturnType<typeof setInterval> | null = null;
 let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
+let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called within the first 35s of startup.
@@ -264,6 +266,24 @@ export function startOutcomeCrons() {
     }
   };
 
+  // A6 (audit #22): recompute the anonymized cross-workspace win-rate priors — the
+  // no_data/degraded FALLBACK tier for the Outcome Learning default path. Aggregates
+  // every workspace's scored outcomes per action type, publishing only above the cohort
+  // + sample floors (FM-2: below either floor -> absent, never fabricated). Runs AFTER
+  // EMV calibration (60s > 55s) so it sees the same settled cross-workspace dataset.
+  const runPlatformPriorsJob = async () => {
+    try {
+      const { recomputePlatformPriors }: typeof PlatformLearningsPriors = await import('./platform-learnings-priors.js'); // dynamic-import-ok
+      const result = recomputePlatformPriors();
+      log.info(
+        { publishedEntries: result.publishedEntries, suppressedBelowFloor: result.suppressedBelowFloor },
+        'Platform learnings priors cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'Platform learnings priors cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -276,6 +296,7 @@ export function startOutcomeCrons() {
     setTimeout(() => void runDecayScan(), 45_000),
     setTimeout(() => void runRankDeclineScan(), 50_000),
     setTimeout(() => void runEmvCalibrationJob(), 55_000),
+    setTimeout(() => void runPlatformPriorsJob(), 60_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -286,6 +307,7 @@ export function startOutcomeCrons() {
   decayScanInterval = setInterval(() => void runDecayScan(), DAILY_MS);
   rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
   emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
+  platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -304,6 +326,7 @@ export function stopOutcomeCrons() {
   if (decayScanInterval) clearInterval(decayScanInterval);
   if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
   if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
+  if (platformPriorsInterval) clearInterval(platformPriorsInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -313,5 +336,6 @@ export function stopOutcomeCrons() {
   decayScanInterval = null;
   rankDeclineScanInterval = null;
   emvCalibrationInterval = null;
+  platformPriorsInterval = null;
   log.info('Outcome crons stopped');
 }

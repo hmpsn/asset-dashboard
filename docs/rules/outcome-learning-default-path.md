@@ -49,6 +49,39 @@ This path **does**:
 - Content-specific caller enrichments still belong to the caller, not the builder
 - Recommendation prioritization logic remains in domain owners such as `server/recommendations.ts` and `server/keyword-recommendations.ts`; the shared helper only adjusts score posture
 
+## Cross-workspace platform priors (A6, audit #22)
+
+The `no_data` / `degraded` tiers now have an optional FALLBACK below "general best
+practices": anonymized cross-workspace win-rate priors.
+
+- **Store:** `server/platform-learnings-priors.ts` (+ migration `133-platform-learnings-priors.sql`).
+  One aggregate row per `actionType` across ALL workspaces, recomputed by the weekly cron in
+  `server/outcome-crons.ts`. Anonymized **by construction** — the row holds only
+  `(action_type, win_rate, contributing_workspaces, scored_actions, computed_at)`. No workspace
+  id, URL, title, or keyword is ever stored. Pattern precedent: `keyword_metrics_cache`.
+- **Floors (privacy + honesty):** a prior is published only above BOTH `MIN_COHORT_WORKSPACES`
+  (≥3 distinct contributing workspaces — below this a single workspace's data could be
+  reverse-identified) and `MIN_PRIOR_SAMPLES` (≥5 scored actions). Below either floor the prior is
+  **absent**, never a fabricated baseline (FM-2). Inputs apply the A1 `not_acted_on` exclusion and
+  count one conclusive 30/60/90-day outcome per action.
+- **The availability switch stays authoritative.** `buildPlatformPriorAdjustment()` and the
+  platform-prior prompt note act ONLY when the workspace's own `availability` is `no_data` or
+  `degraded`. A `ready` workspace runs `buildOutcomeAdjustment` (own history) and never sees a
+  prior; a `disabled` workspace suppresses priors too (admin kill-switch intent extends to them);
+  `not_requested` is a no-op. Do NOT re-check feature flags in callers — switch on the availability
+  the builders already returned.
+- **Honesty labeling is mandatory.** Any surface that renders a platform prior MUST label it as a
+  cross-workspace benchmark ("across all clients on the platform"), never as the workspace's own
+  result. The helpers (`buildPlatformPriorPromptNote`, the extended `buildOutcomeLearningStatusNote`)
+  bake this label in; callers inject the helper output directly. A client must never see platform
+  stats presented as their stats.
+- **Smaller nudge.** `platformPriorMultiplier` is deliberately weaker than `actionTypeMultiplier`
+  and clamped to a tighter band — a cross-workspace benchmark is weaker evidence for this workspace
+  than its own measured history.
+- **Slice field:** `LearningsSlice.platformPriors` is populated by the assembler only on the
+  fallback condition; it is not rendered by the slice formatter (it is in `KNOWN_UNRENDERED_FIELDS`)
+  and is surfaced exclusively through the default-path helpers so labeling stays caller-controlled.
+
 ## Testing expectations
 
 At minimum, PRs touching this path should prove:
@@ -58,3 +91,6 @@ At minimum, PRs touching this path should prove:
 3. recommendation scoring uses the shared outcome-adjustment seam
 4. strong prior wins can boost scores and weak history can down-rank them
 5. no rollout behavior changes unless a separate PR explicitly changes the outcome-learning availability contract
+6. (A6) platform priors are published only above both floors, contain no workspace-identifying data,
+   reach only `no_data`/`degraded` workspaces, are labeled cross-workspace, and leave `ready`
+   workspaces unaffected

@@ -254,6 +254,27 @@ export interface InsightsSlice {
   forPage?: AnalyticsInsight[];
 }
 
+/**
+ * A6 (audit #22): one anonymized cross-workspace win-rate prior, aggregated across
+ * ALL workspaces on the platform for a single action type. Published only above the
+ * cohort + sample floors (see server/platform-learnings-priors.ts) so a single
+ * workspace's history can never be reverse-identified from it.
+ *
+ * HONESTY CONTRACT: this is a PLATFORM benchmark, never the workspace's own result.
+ * Any surface that renders it MUST label it as cross-workspace ("across all clients
+ * on the platform"), never as "your" win rate. Consumed only as the no_data/degraded
+ * FALLBACK tier — a workspace with `availability: 'ready'` keeps its own learnings.
+ */
+export interface PlatformPriorEntry {
+  actionType: string;
+  /** Win rate (0..1) across all contributing workspaces for this action type. */
+  winRate: number;
+  /** Distinct workspaces that contributed scored outcomes (>= cohort floor). */
+  contributingWorkspaces: number;
+  /** Total scored actions behind the rate (>= sample floor). */
+  scoredActions: number;
+}
+
 export interface LearningsSlice {
   availability: 'ready' | 'disabled' | 'no_data' | 'degraded';
   summary: WorkspaceLearnings | null;
@@ -271,6 +292,14 @@ export interface LearningsSlice {
   // New in 3A
   topWins?: TopWin[];
   winRateByActionType?: Record<string, number>;
+  /**
+   * A6 (audit #22): anonymized cross-workspace win-rate priors, populated by the
+   * assembler ONLY when this workspace's own `availability` is `no_data` or
+   * `degraded` (the fallback tier). Absent/undefined when availability is `ready`
+   * (own learnings win) or `disabled`. Each entry is a labeled platform benchmark —
+   * never present these as the workspace's own results. See PlatformPriorEntry.
+   */
+  platformPriors?: PlatformPriorEntry[];
   roiAttribution?: ROIAttribution[];
   weCalledIt?: WeCalledItEntry[];
   scoringConfig?: Partial<Record<string, {
