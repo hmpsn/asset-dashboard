@@ -1226,7 +1226,7 @@
           "est": "3-5h",
           "priority": "P3",
           "status": "pending",
-          "notes": "PR5 ships a documented win-rate-derived calibration because predicted EMV isn't persisted to divide against. Persist predicted emvPerWeek at rec-generation time (or join via ov_divergence), then swap computeOvCalibration to median(realized attributed_value / predicted EMV) per (actionType, difficultyBucket). Clamp + identity-gate contract stays. Needs accumulated outcome history."
+          "notes": "PR5 ships a documented win-rate-derived calibration because predicted EMV isn't persisted to divide against. Persist predicted emvPerWeek at rec-generation time (or join via ov_divergence), then swap computeOvCalibration to median(realized attributed_value / predicted EMV) per (actionType, difficultyBucket). Clamp + identity-gate contract stays. Needs accumulated outcome history. || PARTIAL 2026-06-11 (A5, audit #20): the substrate now exists — predictedEmv is snapshotted on ALL completion paths (live PATCH + backfill, plus a NULL-snapshot repair pass in server/outcome-backfill.ts), and the weekly cron server/outcome-emv-calibration.ts (migration 131, outcome_emv_calibration) persists median(attributed_value/predicted_emv) per (workspace, actionType) with an honest conclusive/inconclusive gate at 5 pairs, plus median time-to-completion effort priors (getEffortPriorDays). REMAINING: flip computeOvCalibration's basis to consume getEmvCalibrationForWorkspace() (per-actionType; difficultyBucket needs difficulty persisted on actions) and thread effort priors into OpportunityInput.effortDays."
         },
         {
           "id": "ov-seasonality-monthly-volumes",

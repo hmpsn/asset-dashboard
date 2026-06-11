@@ -6,10 +6,13 @@ const mocks = vi.hoisted(() => ({
     publishedPosts: { all: vi.fn(() => []) },
     resolvedInsights: { all: vi.fn(() => []) },
     recommendationSet: { get: vi.fn(() => undefined) },
+    // A5: predictedEmv repair-pass candidate query (NULL-snapshot rec actions).
+    nullEmvRecActions: { all: vi.fn(() => []) },
   },
   parseJsonSafeArray: vi.fn(() => []),
   recordAction: vi.fn(),
   getActionBySource: vi.fn(() => null),
+  fillPredictedEmvIfNull: vi.fn(() => true),
   warn: vi.fn(),
   error: vi.fn(),
   info: vi.fn(),
@@ -18,6 +21,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../server/db/index.js', () => ({
   default: {
     prepare: vi.fn(),
+    // A5: the repair pass wraps its fills in db.transaction(); the mock just invokes the body.
+    transaction: (fn: (...args: unknown[]) => unknown) => fn,
   },
 }));
 vi.mock('../../server/db/stmt-cache.js', () => ({
@@ -32,6 +37,7 @@ vi.mock('../../server/logger.js', () => ({
 vi.mock('../../server/outcome-tracking.js', () => ({
   recordAction: mocks.recordAction,
   getActionBySource: mocks.getActionBySource,
+  fillPredictedEmvIfNull: mocks.fillPredictedEmvIfNull,
 }));
 
 import {
@@ -47,8 +53,10 @@ beforeEach(() => {
   mocks.stmts.publishedPosts.all.mockReturnValue([]);
   mocks.stmts.resolvedInsights.all.mockReturnValue([]);
   mocks.stmts.recommendationSet.get.mockReturnValue(undefined);
+  mocks.stmts.nullEmvRecActions.all.mockReturnValue([]);
   mocks.parseJsonSafeArray.mockReturnValue([]);
   mocks.getActionBySource.mockReturnValue(null);
+  mocks.fillPredictedEmvIfNull.mockReturnValue(true);
 });
 
 describe('outcome-backfill', () => {
