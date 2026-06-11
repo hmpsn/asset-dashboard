@@ -1,6 +1,430 @@
 {
   "sprints": [
     {
+      "id": "sprint-client-dashboard-qw1-stop-the-leaks-2026-06-11",
+      "name": "🩹 Client Dashboard Quick Wins 1 — Stop the Leaks",
+      "hours": "~20-28h",
+      "rationale": "First wave of the 2026-06 client dashboard audit. Items where silence is actively costing us: silent data-layer failures, Google API quota burn, silent trial expiry, and an unenforced Growth chat limit. Every item is a no-regret, hours-sized fix with no architectural change.",
+      "notes": "Source: docs/audits/client-dashboard-2026-06/ (00-findings + 01-quick-wins). Ship as small independent PRs, staging-first. Per-PR: data-flow rules 1-2 for any new broadcast, Four Laws for UI, npm run pr-check.",
+      "items": [
+        {
+          "id": "cda-qw1-statetime-ga4-gsc",
+          "title": "Add staleTime to GA4/GSC client hooks (quota + perf risk)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.1",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "src/hooks/client/useClientGA4.ts + useClientSearch.ts. Every tab focus refires 7-12 parallel Google API calls. Pick ~10-15 min staleTime consistent with GA4's 24-48h lag."
+        },
+        {
+          "id": "cda-qw1-getsafe-to-get-inbox",
+          "title": "Convert getSafe()→get() on critical inbox/decision query paths",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.2",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "src/hooks/client/useClientQueries.ts. getSafe renders endpoint failures as 'no data' — a 500 on approvals looks like an empty inbox. Convert approvals/client-actions/requests/content-requests to throwing get() so <ErrorState> renders with retry. Keep getSafe on optional decoration (annotations, anomalies)."
+        },
+        {
+          "id": "cda-qw1-ws-handlers-top5",
+          "title": "Wire top-5 missing WS event handlers (BRIEF_UPDATED, ANOMALIES_UPDATE, INTELLIGENCE_SIGNALS_UPDATED, OUTCOME_*, SCHEMA_*)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.3",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Only ~37 of 67 broadcast events have client handlers — stale caches until manual reload. Add useWorkspaceEvents handlers (never useGlobalAdminEvents) invalidating matching client-* query keys in src/components/ClientDashboard.tsx."
+        },
+        {
+          "id": "cda-qw1-broadcast-handler-contract-test",
+          "title": "Broadcast↔handler contract test (enabler, pulled forward from 03-refactor-rebuild)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9 / 03-refactor-rebuild.md data-layer section",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Contract test asserting every workspace-scoped broadcast the client dashboard cares about has a registered handler (declarative event-bindings map). Locks in cda-qw1-ws-handlers-top5 and prevents the regression class permanently. Ship in the same PR or right after the handler fixes."
+        },
+        {
+          "id": "cda-qw1-trial-countdown-banner",
+          "title": "Trial countdown banner in client shell (trialDaysRemaining <= 5)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.1",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Trials currently end silently — worst conversion leak. ws.isTrial/ws.trialDaysRemaining already in public workspace payload (see PlansTab.tsx:32,139). Dismissible amber banner linking to Plans; hide in betaMode. Unbuilt MONETIZATION.md spec, not a new idea."
+        },
+        {
+          "id": "cda-qw1-day10-trial-email",
+          "title": "Day-10 trial warning email (scheduled, dedup-flagged)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.2",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Other half of the MONETIZATION.md trial spec. Daily scheduled check emailing once at day 10 with days remaining + Plans link; sent-flag (column or keyed activity entry) so it never double-sends."
+        },
+        {
+          "id": "cda-qw1-chat-usage-counter",
+          "title": "Chat usage counter in client chat widget ('2 of 3 free conversations left')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "GET /api/public/chat-usage/:workspaceId already exists (server/routes/public-chat.ts). Fetch + caption render in ClientChatWidget footer; client-* query key hook. Ship before or with Growth limit enforcement so the limit is never a surprise."
+        },
+        {
+          "id": "cda-qw1-growth-chat-enforcement",
+          "title": "Enforce Growth 50-chat/month limit (counted today, not enforced)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.4",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Extend checkChatRateLimit (server/chat-memory.ts / server/usage-tracking.ts, used by public-chat route) to return limit-reached for Growth with soft-gate upgrade-to-Premium message in widget. Integration test against the actual public chat route per test conventions."
+        },
+        {
+          "id": "cda-qw1-hygiene-sweep",
+          "title": "Code hygiene sweep: eslint-disable justification + role=dialog on DecisionDetailModal + ClientHeader menu roles/aria-labels",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §5.1-5.3",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "useClientWorkspaceBootstrap.ts:168 bare suppression (justify or fix dep array); DecisionDetailModal missing role=dialog/aria-modal/aria-labelledby; ClientHeader dropdown role=menu/menuitem + icon-button aria-labels. One small zero-product-risk PR."
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
+      "name": "📖 Client Dashboard Quick Wins 2 — Tell the Story",
+      "hours": "~22-32h",
+      "rationale": "Second quick-win wave from the 2026-06 client dashboard audit: narrative, freshness, and feedback-loop polish. The audit's core theme is that clients see raw results without interpretation or confirmation — these items add the missing 'what this means / we heard you' layer without restructuring any tab.",
+      "notes": "Source: docs/audits/client-dashboard-2026-06/01-quick-wins.md. Several items touch the same components — sequence within the sprint to avoid merge churn. assembledAt (server half) ships with freshness stamps (client half) in one PR per the typed-contract data-flow rule.",
+      "items": [
+        {
+          "id": "cda-qw2-assembledat-freshness-stamps",
+          "title": "assembledAt on intelligence payload + 'Data as of …' freshness stamps on metric surfaces",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.4 + §2.1",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Server half: assembledAt in shared/types/intelligence.ts + buildWorkspaceIntelligence() facade. Client half: shared FreshnessStamp helper in src/components/ui/ rendered on Performance/Search/Analytics/Overview headers (query dataUpdatedAt or assembledAt). Kills the #1 'is this data right?' support question."
+        },
+        {
+          "id": "cda-qw2-analytics-takeaway",
+          "title": "Analytics sub-tab: deterministic takeaway summary + conversion-rate color coding",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.2",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "AnalyticsTab.tsx is the only data tab with no narrative. (a) Template-based takeaway line at top (no AI call); (b) color-code conversion rates per Four Laws (blue metric values; emerald/amber/red only for genuine judgments). Additive only — no tab restructure (that's the significant-changes track)."
+        },
+        {
+          "id": "cda-qw2-roi-methodology-explainer",
+          "title": "ROI methodology explainer ('How we calculate this')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "ROIDashboard.tsx info popover describing inputs and conservative assumptions. Copy-only; first slice of roadmap #74, does not replace it."
+        },
+        {
+          "id": "cda-qw2-health-ring-breakdown",
+          "title": "Composite health ring breakdown (churn 40 / ROI 30 / engagement 30)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.4",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Surface the three weighted components on hover/expand. Data already assembled server-side; read via existing intelligence projection, no new route reads."
+        },
+        {
+          "id": "cda-qw2-post-approval-toast",
+          "title": "Post-approval 'next step' toast in Inbox",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.1",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "After approve, item silently leaves Decisions — clients re-ask. Toast on successful respond: 'Approved — we're publishing this. Track it in Reviews.' Pure frontend; mutation exists (useUnifiedInbox respond handler, DecisionCard, DecisionDetailModal)."
+        },
+        {
+          "id": "cda-qw2-flag-confirmation",
+          "title": "Flag-submission confirmation + optimistic flagged-state on Content Plan cells",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.2",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "ContentPlanTab.tsx flag mutation is silent today, making the tab feel read-only. Success toast + optimistic cell state. Same pattern as the post-approval toast — back-to-back or same PR."
+        },
+        {
+          "id": "cda-qw2-comment-count-badges",
+          "title": "Comment-count badges on work-order conversation threads",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Blue <Badge> (data, not action) on Conversations list rows. Verify count is available list-side without N+1; if it needs a field, that's a one-column serialization addition in public-portal.ts (DB column + mapper lockstep rule)."
+        },
+        {
+          "id": "cda-qw2-keyword-feedback-card",
+          "title": "Keyword feedback summary card on Strategy ('You approved 91% of suggestions')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.4",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "New <SectionCard> block in StrategyTab.tsx, fed by the clientSignals-backed projection — no ad hoc reads. Turns the feedback loop into visible collaboration."
+        },
+        {
+          "id": "cda-qw2-we-called-it-expansion",
+          "title": "'We Called It' prediction card narrative expansion",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.5",
+          "est": "3h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Richer before/after framing per prediction in PredictionShowcaseCard.tsx. Stays on Overview — no new tab."
+        },
+        {
+          "id": "cda-qw2-inline-prices",
+          "title": "Inline prices on every purchase CTA before Stripe redirect",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.5",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Audit each CTA (PricingConfirmationModal, SeoCart/useCart, PlansTab, deliverable cards); prices already in config/payload. Price surprise kills conversion."
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-dashboard-sc3-health-to-revenue-2026-06-11",
+      "name": "💸 Client Dashboard 3 — Health → Revenue",
+      "hours": "~1-2 weeks",
+      "rationale": "First significant-changes sprint from the 2026-06 client dashboard audit. The Health tab shows clients fixable problems with no purchase path, even though Stripe products (fix_meta, fix_alt, schema_page…) and the cart (useCart/SeoCart) already exist — this is mostly wiring, with the most direct revenue payback of the audit. Write the implementation plan (docs/PLAN_WRITING_GUIDE.md) before starting.",
+      "notes": "Source: Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5 (Health → revenue) + §9 (pagination enabler). Phase-per-PR, staging-first. Respect soft-gating and free-data-stays-free.",
+      "items": [
+        {
+          "id": "cda-sc3-fix-this-cart",
+          "title": "'Fix this ($X)' cart integration on Health audit issues",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
+          "est": "3-5d",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Wire existing Stripe fix products + useCart into HealthTab issue rows with inline prices. The audit's highest-confidence revenue unlock: products, cart, and checkout already exist — only the surface is missing."
+        },
+        {
+          "id": "cda-sc3-impact-estimates",
+          "title": "Impact estimates on health fixes (surface emvPerWeek as '$X/week at stake')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
+          "est": "2-3d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Recommendation engine already computes opportunity.emvPerWeek internally. Surface as estimated impact on fix cards (Growth+), giving clients a why-prioritize signal and the cart CTA a justification."
+        },
+        {
+          "id": "cda-sc3-bundle-pricing",
+          "title": "Bundle pricing in cart (e.g. metadata pack when 10+ fixes added)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
+          "est": "1-2d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Designed in MONETIZATION.md, never built. Suggest pack savings when cart crosses thresholds."
+        },
+        {
+          "id": "cda-sc3-pagination-enabler",
+          "title": "Pagination on unbounded client list endpoints (enabler)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
+          "est": "2-3d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Approvals, client-actions, requests, content-plan cells, audit-detail pages return everything (up to ~500KB worst case). Add limit/offset; attach here because the Health work touches audit-detail payloads."
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-dashboard-sc4-premium-rescue-2026-06-11",
+      "name": "👑 Client Dashboard 4 — Premium Rescue",
+      "hours": "~2-3 weeks",
+      "rationale": "The audit found Premium ($999/mo) is nearly empty in code — one exclusive feature, while MONETIZATION.md promises competitor analysis, implementation hours, and a 10% content discount. This sprint builds the promised tier so Growth→Premium conversion (<5% today) has something to convert to. Runs after Health→Revenue because it reuses the purchase-at-point-of-pain pattern. Plan first.",
+      "notes": "Source: Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4 (Premium tier rescue), aligned with roadmap #88 (self-serve upgrade). Three canonical tiers are locked; this fills Premium, it does not add tiers.",
+      "items": [
+        {
+          "id": "cda-sc4-competitor-gaps",
+          "title": "Competitor keyword gap analysis surface (Premium)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4 + §3",
+          "est": "4-6d",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Competitor snapshots already collected server-side (seo-context-slice), never shown to clients. Premium section showing keywords competitors rank for that the client doesn't, fed via a ClientIntelligence projection."
+        },
+        {
+          "id": "cda-sc4-implementation-hours",
+          "title": "Implementation hours tracking (3 hrs/month Premium allowance)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
+          "est": "3-5d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Track allowance usage, show remaining, enable hour-block purchases. Makes the Premium labor component visible instead of invisible."
+        },
+        {
+          "id": "cda-sc4-content-discount",
+          "title": "10% Premium content discount at Stripe checkout",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
+          "est": "1-2d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products."
+        },
+        {
+          "id": "cda-sc4-post-purchase-onboarding",
+          "title": "Post-subscription confirmation + 'welcome to Growth/Premium' moment",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
+          "est": "1-2d",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Today the Stripe return lands with no confirmation and possible stale-tier flash. Confirmation state + what-you-unlocked summary; aligns with #88 self-serve upgrade flow."
+        },
+        {
+          "id": "cda-sc4-briefing-polish-tier-check",
+          "title": "Tier-gate the client-briefing-v2-ai-polish flag as documented (premium-only)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4 / findings §7",
+          "est": "0.5d",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Flag is described as premium-only but has no tier check in code."
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-dashboard-sc5-agency-at-work-2026-06-11",
+      "name": "🔍 Client Dashboard 5 — Agency at Work (Transparency)",
+      "hours": "~2-3 weeks",
+      "rationale": "The audit's #1 untapped-value finding: clients see results but not process — 50+ admin-only activity types, in-progress background jobs, outcome playbooks, and diagnostics all exist server-side and never reach the client, making agency work feel like a black box. This sprint makes the work visible: a live work feed plus evidence-backed outcome storytelling. Highest perceived-value sprint; needs new ClientIntelligence projections, so the per-slice fetch enabler ships first. Plan first.",
+      "notes": "Source: Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1 (Agency at work) + §2 (outcome scorecard) + §9 (per-slice fetch enabler). All new data flows through intelligence slices / ClientIntelligence projections per ADR 0002 — no ad hoc route reads. Long-running anything stays on the job platform (ADR 0001).",
+      "items": [
+        {
+          "id": "cda-sc5-per-slice-fetch",
+          "title": "Per-slice intelligence fetch (?slices= param) + assembledAt-aware caching (enabler)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
+          "est": "3-4d",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Intelligence endpoint is 100-300KB recomputing all slices per request. Selective slice fetch cuts payloads 50-80% and makes the new work-feed projections affordable."
+        },
+        {
+          "id": "cda-sc5-work-feed",
+          "title": "'Agency at work' feed: client-visible activity + in-progress jobs with narrative framing",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1",
+          "est": "4-6d",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Curated projection of process activity ('Audit of 47 pages running…', 'Generating 3 briefs…') + completed work with why-it-was-done framing. Server: new ClientIntelligence projection over activity log + jobs. Client: feed surface on Overview (placement per the 02 doc design)."
+        },
+        {
+          "id": "cda-sc5-outcome-scorecard",
+          "title": "Outcome scorecard with playbook justification (Growth+)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §2",
+          "est": "3-5d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Surface outcome playbooks ('schema fixes worked 73% of the time in your vertical') behind each recommendation/outcome via a scrubbed learnings projection. Shifts win rates from raw numbers to grounded evidence."
+        },
+        {
+          "id": "cda-sc5-diagnostics-rootcause",
+          "title": "Diagnostics root-cause surfacing ('traffic dropped because…')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1",
+          "est": "2-3d",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Diagnostic reports exist server-side (server/diagnostics.ts) and never reach clients. Surface completed diagnostics as narrative cards; aligns with roadmap #33 anomaly detection."
+        }
+      ]
+    },
+    {
+      "id": "sprint-client-dashboard-sc6-attention-inbox-v2-2026-06-11",
+      "name": "🔔 Client Dashboard 6 — Attention & Inbox v2",
+      "hours": "~1.5-2 weeks",
+      "rationale": "Closes the audit's workflow-friction findings: action items are scattered with no global signal (PriorityStrip is inbox-internal), batch approvals are all-or-modal, and changes_requested items vanish causing 'did they get it?' anxiety. Respects the locked inbox section contract (Decisions/Reviews/Conversations) and the retired ActionQueueStrip decision — this is a header-level badge + inbox polish, not a new strip or new sections. Plan first.",
+      "notes": "Source: Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §7 (needs-my-attention system) + §8 (inbox v2 polish) + §9 (JWT refresh / legacy deprecation enablers). pr-check rules inbox-legacy-filter-literal and inbox-action-queue-strip apply.",
+      "items": [
+        {
+          "id": "cda-sc6-attention-badge",
+          "title": "Global 'needs my attention' badge in ClientHeader (cross-tab actionable count)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §7",
+          "est": "2-4d",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Header badge aggregating actionable counts (decisions + reviews + conversations + content-plan flags awaiting client). Deep-links into the right inbox section. NOT a revived ActionQueueStrip — count + link only."
+        },
+        {
+          "id": "cda-sc6-batch-selective-holdback",
+          "title": "Batch approve with selective hold-back (approve N of M)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §8",
+          "est": "2-3d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Per-item toggles in DecisionDetailModal/InlineApprovalCard to hold items back, then a single 'Approve N of M'. Extract the shared flagging logic (useFlagItems) flagged by the code-quality audit."
+        },
+        {
+          "id": "cda-sc6-changes-requested-visibility",
+          "title": "changes_requested visibility ('awaiting team' toggle in inbox)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §8",
+          "est": "1-2d",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Optional show-resolved toggle rendering changes_requested items with an 'Awaiting team' tag, so clients can confirm their feedback landed."
+        },
+        {
+          "id": "cda-sc6-jwt-refresh",
+          "title": "Client JWT refresh flow (enabler)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
+          "est": "1-2d",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "24h client JWT with no refresh — sessions die mid-use. Refresh endpoint + silent client-side renewal."
+        },
+        {
+          "id": "cda-sc6-legacy-deprecation",
+          "title": "Deprecate legacy approvals apply route + delete unmounted legacy tab components (enabler)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
+          "est": "1-2d",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Legacy /approvals/:batchId/apply coexists with unified deliverables respond; ApprovalsTab/RequestsTab/SchemaReviewTab files are unmounted dead code. Follow docs/rules/deprecation-lifecycle.md."
+        }
+      ]
+    },
+    {
       "id": "sprint-platform-simplification-explorers-2026-06-09",
       "name": "🧭 Platform Simplification — Parallel Explorer Recommendations",
       "hours": "phased",
