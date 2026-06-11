@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { aiLimiter } from '../middleware.js';
+import { getWorkspace } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -30,7 +31,7 @@ import {
   addClientSuggestion,
   getEntryCopyStatus,
 } from '../copy-review.js';
-import { generateCopyForEntry, regenerateSection } from '../copy-generation.js';
+import { regenerateSection } from '../copy-generation.js';
 import {
   getAllPatterns,
   getPatternsForPromotion,
@@ -41,14 +42,15 @@ import {
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { getBlueprint, getEntry } from '../page-strategy.js';
+import { getBlueprint } from '../page-strategy.js';
 import {
   createCopyBatchGenerationJob,
   getCopyBatchJob,
   runCopyBatchGenerationJob,
 } from '../copy-batch-jobs.js';
-import { hasActiveJob } from '../jobs.js';
+import { hasActiveJob, createJob } from '../jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { runCopyEntryGenerationJob } from '../copy-entry-generation-job.js';
 
 const router = Router();
 const log = createLogger('copy-pipeline-routes');
@@ -60,39 +62,28 @@ function notifyCopyPipelineUpdated(workspaceId: string): void {
 // ── Generation routes ────────────────────────────────────────────────────────
 
 // POST /api/copy/:workspaceId/:blueprintId/:entryId/generate
-// Generate copy for all sections of a blueprint entry.
+// Enqueue copy generation for all sections of a blueprint entry.
+// Returns { jobId } immediately; poll /api/jobs/:jobId for progress.
 router.post(
   '/api/copy/:workspaceId/:blueprintId/:entryId/generate',
   requireWorkspaceAccess('workspaceId'),
   aiLimiter,
   validate(generateCopySchema),
-  async (req, res) => {
+  (req, res) => {
     const { workspaceId, blueprintId, entryId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
     const { accumulatedSteering } = req.body as { accumulatedSteering?: string[] };
-    try {
-      const { sections, metadata } = await generateCopyForEntry(
+    const job = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId });
+    setImmediate(() => {
+      void runCopyEntryGenerationJob({
+        jobId: job.id,
         workspaceId,
         blueprintId,
         entryId,
         accumulatedSteering,
-      );
-      notifyCopyPipelineUpdated(workspaceId);
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
-        entryId,
-        sectionCount: sections.length,
       });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_METADATA_UPDATED, { entryId });
-      const entry = getEntry(workspaceId, blueprintId, entryId);
-      addActivity(
-        workspaceId,
-        'copy_generated',
-        `Generated copy for "${entry?.name ?? entryId}"`,
-      );
-      return res.json({ sections, metadata });
-    } catch (err) {
-      log.error({ err, workspaceId, blueprintId, entryId }, 'Copy generation failed');
-      return res.status(500).json({ error: 'Copy generation failed' });
-    }
+    });
+    return res.json({ jobId: job.id });
   },
 );
 

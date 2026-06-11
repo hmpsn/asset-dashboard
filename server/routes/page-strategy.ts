@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
+import { getWorkspace } from '../workspaces.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -25,7 +26,10 @@ import {
   listVersions,
   getVersion,
 } from '../page-strategy.js';
-import { generateBlueprint, getDefaultSectionPlan } from '../blueprint-generator.js';
+import { getDefaultSectionPlan } from '../blueprint-generator.js';
+import { createJob } from '../jobs.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { runBlueprintGenerationJob } from '../blueprint-generation-job.js';
 import type { BlueprintGenerationInput } from '../../shared/types/page-strategy.js';
 
 const router = Router();
@@ -135,27 +139,21 @@ router.get(
 );
 
 // IMPORTANT: /generate must come BEFORE /:blueprintId to avoid shadowing
-// POST /api/page-strategy/:workspaceId/generate — AI blueprint generation
+// POST /api/page-strategy/:workspaceId/generate — AI blueprint generation (async)
+// Returns { jobId }; poll /api/jobs/:jobId for progress + result (blueprint).
 router.post(
   '/api/page-strategy/:workspaceId/generate',
   requireWorkspaceAccess('workspaceId'),
   validate(generateBlueprintSchema),
-  async (req, res) => {
+  (req, res) => {
     const { workspaceId } = req.params;
-    try {
-      const input: BlueprintGenerationInput = req.body;
-      const blueprint = await generateBlueprint(workspaceId, input);
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_GENERATED, { blueprint });
-      addActivity(
-        workspaceId,
-        'blueprint_generated',
-        `Generated blueprint "${blueprint.name}" (${blueprint.entries?.length ?? 0} pages)`,
-      );
-      res.json(blueprint);
-    } catch (err) {
-      log.error({ err, workspaceId }, 'Blueprint generation failed');
-      res.status(500).json({ error: 'Blueprint generation failed' });
-    }
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const input: BlueprintGenerationInput = req.body;
+    const job = createJob(BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION, { workspaceId });
+    setImmediate(() => {
+      void runBlueprintGenerationJob({ jobId: job.id, workspaceId, input });
+    });
+    return res.json({ jobId: job.id });
   },
 );
 
