@@ -391,6 +391,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.RECOMMENDATIONS_UPDATED:
       return [
         queryKeys.shared.recommendations(workspaceId),
+        queryKeys.admin.recommendations(workspaceId),
         queryKeys.shared.pageEditStates(workspaceId, false),
         queryKeys.shared.pageEditStates(workspaceId, true),
         queryKeys.admin.actionQueue(workspaceId),
