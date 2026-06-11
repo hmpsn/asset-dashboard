@@ -214,4 +214,46 @@ describe('useAutoSave', () => {
     // Advance time past the 1500ms saved→idle timer to confirm no leak
     await act(async () => { vi.advanceTimersByTime(2000); });
   });
+
+  // ── resetSaveOk: out-of-band-retry recovery ──────────────────────────────────
+  // Regression for the PostEditor section-retry bug: a manual retry that saves
+  // OUTSIDE the hook leaves lastSaveOkRef=false, so the next flush() (with nothing
+  // pending) returns { ok: false } and edit-mode exit is silently blocked forever.
+  // resetSaveOk() is how the caller restores the hook's ok-state after such a save.
+  it('after a failed save, flush returns { ok: false } until resetSaveOk is called', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    // Trigger a failure so lastSaveOkRef flips to false.
+    act(() => { result.current.scheduleAutoSave('<p>boom</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+    expect(result.current.saveStatus).toBe('error');
+
+    // With pendingHtml cleared after the failed attempt drains, flush re-fires the
+    // failed payload (still pending) — it fails again, ok stays false.
+    let flushed = await act(async () => result.current.flush());
+    expect(flushed).toEqual({ ok: false });
+
+    // Simulate the out-of-band retry succeeding: caller resets the ok-state.
+    act(() => { result.current.resetSaveOk(); });
+    expect(result.current.saveStatus).toBe('idle');
+
+    // Now a flush with nothing pending reports ok again, so Done can exit edit mode.
+    flushed = await act(async () => result.current.flush());
+    expect(flushed).toEqual({ ok: true });
+  });
+
+  it('resetSaveOk clears pending content so a stale failed payload does not re-fire', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>stale</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+    expect(saveFn).toHaveBeenCalledTimes(1);
+
+    // resetSaveOk drops the pending payload; a subsequent flush must not re-save it.
+    act(() => { result.current.resetSaveOk(); });
+    await act(async () => { await result.current.flush(); });
+    expect(saveFn).toHaveBeenCalledTimes(1);
+  });
 });

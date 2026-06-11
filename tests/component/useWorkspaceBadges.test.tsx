@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useWorkspaceBadges } from '../../src/hooks/admin/useWorkspaceBadges';
 import { useWsInvalidation } from '../../src/hooks/useWsInvalidation';
@@ -55,13 +55,12 @@ describe('useWorkspaceBadges', () => {
       wrapper: wrapper(client),
     });
 
-    // Wait for query to settle
-    await act(async () => {
-      await new Promise(res => setTimeout(res, 50));
+    // Wait for the query to settle on the positive signal rather than a fixed delay.
+    await waitFor(() => {
+      expect(result.current.data?.pendingRequests).toBe(3);
     });
 
     expect(getBadgesMock).toHaveBeenCalledWith('ws-test');
-    expect(result.current.data?.pendingRequests).toBe(3);
   });
 
   it('is disabled when workspaceId is undefined', () => {

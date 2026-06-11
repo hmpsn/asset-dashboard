@@ -30,6 +30,7 @@ const stopScanMock = vi.fn();
 const fetchPagesMock = vi.fn();
 const generateSinglePageMock = vi.fn();
 const regeneratePageMock = vi.fn();
+const setSinglePageErrorMock = vi.fn();
 
 vi.mock('../../src/components/schema/useSchemaSuggesterGeneration', () => ({
   useSchemaSuggesterGeneration: vi.fn(),
@@ -239,7 +240,6 @@ function makeGenerationHook(overrides: Record<string, unknown> = {}) {
     singlePageError: null,
     setSinglePageError: (...args: unknown[]) => setSinglePageErrorMock(...args),
     fetchPagesError: null,
-    setFetchPagesError: vi.fn(),
     progressMsg: null,
     showNextSteps: false,
     setShowNextSteps: vi.fn(),
@@ -277,6 +277,19 @@ function makeWrapper() {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+// File-level reset: the standalone W1.5 describes below only override the generation
+// hook and rely on a clean publishing hook. Without this, a prior describe that set
+// (e.g.) sendToClientError on the shared mock would leak into later tests and render
+// a second role="alert" banner — breaking single-alert assertions. This beforeEach
+// runs for every test in the file (before each describe's own beforeEach).
+beforeEach(async () => {
+  vi.clearAllMocks();
+  const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+  vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(makeGenerationHook() as ReturnType<typeof genMod.useSchemaSuggesterGeneration>);
+  const pubMod = await import('../../src/components/schema/useSchemaSuggesterPublishingWorkflow');
+  vi.mocked(pubMod.useSchemaSuggesterPublishingWorkflow).mockReturnValue(makePublishingHook() as ReturnType<typeof pubMod.useSchemaSuggesterPublishingWorkflow>);
+});
+
 describe('SchemaSuggester', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -560,6 +573,25 @@ describe('W1.5: single-page failure with NO prior results → error visible, no 
     // Re-scan button is still offered
     expect(screen.getByRole('button', { name: /re-scan/i })).toBeInTheDocument();
   });
+
+  it('singlePageError banner dismiss button clears the error via setSinglePageError(null)', async () => {
+    const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+    vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(
+      makeGenerationHook({
+        started: true,
+        loading: false,
+        data: [],
+        singlePageError: 'Failed to generate schema for this page. Please try again.',
+      }) as ReturnType<typeof genMod.useSchemaSuggesterGeneration>,
+    );
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+    // Clicking the dismiss IconButton must invoke the setter — this exercises the
+    // setSinglePageError wiring (regression: a missing mock declaration would have
+    // thrown a ReferenceError only when the setter was actually called).
+    const dismissBtn = screen.getByRole('button', { name: /dismiss error/i });
+    fireEvent.click(dismissBtn);
+    expect(setSinglePageErrorMock).toHaveBeenCalledWith(null);
+  });
 });
 
 describe('W1.5: page-type failure → revert to prior saved value + visible failure', () => {
@@ -590,11 +622,12 @@ describe('W1.5: page-type failure → revert to prior saved value + visible fail
   });
 });
 
-describe('W1.5: rollback failure → banner visible (SchemaVersionHistory)', () => {
-  it('rollback failure renders an error banner with the error message', async () => {
-    // SchemaVersionHistory is tested separately in tests/component/SchemaVersionHistory.test.tsx
-    // This test verifies the component exists and can be imported without TS errors.
-    const { SchemaVersionHistory } = await import('../../src/components/schema/SchemaVersionHistory');
-    expect(SchemaVersionHistory).toBeDefined();
+// Rollback-failure banner behavior is covered behaviorally in
+// tests/component/SchemaVersionHistory.test.tsx (rollbackError banner render,
+// role="alert", and dismiss). No placeholder import-existence assertion is kept
+// here — it gave false coverage signal without exercising any behavior.
+describe.skip('W1.5: rollback failure → banner visible (SchemaVersionHistory)', () => {
+  it('covered in SchemaVersionHistory.test.tsx', () => {
+    // intentionally empty — see file-level comment above
   });
 });

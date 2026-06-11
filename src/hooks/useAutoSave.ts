@@ -72,6 +72,17 @@ export function useAutoSave(
     return { ok: lastSaveOkRef.current };
   }, [doSave]);
 
+  // Resets the internal ok-state to "succeeded" and clears the error status. Callers
+  // that perform a save OUTSIDE the hook (e.g. a manual retry that replays a captured
+  // payload directly) must call this on success so the hook's lastSaveOkRef no longer
+  // reports the prior failure — otherwise the next flush() returns { ok: false } even
+  // though there is nothing left to save, and edit-mode exit is silently blocked.
+  const resetSaveOk = useCallback(() => {
+    lastSaveOkRef.current = true;
+    pendingHtml.current = null;
+    if (isMounted.current) setSaveStatus(s => (s === 'error' ? 'idle' : s));
+  }, []);
+
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -91,5 +102,5 @@ export function useAutoSave(
     };
   }, []);
 
-  return { scheduleAutoSave, flush, saveStatus };
+  return { scheduleAutoSave, flush, saveStatus, resetSaveOk };
 }

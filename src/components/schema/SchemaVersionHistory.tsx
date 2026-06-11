@@ -81,7 +81,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
   return (
     <div className="space-y-2">
       {rollbackError && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-red-500/8 border border-red-500/20 text-red-400 t-caption-sm">
+        <div role="alert" className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-red-500/8 border border-red-500/20 text-red-400 t-caption-sm">
           <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
           <span>{rollbackError}</span>
           <IconButton

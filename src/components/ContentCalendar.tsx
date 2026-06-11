@@ -80,7 +80,8 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // React Query hook replaces manual useEffect fetching
-  const { data: items = [], isLoading, isError, refetch } = useContentCalendar(workspaceId);
+  const { data: rawItems, isLoading, isError, refetch } = useContentCalendar(workspaceId);
+  const items = rawItems ?? [];
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
 
   // ── Calendar grid ──
@@ -168,7 +169,9 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
     );
   }
 
-  if (isError) {
+  // Only surface the full-screen error when there is no cached data to fall back on.
+  // A background refetch failure with stale data present should keep the calendar visible.
+  if (isError && !rawItems) {
     return (
       <ErrorState
         title="Couldn't load calendar data"

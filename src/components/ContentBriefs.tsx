@@ -50,7 +50,6 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     clientRequests.length === 0 &&
     posts.length === 0;
 
-
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
   const [pendingStandaloneBriefJobId, setPendingStandaloneBriefJobId] = useState<string | null>(null);

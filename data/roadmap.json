@@ -311,6 +311,16 @@
           "status": "pending",
           "createdAt": "2026-06-11",
           "notes": "Incl. tab naming drift, SchemaSuggester PageHeader/TabBar adoption, WorkspaceHome hand-rolled stat card, ad-hoc z-index scale, palette no-workspace no-ops, ?tab= cleanup comment fix, duplicate sidebar icons."
+        },
+        {
+          "id": "awp-inline-error-banner-extraction",
+          "title": "Extract <InlineBanner> ui primitive + extractErrorMessage(err, fallback) util — converge W1's 8 new error surfaces",
+          "source": "Scaled code review of fix/admin-surfaces-w1-silent-failures (2026-06-11)",
+          "est": "3-4h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "W1 introduced ~8 inline error surfaces with drift: bg-red-500/5 vs /8 vs /10, dismissible vs not, span vs div, ~16 inline 'err instanceof Error ? err.message : fallback' sites. Reviewer table in scaled review. UI/UX Rule 9 extraction: InlineBanner (role=alert, icon, optional dismiss, consistent tokens) + shared extractErrorMessage in src/lib. Converge KeywordStrategy trackError/addKeywordError divergence while at it."
         }
       ]
     },

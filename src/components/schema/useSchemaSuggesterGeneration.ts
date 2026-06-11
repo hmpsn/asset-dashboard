@@ -252,7 +252,6 @@ export function useSchemaSuggesterGeneration({
     singlePageError,
     setSinglePageError,
     fetchPagesError,
-    setFetchPagesError,
     progressMsg,
     showNextSteps,
     setShowNextSteps,

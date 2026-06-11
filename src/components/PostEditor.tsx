@@ -184,7 +184,9 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     label: '',
   });
   const [feedbackText, setFeedbackText] = useState('');
-  const [autoSaveError, setAutoSaveError] = useState<'section' | 'intro' | 'conclusion' | null>(null);
+  // Only the section-level retry banner uses this. Intro/conclusion retry is driven by
+  // their own saveStatus === 'error', so this is intentionally section-only.
+  const [autoSaveError, setAutoSaveError] = useState<'section' | null>(null);
   // Captures the exact section index + html that failed so the retry button re-attempts
   // the original failed save rather than whatever section happens to be active at retry time.
   // Fixed: cross-section retry corruption (reviewer Finding 4).
@@ -205,7 +207,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     sections[idx] = { ...sections[idx], content: html, wordCount: countWordsFromHtml(html) };
     await saveField({ sections });
   };
-  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus, resetSaveOk: resetSectionSaveOk } = useAutoSave(
     sectionAutoSaveFn,
     2000,
     // onError: capture the section index and html at error time so retry is safe even if
@@ -224,18 +226,17 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     },
   );
 
+  // Intro/conclusion error + retry UI is driven entirely by their own saveStatus
+  // ('error' → retry button), so they do not write to autoSaveError (which only
+  // gates the section-level retry banner). Avoid write-only state.
   const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ introduction: html }); },
     2000,
-    (_err) => { setAutoSaveError('intro'); },
-    () => { setAutoSaveError(prev => (prev === 'intro' ? null : prev)); },
   );
 
   const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ conclusion: html }); },
     2000,
-    (_err) => { setAutoSaveError('conclusion'); },
-    () => { setAutoSaveError(prev => (prev === 'conclusion' ? null : prev)); },
   );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
@@ -736,7 +737,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                         variant="ghost"
                         size="sm"
                         icon={AlertTriangle}
-                        onClick={() => { setAutoSaveError(null); void flushIntro(); }}
+                        onClick={() => { void flushIntro(); }}
                         className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                       >
                         Save failed — retry
@@ -761,7 +762,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 isGenerating={isGenerating}
                 saveStatus={sectionSaveStatus === 'error' ? 'idle' : sectionSaveStatus}
                 onToggleExpand={toggleSection}
-                onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
+                onStartEdit={async (index) => {
+                  // Block the section switch if flushing the current section's pending save
+                  // failed (mirrors onDone). Otherwise a later successful save in the new
+                  // section would fire onSuccess and silently clear the failed section's
+                  // error + capture, making the failure vanish (invariant 4).
+                  const { ok } = await flushSection();
+                  if (ok) setEditingSection(index);
+                }}
                 onChange={(html) => { setAutoSaveError(null); scheduleSectionSave(html); }}
                 onDone={async () => {
                   // Only exit edit mode if the save succeeded (Finding 2).
@@ -774,7 +782,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   openFeedbackFix('section', s ? `Section: ${s.heading}` : `Section ${sectionIndex + 1}`, sectionIndex);
                 }}
               />
-              {autoSaveError === 'section' && editingSection === section.index && (
+              {autoSaveError === 'section' && sectionSaveErrorCapture.current?.sectionIndex === section.index && (
                 <div className="flex items-center gap-2 px-4 py-2 -mt-2 mb-1">
                   <Button
                     variant="ghost"
@@ -790,9 +798,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                         const idx = sections.findIndex(s => s.index === capture.sectionIndex);
                         if (idx !== -1) {
                           sections[idx] = { ...sections[idx], content: capture.html, wordCount: countWordsFromHtml(capture.html) };
-                          saveField({ sections }).catch(() => {
-                            setAutoSaveError('section');
-                          });
+                          // This save bypasses the hook (it replays the captured payload, which
+                          // may target a different section than the one currently in flight).
+                          // On success we must (a) reset the hook's ok-state so the next Done's
+                          // flush() returns { ok: true } and edit mode can exit, and (b) clear the
+                          // capture so the failure is no longer retryable. On failure, re-arm the
+                          // error+capture so the section stays visibly retryable (invariant 2).
+                          saveField({ sections })
+                            .then(() => {
+                              sectionSaveErrorCapture.current = null;
+                              resetSectionSaveOk();
+                            })
+                            .catch(() => {
+                              setAutoSaveError('section');
+                            });
                         }
                       }
                     }}
@@ -861,7 +880,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                         variant="ghost"
                         size="sm"
                         icon={AlertTriangle}
-                        onClick={() => { setAutoSaveError(null); void flushConclusion(); }}
+                        onClick={() => { void flushConclusion(); }}
                         className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                       >
                         Save failed — retry

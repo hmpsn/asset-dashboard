@@ -14,7 +14,7 @@ import { queryKeys } from '../../lib/queryKeys';
 export function useWorkspaceBadges(workspaceId: string | undefined) {
   return useQuery<WorkspaceBadges>({
     queryKey: queryKeys.admin.workspaceBadges(workspaceId ?? ''),
-    queryFn: () => workspaceBadges.get(workspaceId!),
+    queryFn: () => workspaceBadges.get(workspaceId ?? ''),
     enabled: !!workspaceId,
     staleTime: 60_000,
   });

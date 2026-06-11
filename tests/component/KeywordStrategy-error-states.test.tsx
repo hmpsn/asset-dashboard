@@ -376,11 +376,10 @@ describe('Bug 3 — trackKeyword error handling', () => {
     const trackBtn = screen.getByRole('button', { name: /track in rank tracker/i });
     fireEvent.click(trackBtn);
 
-    // After settling, no error should appear for duplicate
+    // Wait for the positive signal (the mutation actually ran) before asserting the
+    // negative — no fixed-delay sleep. Once the mock has been called and the rejection
+    // has propagated through React Query, any error UI would already be flushed.
     await waitFor(() => expect(mocks.addKeywordMock).toHaveBeenCalledTimes(1));
-
-    // Allow all microtasks to settle
-    await new Promise((r) => setTimeout(r, 50));
 
     const errorMessages = screen.queryAllByText(/failed to track|error.*track|track.*failed/i);
     expect(errorMessages).toHaveLength(0);

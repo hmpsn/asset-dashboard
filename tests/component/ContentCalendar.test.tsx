@@ -249,8 +249,10 @@ describe('ContentCalendar', () => {
 
   it('renders ErrorState when data load fails — not a silently empty calendar (FM-2)', async () => {
     const hooks = await getAdminHooks();
+    // data: undefined models a first-load error with no cached data. ErrorState is
+    // only shown when there is no stale cache to fall back on (isError && !data).
     vi.mocked(hooks.useContentCalendar).mockReturnValue({
-      data: [],
+      data: undefined,
       isLoading: false,
       isError: true,
       refetch: vi.fn(),
@@ -266,7 +268,7 @@ describe('ContentCalendar', () => {
     const refetchMock = vi.fn().mockResolvedValue(undefined);
     const hooks = await getAdminHooks();
     vi.mocked(hooks.useContentCalendar).mockReturnValue({
-      data: [],
+      data: undefined,
       isLoading: false,
       isError: true,
       refetch: refetchMock,
@@ -276,5 +278,21 @@ describe('ContentCalendar', () => {
     expect(retryBtn).toBeInTheDocument();
     fireEvent.click(retryBtn);
     expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it('keeps the calendar visible on a background refetch error when stale data is cached (FM-2)', async () => {
+    const hooks = await getAdminHooks();
+    // isError true but data present (stale cache from a prior successful fetch).
+    // The calendar must stay rendered rather than collapsing to ErrorState.
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: mockItems,
+      isLoading: false,
+      isError: true,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    // Calendar chrome is still present; ErrorState is NOT shown.
+    expect(screen.getByText('Content Calendar')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load calendar data")).not.toBeInTheDocument();
   });
 });

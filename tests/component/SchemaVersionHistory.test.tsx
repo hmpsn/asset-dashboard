@@ -2,9 +2,8 @@
  * SchemaVersionHistory.test.tsx
  *
  * W1.5 real coverage for rollback error surfacing.
- * The tautological schema-silent-failure-fixes.test.ts only tested
- * pure helpers; this test renders the actual component and asserts
- * that a rollback failure surfaces a visible error banner (not swallowed).
+ * This test renders the actual component and asserts that a rollback failure
+ * surfaces a visible, assertive (role="alert") error banner (not swallowed).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -89,6 +88,8 @@ describe('SchemaVersionHistory — rollback error surfacing (W1.5)', () => {
     await waitFor(() => {
       expect(screen.getByText(/rollback did not succeed/i)).toBeInTheDocument();
     });
+    // The banner is an assertive live region so screen readers announce the failure.
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('rollback error has a dismiss button that clears the error', async () => {

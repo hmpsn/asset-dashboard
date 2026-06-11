@@ -196,7 +196,9 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     );
   }
 
-  if (postsQ.isError) {
+  // Only surface the full-screen error when there is no cached data to fall back on.
+  // A background refetch failure with stale data present should keep the list visible.
+  if (postsQ.isError && !postsQ.data) {
     return (
       <ErrorState
         title="Couldn't load content posts"

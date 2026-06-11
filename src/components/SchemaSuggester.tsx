@@ -423,7 +423,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             />
           )}
           {sendToClientError && (
-            <span className="flex items-center gap-1 t-caption text-red-400/80">
+            <span role="alert" className="flex items-center gap-1 t-caption text-red-400/80">
               <Icon as={AlertTriangle} size="sm" />
               {sendToClientError}
               <IconButton
@@ -459,8 +459,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               />
             )}
             {fetchPagesError && (
-              <div className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-center gap-1 px-2 py-1.5 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80 whitespace-nowrap">
-                <Icon as={AlertTriangle} size="sm" />
+              <div role="alert" className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-start gap-1 px-2 py-1.5 max-w-xs bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80">
+                <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
                 {fetchPagesError}
               </div>
             )}
