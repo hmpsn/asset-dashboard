@@ -11,6 +11,8 @@ import {
 import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, ClickableRow, FormTextarea, StatCard } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
+import { useJobProgress } from '../hooks/useJobProgress';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
 import { countAeoQuickWins, estimateAeoChangesMinutes } from '../../shared/types/aeo';
 import { mapAeoEffortToClientEffort } from '../../shared/types/client-actions';
@@ -64,9 +66,7 @@ function getClientReadyPage(page: AeoPageReview): AeoPageReview {
 
 export function AeoReview({ workspaceId }: Props) {
   const [review, setReview] = useState<AeoSiteReview | null>(null);
-  const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [expandedChanges, setExpandedChanges] = useState<Set<string>>(new Set());
   const [filterEffort, setFilterEffort] = useState<AeoEffort | 'all'>('all');
@@ -74,6 +74,9 @@ export function AeoReview({ workspaceId }: Props) {
   const [sendingPage, setSendingPage] = useState<string | null>(null);
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
   const [pageNotes, setPageNotes] = useState<Record<string, string>>({});
+  const [pageError, setPageError] = useState<string | null>(null);
+  // setError alias used by per-page error paths
+  const setError = setPageError;
 
   // Load saved review on mount
   useEffect(() => {
@@ -82,18 +85,21 @@ export function AeoReview({ workspaceId }: Props) {
       .catch((err) => { console.error('AeoReview operation failed:', err); });
   }, [workspaceId]);
 
+  // Job-based site review — enqueues the crawl in the background, polls for completion
+  const {
+    startJob: startSiteReviewJob,
+    isRunning: loading,
+    error,
+  } = useJobProgress(
+    BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW,
+    [], // no query invalidation needed — component loads from disk on mount
+    workspaceId,
+  );
+
   const runSiteReview = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await aeoReviewApi.siteReview(workspaceId, { maxPages: 15 });
-      setReview(data as AeoSiteReview);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId]);
+    void startSiteReviewJob({ maxPages: 15 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- startSiteReviewJob is stable
+  }, [startSiteReviewJob]);
 
   const runSinglePageReview = useCallback(async (pageUrl: string) => {
     setLoadingPage(pageUrl);
@@ -202,9 +208,9 @@ export function AeoReview({ workspaceId }: Props) {
             Requires a completed SEO audit. Reviews pages with AEO issues first, prioritized by traffic.
           </p>
         </div>
-        {error && (
+        {(error || pageError) && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 t-caption-sm text-accent-danger max-w-md text-center">
-            {error}
+            {pageError ?? error}
           </div>
         )}
         {/* styleguide brand accent (Run AEO Review CTA) */}
@@ -350,9 +356,9 @@ export function AeoReview({ workspaceId }: Props) {
         </Button>
       </div>
 
-      {error && (
+      {(error || pageError) && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 t-caption-sm text-accent-danger">
-          {error}
+          {pageError ?? error}
         </div>
       )}
 

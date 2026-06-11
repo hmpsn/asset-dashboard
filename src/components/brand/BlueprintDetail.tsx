@@ -57,8 +57,6 @@ interface EntryCardProps {
   isReviewing?: boolean;
   onReviewCopy?: () => void;
   onCloseReview?: () => void;
-  onGenerateCopy?: () => void;
-  isGenerating?: boolean;
 }
 
 // ─── EntryCard Copy Status Badge ─────────────────────────────────────────────
@@ -112,11 +110,17 @@ function EntryCard({
   isReviewing,
   onReviewCopy,
   onCloseReview,
-  onGenerateCopy,
-  isGenerating,
 }: EntryCardProps) {
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
   const isIncluded = entry.scope === 'included';
+
+  // Copy generation job state — only active when copy pipeline is enabled
+  const { startGenerate, isRunning: isGenerating } = useGenerateCopy(
+    workspaceId ?? '',
+    blueprintId ?? '',
+    entry.id,
+  );
+  const onGenerateCopy = () => { void startGenerate(); };
 
   return (
     // pr-check-disable-next-line -- section card pending Phase 4 SectionCard migration
@@ -379,9 +383,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: blueprint, isLoading, isError } = useBlueprint(workspaceId, blueprintId);
-
-  // Copy generation mutation (safe to call unconditionally — only mutates on user click)
-  const generateCopyMutation = useGenerateCopy(workspaceId, blueprintId);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -659,11 +660,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                 isReviewing={reviewingEntryId === entry.id}
                 onReviewCopy={() => setReviewingEntryId(entry.id)}
                 onCloseReview={() => setReviewingEntryId(null)}
-                onGenerateCopy={() => {
-                  generateCopyMutation.mutate(entry.id);
-                  toast('Generating copy...');
-                }}
-                isGenerating={generateCopyMutation.isPending && generateCopyMutation.variables === entry.id}
               />
             ))}
           </section>
@@ -691,11 +687,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                   isReviewing={reviewingEntryId === entry.id}
                   onReviewCopy={() => setReviewingEntryId(entry.id)}
                   onCloseReview={() => setReviewingEntryId(null)}
-                  onGenerateCopy={() => {
-                    generateCopyMutation.mutate(entry.id);
-                    toast('Generating copy...');
-                  }}
-                  isGenerating={generateCopyMutation.isPending && generateCopyMutation.variables === entry.id}
                 />
               ))}
             </section>

@@ -75,6 +75,7 @@ export const queryKeys = {
     schemaCmsFieldMappings: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-cms-field-mappings', siteId, wsId] as const : ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,
+    llmsTxtResult: (wsId: string) => ['admin-llms-txt-result', wsId] as const,
     webflowPages: (siteId: string, wsId?: string) =>
       wsId ? ['admin-webflow-pages', siteId, wsId] as const : ['admin-webflow-pages', siteId] as const,
     webflowAssets: (siteId: string, wsId?: string) =>

@@ -6,13 +6,8 @@ import { llmsTxt } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
 import { formatDateTime } from '../utils/formatDates';
 import { STALE_TIMES } from '../lib/queryClient';
-
-interface LlmsTxtResult {
-  content: string;
-  fullContent: string;
-  pageCount: number;
-  generatedAt: string;
-}
+import { useJobProgress } from '../hooks/useJobProgress';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 interface LlmsTxtGeneratorProps {
   workspaceId: string;
@@ -29,12 +24,19 @@ function formatFreshness(ts: string | null | undefined): { label: string; color:
 }
 
 export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
-  const [data, setData] = useState<LlmsTxtResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewMode, setPreviewMode] = useState<'index' | 'full'>('index');
+
+  // Load the stored result from the server (populated by the generation job).
+  const { data } = useQuery({
+    queryKey: queryKeys.admin.llmsTxtResult(workspaceId),
+    queryFn: () => llmsTxt.getLast(workspaceId),
+    staleTime: STALE_TIMES.NORMAL,
+    enabled: !!workspaceId,
+    // Return null on 404/error so the empty state renders
+    retry: false,
+  });
 
   const { data: freshnessData } = useQuery({
     queryKey: queryKeys.admin.llmsTxtFreshness(workspaceId),
@@ -45,17 +47,23 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
   const freshness = formatFreshness(freshnessData?.lastGeneratedAt ?? data?.generatedAt);
 
+  // Job-based generation. On 'done', invalidate both the result and freshness queries.
+  const {
+    startJob: startGenerateJob,
+    isRunning: loading,
+    error: generateError,
+  } = useJobProgress(
+    BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION,
+    [
+      queryKeys.admin.llmsTxtFreshness(workspaceId),
+      queryKeys.admin.llmsTxtResult(workspaceId),
+    ],
+    workspaceId,
+  );
+
   const generate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await llmsTxt.generate(workspaceId);
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate LLMs.txt');
-    }
-    setLoading(false);
-  }, [workspaceId]);
+    void startGenerateJob();
+  }, [startGenerateJob]);
 
   const handleCopy = useCallback(async () => {
     if (!data) return;
@@ -93,7 +101,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
     chars: previewContent.length,
   } : null;
 
-  if (!data && !loading && !error) {
+  if (!data && !loading && !generateError) {
     return (
       <div className="space-y-8">
         <PageHeader
@@ -186,10 +194,10 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
         </div>
       )}
 
-      {error && (
+      {generateError && (
         // pr-check-disable-next-line -- brand signature radius intentional for featured error banner surface
         <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <span className="text-xs text-accent-danger">{error}</span>
+          <span className="text-xs text-accent-danger">{generateError}</span>
         </div>
       )}
 

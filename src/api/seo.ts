@@ -281,8 +281,9 @@ export const aeoReview = {
   pageDetail: (wsId: string, path: string) =>
     get<unknown>(`/api/aeo-review/${wsId}/page?path=${encodeURIComponent(path)}`),
 
+  /** Enqueue async site review. Returns { jobId }. */
   siteReview: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/aeo-review/${wsId}/site`, body),
+    post<{ jobId: string }>(`/api/aeo-review/${wsId}/site`, body),
 
   pageReview: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/aeo-review/${wsId}/page`, body),

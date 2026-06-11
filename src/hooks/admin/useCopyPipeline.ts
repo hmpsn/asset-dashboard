@@ -13,6 +13,8 @@ import type {
 } from '../../../shared/types/copy-pipeline';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
+import { useJobProgress } from '../useJobProgress';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 
 // ═══ QUERIES ═══
 
@@ -72,19 +74,36 @@ export function useBatchJob(wsId: string, batchId: string | null) {
 
 // ═══ MUTATIONS ═══
 
-export function useGenerateCopy(wsId: string, blueprintId: string) {
-  const queryClient = useQueryClient();
+/**
+ * Enqueues an async copy generation job for a blueprint entry.
+ *
+ * Returns { startGenerate, isRunning, jobId, error } via useJobProgress.
+ * Call startGenerate({ blueprintId, entryId, accumulatedSteering? }) to kick off.
+ * On 'done' the copySections, copyStatus, and copyMetadata caches for the entry
+ * are invalidated automatically.
+ *
+ * Replaces the old useMutation-based useGenerateCopy.
+ * C3 and subsequent consumers MUST use this hook, not a new inline mutation.
+ */
+export function useGenerateCopy(wsId: string, blueprintId: string, entryId: string) {
   const { toast } = useToast();
-  return useMutation({
-    mutationFn: (entryId: string) =>
-      copyGeneration.generate(wsId, blueprintId, entryId),
-    onSuccess: (_data, entryId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySections(wsId, entryId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatus(wsId, entryId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyMetadata(wsId, entryId) });
-    },
-    onError: () => { toast('Copy generation failed', 'error'); },
-  });
+  const { startJob, isRunning, jobId, error } = useJobProgress(
+    BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION,
+    [
+      queryKeys.admin.copySections(wsId, entryId),
+      queryKeys.admin.copyStatus(wsId, entryId),
+      queryKeys.admin.copyMetadata(wsId, entryId),
+    ],
+    wsId,
+  );
+
+  const startGenerate = async (params?: { accumulatedSteering?: string[] }) => {
+    const id = await startJob({ blueprintId, entryId, ...params });
+    if (!id) toast('Copy generation failed to start', 'error');
+    return id;
+  };
+
+  return { startGenerate, isRunning, jobId, error };
 }
 
 export function useRegenerateCopySection(wsId: string, blueprintId: string) {
