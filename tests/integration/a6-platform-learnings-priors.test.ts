@@ -15,6 +15,8 @@
  *     workspace is UNAFFECTED (availability switch respected).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -235,5 +237,15 @@ describe('A6 fallback seam — availability stays authoritative', () => {
     expect(buildOutcomeLearningStatusNote('ready', 'strategy', priors)).toBe('');
     // `disabled` deliberately suppresses platform priors (admin intent extends to them).
     expect(buildOutcomeLearningStatusNote('disabled', 'strategy', priors)).not.toMatch(/cross-workspace benchmark/i);
+  });
+
+  it('keeps at least one production caller wired (priors must not regress to dead code)', () => {
+    // Review I-1: the consumption side shipped unwired in the first cut. Pin the
+    // first wired consumer so the slice field can never silently go inert again.
+    const source = readFileSync(resolve(import.meta.dirname, '../../server/keyword-recommendations.ts'), 'utf-8'); // readFile-ok — wiring guard: platformPriors must reach buildOutcomeLearningStatusNote in at least one production caller.
+    const callIdx = source.indexOf('buildOutcomeLearningStatusNote(');
+    expect(callIdx).toBeGreaterThan(-1);
+    const callWindow = source.slice(callIdx, callIdx + 400);
+    expect(callWindow).toContain('platformPriors');
   });
 });

@@ -81,6 +81,12 @@ practices": anonymized cross-workspace win-rate priors.
 - **Slice field:** `LearningsSlice.platformPriors` is populated by the assembler only on the
   fallback condition; it is not rendered by the slice formatter (it is in `KNOWN_UNRENDERED_FIELDS`)
   and is surfaced exclusively through the default-path helpers so labeling stays caller-controlled.
+- **Wiring status (2026-06-11):** `server/keyword-recommendations.ts` is the first wired consumer
+  (threads `platformPriors` into `buildOutcomeLearningStatusNote`; pinned by a wiring-guard test in
+  `tests/integration/a6-platform-learnings-priors.test.ts`). The remaining status-note callers
+  (content-brief, content-decay, keyword-strategy-ai-synthesis) and `buildPlatformPriorAdjustment`
+  score consumers are follow-ups on the same contract — when wiring one, pass the slice field
+  through; do not re-derive priors from the store in callers.
 
 ## Testing expectations
 

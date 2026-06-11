@@ -36,7 +36,7 @@ let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
-// if shutdown is called within the first 35s of startup.
+// if shutdown is called during the startup warmup window (currently up to ~60s).
 let startupTimeouts: ReturnType<typeof setTimeout>[] = [];
 
 export function startOutcomeCrons() {
