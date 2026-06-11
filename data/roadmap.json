@@ -1,6 +1,45 @@
 {
   "sprints": [
     {
+      "id": "sprint-core-features-audit-deferred-2026-06-10",
+      "name": "Core-Features Audit — Deferred Follow-ons (SERP, Goals, Content Join-back)",
+      "hours": "TBD — scope per item",
+      "rationale": "Deferred items from the 2026-06-10 core-features audit remediation run. The 25-PR run shipped every 'Now' item; these three were explicitly parked on owner signal or unmet prerequisites. #27 is now unblocked (C4 merged 2026-06-11); #25 awaits a provider-budget cap; #26 awaits a design pass after the proof-of-value wave.",
+      "notes": "Source: docs/audits/2026-06-10-core-features-audit.md + the master plan parked-items table. Owner decisions (2026-06-11): #18 Keyword Hub flag flipped (keyword-hub + keyword-value-scoring + keyword-universe-full); #23 briefing-v2 stays owner-parked pending a cutover date; #24 rec-set normalization remains low-priority substrate, not promoted into this sprint.",
+      "items": [
+        {
+          "id": "audit0610-27-content-perf-joinback-term-grading",
+          "title": "Content performance join-back + term-coverage grading",
+          "source": "Core-features audit 2026-06-10 (#27)",
+          "est": "M-L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "UNBLOCKED 2026-06-11 — prerequisite C4 (#16: persisted brief source text + AI review verdicts) merged. Join published-content performance back to the brief/strategy that drove it, and grade whether the published content actually covered the terms the brief's SERP/reference evidence prescribed. Consumes C4's persisted source-text output shape — do NOT re-derive it. Ready to schedule on owner prioritization; start with a short scoping pass against C4's stored shape."
+        },
+        {
+          "id": "audit0610-25-serp-position-checks",
+          "title": "SERP position checks for client-requested + zero-impression keywords",
+          "source": "Core-features audit 2026-06-10 (#25)",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Parked during the run for zero new provider spend. Re-entry: owner approves a provider budget. Scoped design: client-requested + zero-impression keywords only, ~25/workspace, weekly, DataForSEO task-based SERP endpoint, with a HARD monthly $ cap enforced in config; build behind a flag, dark-launched. BLOCKED ON: owner-supplied monthly $ cap figure."
+        },
+        {
+          "id": "audit0610-26-workspace-goals-trajectory",
+          "title": "Workspace goals + trajectory tracking",
+          "source": "Core-features audit 2026-06-10 (#26)",
+          "est": "L",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "New data model ('Later' tier): let a workspace declare goals and track trajectory toward them. Re-entry: after the proof-of-value wave (E5 scorecard + A-lane outcomes, shipped 2026-06-11) and once retention impact is observed. Needs a design pass first — what a 'goal' is, how trajectory is computed, client vs admin surfacing — brainstorm before implementation."
+        }
+      ]
+    },
+    {
       "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
       "name": "🩹 Admin Surfaces W1 — Stop the Silent Failures",
       "hours": "~18-26h",
