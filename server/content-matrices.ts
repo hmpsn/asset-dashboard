@@ -16,6 +16,7 @@ import type {
 import { createLogger } from './logger.js';
 import { PAGE_TYPE_SCHEMA_MAP, type SchemaPageType } from './schema-suggester.js';
 import { queueSchemaPreGeneration, markSchemaStale } from './schema-queue.js';
+import { validateTransition, MATRIX_CELL_TRANSITIONS } from './state-machines.js';
 
 /**
  * Resolve the combined primary + secondary Schema.org types for a template's pageType.
@@ -300,8 +301,10 @@ export function updateMatrixCell(
 
   const cell = existing.cells[cellIdx];
 
-  // Record status transition in history
+  // Guard + record status transition in history
   if (updates.status && updates.status !== cell.status) {
+    // Throws InvalidTransitionError for illegal moves — caller (route handler) catches and returns 500
+    validateTransition('matrix_cell', MATRIX_CELL_TRANSITIONS, cell.status, updates.status);
     const history = cell.statusHistory || [];
     history.push({ from: cell.status, to: updates.status, at: new Date().toISOString() });
     updates = { ...updates, statusHistory: history } as typeof updates;

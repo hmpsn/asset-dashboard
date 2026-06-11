@@ -10,6 +10,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getUploadRoot } from './data-dir.js';
 import { sanitizePlainText } from './html-sanitize.js';
+import { validateTransition, InvalidTransitionError, REQUEST_TRANSITIONS } from './state-machines.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 
@@ -158,6 +159,16 @@ export function updateRequest(workspaceId: string, id: string, updates: Partial<
     if (v !== undefined) cleanUpdates[k] = v;
   }
   const merged = { ...existing, ...cleanUpdates, updatedAt: new Date().toISOString() };
+
+  // Guard status transitions — illegal moves return null (matches not-found contract)
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    try {
+      validateTransition('request', REQUEST_TRANSITIONS, existing.status, updates.status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return null;
+      throw err;
+    }
+  }
 
   stmts().update.run({
     id: merged.id,

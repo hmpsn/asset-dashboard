@@ -429,6 +429,8 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   emerging_keyword: { label: 'View strategy', tab: 'strategy' },
   freshness_alert: { label: 'View strategy', tab: 'strategy' },
   lost_visibility: { label: 'View search data', tab: 'performance' },
+  audit_finding: { label: 'View site health', tab: 'health' },
+  milestone_attribution: { label: 'View performance', tab: 'performance' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

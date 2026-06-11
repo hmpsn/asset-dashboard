@@ -214,8 +214,147 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'keyword_cluster': {
+      const label = data.label as string | undefined;
+      const queries = data.queries as unknown[] | undefined;
+      const queryCount = Array.isArray(queries) ? queries.length : undefined;
+      if (label) {
+        headline = queryCount !== undefined
+          ? `${queryCount} quer${queryCount === 1 ? 'y' : 'ies'} clustered under "${label}"`
+          : `keyword cluster: "${label}"`;
+      } else {
+        headline = 'keyword cluster identified';
+      }
+      const avgPosition = data.avgPosition as number | undefined;
+      if (avgPosition !== undefined) contextParts.push(`Avg position ${avgPosition.toFixed(1)}`);
+      break;
+    }
+
+    case 'competitor_gap': {
+      const keyword = data.keyword as string | undefined;
+      const competitorPos = data.competitorPosition as number | undefined;
+      if (keyword && competitorPos !== undefined) {
+        headline = `"${keyword}" — competitor at #${competitorPos}`;
+      } else if (keyword) {
+        headline = `competitor gap: "${keyword}"`;
+      } else {
+        headline = 'competitor keyword gap';
+      }
+      const ourPosition = data.ourPosition as number | null | undefined;
+      contextParts.push(`Our position: ${ourPosition != null ? `#${ourPosition}` : 'not ranking'}`);
+      break;
+    }
+
+    case 'strategy_alignment': {
+      const alignedCount = data.alignedCount as number | undefined;
+      const misalignedCount = data.misalignedCount as number | undefined;
+      const untrackedCount = data.untrackedCount as number | undefined;
+      if (alignedCount !== undefined && misalignedCount !== undefined) {
+        headline = `${alignedCount} aligned, ${misalignedCount} misaligned pages`;
+      } else {
+        headline = 'strategy alignment review';
+      }
+      if (untrackedCount !== undefined && untrackedCount > 0) {
+        contextParts.push(`${untrackedCount} untracked`);
+      }
+      break;
+    }
+
+    case 'anomaly_digest': {
+      const anomalyType = data.anomalyType as string | undefined;
+      const deviationPercent = data.deviationPercent as number | undefined;
+      if (anomalyType && deviationPercent !== undefined) {
+        headline = `${anomalyType.replace(/_/g, ' ')} — ${Math.abs(Math.round(deviationPercent))}% deviation`;
+      } else if (anomalyType) {
+        headline = `anomaly: ${anomalyType.replace(/_/g, ' ')}`;
+      } else {
+        headline = 'anomaly detected';
+      }
+      const durationDays = data.durationDays as number | undefined;
+      if (durationDays !== undefined) {
+        contextParts.push(`${durationDays} day${durationDays !== 1 ? 's' : ''} ongoing`);
+      }
+      break;
+    }
+
+    case 'site_health': {
+      const siteScore = data.siteScore as number | undefined;
+      if (siteScore !== undefined) {
+        headline = `Site health: ${siteScore}/100`;
+      } else {
+        headline = 'site health summary';
+      }
+      const scoreDelta = data.scoreDelta as number | null | undefined;
+      if (scoreDelta != null && scoreDelta !== 0) {
+        const sign = scoreDelta > 0 ? '+' : '';
+        contextParts.push(`${sign}${scoreDelta} from last audit`);
+      }
+      break;
+    }
+
+    case 'emerging_keyword': {
+      const keyword = data.keyword as string | undefined;
+      if (keyword) {
+        headline = `"${keyword}" — rising trend`;
+      } else {
+        headline = 'emerging keyword opportunity';
+      }
+      const volume = data.volume as number | undefined;
+      if (volume !== undefined) contextParts.push(`Vol. ${fmtNum(volume)}`);
+      const difficulty = data.difficulty as number | undefined;
+      if (difficulty !== undefined) contextParts.push(`Difficulty: ${difficulty}`);
+      break;
+    }
+
+    case 'competitor_alert': {
+      const competitorDomain = data.competitorDomain as string | undefined;
+      const alertType = data.alertType as string | undefined;
+      if (competitorDomain && alertType) {
+        headline = `${competitorDomain} ${alertType.replace(/_/g, ' ')}`;
+      } else if (competitorDomain) {
+        headline = `competitor alert: ${competitorDomain}`;
+      } else {
+        headline = 'competitor movement detected';
+      }
+      const keyword = data.keyword as string | undefined;
+      if (keyword) contextParts.push(`"${keyword}"`);
+      const positionChange = data.positionChange as number | undefined;
+      if (positionChange !== undefined && positionChange !== 0) {
+        const sign = positionChange > 0 ? '+' : '';
+        contextParts.push(`${sign}${positionChange} positions`);
+      }
+      break;
+    }
+
+    case 'freshness_alert': {
+      const daysSince = data.daysSinceLastAnalysis as number | undefined;
+      if (daysSince !== undefined) {
+        headline = `Content last analyzed ${daysSince}d ago`;
+      } else {
+        headline = 'content freshness alert';
+      }
+      const impressions = data.impressions as number | undefined;
+      if (impressions !== undefined) contextParts.push(`${fmtNum(impressions)} impressions at risk`);
+      break;
+    }
+
+    case 'milestone_attribution': {
+      const daysSinceDelivery = data.daysSinceDelivery as number | undefined;
+      const thresholdCrossed = data.thresholdCrossed as string | undefined;
+      if (daysSinceDelivery !== undefined && typeof thresholdCrossed === 'string') {
+        headline = `Brief delivered ${daysSinceDelivery}d ago crossed ${thresholdCrossed.replace(/_/g, ' ')}`;
+      } else {
+        headline = 'content milestone reached';
+      }
+      const currentClicks = data.currentClicks as number | undefined;
+      if (currentClicks !== undefined) contextParts.push(`${fmtNum(currentClicks)} clicks tracked`);
+      break;
+    }
+
     default: {
-      headline = insight.insightType.replace(/_/g, ' ');
+      // Exhaustive switch — all InsightType cases are handled above.
+      // This branch exists as a runtime safety net for unexpected values.
+      headline = (insight.insightType as string).replace(/_/g, ' ');
       break;
     }
   }

@@ -219,10 +219,13 @@ export function getDeliverableTransitions(type: string): Readonly<Record<string,
 // (server/content-matrices.ts) is currently any-to-any (CP-K4 gap) — this map brings
 // it under validateTransition during the content_plan cutover (design §4.4, M6).
 // Forward pipeline with the operator send-back edges (review→draft, flagged→draft).
+// Admin shortcuts included:
+//   planned/keyword_validated/brief_generated → review  (send-samples admin action)
+//   planned/keyword_validated/brief_generated → approved (batch-approve admin action)
 export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
-  planned:           ['keyword_validated', 'brief_generated', 'draft'],
-  keyword_validated: ['brief_generated', 'draft', 'planned'],
-  brief_generated:   ['draft', 'keyword_validated'],
+  planned:           ['keyword_validated', 'brief_generated', 'draft', 'review', 'approved'],
+  keyword_validated: ['brief_generated', 'draft', 'planned', 'review', 'approved'],
+  brief_generated:   ['draft', 'keyword_validated', 'review', 'approved'],
   draft:             ['review', 'brief_generated'],
   review:            ['flagged', 'approved', 'draft'],
   flagged:           ['review', 'draft', 'approved'],

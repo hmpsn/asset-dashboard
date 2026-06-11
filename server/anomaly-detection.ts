@@ -26,7 +26,7 @@ import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
-import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams, deleteStaleInsightsByType } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
@@ -533,6 +533,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
     }
   }
   log.info('Starting anomaly detection scan...');
+  const cycleStart = new Date().toISOString();
   const workspaces = listWorkspaces();
   const existingCount = (stmts().selectAll.all() as AnomalyRow[]).length;
   const allNew: Anomaly[] = [];
@@ -703,6 +704,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
 
         // Invalidate intelligence cache AFTER all insight writes complete
         invalidateIntelligenceCache(ws.id);
+
+        // ── G2: Prune stale anomaly_digest insight rows ──────────────────────
+        // deleteStaleInsightsByType removes rows whose computed_at < cycleStart that were
+        // NOT refreshed this cycle. Called unconditionally here (outside try) so that a
+        // failed detection run still prunes rows minted by a previous successful run that
+        // are no longer valid. Mirrors the competitor_alert cleanup pattern (analytics-
+        // insights.md §8.2 — outside try, outside workspace-guard).
+        deleteStaleInsightsByType(ws.id, 'anomaly_digest', cycleStart);
 
         // ── Bridge #10: Anomaly → boost existing insight severity ──────────
         // When anomalies are detected, boost insights in the MATCHING domain
