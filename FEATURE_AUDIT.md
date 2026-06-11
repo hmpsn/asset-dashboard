@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **484 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **486 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 486. Cross-workspace platform_learnings priors — anonymized win-rate fallback tier (A6, audit #22)
+
+**What it does:** Gives a workspace with no measured outcomes of its own a real signal instead of nothing. A new platform-level store (`platform_learnings_priors`, migration 133) aggregates a single win rate per `actionType` across *every* workspace, computed from the same `tracked_actions` + `action_outcomes` join the per-workspace learnings engine reads (latest qualifying 30/60/90-day conclusive outcome per action; `not_acted_on` excluded per A1). It is anonymized **by construction** — the stored row holds only `(action_type, win_rate, contributing_workspaces, scored_actions, computed_at)`, with no workspace id, page URL, title, or keyword, mirroring the `keyword_metrics_cache` precedent. Two privacy/honesty floors gate publication: a **cohort floor** of ≥3 distinct contributing workspaces (below which a single workspace's data could be reverse-identified) and a **sample floor** of ≥5 scored actions; a type that clears neither is simply absent (FM-2 — never a fabricated baseline). The fallback seam lives in `server/outcome-learning-default-path.ts`: a new `buildPlatformPriorAdjustment()` applies a deliberately *smaller* score nudge than own-history, and `buildOutcomeLearningStatusNote()` appends a clearly-labeled cross-workspace benchmark line — but **only** when the workspace's own `LearningsSlice.availability` is `no_data` or `degraded`. The availability switch stays authoritative: a `ready` workspace keeps its own learnings and never sees a prior, and an admin-`disabled` workspace suppresses priors too. The intelligence slice populates `LearningsSlice.platformPriors` on the same fallback condition, and a weekly cron (`server/outcome-crons.ts`, mirroring A5's EMV calibration block) recomputes the aggregate.
+
+**Agency value:** A brand-new client — or one whose learnings subsystem hiccuped on a run — no longer falls back to pure generic best practices. Keyword recommendation prompts (the first wired consumer — `server/keyword-recommendations.ts` threads `LearningsSlice.platformPriors` through `buildOutcomeLearningStatusNote`) get a measured, clearly-labeled platform-wide prior for each action type as a stopgap until the workspace accrues its own history, all without any per-workspace privacy exposure. The remaining `buildOutcomeLearningStatusNote` callers (content-brief, content-decay, keyword-strategy-ai-synthesis) and the score-adjustment helper are wired as follow-ups on the same contract.
+
+**Client value:** Recommendations for a new account are informed by what has actually worked across the agency's whole book of business, presented honestly as a cross-workspace benchmark — never dressed up as that client's own results.
+
+**Mutual:** Establishes a privacy-safe cross-workspace learning tier (aggregates-only, cohort-floored) that any future consumer can read, with the anonymization contract pinned by a schema-level test and the honesty labeling pinned in the prompt-note helper.
+
+**Files:** `server/db/migrations/133-platform-learnings-priors.sql`, `server/platform-learnings-priors.ts` (store + recompute + floors), `server/outcome-learning-default-path.ts` (`buildPlatformPriorAdjustment`, `buildPlatformPriorPromptNote`, extended status note), `shared/types/intelligence.ts` (`PlatformPriorEntry` + `LearningsSlice.platformPriors`), `server/intelligence/learnings-slice.ts` (fallback-tier population), `server/outcome-crons.ts` (weekly cron), `scripts/pr-check.ts` (KNOWN_UNRENDERED_FIELDS). Tests: `tests/integration/a6-platform-learnings-priors.test.ts`.
 
 ---
 

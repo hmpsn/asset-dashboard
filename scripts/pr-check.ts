@@ -609,6 +609,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // LearningsSlice
   // availability is control-plane metadata for callers; it intentionally does not render into prompt text
   'availability', 'forPage', 'winRateByActionType',
+  // platformPriors (A6, audit #22): the anonymized cross-workspace fallback tier. It is NOT
+  // rendered by the learnings slice formatter — it is surfaced as a clearly-labeled benchmark
+  // through the default-path helpers (buildPlatformPriorPromptNote / buildOutcomeLearningStatusNote)
+  // only when the workspace's own availability is no_data/degraded, so callers control the labeling.
+  'platformPriors',
   // SiteHealthSlice
   // PageProfileSlice
   // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent

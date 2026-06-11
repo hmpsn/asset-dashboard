@@ -376,6 +376,9 @@ export async function getKeywordRecommendations(
   const outcomeLearningStatusNote = buildOutcomeLearningStatusNote(
     recommendationContext?.learningsAvailability,
     'strategy',
+    // A6: on the no_data/degraded fallback tiers this appends the clearly-labeled
+    // cross-workspace benchmark; on ready/disabled it is a no-op inside the helper.
+    learnings?.platformPriors,
   );
 
   const seed = seedMetrics[0];

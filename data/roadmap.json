@@ -2946,6 +2946,16 @@
           "shippedAt": "2026-06-11",
           "owner": "outcomes",
           "notes": "Mounted OutcomeSummary ('Your results' tiered scorecard) and backported WinsSurface (wins ledger, owner decision #23) onto the LIVE legacy client Overview (no briefing-v2 work). Fixed the fabricated '<action_type> action' recommendation string in GET /api/public/outcomes/:wsId/wins — real source titles resolved via sourceType/sourceId (recommendation/client_action/post/brief/content_request) with an honest exhaustive per-ActionType generic fallback. Public summary now serializes the full scorecard (strongWinRate + pendingMeasurement were omitted → NaN% in the component). TopWin/OutcomeWinEntry gained sourceType/sourceId/attributedValue; attributed_value renders in admin OutcomeTopWins and client WinsSurface (blue=data). OutcomeSummary trimmed to show its empty state until totalScored > 0. WS refresh already wired (OUTCOME_SCORED → client-outcome-* invalidation). Tests: tests/integration/e5-client-outcome-scorecard.test.ts (public read paths), tests/component/OutcomeSummary.test.tsx, tests/unit/WinsSurface.test.tsx extended."
+        },
+        {
+          "id": "core-a6-platform-learnings-priors",
+          "title": "A6 — Cross-workspace platform_learnings priors (audit #22)",
+          "source": "Core-features remediation master plan 2026-06-10 — lane A, gated on A1 staging-verified",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-06-11",
+          "owner": "outcomes",
+          "notes": "Anonymized cross-workspace win-rate priors as the no_data/degraded FALLBACK tier for the Outcome Learning default path (pattern precedent: keyword_metrics_cache). New table platform_learnings_priors (migration 133) + store server/platform-learnings-priors.ts aggregate one win rate per actionType across ALL workspaces from the same tracked_actions+action_outcomes join the per-workspace learnings engine reads (latest qualifying 30/60/90 conclusive outcome per action; not_acted_on excluded per A1). Anonymized by construction — the row holds only (action_type, win_rate, contributing_workspaces, scored_actions, computed_at): no workspace id/url/title/keyword. Two floors gate publication: cohort floor ≥3 distinct workspaces (reverse-id protection) + sample floor ≥5 scored actions; below either → absent (FM-2, never fabricated). Fallback seam in server/outcome-learning-default-path.ts (buildPlatformPriorAdjustment — a smaller nudge than own-history; buildPlatformPriorPromptNote/extended status note — labeled cross-workspace, never the workspace's own results) acts ONLY when own LearningsSlice.availability is no_data/degraded; ready keeps own learnings, disabled suppresses priors. LearningsSlice.platformPriors populated by the assembler on the same condition. Weekly cron in server/outcome-crons.ts (mirrors A5's EMV calibration block, 60s warmup). Tests: tests/integration/a6-platform-learnings-priors.test.ts."
         }
       ],
       "shippedAt": "2026-06-11"
