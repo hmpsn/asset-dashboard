@@ -12,9 +12,7 @@ import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import { updateJob, unregisterAbort } from './jobs.js';
 import { createLogger } from './logger.js';
-import { broadcastToWorkspace } from './broadcast.js';
-import { generateLlmsTxt } from './llms-txt-generator.js';
-import { WS_EVENTS } from './ws-events.js';
+import { generateLlmsTxt, storeResult } from './llms-txt-generator.js';
 
 const log = createLogger('llms-txt-generation-job');
 
@@ -35,10 +33,11 @@ export async function runLlmsTxtGenerationJob({
 
     const result = await generateLlmsTxt(workspaceId);
 
-    broadcastToWorkspace(workspaceId, WS_EVENTS.LLMS_TXT_GENERATED, {
-      pageCount: result.pageCount,
-      generatedAt: result.generatedAt,
-    });
+    // Persist the result so GET routes can serve it without re-crawling.
+    storeResult(workspaceId, result);
+
+    // I-2: useJobProgress already invalidates the llmsTxtResult + llmsTxtFreshness
+    // React Query keys when the job reaches 'done', so no WS broadcast is needed.
 
     updateJob(jobId, {
       status: 'done',

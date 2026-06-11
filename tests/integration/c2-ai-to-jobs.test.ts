@@ -460,7 +460,86 @@ describe('POST /api/aeo-review/:wsId/site — non-existent workspace guard', () 
   });
 });
 
-// ─── 5. Cross-cutting: all routes return { jobId } shape ─────────────────────
+// ─── 5. POST /api/jobs dispatcher covers all 4 C2 job types (C-1 regression guard) ──
+
+describe('POST /api/jobs dispatcher — 4 C2 job types must not return 400 "Unknown job type"', () => {
+  it('BLUEPRINT_GENERATION via POST /api/jobs: returns { jobId }, job reaches done', async () => {
+    const ws = makeWorkspace('C1 Dispatch Blueprint');
+
+    const { startRes, startBody, job } = await startJobAndWait(
+      '/api/jobs',
+      { type: 'blueprint-generation', params: { workspaceId: ws.id, industryType: 'SaaS' } },
+    );
+
+    expect(startRes.status).toBe(200);
+    expect(typeof startBody.jobId).toBe('string');
+    expect(job?.status).toBe('done');
+  });
+
+  it('COPY_ENTRY_GENERATION via POST /api/jobs: returns { jobId }, job reaches done', async () => {
+    const ws = makeWorkspace('C1 Dispatch Copy');
+    const bp = createBlueprint({ workspaceId: ws.id, name: 'Dispatch BP' });
+    const entry = addEntry(ws.id, bp.id, { name: 'Landing Page', pageType: 'landing' });
+    if (!entry) throw new Error('addEntry returned null');
+
+    const { startRes, startBody, job } = await startJobAndWait(
+      '/api/jobs',
+      { type: 'copy-entry-generation', params: { workspaceId: ws.id, blueprintId: bp.id, entryId: entry.id } },
+    );
+
+    expect(startRes.status).toBe(200);
+    expect(typeof startBody.jobId).toBe('string');
+    expect(job?.status).toBe('done');
+  });
+
+  it('LLMS_TXT_GENERATION via POST /api/jobs: returns { jobId }, job reaches done', async () => {
+    const ws = makeWorkspace('C1 Dispatch LlmsTxt');
+
+    const { startRes, startBody, job } = await startJobAndWait(
+      '/api/jobs',
+      { type: 'llms-txt-generation', params: { workspaceId: ws.id } },
+    );
+
+    expect(startRes.status).toBe(200);
+    expect(typeof startBody.jobId).toBe('string');
+    expect(job?.status).toBe('done');
+  });
+
+  it('AEO_SITE_REVIEW via POST /api/jobs: workspace without Webflow returns 400, not "Unknown job type"', async () => {
+    // A workspace without webflowSiteId should get a meaningful 400 (not "Unknown job type")
+    const ws = makeWorkspace('C1 Dispatch AEO No Webflow');
+
+    const res = await postJson('/api/jobs', {
+      type: 'aeo-site-review',
+      params: { workspaceId: ws.id, maxPages: 5 },
+    });
+    // Without webflowSiteId it returns 400 "No Webflow site linked" — not 400 "Unknown job type"
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).not.toBe('Unknown job type: aeo-site-review');
+    expect(body.error).toContain('Webflow');
+  });
+
+  it('AEO_SITE_REVIEW via POST /api/jobs: unknown workspace returns 404', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'aeo-site-review',
+      params: { workspaceId: 'nonexistent-ws', maxPages: 5 },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('unknown job type still returns 400 "Unknown job type"', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'not-a-real-job-type',
+      params: { workspaceId: 'some-ws' },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('Unknown job type');
+  });
+});
+
+// ─── 7. Cross-cutting: all routes return { jobId } shape ─────────────────────
 
 describe('jobId shape contract: all C2 async generation endpoints', () => {
   it('blueprint generate returns { jobId: string } (not old sync body)', async () => {

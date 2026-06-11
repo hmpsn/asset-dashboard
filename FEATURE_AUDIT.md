@@ -7505,6 +7505,22 @@ Service and location page brief defaults are now shorter and more conversion-den
 
 **Files:** `server/schema-plan-generation-job.ts` (NEW); `server/routes/jobs.ts`; `server/routes/webflow-schema.ts`; `server/domains/inbox/schema-plan-respond.ts`; `server/ws-events.ts`; `shared/types/background-jobs.ts`; `shared/types/schema-plan.ts`; `src/api/schema.ts`; `src/components/schema/SchemaPlanPanel.tsx`; `src/hooks/useWsInvalidation.ts`; `src/lib/queryKeys.ts`; `src/lib/wsEvents.ts`; `tests/integration/schema-plan-generation-job-mutation-safety.test.ts` (NEW); `tests/contract/background-job-coverage-contract.test.ts`; `tests/contract/mutation-safety-route-matrix.test.ts`; `tests/contract/schema-snapshot-invalidation.test.ts`; `tests/unit/background-jobs.test.ts`; `tests/unit/shared-types-validation.test.ts`; `tests/e2e/client-workflow-smoke.spec.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
+### 457. C2: Sync AI Routes → Background Job Platform (Review-Pass Fix)
+
+**What it does:** Closes four code-review findings on the C2 migration (PR core-c2-sync-ai-to-jobs):
+
+- **C-1 (CRITICAL):** Added the four missing `switch` cases to `POST /api/jobs` dispatcher (`copy-entry-generation`, `blueprint-generation`, `llms-txt-generation`, `aeo-site-review`). The route-specific `/generate` endpoints already worked, but `useBackgroundTasks.startJob()` posts to `/api/jobs` — these types fell through to the default 400. Now the generic dispatcher delegates to the same job runners. Integration tests added that drive all four types via `/api/jobs` (the real frontend path).
+
+- **I-1 (IMPORTANT):** Implemented the stored-read path for LLMs.txt GET routes. Added migration `130-llms-txt-stored-result` (new `llms_txt_stored_result` table), `storeResult()`/`getStoredResult()` functions, and persistence in the job runner. GET routes now serve the stored blob (returning 404 when none exists) instead of calling `generateLlmsTxt()` inline and triggering a full Webflow crawl on every tab visit.
+
+- **I-2 (IMPORTANT):** Dropped the two unused WS broadcasts (`LLMS_TXT_GENERATED`, `AEO_SITE_REVIEW_COMPLETE`) from their job runners. `useJobProgress` already handles UI refresh via React Query invalidation on job completion; the broadcasts had no frontend consumers.
+
+- **M-1:** Added pr-check rule `C2-migrated generators must not be called synchronously in route handlers` that flags direct calls to `generateLlmsTxt`, `generateBlueprint`, `generateCopyForEntry`, or `reviewSitePages` inside `server/routes/` files. Prevents regression to the sync-AI pattern.
+
+**Boundaries:** No new client-facing surfaces. Migration 130 is additive (no existing rows touched). The AEO GET route (`GET /api/aeo-review/:workspaceId`) is unchanged — it already loads from disk.
+
+**Files:** `server/routes/jobs.ts`; `server/legacy-jobs-runner-registry.ts`; `server/llms-txt-generation-job.ts`; `server/aeo-site-review-job.ts`; `server/llms-txt-generator.ts`; `server/routes/llms-txt.ts`; `server/db/migrations/130-llms-txt-stored-result.sql` (NEW); `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `tests/integration/c2-ai-to-jobs.test.ts`; `FEATURE_AUDIT.md`.
+
 ### 456. Keyword Strategy Generation-Quality Telemetry Persistence
 **What it does:** Persists the `GenerationQuality` telemetry computed on every keyword-strategy generation run (pool size, AI-returned count, suppressed count, backfilled count, deterministic-floor hit) into a new workspace-scoped `generation_quality` table (migration 129) via `server/generation-quality-store.ts` — previously log-only, so generation-health history evaporated. Also upgrades the `keyword-site-synthesis` operation (the platform's highest-leverage AI call) from `gpt-5.4-mini`/3000 tokens to `gpt-5.4`/4500 tokens, and re-attaches `siteKeywordMetrics` in the admin strategy GET (paid metrics had silently vanished from the admin UI after the table-strip migration; the guard test now uses divergent fixtures so the omission can never mask again).
 

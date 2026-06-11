@@ -12,7 +12,6 @@ import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import { updateJob, unregisterAbort } from './jobs.js';
 import { createLogger } from './logger.js';
-import { broadcastToWorkspace } from './broadcast.js';
 import { getWorkspace } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
@@ -21,7 +20,6 @@ import { isContentPage, isExcludedPage } from './audit-page.js';
 import { normalizePageUrl, resolvePagePath, decodeEntities } from './helpers.js';
 import { reviewSitePages } from './aeo-page-review.js';
 import { getDataDir } from './data-dir.js';
-import { WS_EVENTS } from './ws-events.js';
 import type { SeoIssue } from './seo-audit.js';
 
 const log = createLogger('aeo-site-review-job');
@@ -183,10 +181,8 @@ export async function runAeoSiteReviewJob({
     // Save to disk (same location as the existing GET /api/aeo-review/:workspaceId reader)
     saveReview(workspaceId, result);
 
-    broadcastToWorkspace(workspaceId, WS_EVENTS.AEO_SITE_REVIEW_COMPLETE, {
-      pageCount: result.pages.length,
-      quickWins: result.quickWins,
-    });
+    // I-2: AeoReview component loads the stored result from disk on mount and passes
+    // queryKeys: [] to useJobProgress. No WS broadcast is needed for UI refresh.
 
     updateJob(jobId, {
       status: 'done',

@@ -7,12 +7,13 @@
  * GET  /api/llms-txt/:workspaceId/download-full — download stored llms-full.txt
  * GET  /api/llms-txt/:workspaceId/freshness   — return last generation timestamp (fast)
  *
- * Generation is async: use POST /generate to kick off a new run, then poll
- * GET /api/jobs/:jobId for status. GET endpoints serve the cached result stored
- * by the previous successful generation.
+ * Generation is async: use POST /generate to kick off a new run (returns { jobId }),
+ * then poll GET /api/jobs/:jobId for status. GET endpoints serve the stored result
+ * persisted by the job runner — they do NOT trigger a fresh crawl or AI generation.
+ * If no result has been stored yet, they return 404.
  */
 import { Router } from 'express';
-import { generateLlmsTxt, getLastGenerated } from '../llms-txt-generator.js';
+import { getStoredResult, getLastGenerated } from '../llms-txt-generator.js';
 import { createLogger } from '../logger.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { getWorkspace } from '../workspaces.js';
@@ -48,47 +49,32 @@ router.get('/api/llms-txt/:workspaceId/freshness', requireWorkspaceAccess('works
   }
 });
 
-// GET /api/llms-txt/:workspaceId/download — serve stored llms.txt index
-// Falls back to generating on-demand for backward compatibility.
-router.get('/api/llms-txt/:workspaceId/download', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const result = await generateLlmsTxt(req.params.workspaceId);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="llms.txt"');
-    res.send(result.content);
-  } catch (err) {
-    log.error({ err }, 'Failed to download LLMs.txt');
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: msg });
-  }
+// GET /api/llms-txt/:workspaceId/download — serve stored llms.txt (index).
+// Returns 404 if no generation has completed yet. Does NOT trigger a fresh crawl.
+router.get('/api/llms-txt/:workspaceId/download', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const result = getStoredResult(req.params.workspaceId);
+  if (!result) return res.status(404).json({ error: 'No LLMs.txt has been generated yet. Use POST /generate to kick off generation.' });
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="llms.txt"');
+  res.send(result.content);
 });
 
-// GET /api/llms-txt/:workspaceId/download-full — serve stored llms-full.txt
-// Falls back to generating on-demand for backward compatibility.
-router.get('/api/llms-txt/:workspaceId/download-full', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const result = await generateLlmsTxt(req.params.workspaceId);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="llms-full.txt"');
-    res.send(result.fullContent);
-  } catch (err) {
-    log.error({ err }, 'Failed to download llms-full.txt');
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: msg });
-  }
+// GET /api/llms-txt/:workspaceId/download-full — serve stored llms-full.txt.
+// Returns 404 if no generation has completed yet. Does NOT trigger a fresh crawl.
+router.get('/api/llms-txt/:workspaceId/download-full', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const result = getStoredResult(req.params.workspaceId);
+  if (!result) return res.status(404).json({ error: 'No LLMs.txt has been generated yet. Use POST /generate to kick off generation.' });
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="llms-full.txt"');
+  res.send(result.fullContent);
 });
 
-// GET /api/llms-txt/:workspaceId — return last stored result as JSON
-// Falls back to generating on-demand for backward compatibility.
-router.get('/api/llms-txt/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const result = await generateLlmsTxt(req.params.workspaceId);
-    res.json(result);
-  } catch (err) {
-    log.error({ err }, 'Failed to get LLMs.txt');
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: msg });
-  }
+// GET /api/llms-txt/:workspaceId — return last stored result as JSON.
+// Returns 404 if no generation has completed yet. Does NOT trigger a fresh crawl.
+router.get('/api/llms-txt/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const result = getStoredResult(req.params.workspaceId);
+  if (!result) return res.status(404).json({ error: 'No LLMs.txt has been generated yet. Use POST /generate to kick off generation.' });
+  res.json(result);
 });
 
 export default router;
