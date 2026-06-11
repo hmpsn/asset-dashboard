@@ -22,6 +22,9 @@ import {
   recordAction,
   updateActionContext,
   WIN_SCORES,
+  getOverviewStats,
+  getActionIdsByWorkspace,
+  getWinRateForActionIds,
 } from '../outcome-tracking.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
@@ -142,43 +145,63 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
 
 // GET /api/outcomes/overview — Multi-workspace overview
 // LITERAL route — must come BEFORE param routes to avoid shadowing
-router.get('/api/outcomes/overview', async (_req, res) => {
+//
+// A2 (audit #10): replaced the O(W×A) per-action loops with 4 aggregate queries
+// per workspace. Behavioral parity contract:
+//   - winRate / trend / totalScored / totalWins: match computeScorecard() loop semantics
+//     (not_acted_on NOT filtered — computeScorecard includes them)
+//   - scoredLast30d: distinct actions with ANY outcome measured in last 30d (any score)
+//   - topWin: uses getTopWinsForWorkspace which filters not_acted_on (A1 exclusion)
+//   - activeActions: getWorkspaceCounts().pending = COUNT WHERE measurement_complete=0
+// See docs/superpowers/plans/2026-06-10-a2-outcomes-overview-sql.md.
+router.get('/api/outcomes/overview', (_req, res) => {
   try {
     const workspaces = listWorkspaces();
     const overviews: WorkspaceOutcomeOverview[] = [];
 
     for (const ws of workspaces) {
-      const counts = getWorkspaceCounts(ws.id);
-      const topWins = getTopWinsForWorkspace(ws.id, 1);
-      const scorecard = computeScorecard(ws.id);
+      // Single aggregate query replaces getWorkspaceCounts + the scoredLast30d loop
+      const stats = getOverviewStats(ws.id);
 
-      // Determine if attention is needed
-      let attentionNeeded = false;
-      let attentionReason: string | undefined;
-      if (counts.pending > 10) {
-        attentionNeeded = true;
-        attentionReason = `${counts.pending} actions awaiting measurement`;
-      } else if (scorecard.trend === 'declining') {
-        attentionNeeded = true;
-        attentionReason = 'Win rate is declining';
+      // Trend computation: split action IDs into recent/older halves and compare
+      // win rates — matches the computeScorecard() split-half trend logic exactly.
+      // getActionIdsByWorkspace returns IDs in created_at DESC order (same as getByWorkspace).
+      const allIds = getActionIdsByWorkspace(ws.id);
+      const splitIdx = Math.ceil(allIds.length / 2);
+      const recentIds = allIds.slice(0, splitIdx);
+      const olderIds = allIds.slice(splitIdx);
+      const recentRate = getWinRateForActionIds(recentIds);
+      const olderRate = getWinRateForActionIds(olderIds);
+      const overallWinRate = stats.totalScored > 0 ? stats.totalWins / stats.totalScored : 0;
+      let trend: LearningsTrend = 'stable';
+      if (recentRate.scored >= 3 && olderRate.scored > 0) {
+        const recentWinRate = recentRate.wins / recentRate.scored;
+        const olderWinRate = olderRate.wins / olderRate.scored;
+        if (recentWinRate > olderWinRate + 0.1) trend = 'improving';
+        else if (recentWinRate < olderWinRate - 0.1) trend = 'declining';
       }
 
-      // Count actions scored in last 30 days
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const recentActions = getActionsByWorkspace(ws.id);
-      let scoredLast30d = 0;
-      for (const a of recentActions) {
-        const outcomes = getOutcomesForAction(a.id);
-        if (outcomes.some(o => o.measuredAt >= thirtyDaysAgo)) scoredLast30d++;
+      // topWin uses the existing prepared query which applies the A1 not_acted_on exclusion
+      const topWins = getTopWinsForWorkspace(ws.id, 1);
+
+      // Determine if attention is needed (same thresholds as the loop version)
+      let attentionNeeded = false;
+      let attentionReason: string | undefined;
+      if (stats.pendingCount > 10) {
+        attentionNeeded = true;
+        attentionReason = `${stats.pendingCount} actions awaiting measurement`;
+      } else if (trend === 'declining') {
+        attentionNeeded = true;
+        attentionReason = 'Win rate is declining';
       }
 
       overviews.push({
         workspaceId: ws.id,
         workspaceName: ws.name,
-        winRate: scorecard.overallWinRate,
-        trend: scorecard.trend,
-        activeActions: counts.pending,
-        scoredLast30d,
+        winRate: overallWinRate,
+        trend,
+        activeActions: stats.pendingCount,
+        scoredLast30d: stats.scoredLast30d,
         topWin: topWins[0] ?? null,
         attentionNeeded,
         attentionReason,
