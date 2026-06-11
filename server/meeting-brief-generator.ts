@@ -45,7 +45,8 @@ function normalizeMeetingBriefAiOutput(
 export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): MeetingBriefMetrics {
   return {
     siteHealthScore: intel.siteHealth?.auditScore ?? null,
-    openRankingOpportunities: intel.insights?.byType?.ranking_opportunity?.length ?? 0,
+    // G3: byType is capped at 25/type — counts must come from the pre-cap countsByType rollup.
+    openRankingOpportunities: intel.insights?.countsByType?.ranking_opportunity ?? 0,
     contentInPipeline:
       (intel.contentPipeline?.briefs?.total ?? 0) +
       (intel.contentPipeline?.posts?.total ?? 0),
@@ -158,7 +159,7 @@ export function buildPromptHash(
     // result must bust the cache even when the action ID stays the same.
     topWins: intel.learnings?.topWins?.slice(0, 5).map(w => `${w.actionId}:${w.score}:${w.delta?.delta_percent ?? 0}`) ?? [],
     criticalIssues: intel.insights?.bySeverity?.critical,
-    rankingOpportunities: intel.insights?.byType?.ranking_opportunity?.length,
+    rankingOpportunities: intel.insights?.countsByType?.ranking_opportunity,
     priorities: intel.clientSignals?.effectiveBusinessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
     localSeo: intel.localSeo ? {

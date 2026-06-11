@@ -228,8 +228,27 @@ export interface SeoContextSlice {
 }
 
 export interface InsightsSlice {
+  /** Top 100 by impactScore — the prompt-facing bound. Full-iteration consumers read this. */
   all: AnalyticsInsight[];
+  /**
+   * Top 25 per type ordered by impactScore desc (G3 cap — prompt-size guard).
+   * NEVER compute counts or totals from these lists: use `countsByType` instead.
+   */
   byType: Partial<Record<InsightType, AnalyticsInsight[]>>;
+  /**
+   * Full PRE-cap insight counts per type, computed from the complete workspace set
+   * before the `byType` 25-per-type cap is applied. The authoritative source for
+   * any "how many insights of type X" read.
+   */
+  countsByType: Partial<Record<InsightType, number>>;
+  /**
+   * Full PRE-cap type×severity count matrix (same complete-set basis as
+   * `countsByType`). For consumers that need jointly-filtered totals — e.g. the
+   * client portal summary excludes admin-only types AND positive severity, which
+   * neither `countsByType` nor `bySeverity` alone can express.
+   */
+  countsByTypeBySeverity: Partial<Record<InsightType, Record<InsightSeverity, number>>>;
+  /** Full PRE-cap severity counts, computed from the complete workspace set. */
   bySeverity: Record<InsightSeverity, number>;
   topByImpact: AnalyticsInsight[];
   forPage?: AnalyticsInsight[];

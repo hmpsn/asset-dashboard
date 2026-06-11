@@ -69,6 +69,7 @@ function makeIntel(overrides: Record<string, unknown> = {}): Record<string, unkn
     siteHealth: { auditScore: 81, auditScoreDelta: 5 },
     insights: {
       byType: { ranking_opportunity: [{ id: 'i1' }, { id: 'i2' }] },
+      countsByType: { ranking_opportunity: 2 },
       bySeverity: { critical: 3 },
       topByImpact: [{
         id: 'top_1',

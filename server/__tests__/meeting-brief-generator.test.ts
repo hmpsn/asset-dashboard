@@ -36,6 +36,10 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     byType: {
       ranking_opportunity: [buildInsight({ id: '1' }), buildInsight({ id: '2' }), buildInsight({ id: '3' })],
     },
+    countsByType: { ranking_opportunity: 3 },
+    countsByTypeBySeverity: {
+      ranking_opportunity: { critical: 0, warning: 0, opportunity: 3, positive: 0 },
+    },
     bySeverity: { critical: 2, warning: 5, opportunity: 8, positive: 3 },
     topByImpact: [
       buildInsight({

@@ -5,17 +5,22 @@ import { matchPageIdentity } from '../helpers.js';
 
 const log = createLogger('workspace-intelligence/insights');
 
+/**
+ * Per-type cap on `byType` lists (G3 prompt/payload-size guard — see
+ * docs/rules/workspace-intelligence.md). `countsByType` preserves the full
+ * pre-cap totals; count consumers must read that, never these list lengths.
+ */
+const INSIGHTS_PER_TYPE_CAP = 25;
+
+/**
+ * Returns the slice's prompt-facing insight list (`all`, top 100 by impactScore desc).
+ *
+ * G3: `byType` is capped at 25 per type, so it can no longer reconstruct full coverage —
+ * this helper reads `all` directly. Consumers that need full PRE-cap counts must use
+ * `insights.countsByType` / `insights.bySeverity`, never the lengths of these lists.
+ */
 export function listAllInsightsFromSlice(insights: InsightsSlice): AnalyticsInsight[] {
-  const byId = new Map<string, AnalyticsInsight>();
-  for (const list of Object.values(insights.byType)) {
-    for (const insight of list ?? []) {
-      byId.set(insight.id, insight);
-    }
-  }
-  if (byId.size === 0) {
-    for (const insight of insights.all) byId.set(insight.id, insight);
-  }
-  return [...byId.values()].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
+  return [...insights.all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
 }
 
 function insightPageIdentities(insight: AnalyticsInsight): string[] {
@@ -45,12 +50,23 @@ export async function assembleInsights(
   const sorted = [...all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
   const capped = sorted.slice(0, 100);
 
-  // Group by type
+  // Group by type, capped at INSIGHTS_PER_TYPE_CAP per type. `sorted` is impact-ordered,
+  // so each capped list keeps the top-N by impactScore. countsByType carries the full
+  // PRE-cap totals — it must be computed from the complete sorted set, never from the
+  // (capped) byType list lengths.
   const byType: Partial<Record<InsightType, AnalyticsInsight[]>> = {};
+  const countsByType: Partial<Record<InsightType, number>> = {};
+  const countsByTypeBySeverity: Partial<Record<InsightType, Record<InsightSeverity, number>>> = {};
   for (const insight of sorted) {
+    countsByType[insight.insightType] = (countsByType[insight.insightType] ?? 0) + 1;
+    const severityCounts = countsByTypeBySeverity[insight.insightType]
+      ?? (countsByTypeBySeverity[insight.insightType] = { critical: 0, warning: 0, opportunity: 0, positive: 0 });
+    severityCounts[insight.severity] = (severityCounts[insight.severity] ?? 0) + 1;
     const list = byType[insight.insightType] ?? [];
-    list.push(insight);
-    byType[insight.insightType] = list;
+    if (list.length < INSIGHTS_PER_TYPE_CAP) {
+      list.push(insight);
+      byType[insight.insightType] = list;
+    }
   }
 
   // Count by severity
@@ -72,5 +88,5 @@ export async function assembleInsights(
     );
   }
 
-  return { all: capped, byType, bySeverity, topByImpact, forPage };
+  return { all: capped, byType, countsByType, countsByTypeBySeverity, bySeverity, topByImpact, forPage };
 }
