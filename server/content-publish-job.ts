@@ -21,6 +21,7 @@ import { updateJob, unregisterAbort } from './jobs.js';
 import { getPost } from './content-posts-db.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
+import { addActivity } from './activity-log.js';
 import {
   publishPostToWebflow,
   PublishPostError,
@@ -76,6 +77,16 @@ export async function runContentPublishJob({
       error: err instanceof Error ? err.message : String(err),
       message: 'Auto-publish to Webflow failed',
     });
+    // Failure activity (admin-facing — content_publish_failed is not in CLIENT_VISIBLE_TYPES):
+    // the job error alone disappears with the job's TTL; the activity entry is the durable record.
+    const failedPost = getPost(workspaceId, postId);
+    addActivity(
+      workspaceId,
+      'content_publish_failed',
+      `Auto-publish of "${failedPost?.title ?? postId}" to Webflow failed`,
+      err instanceof Error ? err.message : String(err),
+      { postId, source: 'auto-publish', code: err instanceof PublishPostError ? err.code : 'unexpected' },
+    );
   } finally {
     unregisterAbort(jobId);
   }

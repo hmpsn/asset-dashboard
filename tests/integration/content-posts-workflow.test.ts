@@ -352,6 +352,48 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
     expect(stored?.webflowItemId).toBeUndefined();
     expect(stored?.publishedAt).toBeUndefined();
     expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+
+    // The failure must leave a durable activity record (the job expires with its TTL).
+    expect(listActivity(wsId).some(a =>
+      a.type === 'content_publish_failed'
+      && (a.metadata as { postId?: string } | undefined)?.postId === post.id,
+    )).toBe(true);
+  });
+
+  it('back-to-back approvals of two different posts each get their own publish job (no silent drop)', async () => {
+    configurePublishTarget();
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items$/, { id: 'wf_concurrent_item' });
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items\/publish$/, {});
+    const postA = seedPost({ status: 'review', title: 'Concurrent A' });
+    const postB = seedPost({ status: 'review', title: 'Concurrent B' });
+
+    // Approve both before either background job has a chance to finish — a
+    // workspace-scoped hasActiveJob guard here would silently skip post B's publish.
+    const [resA, resB] = await Promise.all([
+      patchJson(`/api/content-posts/${wsId}/${postA.id}`, { status: 'approved' }),
+      patchJson(`/api/content-posts/${wsId}/${postB.id}`, { status: 'approved' }),
+    ]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+
+    await waitFor(() => {
+      const a = getPost(wsId, postA.id);
+      const b = getPost(wsId, postB.id);
+      return Boolean(a?.webflowItemId && b?.webflowItemId);
+    });
+
+    // Two Webflow creates — one per post.
+    const creates = getCapturedRequests().filter(r =>
+      r.method === 'POST' && r.endpoint === '/collections/collection_content_posts/items',
+    );
+    expect(creates).toHaveLength(2);
+
+    const publishJobs = listJobs(wsId)
+      .filter(j => j.type === BACKGROUND_JOB_TYPES.CONTENT_PUBLISH)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 2);
+    expect(publishJobs).toHaveLength(2);
+    expect(publishJobs.every(j => j.status === 'done')).toBe(true);
   });
 
   it('auto-publish job success stamps the post, broadcasts CONTENT_PUBLISHED, and logs activity', async () => {

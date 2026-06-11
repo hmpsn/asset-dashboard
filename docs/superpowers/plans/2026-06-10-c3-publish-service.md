@@ -69,7 +69,7 @@ The route calls it directly and awaits; the job runner calls it and maps the res
 | --- | --- |
 | `server/domains/content/publish-post-to-webflow.ts` | NEW — the extracted service + `PublishResult`/`PublishPostError`. |
 | `server/content-publish-job.ts` | NEW — job runner (`runContentPublishJob`), mirrors `llms-txt-generation-job.ts`. |
-| `shared/types/background-jobs.ts` | Additive `CONTENT_PUBLISH` job type + metadata (`ephemeral`, non-cancellable). |
+| `shared/types/background-jobs.ts` | Additive `CONTENT_PUBLISH` job type + metadata (`domain-store` — the job persists publish fields on the post row — non-cancellable). |
 | `server/routes/content-publish.ts` | Manual route calls the service; remove inlined field-map/broadcast/activity/outcome/follow-on. |
 | `server/routes/content-posts.ts` | Auto-publish → `createJob(CONTENT_PUBLISH)` + `setImmediate(runContentPublishJob)`. Remove inlined block + stale `// background-generation-ok` hatch. |
 | `tests/integration/content-posts-workflow.test.ts` | Auto-publish tests now assert job lifecycle (`error` surfaces, no partial stamp, summary/featuredImage field parity). |
@@ -121,14 +121,19 @@ export async function runContentPublishJob({ jobId, workspaceId, postId }): Prom
 ```
 Mirrors `llms-txt-generation-job.ts`: `updateJob(running)` → re-read post, short-circuit done if
 already `webflowItemId` → `await publishPostToWebflow(..., { activitySource:'auto-publish' })` →
-`updateJob(done, { result })`. On `PublishPostError`/any error → `updateJob(error, ...)`. The
-service already wrote partial-stamp + activity, so the job error path adds no DB writes.
+`updateJob(done, { result })`. On `PublishPostError`/any error → `updateJob(error, ...)` plus a
+durable `content_publish_failed` activity entry (review amendment I-1: the job record expires with
+the job-store TTL, so the activity log is the lasting failure record). The service already wrote
+any partial-failure stamp before throwing.
 `unregisterAbort` in `finally` (parity with the C2 pattern, though non-cancellable).
 
 Auto-publish dispatch lives in `content-posts.ts` (I own it) via `createJob` + `setImmediate`,
 NOT in `routes/jobs.ts` (owned by another lane) — the frontend never starts this job directly;
-it observes it through `useBackgroundTasks`/`useJobProgress` polling `/api/jobs`. Guard with
-`hasActiveJob(CONTENT_PUBLISH, wsId)` keyed by postId-in-message to avoid double-dispatch.
+it observes it through `useBackgroundTasks`/`useJobProgress` polling `/api/jobs`. NO dedup guard
+on dispatch (review amendment C-1): `hasActiveJob` is workspace-scoped, so it would silently drop
+the second of two back-to-back approvals of DIFFERENT posts. Same-post re-entry is already safe
+(job `webflowItemId` short-circuit + service fresh-post re-read); cross-post concurrency matches
+the legacy fire-and-forget behavior. Regression test: two approvals → two jobs → two creates.
 
 ## Tests (TDD)
 

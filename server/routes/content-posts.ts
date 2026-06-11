@@ -372,17 +372,18 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   if (req.body.status === 'approved' && previous.status !== 'approved' && !updated.webflowItemId) {
     const ws = getWorkspace(req.params.workspaceId);
     if (ws?.publishTarget && ws.webflowSiteId && getTokenForSite(ws.webflowSiteId)) {
-      const existingJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, req.params.workspaceId);
-      if (!existingJob) {
-        const publishJob = createJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, {
-          workspaceId: req.params.workspaceId,
-          message: 'Publishing to Webflow...',
-        });
-        const { workspaceId, postId } = req.params;
-        setImmediate(() => {
-          void runContentPublishJob({ jobId: publishJob.id, workspaceId, postId });
-        });
-      }
+      // Each approval gets its own job — no workspace-level hasActiveJob guard here,
+      // because that would silently drop the second of two back-to-back approvals of
+      // DIFFERENT posts (the guard cannot see postId). Same-post re-entry is already
+      // safe: the job short-circuits on webflowItemId and the service re-reads the post.
+      const publishJob = createJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, {
+        workspaceId: req.params.workspaceId,
+        message: 'Publishing to Webflow...',
+      });
+      const { workspaceId, postId } = req.params;
+      setImmediate(() => {
+        void runContentPublishJob({ jobId: publishJob.id, workspaceId, postId });
+      });
     }
   }
 

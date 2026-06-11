@@ -65,6 +65,7 @@ export type ActivityType =
   | 'brief_sent_for_review'
   | 'post_sent_for_review'
   | 'content_published'
+  | 'content_publish_failed'
   | 'aeo_review'
   | 'content_subscription'
   | 'subscription_issue'
