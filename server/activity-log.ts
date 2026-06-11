@@ -62,6 +62,7 @@ export type ActivityType =
   | 'anomaly_acknowledged'
   | 'post_generated'
   | 'post_reverted'
+  | 'post_ai_review'   // admin-only: AI review verdicts persisted (C4) — NOT client-visible
   | 'brief_sent_for_review'
   | 'post_sent_for_review'
   | 'content_published'

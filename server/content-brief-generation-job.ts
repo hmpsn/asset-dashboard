@@ -1,7 +1,8 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
-import { generateBrief } from './content-brief.js';
+import { generateBrief, updateBrief } from './content-brief.js';
 import { collectBriefEnrichment, deriveStylePageUrls } from './content-brief-scrape-enrichment.js';
+import type { BriefScrapeEnrichment } from './content-brief-scrape-enrichment.js';
 import { resolveBriefTemplateCrossref, toBriefPageType } from './content-brief-template-crossref.js';
 import { getAllSitePages } from './content-site-pages.js';
 import { getContentRequest, updateContentRequest } from './content-requests.js';
@@ -21,7 +22,7 @@ import { getWorkspace } from './workspaces.js';
 import { getSearchOverview } from './search-console.js';
 import { WS_EVENTS } from './ws-events.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
-import type { BriefJourneyStage, ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.js';
+import type { BriefJourneyStage, BriefSourceEvidence, ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.js';
 
 const log = createLogger('content-brief-generation-job');
 
@@ -60,6 +61,44 @@ export interface StartedContentBriefGenerationJob {
 function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
   invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+}
+
+/**
+ * C4 (audit #16): map C1's enrichment output to the persisted source-evidence blob.
+ * Consumes `BriefScrapeEnrichment` directly — the helper's exported interface is the
+ * contract (see server/content-brief-scrape-enrichment.ts header); do not re-derive.
+ * Returns null when the scrape fully degraded (C1's FM-2 posture) so the column
+ * stays NULL instead of storing an empty pack.
+ */
+function buildBriefSourceEvidence(enrichment: BriefScrapeEnrichment): BriefSourceEvidence | null {
+  const { scrapedRefs, serpData, stylePages } = enrichment;
+  if (scrapedRefs.length === 0 && !serpData && stylePages.length === 0) return null;
+  return {
+    scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
+    serpResults: serpData && serpData.organicResults.length > 0
+      ? serpData.organicResults.map(r => ({ position: r.position, title: r.title, url: r.url, snippet: r.snippet }))
+      : undefined,
+    serpFetchedAt: serpData?.fetchedAt,
+    styleExamples: stylePages.length > 0 ? stylePages : undefined,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Persist the scraped source text on the freshly generated brief row.
+ * Runs before the brief_generated broadcast in both job paths so the existing
+ * CONTENT_UPDATED event covers the write. Returns the updated brief when
+ * evidence was attached, otherwise the original.
+ */
+function persistBriefSourceEvidence(
+  workspaceId: string,
+  brief: ContentBrief,
+  enrichment: BriefScrapeEnrichment,
+): ContentBrief {
+  const sourceEvidence = buildBriefSourceEvidence(enrichment);
+  if (!sourceEvidence) return brief;
+  const updated = updateBrief(workspaceId, brief.id, { sourceEvidence });
+  return updated ?? brief;
 }
 
 function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
@@ -135,7 +174,7 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
   });
 
   const resolvedPageType = toBriefPageType(pageType) ?? templateCrossref?.pageType ?? undefined;
-  const brief = await generateBrief(workspaceId, targetKeyword, {
+  let brief = await generateBrief(workspaceId, targetKeyword, {
     relatedQueries,
     businessContext: businessContext || ws.keywordStrategy?.businessContext,
     existingPages,
@@ -163,6 +202,10 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     styleExamples: stylePages.length > 0 ? stylePages : undefined,
     pageAnalysisContext,
   });
+
+  // C4: persist the scraped source text (bodyText, SERP snippets, fetch timestamps)
+  // before the brief_generated broadcast below covers the write.
+  brief = persistBriefSourceEvidence(workspaceId, brief, { scrapedRefs, serpData, stylePages });
 
   try {
     recordAction({ // recordAction-ok — workspaceId is validated before job creation
@@ -255,6 +298,7 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
   });
 
   const existingPages = await getAllSitePages(ws);
+  const requestEnrichment: BriefScrapeEnrichment = { scrapedRefs, serpData, stylePages };
   const strategyCardContext: StrategyCardContext = {
     rationale: request.rationale,
     intent: request.intent,
@@ -284,7 +328,7 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     }
   }
 
-  const brief = await generateBrief(workspaceId, request.targetKeyword, {
+  let brief = await generateBrief(workspaceId, request.targetKeyword, {
     relatedQueries,
     businessContext: ws.keywordStrategy?.businessContext || '',
     existingPages,
@@ -300,6 +344,9 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
     styleExamples: stylePages.length > 0 ? stylePages : undefined,
   });
+
+  // C4: persist scraped source text before the broadcasts below cover the write.
+  brief = persistBriefSourceEvidence(workspaceId, brief, requestEnrichment);
 
   updateContentRequest(workspaceId, requestId, {
     status: 'brief_generated',

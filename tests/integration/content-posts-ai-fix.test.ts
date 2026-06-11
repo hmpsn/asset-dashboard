@@ -500,9 +500,14 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
     expect(body.review).not.toHaveProperty('summary');
 
     const after = getPost(wsId, postId);
+    // The human-checked checklist is untouched by an AI review run…
     expect(after?.reviewChecklist).toBe(before?.reviewChecklist);
-    expect(after?.updatedAt).toBe(before?.updatedAt);
-    expect(broadcastState.calls).toHaveLength(0);
+    // …but C4 (audit #16) persists the AI verdicts on the post (so they survive
+    // editor close) and broadcasts the write — the pre-C4 "no write, no broadcast"
+    // contract is intentionally gone.
+    expect(after?.aiReview?.review.factual_accuracy.pass).toBe(false);
+    expect(after?.aiReview?.review.factual_accuracy.humanReviewRequired).toBe(true);
+    expect(broadcastState.calls.some(c => c.payload && (c.payload as { action?: string }).action === 'ai_review_completed')).toBe(true);
   });
 
   it('returns manual-unknown claim evidence when no saved source pack exists', async () => {
