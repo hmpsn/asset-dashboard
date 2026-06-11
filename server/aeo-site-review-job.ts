@@ -160,7 +160,7 @@ export async function runAeoSiteReviewJob({
         }
         // url-fetch-ok: per-page fetch may timeout or fail; skipping unreachable pages is intentional.
       } catch (err) {
-        if (isProgrammingError(err)) {
+        if (isProgrammingError(err)) { // url-fetch-ok: per-page fetch timeouts/unreachable pages are expected degradation
           log.warn({ err }, 'aeo-site-review-job: programming error fetching page');
         }
         // skip unreachable / timed-out pages
@@ -197,7 +197,7 @@ export async function runAeoSiteReviewJob({
       result.sitewideSummary,
     );
   } catch (err) {
-    if (isProgrammingError(err)) {
+    if (isProgrammingError(err)) { // url-fetch-ok: job-level catch wraps page fetches; network failures are expected degradation
       log.warn({ err, workspaceId }, 'aeo-site-review-job: programming error');
     } else {
       log.debug({ err, workspaceId }, 'aeo-site-review-job: review failed');
