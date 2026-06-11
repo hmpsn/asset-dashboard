@@ -743,6 +743,17 @@
           "priority": "P3",
           "status": "pending",
           "notes": "Deliberate deferral recorded at migration 129 header. Wire when touching the seoContext or operational slice, or when building the generation-health admin panel."
+        },
+        {
+          "id": "core-c3-publish-service-extraction",
+          "title": "C3 (audit item #12) — extract publishPostToWebflow domain service; auto-publish → background job",
+          "source": "docs/superpowers/plans/2026-06-10-core-features-remediation-master.md §C3; plan docs/superpowers/plans/2026-06-10-c3-publish-service.md",
+          "est": "medium",
+          "priority": "P2",
+          "status": "done",
+          "notes": "DONE 2026-06-10. Extracted ONE shared publish service `server/domains/content/publish-post-to-webflow.ts` (`publishPostToWebflow()`) consumed by BOTH publish paths, mirroring `send-post-to-client.ts`. Fixed three drifts: (1) silent fire-and-forget auto-publish in `server/routes/content-posts.ts` (was ~:369-441, `createCollectionItem(...).then()` at ~:386, hatch at ~:385) now runs as a background `CONTENT_PUBLISH` job (`server/content-publish-job.ts`, new BACKGROUND_JOB_TYPES entry: label 'Publishing to Webflow', non-cancellable, domain-store) following the C2-migrated runner pattern (createJob + setImmediate dispatched from the route, idempotent guard on `!webflowItemId`); failures now surface as job `error` + activity, never silent. (2) field-map drift — auto-publish wrote a strict subset (missing `summary` from brief + `featuredImage`); the unified service builds the ONE manual-superset field map, covered by a new field-map parity contract test `tests/integration/publish-service-field-parity.test.ts`. (3) skipped follow-on — `queueKeywordStrategyPostUpdateFollowOns` now lives inside the shared service so it fires on BOTH paths (contract test in `outcome-publish-triggers-rec-regen.test.ts` expanded). Sync-vs-job decision: manual publish stays SYNCHRONOUS (single foreground Webflow round-trip, UI awaits inline `{ success, post }`); only auto-publish became a job. Post status `approved` stays TERMINAL — publish tracked via webflowItemId/publishedAt/publishedSlug, no state-machine change. `recordAction` getActionByWorkspaceAndSource dedup guard preserved for job-retry safety. `CONTENT_PUBLISHED` broadcast + `content_published` activity + `invalidateContentPipelineIntelligence` moved into the service (single site). Migrated/updated legacy suites: content-posts-workflow (auto-publish now asserts job lifecycle + FM-2), outcome-publish-triggers-rec-regen, canonical-page-address-contract, workspace-intelligence-freshness-wiring, background-job-test-matrix; journey-content-publish / content-publish-writes / content-publish-action-tracking / content-posts-lifecycle pass unchanged (manual route keeps its response contract). Gates: typecheck + vite build + pr-check (0 errors) + full contract suite (562) + content/publish/jobs integration shard (696) green.",
+          "createdAt": "2026-06-10",
+          "shippedAt": "2026-06-10"
         }
       ]
     },

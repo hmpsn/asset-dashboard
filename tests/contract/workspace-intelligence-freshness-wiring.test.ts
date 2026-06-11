@@ -17,7 +17,9 @@ describe('workspace intelligence freshness wiring', () => {
       'server/routes/content-briefs.ts',
       'server/content-posts.ts',
       'server/routes/content-matrices.ts',
-      'server/routes/content-publish.ts',
+      // C3 (audit item #12): the publish mutation's freshness boundary moved into the shared
+      // publishPostToWebflow() service, consumed by BOTH the manual route and the auto-publish job.
+      'server/domains/content/publish-post-to-webflow.ts',
       'server/routes/suggested-briefs.ts',
       'server/routes/content-decay.ts',
       'server/content-subscriptions.ts',

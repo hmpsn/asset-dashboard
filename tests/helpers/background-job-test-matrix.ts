@@ -247,4 +247,16 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/c2-ai-to-jobs.test.ts',
   ),
+  // C3 (audit item #12): auto-publish-on-approval migrated from silent fire-and-forget to a job.
+  // Lifecycle (success stamp + CONTENT_PUBLISHED, and FM-2 create-failure → job 'error', no
+  // partial stamp) is exercised in the content-posts workflow suite.
+  [BACKGROUND_JOB_TYPES.CONTENT_PUBLISH]: entry(
+    'CONTENT_PUBLISH',
+    {
+      expectedLabel: 'Publishing to Webflow',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/integration/content-posts-workflow.test.ts',
+  ),
 };
