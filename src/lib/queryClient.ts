@@ -2,6 +2,8 @@ import { QueryClient } from '@tanstack/react-query';
 
 /** Stale time constants — pick the right tier for each query. */
 export const STALE_TIMES = {
+  /** Analytics dashboards and client search data. */
+  ANALYTICS: 15 * 60_000,
   /** Rarely-changing config: health, workspace list, publish targets. */
   STABLE: 5 * 60_000,
   /** Default — most dashboard data (analytics, audit, activity). */

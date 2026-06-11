@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **486 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **487 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 487. Client Dashboard Quick Wins 1 — Stop the Leaks
+
+**What it does:** Closes the first wave of client-dashboard leakage found in the 2026-06 audit. Client GA4/GSC React Query hooks now use a 15-minute analytics stale time so tab focus no longer fans out repeated Google reads, while admin analytics keeps its existing freshness behavior. Critical client inbox/decision hooks now throw through React Query instead of returning silent empty arrays on endpoint failure. ClientDashboard subscribes to confirmed client-visible workspace broadcasts for brief updates and outcome-learning changes, invalidating content requests, content plan, unified inbox, outcome summary, and intelligence caches. Monetization leaks are tightened in two paths: the existing trial banner now appears only in the final 1-5 active trial days with per-trial dismissal and a Plans CTA, and the Day-10 warning email is formalized as the 4-days-remaining reminder for the 14-day trial model. Chat usage now has a shared typed response contract, React Query usage hook/key, Free/Growth counters, Premium unlimited treatment, typed `usage_limit` 429s, Growth 50-chat enforcement, trial-as-Growth enforcement, existing-session continuation, and failed-AI usage refunds. Hygiene fixes remove a bare hook-deps suppression, make the client account menu keyboard/menu-semantic, label the custom date trigger, and pin DecisionDetailModal dialog semantics.
+
+**Agency value:** Reduces support-driving ambiguity: endpoint failures visibly error, client caches refresh when backend work lands, trial conversion prompts happen before expiry, and chat limits are enforced before AI spend instead of counted after the fact. The analytics stale time trims avoidable quota burn without changing admin workflows.
+
+**Client value:** The portal feels more trustworthy and current: inbox sections no longer masquerade outages as "nothing to do," client-visible updates arrive without a manual refresh, trial prompts are timely and dismissible, and chat usage is visible before a limit surprises the user.
+
+**Mutual:** Converts several silent failure modes into explicit, tested contracts across API, React Query, WebSocket invalidation, billing lifecycle, and accessibility. The sprint keeps the fixes small while making the client dashboard harder to misread.
+
+**Files:** `src/lib/queryClient.ts`, `src/hooks/shared/useGA4Base.ts`, `src/hooks/shared/useGSCBase.ts`, `src/hooks/client/useClientGA4.ts`, `src/hooks/client/useClientSearch.ts`, `src/hooks/client/useClientQueries.ts`, `src/lib/wsInvalidation.ts`, `src/components/ClientDashboard.tsx`, `shared/types/usage.ts`, `src/hooks/client/useClientChatUsage.ts`, `src/hooks/useChat.ts`, `src/components/client/ClientChatWidget.tsx`, `server/chat-memory.ts`, `server/routes/public-chat.ts`, `server/routes/public-analytics.ts`, `server/trial-reminders.ts`, `src/components/client/ClientHeader.tsx`, `src/components/client/client-dashboard/useClientWorkspaceBootstrap.ts`. Tests: `tests/unit/hooks/analytics-stale-time.test.tsx`, `tests/unit/hooks/client-queries.test.tsx`, `tests/unit/wsInvalidationRegistry.test.ts`, `tests/unit/client-dashboard-invalidation-keys.test.ts`, `tests/component/ClientDashboard.test.tsx`, `tests/unit/public-chat-pure.test.ts`, `tests/unit/hooks/useChat.test.ts`, `tests/component/client/ClientChatWidget.risky.test.tsx`, `tests/integration/tier-gate-enforcement.test.ts`, `tests/integration/billing-tier-downgrade.test.ts`, `tests/integration/public-analytics-extended.test.ts`, `tests/unit/trial-reminders.test.ts`, `tests/component/client/ClientHeader.test.tsx`, `tests/unit/DecisionDetailModal.test.tsx`.
 
 ---
 

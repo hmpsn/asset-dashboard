@@ -127,7 +127,22 @@ describe('ClientHeader — user avatar and logout', () => {
     renderHeader({
       clientUser: { id: 'u1', name: 'Jane Smith', email: 'jane@example.com', role: 'editor' },
     });
-    expect(screen.getByRole('button', { name: /Sign out/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Jane Smith account menu/i })).toBeInTheDocument();
+  });
+
+  it('opens the account menu and exposes sign out as a menuitem', () => {
+    renderHeader({
+      clientUser: { id: 'u1', name: 'Jane Smith', email: 'jane@example.com', role: 'editor' },
+    });
+    const trigger = screen.getByRole('button', { name: /Jane Smith account menu/i });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument();
   });
 
   it('calls handleClientLogout when logout button is clicked', () => {
@@ -136,7 +151,8 @@ describe('ClientHeader — user avatar and logout', () => {
       clientUser: { id: 'u1', name: 'Jane Smith', email: 'jane@example.com', role: 'editor' },
       handleClientLogout,
     });
-    fireEvent.click(screen.getByRole('button', { name: /Sign out/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Jane Smith account menu/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /sign out/i }));
     expect(handleClientLogout).toHaveBeenCalledTimes(1);
   });
 
@@ -254,5 +270,10 @@ describe('ClientHeader — date range controls', () => {
     renderHeader({ hasAnalytics: true, changeDays });
     fireEvent.click(screen.getByRole('button', { name: /7d/i }));
     expect(changeDays).toHaveBeenCalledWith(7, baseWs);
+  });
+
+  it('labels the custom date range trigger for assistive tech', () => {
+    renderHeader({ hasAnalytics: true });
+    expect(screen.getByRole('button', { name: /open custom date range picker/i })).toBeInTheDocument();
   });
 });

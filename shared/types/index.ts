@@ -35,3 +35,4 @@ export * from './background-jobs.ts';
 export * from './analytics-contract.ts';
 export type * from './platform-observability.ts';
 export type * from './keyword-strategy-ux.ts';
+export type * from './usage.ts';

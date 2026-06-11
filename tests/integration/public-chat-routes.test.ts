@@ -95,11 +95,34 @@ describe('public chat session routes', () => {
     const invalidRes = await api(`/api/public/chat-sessions/${workspaceId}?channel=not-a-channel`);
     expect(invalidRes.status).toBe(400);
 
+    const searchFilterRes = await api(`/api/public/chat-sessions/${workspaceId}?channel=search`);
+    expect(searchFilterRes.status).toBe(400);
+
     const clientRes = await api(`/api/public/chat-sessions/${workspaceId}?channel=client`);
     expect(clientRes.status).toBe(200);
     const sessions = await clientRes.json();
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({ id: 'client-session', channel: 'client' });
+
+    const defaultRes = await api(`/api/public/chat-sessions/${workspaceId}`);
+    expect(defaultRes.status).toBe(200);
+    const defaultSessions = await defaultRes.json();
+    expect(defaultSessions).toHaveLength(1);
+    expect(defaultSessions[0]).toMatchObject({ id: 'client-session', channel: 'client' });
+  });
+
+  it('does not expose or mutate non-client sessions through public chat routes', async () => {
+    addMessage(workspaceId, 'admin-chat-session', 'admin', 'user', 'Internal admin note');
+
+    const getRes = await api(`/api/public/chat-sessions/${workspaceId}/admin-chat-session`);
+    expect(getRes.status).toBe(404);
+
+    const summarizeRes = await postJson(`/api/public/chat-sessions/${workspaceId}/admin-chat-session/summarize`, {});
+    expect(summarizeRes.status).toBe(404);
+
+    const deleteRes = await del(`/api/public/chat-sessions/${workspaceId}/admin-chat-session`);
+    expect(deleteRes.status).toBe(404);
+    expect(getSession(workspaceId, 'admin-chat-session')).not.toBeNull();
   });
 
   it('does not read, summarize, or delete chat sessions through the wrong workspace', async () => {

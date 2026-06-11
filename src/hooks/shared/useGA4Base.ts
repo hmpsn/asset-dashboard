@@ -30,6 +30,8 @@ export interface GA4BaseOptions {
   includeEvents?: boolean;
   /** Extra options forwarded to ga4.landingPages (e.g. organic, limit). */
   landingOpts?: { organic?: boolean; limit?: number };
+  /** Optional cache freshness override for all GA4 sub-queries. */
+  staleTime?: number;
   api?: {
     overview: typeof ga4.overview;
     trend: typeof ga4.trend;
@@ -54,6 +56,7 @@ export function useGA4Base({
   keyPrefix,
   includeEvents = false,
   landingOpts,
+  staleTime,
   api = ga4,
 }: GA4BaseOptions) {
   // Build a consistent query key: [prefix, wsId, metric, days] or [..., dateRange]
@@ -64,54 +67,63 @@ export function useGA4Base({
     queryKey: mk('overview'),
     queryFn: () => api.overview(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const trendQ = useQuery({
     queryKey: mk('trend'),
     queryFn: () => api.trend(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const topPagesQ = useQuery({
     queryKey: mk('pages'),
     queryFn: () => api.topPages(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const sourcesQ = useQuery({
     queryKey: mk('sources'),
     queryFn: () => api.sources(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const devicesQ = useQuery({
     queryKey: mk('devices'),
     queryFn: () => api.devices(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const countriesQ = useQuery({
     queryKey: mk('countries'),
     queryFn: () => api.countries(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const comparisonQ = useQuery({
     queryKey: mk('comparison'),
     queryFn: () => api.comparison(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const nvrQ = useQuery({
     queryKey: mk('nvr'),
     queryFn: () => api.newVsReturning(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const organicQ = useQuery({
     queryKey: mk('organic'),
     queryFn: () => api.organic(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const landingQ = useQuery({
@@ -122,18 +134,21 @@ export function useGA4Base({
         ...landingOpts,
       }),
     enabled,
+    staleTime,
   });
 
   const conversionsQ = useQuery({
     queryKey: mk('conversions'),
     queryFn: () => api.conversions(wsId, days, dr),
     enabled,
+    staleTime,
   });
 
   const eventsQ = useQuery({
     queryKey: mk('events'),
     queryFn: () => api.events ? api.events(wsId, days, dr) : Promise.resolve([]),
     enabled: enabled && includeEvents,
+    staleTime,
   });
 
   return {

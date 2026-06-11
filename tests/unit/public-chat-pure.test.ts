@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - FREE_CHAT_LIMIT: exported constant value
- *   - checkChatRateLimit: non-free tiers always allowed; free tier enforces limit;
+ *   - checkChatRateLimit: tier-aware chat usage limits;
  *     continuing an existing session is always allowed; new sessions respect limit
  *   - getMonthlyConversationCount: counts sessions in current calendar month only
  *   - buildConversationContext: returns correct historyMessages and priorContext
@@ -16,6 +16,8 @@ import { randomUUID } from 'crypto';
 import {
   FREE_CHAT_LIMIT,
   checkChatRateLimit,
+  reserveChatUsageIfNeeded,
+  refundReservedChatUsage,
   getMonthlyConversationCount,
   buildConversationContext,
   addMessage,
@@ -24,6 +26,7 @@ import {
   deleteSession,
   type ChatSession,
 } from '../../server/chat-memory.js';
+import { getUsageCount, incrementUsage } from '../../server/usage-tracking.js';
 
 // ── Test workspace IDs — use unique prefixes to avoid collisions ──────────────
 
@@ -76,13 +79,13 @@ describe('FREE_CHAT_LIMIT', () => {
 // ─── checkChatRateLimit — non-free tiers ─────────────────────────────────────
 
 describe('checkChatRateLimit — non-free tiers', () => {
-  it('growth tier is always allowed with no used count', () => {
+  it('growth tier has a monthly limit of 50', () => {
     const wsId = makeWsId('growth');
     const result = checkChatRateLimit(wsId, 'growth');
     expect(result.allowed).toBe(true);
     expect(result.used).toBe(0);
-    expect(result.limit).toBe(Infinity);
-    expect(result.remaining).toBe(Infinity);
+    expect(result.limit).toBe(50);
+    expect(result.remaining).toBe(50);
   });
 
   it('premium tier is always allowed', () => {
@@ -95,12 +98,60 @@ describe('checkChatRateLimit — non-free tiers', () => {
   });
 
   it('unknown tier behaves like free (restrictive)', () => {
-    // Unknown tier falls through to free
     const wsId = makeWsId('unknown');
-    // A fresh workspace with no sessions should have remaining > 0
     const result = checkChatRateLimit(wsId, 'some_unknown_tier');
-    // Non-free tiers → allowed=true (all non-free tiers are unrestricted)
     expect(result.allowed).toBe(true);
+    expect(result.limit).toBe(FREE_CHAT_LIMIT);
+    expect(result.remaining).toBe(FREE_CHAT_LIMIT);
+  });
+
+  it('growth tier blocks new conversations after 50 chats are used', () => {
+    const wsId = makeWsId('growth-block');
+    for (let i = 0; i < 50; i++) incrementUsage(wsId, 'ai_chats');
+
+    const result = checkChatRateLimit(wsId, 'growth');
+    expect(result.allowed).toBe(false);
+    expect(result.used).toBe(50);
+    expect(result.limit).toBe(50);
+    expect(result.remaining).toBe(0);
+  });
+
+  it('growth tier allows continuation of an existing session after the limit is reached', () => {
+    const wsId = makeWsId('growth-continue');
+    for (let i = 0; i < 50; i++) incrementUsage(wsId, 'ai_chats');
+
+    const existingId = `sess-growth-existing-${randomUUID().slice(0, 8)}`;
+    sessionsToClean.push({ workspaceId: wsId, sessionId: existingId });
+    saveSession(makeSession(wsId, existingId, 'client'));
+
+    const result = checkChatRateLimit(wsId, 'growth', existingId);
+    expect(result.allowed).toBe(true);
+    expect(result.used).toBe(50);
+    expect(result.limit).toBe(50);
+  });
+});
+
+describe('reserveChatUsageIfNeeded', () => {
+  it('reserves one usage unit for a new growth conversation', () => {
+    const wsId = makeWsId('growth-reserve');
+
+    const result = reserveChatUsageIfNeeded(wsId, 'growth', `new-${randomUUID().slice(0, 8)}`);
+
+    expect(result.allowed).toBe(true);
+    expect(result.reserved).toBe(true);
+    expect(getUsageCount(wsId, 'ai_chats')).toBe(1);
+  });
+
+  it('refundReservedChatUsage releases a reserved unit after a failed AI call', () => {
+    const wsId = makeWsId('growth-refund');
+    const result = reserveChatUsageIfNeeded(wsId, 'growth', `new-${randomUUID().slice(0, 8)}`);
+
+    expect(result.reserved).toBe(true);
+    expect(getUsageCount(wsId, 'ai_chats')).toBe(1);
+
+    refundReservedChatUsage(wsId);
+
+    expect(getUsageCount(wsId, 'ai_chats')).toBe(0);
   });
 });
 
@@ -119,13 +170,7 @@ describe('checkChatRateLimit — free tier', () => {
   it('denies a new conversation when usage equals the limit', () => {
     const wsId = makeWsId('free-deny');
 
-    // Seed exactly FREE_CHAT_LIMIT sessions this month with >= 1 user message each
-    for (let i = 0; i < FREE_CHAT_LIMIT; i++) {
-      const sessionId = `sess-deny-${i}-${randomUUID().slice(0, 8)}`;
-      sessionsToClean.push({ workspaceId: wsId, sessionId });
-      const session = makeSession(wsId, sessionId, 'client');
-      saveSession(session);
-    }
+    for (let i = 0; i < FREE_CHAT_LIMIT; i++) incrementUsage(wsId, 'ai_chats');
 
     const result = checkChatRateLimit(wsId, 'free');
     expect(result.allowed).toBe(false);
@@ -137,12 +182,7 @@ describe('checkChatRateLimit — free tier', () => {
   it('allows continuation of an existing session even when limit is reached', () => {
     const wsId = makeWsId('free-continue');
 
-    // Seed FREE_CHAT_LIMIT sessions to max out
-    for (let i = 0; i < FREE_CHAT_LIMIT; i++) {
-      const sessionId = `sess-cont-${i}-${randomUUID().slice(0, 8)}`;
-      sessionsToClean.push({ workspaceId: wsId, sessionId });
-      saveSession(makeSession(wsId, sessionId, 'client'));
-    }
+    for (let i = 0; i < FREE_CHAT_LIMIT; i++) incrementUsage(wsId, 'ai_chats');
 
     // Seed one existing session with messages
     const existingId = `sess-existing-${randomUUID().slice(0, 8)}`;
@@ -153,19 +193,14 @@ describe('checkChatRateLimit — free tier', () => {
     const result = checkChatRateLimit(wsId, 'free', existingId);
     expect(result.allowed).toBe(true);
     // Still reports correct usage stats
-    expect(result.used).toBe(FREE_CHAT_LIMIT + 1);
+    expect(result.used).toBe(FREE_CHAT_LIMIT);
     expect(result.limit).toBe(FREE_CHAT_LIMIT);
   });
 
   it('counts used correctly before the limit is reached', () => {
     const wsId = makeWsId('free-count');
 
-    // Seed 2 sessions (below limit of 3)
-    for (let i = 0; i < 2; i++) {
-      const sessionId = `sess-count-${i}-${randomUUID().slice(0, 8)}`;
-      sessionsToClean.push({ workspaceId: wsId, sessionId });
-      saveSession(makeSession(wsId, sessionId, 'client'));
-    }
+    for (let i = 0; i < 2; i++) incrementUsage(wsId, 'ai_chats');
 
     const result = checkChatRateLimit(wsId, 'free');
     expect(result.used).toBe(2);

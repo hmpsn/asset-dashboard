@@ -15,7 +15,9 @@ import {
   buildConversationContext,
   getSession as getChatSession,
   generateSessionSummary,
-  checkChatRateLimit,
+  formatChatLimitError,
+  refundReservedChatUsage,
+  reserveChatUsageIfNeeded,
 } from '../chat-memory.js';
 import {
   getGA4Overview,
@@ -48,7 +50,6 @@ import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
 import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
-import { incrementUsage } from '../usage-tracking.js';
 import { computeEffectiveTier, getWorkspace, getBrandName } from '../workspaces.js';
 import { getOrComputeInsights } from '../analytics-intelligence.js';
 import { buildClientInsights } from '../insight-narrative.js';
@@ -349,17 +350,23 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
 
   // Rate limit check — always enforced (betaMode is cosmetic, not a rate-limit bypass)
   const tier = computeEffectiveTier(ws);
-  const rl = checkChatRateLimit(ws.id, tier, sessionId);
-  if (!rl.allowed) {
-    return res.status(429).json({
-      error: 'Chat limit reached',
-      message: `You've used all ${rl.limit} free conversations this month. Upgrade to Growth for unlimited chat.`,
-      used: rl.used,
-      limit: rl.limit,
-    });
+  if (sessionId) {
+    const existingSession = getChatSession(ws.id, sessionId);
+    if (existingSession && existingSession.channel !== 'client') {
+      return res.status(404).json({ error: 'Session not found' });
+    }
   }
+  const usageReservation = reserveChatUsageIfNeeded(ws.id, tier, sessionId);
+  let reservedChatUsage = usageReservation.reserved;
+  if (!usageReservation.allowed) {
+    return res.status(429).json(formatChatLimitError(usageReservation, tier));
+  }
+
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
+  if (!openaiKey) {
+    if (reservedChatUsage) refundReservedChatUsage(ws.id);
+    return res.status(400).json({ error: 'AI not configured' });
+  }
 
   try {
     // Build conversation context from memory
@@ -630,7 +637,6 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
       // Log first exchange to activity log so agency sees what clients ask
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`); // client-visibility-ok: admin activity signal; intentionally not shown in client-visible activity feed
-        incrementUsage(ws.id, 'ai_chats');
       }
       // Auto-summarize after 6+ messages
       if (session && session.messages.length >= 6 && !session.summary) {
@@ -669,8 +675,10 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical — never block chat response */ }
 
+    reservedChatUsage = false;
     res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {
+    if (reservedChatUsage) refundReservedChatUsage(ws.id);
     log.error({ err }, 'Failed to process search chat');
     res.status(500).json({ error: 'Internal server error' });
   }

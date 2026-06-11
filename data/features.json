@@ -83,7 +83,7 @@
     {
       "id": 9,
       "title": "Client Portal",
-      "oneLiner": "White-labeled dashboard with search data, health scores, strategy, content hub, approvals, and AI chatbot",
+      "oneLiner": "White-labeled dashboard with search data, health scores, strategy, content hub, approvals, fail-loud inbox states, live refreshes, trial prompts, and AI chatbot",
       "category": "client",
       "painPoints": ["client-transparency", "reporting"],
       "tier": "free",
@@ -93,7 +93,7 @@
     {
       "id": 10,
       "title": "AI Insights Engine (Client Chatbot)",
-      "oneLiner": "GPT-4o advisor using full dashboard data — GSC, GA4, audit, strategy, ranks — with conversation memory and revenue hooks",
+      "oneLiner": "Client advisor using dashboard data — GSC, GA4, audit, strategy, ranks — with conversation memory, tier-aware usage counters, and Growth/Premium limits",
       "category": "ai",
       "painPoints": ["client-transparency", "reporting"],
       "tier": "growth",
@@ -563,7 +563,7 @@
     {
       "id": 57,
       "title": "14-Day Growth Trial",
-      "oneLiner": "New workspaces auto-provisioned with Growth tier access — trial badges, countdown timers, and upgrade prompts drive conversion passively",
+      "oneLiner": "New workspaces auto-provisioned with Growth tier access — trial badges, five-day countdown banner, Day-10 email warning, and upgrade prompts drive conversion passively",
       "category": "monetization",
       "painPoints": ["onboarding", "payments"],
       "tier": "free",

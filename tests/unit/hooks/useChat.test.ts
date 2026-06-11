@@ -11,13 +11,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createElement, type ReactNode } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useChat } from '../../../src/hooks/useChat';
 import type { ChatDeps } from '../../../src/hooks/useChat';
 import { ApiError } from '../../../src/api/client';
 
 // ── Mock the API client module ──────────────────────────────────────────────
 vi.mock('../../../src/api/client', () => ({
+  get: vi.fn(),
   post: vi.fn(),
   getOptional: vi.fn(),
   ApiError: class ApiError extends Error {
@@ -32,7 +35,8 @@ vi.mock('../../../src/api/client', () => ({
   },
 }));
 
-import { post, getOptional } from '../../../src/api/client';
+import { get, post, getOptional } from '../../../src/api/client';
+const mockGet = vi.mocked(get);
 const mockPost = vi.mocked(post);
 const mockGetOptional = vi.mocked(getOptional);
 
@@ -86,15 +90,20 @@ function makeDeps(overrides: Partial<ChatDeps> = {}): ChatDeps {
 
 function renderChat(overrides: Partial<ChatDeps> = {}) {
   const deps = makeDeps(overrides);
-  return renderHook(() => useChat(deps));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+  return renderHook(() => useChat(deps), { wrapper });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('useChat — initial state', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 
@@ -138,6 +147,11 @@ describe('useChat — initial state', () => {
     expect(result.current.chatSessionId).toMatch(/^cs-\d+-[a-z0-9]+$/);
   });
 
+  it('starts without a server-backed chat session', () => {
+    const { result } = renderChat();
+    expect(result.current.chatHasServerBackedSession).toBe(false);
+  });
+
   it('starts with chat not expanded', () => {
     const { result } = renderChat();
     expect(result.current.chatExpanded).toBe(false);
@@ -156,8 +170,10 @@ describe('useChat — initial state', () => {
 
 describe('useChat — setChatOpen / setChatExpanded', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 
@@ -180,21 +196,28 @@ describe('useChat — setChatOpen / setChatExpanded', () => {
 });
 
 describe('useChat — chat usage fetched on open', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockPost.mockReset();
+    mockGetOptional.mockReset();
+    mockGetOptional.mockResolvedValue(null);
+  });
+
   afterEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
   });
 
   it('fetches chat usage when chat opens and ws is set', async () => {
     const usagePayload = { allowed: true, used: 2, limit: 10, remaining: 8, tier: 'growth' };
-    mockGetOptional.mockResolvedValue(usagePayload);
+    mockGet.mockResolvedValue(usagePayload);
 
     const { result } = renderChat();
 
     await act(async () => { result.current.setChatOpen(true); });
     await waitFor(() => {
-      // getOptional should have been called for chat-usage
-      expect(mockGetOptional).toHaveBeenCalledWith(expect.stringContaining('/api/public/chat-usage/ws-123'));
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/public/chat-usage/ws-123'));
     });
   });
 
@@ -204,12 +227,12 @@ describe('useChat — chat usage fetched on open', () => {
     await act(async () => { result.current.setChatOpen(true); });
     // Allow microtasks
     await new Promise(r => setTimeout(r, 10));
-    expect(mockGetOptional).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('sets chatUsage state from API response', async () => {
     const usagePayload = { allowed: true, used: 3, limit: 10, remaining: 7, tier: 'growth' };
-    mockGetOptional.mockResolvedValue(usagePayload);
+    mockGet.mockResolvedValue(usagePayload);
 
     const { result } = renderChat();
 
@@ -222,8 +245,10 @@ describe('useChat — chat usage fetched on open', () => {
 
 describe('useChat — askAi', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 
@@ -289,6 +314,7 @@ describe('useChat — askAi', () => {
 
     const assistantMsg = result.current.chatMessages.find(m => m.role === 'assistant');
     expect(assistantMsg?.content).toBe('Your traffic is great!');
+    expect(result.current.chatHasServerBackedSession).toBe(true);
   });
 
   it('appends error content from API data.error field', async () => {
@@ -333,13 +359,63 @@ describe('useChat — askAi', () => {
   it('handles 429 rate limit error with upgrade message', async () => {
     const rateLimitError = new ApiError(429, 'Too many requests');
     mockPost.mockRejectedValue(rateLimitError);
-    const { result } = renderChat();
+    const { result } = renderChat({ effectiveTier: 'free' });
 
     await act(async () => { await result.current.askAi('hello'); });
 
     const lastMsg = result.current.chatMessages[result.current.chatMessages.length - 1];
     expect(lastMsg.role).toBe('assistant');
     expect(lastMsg.content).toContain("You've used all your free conversations this month.");
+  });
+
+  it('handles growth 429 rate limit error with premium upgrade message', async () => {
+    const rateLimitError = new ApiError(429, 'Too many requests', {
+      error: 'Chat limit reached',
+      code: 'usage_limit',
+      message: "You've used all 50 growth chat conversations this month. Upgrade to Premium for more chat access.",
+      allowed: false,
+      used: 50,
+      limit: 50,
+      remaining: 0,
+      tier: 'growth',
+    });
+    mockPost.mockRejectedValue(rateLimitError);
+    const { result } = renderChat({ effectiveTier: 'growth' });
+
+    await act(async () => { await result.current.askAi('hello'); });
+
+    const lastMsg = result.current.chatMessages[result.current.chatMessages.length - 1];
+    expect(lastMsg.content).toContain('Upgrade to Premium');
+    expect(result.current.chatUsage).toMatchObject({ allowed: false, used: 50, limit: 50, remaining: 0, tier: 'growth' });
+    expect(result.current.chatHasServerBackedSession).toBe(false);
+  });
+
+  it('does not post or append a user message when an exhausted user has no server-backed session', async () => {
+    const { result } = renderChat({ effectiveTier: 'growth' });
+    act(() => {
+      result.current.setChatUsage({ allowed: false, used: 50, limit: 50, remaining: 0, tier: 'growth' });
+    });
+
+    await act(async () => { await result.current.askAi('Can I start anyway?'); });
+
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(result.current.chatMessages).toEqual([
+      expect.objectContaining({ role: 'assistant', content: expect.stringContaining('Upgrade to Premium') }),
+    ]);
+  });
+
+  it('allows an exhausted user to continue after a server-backed session exists', async () => {
+    mockPost.mockResolvedValue({ answer: 'Continuing.' });
+    const { result } = renderChat({ effectiveTier: 'growth' });
+    act(() => {
+      result.current.setChatUsage({ allowed: false, used: 50, limit: 50, remaining: 0, tier: 'growth' });
+      result.current.setChatHasServerBackedSession(true);
+    });
+
+    await act(async () => { await result.current.askAi('Continue the thread'); });
+
+    expect(mockPost).toHaveBeenCalled();
+    expect(result.current.chatMessages.some(m => m.role === 'user' && m.content === 'Continue the thread')).toBe(true);
   });
 
   it('on 429, sets chatUsage remaining to 0', async () => {
@@ -358,16 +434,13 @@ describe('useChat — askAi', () => {
 
   it('includes ROI value in rate-limit message when roiValue is set', async () => {
     mockPost.mockRejectedValue(new ApiError(429, 'Too many requests'));
-    // Pre-populate chatUsage so the 429 path has something to update
-    mockGetOptional.mockResolvedValue({ allowed: true, used: 5, limit: 5, remaining: 0, tier: 'free' });
+    mockGet.mockResolvedValue({ allowed: true, used: 5, limit: 5, remaining: 0, tier: 'free' });
 
     const { result } = renderChat();
     // Open chat to trigger usage fetch, then manually set roiValue via internal hook
     await act(async () => { result.current.setChatOpen(true); });
     await waitFor(() => expect(result.current.chatUsage).not.toBeNull());
 
-    // Manually inject ROI value via setChatUsage to verify message includes it
-    // (roiValue is set by a separate getOptional call, so we test the 429 path with roiValue=null)
     await act(async () => { await result.current.askAi('hello'); });
     const lastMsg = result.current.chatMessages[result.current.chatMessages.length - 1];
     expect(lastMsg.content).toContain('Upgrade to Growth');
@@ -414,8 +487,10 @@ describe('useChat — askAi', () => {
 
 describe('useChat — clearIntent', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 
@@ -433,8 +508,10 @@ describe('useChat — clearIntent', () => {
 
 describe('useChat — askAi payload shape (E4 server-side grounding)', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 
@@ -495,8 +572,10 @@ describe('useChat — askAi payload shape (E4 server-side grounding)', () => {
 
 describe('useChat — proactive greeting', () => {
   beforeEach(() => {
+    mockGet.mockReset();
     mockPost.mockReset();
     mockGetOptional.mockReset();
+    mockGet.mockResolvedValue({ allowed: true, used: 0, limit: 50, remaining: 50, tier: 'growth' });
     mockGetOptional.mockResolvedValue(null);
   });
 

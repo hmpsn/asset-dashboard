@@ -23,7 +23,8 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { cleanSeedData } from '../global-setup.js';
-import { addMessage, FREE_CHAT_LIMIT } from '../../server/chat-memory.js';
+import { FREE_CHAT_LIMIT, addMessage, getSession } from '../../server/chat-memory.js';
+import { incrementUsage } from '../../server/usage-tracking.js';
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13381, { autoPublicAuth: true });
@@ -481,11 +482,25 @@ describe('POST /api/public/search-chat — validation and guard branches', () =>
     expect(body.error).toBe('AI not configured');
   });
 
+  it('does not allow public search-chat to continue a non-client chat session', async () => {
+    addMessage(wsNoCredsId, 'admin-session-leak-check', 'admin', 'user', 'Internal admin context');
+
+    const res = await postJson(`/api/public/search-chat/${wsNoCredsId}`, {
+      question: 'Can you continue this?',
+      sessionId: 'admin-session-leak-check',
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Session not found');
+    expect(getSession(wsNoCredsId, 'admin-session-leak-check')?.channel).toBe('admin');
+    expect(getSession(wsNoCredsId, 'admin-session-leak-check')?.messages).toHaveLength(1);
+  });
+
   it('returns 429 when free tier has exhausted monthly chat limit', async () => {
-    // Exhaust the monthly conversation count for wsFreeId
-    // Each addMessage call on a new sessionId creates a new conversation
+    // Exhaust the monthly chat usage count for wsFreeId.
     for (let i = 0; i < FREE_CHAT_LIMIT; i++) {
-      addMessage(wsFreeId, `exhaust-session-${i}`, 'client', 'user', 'hello');
+      incrementUsage(wsFreeId, 'ai_chats');
     }
 
     // Now a NEW session should be rate-limited
@@ -497,9 +512,12 @@ describe('POST /api/public/search-chat — validation and guard branches', () =>
     const body = await res.json();
     expect(body).toHaveProperty('error');
     expect(body.error).toBe('Chat limit reached');
+    expect(body.code).toBe('usage_limit');
     expect(body).toHaveProperty('limit');
     expect(body).toHaveProperty('used');
     expect(body.limit).toBe(FREE_CHAT_LIMIT);
+    expect(body.remaining).toBe(0);
+    expect(body.tier).toBe('free');
   });
 
   it('returns 429 response body has correct shape (message, used, limit)', async () => {
