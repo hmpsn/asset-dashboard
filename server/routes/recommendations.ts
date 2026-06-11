@@ -4,6 +4,7 @@
 import { Router } from 'express';
 
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
@@ -237,12 +238,21 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
     });
   }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status });
-  addActivity(
-    workspaceId,
-    'rec_status_updated',
-    `Recommendation updated: ${rec.title}`,
-    `Status changed to "${status}"`,
-  );
+  if (status === 'dismissed') {
+    addActivity(
+      workspaceId,
+      'rec_dismissed',
+      `Recommendation dismissed: ${rec.title}`,
+      rec.description,
+    );
+  } else {
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Recommendation updated: ${rec.title}`,
+      `Status changed to "${status}"`,
+    );
+  }
   // Client-facing single-rec response — strip the admin/AI-only dollar figures
   // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
   res.json(stripEmvFromPublicRecs([rec])[0]);
@@ -280,7 +290,7 @@ router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenti
 
 // Admin list — returns the full set for a workspace (all statuses, no EMV strip).
 // Supports ?status= and ?priority= filters.
-router.get('/api/recommendations/:workspaceId', (req, res) => { // activity-ok: read-only
+router.get('/api/recommendations/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => { // activity-ok: read-only
   try {
     const { workspaceId } = req.params;
     const set = loadRecommendations(workspaceId);
@@ -309,7 +319,7 @@ router.get('/api/recommendations/:workspaceId', (req, res) => { // activity-ok: 
 // Admin un-dismiss — transitions a dismissed rec back to pending.
 // Uses validateTransition (dismissed → pending is a legal backward edge in
 // RECOMMENDATION_TRANSITIONS) so any future machine changes are honoured.
-router.patch('/api/recommendations/:workspaceId/:recId/undismiss', (req, res) => {
+router.patch('/api/recommendations/:workspaceId/:recId/undismiss', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { workspaceId, recId } = req.params;
   const set = loadRecommendations(workspaceId);
   if (!set) return res.status(404).json({ error: 'Workspace has no recommendation set' });

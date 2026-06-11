@@ -38,7 +38,14 @@ export function signToken(payload: JwtPayload): string {
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    // Must have userId to distinguish internal-user tokens from client-portal
+    // tokens (which carry `clientUserId`, not `userId`). Both are signed with
+    // the same JWT_SECRET, so without this guard a client-portal token would
+    // pass the admin APP_PASSWORD gate (app.ts) and reach admin-only routes.
+    // This is the exact inverse of the `clientUserId` check in verifyClientToken.
+    if (!payload?.userId) return null;
+    return payload;
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'auth/verifyToken: programming error');
     return null;

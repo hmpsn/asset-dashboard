@@ -220,7 +220,7 @@ function RecRow({ rec, showUndismiss, onUndismiss }: {
                 <div className="t-caption text-[var(--brand-text-bright)]">{rec.estimatedGain}</div>
               </div>
             )}
-            {rec.opportunity?.emvPerWeek != null && (
+            {rec.opportunity?.emvPerWeek != null && rec.opportunity.emvPerWeek > 0 && (
               <div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">EMV/wk (admin)</div>
                 <div className={`t-caption font-medium ${scoreColorClass(rec.impactScore)}`}>

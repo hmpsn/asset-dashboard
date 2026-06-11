@@ -37,6 +37,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations } from '../../server/recommendations.js';
 import { listActivity } from '../../server/activity-log.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
+import { signAdminToken } from '../../server/middleware.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
@@ -44,10 +45,16 @@ import type { RecommendationSet } from '../../shared/types/recommendations.js';
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 let baseUrl = '';
 let server: http.Server | undefined;
+// Cached so the gated (APP_PASSWORD-set) server in D1(f) boots on the SAME module
+// graph — same db instance, same broadcast mock. createApp() reads process.env
+// .APP_PASSWORD at call time, so the gate is toggled purely via the env var, never
+// vi.resetModules() (which would fork the db and orphan the seeded data).
+let createAppFn: (() => import('express').Express) | undefined;
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
   const { createApp } = await import('../../server/app.js');
+  createAppFn = createApp;
   const app = createApp();
   server = http.createServer(app);
   await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
@@ -91,7 +98,30 @@ function clientCookie(wsId: string, token: string): string {
 }
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
-function makeRecSet(wsId: string, recId: string, status: RecommendationSet['recommendations'][0]['status'] = 'pending'): RecommendationSet {
+/** A full OpportunityScore carrying the three admin/AI-only dollar fields
+ *  (emvPerWeek / predictedEmv / roiPerEffortDay) so tests can assert that the
+ *  admin GET exposes them and the public client GET strips them. */
+function makeOpportunity(): RecommendationSet['recommendations'][0]['opportunity'] {
+  return {
+    value: 75,
+    emvPerWeek: 420,
+    predictedEmv: 5460,
+    roiPerEffortDay: 84,
+    confidence: 0.8,
+    calibration: 1.0,
+    groundedSpine: 'computed',
+    components: [],
+    calibrationVersion: 'v1',
+    modelVersion: 'ov-1',
+  };
+}
+
+function makeRecSet(
+  wsId: string,
+  recId: string,
+  status: RecommendationSet['recommendations'][0]['status'] = 'pending',
+  withOpportunity = false,
+): RecommendationSet {
   return {
     workspaceId: wsId,
     generatedAt: new Date().toISOString(),
@@ -114,6 +144,7 @@ function makeRecSet(wsId: string, recId: string, status: RecommendationSet['reco
         impressionsAtRisk: 3000,
         estimatedGain: '~100 clicks/month',
         status,
+        ...(withOpportunity ? { opportunity: makeOpportunity() } : {}),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -306,6 +337,103 @@ describe('D1(c) — admin GET /api/recommendations/:workspaceId', () => {
   it('workspace isolation: unknown workspace ID returns 404', async () => {
     const res = await api('/api/recommendations/ws_nonexistent_d1c');
     expect(res.status).toBe(404);
+  });
+});
+
+// ─── (c2) EMV exposure: admin GET includes it, public client GET strips it ────
+describe('D1(c2) — emvPerWeek is admin-only (present on admin GET, stripped on public GET)', () => {
+  const recId = `rec_d1c2_${Date.now()}`;
+
+  beforeAll(() => {
+    // Seed a rec carrying a full OpportunityScore with the three admin/AI-only
+    // dollar fields populated (emvPerWeek / predictedEmv / roiPerEffortDay).
+    saveRecommendations(makeRecSet(wsId, recId, 'pending', true));
+  });
+
+  it('admin GET exposes emvPerWeek / predictedEmv / roiPerEffortDay', async () => {
+    const res = await api(`/api/recommendations/${wsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as RecommendationSet;
+    const rec = body.recommendations.find(r => r.id === recId);
+    expect(rec?.opportunity).toBeDefined();
+    expect(rec?.opportunity?.emvPerWeek).toBe(420);
+    expect(rec?.opportunity?.predictedEmv).toBe(5460);
+    expect(rec?.opportunity?.roiPerEffortDay).toBe(84);
+  });
+
+  it('public client GET strips emvPerWeek / predictedEmv / roiPerEffortDay but keeps the rest of the OV', async () => {
+    const res = await api(
+      `/api/public/recommendations/${wsId}`,
+      { headers: { Cookie: clientCookie(wsId, clientToken) } },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as RecommendationSet;
+    const rec = body.recommendations.find(r => r.id === recId);
+    expect(rec?.opportunity).toBeDefined();
+    // The three admin/AI-only dollar fields must be absent.
+    expect(rec?.opportunity).not.toHaveProperty('emvPerWeek');
+    expect(rec?.opportunity).not.toHaveProperty('predictedEmv');
+    expect(rec?.opportunity).not.toHaveProperty('roiPerEffortDay');
+    // The rest of the OV breakdown is preserved for the client "why this is #1" card.
+    expect(rec?.opportunity?.value).toBe(75);
+    expect(rec?.opportunity?.confidence).toBe(0.8);
+  });
+});
+
+// ─── (f) Auth boundary: with APP_PASSWORD SET, a client token must NOT pass ───
+//   the admin gate. This is the C1 regression guard — a client-portal JWT (carries
+//   clientUserId, not userId) shares JWT_SECRET with internal-user tokens, so
+//   without the verifyToken userId guard it would pass the app.ts gate and leak EMV.
+//   Runs on a DEDICATED server with APP_PASSWORD set (the main suite deletes it).
+describe('D1(f) — admin GET rejects a client-portal token when APP_PASSWORD is set', () => {
+  const recId = `rec_d1f_${Date.now()}`;
+  let gatedBaseUrl = '';
+  let gatedServer: http.Server | undefined;
+  const savedAppPassword = process.env.APP_PASSWORD;
+
+  beforeAll(async () => {
+    saveRecommendations(makeRecSet(wsId, recId, 'pending', true));
+    // Boot a second app instance WITH the gate enabled so the boundary is real.
+    // Reuse the cached createApp from the same module graph (shared db + broadcast
+    // mock); createApp reads APP_PASSWORD at call time, so just setting the env var
+    // here turns the gate on for this instance only.
+    process.env.APP_PASSWORD = 'test-admin-secret';
+    const app = createAppFn!();
+    gatedServer = http.createServer(app);
+    await new Promise<void>(resolve => gatedServer!.listen(0, '127.0.0.1', resolve));
+    const { port } = gatedServer.address() as AddressInfo;
+    gatedBaseUrl = `http://127.0.0.1:${port}`;
+  }, 60_000);
+
+  afterAll(async () => {
+    if (gatedServer) {
+      await new Promise<void>((resolve, reject) => {
+        gatedServer!.close(err => (err ? reject(err) : resolve()));
+      });
+    }
+    if (savedAppPassword === undefined) delete process.env.APP_PASSWORD;
+    else process.env.APP_PASSWORD = savedAppPassword;
+  });
+
+  it('rejects a client token sent via Authorization: Bearer (401, no EMV leak)', async () => {
+    const res = await fetch(`${gatedBaseUrl}/api/recommendations/${wsId}`, {
+      headers: { Authorization: `Bearer ${clientToken}` },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a client token sent via the `token` cookie (401, no EMV leak)', async () => {
+    const res = await fetch(`${gatedBaseUrl}/api/recommendations/${wsId}`, {
+      headers: { Cookie: `token=${clientToken}` },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows the request with a valid admin HMAC token (sanity: gate is actually on)', async () => {
+    const res = await fetch(`${gatedBaseUrl}/api/recommendations/${wsId}`, {
+      headers: { 'x-auth-token': signAdminToken() },
+    });
+    expect(res.status).toBe(200);
   });
 });
 
