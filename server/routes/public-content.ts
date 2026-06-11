@@ -502,8 +502,10 @@ router.post('/api/public/work-order/:workspaceId/:orderId/comment', requirePubli
 router.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
-  // Return client-safe view (exclude internal fields if any)
-  res.json(brief);
+  // Return client-safe view — sourceEvidence (C4) is admin-internal scraped
+  // source text (~25 KB of competitor bodyText); never serve it to clients.
+  const { sourceEvidence: _sourceEvidence, ...clientBrief } = brief;
+  res.json(clientBrief);
 });
 
 // Client can download a brief as branded HTML
@@ -692,7 +694,9 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
 
-  res.json(post);
+  // aiReview (C4) is the admin QA verdict pack — admin-internal; never serve to clients.
+  const { aiReview: _aiReview, ...clientPost } = post;
+  res.json(clientPost);
 });
 
 // Client approves a post — transitions request to 'delivered'
@@ -850,7 +854,9 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requi
   }
   invalidateContentPipelineIntelligence(req.params.workspaceId);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
-  res.json(updated);
+  // aiReview (C4) is admin-internal — strip from the client-edit response too.
+  const { aiReview: _aiReview, ...clientPost } = updated;
+  res.json(clientPost);
 });
 
 export default router;

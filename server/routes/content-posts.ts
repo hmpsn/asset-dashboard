@@ -40,7 +40,7 @@ import { buildSystemPrompt } from '../prompt-assembly.js';
 import {
   buildClaimEvidenceLedger,
 } from '../content-review-evidence-ledger.js';
-import type { AIReviewMap, AiFixRequest, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
+import type { AIReviewMap, AiFixRequest, AiFixResult, ContentReviewEvidence, IssueKey, PostSection, StoredAIReview } from '../../shared/types/content.js';
 import { AI_FEEDBACK_TARGETS, CONTENT_GENERATION_STYLES, ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
@@ -447,6 +447,9 @@ router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspac
   res.send(html);
 });
 
+// Model used for AI review — also recorded on the persisted StoredAIReview blob.
+const AI_REVIEW_MODEL = 'gpt-5.4-mini';
+
 // AI auto-review checklist — runs AI against post content to pre-check objective items.
 // Provenance-sensitive items are surfaced for human review only; the model does not
 // have verified source evidence for factual accuracy or hallucination clearance.
@@ -502,7 +505,7 @@ Return ONLY valid JSON like:
         'You are a strict content QA reviewer. Return only valid JSON matching the requested checklist schema.',
       );
       const result = await callAI({
-        model: 'gpt-5.4-mini',
+        model: AI_REVIEW_MODEL,
         system: systemPrompt,
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 1000,
@@ -521,11 +524,29 @@ Return ONLY valid JSON like:
     }
 
     const evidence = buildReviewEvidence(req.params.workspaceId, post.briefId);
-    log.info(`AI review completed for post ${post.id}`);
-    res.json({
-      review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify, evidence),
+    const review = markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify, evidence);
+
+    // C4 (audit #16): persist verdicts so they survive editor close. Only the
+    // post-provenance-marking map is stored — provenance-sensitive keys are
+    // always pass=false + humanReviewRequired (content-quality-grounding).
+    const aiReview: StoredAIReview = {
+      review,
       evidence,
-    });
+      reviewedAt: new Date().toISOString(),
+      model: AI_REVIEW_MODEL,
+    };
+    updatePostField(req.params.workspaceId, post.id, { aiReview });
+    addActivity(
+      req.params.workspaceId,
+      'post_ai_review',
+      `AI review completed for "${post.targetKeyword}"`,
+      post.title,
+      { postId: post.id, action: 'ai_review_completed' },
+    );
+    notifyContentUpdated(req.params.workspaceId, { postId: post.id, action: 'ai_review_completed' });
+
+    log.info(`AI review completed for post ${post.id}`);
+    res.json({ review, evidence });
   } catch (err) {
     log.error({ err }, 'AI review failed');
     const msg = err instanceof Error ? err.message : String(err);
