@@ -138,7 +138,8 @@ export type ActivityType =
   | 'action_backlog_alert'
   | 'post_approved'
   | 'post_changes_requested'
-  | 'post_client_edit';
+  | 'post_client_edit'
+  | 'llms_txt_generated';
 
 export interface ActivityEntry {
   id: string;
