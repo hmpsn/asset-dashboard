@@ -90,6 +90,7 @@ export const RICH_INSIGHTS: InsightsSlice = {
     { id: 'ins-2', insightType: 'ranking_opportunity', severity: 'opportunity', impactScore: 6, pageId: '/services', title: 'Ranking opportunity', description: 'Page 2 keyword' } as any,
   ],
   byType: { content_decay: [{ id: 'ins-1' } as any] },
+  countsByType: { content_decay: 1, ranking_opportunity: 1 },
   bySeverity: { critical: 0, warning: 1, opportunity: 1, positive: 0 },
   topByImpact: [
     { id: 'ins-1', insightType: 'content_decay', severity: 'warning', impactScore: 8, pageId: '/blog/old-post' } as any,

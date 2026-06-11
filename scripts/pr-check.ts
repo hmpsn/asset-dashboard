@@ -600,6 +600,9 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // SeoContextSlice — backlinkProfile and serpFeatures are now rendered by formatSeoContextSection()
   // InsightsSlice
   'byType', 'forPage',
+  // countsByType: pre-cap count rollup for count consumers (G3); the prompt renders
+  // the severity summary line instead — per-type counts are structured data
+  'countsByType',
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice

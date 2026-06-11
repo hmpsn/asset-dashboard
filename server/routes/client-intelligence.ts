@@ -11,7 +11,6 @@ import { requireClientPortalAuth } from '../middleware.js';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import { createLogger } from '../logger.js';
-import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type {
   ClientIntelligence,
   ClientInsightsSummary,
@@ -36,12 +35,16 @@ const log = createLogger('client-intelligence');
 const ADMIN_ONLY_INSIGHT_TYPES = new Set(['strategy_alignment']);
 
 function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSummary {
+  // G3: byType is capped at 25/type and must never be used for counts or iteration.
+  // Iterate `all` (top 100 by impact — the slice's full-iteration surface) so the
+  // admin-only-type scrub stays exact joint type×severity filtering. Exact pre-cap
+  // per-type totals live in `countsByType`, but they cannot drive these counts because
+  // the scrub needs the joint distribution; on workspaces with >100 stored insights
+  // the summary is bounded by the `all` cap (a deliberate prompt/payload guard).
   // Exclude positive-severity insights: they aren't actionable priority items and
   // including them in 'total' would create a gap vs. highPriority + mediumPriority
   // that clients would have no way to explain.
-  const fullInsightSet = Object.values(insights.byType).flat() as AnalyticsInsight[];
-  const countSource = fullInsightSet.length > 0 ? fullInsightSet : insights.all;
-  const visible = countSource.filter(
+  const visible = insights.all.filter(
     i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive',
   );
   return {

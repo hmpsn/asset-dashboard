@@ -419,6 +419,7 @@ describe('contract: InsightsSlice field population', () => {
     // All required fields from the InsightsSlice interface
     expect(result).toHaveProperty('all');
     expect(result).toHaveProperty('byType');
+    expect(result).toHaveProperty('countsByType');
     expect(result).toHaveProperty('bySeverity');
     expect(result).toHaveProperty('topByImpact');
   });
@@ -428,6 +429,7 @@ describe('contract: InsightsSlice field population', () => {
 
     expect(Array.isArray(result.all)).toBe(true);
     expect(typeof result.byType).toBe('object');
+    expect(typeof result.countsByType).toBe('object');
     expect(typeof result.bySeverity).toBe('object');
     expect(Array.isArray(result.topByImpact)).toBe(true);
   });

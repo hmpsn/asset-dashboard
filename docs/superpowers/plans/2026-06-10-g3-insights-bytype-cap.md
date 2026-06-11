@@ -42,7 +42,7 @@ Full-repo grep of `byType` across `server/`, `src/`, `tests/`, `shared/`, `scrip
 | ↳ `server/intelligence/diagnostic-context-builder.ts:38,77` | via helper | no file change; `:38` path already has a direct-store fallback for cache misses |
 | `server/meeting-brief-generator.ts:48` `assembleMeetingBriefMetrics` | `byType.ranking_opportunity?.length` as a COUNT | `countsByType.ranking_opportunity ?? 0` |
 | `server/meeting-brief-generator.ts:161` (cache-key fingerprint) | same count | `countsByType.ranking_opportunity` |
-| `server/routes/client-intelligence.ts:42` `summarizeInsightsForClient` | flattens uncapped byType for filtered totals | derive counts from pre-cap aggregates (`bySeverity` for high/medium, total = high + medium). Exact: the only admin-only type (`strategy_alignment`) has **no producer** anywhere in `server/` (grep-verified), and positive severity is excluded by construction. `topInsights` (from `topByImpact`) keeps the type+severity filter. |
+| `server/routes/client-intelligence.ts:42` `summarizeInsightsForClient` | flattens uncapped byType for filtered totals | filter `insights.all` (the full-iteration surface). The scrub contract (`tests/contract/client-intelligence-tiers.test.ts` seeds a `strategy_alignment` insight and requires it never be exposed) needs joint type×severity filtering, which pre-cap aggregates (`countsByType`/`bySeverity`) cannot provide — so exact scrubbing wins over exact >100-scale totals. Counts are bounded by the pre-existing `all` 100-cap on pathological workspaces; exact per-type totals remain available in `countsByType`. |
 
 ### byType occurrences verified NOT InsightsSlice (no change)
 

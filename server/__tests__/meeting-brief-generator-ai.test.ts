@@ -51,6 +51,7 @@ const baseIntel = {
   assembledAt: '2026-05-19T00:00:00.000Z',
   insights: {
     byType: { ranking_opportunity: [] },
+    countsByType: { ranking_opportunity: 0 },
     bySeverity: { critical: 0, warning: 0, opportunity: 0, positive: 0 },
     topByImpact: [],
   },
