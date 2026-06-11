@@ -27,6 +27,11 @@ export interface Recommendation {
   actionType: RecActionType;
   productType?: string;      // for purchasable fix upsell
   productPrice?: number;
+  /** D2 (audit #11): the keyword this rec targets (set on content-gap recs at mint).
+   *  Matched via keywordComparisonKey against in-flight briefs/posts (generation
+   *  suppression) and against the published post's targetKeyword (publish-time
+   *  resolution in publishPostToWebflow). Absent on legacy rows and non-content recs. */
+  targetKeyword?: string;
   status: RecStatus;
   assignedTo?: 'team' | 'client'; // premium → team, growth/free → client
   /** SEO Gen-Quality P2: true when this rec comes from a deterministic-backfill content

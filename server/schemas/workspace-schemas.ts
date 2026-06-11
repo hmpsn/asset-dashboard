@@ -375,6 +375,9 @@ export const recommendationSchema = z.object({
   actionType: z.enum(['automated', 'manual', 'content_creation', 'purchase']),
   productType: z.string().optional(),
   productPrice: z.number().optional(),
+  // D2 (audit #11): content-gap recs carry their target keyword for publish-time
+  // resolution matching. Optional — absent on legacy rows and non-content recs.
+  targetKeyword: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed', 'dismissed']),
   assignedTo: z.enum(['team', 'client']).optional(),
   createdAt: z.string(),

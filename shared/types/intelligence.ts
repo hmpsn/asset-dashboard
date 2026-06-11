@@ -306,6 +306,16 @@ export interface ContentPipelineSlice {
   decayAlerts?: DecayAlert[];
   suggestedBriefs?: number;
   copyPipeline?: CopyPipelineSummary;
+  /**
+   * D2 (audit #11): comparison-keyed (`keywordComparisonKey` from
+   * shared/keyword-normalization.ts — already normalized, do NOT re-normalize for
+   * comparison; apply the same function to the candidate keyword) target keywords of
+   * briefs + non-error posts currently in the pipeline. Consumed by the recommendation
+   * engine to suppress content-gap recs the pipeline is already producing. Optional —
+   * degrades to absent/[] when the content stores are unavailable (suppression fails
+   * open: recs are minted, never falsely resolved).
+   */
+  inFlightTargetKeywords?: string[];
   contentPricing?: {
     briefPrice: number;
     fullPostPrice: number;

@@ -538,6 +538,59 @@ export function resolveRecommendationsForPageIds(
 }
 
 /**
+ * D2 (audit #11) — resolve (complete) active content recommendations whose target keyword
+ * matches a just-published post. Called best-effort from the C3 publish domain service
+ * (`server/domains/content/publish-post-to-webflow.ts`) AFTER a successful publish, so the
+ * "create content for X" rec disappears the moment the content for X goes live — without
+ * waiting for the next full regen (which is GSC-lag-gated).
+ *
+ * Content-gap recs have `affectedPages: []` (the page doesn't exist until publish), so the
+ * page-intersection resolver (`resolveRecommendationsForChange`) can never match them —
+ * matching is by `rec.targetKeyword` via `keywordComparisonKey` (the same normalization the
+ * generation-time suppression and the contentPipeline slice use).
+ *
+ * Mirrors `resolveRecommendationsForChange`: validateTransition per rec, summary recompute,
+ * save, intelligence-cache invalidation, and a RECOMMENDATIONS_UPDATED broadcast — only when
+ * at least one rec changed. Deliberately does NOT call `triggerOpportunityRegen`: the publish
+ * service already enqueues `queueKeywordStrategyPostUpdateFollowOns`, which re-ranks the queue.
+ *
+ * @returns the number of recommendations transitioned to `completed`.
+ */
+export function resolveContentRecommendationsForPublishedPost(
+  workspaceId: string,
+  targetKeyword: string | null | undefined,
+): number {
+  const key = targetKeyword ? keywordComparisonKey(targetKeyword) : '';
+  if (!key) return 0;
+
+  const set = loadRecommendations(workspaceId);
+  if (!set) return 0;
+
+  let resolved = 0;
+  const now = new Date().toISOString();
+  for (const rec of set.recommendations) {
+    if (rec.status === 'completed' || rec.status === 'dismissed') continue;
+    if (rec.type !== 'content') continue;
+    if (!rec.targetKeyword || keywordComparisonKey(rec.targetKeyword) !== key) continue;
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
+    rec.status = 'completed';
+    rec.updatedAt = now;
+    resolved++;
+  }
+
+  if (resolved === 0) return 0;
+
+  // Recompute the summary so headline counts / OV totals drop the resolved recs
+  // immediately (same contract as resolveRecommendationsForChange).
+  set.summary = computeRecommendationSummary(set.recommendations);
+  saveRecommendations(set);
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
+  log.info(`Resolved ${resolved} content recommendation(s) for ${workspaceId} after publishing "${targetKeyword}"`);
+  return resolved;
+}
+
+/**
  * Compute the RecommendationSet summary from a rec list. Shared by the full
  * regen (generateRecommendations) and the in-place resolver
  * (resolveRecommendationsForChange) so client-facing headline numbers never
@@ -873,10 +926,30 @@ export function checkToRecType(check: string, category?: string): RecType {
   return 'technical';
 }
 
+/** D2 (audit #11): content-gap recs route into the EXISTING brief-purchase flow.
+ * Brief product per suggested page type — productType values are real `ProductType`
+ * members (shared/types/payments.ts) accepted by /api/stripe/cart-checkout, and prices
+ * mirror PRODUCT_MAP in server/stripe.ts (the same hardcoded-mirror convention the other
+ * mapToProduct cases follow, e.g. schema_page $39).
+ */
+const BRIEF_PRODUCT_BY_PAGE_TYPE: Record<NonNullable<ContentGap['suggestedPageType']>, { productType: string; productPrice: number }> = {
+  blog:     { productType: 'brief_blog',     productPrice: 125 },
+  landing:  { productType: 'brief_landing',  productPrice: 150 },
+  service:  { productType: 'brief_service',  productPrice: 150 },
+  location: { productType: 'brief_location', productPrice: 150 },
+  product:  { productType: 'brief_product',  productPrice: 150 },
+  pillar:   { productType: 'brief_pillar',   productPrice: 200 },
+  resource: { productType: 'brief_resource', productPrice: 150 },
+};
+
 /** Map issue type to purchasable product
  * @internal exported for unit testing
  */
-export function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
+export function mapToProduct(
+  recType: RecType,
+  pageCount: number,
+  pageType?: ContentGap['suggestedPageType'],
+): { productType?: string; productPrice?: number } {
   switch (recType) {
     case 'metadata':
       return pageCount >= 10
@@ -896,6 +969,9 @@ export function mapToProduct(recType: RecType, pageCount: number): { productType
       return pageCount >= 5
         ? { productType: 'content_refresh_5', productPrice: 799 }
         : { productType: 'content_refresh', productPrice: 199 };
+    case 'content':
+      // D2 (audit #11): brief-purchase product keyed by the gap's suggested page type.
+      return BRIEF_PRODUCT_BY_PAGE_TYPE[pageType ?? 'blog'];
     default:
       return {};
   }
@@ -1088,7 +1164,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // We consume it through the shared builder rather than a hand-rolled read so
     // intent stays sourced from the one blessed representation (CLAUDE.md
     // "AI/recommendation generation consumers must use shared intelligence context builders").
-    slices: ['seoContext', 'clientSignals', 'learnings'],
+    // `contentPipeline` (D2, audit #11) carries `inFlightTargetKeywords` — the
+    // comparison-keyed brief/post keywords used to suppress content-gap recs the
+    // pipeline is already producing.
+    slices: ['seoContext', 'clientSignals', 'learnings', 'contentPipeline'],
     verbosity: 'standard',
     tokenBudget: 800,
     enrichWithBacklinks: true,
@@ -1101,6 +1180,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Used only as a within-tier ranking tiebreaker below — never to change tiers.
   const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
   const outcomeLearnings = recommendationContext?.intelligence.learnings ?? null;
+  // D2 (audit #11): keywords the content pipeline is already producing (briefs +
+  // non-error posts), comparison-keyed at slice-assembly time. Suppression fails OPEN:
+  // when the slice/context is unavailable this set is empty and gaps mint as before —
+  // the safe direction (an extra rec, never a false resolution).
+  const inFlightContentKeywords = new Set(
+    recommendationContext?.intelligence.contentPipeline?.inFlightTargetKeywords ?? [],
+  );
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   // It now feeds recommendation copy/context only (KD notes / authority framing), while
@@ -1384,6 +1470,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
 
+        // D2 (audit #11): skip gaps the content pipeline is already producing (an
+        // in-flight brief/post targets this keyword). A previously-minted pending rec
+        // for this gap auto-resolves in the merge tail below — intended: the pipeline
+        // is handling it, and `completed → pending` revives it on a later regen if the
+        // brief is deleted without ever publishing.
+        if (cg.targetKeyword && inFlightContentKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
+
         // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
         // "within-reach" by kdClassificationNote.
         const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
@@ -1411,6 +1504,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           timingBoost: maxBoostForPages(timingBoosts, []),
         }, { calibration: ovCalibration, weights: ovWeights });
         const scoring = deriveCanonicalRecommendationFields(source, opportunity);
+        // D2 (audit #11): content recs route into the existing brief-purchase flow.
+        const product = mapToProduct('content', 1, cg.suggestedPageType);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -1429,6 +1524,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impressionsAtRisk: 0,
           estimatedGain: story.estimatedGain,
           actionType: 'content_creation',
+          ...product,
+          // D2: persisted so the publish-time resolver can match this rec against the
+          // published post's targetKeyword (content-gap recs have no affectedPages).
+          targetKeyword: cg.targetKeyword,
           status: 'pending',
           assignedTo,
           // Carry the gap's deterministic-backfill provenance onto the rec (only when
