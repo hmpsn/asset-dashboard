@@ -347,9 +347,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.2",
           "est": "4-6h",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "AnalyticsTab.tsx is the only data tab with no narrative. (a) Template-based takeaway line at top (no AI call); (b) color-code conversion rates per Four Laws (blue metric values; emerald/amber/red only for genuine judgments). Additive only — no tab restructure (that's the significant-changes track)."
+          "notes": "Shipped in PR 2. AnalyticsTab now renders a deterministic, template-based takeaway from GA4 traffic, top source/page, and top tracked action with no AI call. Conversion rates remain display percentages and use judgment colors only: emerald for 5%+, amber for 2-4.9%, red below 2%, while raw conversion counts remain neutral metric text."
         },
         {
           "id": "cda-qw2-roi-methodology-explainer",
