@@ -61,6 +61,10 @@ const stmts = createStmtCache(() => ({
   markComplete: db.prepare(`UPDATE tracked_actions SET measurement_complete = 1, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
+  // A5 (audit #20): repair-only write — the `predicted_emv IS NULL` guard makes a captured
+  // snapshot immutable. Only the backfill repair pass (backfillPredictedEmvSnapshots) may
+  // fill a missing snapshot; nothing may ever overwrite one.
+  fillPredictedEmvIfNull: db.prepare(`UPDATE tracked_actions SET predicted_emv = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ? AND predicted_emv IS NULL`),
   insertOutcome: db.prepare(`
     INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis)
     VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
@@ -264,9 +268,11 @@ export interface RecordActionParams {
   baselineConfidence?: BaselineConfidence;
   context?: ActionContext;
   /** SEO Gen-Quality P4: OV `predictedEmv` snapshot (CPC-proxy placeholder). Optional —
-   *  defaults to null. Threaded at the recommendation-completion write site
-   *  (rec.opportunity?.predictedEmv); null on the outcome-backfill path and the
-   *  post/insight recordAction sites (which carry no rec opportunity). */
+   *  defaults to null. Threaded at BOTH recommendation-completion write sites: the live
+   *  PATCH route (rec.opportunity?.predictedEmv) and, since A5 (audit #20), the
+   *  outcome-backfill completed-recommendations pass (which reads the same field from the
+   *  rec blob). Still null on the post/insight recordAction sites — those sources carry
+   *  no rec opportunity, so there is no prediction to snapshot (FM-2: never fabricated). */
   predictedEmv?: number | null;
 }
 
@@ -423,6 +429,18 @@ export function updateActionContext(actionId: string, workspaceId: string, conte
 
 export function updateBaselineSnapshot(actionId: string, workspaceId: string, snapshot: BaselineSnapshot): boolean {
   const result = stmts().updateBaseline.run(JSON.stringify(snapshot), actionId, workspaceId);
+  return result.changes > 0;
+}
+
+/**
+ * A5 (audit #20): fill a missing predictedEmv snapshot on an existing tracked action.
+ * Guarded by `predicted_emv IS NULL` in the statement itself, so a snapshot captured at
+ * action time can NEVER be overwritten — re-running the repair pass is a natural no-op.
+ * Returns false when the action doesn't exist, belongs to another workspace, or already
+ * carries a snapshot.
+ */
+export function fillPredictedEmvIfNull(actionId: string, workspaceId: string, predictedEmv: number): boolean {
+  const result = stmts().fillPredictedEmvIfNull.run(predictedEmv, actionId, workspaceId);
   return result.changes > 0;
 }
 

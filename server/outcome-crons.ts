@@ -13,6 +13,7 @@ import type * as OutcomePlaybooks from './outcome-playbooks.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 import type * as ActivityLog from './activity-log.js';
 import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
+import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
 
 const log = createLogger('outcome-crons');
 
@@ -30,6 +31,7 @@ let playbooksInterval: ReturnType<typeof setInterval> | null = null;
 let backfillInterval: ReturnType<typeof setInterval> | null = null;
 let decayScanInterval: ReturnType<typeof setInterval> | null = null;
 let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
+let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called within the first 35s of startup.
@@ -238,6 +240,30 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── A5 (audit #20) — P6 realized-vs-predicted EMV calibration + effort priors. ──
+  // Weekly recompute of outcome_emv_calibration from the predictedEmv snapshots +
+  // realized attributed_value pairs, plus the per-actionType time-to-completion effort
+  // priors. Runs AFTER the backfill startup pass (55s > 40s) so freshly snapshotted
+  // backfill rows are included in the first computation. Derived data only — honest
+  // `inconclusive` below the pair floor, never fabricated (FM-2).
+  const runEmvCalibrationJob = async () => {
+    try {
+      const { runEmvCalibration }: typeof OutcomeEmvCalibration = await import('./outcome-emv-calibration.js'); // dynamic-import-ok
+      const result = runEmvCalibration();
+      log.info(
+        {
+          workspacesProcessed: result.workspacesProcessed,
+          conclusiveEntries: result.conclusiveEntries,
+          inconclusiveEntries: result.inconclusiveEntries,
+          errors: result.errors,
+        },
+        'EMV calibration cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'EMV calibration cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -249,6 +275,7 @@ export function startOutcomeCrons() {
     setTimeout(runBackfillJob, 40_000),
     setTimeout(() => void runDecayScan(), 45_000),
     setTimeout(() => void runRankDeclineScan(), 50_000),
+    setTimeout(() => void runEmvCalibrationJob(), 55_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -258,6 +285,7 @@ export function startOutcomeCrons() {
   backfillInterval = setInterval(runBackfillJob, WEEKLY_MS);
   decayScanInterval = setInterval(() => void runDecayScan(), DAILY_MS);
   rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
+  emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -275,6 +303,7 @@ export function stopOutcomeCrons() {
   if (backfillInterval) clearInterval(backfillInterval);
   if (decayScanInterval) clearInterval(decayScanInterval);
   if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
+  if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -283,5 +312,6 @@ export function stopOutcomeCrons() {
   backfillInterval = null;
   decayScanInterval = null;
   rankDeclineScanInterval = null;
+  emvCalibrationInterval = null;
   log.info('Outcome crons stopped');
 }

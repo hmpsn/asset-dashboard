@@ -121,9 +121,11 @@ export interface TrackedAction {
   context: ActionContext;
   /** SEO Gen-Quality P4: OV `predictedEmv` snapshotted at recordAction time (CPC-proxy
    *  placeholder, NOT real money — see OpportunityScore.predictedEmv). Admin/AI-only,
-   *  never client-facing. null when no opportunity was available at record time (e.g.
-   *  the outcome-backfill path, which cannot read the rec's opportunity object). Feeds
-   *  the P6 realized-vs-predicted calibration loop. */
+   *  never client-facing. Since A5 (audit #20) BOTH recommendation-completion paths
+   *  snapshot it (live PATCH route AND the outcome-backfill rec pass, which reads it
+   *  from the rec blob). null when the source carries no rec opportunity (posts,
+   *  insights, legacy rows). Feeds the P6 realized-vs-predicted calibration loop
+   *  (server/outcome-emv-calibration.ts). */
   predictedEmv?: number | null;
   createdAt: string;
   updatedAt: string;
