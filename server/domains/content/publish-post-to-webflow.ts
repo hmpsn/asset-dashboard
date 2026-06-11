@@ -46,6 +46,7 @@ import { WS_EVENTS } from '../../ws-events.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../../keyword-strategy-follow-ons.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../../outcome-tracking.js';
+import { resolveContentRecommendationsForPublishedPost } from '../../recommendations.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
 import { normalizePageUrl } from '../../helpers.js';
 import { createLogger } from '../../logger.js';
@@ -265,6 +266,16 @@ export async function publishPostToWebflow(
     title: post.title,
     isUpdate,
   });
+
+  // D2 (audit #11): resolve content-gap recommendations matching the published post's
+  // target keyword — the "create content for X" rec completes the moment X goes live.
+  // Best-effort: this runs only on the success path (we are past every throw above) and a
+  // resolution failure must never undo or fail a successful publish.
+  try {
+    resolveContentRecommendationsForPublishedPost(workspaceId, post.targetKeyword ?? null);
+  } catch (err) {
+    log.warn({ err, workspaceId, postId }, 'Failed to resolve content recommendations after publish');
+  }
 
   // Follow-on recommendation regen — a content publish changes the live page inventory so
   // recommendations should reflect it. This used to fire on the manual path only; routing it

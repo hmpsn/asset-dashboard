@@ -435,8 +435,20 @@ describe('mapToProduct', () => {
     expect(mapToProduct('technical', 50)).toEqual({});
   });
 
-  it('content → empty object (no product)', () => {
-    expect(mapToProduct('content', 10)).toEqual({});
+  // D2 (audit #11): content recs map to the existing brief-purchase products so the
+  // client CTA routes into the brief-purchase flow instead of dead-ending with no product.
+  it('content → brief product keyed by suggested page type (prices mirror PRODUCT_MAP)', () => {
+    expect(mapToProduct('content', 1, 'blog')).toEqual({ productType: 'brief_blog', productPrice: 125 });
+    expect(mapToProduct('content', 1, 'landing')).toEqual({ productType: 'brief_landing', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'service')).toEqual({ productType: 'brief_service', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'location')).toEqual({ productType: 'brief_location', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'product')).toEqual({ productType: 'brief_product', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'pillar')).toEqual({ productType: 'brief_pillar', productPrice: 200 });
+    expect(mapToProduct('content', 1, 'resource')).toEqual({ productType: 'brief_resource', productPrice: 150 });
+  });
+
+  it('content without a page type → brief_blog default', () => {
+    expect(mapToProduct('content', 10)).toEqual({ productType: 'brief_blog', productPrice: 125 });
   });
 
   it('performance → empty object (no product)', () => {

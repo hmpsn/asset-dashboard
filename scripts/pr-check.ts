@@ -611,6 +611,10 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   'searchIntent',
   // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
   'insights',
+  // ContentPipelineSlice — inFlightTargetKeywords is mechanical matching data (D2, audit
+  // #11): comparison-keyed brief/post keywords consumed by the recommendation engine's
+  // in-flight suppression pass, never prompt material (normalized keys would only burn tokens).
+  'inFlightTargetKeywords',
   // ClientSignalsSlice — businessPriorities is the RAW client-only store field; it is
   // intentionally not injected into prompts. Only effectiveBusinessPriorities (the resolved
   // superset) is rendered by formatClientSignalsSection. The raw field remains in the type

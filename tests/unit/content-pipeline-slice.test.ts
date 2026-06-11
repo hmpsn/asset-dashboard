@@ -366,6 +366,7 @@ describe('assembleContentPipeline', () => {
       copyPipeline: undefined,
       rewritePlaybook: undefined,
       contentPricing: undefined,
+      inFlightTargetKeywords: [],
     });
     expect(mocks.logWarn).toHaveBeenCalled();
   });

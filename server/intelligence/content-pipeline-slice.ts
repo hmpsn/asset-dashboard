@@ -87,6 +87,32 @@ export async function assembleContentPipeline(
     { logger: log },
   );
 
+  // D2 (audit #11): comparison-keyed target keywords of briefs + non-error posts in the
+  // pipeline. The recommendation engine consumes this (via the shared generation-context
+  // builder) to suppress content-gap recs the pipeline is already producing. Degrades to
+  // [] — suppression fails open (recs minted), never falsely resolving anything.
+  const inFlightTargetKeywords = await readOptionalSlicePart<string[]>(
+    'assembleContentPipeline: in-flight target keywords',
+    workspaceId,
+    [],
+    async () => {
+      const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { listPosts } = await import('../content-posts-db.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const keys = new Set<string>();
+      for (const brief of listBriefs(workspaceId)) {
+        const key = keywordComparisonKey(brief.targetKeyword);
+        if (key) keys.add(key);
+      }
+      for (const post of listPosts(workspaceId)) {
+        if (post.status === 'error') continue;
+        const key = keywordComparisonKey(post.targetKeyword);
+        if (key) keys.add(key);
+      }
+      return [...keys];
+    },
+    { logger: log },
+  );
+
   const subscriptions = await readOptionalSlicePart<
     ContentPipelineSlice['subscriptions']
   >(
@@ -260,6 +286,7 @@ export async function assembleContentPipeline(
     workOrders: summary.workOrders,
     coverageGaps,
     seoEdits: summary.seoEdits,
+    inFlightTargetKeywords,
     subscriptions,
     schemaDeployment,
     cannibalizationWarnings,
