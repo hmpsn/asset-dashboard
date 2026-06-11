@@ -964,11 +964,12 @@ export function mapToProduct(
     // 'aeo' and 'content_refresh' deliberately fall through to the no-product
     // default: the values this used to return (aeo_site_review/aeo_page_review/
     // content_refresh/content_refresh_5) are NOT in the ProductType union or
-    // PRODUCT_MAP, so the CTA they produced failed isProductType at cart
-    // checkout. Restore a case here ONLY together with real PRODUCT_MAP entries
+    // PRODUCT_MAP, so the CTA they produced was unsellable — createCartCheckoutSession
+    // throws "Unknown product type" on a phantom type before any Stripe session
+    // exists. Restore a case here ONLY together with real PRODUCT_MAP entries
     // (displayName, price, Stripe env key, fulfillment) — the contract test in
     // tests/unit/recommendations-pure-logic.test.ts pins every returned
-    // productType to isProductType.
+    // productType to isProductType (catalog membership).
     case 'content':
       // D2 (audit #11): brief-purchase product keyed by the gap's suggested page type.
       return BRIEF_PRODUCT_BY_PAGE_TYPE[pageType ?? 'blog'];

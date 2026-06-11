@@ -4,7 +4,10 @@
  * Covers: getRecoveryRate, migrateSourceKey, buildMergeKey, pageImportanceMultiplier,
  * checkToRecType, mapToProduct, auditInsight, getTrafficScore (base formula)
  *
- * All functions under test are pure / non-async / non-DB.
+ * The functions under test are pure / non-async / non-DB. The product-catalog
+ * helpers imported from server/stripe.js (isProductType, getProductConfig) are
+ * likewise static lookups over PRODUCT_MAP — the Stripe client is constructed
+ * lazily, so importing them here does not touch the DB or open a connection.
  */
 import { describe, it, expect } from 'vitest';
 import { isProductType, getProductConfig } from '../../server/stripe.js';
