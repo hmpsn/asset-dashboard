@@ -7,7 +7,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
+import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 
@@ -37,6 +37,7 @@ interface PostRow {
   published_at: string | null;
   published_slug: string | null;
   review_checklist: string | null;
+  ai_review: string | null;
   voice_score: number | null;
   voice_feedback: string | null;
   generation_style: string | null;
@@ -155,7 +156,7 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist,
+            unification_note, review_checklist, ai_review,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
             voice_score, voice_feedback, generation_style,
             created_at, updated_at)
@@ -163,7 +164,7 @@ const stmts = createStmtCache(() => ({
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist,
+            @unification_note, @review_checklist, @ai_review,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
             @voice_score, @voice_feedback, @generation_style,
             @created_at, @updated_at)`,
@@ -182,6 +183,7 @@ const stmts = createStmtCache(() => ({
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
            unification_note = @unification_note, review_checklist = @review_checklist,
+           ai_review = @ai_review,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
@@ -231,6 +233,9 @@ function rowToPost(row: PostRow): GeneratedPost {
           no_hallucinations: false, meta_optimized: false, word_count_target: false,
         }, { field: 'review_checklist', table: 'content_posts' })
       : undefined,
+    aiReview: row.ai_review
+      ? parseJsonSafe(row.ai_review, storedAiReviewSchema, null, { workspaceId: row.workspace_id, field: 'ai_review', table: 'content_posts' }) ?? undefined
+      : undefined,
     voiceScore: row.voice_score ?? undefined,
     voiceFeedback: row.voice_feedback ?? undefined,
     generationStyle: resolveContentGenerationStyle(row.generation_style),
@@ -262,6 +267,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
+    ai_review: post.aiReview ? JSON.stringify(post.aiReview) : null,
     voice_score: post.voiceScore ?? null,
     voice_feedback: post.voiceFeedback ?? null,
     generation_style: resolveContentGenerationStyle(post.generationStyle),
