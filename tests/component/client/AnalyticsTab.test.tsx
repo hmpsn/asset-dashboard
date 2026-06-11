@@ -65,10 +65,16 @@ describe('AnalyticsTab', () => {
         ga4Events={[]}
         ws={baseWorkspace}
         days={28}
+        dataUpdatedAt={new Date('2026-06-11T15:30:00.000Z').getTime()}
       />,
     );
 
     expect(screen.getByText('2026-04-18 — 2026-05-16')).toBeInTheDocument();
+    expect(screen.getByText(/Data as of/i)).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => {
+      return element?.tagName.toLowerCase() === 'time'
+        && element.getAttribute('dateTime') === '2026-06-11T15:30:00.000Z';
+    })).toBeInTheDocument();
     expect(screen.getByText('/services/seo')).toBeInTheDocument();
     expect(screen.getByText('google / organic')).toBeInTheDocument();
   });

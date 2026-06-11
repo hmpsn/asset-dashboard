@@ -33,6 +33,7 @@ interface PerformanceTabProps {
   rankHistory: { date: string; positions: Record<string, number> }[];
   latestRanks: { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[];
   insights: SearchInsights | null;
+  searchDataUpdatedAt?: number | null;
   // Analytics props
   ga4Overview: GA4Overview | null;
   ga4Comparison: GA4Comparison | null;
@@ -45,6 +46,7 @@ interface PerformanceTabProps {
   ga4NewVsReturning: GA4NewVsReturning[] | null;
   ga4Conversions: GA4ConversionSummary[];
   ga4Events: GA4Event[];
+  ga4DataUpdatedAt?: number | null;
   ws: WorkspaceInfo;
   tier: 'free' | 'growth' | 'premium';
   days: number;
@@ -133,6 +135,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
           rankHistory={props.rankHistory}
           latestRanks={props.latestRanks}
           insights={props.insights}
+          dataUpdatedAt={props.searchDataUpdatedAt}
         />
       )}
 
@@ -149,6 +152,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
           ga4NewVsReturning={props.ga4NewVsReturning}
           ga4Conversions={props.ga4Conversions}
           ga4Events={props.ga4Events}
+          dataUpdatedAt={props.ga4DataUpdatedAt}
           ws={props.ws}
           days={props.days}
           dateRange={props.dateRange}

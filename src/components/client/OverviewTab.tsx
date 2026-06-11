@@ -12,7 +12,7 @@ import { useClientIntelligence } from '../../hooks/client';
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge, FreshnessStamp } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -51,6 +51,8 @@ interface OverviewTabProps {
   ga4Organic: GA4OrganicOverview | null;
   ga4Conversions: GA4ConversionSummary[];
   ga4NewVsReturning: GA4NewVsReturning[];
+  searchDataUpdatedAt?: number | null;
+  ga4DataUpdatedAt?: number | null;
   audit: AuditSummary | null;
   auditDetail: AuditDetail | null;
   strategyData: ClientKeywordStrategy | null;
@@ -80,6 +82,7 @@ export function OverviewTab({
   ws,
   overview, searchComparison,
   ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
+  searchDataUpdatedAt, ga4DataUpdatedAt,
   audit, auditDetail, strategyData, insights,
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
@@ -152,10 +155,19 @@ export function OverviewTab({
     }
     return 'Here are your latest insights';
   })();
+  const showSearchFreshness = Boolean(overview && searchDataUpdatedAt);
+  const showGa4Freshness = Boolean(ga4Overview && ga4DataUpdatedAt);
+
   return (<>
     <p className="t-body text-[var(--brand-text-muted)]">
       Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}. {dynamicSubtitle}
     </p>
+    {(showSearchFreshness || showGa4Freshness) && (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 -mt-1">
+        {showSearchFreshness && <FreshnessStamp value={searchDataUpdatedAt} label="Search data as of" />}
+        {showGa4Freshness && <FreshnessStamp value={ga4DataUpdatedAt} label="Analytics data as of" />}
+      </div>
+    )}
 
     {/* Headline health score */}
     <HealthScoreCard score={clientIntel?.compositeHealthScore} workspaceId={workspaceId} />

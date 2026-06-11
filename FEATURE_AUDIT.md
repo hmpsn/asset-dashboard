@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **487 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **488 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 488. Client Dashboard QW2 PR1 — Data Freshness Stamps
+
+**What it does:** Adds visible "Data as of ..." freshness stamps to the client dashboard's blended Overview metrics and dedicated Performance > Search / Analytics surfaces. Client GA4 and GSC hooks now expose `dataUpdatedAt` from the real React Query child queries, and the shared `FreshnessStamp` primitive renders nothing when freshness is missing or invalid. The client intelligence API wrapper now fails through React Query instead of returning a fabricated `assembledAt: now` fallback, preventing failed intelligence reads from looking freshly assembled.
+
+**Agency value:** Reduces "is this dashboard current?" support loops without adding new data contracts or backend work. The UI now distinguishes real loaded freshness from unavailable data.
+
+**Client value:** Clients can see when the metrics on the page were last loaded, which makes search and analytics reporting feel more transparent and trustworthy.
+
+**Mutual:** Turns data recency from an implicit cache detail into a visible, tested client trust cue while preserving error honesty for intelligence.
+
+**Files:** `src/components/ui/FreshnessStamp.tsx`, `src/components/ui/index.ts`, `src/hooks/client/useClientGA4.ts`, `src/hooks/client/useClientSearch.ts`, `src/api/analytics.ts`, `src/components/ClientDashboard.tsx`, `src/components/client/OverviewTab.tsx`, `src/components/client/PerformanceTab.tsx`, `src/components/client/SearchTab.tsx`, `src/components/client/AnalyticsTab.tsx`. Tests: `tests/component/FreshnessStamp.test.tsx`, `tests/component/SearchTab.test.tsx`, `tests/component/client/AnalyticsTab.test.tsx`, `tests/component/client/OverviewTab.test.tsx`, `tests/unit/hooks/client-hooks-extended.test.tsx`, `tests/unit/api-modules-a.test.ts`, `tests/unit/src-api-modules-pure.test.ts`.
 
 ---
 

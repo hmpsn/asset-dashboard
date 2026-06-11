@@ -11,6 +11,17 @@ export interface ClientSearchData {
   trend: PerformanceTrend[];
   comparison: SearchComparison | null;
   devices: SearchDeviceBreakdown[];
+  dataUpdatedAt: number | null;
+}
+
+type FreshnessQuery = {
+  status: 'pending' | 'error' | 'success';
+  dataUpdatedAt: number;
+};
+
+function primaryDataUpdatedAt(query: FreshnessQuery, data: unknown): number | null {
+  if (!data || query.status !== 'success' || query.dataUpdatedAt <= 0) return null;
+  return query.dataUpdatedAt;
 }
 
 export function useClientSearch(
@@ -37,11 +48,14 @@ export function useClientSearch(
     },
   });
 
+  const overview = (overviewQ.data ?? null) as SearchOverview | null;
+
   return {
-    overview: (overviewQ.data ?? null) as SearchOverview | null,
+    overview,
     trend: trendQ.data ?? [],
     comparison: (comparisonQ.data ?? null) as SearchComparison | null,
     devices: devicesQ.data ?? [],
+    dataUpdatedAt: primaryDataUpdatedAt(overviewQ, overview),
     isLoading: overviewQ.isLoading || trendQ.isLoading,
     error: overviewQ.error || trendQ.error || comparisonQ.error || devicesQ.error,
   };

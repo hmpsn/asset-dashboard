@@ -1,5 +1,5 @@
 // ── Analytics API (GA4 + GSC) ──────────────────────────────────────
-import { get, post, getSafe, getOptional } from './client';
+import { get, post, getOptional } from './client';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   SearchDeviceBreakdown, SearchCountryBreakdown, SearchTypeBreakdown,
@@ -151,14 +151,5 @@ export const gscAdmin = {
 
 // ── Client Intelligence ────────────────────────────────────────────
 export async function fetchClientIntelligence(workspaceId: string): Promise<ClientIntelligence> {
-  return getSafe<ClientIntelligence>(
-    `/api/public/intelligence/${workspaceId}`,
-    {
-      workspaceId,
-      assembledAt: new Date().toISOString(),
-      tier: 'free',
-      insightsSummary: null,
-      pipelineStatus: null,
-    },
-  );
+  return get<ClientIntelligence>(`/api/public/intelligence/${workspaceId}`);
 }
