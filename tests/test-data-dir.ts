@@ -7,6 +7,13 @@ import { fileURLToPath } from 'url';
 const TEST_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(TEST_ROOT, '..');
 
+declare global {
+  // Avoid duplicate exit/signal handlers when Vitest setup imports this helper
+  // before many test files in the same worker process.
+  // eslint-disable-next-line no-var
+  var __assetDashboardTestDataDirCleanupRegistered: boolean | undefined;
+}
+
 function hashTemplateInputs(): string {
   const migrationsDir = path.join(REPO_ROOT, 'server/db/migrations');
   const files = fs.readdirSync(migrationsDir)
@@ -97,6 +104,47 @@ function copyTemplateDb(dataDir: string): void {
   fs.copyFileSync(source, dest);
 }
 
+function isWorkerDataDir(dataDir: string): boolean {
+  const tmpRoot = path.resolve(os.tmpdir());
+  const resolved = path.resolve(dataDir);
+  return (
+    resolved.startsWith(`${tmpRoot}${path.sep}`)
+    && /^asset-dashboard-vitest-\d+-[^/]+$/.test(path.basename(resolved))
+  );
+}
+
+function removeWorkerDataDir(dataDir: string): void {
+  if (process.env.ASSET_DASHBOARD_TEST_PRESERVE_DATA_DIR === '1') return;
+  if (!isWorkerDataDir(dataDir)) return;
+
+  try {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  } catch {
+    // Best effort: a failed temp cleanup should never mask the test result.
+  }
+}
+
+function registerWorkerDataDirCleanup(dataDir: string): void {
+  if (globalThis.__assetDashboardTestDataDirCleanupRegistered) return;
+  globalThis.__assetDashboardTestDataDirCleanupRegistered = true;
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    removeWorkerDataDir(dataDir);
+  };
+
+  process.once('exit', cleanup);
+
+  const handleSignal = (signal: NodeJS.Signals) => {
+    cleanup();
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  };
+  process.once('SIGINT', handleSignal);
+  process.once('SIGTERM', handleSignal);
+}
+
 /**
  * Ensure tests in the current Vitest worker use an isolated data directory
  * before any server/db module reads DATA_DIR.
@@ -111,6 +159,7 @@ export function ensureIsolatedTestDataDir(): string {
         + 'Restart Vitest so the worker DB can be recreated from the latest migration template.',
       );
     }
+    registerWorkerDataDirCleanup(process.env.DATA_DIR);
     return process.env.DATA_DIR;
   }
 
@@ -125,6 +174,7 @@ export function ensureIsolatedTestDataDir(): string {
   process.env.DATA_DIR = dir;
   process.env.ASSET_DASHBOARD_TEST_DATA_DIR_SET = '1';
   process.env.ASSET_DASHBOARD_TEST_DB_TEMPLATE_HASH = templateHash;
+  registerWorkerDataDirCleanup(dir);
 
   return dir;
 }
