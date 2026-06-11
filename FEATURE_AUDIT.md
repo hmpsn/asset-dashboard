@@ -1,18 +1,46 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **482 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **484 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 482. Keyword-Level Outcome Bridge + Client Requested-Keyword Rank Trend (A4, audit #15)
+### 484. Keyword-Level Outcome Bridge + Client Requested-Keyword Rank Trend (A4, audit #15)
 
 **What it does:** Closes the keyword-level outcome loop in three pieces. (1) **Hub actions enter outcome tracking** — Keyword Hub track / promote / add-to-strategy actions (single, bulk, route, and MCP paths, all via B2's `applyKeywordCommandCenterAction` contract point) now record a tracked outcome action through the new `recordKeywordTrackingAction()` (`server/outcome-measurement-keywords.ts`), reusing A3's `strategy_page_keyword` sourceType + `strategyPageKeywordSourceId()` idempotency key so the Hub and strategy-regeneration writers share one dedup space (re-track / decline→re-add never duplicates). Baselines capture the keyword's current position from the freshest rank snapshot (`exact`), or an honestly-empty `estimated` baseline when none exists. (2) **Keyword-level scoring** — the measurement cron scores `strategy_keyword_added` actions that carry a `targetKeyword` against `rank_snapshots` (keyword-level position, ≤14-day freshness via `readKeywordRankSnapshot`) instead of page-aggregate GSC, matching the keyword-level baselines; missing/stale snapshots score `inconclusive`, never fabricated (FM-2). Two inherited A3-review fixes shipped here: a search-metric action whose baseline lacks the PRIMARY metric now scores `inconclusive` (previously a missing baseline position was read as 0, fabricating a loss), and permanently-unmeasurable strategy-level actions (no pageUrl, no targetKeyword, metrics-empty baseline) exit the measurement queue at their first due checkpoint instead of emitting inconclusive noise until day 90. (3) **Client trend card** — the client Strategy tab shows a 180-day rank-trend `ChartCard` for the keywords the client requested themselves (`StrategyRequestedKeywordTrendSection` + `useRequestedKeywordRankTrend`, growth-gated inside the no-keywords check so free-tier clients never see an irrelevant upsell, live-refreshed on `RANK_TRACKING_UPDATED`).
 
 **Agency value:** Keyword work done in the Hub finally feeds the learnings engine — wins and losses on tracked keywords accrue to the same outcome dataset that calibrates recommendations — and the measurement queue stops carrying permanently-dead actions or fabricating losses from partial baselines.
 
 **Client value:** "Add a keyword you care about" now has a visible payoff: a live 180-day ranking trend of exactly the keywords they requested, refreshed as new rank snapshots land.
+
+---
+
+### 483. Server-side grounding for client chat — kill the verbatim-context prompt-injection / token-sink surface (E4, audit #17)
+
+**What it does:** Hardens the public client chat endpoint (`POST /api/public/search-chat/:workspaceId`). Previously the endpoint accepted `context: z.record(z.unknown())` and serialized it VERBATIM into the system prompt (`JSON.stringify(context)`), so any client could inject arbitrary JSON below the guardrails (prompt injection) and there was no size cap (unbounded token sink). Now: (1) the opaque `context` field is removed from the Zod schema — Zod's default strip means the existing frontend keeps working but its `context` payload never reaches the prompt; (2) client input is limited to enum/size-capped HINTS only (`currentTab` from a fixed `ClientTab`-mirrored union, `days` bounded 1–366, plus the already-capped `question`/`sessionId`/`betaMode`); (3) the model's view of workspace data is now SERVER-ASSEMBLED — the data-inventory flags and the grounding block are derived from intelligence slices (`buildSeoPromptContext` with the client-safe slice set `seoContext`/`insights`/`siteHealth`/`learnings`) plus server-owned reads (search/GA4 headline overviews re-fetched server-side, audit-traffic, content plan, approval/request counts read from the DB — never client-claimed). The grounding deliberately EXCLUDES the agency-only `clientSignals` slice (churn risk, intent signals, approval rate) per the D1/EMV precedent, and the standard formatter path already omits admin-only fields like `emvPerWeek`. Slice failure degrades to minimal grounding and still returns 200 (FM-2), never 500. Response shape `{ answer, sessionId, detectedIntent }` is unchanged for the frontend. Reuses the existing `client-search-chat` named operation in the AI operation registry (prose output — no new registry entry needed).
+
+**Agency value:** Closes a real security hole on a public, client-facing endpoint — clients can no longer steer the advisor with injected instructions or poison its answers with fabricated metrics, and can no longer blow up token spend by posting megabytes of "context." The agency, not the browser, now decides exactly what the model sees, scoped to the workspace.
+
+**Client value:** The advisor's answers are grounded in authoritative, server-verified workspace data rather than whatever the browser happened to send, so its numbers are trustworthy and consistent. No behavior change in the chat UI.
+
+**Mutual:** A safer, more predictable advisor that can't be manipulated or made to leak agency-only intelligence, with answer quality preserved via real slice-derived grounding.
+
+**Files:** `server/routes/public-analytics.ts` (`chatSchema` hardened, `CLIENT_CHAT_TAB_HINTS`, server-side grounding + headline-overview re-fetch + approval/request reads, verbatim-context removal). Tests: `tests/integration/client-chat-grounding.test.ts` (injection-never-in-prompt via mocked `callAI` capture, oversized-context drop, client-safe slice set, enum-hint accept + invalid-enum 400, FM-2 minimal-grounding 200, response-shape preservation, 401-without-auth).
+
+---
+
+### 482. Persisted AI review verdicts + scraped source evidence (audit #16)
+
+**What it does:** Makes content QA durable in two places that previously evaporated. (1) AI review verdicts: the post AI-review run (`POST /api/content-posts/:wsId/:postId/ai-review`) now persists its full verdict pack (`StoredAIReview` — the post-provenance-marking review map, evidence snapshot, `reviewedAt`, model) on a new `content_posts.ai_review` column, so verdicts survive editor close and are retrievable on any fresh post GET. Provenance-sensitive items (`factual_accuracy`, `no_hallucinations`) are only ever stored `pass=false` + `humanReviewRequired` — the grounding contract is preserved at the storage layer, not just the response. (2) Scraped source text: the brief generation job now persists C1's enrichment output (`BriefSourceEvidence` on `content_briefs.source_evidence`) — scraped reference-page `bodyText`, real SERP result snippets (previously dropped at the `generateBrief` boundary), fetch timestamps, and style-example pages. Regenerating a brief carries the evidence forward. Both fields are admin-internal and stripped from public client brief/post responses.
+
+**Agency value:** Reviewers stop re-running AI reviews because the verdicts vanished with the editor session, and the saved source pack means a future claim can be checked against the *actual text* that grounded the brief — not just URLs. This is the storage prerequisite for the real-text evidence ledger (#27).
+
+**Client value:** Indirect — stronger, auditable human-verification workflow behind delivered content, with zero new client-facing payload (the scraped competitor text never leaves the admin boundary).
+
+**Mutual:** One review run now produces a durable QA artifact tied to the post, and one scrape now produces a durable evidence pack tied to the brief — both reusable by future features without re-fetching or re-paying for the work.
+
+**Files:** `server/db/migrations/132-c4-persist-review-results.sql`, `shared/types/content.ts` (`StoredAIReview`, `BriefSourceEvidence`, `BriefScrapedSource`), `server/schemas/content-schemas.ts`, `server/content-posts-db.ts`, `server/content-brief.ts`, `server/routes/content-posts.ts` (review seam + activity + broadcast), `server/content-brief-generation-job.ts` (persistence seam), `server/routes/public-content.ts` (client-boundary strips), `server/activity-log.ts` (`post_ai_review`). Tests: `tests/integration/c4-persist-review-results.test.ts`.
 
 ---
 
