@@ -57,6 +57,7 @@ const defaultProps = {
   rankHistory: [],
   latestRanks: [],
   insights: null,
+  dataUpdatedAt: null as number | null,
 };
 
 describe('SearchTab', () => {
@@ -72,6 +73,16 @@ describe('SearchTab', () => {
   it('keeps RankTrackingSection as-is (not migrated)', () => {
     render(<SearchTab {...defaultProps} />);
     expect(screen.getByTestId('rank-tracking-section')).toBeInTheDocument();
+  });
+
+  it('shows a real data freshness stamp when query freshness is available', () => {
+    render(<SearchTab {...defaultProps} dataUpdatedAt={new Date('2026-06-11T15:30:00.000Z').getTime()} />);
+
+    expect(screen.getByText(/Data as of/i)).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => {
+      return element?.tagName.toLowerCase() === 'time'
+        && element.getAttribute('dateTime') === '2026-06-11T15:30:00.000Z';
+    })).toBeInTheDocument();
   });
 
   // Wave 2b B2: "All Keywords & Pages" section — expand and verify KeywordTable renders query rows.

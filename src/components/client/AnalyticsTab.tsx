@@ -3,7 +3,7 @@ import {
   LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
-import { StatCard, EmptyState, Icon, SectionCard, ChartCard, Button, FormInput } from '../ui';
+import { StatCard, EmptyState, Icon, SectionCard, ChartCard, Button, FormInput, FreshnessStamp } from '../ui';
 import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -36,12 +36,13 @@ interface AnalyticsTabProps {
   ws: WorkspaceInfo;
   days: number;
   dateRange?: AnalyticsDateRange;
+  dataUpdatedAt?: number | null;
 }
 
 export function AnalyticsTab({
   ga4Overview, ga4Comparison, ga4Trend, ga4Devices, ga4Pages, ga4Sources,
   ga4Organic, ga4LandingPages, ga4NewVsReturning,
-  ga4Conversions, ga4Events, ws, days, dateRange,
+  ga4Conversions, ga4Events, ws, days, dateRange, dataUpdatedAt,
 }: AnalyticsTabProps) {
   // Analytics-internal state
   const [ga4SelectedEvent, setGa4SelectedEvent] = useState<string | null>(null);
@@ -176,9 +177,12 @@ export function AnalyticsTab({
 
   return (<>
     <div className="space-y-6">
-    <p className="t-caption-sm text-[var(--brand-text-muted)]">
-      {ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
-    </p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="t-caption-sm text-[var(--brand-text-muted)]">
+        {ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
+      </p>
+      <FreshnessStamp value={dataUpdatedAt} />
+    </div>
     {analyticsActionError && (
       <div className="px-3 py-2 bg-red-500/8 border border-red-500/15 text-accent-danger t-caption-sm" style={{ borderRadius: 'var(--radius-signature)' }}>
         {analyticsActionError}

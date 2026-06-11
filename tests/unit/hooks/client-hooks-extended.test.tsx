@@ -210,6 +210,11 @@ describe('useClientSearch — disabled state', () => {
     const { result } = renderHook(() => useClientSearch('ws-1', 28, undefined, false), { wrapper: makeWrapper() });
     expect(result.current.devices).toEqual([]);
   });
+
+  it('dataUpdatedAt defaults to null when disabled', () => {
+    const { result } = renderHook(() => useClientSearch('ws-1', 28, undefined, false), { wrapper: makeWrapper() });
+    expect(result.current.dataUpdatedAt).toBeNull();
+  });
 });
 
 describe('useClientSearch — successful fetch', () => {
@@ -278,6 +283,38 @@ describe('useClientSearch — successful fetch', () => {
 
     const { result } = renderHook(() => useClientSearch('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it('exposes overview dataUpdatedAt when primary overview data is present', async () => {
+    mockGscOverview.mockResolvedValue({
+      totalClicks: 500,
+      totalImpressions: 5000,
+      avgCtr: 10,
+      avgPosition: 4.2,
+      topQueries: [],
+      topPages: [],
+      dateRange: { start: '2026-06-01', end: '2026-06-11' },
+    });
+    mockGscTrend.mockResolvedValue([]);
+    mockGscComparison.mockResolvedValue(null);
+    mockGscDevices.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useClientSearch('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.dataUpdatedAt).toEqual(expect.any(Number)));
+    expect(result.current.dataUpdatedAt).toBeGreaterThan(0);
+  });
+
+  it('does not expose freshness when only secondary sub-queries have data', async () => {
+    mockGscOverview.mockResolvedValue(null);
+    mockGscTrend.mockResolvedValue([
+      { date: '2026-06-11', clicks: 10, impressions: 100, ctr: 10, position: 3 },
+    ]);
+    mockGscComparison.mockResolvedValue(null);
+    mockGscDevices.mockResolvedValue([{ device: 'desktop', clicks: 5, impressions: 50, ctr: 10, position: 4 }]);
+
+    const { result } = renderHook(() => useClientSearch('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.dataUpdatedAt).toBeNull();
   });
 
   it('exposes error when a sub-query fails', async () => {
@@ -351,6 +388,11 @@ describe('useClientGA4 — disabled state', () => {
     const { result } = renderHook(() => useClientGA4('ws-1', 28, undefined, false), { wrapper: makeWrapper() });
     expect(result.current.sectionError).toBeNull();
   });
+
+  it('dataUpdatedAt defaults to null when disabled', () => {
+    const { result } = renderHook(() => useClientGA4('ws-1', 28, undefined, false), { wrapper: makeWrapper() });
+    expect(result.current.dataUpdatedAt).toBeNull();
+  });
 });
 
 describe('useClientGA4 — successful fetch', () => {
@@ -407,6 +449,34 @@ describe('useClientGA4 — successful fetch', () => {
     const { result } = renderHook(() => useClientGA4('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.sectionError).toBeNull();
+  });
+
+  it('exposes overview dataUpdatedAt when primary overview data is present', async () => {
+    mockGa4Overview.mockResolvedValue({
+      totalUsers: 800,
+      totalSessions: 1000,
+      totalPageviews: 2000,
+      avgSessionDuration: 75,
+      bounceRate: 40,
+      newUserPercentage: 65,
+      dateRange: { start: '2026-06-01', end: '2026-06-11' },
+    });
+
+    const { result } = renderHook(() => useClientGA4('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.dataUpdatedAt).toEqual(expect.any(Number)));
+    expect(result.current.dataUpdatedAt).toBeGreaterThan(0);
+  });
+
+  it('does not expose freshness when only secondary GA4 sub-queries have data', async () => {
+    mockGa4Overview.mockResolvedValue(null);
+    mockGa4Trend.mockResolvedValue([{ date: '2026-06-11', users: 12, sessions: 18, pageviews: 40 }]);
+    mockGa4TopPages.mockResolvedValue([
+      { path: '/', pageviews: 40, users: 12, sessions: 18, avgEngagementTime: 30 },
+    ]);
+
+    const { result } = renderHook(() => useClientGA4('ws-1', 28, undefined, true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.dataUpdatedAt).toBeNull();
   });
 });
 

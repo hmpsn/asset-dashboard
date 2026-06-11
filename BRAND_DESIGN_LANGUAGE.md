@@ -125,6 +125,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **SectionCard** | `SectionCard.tsx` | `bg-[var(--surface-2)] border-[var(--brand-border)]` | Header row optional; title: `.t-body font-semibold text-[var(--brand-text-bright)]` |
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-[var(--brand-border)]`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), `.t-ui` inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature card radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
+| **FreshnessStamp** | `FreshnessStamp.tsx` | `text-[var(--brand-text-muted)]` + muted clock icon | Compact metadata stamp for real data recency ("Data as of ..."). Renders nothing when the timestamp is missing or invalid so unavailable data never looks current. |
 | **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
 | **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, keyword-command-center, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
@@ -624,6 +625,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/SectionCard.tsx` | Standard card container |
 | `src/components/ui/ChartCard.tsx` | SectionCard variant for charts (tighter padding, inline title+trend) |
 | `src/components/ui/TrendBadge.tsx` | Canonical directional delta indicator (emerald/red/zinc) |
+| `src/components/ui/FreshnessStamp.tsx` | Canonical real-data recency stamp; renders nothing without a valid timestamp |
 | `src/components/ui/PageHeader.tsx` | Consistent page header |
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |

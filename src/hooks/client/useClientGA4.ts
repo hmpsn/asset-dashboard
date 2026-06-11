@@ -20,6 +20,17 @@ export interface ClientGA4Data {
   ga4NewVsReturning: GA4NewVsReturning[];
   ga4Organic: GA4OrganicOverview | null;
   ga4LandingPages: GA4LandingPage[];
+  dataUpdatedAt: number | null;
+}
+
+type FreshnessQuery = {
+  status: 'pending' | 'error' | 'success';
+  dataUpdatedAt: number;
+};
+
+function primaryDataUpdatedAt(query: FreshnessQuery, data: unknown): number | null {
+  if (!data || query.status !== 'success' || query.dataUpdatedAt <= 0) return null;
+  return query.dataUpdatedAt;
 }
 
 export function useClientGA4(
@@ -63,8 +74,10 @@ export function useClientGA4(
       ? `Partial analytics load — failed: ${failedKeys.join(', ')}`
       : null;
 
+  const ga4Overview = (overviewQ.data ?? null) as GA4Overview | null;
+
   return {
-    ga4Overview: (overviewQ.data ?? null) as GA4Overview | null,
+    ga4Overview,
     ga4Trend: trendQ.data ?? [],
     ga4Pages: topPagesQ.data ?? [],
     ga4Sources: sourcesQ.data ?? [],
@@ -76,6 +89,7 @@ export function useClientGA4(
     ga4NewVsReturning: nvrQ.data ?? [],
     ga4Organic: (organicQ.data ?? null) as GA4OrganicOverview | null,
     ga4LandingPages: landingQ.data ?? [],
+    dataUpdatedAt: primaryDataUpdatedAt(overviewQ, ga4Overview),
     isLoading: overviewQ.isLoading || trendQ.isLoading,
     sectionError,
   };

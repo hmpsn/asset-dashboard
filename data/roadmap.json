@@ -337,9 +337,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.4 + §2.1",
           "est": "4-6h",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Server half: assembledAt in shared/types/intelligence.ts + buildWorkspaceIntelligence() facade. Client half: shared FreshnessStamp helper in src/components/ui/ rendered on Performance/Search/Analytics/Overview headers (query dataUpdatedAt or assembledAt). Kills the #1 'is this data right?' support question."
+          "notes": "Shipped in PR 1. Server half already existed via ClientIntelligence.assembledAt; this PR adds a shared FreshnessStamp primitive, real React Query dataUpdatedAt plumbing for client GA4/GSC hooks, visible stamps on Search/Analytics/Overview metric surfaces, and removes the synthetic client-intelligence fallback timestamp so failed intelligence reads cannot render as fresh."
         },
         {
           "id": "cda-qw2-analytics-takeaway",

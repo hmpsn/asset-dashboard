@@ -385,8 +385,8 @@ describe('gscAdmin.chat', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('fetchClientIntelligence', () => {
-  it('calls getSafe with intelligence endpoint', async () => {
-    mockGetSafe.mockResolvedValueOnce({
+  it('calls get with intelligence endpoint', async () => {
+    mockGet.mockResolvedValueOnce({
       workspaceId: 'ws-1',
       assembledAt: '2025-01-01T00:00:00Z',
       tier: 'free',
@@ -394,23 +394,23 @@ describe('fetchClientIntelligence', () => {
       pipelineStatus: null,
     });
     await fetchClientIntelligence('ws-1');
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/public/intelligence/ws-1');
   });
 
-  it('returns the resolved data from getSafe', async () => {
+  it('returns the resolved data from get', async () => {
     const data = { workspaceId: 'ws-99', assembledAt: '2025-01-01T00:00:00Z', tier: 'growth' as const, insightsSummary: null, pipelineStatus: null };
-    mockGetSafe.mockResolvedValueOnce(data);
+    mockGet.mockResolvedValueOnce(data);
     const result = await fetchClientIntelligence('ws-99');
     expect(result.workspaceId).toBe('ws-99');
     expect(result.tier).toBe('growth');
   });
 
-  it('fallback has correct shape when getSafe returns the default', async () => {
-    mockGetSafe.mockImplementationOnce((_url, fallback) => Promise.resolve(fallback));
-    const result = await fetchClientIntelligence('ws-1');
-    expect(result.insightsSummary).toBeNull();
-    expect(result.pipelineStatus).toBeNull();
+  it('surfaces provider failures instead of returning a synthetic timestamp fallback', async () => {
+    const err = new Error('intelligence unavailable');
+    mockGet.mockRejectedValueOnce(err);
+    await expect(fetchClientIntelligence('ws-1')).rejects.toThrow('intelligence unavailable');
+    expect(mockGetSafe).not.toHaveBeenCalled();
   });
 });
 

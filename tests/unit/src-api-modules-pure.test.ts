@@ -183,8 +183,8 @@ describe('src/api/analytics — gscAdmin', () => {
 });
 
 describe('src/api/analytics — fetchClientIntelligence', () => {
-  it('calls getSafe with correct url and fallback shape', async () => {
-    mockedGetSafe.mockResolvedValueOnce({
+  it('calls get with correct url and returns the server intelligence payload', async () => {
+    mockedGet.mockResolvedValueOnce({
       workspaceId: 'ws-1',
       assembledAt: '2024-01-01',
       tier: 'free',
@@ -192,10 +192,16 @@ describe('src/api/analytics — fetchClientIntelligence', () => {
       pipelineStatus: null,
     });
     const result = await fetchClientIntelligence('ws-1');
-    expect(mockedGetSafe).toHaveBeenCalled();
-    const [url] = mockedGetSafe.mock.calls[0];
+    expect(mockedGet).toHaveBeenCalled();
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/intelligence/ws-1');
     expect(result.workspaceId).toBe('ws-1');
+  });
+
+  it('does not return a fallback intelligence timestamp when the request fails', async () => {
+    mockedGet.mockRejectedValueOnce(new Error('network down'));
+    await expect(fetchClientIntelligence('ws-1')).rejects.toThrow('network down');
+    expect(mockedGetSafe).not.toHaveBeenCalled();
   });
 });
 

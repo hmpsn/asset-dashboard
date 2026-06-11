@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { KeywordTable, RankTrackingSection } from '../shared/RankTable';
 import type { KeywordTableRow } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button, FreshnessStamp } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -30,6 +30,7 @@ interface SearchTabProps {
   rankHistory: { date: string; positions: Record<string, number> }[];
   latestRanks: { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[];
   insights: SearchInsights | null;
+  dataUpdatedAt?: number | null;
 }
 
 function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | null, insights: SearchInsights | null): string {
@@ -51,7 +52,7 @@ function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | 
 
 export function SearchTab({
   overview, searchComparison, trend, annotations,
-  rankHistory, latestRanks, insights,
+  rankHistory, latestRanks, insights, dataUpdatedAt,
 }: SearchTabProps) {
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -80,7 +81,10 @@ export function SearchTab({
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
-    <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
+      <FreshnessStamp value={dataUpdatedAt} />
+    </div>
 
     {/* AI-style takeaway */}
     <SectionCard variant="subtle" noPadding>

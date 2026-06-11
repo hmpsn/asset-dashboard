@@ -10,6 +10,7 @@ export type { BadgeTone, BadgeVariant, BadgeSize, BadgeShape } from './Badge';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeDomain, StatusBadgeConfig } from './statusConfig';
 export { CharacterCounter } from './CharacterCounter';
+export { FreshnessStamp, type FreshnessStampProps } from './FreshnessStamp';
 export { SerpPreview } from './SerpPreview';
 export { SocialPreview } from './SocialPreview';
 export { EmptyState } from './EmptyState';
