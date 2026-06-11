@@ -1,75 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
-      "name": "🩹 Admin Surfaces W1 — Stop the Silent Failures",
-      "hours": "~18-26h",
-      "rationale": "Wave 1 of the 2026-06-11 admin surface audit. Every item is a fetch/mutation failure currently rendering as success or an empty state — the audit's #1 defect class. Six parallel lanes, exclusive file ownership, all S-effort.",
-      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 1. Per-lane FM-2 error-path test required. All findings adversarially verified (0/187 refuted).",
-      "items": [
-        {
-          "id": "aw1-strategy-error-channels",
-          "title": "Strategy: stop swallowing fetch errors + decouple add-to-strategy errors from the credit-burning generation retry",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "useKeywordStrategy.ts:44 `.catch(() => null)` renders 500s as the 'No keyword strategy yet' empty state; add-to-strategy failures share the generation ErrorState whose Try Again launches a full regeneration. Also fix trackKeyword swallowing all failures as duplicates. Report §1."
-        },
-        {
-          "id": "aw1-local-seo-panel-errorstate",
-          "title": "Local SEO: ErrorState before the panel's null return (3 mounts) + drawer edit-wipe guard + in-view save errors",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "LocalSeoVisibilityPanel.tsx:288 silently vanishes on load error on all three mount surfaces; setup drawer destroys unsaved edits when WS invalidation lands mid-session; save/validation errors render off-screen. Report §3."
-        },
-        {
-          "id": "aw1-editor-silent-save",
-          "title": "Content: editor stops claiming 'Saved' after failed saves + un-swallow ContentManager/PostEditor mutation errors",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Rethrow in PostEditor.saveField + add 'error' SaveStatus to useAutoSave; publish/approve/delete/score failures currently look like success; ContentManager/ContentCalendar show misleading empty states on query failure. Report §5."
-        },
-        {
-          "id": "aw1-kcc-ws-wiring",
-          "title": "KCC: copy Hub's wsHandlers block — production surface has zero useWorkspaceEvents wiring",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "1-2h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Server triple-broadcasts on every mutation; KCC never invalidates → 2-5 min stale data on external changes. Data Flow Rule 2 violation on the live surface. Report §2."
-        },
-        {
-          "id": "aw1-schema-silent-failures",
-          "title": "Schema: un-silence send-to-client/save-as-template/page-type/rollback failures + scoped single-page error UI",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Four mutation paths fail completely silently; a single-page generation failure replaces the entire results view with a full-screen error. Report §4."
-        },
-        {
-          "id": "aw1-shell-palette-badge",
-          "title": "Admin shell: palette 'Run Audit' actually runs an audit + pendingContentRequests badge onto React Query/WS",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "CommandPalette.tsx:174-180 'Run Audit' silently enables a schedule instead; 'Scan for Anomalies' fires globally while presented workspace-scoped; App.tsx:285-295 badge is a raw fetch that goes stale. Report §6."
-        }
-      ]
-    },
-    {
       "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",
       "name": "🔒 Admin Surfaces W2 — Data Integrity & Protection",
       "hours": "~24-34h",
@@ -1602,6 +1533,76 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
+      "name": "✅ SHIPPED — 🩹 Admin Surfaces W1 — Stop the Silent Failures",
+      "hours": "~18-26h",
+      "rationale": "Wave 1 of the 2026-06-11 admin surface audit. Every item is a fetch/mutation failure currently rendering as success or an empty state — the audit's #1 defect class. Six parallel lanes, exclusive file ownership, all S-effort.",
+      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 1. Per-lane FM-2 error-path test required. All findings adversarially verified (0/187 refuted).",
+      "items": [
+        {
+          "id": "aw1-strategy-error-channels",
+          "title": "Strategy: stop swallowing fetch errors + decouple add-to-strategy errors from the credit-burning generation retry",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w1 (95691558). Main-query swallow removed; ErrorState+refetch before empty state; add-keyword failures get own role=alert banner; trackKeyword distinguishes duplicates, per-keyword pending+errors. 9 behavioral tests."
+        },
+        {
+          "id": "aw1-local-seo-panel-errorstate",
+          "title": "Local SEO: ErrorState before the panel's null return (3 mounts) + drawer edit-wipe guard + in-view save errors",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done (3adcdeb4). ErrorState before featureEnabled return covers all 3 mounts; drawer dirty-guard via last-synced ref (project external-sync gotcha); role=alert + footer indicator for save errors; focus restore only on close. 8 new tests."
+        },
+        {
+          "id": "aw1-editor-silent-save",
+          "title": "Content: editor stops claiming 'Saved' after failed saves + un-swallow ContentManager/PostEditor mutation errors",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done (319f0b9d + review-fix commit). saveField rethrows; SaveStatus 'error'; Done-exit blocked on failed flush; fire-and-forget callers caught; cross-section retry corruption edge fixed; FM-2 component tests added. NOTE: 319f0b9d is mislabeled fix(w1.1) — contains this lane's content."
+        },
+        {
+          "id": "aw1-kcc-ws-wiring",
+          "title": "KCC: copy Hub's wsHandlers block — production surface has zero useWorkspaceEvents wiring",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "CLOSED — AUDIT CLAIM REFUTED during implementation (b2f5674f). KCC was never dead air: RANK_TRACKING_UPDATED/STRATEGY_UPDATED/INTELLIGENCE_SIGNALS_UPDATED already map centrally to the admin-keyword-command-center prefix key in useWsInvalidation (active via App.tsx). Adding component handlers would violate the centralized-event pr-check rule. Shipped a regression test locking central coverage instead. Spec-reviewer adjudicated the counter-claim with full evidence chain."
+        },
+        {
+          "id": "aw1-schema-silent-failures",
+          "title": "Schema: un-silence send-to-client/save-as-template/page-type/rollback failures + scoped single-page error UI",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done (60f3e7ef + review-fix commit). All six swallows surfaced (incl. fetchPages made reachable via throwing get, page-type honest revert, regeneratePage); single-page failures separated from full-scan; fixContext-failure false-success state fixed; raw dismiss buttons -> IconButton, style exceptions removed; component-level tests."
+        },
+        {
+          "id": "aw1-shell-palette-badge",
+          "title": "Admin shell: palette 'Run Audit' actually runs an audit + pendingContentRequests badge onto React Query/WS",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done (52fcc9cb + cleanup). Palette Run Audit now startJob('seo-audit') matching SeoAudit's exact payload, with toasts + no-site fallback; anomaly scan honestly relabeled 'Scan All Workspaces' (server gap flagged: no workspace-scoped variant); badges on useWorkspaceBadges React Query hook invalidated by CONTENT_REQUEST_* events; onRequestCountChange threading fully removed."
+        }
+      ],
+      "shippedAt": "2026-06-11"
     }
   ]
 }
