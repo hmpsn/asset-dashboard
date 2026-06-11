@@ -402,7 +402,7 @@ describe('Bug 3 — Snapshot retention prune', () => {
     expect(snapshotCount(ws.id)).toBe(3);
 
     const { pruned } = runSnapshotRetentionPrune(ws.id);
-    // 3 rows in 1 week → keep 1 (MIN(id)), delete 2
+    // 3 rows in 1 week → keep 1 (latest-per-bucket keeper), delete 2
     expect(pruned).toBe(2);
     expect(snapshotCount(ws.id)).toBe(1);
   });

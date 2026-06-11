@@ -510,19 +510,54 @@ const stmts = createStmtCache(() => ({
   //
   // Step 1 — IDs to thin from the weekly window (RETENTION_RAW_DAYS → RETENTION_WEEKLY_MAX_DAYS):
   //   rows that are NOT the canonical row per (market, keyword, device, language, week) —
-  //   i.e. not MIN(id) per group — AND are not the single immortal row per 4-col identity.
+  //   i.e. not the latest-per-bucket keeper (MAX(captured_at), tie-broken by MIN(id)) —
+  //   AND are not the single immortal row per 4-col identity.
+  //
+  //   The keeper uses MAX(captured_at) per week bucket (not MIN(id) per group) so that the
+  //   weekly survivor is always the most-recent snapshot in that bucket. This makes the
+  //   keeper coincide with the immortal row whenever the bucket holds the pair's overall
+  //   latest, eliminating a nondeterministic interaction: when the bucket's latest row is
+  //   also the immortal (e.g. Dec 31 vs Jan 1 straddling a year boundary), a random-UUID
+  //   MIN(id) coin flip could keep the older row while the immortal guard protects the
+  //   newer one — leaving both alive and returning pruned=0 instead of 1.
+  //
+  //   Two-level keepers subquery:
+  //     Inner: MAX(captured_at) per (market, keyword, device, language, week_start)
+  //     Outer: JOIN on that max, MIN(id) to break ties among rows sharing the max timestamp
+  //   Parameters (12 total):
+  //     1-3: inner subquery WHERE (workspace_id, raw_days, weekly_max)
+  //     4-6: outer keepers WHERE (workspace_id, raw_days, weekly_max)
+  //     7-9: main outer WHERE (workspace_id, raw_days, weekly_max)
+  //     10-11: immortal NOT IN guard (workspace_id inner, workspace_id outer)
+  //     12: LIMIT
   pruneWeeklyThinIds: db.prepare(`
     SELECT s.id
     FROM local_visibility_snapshots s
     JOIN (
-      SELECT market_id, normalized_keyword, device, language_code,
-             date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
-             MIN(id) AS keep_id
-      FROM local_visibility_snapshots
-      WHERE workspace_id = ?
-        AND captured_at < datetime('now', '-' || ? || ' days')
-        AND captured_at >= datetime('now', '-' || ? || ' days')
-      GROUP BY market_id, normalized_keyword, device, language_code, week_start
+      SELECT outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
+             outer_k.language_code, top.week_start,
+             MIN(outer_k.id) AS keep_id
+      FROM local_visibility_snapshots outer_k
+      JOIN (
+        SELECT market_id, normalized_keyword, device, language_code,
+               date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
+               MAX(captured_at) AS max_captured_at
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND captured_at < datetime('now', '-' || ? || ' days')
+          AND captured_at >= datetime('now', '-' || ? || ' days')
+        GROUP BY market_id, normalized_keyword, device, language_code, week_start
+      ) top ON outer_k.market_id = top.market_id
+           AND outer_k.normalized_keyword = top.normalized_keyword
+           AND outer_k.device = top.device
+           AND outer_k.language_code = top.language_code
+           AND date(outer_k.captured_at, '-' || strftime('%w', outer_k.captured_at) || ' days') = top.week_start
+           AND outer_k.captured_at = top.max_captured_at
+      WHERE outer_k.workspace_id = ?
+        AND outer_k.captured_at < datetime('now', '-' || ? || ' days')
+        AND outer_k.captured_at >= datetime('now', '-' || ? || ' days')
+      GROUP BY outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
+               outer_k.language_code, top.week_start
     ) keepers ON keepers.market_id = s.market_id
              AND keepers.normalized_keyword = s.normalized_keyword
              AND keepers.device = s.device
@@ -2731,11 +2766,15 @@ export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number
   let batch: Array<{ id: string }>;
   do {
     batch = stmts().pruneWeeklyThinIds.all(
-      // keepers subquery: workspace_id, raw_days, weekly_max
+      // inner subquery (max captured_at per week bucket): workspace_id, raw_days, weekly_max
       workspaceId,
       RETENTION_RAW_DAYS,
       RETENTION_WEEKLY_MAX_DAYS,
-      // outer WHERE: workspace_id, raw_days, weekly_max
+      // outer keepers WHERE (rows at max captured_at): workspace_id, raw_days, weekly_max
+      workspaceId,
+      RETENTION_RAW_DAYS,
+      RETENTION_WEEKLY_MAX_DAYS,
+      // main outer WHERE: workspace_id, raw_days, weekly_max
       workspaceId,
       RETENTION_RAW_DAYS,
       RETENTION_WEEKLY_MAX_DAYS,

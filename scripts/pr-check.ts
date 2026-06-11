@@ -4995,7 +4995,7 @@ export const CHECKS: Check[] = [
       '// background-generation-ok with a reason for reviewed short-lived exceptions.',
     severity: 'warn',
     rationale:
-      'Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation.',
+      'Anonymous post-response generation promises drift away from NotificationBell visibility, cancellation, activity, and cache invalidation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
