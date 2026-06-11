@@ -178,10 +178,14 @@ async function waitForMemoryHeadroom(): Promise<void> {
 // Snapshot retention policy constants (Bug 3 / owner decision D4).
 //   - Raw retention window: keep all rows captured within RETENTION_RAW_DAYS.
 //   - Weekly thinning: for rows older than RETENTION_RAW_DAYS, keep one row per
-//     (market_id, normalized_keyword) per ISO week up to RETENTION_WEEKLY_MAX_DAYS.
+//     (market_id, normalized_keyword, device, language_code) per week up to
+//     RETENTION_WEEKLY_MAX_DAYS. Weeks are bucketed by start DATE (no year-boundary
+//     artifact), and per-device/per-language history is thinned independently.
 //   - Hard cutoff: delete all rows beyond RETENTION_WEEKLY_MAX_DAYS.
-//   - Exception: ALWAYS keep the latest row per (market_id, normalized_keyword)
-//     regardless of age so a market-keyword pair is never invisible.
+//   - Exception: ALWAYS keep the latest row per
+//     (market_id, normalized_keyword, device, language_code) regardless of age so a
+//     market-keyword-device-language series is never invisible (matches the
+//     latestSnapshots read granularity).
 // Batch size: 200 rows per DELETE to stay within SQLite's safe per-statement
 // range on memory-constrained hosts.
 export const RETENTION_RAW_DAYS = 180;
@@ -345,6 +349,17 @@ const stmts = createStmtCache(() => ({
       ORDER BY s.captured_at DESC
       LIMIT 1`,
   ),
+  // Count of markets currently flagged primary AND still eligible (active + has a
+  // provider location code). Used to detect the "orphaned primary" state after a
+  // configuration update deactivates the primary market.
+  countEligiblePrimary: db.prepare(
+    "SELECT COUNT(*) AS count FROM local_seo_markets WHERE workspace_id = ? AND is_primary = 1 AND status = 'active' AND provider_location_code IS NOT NULL",
+  ),
+  // Deterministic first eligible active market for primary-successor promotion.
+  // Ordered by (created_at, id) so the choice is stable across calls.
+  firstEligibleActiveMarket: db.prepare(
+    "SELECT * FROM local_seo_markets WHERE workspace_id = ? AND status = 'active' AND provider_location_code IS NOT NULL ORDER BY created_at ASC, id ASC LIMIT 1",
+  ),
   clearPrimary: db.prepare(
     'UPDATE local_seo_markets SET is_primary = 0 WHERE workspace_id = @workspaceId',
   ),
@@ -420,37 +435,44 @@ const stmts = createStmtCache(() => ({
   // truncating large workspaces (300 keywords × 3 markets = 900 rows > 500).
   // Migration 097's composite index on (workspace_id, market_id, normalized_keyword,
   // device, language_code) already supports this query.
+  // Tiebreaker fix: when two rows in the same (market, keyword, device, language)
+  // group share the MAX(captured_at) timestamp, joining on captured_at alone returns
+  // BOTH rows (duplicate "latest" entries). The id IN (SELECT MIN(id) ... GROUP BY ...)
+  // guard collapses each group to a single deterministic row (MIN(id) among the rows
+  // tied at the group's MAX(captured_at)).
   latestSnapshots: db.prepare(`
     SELECT s.*
     FROM local_visibility_snapshots s
-    JOIN (
-      SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
-      FROM local_visibility_snapshots
-      WHERE workspace_id = ?
-      GROUP BY market_id, normalized_keyword, device, language_code
-    ) latest
-      ON latest.market_id = s.market_id
-      AND latest.normalized_keyword = s.normalized_keyword
-      AND latest.device = s.device
-      AND latest.language_code = s.language_code
-      AND latest.captured_at = s.captured_at
     WHERE s.workspace_id = ?
+      AND s.id IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
+            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
   `),
   latestSnapshotsByKeyword: db.prepare(`
     SELECT s.*
     FROM local_visibility_snapshots s
-    JOIN (
-      SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
-      FROM local_visibility_snapshots
-      WHERE workspace_id = ? AND normalized_keyword = ?
-      GROUP BY market_id, normalized_keyword, device, language_code
-    ) latest
-      ON latest.market_id = s.market_id
-      AND latest.normalized_keyword = s.normalized_keyword
-      AND latest.device = s.device
-      AND latest.language_code = s.language_code
-      AND latest.captured_at = s.captured_at
     WHERE s.workspace_id = ? AND s.normalized_keyword = ?
+      AND s.id IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ? AND normalized_keyword = ?
+          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
+            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ? AND normalized_keyword = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
   `),
   // Bug 2 fix: keyset-paginated read for the backfill job so it never materialises
   // all rows into memory at once. Cursor is (captured_at DESC, id ASC) for stable pagination.
@@ -469,27 +491,43 @@ const stmts = createStmtCache(() => ({
   `),
   // Bug 3 fix: retention prune (owner decision D4).
   //
-  // The "immortal" guard selects EXACTLY ONE row per (market_id, normalized_keyword)
-  // by using (MAX(captured_at), MIN(id)) — same tie-breaking as the latestSnapshots
-  // GROUP BY read query. This avoids protecting ALL rows that share the same
-  // captured_at timestamp (which happens in unit tests and occasionally in real refreshes).
+  // Grouping fix: every grouping here is on the FULL 4-column identity
+  // (market_id, normalized_keyword, device, language_code) — the SAME granularity as
+  // the latestSnapshots read query. Grouping on (market, keyword) alone would let the
+  // immortal guard protect only ONE device/language variant and would thin per-device
+  // history into a single shared row, destroying the other device's series.
+  //
+  // The "immortal" guard selects EXACTLY ONE row per 4-col identity using
+  // (MAX(captured_at), MIN(id)) — same tie-breaking as the read query — so it never
+  // protects ALL rows that share a captured_at timestamp.
+  //
+  // Week key fix: the weekly bucket is keyed on the week's START DATE
+  // (date(captured_at, '-' || strftime('%w', captured_at) || ' days') → the Sunday of
+  // that week) instead of strftime('%Y-%W'). The %Y-%W form concatenates the CALENDAR
+  // year with the week number, which mis-buckets the days around a year boundary (e.g.
+  // 2024-W52 vs 2025-W00 for the same Sun–Sat week). The start-date key has no such
+  // artifact.
   //
   // Step 1 — IDs to thin from the weekly window (RETENTION_RAW_DAYS → RETENTION_WEEKLY_MAX_DAYS):
-  //   rows that are NOT the canonical row per (market, keyword, ISO week) — i.e. not MIN(id)
-  //   per group — AND are not the single immortal row per (market, keyword).
+  //   rows that are NOT the canonical row per (market, keyword, device, language, week) —
+  //   i.e. not MIN(id) per group — AND are not the single immortal row per 4-col identity.
   pruneWeeklyThinIds: db.prepare(`
     SELECT s.id
     FROM local_visibility_snapshots s
     JOIN (
-      SELECT market_id, normalized_keyword, strftime('%Y-%W', captured_at) AS iso_week, MIN(id) AS keep_id
+      SELECT market_id, normalized_keyword, device, language_code,
+             date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
+             MIN(id) AS keep_id
       FROM local_visibility_snapshots
       WHERE workspace_id = ?
         AND captured_at < datetime('now', '-' || ? || ' days')
         AND captured_at >= datetime('now', '-' || ? || ' days')
-      GROUP BY market_id, normalized_keyword, iso_week
+      GROUP BY market_id, normalized_keyword, device, language_code, week_start
     ) keepers ON keepers.market_id = s.market_id
              AND keepers.normalized_keyword = s.normalized_keyword
-             AND strftime('%Y-%W', s.captured_at) = keepers.iso_week
+             AND keepers.device = s.device
+             AND keepers.language_code = s.language_code
+             AND date(s.captured_at, '-' || strftime('%w', s.captured_at) || ' days') = keepers.week_start
     WHERE s.workspace_id = ?
       AND s.captured_at < datetime('now', '-' || ? || ' days')
       AND s.captured_at >= datetime('now', '-' || ? || ' days')
@@ -498,17 +536,18 @@ const stmts = createStmtCache(() => ({
         SELECT MIN(id)
         FROM local_visibility_snapshots
         WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword
+          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
+            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
             FROM local_visibility_snapshots
             WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword
+            GROUP BY market_id, normalized_keyword, device, language_code
           )
-        GROUP BY market_id, normalized_keyword
+        GROUP BY market_id, normalized_keyword, device, language_code
       )
     LIMIT ?
   `),
-  // Step 2 — IDs beyond the hard cutoff (> RETENTION_WEEKLY_MAX_DAYS) that are not the immortal row.
+  // Step 2 — IDs beyond the hard cutoff (> RETENTION_WEEKLY_MAX_DAYS) that are not the
+  // immortal row (latest per 4-col identity).
   pruneHardCutoffIds: db.prepare(`
     SELECT s.id
     FROM local_visibility_snapshots s
@@ -518,13 +557,13 @@ const stmts = createStmtCache(() => ({
         SELECT MIN(id)
         FROM local_visibility_snapshots
         WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword
+          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
+            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
             FROM local_visibility_snapshots
             WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword
+            GROUP BY market_id, normalized_keyword, device, language_code
           )
-        GROUP BY market_id, normalized_keyword
+        GROUP BY market_id, normalized_keyword, device, language_code
       )
     LIMIT ?
   `),
@@ -946,6 +985,10 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           Math.min(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP, Math.trunc(request.keywordsPerRefresh)),
         );
 
+  // Set inside the transaction when an orphaned primary is auto-promoted to a
+  // successor; surfaced in the activity detail after the transaction commits.
+  let promotedPrimaryLabel: string | null = null;
+
   const run = db.transaction(() => {
     writeSettings({
       ...current,
@@ -1024,25 +1067,48 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           is_primary: 0,
         });
       }
+
+      // Orphaned-primary recovery: deactivating the primary market (or any update
+      // that leaves no eligible primary) would otherwise silently degrade every
+      // downstream `is_primary = 1` read (keyword geo-targeting, language resolution).
+      // If no eligible primary remains but at least one active+code-bearing market
+      // exists, promote the first one (deterministic created_at/id order).
+      const eligiblePrimaryCount = (stmts().countEligiblePrimary.get(workspace.id) as { count: number }).count;
+      if (eligiblePrimaryCount === 0) {
+        const successor = stmts().firstEligibleActiveMarket.get(workspace.id) as MarketRow | undefined;
+        if (successor) {
+          stmts().clearPrimary.run({ workspaceId: workspace.id });
+          stmts().setMarketPrimary.run({ workspaceId: workspace.id, marketId: successor.id });
+          promotedPrimaryLabel = successor.label;
+        }
+      }
     }
   });
   run();
 
-  addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', 'Updated local SEO posture or market setup', { source: 'local_seo' });
+  const activityDetail = promotedPrimaryLabel
+    ? `Updated local SEO posture or market setup — auto-promoted "${promotedPrimaryLabel}" to primary market`
+    : 'Updated local SEO posture or market setup';
+  addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', activityDetail, { source: 'local_seo', ...(promotedPrimaryLabel ? { promotedPrimaryLabel } : {}) });
   notifyLocalSeoUpdated(workspace.id, { action: 'configuration_updated', updatedAt: now });
   return getLocalSeoReadModel(workspace.id, featureEnabled);
 }
 
 export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
-  // Bug 1 fix: GROUP BY MAX query takes (workspaceId, workspaceId) — two bindings
-  // (inner subquery + outer WHERE clause).
-  const rows = stmts().latestSnapshots.all(workspaceId, workspaceId) as SnapshotRow[];
+  // Bug 1 + tiebreaker fix: query takes (workspaceId × 3) — outer WHERE, the
+  // MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
+  const rows = stmts().latestSnapshots.all(workspaceId, workspaceId, workspaceId) as SnapshotRow[];
   return rows.map(rowToSnapshot);
 }
 
 function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, normalizedKeyword: string): LocalVisibilitySnapshot[] {
-  // Bug 1 fix: GROUP BY MAX query takes (workspaceId, normalizedKeyword, workspaceId, normalizedKeyword).
-  const rows = stmts().latestSnapshotsByKeyword.all(workspaceId, normalizedKeyword, workspaceId, normalizedKeyword) as SnapshotRow[];
+  // Bug 1 + tiebreaker fix: query takes (workspaceId, normalizedKeyword) × 3 — outer
+  // WHERE, the MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
+  const rows = stmts().latestSnapshotsByKeyword.all(
+    workspaceId, normalizedKeyword,
+    workspaceId, normalizedKeyword,
+    workspaceId, normalizedKeyword,
+  ) as SnapshotRow[];
   return rows.map(rowToSnapshot);
 }
 
@@ -2646,9 +2712,11 @@ export function latestLocalSnapshotAt(workspaceId: string): string | null {
  * Policy:
  *   - Rows within RETENTION_RAW_DAYS (180 d): always kept.
  *   - Rows between RETENTION_RAW_DAYS and RETENTION_WEEKLY_MAX_DAYS (18 months):
- *     weekly thinning — keep exactly one row per (market_id, normalized_keyword, ISO week).
+ *     weekly thinning — keep exactly one row per
+ *     (market_id, normalized_keyword, device, language_code, week-start-date).
  *   - Rows beyond RETENTION_WEEKLY_MAX_DAYS: hard delete.
- *   - ALWAYS keep the latest row per (market_id, normalized_keyword) regardless of age.
+ *   - ALWAYS keep the latest row per
+ *     (market_id, normalized_keyword, device, language_code) regardless of age.
  *
  * Runs inside a db.transaction() per batch (RETENTION_PRUNE_BATCH_SIZE rows). Returns
  * the total pruned count for logging. Safe to call multiple times — no-op when the

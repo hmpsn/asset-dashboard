@@ -3278,7 +3278,7 @@ function applyKeywordCommandCenterActionInternal(
   const displayKeyword = request.keyword.trim();
 
   // Resolve from the PROVENANCE-BEARING table read (listTrackedKeywordRows), NOT
-  // findTracked/getTrackedKeywords — those strip `sourceGapKey` via stripUndefinedKeys,
+  // getTrackedKeywords — the latter strips `sourceGapKey` via stripUndefinedKeys,
   // which makes protectedReason()'s "Gap-approved keyword" arm unreachable and
   // silently allows unforced retire/decline/pause of client-approved gap keywords.
   // See deleteKeywordHard for the documented trap this mirrors.
@@ -3330,8 +3330,8 @@ function applyKeywordCommandCenterActionInternal(
         if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         // protection guard → transition guard → write. `existing.status` (read pre-txn
-        // via findTracked) is the authoritative `from`; an illegal move throws inside the
-        // txn so retireTrackedKeyword never runs (no partial write, no broadcast).
+        // via listTrackedKeywordRows) is the authoritative `from`; an illegal move throws
+        // inside the txn so retireTrackedKeyword never runs (no partial write, no broadcast).
         validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.PAUSED);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.PAUSED);
         message = `"${keyword}" was paused from active tracking.`;
@@ -3474,7 +3474,7 @@ export function deleteKeywordHard(
   if (!normalized) throw new Error('keyword required');
 
   // Resolve from the PROVENANCE-BEARING table read (listTrackedKeywordRows), NOT
-  // getTrackedKeywords/findTracked — the latter STRIPS sourceGapKey, which would make
+  // getTrackedKeywords — the latter STRIPS sourceGapKey, which would make
   // a gap-provenanced keyword look eligible and silently bypass the retire-not-delete rule.
   const existing = listTrackedKeywordRows(workspace.id).find(
     entry => keywordComparisonKey(entry.query) === normalized,

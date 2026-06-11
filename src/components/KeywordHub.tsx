@@ -529,7 +529,12 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         isLoading={detail.isFetching && !!selectedKey && !detail.data}
         loadingAction={localRefresh.isPending ? 'check_local_visibility' : rowAction.isPending ? rowAction.variables?.action : undefined}
         onAction={handleDrawerAction}
-        onClose={() => setSelectedKey(null)}
+        onClose={() => {
+          setSelectedKey(null);
+          // Drop any pending force-override gate tied to the now-closed drawer so a
+          // stale dialog can't fire against a different keyword on reopen.
+          setPendingDrawerForceAction(null);
+        }}
       />
 
       {/* Per-item bulk result summary (applied / skipped / failed). */}
@@ -568,10 +573,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         cancelLabel="Cancel"
         onCancel={() => setPendingDrawerForceAction(null)}
         onConfirm={() => {
-          if (pendingDrawerForceAction && selectedRow && isServerAction(pendingDrawerForceAction.type)) {
+          // Use the keyword/pagePath captured ON the action when the dialog opened —
+          // NOT resolved from selectedRow at confirm time. If the drawer's selected
+          // row changes while the dialog is open, reading selectedRow would force the
+          // override against the wrong keyword. The action carries both fields.
+          if (pendingDrawerForceAction && isServerAction(pendingDrawerForceAction.type)) {
             rowAction.mutate({
               action: pendingDrawerForceAction.type,
-              keyword: selectedRow.keyword,
+              keyword: pendingDrawerForceAction.keyword,
               pagePath: pendingDrawerForceAction.pagePath,
               force: true,
             });

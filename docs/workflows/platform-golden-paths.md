@@ -134,7 +134,7 @@ Use for long-running admin generation, bulk processing, crawls, or work that con
 **API / hooks / query keys**
 - Entry route returns `{ jobId }` via `/api/jobs` platform flow
 - Domain logic persists results in the owning context, not inside the route handler
-- Frontend job tracking uses existing background-task hooks/components (`useBackgroundTasks`, `TaskPanel`)
+- Frontend job tracking uses existing background-task hooks/components (`useBackgroundTasks`, `NotificationBell`)
 - Query keys: add domain-specific invalidation targets in `src/lib/queryKeys.ts`
 
 **Broadcasts / listeners**

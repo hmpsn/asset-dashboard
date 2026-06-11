@@ -235,6 +235,54 @@ describe('Bug 2 — send-to-client dedupe: getOpenRequestForBrief', () => {
     const found = getOpenRequestForBrief(workspaceId, brief.id);
     expect(found).toBeUndefined();
   });
+
+  // Review fix #3: the dedupe filter must exclude ALL concluded statuses, not just
+  // ('declined','published'). `delivered` is terminal-enough (work shipped) that a
+  // re-send should open a fresh request; `client_review` is in-flight and must block.
+  function linkRequest(brief: ContentBrief, status: string): string {
+    let id = '';
+    db.transaction(() => {
+      const req = createContentRequest(workspaceId, {
+        topic: brief.suggestedTitle,
+        targetKeyword: brief.targetKeyword,
+        intent: 'informational',
+        priority: 'medium',
+        rationale: 'test',
+        source: 'strategy',
+        serviceType: 'brief_only',
+        pageType: 'blog',
+        initialStatus: 'brief_generated',
+        dedupe: false,
+      });
+      updateContentRequest(workspaceId, req.id, { briefId: brief.id, status: 'client_review' });
+      if (status !== 'client_review') {
+        updateContentRequest(workspaceId, req.id, { status: status as never });
+      }
+      id = req.id;
+    })();
+    return id;
+  }
+
+  it('a DELIVERED request does NOT block re-send (delivered is excluded)', () => {
+    const brief = makeBrief(workspaceId, 'dedupe-delivered');
+    linkRequest(brief, 'delivered');
+    // delivered is concluded → no open request → re-send allowed.
+    expect(getOpenRequestForBrief(workspaceId, brief.id)).toBeUndefined();
+  });
+
+  it('a PUBLISHED request does NOT block re-send (published is terminal)', () => {
+    const brief = makeBrief(workspaceId, 'dedupe-published');
+    linkRequest(brief, 'published');
+    expect(getOpenRequestForBrief(workspaceId, brief.id)).toBeUndefined();
+  });
+
+  it('a CLIENT_REVIEW request DOES block re-send (still in flight)', () => {
+    const brief = makeBrief(workspaceId, 'dedupe-clientreview');
+    const id = linkRequest(brief, 'client_review');
+    const found = getOpenRequestForBrief(workspaceId, brief.id);
+    expect(found).toBeDefined();
+    expect(found!.id).toBe(id);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

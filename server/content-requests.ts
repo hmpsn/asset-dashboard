@@ -8,6 +8,22 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentTopicRequest } from '../shared/types/content.ts';
 
+// ── Concluded statuses for brief-dedupe ──
+// A content request only blocks a re-send (send-to-client dedupe) while it is still
+// in flight. Once it reaches a CONCLUDED status — every terminal state (no outbound
+// transitions in CONTENT_REQUEST_TRANSITIONS, i.e. `published`/`declined`) PLUS
+// `delivered` (the work is finished and shipped; its only forward edge is `published`)
+// — a fresh send must create a NEW request rather than re-surfacing the old one.
+// Derived from the state machine so a future terminal status is picked up automatically.
+const CONTENT_REQUEST_TERMINAL_STATUSES: readonly string[] = Object.entries(CONTENT_REQUEST_TRANSITIONS)
+  .filter(([, next]) => next.length === 0)
+  .map(([status]) => status);
+export const CONTENT_REQUEST_CONCLUDED_STATUSES: readonly string[] = Array.from(
+  new Set([...CONTENT_REQUEST_TERMINAL_STATUSES, 'delivered']),
+);
+// Pre-rendered placeholder list for the prepared IN(...) clause.
+const CONCLUDED_STATUS_PLACEHOLDERS = CONTENT_REQUEST_CONCLUDED_STATUSES.map(() => '?').join(', ');
+
 // ── SQLite row shape ──
 
 interface RequestRow {
@@ -61,7 +77,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND target_keyword = ? AND status != 'declined'`,
   ),
   selectOpenByBriefId: db.prepare(
-    `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND brief_id = ? AND status NOT IN ('declined', 'published') LIMIT 1`,
+    `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND brief_id = ? AND status NOT IN (${CONCLUDED_STATUS_PLACEHOLDERS}) LIMIT 1`,
   ),
   update: db.prepare(
     `UPDATE content_topic_requests SET
@@ -123,7 +139,7 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
  * Used by the send-to-client route to avoid creating duplicate client requests.
  */
 export function getOpenRequestForBrief(workspaceId: string, briefId: string): ContentTopicRequest | undefined {
-  const row = stmts().selectOpenByBriefId.get(workspaceId, briefId) as RequestRow | undefined;
+  const row = stmts().selectOpenByBriefId.get(workspaceId, briefId, ...CONTENT_REQUEST_CONCLUDED_STATUSES) as RequestRow | undefined;
   return row ? rowToRequest(row) : undefined;
 }
 

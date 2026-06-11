@@ -266,7 +266,11 @@ export default function ContentDecay({ workspaceId }: Props) {
                               icon={FileText}
                               onClick={() => navigate(
                                 adminPath(workspaceId, 'content-pipeline'),
-                                { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: page.page } } },
+                                // page.page is a URL/path — send it as pageSlug/pageName (matching
+                                // the adjacent "Review page" handoff), NOT primaryKeyword. The
+                                // ContentBriefs receiver targets the page via pageSlug and would
+                                // otherwise prefill a raw URL into the keyword field.
+                                { state: { fixContext: { targetRoute: 'content-pipeline', pageSlug: page.page, pageName: page.page } } },
                               )}
                             >
                               Refresh brief

@@ -129,6 +129,28 @@ describe('schema-store', () => {
     expect(snapshot?.results.find(r => r.pageId === 'home')?.suggestedSchemas[0].template).toMatchObject({ name: 'Home' });
   });
 
+  it('upsertPageResultInSnapshot is atomic: sequential per-page upserts never drop a prior page', () => {
+    // Review fix #6: the read-modify-write (read snapshot → merge page → rewrite full
+    // blob) is wrapped in db.transaction(). Each call must observe the prior call's
+    // committed write so accumulating many single-page generations never clobbers an
+    // earlier page (the last-writer-wins data-loss scenario the txn prevents).
+    saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' }),
+    ]);
+
+    for (const pid of ['p1', 'p2', 'p3', 'p4']) {
+      expect(upsertPageResultInSnapshot(
+        SITE_ID,
+        WS_ID,
+        pageSuggestion(pid, `/${pid}`, { '@type': 'WebPage', name: pid }),
+      )).toBe(true);
+    }
+
+    const snapshot = getSchemaSnapshot(SITE_ID);
+    expect(snapshot?.pageCount).toBe(5);
+    expect(snapshot?.results.map(r => r.pageId).sort()).toEqual(['home', 'p1', 'p2', 'p3', 'p4']);
+  });
+
   it('normalizes corrupt snapshot results payload to empty array instead of leaking wrong shape', () => {
     db.prepare(`
       INSERT INTO schema_snapshots (id, site_id, workspace_id, created_at, results, page_count)

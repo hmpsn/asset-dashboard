@@ -107,6 +107,7 @@ const protectedRetireAction: KeywordCommandCenterNextAction = {
   detail: 'Retire this keyword.',
   tone: 'red',
   keyword: 'gap approved kw',
+  pagePath: '/services/dental',
   // disabledReason present → protected, drawer renders it as a live button
   disabledReason: 'Gap-approved keyword requires confirmation before retirement.',
 };
@@ -283,6 +284,59 @@ describe('KeywordHub — W2.2: protected drawer action requires ConfirmDialog', 
     expect(rowActionMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'retire', force: true }),
     );
+  });
+
+  it('confirm uses the keyword/pagePath captured ON the action, not re-resolved at confirm time', async () => {
+    // W2-review hardening: the confirm handler must read keyword/pagePath from the
+    // pending action (captured when the dialog opened), NOT from selectedRow at
+    // confirm time — otherwise a drawer-row change while the dialog is open would
+    // force the override against the wrong keyword.
+    renderHub();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('row-click-gap approved kw'));
+    });
+    const drawer = screen.getByRole('dialog');
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: /^retire$/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+    });
+
+    expect(rowActionMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retire',
+        keyword: 'gap approved kw',
+        pagePath: '/services/dental',
+        force: true,
+      }),
+    );
+  });
+
+  it('closing the drawer clears the pending force dialog', async () => {
+    renderHub();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('row-click-gap approved kw'));
+    });
+    const drawer = screen.getByRole('dialog');
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: /^retire$/i }));
+    });
+    // Dialog is open
+    expect(screen.getByText(/gap-approved keyword requires confirmation/i)).toBeInTheDocument();
+
+    // Close the drawer (KeywordDetailDrawer onClose). The drawer's close control is
+    // labelled "Close keyword detail".
+    const closeBtn = within(drawer).getByRole('button', { name: /close keyword detail/i });
+    await act(async () => {
+      fireEvent.click(closeBtn);
+    });
+
+    // The pending force dialog must be gone (cleared by onClose), and no mutation fired.
+    expect(screen.queryByText(/gap-approved keyword requires confirmation/i)).not.toBeInTheDocument();
+    expect(rowActionMutateMock).not.toHaveBeenCalled();
   });
 
   it('clicking an unprotected drawer action fires the mutation immediately without a dialog', async () => {

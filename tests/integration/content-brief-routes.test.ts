@@ -5,7 +5,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
-import { getBrief } from '../../server/content-brief.js';
+import { getBrief, upsertBrief } from '../../server/content-brief.js';
+import { listContentRequests, updateContentRequest } from '../../server/content-requests.js';
 import { createTemplate } from '../../server/content-templates.js';
 import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import type { ContentBrief } from '../../shared/types/content.js';
@@ -147,12 +148,39 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
+  db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_matrices WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_templates WHERE workspace_id = ?').run(testWsId);
   deleteWorkspace(testWsId);
   await ctx.stopServer();
 });
+
+// ─── Test helpers for the W2 review-fix route tests ───────────────────────────
+
+let briefSeq = 0;
+function seedRouteBrief(suffix: string): ContentBrief {
+  briefSeq++;
+  const brief: ContentBrief = {
+    id: `brief_w2_${suffix}_${briefSeq}_${Date.now()}`,
+    workspaceId: testWsId,
+    targetKeyword: `w2 keyword ${suffix} ${briefSeq}`,
+    secondaryKeywords: [],
+    suggestedTitle: `W2 ${suffix} Title`,
+    suggestedMetaDesc: `Meta for ${suffix}`,
+    outline: [{ heading: 'Intro', notes: 'Intro section' }],
+    wordCountTarget: 1200,
+    intent: 'informational',
+    audience: 'general',
+    competitorInsights: '',
+    internalLinkSuggestions: [],
+    createdAt: new Date().toISOString(),
+    executiveSummary: `Summary ${suffix}`,
+    pageType: 'blog',
+  };
+  upsertBrief(testWsId, brief);
+  return brief;
+}
 
 describe('Content Briefs — update route validation', () => {
   it('PATCH updates editable fields while ignoring immutable identity fields', async () => {
@@ -253,5 +281,111 @@ describe('Content Briefs — template cross-reference route', () => {
       matchedSource: 'target',
       matchedKeyword: 'Emergency HVAC Repair',
     });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// W2 review fix #1 — deleting a superseding brief no longer 500s (ON DELETE SET NULL)
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('Content Briefs — DELETE of a superseding brief (FK ON DELETE SET NULL)', () => {
+  it('migration 134 declares superseded_by with ON DELETE SET NULL', () => {
+    // The spawned server runs with foreign_keys=ON; assert the schema's FK action is
+    // SET NULL (not RESTRICT) so the DELETE route below cannot fail with a constraint
+    // error. Robust to stale worker DBs — fails loudly if the migration regressed.
+    const fks = db.prepare(`PRAGMA foreign_key_list(content_briefs)`).all() as Array<{ from: string; on_delete: string }>;
+    const supersededFk = fks.find(fk => fk.from === 'superseded_by');
+    expect(supersededFk).toBeDefined();
+    expect(supersededFk!.on_delete).toBe('SET NULL');
+  });
+
+  it('regenerate (A→B) then DELETE B returns 200 and A.superseded_by becomes NULL', async () => {
+    // Predecessor A and its replacement B; A points at B via superseded_by.
+    const briefA = seedRouteBrief('fk-pred');
+    const briefB = seedRouteBrief('fk-succ');
+    db.prepare(`UPDATE content_briefs SET superseded_by = ? WHERE id = ? AND workspace_id = ?`)
+      .run(briefB.id, briefA.id, testWsId);
+
+    // Sanity: A is currently superseded (hidden from the default list).
+    expect(getBrief(testWsId, briefA.id)?.supersededBy).toBe(briefB.id);
+
+    // Delete the SUPERSEDING brief B via the HTTP route (server has FK ON).
+    const res = await api(`/api/content-briefs/${testWsId}/${briefB.id}`, { method: 'DELETE' });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
+
+    // B is gone; A survives and its dangling pointer was nulled by ON DELETE SET NULL,
+    // so A becomes the visible (non-superseded) brief again — the sane outcome.
+    expect(getBrief(testWsId, briefB.id)).toBeUndefined();
+    const readA = getBrief(testWsId, briefA.id);
+    expect(readA).toBeDefined();
+    expect(readA!.supersededBy).toBeUndefined();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// W2 review fix #8e + #3 — send-to-client dedupe at the HTTP-route level
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('Content Briefs — send-to-client dedupe (HTTP route)', () => {
+  function sendToClient(briefId: string) {
+    return api(`/api/content-briefs/${testWsId}/${briefId}/send-to-client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+  }
+
+  function requestsForBrief(briefId: string) {
+    return listContentRequests(testWsId).filter(r => r.briefId === briefId);
+  }
+
+  it('calling the route twice creates exactly ONE content request', async () => {
+    const brief = seedRouteBrief('dedupe-route');
+
+    const res1 = await sendToClient(brief.id);
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json() as { ok: boolean; requestId: string };
+    expect(body1.ok).toBe(true);
+
+    const res2 = await sendToClient(brief.id);
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json() as { ok: boolean; requestId: string };
+
+    // Second call dedupes to the same request id — no duplicate created.
+    expect(body2.requestId).toBe(body1.requestId);
+    expect(requestsForBrief(brief.id)).toHaveLength(1);
+  });
+
+  it('a request in client_review (in-flight) blocks a re-send', async () => {
+    const brief = seedRouteBrief('dedupe-inflight');
+
+    const res1 = await sendToClient(brief.id);
+    const { requestId } = await res1.json() as { requestId: string };
+    // The route leaves the new request in client_review.
+    expect(listContentRequests(testWsId).find(r => r.id === requestId)?.status).toBe('client_review');
+
+    const res2 = await sendToClient(brief.id);
+    const body2 = await res2.json() as { requestId: string };
+    expect(body2.requestId).toBe(requestId);
+    expect(requestsForBrief(brief.id)).toHaveLength(1);
+  });
+
+  it('a DELIVERED request is terminal-enough that a re-send creates a NEW request', async () => {
+    const brief = seedRouteBrief('dedupe-delivered');
+
+    const res1 = await sendToClient(brief.id);
+    const { requestId: firstId } = await res1.json() as { requestId: string };
+
+    // Advance the request to delivered (concluded — work shipped). The dedupe filter
+    // must now treat it as no longer blocking, so a fresh send opens a new request.
+    updateContentRequest(testWsId, firstId, { status: 'delivered' });
+
+    const res2 = await sendToClient(brief.id);
+    expect(res2.status).toBe(200);
+    const { requestId: secondId } = await res2.json() as { requestId: string };
+
+    expect(secondId).not.toBe(firstId);
+    expect(requestsForBrief(brief.id)).toHaveLength(2);
   });
 });

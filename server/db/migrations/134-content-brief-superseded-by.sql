@@ -10,5 +10,12 @@
 -- BriefRow.superseded_by + rowToBrief mapper update + upsertBrief + briefToParams +
 -- the regenerateBrief write path and the updated listBriefs query.
 -- Not serialized on any public-portal route (admin-only briefs list).
+--
+-- ON DELETE SET NULL (not the default RESTRICT): with foreign_keys=ON, deleting a
+-- superseding brief B after an A→B regeneration would otherwise throw a FK
+-- constraint error (A.superseded_by still references B), failing the DELETE route
+-- with a 500. SET NULL nulls the predecessor's pointer instead, so A becomes the
+-- visible (non-superseded) brief again. SQLite accepts the inline
+-- `REFERENCES ... ON DELETE SET NULL` action on ADD COLUMN (verified).
 
-ALTER TABLE content_briefs ADD COLUMN superseded_by TEXT REFERENCES content_briefs(id);
+ALTER TABLE content_briefs ADD COLUMN superseded_by TEXT REFERENCES content_briefs(id) ON DELETE SET NULL;

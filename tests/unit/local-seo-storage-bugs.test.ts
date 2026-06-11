@@ -181,6 +181,52 @@ function insertRawSnapshot(opts: {
   );
 }
 
+/**
+ * Insert a snapshot row with explicit device + language_code (W2.4 multi-device fix).
+ * Returns the generated row id so tests can assert specific-row survival.
+ */
+function insertRawSnapshotWithVariant(opts: {
+  workspaceId: string;
+  marketId: string;
+  keyword: string;
+  capturedAt: string;
+  device: string;
+  languageCode: string;
+  id?: string;
+  status?: string;
+}): string {
+  const id = opts.id ?? randomUUID();
+  db.prepare(`
+    INSERT INTO local_visibility_snapshots (
+      id, workspace_id, keyword, normalized_keyword, market_id, market_label,
+      captured_at, local_pack_present, business_found, business_match_confidence,
+      local_rank, top_competitors, source_endpoint, provider, device, language_code,
+      status, raw_results
+    ) VALUES (
+      ?, ?, ?, ?, ?, 'Test Market',
+      ?, 0, 0, 'not_found',
+      NULL, '[]', 'google_organic_serp', 'dataforseo', ?, ?,
+      ?, '[]'
+    )
+  `).run(
+    id,
+    opts.workspaceId,
+    opts.keyword,
+    opts.keyword,
+    opts.marketId,
+    opts.capturedAt,
+    opts.device,
+    opts.languageCode,
+    opts.status ?? LOCAL_VISIBILITY_STATUS.SUCCESS,
+  );
+  return id;
+}
+
+/** True when a snapshot row with the given id still exists. */
+function snapshotExists(id: string): boolean {
+  return !!db.prepare(`SELECT 1 FROM local_visibility_snapshots WHERE id = ?`).get(id);
+}
+
 /** Return the count of snapshot rows for a given workspace. */
 function snapshotCount(workspaceId: string): number {
   const row = db.prepare(`SELECT COUNT(*) AS n FROM local_visibility_snapshots WHERE workspace_id = ?`).get(workspaceId) as { n: number };
@@ -467,8 +513,178 @@ describe('Bug 3 — Snapshot retention prune', () => {
     expect(snapshotCount(ws.id)).toBe(batchSize + 1);
 
     const { pruned } = runSnapshotRetentionPrune(ws.id);
-    // One per (market, keyword, ISO-week) is kept; the rest pruned
+    // One per (market, keyword, device, language, week) is kept; the rest pruned
     expect(pruned).toBe(batchSize);
+    expect(snapshotCount(ws.id)).toBe(1);
+  });
+});
+
+// ─── W2.4: per-device / per-language retention granularity ────────────────────
+//
+// The retention read (latestSnapshots) groups by 4 columns
+// (market_id, normalized_keyword, device, language_code). These tests prove the
+// PRUNE now groups by the same 4 columns: a multi-device pair's other-device latest
+// row must survive the immortal guard, and per-device weekly history is independent.
+
+describe('W2.4 — retention prune preserves per-device / per-language series', () => {
+  it('hard cutoff keeps the latest row of EACH device (other device not orphaned)', () => {
+    const ws = createWorkspace('Retention Multi-Device Hard Cutoff');
+    cleanupWorkspaceIds.add(ws.id);
+
+    // desktop: two rows beyond the hard cutoff — latest (600d) is the desktop immortal.
+    const desktopLatest = insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentist',
+      capturedAt: makeIsoTimestamp(600), device: 'desktop', languageCode: 'en',
+    });
+    insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentist',
+      capturedAt: makeIsoTimestamp(700), device: 'desktop', languageCode: 'en',
+    });
+    // mobile: a single very old row — it is the mobile immortal and must survive.
+    const mobileLatest = insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentist',
+      capturedAt: makeIsoTimestamp(650), device: 'mobile', languageCode: 'en',
+    });
+
+    expect(snapshotCount(ws.id)).toBe(3);
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    // Only the older desktop row (700d) is deleted. Both per-device latest rows survive.
+    expect(pruned).toBe(1);
+    expect(snapshotExists(desktopLatest)).toBe(true);
+    expect(snapshotExists(mobileLatest)).toBe(true);
+  });
+
+  it('different language_code values are pruned/protected independently', () => {
+    const ws = createWorkspace('Retention Multi-Language Immortal');
+    cleanupWorkspaceIds.add(ws.id);
+
+    // 'en': single old row — en immortal.
+    const enLatest = insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentista',
+      capturedAt: makeIsoTimestamp(900), device: 'desktop', languageCode: 'en',
+    });
+    // 'es': single old row — es immortal. Same (market, keyword, device) as en;
+    // a 3-column guard would protect only ONE of these and delete the other.
+    const esLatest = insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentista',
+      capturedAt: makeIsoTimestamp(950), device: 'desktop', languageCode: 'es',
+    });
+
+    expect(snapshotCount(ws.id)).toBe(2);
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    expect(pruned).toBe(0);
+    expect(snapshotExists(enLatest)).toBe(true);
+    expect(snapshotExists(esLatest)).toBe(true);
+  });
+
+  it('weekly thinning is per-device: each device keeps one row per week', () => {
+    const ws = createWorkspace('Retention Multi-Device Weekly Thin');
+    cleanupWorkspaceIds.add(ws.id);
+
+    // desktop: 3 rows in the same week (200d window) → thin to 1.
+    for (let i = 0; i < 3; i++) {
+      insertRawSnapshotWithVariant({
+        workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentist',
+        capturedAt: makeIsoTimestamp(200), device: 'desktop', languageCode: 'en',
+      });
+    }
+    // mobile: 3 rows in the same week → thin to 1 (independently of desktop).
+    for (let i = 0; i < 3; i++) {
+      insertRawSnapshotWithVariant({
+        workspaceId: ws.id, marketId: 'mkt-1', keyword: 'dentist',
+        capturedAt: makeIsoTimestamp(200), device: 'mobile', languageCode: 'en',
+      });
+    }
+
+    expect(snapshotCount(ws.id)).toBe(6);
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    // 2 thinned per device = 4 total; 1 desktop + 1 mobile survive.
+    expect(pruned).toBe(4);
+    expect(snapshotCount(ws.id)).toBe(2);
+    const remainingDevices = (db.prepare(
+      `SELECT DISTINCT device FROM local_visibility_snapshots WHERE workspace_id = ?`,
+    ).all(ws.id) as Array<{ device: string }>).map(r => r.device).sort();
+    expect(remainingDevices).toEqual(['desktop', 'mobile']);
+  });
+
+  it('listLatestLocalVisibilitySnapshots returns one row per (market, keyword, device, language)', () => {
+    const ws = createWorkspace('Latest Multi-Variant Read');
+    cleanupWorkspaceIds.add(ws.id);
+
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: makeIsoTimestamp(2), device: 'desktop', languageCode: 'en' });
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: makeIsoTimestamp(1), device: 'mobile', languageCode: 'en' });
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: makeIsoTimestamp(1), device: 'desktop', languageCode: 'es' });
+
+    const latest = listLatestLocalVisibilitySnapshots(ws.id);
+    expect(latest.length).toBe(3);
+    const variants = latest.map(s => `${s.device}:${s.languageCode}`).sort();
+    expect(variants).toEqual(['desktop:en', 'desktop:es', 'mobile:en']);
+  });
+});
+
+// ─── W2.4: latestSnapshots tiebreaker on identical captured_at ─────────────────
+
+describe('W2.4 — latestSnapshots deterministic tiebreaker', () => {
+  it('two rows with identical captured_at in one group return exactly ONE row', () => {
+    const ws = createWorkspace('Latest Tiebreaker Same Timestamp');
+    cleanupWorkspaceIds.add(ws.id);
+
+    const ts = makeIsoTimestamp(1);
+    // Two rows, same (market, keyword, device, language) AND same captured_at.
+    // The old self-join (captured_at = s.captured_at, no tiebreaker) returned BOTH.
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: ts, device: 'desktop', languageCode: 'en', id: 'aaa-low-id' });
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: ts, device: 'desktop', languageCode: 'en', id: 'zzz-high-id' });
+
+    const latest = listLatestLocalVisibilitySnapshots(ws.id);
+    expect(latest.length).toBe(1); // not 2
+  });
+});
+
+// ─── W2.4 (8d): weekly thinning uses week-START-DATE (no year-boundary artifact) ──
+
+describe('W2.4 — weekly thinning week key has no year-boundary artifact', () => {
+  it('rows in the same Sun–Sat week straddling a year boundary thin to ONE', () => {
+    const ws = createWorkspace('Retention Year Boundary Week');
+    cleanupWorkspaceIds.add(ws.id);
+
+    // Pick a New-Year boundary (Dec 31 → Jan 1) that currently lands inside the weekly
+    // window (180–548 days old). These two days fall in the SAME Sun–Sat week (so the
+    // week-start-date key buckets them together → thin to 1), but strftime('%Y-%W')
+    // splits them across the calendar-year boundary ('YYYY-53' vs 'YYYY+1-00') and would
+    // KEEP both. Computed relative to now so the test is not pinned to a wall-clock date.
+    const nowMs = Date.now();
+    let boundaryDec: string | null = null;
+    let boundaryJan: string | null = null;
+    for (let yearsBack = 1; yearsBack <= 2; yearsBack++) {
+      const dec31 = new Date(Date.UTC(new Date().getUTCFullYear() - yearsBack, 11, 31, 12, 0, 0));
+      const jan1 = new Date(dec31.getTime() + 24 * 60 * 60 * 1000);
+      const decDays = (nowMs - dec31.getTime()) / 86_400_000;
+      const janDays = (nowMs - jan1.getTime()) / 86_400_000;
+      // Require BOTH days in the weekly-thinning window AND in the same Sun–Sat week.
+      const sameWeek = dec31.getUTCDay() !== 6; // Dec 31 not a Saturday → Jan 1 in same week
+      if (decDays > RETENTION_RAW_DAYS && decDays < RETENTION_WEEKLY_MAX_DAYS
+        && janDays > RETENTION_RAW_DAYS && janDays < RETENTION_WEEKLY_MAX_DAYS
+        && sameWeek) {
+        boundaryDec = dec31.toISOString().slice(0, 19).replace('T', ' ');
+        boundaryJan = jan1.toISOString().slice(0, 19).replace('T', ' ');
+        break;
+      }
+    }
+    // Loud precondition: if no in-window same-week boundary exists, the fixture needs a
+    // refresh — fail rather than silently pass.
+    expect(boundaryDec, 'no in-window year boundary found — update the fixture window').not.toBeNull();
+
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: boundaryDec!, device: 'desktop', languageCode: 'en' });
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'k', capturedAt: boundaryJan!, device: 'desktop', languageCode: 'en' });
+
+    expect(snapshotCount(ws.id)).toBe(2);
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    // Both share the same week-start date → thin to one. (Under %Y-%W this would prune 0.)
+    expect(pruned).toBe(1);
     expect(snapshotCount(ws.id)).toBe(1);
   });
 });

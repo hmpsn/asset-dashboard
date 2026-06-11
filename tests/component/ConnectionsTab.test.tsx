@@ -136,4 +136,53 @@ describe('ConnectionsTab — site linking', () => {
       expect(onSiteLinked).toHaveBeenCalled();
     });
   });
+
+  it('surfaces an inline error and does NOT call onSiteLinked when linking fails', async () => {
+    mocks.flowToken = 'my-token';
+    mocks.flowSites = [{ id: 'site-1', displayName: 'Acme Site', shortName: 'acme' }];
+    mocks.linkSiteMutateAsync.mockRejectedValue(new Error('Webflow token rejected'));
+    const onSiteLinked = vi.fn();
+
+    renderTab({ webflowSiteId: undefined, onSiteLinked });
+    fireEvent.click(screen.getByText('Acme Site'));
+
+    // Inline error surfaced (no unhandled rejection, no silent failure).
+    await waitFor(() => {
+      expect(screen.getByText('Webflow token rejected')).toBeInTheDocument();
+    });
+    // reset()/onSiteLinked must NOT fire on a failed link.
+    expect(onSiteLinked).not.toHaveBeenCalled();
+    expect(mocks.flowReset).not.toHaveBeenCalled();
+  });
+
+  it('shows the pending spinner only on the clicked row and disables the others', async () => {
+    mocks.flowToken = 'my-token';
+    mocks.flowSites = [
+      { id: 'site-1', displayName: 'First Site', shortName: 'first' },
+      { id: 'site-2', displayName: 'Second Site', shortName: 'second' },
+    ];
+    // Keep the link in-flight so we can observe the per-row pending state.
+    let resolveLink: () => void = () => {};
+    mocks.linkSiteMutateAsync.mockImplementation(
+      () => new Promise<void>((res) => { resolveLink = res; }),
+    );
+
+    renderTab({ webflowSiteId: undefined });
+
+    const firstRow = screen.getByText('First Site').closest('button')!;
+    const secondRow = screen.getByText('Second Site').closest('button')!;
+    fireEvent.click(firstRow);
+
+    // While the click is in-flight, both rows are disabled (clicked row shows the
+    // spinner; the others are blocked) — the old code spun EVERY row.
+    await waitFor(() => {
+      expect(firstRow).toBeDisabled();
+      expect(secondRow).toBeDisabled();
+      // Spinner (animate-spin) renders inside the clicked row only.
+      expect(firstRow.querySelector('.animate-spin')).not.toBeNull();
+      expect(secondRow.querySelector('.animate-spin')).toBeNull();
+    });
+
+    resolveLink();
+  });
 });

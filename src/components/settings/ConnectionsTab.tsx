@@ -43,6 +43,24 @@ export function ConnectionsTab({
   const currentDomain = (ws?.liveDomain as string) || '';
   const [domainDraft, setDomainDraft] = useState('');
   const [domainEditing, setDomainEditing] = useState(false);
+  // Track the specific site being linked so the spinner + disabled state apply
+  // only to the clicked row (not every row), and surface link failures inline.
+  const [linkingSiteId, setLinkingSiteId] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const handleLinkSite = async (siteId: string, siteName: string) => {
+    setLinkingSiteId(siteId);
+    setLinkError(null);
+    try {
+      await linkSiteMutation.mutateAsync({ workspaceId, siteId, siteName, token: flow.token.trim() });
+      flow.reset();
+      onSiteLinked?.();
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Failed to link site. Please try again.');
+    } finally {
+      setLinkingSiteId(null);
+    }
+  };
   const integrationHealthQuery = useIntegrationHealth(workspaceId);
   const integrationHealth = integrationHealthQuery.data;
   const linkSiteMutation = useLinkSite();
@@ -144,20 +162,18 @@ export function ConnectionsTab({
                 {flow.sites.map(site => (
                   <ClickableRow
                     key={site.id}
-                    onClick={async () => {
-                      await linkSiteMutation.mutateAsync({ workspaceId, siteId: site.id, siteName: site.displayName, token: flow.token.trim() });
-                      flow.reset();
-                      onSiteLinked?.();
-                    }}
+                    disabled={linkingSiteId != null}
+                    onClick={() => handleLinkSite(site.id, site.displayName)}
                     className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-[var(--surface-3)] t-caption"
                   >
                     <Icon as={Globe} size="sm" className="text-accent-brand shrink-0" />
                     <span className="flex-1 truncate">{site.displayName}</span>
-                    {linkSiteMutation.isPending && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
+                    {linkingSiteId === site.id && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
                   </ClickableRow>
                 ))}
               </div>
             )}
+            {linkError && <p className="t-caption-sm text-accent-danger">{linkError}</p>}
           </div>
         )}
         {webflowSiteId && (

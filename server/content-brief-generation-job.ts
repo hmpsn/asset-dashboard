@@ -115,6 +115,12 @@ function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
 }
 
 async function generateStandaloneBrief(params: StandaloneContentBriefGenerationParams): Promise<ContentBrief> {
+  // Page resolution is slug-only by design. `params.targetPageId` (a Webflow page ID)
+  // is threaded through from the route but NOT consumed here: the decay-context lookup
+  // below matches against `decay.decayingPages[].page`, which is a normalized URL/slug,
+  // and `getAllSitePages` returns bare URL strings (no id→slug map). Resolving the page
+  // ID to a slug would require an extra Webflow API fetch — not worth it when the slug
+  // the caller already supplies is the exact key the decay analysis is indexed by.
   const { workspaceId, targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle, targetPageSlug } = params;
   const ws = getWorkspace(workspaceId);
   if (!ws) throw new Error('Workspace not found');

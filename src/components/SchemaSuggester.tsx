@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { put } from '../api/client';
 import type { FixContext } from '../App';
 import {
@@ -73,6 +73,19 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
+
+  // `onPageGenerated` must have a STABLE identity across renders: the generation
+  // hook feeds it into `generateSinglePage` (a useCallback), which in turn is a
+  // dep of the fix-handoff effect. An inline arrow here would change identity
+  // every render, re-running that effect and cancelling its pending trigger —
+  // the PI "Add Schema" auto-generation would silently never fire. We hold the
+  // live callback body in a ref (updated below, after the publishing-workflow
+  // hook resolves clearManual* fns) and pass a stable wrapper to the hook.
+  const onPageGeneratedRef = useRef<(pageId: string) => void>(() => {});
+  const onPageGenerated = useCallback((pageId: string) => {
+    onPageGeneratedRef.current(pageId);
+  }, []);
+
   const {
     data,
     setData,
@@ -107,14 +120,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     siteId,
     workspaceId,
     fixContext,
-    onPageGenerated: pageId => {
-      setExpanded(prev => new Set(prev).add(pageId));
-      clearManualDeliveryForPage(pageId);
-      // Drop any stale manual JSON edit so the regenerated schema is authoritative
-      // (getEffectiveSchema prefers editedSchemaJson — an un-cleared edit would
-      // silently override the new generation in preview/Publish/Copy/send).
-      clearManualEditForPage(pageId);
-    },
+    onPageGenerated,
   });
   const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
   const graphValidation = graphValidationQuery.data ?? null;
@@ -190,6 +196,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     clearManualEditForPage,
     clearAllManualEdits,
   } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData, bulkPublishBlocked });
+
+  // Keep the stable onPageGenerated wrapper pointed at the latest closure. Assigned
+  // on every render (cheap) so it always sees current clearManual* references.
+  onPageGeneratedRef.current = (pageId: string) => {
+    setExpanded(prev => new Set(prev).add(pageId));
+    clearManualDeliveryForPage(pageId);
+    // Drop any stale manual JSON edit so the regenerated schema is authoritative
+    // (getEffectiveSchema prefers editedSchemaJson — an un-cleared edit would
+    // silently override the new generation in preview/Publish/Copy/send).
+    clearManualEditForPage(pageId);
+  };
 
   // Full re-scan regenerates every page — drop ALL stale manual edits first so the
   // freshly-generated schemas are authoritative (mirrors per-page clearing in onPageGenerated).

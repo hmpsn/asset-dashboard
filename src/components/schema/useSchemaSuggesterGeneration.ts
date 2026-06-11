@@ -47,6 +47,7 @@ export function useSchemaSuggesterGeneration({
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
   const fixConsumed = useRef(false);
+  const fixTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: snapshotData } = useSchemaSnapshot(siteId, workspaceId);
   useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
@@ -227,13 +228,24 @@ export function useSchemaSuggesterGeneration({
     }
     if (!resolvedPageId) return;
 
+    // Consume the handoff exactly once. The trigger timer is stored in a ref —
+    // NOT returned as the effect's cleanup — because this effect re-runs on every
+    // identity change of its deps (e.g. `generateSinglePage`, which depends on the
+    // caller's `onPageGenerated`). A returned-cleanup timer would be cancelled by
+    // the very next re-render before it ever fires, silently no-op'ing the handoff.
+    // The ref-held timer is cleared only on unmount (see the unmount effect below).
     fixConsumed.current = true;
     const pageId = resolvedPageId;
-    const timer = setTimeout(() => {
+    fixTriggerTimerRef.current = setTimeout(() => {
+      fixTriggerTimerRef.current = null;
       generateSinglePage(pageId);
     }, 600);
-    return () => clearTimeout(timer);
   }, [fixContext, availablePages, data, generateSinglePage]);
+
+  // Clear the pending fix-handoff trigger on unmount only — never on re-render.
+  useEffect(() => () => {
+    if (fixTriggerTimerRef.current) clearTimeout(fixTriggerTimerRef.current);
+  }, []);
 
   const regeneratePage = useCallback(async (pageId: string) => {
     setRegenerating(prev => new Set(prev).add(pageId));

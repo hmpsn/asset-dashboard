@@ -308,7 +308,7 @@ describe('ContentDecay: Refresh brief and Review page buttons', () => {
     });
   });
 
-  it('"Refresh brief" navigates to content-pipeline with fixContext', async () => {
+  it('"Refresh brief" navigates to content-pipeline passing the page as pageSlug (NOT primaryKeyword)', async () => {
     await setup();
     await waitFor(() => screen.getByText('/blog/losing-page'));
     fireEvent.click(screen.getByText('/blog/losing-page'));
@@ -316,8 +316,22 @@ describe('ContentDecay: Refresh brief and Review page buttons', () => {
     fireEvent.click(screen.getByText('Refresh brief'));
     expect(navigateMock).toHaveBeenCalledWith(
       expect.stringContaining('content-pipeline'),
-      expect.objectContaining({ state: expect.objectContaining({ fixContext: expect.objectContaining({ targetRoute: 'content-pipeline' }) }) }),
+      expect.objectContaining({
+        state: expect.objectContaining({
+          fixContext: expect.objectContaining({
+            targetRoute: 'content-pipeline',
+            // page.page is a URL/path — the ContentBriefs receiver reads pageSlug for
+            // page targeting and would prefill a raw URL into the keyword field if this
+            // were sent as primaryKeyword. Assert the correct contract.
+            pageSlug: '/blog/losing-page',
+            pageName: '/blog/losing-page',
+          }),
+        }),
+      }),
     );
+    // Guard against regression to the wrong contract field.
+    const [, options] = navigateMock.mock.calls[0] as [string, { state: { fixContext: Record<string, unknown> } }];
+    expect(options.state.fixContext).not.toHaveProperty('primaryKeyword');
   });
 
   it('"Review page" navigates to page-intelligence with fixContext', async () => {
