@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, EmptyState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
+import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
 import {
@@ -12,6 +12,7 @@ import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
 import { useAdminPostsList, usePublishTarget, useSendPostToClient } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
+import { useToast } from './Toast';
 
 interface PostSummary {
   id: string;
@@ -47,6 +48,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const posts = (postsQ.data ?? []) as PostSummary[];
   const loading = postsQ.isLoading;
   const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
+  const { toast } = useToast();
 
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -67,8 +69,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     setPublishingPost(postId);
     try {
       const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
-      if (result.success) invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+      if (result.success) {
+        invalidatePosts();
+      } else {
+        toast(result.error || 'Publish failed', 'error');
+      }
+    } catch (err) {
+      console.error('ContentManager publish failed:', err);
+      toast(err instanceof Error ? err.message : 'Publish failed', 'error');
+    }
     setPublishingPost(null);
   };
 
@@ -77,7 +86,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     try {
       await contentPosts.update(workspaceId, postId, { status });
       invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+    } catch (err) {
+      console.error('ContentManager status update failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to update status', 'error');
+    }
     setUpdatingStatus(null);
   };
 
@@ -98,15 +110,25 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       await contentPosts.remove(workspaceId, postId);
       invalidatePosts();
       setDeleteConfirm(null);
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+    } catch (err) {
+      console.error('ContentManager delete failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
+    }
   };
 
   const scoreVoice = async (postId: string) => {
     setScoringVoice(postId);
     try {
       const result = await contentPosts.scoreVoice(workspaceId, postId);
-      if (result) invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+      if (result) {
+        invalidatePosts();
+      } else {
+        toast('Voice scoring failed', 'error');
+      }
+    } catch (err) {
+      console.error('ContentManager voice score failed:', err);
+      toast(err instanceof Error ? err.message : 'Voice scoring failed', 'error');
+    }
     setScoringVoice(null);
   };
 
@@ -171,6 +193,20 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center justify-center py-24">
         <Icon as={Loader2} size="lg" className="animate-spin text-[var(--brand-text-muted)]" />
       </div>
+    );
+  }
+
+  if (postsQ.isError) {
+    return (
+      <ErrorState
+        title="Couldn't load content posts"
+        message="Content post data failed to load. Try reloading."
+        actions={[
+          { label: 'Retry', onClick: () => { void postsQ.refetch(); } },
+          { label: 'Refresh page', onClick: () => window.location.reload(), variant: 'secondary' },
+        ]}
+        type="data"
+      />
     );
   }
 

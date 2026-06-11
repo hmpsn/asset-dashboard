@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
-type SaveStatus = 'idle' | 'saving' | 'saved';
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 export function useAutoSave(
   saveFn: (html: string) => Promise<void> | void,
@@ -35,7 +35,7 @@ export function useAutoSave(
         }, 1500);
       } catch (err) {
         onErrorRef.current?.(err);
-        if (isMounted.current) setSaveStatus('idle');
+        if (isMounted.current) setSaveStatus('error');
       }
     })();
     const finalPromise = run.finally(() => {

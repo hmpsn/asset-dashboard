@@ -182,6 +182,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     label: '',
   });
   const [feedbackText, setFeedbackText] = useState('');
+  const [autoSaveError, setAutoSaveError] = useState<'section' | 'intro' | 'conclusion' | null>(null);
+
+  const onAutoSaveError = (field: 'section' | 'intro' | 'conclusion') => (_err: unknown) => {
+    setAutoSaveError(field);
+  };
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
   const sectionAutoSaveFn = async (html: string) => {
@@ -192,14 +197,22 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     sections[idx] = { ...sections[idx], content: html, wordCount: countWordsFromHtml(html) };
     await saveField({ sections });
   };
-  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(sectionAutoSaveFn);
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
+    sectionAutoSaveFn,
+    2000,
+    onAutoSaveError('section'),
+  );
 
   const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ introduction: html }); },
+    2000,
+    onAutoSaveError('intro'),
   );
 
   const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ conclusion: html }); },
+    2000,
+    onAutoSaveError('conclusion'),
   );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
@@ -228,7 +241,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
       queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
-    } catch (err) { console.error('PostEditor operation failed:', err); }
+    } catch (err) {
+      console.error('PostEditor save failed:', err);
+      throw err; // rethrow so useAutoSave can catch it and transition to 'error'
+    }
   };
 
   const handleRegenerate = async (sectionIndex: number) => {
@@ -679,6 +695,17 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     {introSaveStatus === 'saved' && (
                       <span className="t-caption-sm text-emerald-400/70">Saved</span>
                     )}
+                    {introSaveStatus === 'error' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={AlertTriangle}
+                        onClick={() => { setAutoSaveError(null); void flushIntro(); }}
+                        className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
+                      >
+                        Save failed — retry
+                      </Button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -689,23 +716,38 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
           {/* Body Sections */}
           {post.sections.map((section) => (
-            <SectionEditor
-              key={section.index} section={section}
-              expanded={expandedSections.has(section.index)}
-              editing={editingSection === section.index}
-              regenerating={regenerating === section.index}
-              isGenerating={isGenerating}
-              saveStatus={sectionSaveStatus}
-              onToggleExpand={toggleSection}
-              onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
-              onChange={scheduleSectionSave}
-              onDone={async () => { await flushSection(); setEditingSection(null); }}
-              onRegenerate={handleRegenerate}
-              onGenerateWithFeedback={(sectionIndex) => {
-                const section = post.sections.find(item => item.index === sectionIndex);
-                openFeedbackFix('section', section ? `Section: ${section.heading}` : `Section ${sectionIndex + 1}`, sectionIndex);
-              }}
-            />
+            <div key={section.index}>
+              <SectionEditor
+                section={section}
+                expanded={expandedSections.has(section.index)}
+                editing={editingSection === section.index}
+                regenerating={regenerating === section.index}
+                isGenerating={isGenerating}
+                saveStatus={sectionSaveStatus === 'error' ? 'idle' : sectionSaveStatus}
+                onToggleExpand={toggleSection}
+                onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
+                onChange={(html) => { setAutoSaveError(null); scheduleSectionSave(html); }}
+                onDone={async () => { await flushSection(); setEditingSection(null); }}
+                onRegenerate={handleRegenerate}
+                onGenerateWithFeedback={(sectionIndex) => {
+                  const s = post.sections.find(item => item.index === sectionIndex);
+                  openFeedbackFix('section', s ? `Section: ${s.heading}` : `Section ${sectionIndex + 1}`, sectionIndex);
+                }}
+              />
+              {autoSaveError === 'section' && editingSection === section.index && (
+                <div className="flex items-center gap-2 px-4 py-2 -mt-2 mb-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={AlertTriangle}
+                    onClick={() => { setAutoSaveError(null); void flushSection(); }}
+                    className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
+                  >
+                    Save failed — retry
+                  </Button>
+                </div>
+              )}
+            </div>
           ))}
 
           {/* Conclusion */}
@@ -754,6 +796,17 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     )}
                     {conclusionSaveStatus === 'saved' && (
                       <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                    )}
+                    {conclusionSaveStatus === 'error' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={AlertTriangle}
+                        onClick={() => { setAutoSaveError(null); void flushConclusion(); }}
+                        className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
+                      >
+                        Save failed — retry
+                      </Button>
                     )}
                   </div>
                 </div>
