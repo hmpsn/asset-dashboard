@@ -7,7 +7,7 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
+  Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers, ChevronRight,
 } from 'lucide-react';
 import { Button, ClickableRow, MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
@@ -25,6 +25,8 @@ export { AIUsageSection } from './AIUsageSection';
 export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (id: string) => void }) {
   const navigate = useNavigate();
   const { data: overviewData, isLoading: loading } = useWorkspaceOverviewData();
+
+  const [attentionExpanded, setAttentionExpanded] = useState(false);
 
   // Real-time presence: WebSocket overrides query data via a state + ref trigger
   const [wsPresence, setWsPresence] = useState<PresenceMap | null>(null);
@@ -67,27 +69,100 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   const totalPendingContent = data.reduce((s, w) => s + (w.contentRequests?.pending || 0), 0);
   const totalInProgressContent = data.reduce((s, w) => s + (w.contentRequests?.inProgress || 0), 0);
   const totalDeliveredContent = data.reduce((s, w) => s + (w.contentRequests?.delivered || 0), 0);
-  const totalPendingWorkOrders = data.reduce((s, w) => s + (w.workOrders?.pending || 0), 0);
   const avgScore = data.filter(w => w.audit).length > 0
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
 
-  // Needs attention items — priority sorted
-  const attentionItems: Array<{ label: string; value: string; color: string; icon: typeof Bell; priority: number }> = [];
-  if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-accent-danger', icon: Bell, priority: 2 });
-  if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-accent-brand', icon: ClipboardCheck, priority: 3 });
-  if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-accent-warning', icon: FileText, priority: 4 });
-  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5 });
-  const rejectedWorkspaces = data.filter(w => (w.pageStates?.rejected || 0) > 0);
-  const totalRejected = rejectedWorkspaces.reduce((s, w) => s + (w.pageStates?.rejected || 0), 0);
-  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-accent-danger', icon: AlertTriangle, priority: 6 });
-  const lowScoreWorkspaces = data.filter(w => w.audit && w.audit.score < 60);
-  if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-accent-danger', icon: AlertTriangle, priority: 7 });
-  const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
-  if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-accent-warning', icon: Globe, priority: 8 });
-  const atRiskWorkspaces = data.filter(w => (w.churnSignals?.critical || 0) > 0 || (w.churnSignals?.warning || 0) > 0);
-  if (atRiskWorkspaces.length > 0) attentionItems.push({ label: `${atRiskWorkspaces.length} workspace${atRiskWorkspaces.length > 1 ? 's' : ''} at risk of churn`, value: 'Churn', color: atRiskWorkspaces.some(w => (w.churnSignals?.critical || 0) > 0) ? 'text-accent-danger' : 'text-accent-warning', icon: Flag, priority: 1.5 });
+  // Needs attention items — per workspace, priority sorted
+  // Each item deep-links to the relevant admin tab for the specific workspace.
+  type AttentionItem = {
+    label: string;
+    value: string;
+    color: string;
+    icon: typeof Bell;
+    priority: number;
+    href: string;
+    wsName: string;
+    ariaLabel: string;
+  };
+  const attentionItems: AttentionItem[] = [];
+
+  // Churn risk (priority 1 = critical, 1.5 = warning only) — link to requests page
+  for (const ws of data) {
+    const critical = ws.churnSignals?.critical || 0;
+    const warning = ws.churnSignals?.warning || 0;
+    if (critical > 0 || warning > 0) {
+      const priority = critical > 0 ? 1 : 1.5;
+      const color = critical > 0 ? 'text-accent-danger' : 'text-accent-warning';
+      const label = 'At risk of churn';
+      attentionItems.push({ label, value: 'Churn', color, icon: Flag, priority, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // New client requests (priority 2) — link to requests page
+  for (const ws of data) {
+    if (ws.requests.new > 0) {
+      const n = ws.requests.new;
+      const label = `${n} new client request${n > 1 ? 's' : ''}`;
+      attentionItems.push({ label, value: 'Requests', color: 'text-accent-danger', icon: Bell, priority: 2, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // Pending approvals (priority 3) — link to seo-editor (where client SEO changes are reviewed)
+  for (const ws of data) {
+    if (ws.approvals.pending > 0) {
+      const n = ws.approvals.pending;
+      const label = `${n} pending approval${n > 1 ? 's' : ''}`;
+      attentionItems.push({ label, value: 'Approvals', color: 'text-accent-brand', icon: ClipboardCheck, priority: 3, href: adminPath(ws.id, 'seo-editor'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // Content briefs awaiting review (priority 4) — link to content-pipeline?tab=briefs
+  for (const ws of data) {
+    const pending = ws.contentRequests?.pending || 0;
+    if (pending > 0) {
+      const label = `${pending} content brief${pending > 1 ? 's' : ''} awaiting review`;
+      attentionItems.push({ label, value: 'Content', color: 'text-accent-warning', icon: FileText, priority: 4, href: adminPath(ws.id, 'content-pipeline') + '?tab=briefs', wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // Pending work orders (priority 5) — link to requests page (ClientDeliverablesPane)
+  for (const ws of data) {
+    const pending = ws.workOrders?.pending || 0;
+    if (pending > 0) {
+      const label = `${pending} purchased fix${pending > 1 ? 'es' : ''} awaiting fulfillment`;
+      attentionItems.push({ label, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // Rejected changes (priority 6) — link to seo-editor
+  for (const ws of data) {
+    const rejected = ws.pageStates?.rejected || 0;
+    if (rejected > 0) {
+      const label = `${rejected} rejected change${rejected > 1 ? 's' : ''} need revision`;
+      attentionItems.push({ label, value: 'Rejected', color: 'text-accent-danger', icon: AlertTriangle, priority: 6, href: adminPath(ws.id, 'seo-editor'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+    }
+  }
+
+  // Low health score < 60 (priority 7) — link to seo-audit, show per-workspace score
+  for (const ws of data) {
+    if (ws.audit && ws.audit.score < 60) {
+      const label = `Health score ${ws.audit.score} — needs attention`;
+      attentionItems.push({ label, value: 'Health', color: 'text-accent-danger', icon: AlertTriangle, priority: 7, href: adminPath(ws.id, 'seo-audit'), wsName: ws.name, ariaLabel: `Health score ${ws.audit.score} · ${ws.name}` });
+    }
+  }
+
+  // No site linked (priority 8) — link to workspace-settings?tab=connections
+  for (const ws of data) {
+    if (!ws.webflowSiteId) {
+      const label = 'No site linked · connect Webflow';
+      attentionItems.push({ label, value: 'Setup', color: 'text-accent-warning', icon: Globe, priority: 8, href: adminPath(ws.id, 'workspace-settings') + '?tab=connections', wsName: ws.name, ariaLabel: `No site linked · connect Webflow · ${ws.name}` });
+    }
+  }
+
   attentionItems.sort((a, b) => a.priority - b.priority);
+
+  const ATTENTION_CAP = 8;
 
   return (
     <div className="space-y-8">
@@ -110,16 +185,34 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {attentionItems.length > 0 && (
         <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-warning" />} noPadding>
           <div className="divide-y divide-[var(--brand-border)]">
-            {attentionItems.map((item, i) => {
+            {(attentionExpanded ? attentionItems : attentionItems.slice(0, ATTENTION_CAP)).map((item) => {
               const ItemIcon = item.icon;
               return (
-                <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                <ClickableRow
+                  key={`${item.href}-${item.value}`}
+                  onClick={() => navigate(item.href)}
+                  aria-label={item.ariaLabel}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                >
                   <ItemIcon className={cn('w-3.5 h-3.5 flex-shrink-0', item.color)} />
                   <span className="t-caption text-[var(--brand-text-bright)] flex-1">{item.label}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{item.wsName}</span>
                   <Badge label={item.value} tone="zinc" />
-                </div>
+                  <ChevronRight className="w-3 h-3 flex-shrink-0 text-accent-brand opacity-60" />
+                </ClickableRow>
               );
             })}
+            {attentionItems.length > ATTENTION_CAP && (
+              <Button
+                variant="ghost"
+                onClick={() => setAttentionExpanded(e => !e)}
+                className="w-full px-4 py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] justify-start"
+              >
+                {attentionExpanded
+                  ? 'Show less'
+                  : `Show ${attentionItems.length - ATTENTION_CAP} more`}
+              </Button>
+            )}
           </div>
         </SectionCard>
       )}
