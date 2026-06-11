@@ -36,7 +36,7 @@ export function useRequestedKeywordRankTrend({ workspaceId, keywords }: UseReque
     // ws-invalidation-ok: the trend card owns this client-requested-keyword-trend key.
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;
-      queryClient.invalidateQueries({ queryKey: ['client-requested-keyword-trend', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.requestedKeywordTrendAll(workspaceId) });
     },
   });
 
