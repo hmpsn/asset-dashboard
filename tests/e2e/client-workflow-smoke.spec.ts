@@ -198,6 +198,17 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('workflow smoke: inbox conversation/review deep-links stay routable', async ({ page }) => {
+    // E3: the portal requires a client session for in-browser data fetches.
+    // page.request shares the browser context's cookie jar, so logging in here
+    // authenticates the page navigations that follow.
+    const loginRes = await page.request.post(`/api/public/client-login/${workspaceId}`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+      },
+    });
+    expect(loginRes.ok()).toBe(true);
+
     await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=conversations`);
     await dismissOnboardingIfPresent(page);
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=conversations`));
@@ -212,10 +223,12 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('client smoke: free tier public workspace + tier endpoints stay coherent', async ({ request }) => {
+    // E3: content-requests requires portal auth and the free-tier workspace has
+    // no client user — pass the admin token (workspace/tier stay public-info).
     const [workspaceRes, tierRes, requestsRes] = await Promise.all([
       request.get(`/api/public/workspace/${freeTierWorkspaceId}`),
       request.get(`/api/public/tier/${freeTierWorkspaceId}`),
-      request.get(`/api/public/content-requests/${freeTierWorkspaceId}`),
+      request.get(`/api/public/content-requests/${freeTierWorkspaceId}`, { headers: publicAuthHeaders }),
     ]);
 
     expect(workspaceRes.ok()).toBe(true);
