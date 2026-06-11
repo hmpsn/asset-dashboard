@@ -27,6 +27,8 @@
     "test:component": "vitest run --project component",
     "test:integration": "vitest run --project integration",
     "test:coverage": "vitest run --coverage",
+    "test:tmp:clean": "tsx scripts/cleanup-vitest-temp.ts",
+    "test:tmp:clean:dry": "tsx scripts/cleanup-vitest-temp.ts --dry-run",
     "test:e2e": "playwright test",
     "phase2:baseline": "playwright test --config=playwright.visual.config.ts",
     "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
