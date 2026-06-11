@@ -7,6 +7,21 @@ import type {
   SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview,
 } from '../components/client/types';
 import type { Tier } from '../components/ui';
+import type { ClientTab } from '../routes';
+
+/**
+ * Tab values the server chat endpoint accepts as the `currentTab` hint — a
+ * mirror of `CLIENT_CHAT_TAB_HINTS` in server/routes/public-analytics.ts. The
+ * server validates with `z.enum(...).optional()`, so a PRESENT-but-unknown
+ * value rejects the WHOLE request with a 400. This set is the two-halves
+ * contract's receiving guard: send `currentTab` only when it's a known hint,
+ * so a future ClientTab value not yet accepted by the server degrades to an
+ * omitted hint instead of breaking chat. Keep in sync with the server enum.
+ */
+const CHAT_TAB_HINTS = new Set<ClientTab>([
+  'overview', 'performance', 'search', 'health', 'strategy', 'analytics',
+  'inbox', 'approvals', 'requests', 'content', 'plans', 'roi', 'content-plan', 'brand',
+]);
 
 export interface ChatDeps {
   ws: { id: string; eventConfig?: Array<{ eventName: string; displayName: string; pinned: boolean; group?: string }> } | null;
@@ -33,6 +48,9 @@ export interface ChatDeps {
   requests: ClientRequest[];
   anomalies: Array<{ type: string; severity: string; title: string; description: string; source: string; changePct: number }>;
   days: number;
+  /** Which client dashboard tab the user is on — sent to the chat endpoint as a
+   *  size-capped hint (see CHAT_TAB_HINTS). Optional: omitted when unknown. */
+  currentTab?: ClientTab;
   betaMode: boolean;
   effectiveTier: Tier;
 }
@@ -67,7 +85,6 @@ export interface ChatActions {
   /** Clear lastIntent — call after CTA is actioned so it doesn't re-appear on next render */
   clearIntent: () => void;
   askAi: (question: string) => Promise<void>;
-  buildChatContext: () => Record<string, unknown>;
 }
 
 export function useChat(deps: ChatDeps): ChatState & ChatActions {
@@ -87,94 +104,25 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  const buildChatContext = useCallback(() => {
-    const { overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices, ga4Events, ga4Conversions,
-      ga4Countries, searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning,
-      audit, auditDetail, strategyData, latestRanks, activityLog, annotations,
-      approvalBatches, requests, anomalies, days } = deps;
-
-    const context: Record<string, unknown> = { days };
-    if (overview) {
-      context.search = {
-        dateRange: overview.dateRange, totalClicks: overview.totalClicks,
-        totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
-        avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
-      };
-    }
-    if (trend.length > 1) {
-      context.searchTrend = { firstDay: trend[0], lastDay: trend[trend.length - 1], totalDays: trend.length };
-    }
-    if (ga4Overview) {
-      context.ga4 = {
-        overview: ga4Overview,
-        topPages: ga4Pages.slice(0, 10),
-        sources: ga4Sources.slice(0, 8),
-        devices: ga4Devices,
-        events: ga4Events.slice(0, 15),
-        conversions: ga4Conversions.slice(0, 10),
-        countries: ga4Countries.slice(0, 8),
-      };
-    }
-    if (searchComparison) context.searchComparison = searchComparison;
-    if (ga4Comparison) context.ga4Comparison = ga4Comparison;
-    if (ga4Organic) context.ga4Organic = ga4Organic;
-    if (ga4NewVsReturning && ga4NewVsReturning.length > 0) context.ga4NewVsReturning = ga4NewVsReturning;
-    if (audit) {
-      context.siteHealth = {
-        score: audit.siteScore, totalPages: audit.totalPages,
-        errors: audit.errors, warnings: audit.warnings,
-        previousScore: audit.previousScore,
-      };
-    }
-    if (auditDetail) {
-      context.siteHealthDetail = {
-        siteWideIssues: auditDetail.audit.siteWideIssues.slice(0, 10),
-        scoreHistory: auditDetail.scoreHistory?.slice(0, 5),
-        topIssuePages: auditDetail.audit.pages
-          .filter(p => p.issues.length > 0)
-          .sort((a, b) => b.issues.length - a.issues.length)
-          .slice(0, 5)
-          .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
-        cwvSummary: auditDetail.audit.cwvSummary,
-      };
-    }
-    if (strategyData) {
-      context.seoStrategy = {
-        pageMap: strategyData.pageMap?.slice(0, 10),
-        opportunities: strategyData.opportunities?.slice(0, 5),
-        contentGaps: strategyData.contentGaps?.slice(0, 5),
-        quickWins: strategyData.quickWins?.slice(0, 5),
-      };
-    }
-    if (latestRanks.length > 0) context.rankings = latestRanks.slice(0, 15);
-    if (activityLog.length > 0) context.recentActivity = activityLog.slice(0, 10);
-    if (annotations.length > 0) context.annotations = annotations.slice(0, 10);
-    if (approvalBatches.length > 0) {
-      const pending = approvalBatches.filter(b => b.status === 'pending');
-      if (pending.length > 0) context.pendingApprovals = pending.length;
-    }
-    if (requests.length > 0) {
-      const active = requests.filter(r => r.status !== 'closed');
-      if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
-    }
-    if (anomalies.length > 0) {
-      context.detectedAnomalies = anomalies.map(a => ({ type: a.type, severity: a.severity, title: a.title, description: a.description, source: a.source, changePct: a.changePct }));
-    }
-    return context;
-  }, [deps]);
-
   const askAi = useCallback(async (question: string) => {
-    const { ws, overview, ga4Overview, betaMode } = deps;
+    const { ws, overview, ga4Overview, betaMode, days, currentTab } = deps;
     if (!question.trim() || !ws) return;
     if (!overview && !ga4Overview) return;
     setChatMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setChatInput('');
     setChatLoading(true);
     try {
-      const context = buildChatContext();
+      // E4 (audit #17): grounding is assembled SERVER-SIDE. The frontend sends only
+      // size-capped hints — the date-range (`days`) and the current tab (only when
+      // it's a known server hint; an unknown value would 400 the request). The old
+      // verbatim `context` blob was a prompt-injection surface and is gone.
+      const payload: { question: string; days: number; sessionId: string; betaMode: boolean; currentTab?: ClientTab } = {
+        question: question.trim(), days, sessionId: chatSessionId, betaMode,
+      };
+      if (currentTab && CHAT_TAB_HINTS.has(currentTab)) payload.currentTab = currentTab;
       let data: { answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null };
       try {
-        data = await post<{ answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
+        data = await post<{ answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null }>(`/api/public/search-chat/${ws.id}`, payload);
       } catch (err) {
         if (err instanceof ApiError && err.status === 429) {
           const roiMsg = roiValue && roiValue > 0
@@ -194,7 +142,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
       console.error('useChat operation failed:', err);
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
-  }, [deps, buildChatContext, chatSessionId, roiValue]);
+  }, [deps, chatSessionId, roiValue]);
 
   // Build a proactive greeting from already-loaded data (zero AI cost)
   const buildProactiveGreeting = useCallback((): string => {
@@ -315,6 +263,5 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     lastIntent,
     clearIntent: () => setLastIntent(null),
     askAi,
-    buildChatContext,
   };
 }
