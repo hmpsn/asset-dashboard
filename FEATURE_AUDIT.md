@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **483 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **484 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -17,6 +17,16 @@ A comprehensive value assessment of every feature in the platform — **483 feat
 **Mutual:** The prompt-size guard and the count-honesty contract now coexist explicitly: lists are bounded, counts are authoritative, and the contract test pins both so no future consumer silently under-reports from a capped list.
 
 **Files:** `shared/types/intelligence.ts` (`InsightsSlice.countsByType` + cap JSDoc), `server/intelligence/insights-slice.ts` (cap + rollup + helper redirect), `server/meeting-brief-generator.ts`, `server/routes/client-intelligence.ts`, `server/monthly-digest.ts`, `scripts/pr-check.ts` (KNOWN_UNRENDERED_FIELDS), `docs/rules/workspace-intelligence.md`. Tests: `tests/unit/insights-slice.test.ts`, `tests/integration/g3-insights-bytype-cap.test.ts`, `tests/contract/intelligence-slice-population.test.ts`, `tests/unit/workspace-intelligence-extended.test.ts`.
+
+---
+
+### 484. Keyword-Level Outcome Bridge + Client Requested-Keyword Rank Trend (A4, audit #15)
+
+**What it does:** Closes the keyword-level outcome loop in three pieces. (1) **Hub actions enter outcome tracking** — Keyword Hub track / promote / add-to-strategy actions (single, bulk, route, and MCP paths, all via B2's `applyKeywordCommandCenterAction` contract point) now record a tracked outcome action through the new `recordKeywordTrackingAction()` (`server/outcome-measurement-keywords.ts`), reusing A3's `strategy_page_keyword` sourceType + `strategyPageKeywordSourceId()` idempotency key so the Hub and strategy-regeneration writers share one dedup space (re-track / decline→re-add never duplicates). Baselines capture the keyword's current position from the freshest rank snapshot (`exact`), or an honestly-empty `estimated` baseline when none exists. (2) **Keyword-level scoring** — the measurement cron scores `strategy_keyword_added` actions that carry a `targetKeyword` against `rank_snapshots` (keyword-level position, ≤14-day freshness via `readKeywordRankSnapshot`) instead of page-aggregate GSC, matching the keyword-level baselines; missing/stale snapshots score `inconclusive`, never fabricated (FM-2). Two inherited A3-review fixes shipped here: a search-metric action whose baseline lacks the PRIMARY metric now scores `inconclusive` (previously a missing baseline position was read as 0, fabricating a loss), and permanently-unmeasurable strategy-level actions (no pageUrl, no targetKeyword, metrics-empty baseline) exit the measurement queue at their first due checkpoint instead of emitting inconclusive noise until day 90. (3) **Client trend card** — the client Strategy tab shows a 180-day rank-trend `ChartCard` for the keywords the client requested themselves (`StrategyRequestedKeywordTrendSection` + `useRequestedKeywordRankTrend`, growth-gated inside the no-keywords check so free-tier clients never see an irrelevant upsell, live-refreshed on `RANK_TRACKING_UPDATED`).
+
+**Agency value:** Keyword work done in the Hub finally feeds the learnings engine — wins and losses on tracked keywords accrue to the same outcome dataset that calibrates recommendations — and the measurement queue stops carrying permanently-dead actions or fabricating losses from partial baselines.
+
+**Client value:** "Add a keyword you care about" now has a visible payoff: a live 180-day ranking trend of exactly the keywords they requested, refreshed as new rank snapshots land.
 
 ---
 

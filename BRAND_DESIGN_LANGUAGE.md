@@ -331,6 +331,7 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | **SchemaSuggester.tsx** | CMS template badge | `purple-500/15 text-purple-400` | Technical admin badge |
 | **ContentBriefs.tsx** | Full Post badge, brief toggle, word count badge | `blue-500/10 text-blue-400` | Data/info context on admin side |
 | **KeywordStrategy.tsx** | Page type badge, content gap cards | `teal` | Matches design system |
+| **StrategyRequestedKeywordTrendSection.tsx** | Section icon chip, chart series | `bg-blue-500/20 text-blue-400`, `CHART_SERIES_ORDER` | Rank data = blue / chart tokens (read-only, client-facing, no purple) |
 | **WorkspaceOverview.tsx** | Tier badges on workspace cards | `teal-500/15 text-teal-400` | Unified |
 | **WorkspaceSettings.tsx** | Knowledge base icon, client users icon, avatar gradient | `teal` | Unified |
 | **OnboardingChecklist.tsx** | Progress bar | `bg-blue-500` | Data metric — tracks setup completion |
