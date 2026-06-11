@@ -218,6 +218,9 @@ export const queryKeys = {
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
     rankHistory: (wsId: string) => ['client-rank-history', wsId] as const,
+    // A4 (audit #15): 180-day rank series for client-requested keywords (Strategy tab trend card).
+    requestedKeywordTrend: (wsId: string, keywords: string[]) =>
+      ['client-requested-keyword-trend', wsId, ...keywords] as const,
     latestRanks: (wsId: string) => ['client-latest-ranks', wsId] as const,
     annotations: (wsId: string) => ['client-annotations', wsId] as const,
     anomalies: (wsId: string) => ['client-anomalies', wsId] as const,

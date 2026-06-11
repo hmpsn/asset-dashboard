@@ -122,6 +122,18 @@ export const rankTracking = {
   history: (wsId: string) =>
     getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history`, []),
 
+  /** Filtered public rank history — repeated `query` params + explicit `limit`
+   *  (A4: the client requested-keyword trend card reads 180 days). */
+  historyFiltered: (wsId: string, queries: string[], limit: number) => {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    for (const query of queries) {
+      const trimmed = query.trim();
+      if (trimmed) params.append('query', trimmed);
+    }
+    return getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history?${params.toString()}`, []);
+  },
+
   addKeyword: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/rank-tracking/${wsId}/keywords`, body),
 

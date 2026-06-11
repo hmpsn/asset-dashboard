@@ -107,6 +107,12 @@ vi.mock('../../../src/components/client/strategy/StrategyDeclinedKeywordsSection
   StrategyDeclinedKeywordsSection: () => <div data-testid="declined-keywords" />,
 }));
 
+// A4: requested-keyword trend card owns its own React Query hook — stub like the
+// other sections (covered by StrategyRequestedKeywordTrendSection.test.tsx).
+vi.mock('../../../src/components/client/strategy/StrategyRequestedKeywordTrendSection', () => ({
+  StrategyRequestedKeywordTrendSection: () => <div data-testid="requested-keyword-trend" />,
+}));
+
 vi.mock('../../../src/components/client/strategy/StrategyDeclineKeywordModal', () => ({
   StrategyDeclineKeywordModal: () => <div data-testid="decline-modal" />,
 }));
