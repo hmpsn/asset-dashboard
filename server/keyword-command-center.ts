@@ -3383,11 +3383,17 @@ function applyKeywordCommandCenterActionInternal(
     || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.TRACK
     || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE
   ) {
-    recordKeywordTrackingAction({
-      workspaceId: workspace.id,
-      keyword: displayKeyword,
-      pagePath: request.pagePath ?? existing?.pagePath,
-    });
+    // Outcome tracking is a side-channel: the user-visible action committed above,
+    // so a recording failure must log, never surface as an error to the caller.
+    try {
+      recordKeywordTrackingAction({
+        workspaceId: workspace.id,
+        keyword: displayKeyword,
+        pagePath: request.pagePath ?? existing?.pagePath,
+      });
+    } catch (err) {
+      log.error({ err, workspaceId: workspace.id, keyword: displayKeyword, action: request.action }, 'keyword outcome recording failed — Hub action already committed');
+    }
   }
 
   invalidateIntelligenceCache(workspace.id);
