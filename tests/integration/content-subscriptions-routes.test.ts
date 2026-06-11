@@ -13,6 +13,7 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -37,7 +38,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function getJson(path: string): Promise<Response> {
-  return fetch(`${baseUrl}${path}`);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {

@@ -19,7 +19,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 const PORT = 13501;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let wsId = '';

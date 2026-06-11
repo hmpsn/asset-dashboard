@@ -40,6 +40,13 @@ export interface TestContext {
 /**
  * Create an isolated test context bound to a specific port.
  * Each test file should call this with a unique port number.
+ *
+ * E3 (passwordless-closure): autoPublicAuth defaults to true so that fixed-port
+ * integration/contract tests automatically get the admin HMAC token injected on
+ * /api/public/ calls, matching the createEphemeralTestContext default. Tests that
+ * deliberately check unauthenticated behaviour must pass
+ * `{ headers: { 'x-no-auto-public-auth': 'true' } }` to suppress injection for
+ * those individual calls.
  */
 export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number; autoPublicAuth?: boolean }): TestContext {
   const BASE = `http://localhost:${port}`;
@@ -155,8 +162,11 @@ export function createTestContext(port: number, options?: { env?: Record<string,
     };
     const skipAutoPublicAuth = headers['x-no-auto-public-auth'] === 'true';
     delete headers['x-no-auto-public-auth'];
+    // Default autoPublicAuth to true (E3: portals are closed until configured).
+    // Explicit false opts out; undefined is treated as true.
+    const autoPublicAuth = options?.autoPublicAuth !== false;
     if (
-      options?.autoPublicAuth
+      autoPublicAuth
       && !skipAutoPublicAuth
       && urlPath.startsWith('/api/public/')
       && !headers['x-auth-token']
@@ -260,6 +270,12 @@ export function createTestContext(port: number, options?: { env?: Record<string,
 /**
  * Allocate a unique integration-test port from the shared lock-backed range.
  * Callers should pass a stable file identifier such as `import.meta.url`.
+ *
+ * E3 (passwordless-closure): autoPublicAuth defaults to true so that all
+ * ephemeral-context integration tests automatically get the admin HMAC token
+ * injected on /api/public/ calls. Tests that deliberately check unauthenticated
+ * behaviour must pass `{ headers: { 'x-no-auto-public-auth': 'true' } }` to
+ * suppress injection for those individual calls.
  */
 export function createEphemeralTestContext(
   testFileUrl: string,
@@ -273,7 +289,8 @@ export function createEphemeralTestContext(
   }
 
   const port = reserveIntegrationTestPort(testFileUrl);
-  const ctx = createTestContext(port, options);
+  // Default autoPublicAuth to true (E3: portals are closed until configured).
+  const ctx = createTestContext(port, { ...options, autoPublicAuth: options?.autoPublicAuth ?? true });
   const baseStopServer = ctx.stopServer;
 
   return {

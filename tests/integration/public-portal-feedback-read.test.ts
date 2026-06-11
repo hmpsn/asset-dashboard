@@ -13,7 +13,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createTestContext(13602);
+const ctx = createTestContext(13602, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-feedback-99999';

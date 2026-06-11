@@ -7689,14 +7689,17 @@ export const CHECKS: Check[] = [
     // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
     //
     // Every `/api/public/<resource>/:workspaceId/...` route that serves
-    // workspace-scoped data must apply either `requireClientPortalAuth()`
-    // (allows passwordless workspaces) or `requireAuthenticatedClientPortalAuth()`
-    // (rejects passwordless workspaces — preferred for sensitive data).
+    // workspace-scoped data must apply either `requireClientPortalAuth()` or
+    // `requireAuthenticatedClientPortalAuth()`. As of E3 (passwordless portal
+    // closure) BOTH reject passwordless workspaces — a portal returns 401 until
+    // a client credential is configured. `requireAuthenticatedClientPortalAuth`
+    // additionally rejects internal-JWT-only access and is preferred for the
+    // most sensitive mutations.
     //
-    // The global app gate at server/app.ts:262 short-circuits to next() when
-    // `!ws.clientPassword`, which silently leaks data for any workspace whose
-    // dashboard has not been configured yet. The per-route middleware closes
-    // that hole.
+    // The global app gate at server/app.ts advances passwordless requests to
+    // the route (it is an advance-only defense-in-depth layer, not the backstop
+    // — see the comment there). This per-route middleware is the real backstop,
+    // which is why full per-route coverage is mandatory and enforced here.
     //
     // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
     // allowed by the global gate (server/app.ts:258): bootstrap/login flow

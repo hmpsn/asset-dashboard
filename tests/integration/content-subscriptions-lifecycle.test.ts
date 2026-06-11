@@ -29,6 +29,7 @@ vi.mock('../../server/broadcast.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Server helpers ──
 
@@ -54,7 +55,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function getJson(path: string): Promise<Response> {

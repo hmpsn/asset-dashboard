@@ -20,7 +20,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { createClientUser, createResetToken, deleteClientUser } from '../../server/client-users.js';
 
 const PORT = 13500;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Each describe block that calls rate-limited endpoints gets its own workspace

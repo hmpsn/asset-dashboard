@@ -196,7 +196,7 @@ export function internalJwtCanAccessWorkspace(req: express.Request, workspaceId:
 // ── Client Portal Auth Guard ──
 
 /** Require client portal authentication (JWT or legacy session cookie) on public endpoints.
- *  Passwordless workspaces (no client password set) are accessible by URL alone. */
+ *  Portals are closed until configured — workspaces with no client password return 401. */
 export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const workspaceId = req.params[wsIdParam];
@@ -216,8 +216,6 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
     if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
     // Allow internal users only when their JWT is scoped to this workspace.
     if (internalJwtCanAccessWorkspace(req, workspaceId)) return next();
-    // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
-    if (!ws.clientPassword) return next();
 
     return res.status(401).json({ error: 'Authentication required' });
   };

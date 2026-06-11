@@ -25,7 +25,7 @@ import {
 import { renderMonthlyReport } from '../../server/email-templates.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13260);
+const ctx = createTestContext(13260, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Fixture workspaces ──

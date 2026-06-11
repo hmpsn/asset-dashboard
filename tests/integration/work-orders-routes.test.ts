@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13219);
+const ctx = createTestContext(13219, { autoPublicAuth: true });
 const { api, patchJson } = ctx;
 
 let testWsId = '';

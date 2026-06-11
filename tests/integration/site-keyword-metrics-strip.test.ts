@@ -34,7 +34,7 @@ import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import type { KeywordStrategySiteKeywordMetric } from '../../server/keyword-strategy-enrichment.js';
 
 const PORT = 13892;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api } = ctx;
 
 const cleanupIds: string[] = [];

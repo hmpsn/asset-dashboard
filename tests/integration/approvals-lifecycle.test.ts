@@ -119,7 +119,7 @@ async function startTestServer(): Promise<void> {
 // ── HTTP helpers ───────────────────────────────────────────────────────────────
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
@@ -148,6 +148,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace, getPageState } from 
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { recordSend } from '../../server/email-throttle.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 const originalAppPassword = process.env.APP_PASSWORD;
 const originalWebflowToken = process.env.WEBFLOW_API_TOKEN;

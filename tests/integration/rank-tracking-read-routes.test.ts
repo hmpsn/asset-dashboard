@@ -18,7 +18,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { storeRankSnapshot } from '../../server/rank-tracking.js';
 
-const ctx = createTestContext(13610);
+const ctx = createTestContext(13610, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 let wsId = '';
 

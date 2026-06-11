@@ -44,6 +44,7 @@ vi.mock('../../server/email.js', async importOriginal => {
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest } from '../../server/requests.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -69,17 +70,17 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 beforeAll(async () => {
   await startTestServer();
   wsName = 'RequestFollowupNotif-Test';
-  // No client password → passwordless workspace bypasses requireClientPortalAuth
+  // E3: admin HMAC injected by withPublicTestAuth; workspace needs no client password
   wsId = createWorkspace(wsName).id;
 }, 30_000);
 

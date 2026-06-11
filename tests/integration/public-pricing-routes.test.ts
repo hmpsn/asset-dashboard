@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13359); // port-ok: next free after 13358
+const ctx = createTestContext(13359, { autoPublicAuth: true }); // port-ok: next free after 13358
 
 let workspaceId = '';
 

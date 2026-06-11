@@ -10,7 +10,7 @@ import { deleteSchemaPlan, deleteSchemaSnapshot, saveSchemaPlan, saveSchemaSnaps
 import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 
-const ctx = createTestContext(13356); // port-ok: 13201-13355 already allocated in integration suite
+const ctx = createTestContext(13356, { autoPublicAuth: true }); // port-ok: 13201-13355 already allocated in integration suite
 const { api } = ctx;
 
 let workspaceAId = '';
@@ -272,7 +272,7 @@ describe('public/client serialization contract matrix', () => {
     expect(workspace.id).toBe(workspaceProtectedId);
     expect(workspace.requiresPassword).toBe(true);
 
-    const gatedRes = await api(`/api/public/content-requests/${workspaceProtectedId}`);
+    const gatedRes = await api(`/api/public/content-requests/${workspaceProtectedId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(gatedRes.status).toBe(401);
     await expect(gatedRes.json()).resolves.toMatchObject({
       error: expect.stringContaining('Authentication required'),

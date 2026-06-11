@@ -17,7 +17,7 @@ import { upsertContentGap } from '../../server/content-gaps.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
 
 const PORT = 13879;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';

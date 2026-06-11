@@ -17,7 +17,7 @@ import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 
 const PORT = 13890;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api } = ctx;
 
 let tableWsId = '';

@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13600);
+const ctx = createTestContext(13600, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-pub-99999';

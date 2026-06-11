@@ -26,7 +26,7 @@ import { saveSchemaPlan, getSchemaPlan, deleteSchemaPlan } from '../../server/sc
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
-const ctx = createTestContext(13874); // port-ok: next free after 13873
+const ctx = createTestContext(13874, { autoPublicAuth: true }); // port-ok: next free after 13873
 
 let pwless: SeededFullWorkspace;
 let clientUserId = '';
@@ -71,9 +71,13 @@ afterAll(async () => {
 
 describe('PATCH /api/public/deliverables/:workspaceId/:id/respond auth', () => {
   it('returns 401 unauthenticated on a PASSWORDLESS workspace (route guard, not global gate)', async () => {
-    const res = await ctx.patchJson(
+    const res = await ctx.api(
       `/api/public/deliverables/${pwless.workspaceId}/cd_nonexistent/respond`,
-      { decision: 'approved' },
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+        body: JSON.stringify({ decision: 'approved' }),
+      },
     );
     expect(res.status).toBe(401);
   });

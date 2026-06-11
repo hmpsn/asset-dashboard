@@ -43,7 +43,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 });
 
 const PORT = 13896;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api } = ctx;
 
 const cleanupWorkspaceIds: string[] = [];

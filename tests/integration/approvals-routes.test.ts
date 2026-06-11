@@ -16,7 +16,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13214);
+const ctx = createTestContext(13214, { autoPublicAuth: true });
 const { api, postJson, patchJson, del, clearCookies } = ctx;
 
 let testWsId = '';
@@ -220,16 +220,17 @@ describe('Approvals — CRUD', () => {
     const protectedItemId = created.items[0].id;
 
     clearCookies();
-    const listRes = await api(`/api/public/approvals/${protectedWsId}`);
+    const listRes = await api(`/api/public/approvals/${protectedWsId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(listRes.status).toBe(401);
 
-    const readRes = await api(`/api/public/approvals/${protectedWsId}/${created.id}`);
+    const readRes = await api(`/api/public/approvals/${protectedWsId}/${created.id}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(readRes.status).toBe(401);
 
-    const unauthenticatedPatchRes = await patchJson(
-      `/api/public/approvals/${protectedWsId}/${created.id}/${protectedItemId}`,
-      { status: 'approved', clientNote: 'This should not save.' },
-    );
+    const unauthenticatedPatchRes = await api(`/api/public/approvals/${protectedWsId}/${created.id}/${protectedItemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ status: 'approved', clientNote: 'This should not save.' }),
+    });
     expect(unauthenticatedPatchRes.status).toBe(401);
 
     const beforeLoginRes = await api(`/api/approvals/${protectedWsId}/${created.id}`);
@@ -286,16 +287,17 @@ describe('Approvals — CRUD', () => {
     });
     expect(loginRes.status).toBe(200);
 
-    const crossListRes = await api(`/api/public/approvals/${protectedOtherWsId}`);
+    const crossListRes = await api(`/api/public/approvals/${protectedOtherWsId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(crossListRes.status).toBe(401);
 
-    const crossReadRes = await api(`/api/public/approvals/${protectedOtherWsId}/${created.id}`);
+    const crossReadRes = await api(`/api/public/approvals/${protectedOtherWsId}/${created.id}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(crossReadRes.status).toBe(401);
 
-    const crossPatchRes = await patchJson(
-      `/api/public/approvals/${protectedOtherWsId}/${created.id}/${protectedOtherItemId}`,
-      { status: 'approved', clientNote: 'Wrong protected workspace.' },
-    );
+    const crossPatchRes = await api(`/api/public/approvals/${protectedOtherWsId}/${created.id}/${protectedOtherItemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ status: 'approved', clientNote: 'Wrong protected workspace.' }),
+    });
     expect(crossPatchRes.status).toBe(401);
 
     const ownerRes = await api(`/api/approvals/${protectedOtherWsId}/${created.id}`);

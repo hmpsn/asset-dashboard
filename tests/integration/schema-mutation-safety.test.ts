@@ -96,6 +96,7 @@ import { WS_EVENTS } from '../../server/ws-events.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -134,7 +135,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {

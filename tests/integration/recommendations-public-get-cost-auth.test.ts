@@ -27,7 +27,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { loadRecommendations, saveRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13887); // port-ok: next free integration port
+const ctx = createTestContext(13887, { autoPublicAuth: true }); // port-ok: next free integration port
 const { api, postJson, clearCookies } = ctx;
 
 let emptyWsId = '';        // known workspace, NO cached recommendations
@@ -156,7 +156,9 @@ describe('GET /api/public/recommendations/:wsId — cost: no inline generation o
 describe('GET /api/public/recommendations/:wsId — auth (soft gate)', () => {
   it('returns 401 for a password-set workspace with no session', async () => {
     clearCookies();
-    const res = await api(`/api/public/recommendations/${passwordWsId}`);
+    const res = await api(`/api/public/recommendations/${passwordWsId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
     const body = await res.json().catch(() => ({}));
     expect(body).toHaveProperty('error');

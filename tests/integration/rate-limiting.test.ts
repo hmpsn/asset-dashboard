@@ -31,7 +31,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 // Dedicated port — no other test file uses 13302
-const ctx = createTestContext(13302);
+const ctx = createTestContext(13302, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // publicApiWsId is shared across the header-presence describe block (describe block 1 + 2).

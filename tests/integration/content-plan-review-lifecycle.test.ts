@@ -81,7 +81,7 @@ async function stopTestServer(): Promise<void> {
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
 
 function getJson(path: string): Promise<Response> {
-  return fetch(`${baseUrl}${path}`);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
 }
 
 function postJson(path: string, body?: unknown): Promise<Response> {

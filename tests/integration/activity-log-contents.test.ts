@@ -447,7 +447,8 @@ describe('Multiple workspaces isolation', () => {
       new Date().toISOString(),
     );
 
-    const res = await fetch(`${baseUrl}/api/public/activity/${wsId}`);
+    const path = `/api/public/activity/${wsId}`;
+    const res = await fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ type: string; workspaceId: string }>;
     expect(Array.isArray(body)).toBe(true);

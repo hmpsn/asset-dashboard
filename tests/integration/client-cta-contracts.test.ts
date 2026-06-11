@@ -21,7 +21,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { listClientSignals } from '../../server/client-signals-store.js';
 
-const ctx = createTestContext(13301);
+const ctx = createTestContext(13301, { autoPublicAuth: true });
 const { postJson, api } = ctx;
 
 // One workspace per describe block that sends POST requests.

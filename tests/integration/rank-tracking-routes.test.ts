@@ -17,7 +17,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
-const ctx = createTestContext(13213);
+const ctx = createTestContext(13213, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

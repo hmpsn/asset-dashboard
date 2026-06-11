@@ -43,7 +43,7 @@ import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluste
 
 // ── Port — unique across all integration tests ─────────────────────────────
 
-const ctx = createTestContext(13222);
+const ctx = createTestContext(13222, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Workspace IDs ───────────────────────────────────────────────────────────
@@ -876,9 +876,10 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     const unauthWs = createWorkspace('Unauth Feedback WS');
     try {
       updateWorkspace(unauthWs.id, { clientPassword: 'some-password' });
-      const res = await postJson(`/api/public/keyword-feedback/${unauthWs.id}`, {
-        keyword: 'some keyword',
-        status: 'approved',
+      const res = await api(`/api/public/keyword-feedback/${unauthWs.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+        body: JSON.stringify({ keyword: 'some keyword', status: 'approved' }),
       });
       // No session cookie for unauthWs, so auth check fails
       expect(res.status).toBe(401);
@@ -1126,8 +1127,10 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
     const unauthWs = createWorkspace('Unauth Bulk WS');
     try {
       updateWorkspace(unauthWs.id, { clientPassword: 'pw' });
-      const res = await postJson(`/api/public/keyword-feedback/${unauthWs.id}/bulk`, {
-        keywords: [{ keyword: 'test', status: 'approved' }],
+      const res = await api(`/api/public/keyword-feedback/${unauthWs.id}/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+        body: JSON.stringify({ keywords: [{ keyword: 'test', status: 'approved' }] }),
       });
       expect(res.status).toBe(401);
     } finally {
@@ -1228,9 +1231,10 @@ describe('POST /api/public/content-gap-vote — voting', () => {
     const unauthWs = createWorkspace('Unauth Vote WS');
     try {
       updateWorkspace(unauthWs.id, { clientPassword: 'pw' });
-      const res = await postJson(`/api/public/content-gap-vote/${unauthWs.id}`, {
-        keyword: 'technical seo',
-        vote: 'up',
+      const res = await api(`/api/public/content-gap-vote/${unauthWs.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+        body: JSON.stringify({ keyword: 'technical seo', vote: 'up' }),
       });
       expect(res.status).toBe(401);
     } finally {

@@ -25,7 +25,7 @@ import { createBatch } from '../../server/approvals.js';
 import { saveRecommendations, loadRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13872); // port-ok: next free port above 13871
+const ctx = createTestContext(13872, { autoPublicAuth: true }); // port-ok: next free port above 13871
 const { patchJson } = ctx;
 
 let testWsId = '';

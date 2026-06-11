@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedApprovalData, type SeededApprovals } from '../fixtures/approval-seed.js';
 import { createTestContext } from './helpers.js';
 
-const ctx = createTestContext(13719);
+const ctx = createTestContext(13719, { autoPublicAuth: true });
 const { api } = ctx;
 
 let seeded: SeededApprovals | null = null;

@@ -6,7 +6,7 @@ import db from '../../server/db/index.js';
 import { seedIntelligenceTestData, type SeededWorkspace } from '../fixtures/intelligence-seed.js';
 import { createTestContext } from './helpers.js';
 
-const ctx = createTestContext(13716);
+const ctx = createTestContext(13716, { autoPublicAuth: true });
 const { api } = ctx;
 
 let openSeed: SeededWorkspace | null = null;
@@ -126,7 +126,7 @@ describe('public insights routes with intelligence fixture', () => {
     expect(protectedSeed).toBeTruthy();
     if (!protectedSeed) return;
 
-    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}`);
+    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
 
     const body = await res.json() as { error: string };
@@ -210,7 +210,7 @@ describe('public insights routes with intelligence fixture', () => {
     expect(protectedSeed).toBeTruthy();
     if (!protectedSeed) return;
 
-    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}/narrative`);
+    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}/narrative`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
 
     const body = await res.json() as { error: string };
@@ -239,7 +239,7 @@ describe('public insights routes with intelligence fixture', () => {
     expect(protectedSeed).toBeTruthy();
     if (!protectedSeed) return;
 
-    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}/digest`);
+    const res = await api(`/api/public/insights/${protectedSeed.workspaceId}/digest`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
 
     const body = await res.json() as { error: string };

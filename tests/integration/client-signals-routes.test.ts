@@ -13,7 +13,7 @@ import { createClientSignal } from '../../server/client-signals-store.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 
-const ctx = createTestContext(13298);
+const ctx = createTestContext(13298, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';

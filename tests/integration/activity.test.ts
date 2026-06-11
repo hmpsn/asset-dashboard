@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13204);
+const ctx = createTestContext(13204, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const testWsId = 'ws_integ_activity_' + Date.now();

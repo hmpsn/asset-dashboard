@@ -18,7 +18,7 @@ import { createWorkOrder } from '../../server/work-orders.js';
 import db from '../../server/db/index.js';
 import type { ProductType } from '../../shared/types/payments.js';
 
-const ctx = createTestContext(13698);
+const ctx = createTestContext(13698, { autoPublicAuth: true });
 const { api, patchJson } = ctx;
 
 let wsAId = '';

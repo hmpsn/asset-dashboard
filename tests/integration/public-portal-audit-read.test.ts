@@ -17,7 +17,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13601);
+const ctx = createTestContext(13601, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-audit-99999';

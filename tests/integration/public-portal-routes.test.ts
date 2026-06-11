@@ -19,7 +19,7 @@ import { createClientUser, deleteClientUser, signClientToken } from '../../serve
 import { updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
-const ctx = createTestContext(13367); // port-ok: next free after 13366
+const ctx = createTestContext(13367, { autoPublicAuth: true }); // port-ok: next free after 13366
 const { api } = ctx;
 
 /**
@@ -284,7 +284,7 @@ describe('requireClientStrategyMutationAuth — authentication enforcement', () 
   it('returns 401 with no cookies at all', async () => {
     const res = await api(kfEndpoint(wsA.workspaceId), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify(validFeedback),
     });
     expect(res.status).toBe(401);
@@ -566,7 +566,7 @@ describe('POST /api/public/business-priorities/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/business-priorities/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ priorities: [{ text: 'Grow revenue', category: 'growth' }] }),
     });
     expect(res.status).toBe(401);
@@ -848,6 +848,7 @@ describe('DELETE /api/public/keyword-feedback/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/keyword-feedback/${delWs.workspaceId}?keyword=test`, {
       method: 'DELETE',
+      headers: { 'x-no-auto-public-auth': 'true' },
     });
     expect(res.status).toBe(401);
   });
@@ -906,7 +907,7 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/content-gap-vote/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ keyword: 'test', vote: 'up' }),
     });
     expect(res.status).toBe(401);
@@ -1020,7 +1021,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/workspaces/${wsA.workspaceId}/business-profile`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ phone: '555-1234' }),
     });
     expect(res.status).toBe(401);
@@ -1120,7 +1121,7 @@ describe('POST /api/public/keyword-feedback/:workspaceId/bulk', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/keyword-feedback/${wsA.workspaceId}/bulk`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ keywords: [{ keyword: 'test', status: 'approved' }] }),
     });
     expect(res.status).toBe(401);

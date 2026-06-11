@@ -25,7 +25,7 @@ import { saveSnapshot } from '../../server/reports.js';
 import { listActivity } from '../../server/activity-log.js';
 import type { SeoAuditResult } from '../../server/seo-audit.js';
 
-const ctx = createTestContext(13211);
+const ctx = createTestContext(13211, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
