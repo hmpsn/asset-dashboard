@@ -485,31 +485,20 @@ describe('mapToProduct', () => {
     });
   });
 
+  // aeo/content_refresh deliberately return no product: the values they used to
+  // return are not in the ProductType union / PRODUCT_MAP, so their CTAs failed
+  // isProductType at cart checkout. Re-add only with real PRODUCT_MAP entries.
   describe('aeo', () => {
-    it('returns aeo_page_review for < 5 pages', () => {
-      const p = mapToProduct('aeo', 3);
-      expect(p.productType).toBe('aeo_page_review');
-      expect(p.productPrice).toBe(99);
-    });
-
-    it('returns aeo_site_review for >= 5 pages', () => {
-      const p = mapToProduct('aeo', 5);
-      expect(p.productType).toBe('aeo_site_review');
-      expect(p.productPrice).toBe(499);
+    it('returns no product (not in the checkout catalog)', () => {
+      expect(mapToProduct('aeo', 3)).toEqual({});
+      expect(mapToProduct('aeo', 5)).toEqual({});
     });
   });
 
   describe('content_refresh', () => {
-    it('returns content_refresh for < 5 pages', () => {
-      const p = mapToProduct('content_refresh', 1);
-      expect(p.productType).toBe('content_refresh');
-      expect(p.productPrice).toBe(199);
-    });
-
-    it('returns content_refresh_5 for >= 5 pages', () => {
-      const p = mapToProduct('content_refresh', 5);
-      expect(p.productType).toBe('content_refresh_5');
-      expect(p.productPrice).toBe(799);
+    it('returns no product (not in the checkout catalog)', () => {
+      expect(mapToProduct('content_refresh', 1)).toEqual({});
+      expect(mapToProduct('content_refresh', 5)).toEqual({});
     });
   });
 
