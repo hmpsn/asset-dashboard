@@ -645,7 +645,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
                                       size="sm"
                                       icon={ShoppingCart}
                                     >
-                                      Let Us Fix This — {fmt(rec.productPrice)}
+                                      {/* D2 (audit #11): content recs carry a brief product — label the CTA
+                                          as a brief order so it reads as the brief-purchase flow it routes to. */}
+                                      {rec.type === 'content'
+                                        ? <>Order Content Brief — {fmt(rec.productPrice)}</>
+                                        : <>Let Us Fix This — {fmt(rec.productPrice)}</>}
                                     </Button>
                                   ) : inCart ? (
                                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] badge-span-ok t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">

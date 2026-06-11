@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **480 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **481 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 481. Recommendations ↔ Content Pipeline Reconciliation (D2, audit #11)
+
+**What it does:** Closes the loop between the recommendation engine and the content pipeline in three directions. (1) **Generation suppression** — `generateRecommendations` now includes the `contentPipeline` intelligence slice (via the shared `buildRecommendationGenerationContext` builder) and skips content-gap recs whose target keyword already has an in-flight brief or post (new comparison-keyed `ContentPipelineSlice.inFlightTargetKeywords`, populated in `assembleContentPipeline`). Suppression fails open: if the slice degrades, recs mint as before — never a false resolution. (2) **Publish-time resolution** — the C3 publish domain service (`publishPostToWebflow`) makes one best-effort call to the new `resolveContentRecommendationsForPublishedPost()` after a successful publish, completing active content recs whose persisted `targetKeyword` (new optional `Recommendation` field, set at content-gap mint) matches the published post's keyword — with `validateTransition`, summary recompute, intelligence-cache invalidation, and a `RECOMMENDATIONS_UPDATED` broadcast. A resolution failure never fails a publish; a failed publish never resolves a rec. (3) **CTA → brief purchase** — `mapToProduct('content', …)` no longer returns `{}`: content recs carry the real brief-purchase product keyed by the gap's suggested page type (`brief_blog` $125 … `brief_pillar` $200, mirroring `PRODUCT_MAP`), so the client rec card's purchase CTA ("Order Content Brief — $X") routes into the existing cart → `/api/stripe/cart-checkout` brief-purchase flow.
+
+**Agency value:** The rec queue and the content pipeline can no longer contradict each other — the team never sees (and the client is never sold) a "create content for X" rec while a brief or post for X is already in flight, and a publish clears its rec immediately instead of waiting for the GSC-lag-gated regen.
+
+**Client value:** The priority list stays honest: recommendations disappear the moment the work is actually underway or live, and content recommendations finally have a one-click purchase path instead of a dead-end "we should create this" card.
+
+**Mutual:** Suppression + resolution prevent double-selling content the client already paid for; the CTA turns the highest-intent moment (a data-grounded content gap) into a frictionless brief order on existing payment rails.
+
+**Files:** `server/recommendations.ts` (slice in builder call, suppression, `BRIEF_PRODUCT_BY_PAGE_TYPE`, `mapToProduct` pageType param, `resolveContentRecommendationsForPublishedPost`), `server/domains/content/publish-post-to-webflow.ts` (one best-effort hook), `server/intelligence/content-pipeline-slice.ts` + `shared/types/intelligence.ts` (`inFlightTargetKeywords`), `shared/types/recommendations.ts` + `server/schemas/workspace-schemas.ts` (`targetKeyword`), `src/components/client/InsightsEngine.tsx` (CTA label). Tests: `tests/integration/recommendations-content-reconciliation.test.ts` (suppression, publish resolution, FM-2 both directions), `tests/unit/recommendations-pure-logic.test.ts` (brief-product mapping).
 
 ---
 
