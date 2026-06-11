@@ -19,44 +19,69 @@ untenable: the admin knows _what_ is wrong but not _where_ to go.
 ## Goal
 
 1. Each attention item becomes a clickable deep link (`ClickableRow`) that navigates
-   directly to the correct admin tab for the relevant workspace(s).
-2. Per-workspace attribution is visible — for multi-workspace issues, the most-affected
-   workspace is called out in the label.
-3. Severity sort order is tightened (priority field already exists; churn risk bumped
-   above new requests as highest urgency).
+   directly to the correct admin tab for the relevant workspace.
+2. Per-workspace attribution is visible — every row carries the workspace name as
+   attribution so the admin knows which client to action.
+3. Severity sort order is tightened (churn risk is highest urgency, above new requests).
 4. `?tab=` two-halves contract is verified: any link that appends `?tab=X` to an
    `adminPath()` must land on a component that reads `searchParams.get('tab')`.
+5. Section is capped at 8 visible rows with a "Show N more" expander to prevent
+   the list from pushing Global Stats and the workspace grid below the fold with 20+
+   workspaces.
 
 ---
 
-## Link-target inventory
+## Design: per-workspace rows (not aggregated)
 
-| Attention type | Target admin page | ?tab= | Receiver reads searchParams? |
+The shipped design uses **one row per workspace per issue** rather than a single aggregated
+row per issue type. Reasons:
+
+- Each row deep-links to a specific workspace tab — aggregation makes link targets
+  ambiguous (which workspace?).
+- Attribution (workspace name) is immediately visible on every row without needing hover
+  or sub-labels.
+- The severity sort + 8-row cap prevents unbounded growth: the most urgent items (churn
+  critical > churn warning > new requests > ...) survive the cap; low-priority "no site
+  linked" rows get pushed into the expander.
+
+An aggregated design would save vertical space only at the cost of losing per-workspace
+navigation — a worse tradeoff for an admin dashboard.
+
+---
+
+## Link-target inventory (final, with review fixes applied)
+
+| Attention type | Target admin page | `?tab=` | Notes |
 |---|---|---|---|
-| New client requests | `adminPath(ws.id, 'requests')` | none | N/A |
-| Pending approvals | `adminPath(ws.id, 'content-pipeline')` | none | N/A |
-| Content briefs awaiting review | `adminPath(ws.id, 'content-pipeline')` | `briefs` | YES — ContentPipeline.tsx:51 |
-| Pending work orders | `adminPath(ws.id, 'requests')` | none | N/A |
-| Rejected changes | `adminPath(ws.id, 'seo-editor')` | none | N/A |
-| Low health score | `adminPath(ws.id, 'seo-audit')` | none | N/A |
-| No site linked | `adminPath(ws.id, 'workspace-settings')` | none | N/A |
-| Churn risk | `adminPath(ws.id, 'home')` | none | N/A |
+| Churn risk — critical | `adminPath(ws.id, 'requests')` | none | Priority 1 |
+| Churn risk — warning | `adminPath(ws.id, 'requests')` | none | Priority 1.5 |
+| New client requests | `adminPath(ws.id, 'requests')` | none | Priority 2 |
+| Pending approvals | `adminPath(ws.id, 'seo-editor')` | none | Priority 3 |
+| Content briefs awaiting review | `adminPath(ws.id, 'content-pipeline')` | `briefs` | Priority 4 — ContentPipeline.tsx reads searchParams.get('tab') |
+| Pending work orders | `adminPath(ws.id, 'requests')` | none | Priority 5 — ClientDeliverablesPane on requests page |
+| Rejected changes | `adminPath(ws.id, 'seo-editor')` | none | Priority 6 |
+| Low health score | `adminPath(ws.id, 'seo-audit')` | none | Priority 7 |
+| No site linked | `adminPath(ws.id, 'workspace-settings')` | `connections` | Priority 8 |
 
-Only **content briefs** uses `?tab=briefs`. `ContentPipeline.tsx` already reads
-`searchParams.get('tab')` at line 51 via `resolveTabSearchParam` — receiver half is
-already wired. No new receiver edits needed.
+**Note on work orders (I1 review fix):** the original plan doc listed `workspace-settings`
+as the work-order target, but `workspace-settings` has no work-order UI (its tabs are
+connections/features/flags/dashboard/publishing/export/llms-txt). Work orders are fulfilled
+via `ClientDeliverablesPane` on the `requests` page. Fixed in the (review) commit.
 
----
+Only **content briefs** and **no site linked** use `?tab=`. ContentPipeline.tsx already
+reads `searchParams.get('tab')` at line 51 via `resolveTabSearchParam` — receiver half is
+already wired. WorkspaceSettings.tsx reads `searchParams.get('tab')` at line 89 — also
+already wired. No new receiver edits needed for these two.
 
-## Attribution strategy
-
-All items are cross-workspace aggregates. Design principle: show the single "most
-affected" workspace inline in the label; the row links to that workspace. If only
-one workspace has the issue, link directly. If multiple, show count and link to the
-worst offender (highest count).
-
-Items with no single-workspace scope (config issues like "no site linked") link to the
-first affected workspace by alphabetical sort.
+**I4 — requests page sub-tab deep link:** `adminPath(ws.id, 'requests')` renders the
+requests tab in App.tsx with a `requestsSubTab` local state defaulting to `'deliverables'`.
+The (review) commit wires the receiver: on workspace navigation the state initialiser now
+reads `searchParams.get('tab')` and resolves it against the valid sub-tab set
+`['signals', 'requests', 'actions', 'deliverables']`, falling back to `'deliverables'`.
+This means a sender can append `?tab=signals` to land directly on the Signals sub-tab.
+Senders in WorkspaceOverview currently don't append a sub-tab query string for requests
+(churn, new requests, work orders all land on the default `deliverables` tab), but the
+receiver is now wired for future callers.
 
 ---
 
@@ -74,72 +99,39 @@ first affected workspace by alphabetical sort.
 | 7 | Low health score |
 | 8 | No site linked |
 
-The existing code already sorts by `priority` ascending. The priority values above match
-the current code. No reorder needed — sort is already correct.
+The list is sorted ascending by priority. Items beyond position 8 are hidden behind a
+"Show N more" button (simple `useState` toggle revealing the rest). The severity sort
+guarantees the most urgent items are always visible in the cap.
 
 ---
 
-## Implementation plan
+## Row cap (I2 review fix)
 
-### 1. Refactor the attention items array to include navigation targets
+The original plan had no cap. With 20+ workspaces, a "no site linked" item fires for
+every unlinked workspace, permanently pushing Global Stats and the workspace grid below
+the fold. Fix: cap at `ATTENTION_CAP = 8` rows with a `useState(false)` expander toggle.
+The severity sort ensures the most urgent rows survive the cap.
 
-Extend the `attentionItems` array type to include a `href` field:
+---
 
-```ts
-type AttentionItem = {
-  label: string;
-  value: string;
-  color: string;
-  icon: typeof Bell;
-  priority: number;
-  href: string;          // ← new
-  attribution?: string;  // ← new: workspace name (if multi-ws)
-};
-```
+## Files changed
 
-For each item, select the "most affected" workspace from `data` and derive the href via
-`adminPath()`.
-
-### 2. Replace the static `<div>` with `<ClickableRow>`
-
-Replace lines 116–121 with `<ClickableRow onClick={() => navigate(item.href)} ...>`
-styled teal on hover per the design system (action = teal).
-
-Show an `<ArrowRight>` icon on the right (already imported in the file) to signal
-navigability.
-
-### 3. Attribution label
-
-For items that aggregate multiple workspaces, append ` · {wsName}` when only one
-workspace is affected, or `· {N} workspaces` when several are. The worst offender's name
-is the one shown for context.
-
-### 4. Files changed
-
-- `src/components/WorkspaceOverview.tsx` — main change (OWNS)
-- No receiving component edits needed (ContentPipeline already reads searchParams)
-
-### 5. Tests
-
-New file: `tests/component/WorkspaceOverview.attention.test.tsx`
-
-Tests:
-- Each attention item type produces a clickable row with correct href
-- Content briefs item produces href ending in `?tab=briefs`
-- Items are ordered by priority ascending
-- Attribution label shows workspace name when single workspace affected
-- Multiple workspaces produce "N workspaces" attribution
+- `src/components/WorkspaceOverview.tsx` — main change (OWNS): ClickableRow, per-workspace rows, 8-row cap + expander, I1 work-order link fix, M6 redundant class trim, M7 stable key
+- `src/App.tsx` — I4: wire `requestsSubTab` to read `searchParams.get('tab')` on workspace entry
+- `tests/component/WorkspaceOverview-attention.test.tsx` — M5: divergent sort fixture + fixed comment; I1: updated assertion to `requests`
 
 ---
 
 ## Acceptance checklist
 
-- [ ] `npm run typecheck` — zero errors
-- [ ] `npx vite build` — success
-- [ ] `npx vitest run` — all tests pass including new component tests
-- [ ] `npm run pr-check` — zero errors
-- [ ] No `violet` / `indigo` in changed files
-- [ ] Attention items are clickable (ClickableRow)
-- [ ] Content briefs row navigates to `content-pipeline?tab=briefs`
-- [ ] `tests/contract/tab-deep-link-wiring.test.ts` passes (verifies the ?tab=briefs
-      sender → ContentPipeline receiver contract)
+- [x] `npm run typecheck` — zero errors
+- [x] `npx vite build` — success
+- [x] `npx vitest run` — all tests pass including new component tests
+- [x] `npm run pr-check` — zero errors
+- [x] No `violet` / `indigo` in changed files
+- [x] Attention items are clickable (ClickableRow)
+- [x] Content briefs row navigates to `content-pipeline?tab=briefs`
+- [x] Work orders row navigates to `requests` (not `workspace-settings`)
+- [x] Section capped at 8 rows with expander
+- [x] Sort is tested with a divergent fixture (insertion order ≠ sorted order)
+- [x] `tests/contract/tab-deep-link-wiring.test.ts` passes

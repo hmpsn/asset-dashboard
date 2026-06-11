@@ -246,7 +246,31 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
   // ── 7. Severity ordering ────────────────────────────────────────────────────
 
-  it('displays churn-risk row before new-requests row (priority 1.5 before 2)', async () => {
+  // Divergent fixture: two workspaces where insertion order != sorted order.
+  // ws-warn (priority 1.5 = warning churn) inserted first, ws-crit (priority 1 = critical churn)
+  // inserted second — sort must place ws-crit (critical) before ws-warn (warning).
+  it('displays critical-churn before warning-churn even when warning workspace is inserted first', async () => {
+    mockUseWorkspaceOverviewData.mockReturnValue({
+      data: makeOverviewData([
+        makeWorkspace({ id: 'ws-warn', name: 'WarningCo', churnSignals: { critical: 0, warning: 2 } }),
+        makeWorkspace({ id: 'ws-crit', name: 'CriticalCo', churnSignals: { critical: 1, warning: 0 } }),
+      ]),
+      isLoading: false,
+    });
+
+    renderOverview();
+
+    const buttons = screen.getAllByRole('button');
+    const critIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('CriticalCo'));
+    const warnIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('WarningCo'));
+
+    expect(critIdx).not.toBe(-1);
+    expect(warnIdx).not.toBe(-1);
+    // Critical (priority 1) must render before warning (priority 1.5)
+    expect(critIdx).toBeLessThan(warnIdx);
+  });
+
+  it('displays churn-risk row before new-requests row (critical churn priority 1 before requests priority 2)', async () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({
@@ -347,9 +371,9 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.queryByText('Needs Attention')).toBeNull();
   });
 
-  // ── 11. Work orders link to workspace-settings ────────────────────────────────
+  // ── 11. Work orders link to requests page (ClientDeliverablesPane) ────────────
 
-  it('renders work orders row linking to workspace-settings', async () => {
+  it('renders work orders row linking to requests page (not workspace-settings)', async () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-wo', name: 'WidgetCo', workOrders: { pending: 1, total: 1 } }),
@@ -363,7 +387,8 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     const row = screen.getByRole('button', { name: /1 purchased fix/i });
     fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-wo/workspace-settings');
+    // Work orders live on the requests page (ClientDeliverablesPane), not workspace-settings
+    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-wo/requests');
   });
 
   // ── 12. Churn risk links to requests page ─────────────────────────────────────

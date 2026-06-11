@@ -26,6 +26,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   const navigate = useNavigate();
   const { data: overviewData, isLoading: loading } = useWorkspaceOverviewData();
 
+  const [attentionExpanded, setAttentionExpanded] = useState(false);
+
   // Real-time presence: WebSocket overrides query data via a state + ref trigger
   const [wsPresence, setWsPresence] = useState<PresenceMap | null>(null);
   const handlePresenceUpdate = useCallback((d: unknown) => {
@@ -124,12 +126,12 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
     }
   }
 
-  // Pending work orders (priority 5) — link to workspace-settings
+  // Pending work orders (priority 5) — link to requests page (ClientDeliverablesPane)
   for (const ws of data) {
     const pending = ws.workOrders?.pending || 0;
     if (pending > 0) {
       const label = `${pending} purchased fix${pending > 1 ? 'es' : ''} awaiting fulfillment`;
-      attentionItems.push({ label, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5, href: adminPath(ws.id, 'workspace-settings'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+      attentionItems.push({ label, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
     }
   }
 
@@ -160,6 +162,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
   attentionItems.sort((a, b) => a.priority - b.priority);
 
+  const ATTENTION_CAP = 8;
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -181,14 +185,14 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {attentionItems.length > 0 && (
         <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-warning" />} noPadding>
           <div className="divide-y divide-[var(--brand-border)]">
-            {attentionItems.map((item, i) => {
+            {(attentionExpanded ? attentionItems : attentionItems.slice(0, ATTENTION_CAP)).map((item) => {
               const ItemIcon = item.icon;
               return (
                 <ClickableRow
-                  key={i}
+                  key={`${item.href}-${item.value}`}
                   onClick={() => navigate(item.href)}
                   aria-label={item.ariaLabel}
-                  className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-[var(--surface-3)]/40 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2.5"
                 >
                   <ItemIcon className={cn('w-3.5 h-3.5 flex-shrink-0', item.color)} />
                   <span className="t-caption text-[var(--brand-text-bright)] flex-1">{item.label}</span>
@@ -198,6 +202,17 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 </ClickableRow>
               );
             })}
+            {attentionItems.length > ATTENTION_CAP && (
+              <Button
+                variant="ghost"
+                onClick={() => setAttentionExpanded(e => !e)}
+                className="w-full px-4 py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] justify-start"
+              >
+                {attentionExpanded
+                  ? 'Show less'
+                  : `Show ${attentionItems.length - ATTENTION_CAP} more`}
+              </Button>
+            )}
           </div>
         </SectionCard>
       )}
