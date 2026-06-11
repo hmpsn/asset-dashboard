@@ -4,7 +4,7 @@ import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus,
-  BookOpen,
+  BookOpen, AlertTriangle, X,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
@@ -72,6 +72,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
   const {
     data,
     setData,
@@ -79,6 +80,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     started,
     regenerating,
     scanError,
+    singlePageError,
+    setSinglePageError,
+    fetchPagesError,
     progressMsg,
     showNextSteps,
     setShowNextSteps,
@@ -144,10 +148,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setConfirmPublish,
     sendingToClient,
     sentToClient,
+    sendToClientError,
+    setSendToClientError,
     approvalRefreshKey,
     setApprovalRefreshKey,
     sendingPage,
     sentPages,
+    sendPageErrors,
     retractingPages,
     retractedPages,
     bulkPublishing,
@@ -158,6 +165,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     schemaParseError,
     savingTemplate,
     templateSaved,
+    templateSaveError,
     getState,
     summary,
     unpublishedCount,
@@ -394,6 +402,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               graphValidationLoading={graphValidationQuery.isFetching}
             />
           )}
+          {sendToClientError && (
+            <span className="flex items-center gap-1 t-caption text-red-400/80">
+              <Icon as={AlertTriangle} size="sm" />
+              {sendToClientError}
+              <button
+                type="button"
+                onClick={() => setSendToClientError(null)}
+                className="ml-1 opacity-60 hover:opacity-100"
+                aria-label="Dismiss"
+              >
+                <Icon as={X} size="sm" />
+              </button>
+            </span>
+          )}
           <div className="relative">
             <Button
               onClick={fetchPages}
@@ -416,6 +438,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                 onClose={() => { setShowPagePicker(false); setPageSearch(''); }}
               />
             )}
+            {fetchPagesError && (
+              <div className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-center gap-1 px-2 py-1.5 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80 whitespace-nowrap">
+                <Icon as={AlertTriangle} size="sm" />
+                {fetchPagesError}
+              </div>
+            )}
           </div>
           <Button onClick={runScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
             Re-generate All
@@ -426,6 +454,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
           <Icon as={Loader2} size="sm" className="animate-spin text-accent-brand" />
           <span className="t-caption text-accent-brand">Generating schema for page...</span>
+        </div>
+      )}
+
+      {/* Single-page generation error — dismissible inline banner, does NOT replace the results view */}
+      {singlePageError && (
+        <div role="alert" className="flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
+          <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="t-caption font-medium text-red-400">Page generation failed</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSinglePageError(null)}
+            className="flex-shrink-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+            aria-label="Dismiss error"
+          >
+            <Icon as={X} size="md" />
+          </button>
         </div>
       )}
 
@@ -465,6 +512,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               confirmPublish={confirmPublish === page.pageId}
               sentPage={sentPages.has(page.pageId)}
               sendingPage={sendingPage.has(page.pageId)}
+              sendPageError={sendPageErrors[page.pageId]}
               editingSchema={editingSchema.has(page.pageId)}
               editedSchemaJson={editedSchemaJson[page.pageId]}
               schemaParseError={schemaParseError[page.pageId]}
@@ -475,10 +523,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               isHomepage={!page.slug || page.slug === '/' || page.slug === 'index' || page.slug === 'home'}
               savingTemplate={savingTemplate}
               templateSaved={templateSaved}
+              templateSaveError={templateSaveError ?? undefined}
+              pageTypeError={pageTypeErrors[page.pageId]}
               onPageTypeChange={(pid, t) => {
                 setPageTypes(prev => ({ ...prev, [pid]: t }));
-                // Persist to server (fire-and-forget)
-                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch(() => {});
+                setPageTypeErrors(prev => { const n = { ...prev }; delete n[pid]; return n; });
+                // Persist page-type to server; surface failure so the user knows the selection wasn't saved
+                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch((err: unknown) => {
+                  setPageTypeErrors(prev => ({ ...prev, [pid]: err instanceof Error ? err.message : 'Page type not saved — try again.' }));
+                  // Revert local state so it honestly reflects what the server has
+                  setPageTypes(prev => { const n = { ...prev }; delete n[pid]; return n; });
+                });
               }}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}

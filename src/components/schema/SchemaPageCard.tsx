@@ -38,6 +38,7 @@ export interface SchemaPageCardProps {
   confirmPublish: boolean;
   sentPage: boolean;
   sendingPage: boolean;
+  sendPageError?: string;
   editingSchema: boolean;
   editedSchemaJson: string | undefined;
   schemaParseError: string | undefined;
@@ -48,6 +49,8 @@ export interface SchemaPageCardProps {
   isHomepage: boolean;
   savingTemplate: boolean;
   templateSaved: boolean;
+  templateSaveError?: string;
+  pageTypeError?: string;
   onPageTypeChange: (pageId: string, type: string) => void;
   // Callbacks
   onToggleExpand: (pageId: string) => void;
@@ -73,9 +76,9 @@ export interface SchemaPageCardProps {
 export function SchemaPageCard({
   page, isOpen, isRegenLoading, editState, copiedId,
   published, publishing, publishError, manualDelivery, confirmPublish,
-  sentPage, sendingPage, editingSchema, editedSchemaJson,
+  sentPage, sendingPage, sendPageError, editingSchema, editedSchemaJson,
   schemaParseError, showDiff, schemaRecs, workspaceId,
-  pageType, isHomepage, savingTemplate, templateSaved,
+  pageType, isHomepage, savingTemplate, templateSaved, templateSaveError, pageTypeError,
   onPageTypeChange,
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onCopyJsonLd, onPublish, onConfirmPublish,
@@ -166,6 +169,12 @@ export function SchemaPageCard({
             className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
             title="Page type hint for schema generation"
           />
+          {pageTypeError && (
+            <span className="badge-span-ok t-caption-sm text-red-400/80 flex items-center gap-0.5">
+              <Icon as={AlertTriangle} size="sm" />
+              Not saved
+            </span>
+          )}
           <IconButton
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
             disabled={isRegenLoading}
@@ -354,22 +363,30 @@ export function SchemaPageCard({
                 templateSaved ? (
                   <Badge label="Template Saved" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />
                 ) : (
-                  <Button
-                    onClick={() => onSaveAsTemplate(page.pageId)}
-                    disabled={savingTemplate}
-                    loading={savingTemplate}
-                    icon={savingTemplate ? undefined : Save}
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30"
-                    title="Save Organization + WebSite nodes as the site-wide template for subpages"
-                  >
-                    {savingTemplate ? (
-                      'Saving...'
-                    ) : (
-                      'Save as Site Template'
+                  <>
+                    <Button
+                      onClick={() => onSaveAsTemplate(page.pageId)}
+                      disabled={savingTemplate}
+                      loading={savingTemplate}
+                      icon={savingTemplate ? undefined : Save}
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30"
+                      title="Save Organization + WebSite nodes as the site-wide template for subpages"
+                    >
+                      {savingTemplate ? (
+                        'Saving...'
+                      ) : (
+                        'Save as Site Template'
+                      )}
+                    </Button>
+                    {templateSaveError && (
+                      <span className="badge-span-ok t-caption text-red-400/80 flex items-center gap-1">
+                        <Icon as={AlertTriangle} size="sm" />
+                        {templateSaveError}
+                      </span>
                     )}
-                  </Button>
+                  </>
                 )
               )}
               {published && !retracted && (
@@ -445,6 +462,12 @@ export function SchemaPageCard({
                         'Send to client'
                       )}
                     </Button>
+                    {sendPageError && (
+                      <span className="badge-span-ok t-caption text-red-400/80 flex items-center gap-1">
+                        <Icon as={AlertTriangle} size="sm" />
+                        {sendPageError}
+                      </span>
+                    )}
                     <FormTextarea
                       value={pageNote}
                       onChange={setPageNote}

@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { formatDateTime } from '../../utils/formatDates';
 import { getSafe, post } from '../../api/client';
-import { Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
 import { Icon, Button } from '../ui';
 
 interface PublishEntry {
@@ -27,6 +27,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
   const [restored, setRestored] = useState<string | null>(null);
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -41,6 +42,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
 
   const handleRollback = async (entry: PublishEntry) => {
     setRollingBack(entry.id);
+    setRollbackError(null);
     try {
       const result = await post<{ success: boolean; restoredSchema: Record<string, unknown> }>(
         `/api/webflow/schema-rollback/${siteId}?workspaceId=${workspaceId || ''}`,
@@ -49,9 +51,11 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
       if (result.success) {
         setRestored(entry.id);
         onRestore(result.restoredSchema);
+      } else {
+        setRollbackError('Rollback did not succeed. Please try again.');
       }
-    } catch {
-      // error handled silently — user can retry
+    } catch (err) {
+      setRollbackError(err instanceof Error ? err.message : 'Failed to restore this version. Please try again.');
     } finally {
       setRollingBack(null);
     }
@@ -75,64 +79,80 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
   }
 
   return (
-    <div className="space-y-1 max-h-64 overflow-y-auto">
-      {history.map((entry, i) => {
-        const isExpanded = expandedId === entry.id;
-        const date = new Date(entry.publishedAt);
-        const isLatest = i === 0;
-        const isRestored = restored === entry.id;
+    <div className="space-y-2">
+      {rollbackError && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-red-500/8 border border-red-500/20 text-red-400 t-caption-sm">
+          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
+          <span>{rollbackError}</span>
+          <button
+            type="button"
+            onClick={() => setRollbackError(null)}
+            className="ml-auto flex-shrink-0 opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <div className="space-y-1 max-h-64 overflow-y-auto">
+        {history.map((entry, i) => {
+          const isExpanded = expandedId === entry.id;
+          const date = new Date(entry.publishedAt);
+          const isLatest = i === 0;
+          const isRestored = restored === entry.id;
 
-        return (
-          <div key={entry.id} className="border border-[var(--brand-border)] bg-[var(--surface-1)] overflow-hidden rounded-[var(--radius-signature)]">
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Button
-                onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                variant="ghost"
-                size="sm"
-                className="flex-1 min-w-0 justify-start h-auto px-0 py-0 text-left hover:opacity-80 hover:bg-transparent"
-              >
-                {isExpanded
-                  ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
-                <span className="t-caption-sm text-[var(--brand-text)]">
-                  {formatDateTime(date)}
-                </span>
-                {isLatest && (
-                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                    current
+          return (
+            <div key={entry.id} className="border border-[var(--brand-border)] bg-[var(--surface-1)] overflow-hidden rounded-[var(--radius-signature)]">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Button
+                  onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 min-w-0 justify-start h-auto px-0 py-0 text-left hover:opacity-80 hover:bg-transparent"
+                >
+                  {isExpanded
+                    ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                    : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
+                  <span className="t-caption-sm text-[var(--brand-text)]">
+                    {formatDateTime(date)}
+                  </span>
+                  {isLatest && (
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                      current
+                    </span>
+                  )}
+                </Button>
+                {!isLatest && !isRestored && (
+                  <Button
+                    onClick={() => handleRollback(entry)}
+                    disabled={rollingBack !== null}
+                    loading={rollingBack === entry.id}
+                    icon={RotateCcw}
+                    size="sm"
+                    variant="secondary"
+                    className="px-2 py-1 rounded t-caption-sm font-medium disabled:opacity-50 bg-amber-500/8 text-amber-400/80 border border-amber-500/20 hover:bg-amber-500/15"
+                    title="Restore this version"
+                  >
+                    Restore
+                  </Button>
+                )}
+                {isRestored && (
+                  <span className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                    <Icon as={CheckCircle} size="sm" /> Restored
                   </span>
                 )}
-              </Button>
-              {!isLatest && !isRestored && (
-                <Button
-                  onClick={() => handleRollback(entry)}
-                  disabled={rollingBack !== null}
-                  loading={rollingBack === entry.id}
-                  icon={RotateCcw}
-                  size="sm"
-                  variant="secondary"
-                  className="px-2 py-1 rounded t-caption-sm font-medium disabled:opacity-50 bg-amber-500/8 text-amber-400/80 border border-amber-500/20 hover:bg-amber-500/15"
-                  title="Restore this version"
-                >
-                  Restore
-                </Button>
-              )}
-              {isRestored && (
-                <span className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                  <Icon as={CheckCircle} size="sm" /> Restored
-                </span>
+              </div>
+              {isExpanded && (
+                <div className="px-3 pb-2">
+                  <pre className="t-caption-sm font-mono bg-[var(--surface-2)] rounded p-2 overflow-x-auto text-[var(--brand-text-muted)] max-h-40 overflow-y-auto whitespace-pre-wrap border border-[var(--brand-border)]">
+                    {JSON.stringify(entry.schemaJson, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
-            {isExpanded && (
-              <div className="px-3 pb-2">
-                <pre className="t-caption-sm font-mono bg-[var(--surface-2)] rounded p-2 overflow-x-auto text-[var(--brand-text-muted)] max-h-40 overflow-y-auto whitespace-pre-wrap border border-[var(--brand-border)]">
-                  {JSON.stringify(entry.schemaJson, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -25,6 +25,8 @@ export function useSchemaSuggesterGeneration({
   const [started, setStarted] = useState(false);
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
   const [scanError, setScanError] = useState<string | null>(null);
+  const [singlePageError, setSinglePageError] = useState<string | null>(null);
+  const [fetchPagesError, setFetchPagesError] = useState<string | null>(null);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [showPagePicker, setShowPagePicker] = useState(false);
@@ -160,18 +162,21 @@ export function useSchemaSuggesterGeneration({
       return;
     }
     setLoadingPages(true);
+    setFetchPagesError(null);
     try {
       const pages = await fetchAllPageOptions();
       setAvailablePages(pages);
       setShowPagePicker(true);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setFetchPagesError(err instanceof Error ? err.message : 'Failed to load pages. Please try again.');
+    } finally {
+      setLoadingPages(false);
     }
-    setLoadingPages(false);
   }, [availablePages.length, fetchAllPageOptions]);
 
   const generateSinglePage = useCallback(async (pageId: string) => {
     setGeneratingSingle(pageId);
+    setSinglePageError(null);
     setShowPagePicker(false);
     setStarted(true);
     try {
@@ -192,8 +197,7 @@ export function useSchemaSuggesterGeneration({
       onPageGenerated(pageId);
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
-      setScanError('Single page generation failed');
+      setSinglePageError(err instanceof Error ? err.message : 'Failed to generate schema for this page. Please try again.');
     } finally {
       setGeneratingSingle(null);
     }
@@ -244,6 +248,10 @@ export function useSchemaSuggesterGeneration({
     started,
     regenerating,
     scanError,
+    singlePageError,
+    setSinglePageError,
+    fetchPagesError,
+    setFetchPagesError,
     progressMsg,
     showNextSteps,
     setShowNextSteps,
