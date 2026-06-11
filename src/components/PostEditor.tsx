@@ -21,6 +21,7 @@ import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, Content
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 import { formatDate } from '../utils/formatDates';
+import { useToast } from './Toast';
 
 interface PostSection {
   index: number;
@@ -128,6 +129,7 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
 
 export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const postQ = useAdminPost(workspaceId, postId);
   const post = (postQ.data ?? null) as GeneratedPost | null;
   const briefQ = useQuery({
@@ -183,14 +185,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   });
   const [feedbackText, setFeedbackText] = useState('');
   const [autoSaveError, setAutoSaveError] = useState<'section' | 'intro' | 'conclusion' | null>(null);
-
-  const onAutoSaveError = (field: 'section' | 'intro' | 'conclusion') => (_err: unknown) => {
-    setAutoSaveError(field);
-  };
+  // Captures the exact section index + html that failed so the retry button re-attempts
+  // the original failed save rather than whatever section happens to be active at retry time.
+  // Fixed: cross-section retry corruption (reviewer Finding 4).
+  const sectionSaveErrorCapture = useRef<{ sectionIndex: number; html: string } | null>(null);
+  // Tracks the last save attempt parameters so onError can capture them for retry binding.
+  // Set synchronously at the start of sectionAutoSaveFn before any await.
+  const lastSectionSaveAttempt = useRef<{ sectionIndex: number; html: string } | null>(null);
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
   const sectionAutoSaveFn = async (html: string) => {
     if (editingSection === null || !post) return;
+    // Capture the target synchronously BEFORE any await so the onError callback can
+    // reliably read it even if editingSection changes while the request is in-flight.
+    lastSectionSaveAttempt.current = { sectionIndex: editingSection, html };
     const sections = [...post.sections];
     const idx = sections.findIndex(s => s.index === editingSection);
     if (idx === -1) return;
@@ -200,19 +208,34 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
     sectionAutoSaveFn,
     2000,
-    onAutoSaveError('section'),
+    // onError: capture the section index and html at error time so retry is safe even if
+    // the user switches to a different section before clicking retry (Finding 4).
+    (_err) => {
+      if (lastSectionSaveAttempt.current !== null) {
+        sectionSaveErrorCapture.current = lastSectionSaveAttempt.current;
+      }
+      setAutoSaveError('section');
+    },
+    // onSuccess: clear stale error so re-opening any section doesn't show a ghost retry
+    // affordance from a previous failure that has since been resolved (Finding 3).
+    () => {
+      sectionSaveErrorCapture.current = null;
+      setAutoSaveError(prev => (prev === 'section' ? null : prev));
+    },
   );
 
   const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ introduction: html }); },
     2000,
-    onAutoSaveError('intro'),
+    (_err) => { setAutoSaveError('intro'); },
+    () => { setAutoSaveError(prev => (prev === 'intro' ? null : prev)); },
   );
 
   const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ conclusion: html }); },
     2000,
-    onAutoSaveError('conclusion'),
+    (_err) => { setAutoSaveError('conclusion'); },
+    () => { setAutoSaveError(prev => (prev === 'conclusion' ? null : prev)); },
   );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
@@ -258,8 +281,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const saveTitleEdit = () => {
     if (!post) return;
-    saveField({ title: titleBuffer });
+    // Exit edit mode optimistically; surface failure via toast if the save throws.
     setEditingTitle(false);
+    saveField({ title: titleBuffer }).catch((err) => {
+      toast(err instanceof Error ? err.message : 'Failed to save title', 'error');
+    });
   };
 
   const copyAllHTML = () => {
@@ -622,9 +648,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           onToggleShowChecklist={() => setShowChecklist(!showChecklist)}
           onToggleItem={(key) => {
             const checklist = post.reviewChecklist ?? { factual_accuracy: false, brand_voice: false, internal_links: false, no_hallucinations: false, meta_optimized: false, word_count_target: false };
-            saveField({ reviewChecklist: { ...checklist, [key]: !checklist[key] } });
+            saveField({ reviewChecklist: { ...checklist, [key]: !checklist[key] } }).catch((err) => {
+              toast(err instanceof Error ? err.message : 'Failed to save checklist', 'error');
+            });
           }}
-          onChangeStatus={(status) => saveField({ status })}
+          onChangeStatus={(status) => {
+            saveField({ status }).catch((err) => {
+              toast(err instanceof Error ? err.message : 'Failed to update status', 'error');
+            });
+          }}
           onRunAIReview={async () => {
             const res = await contentPosts.aiReview(workspaceId, postId);
             return res ?? null;
@@ -682,7 +714,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       variant="secondary"
                       size="sm"
                       icon={Check}
-                      onClick={async () => { await flushIntro(); setEditingIntro(false); }}
+                      onClick={async () => {
+                        const { ok } = await flushIntro();
+                        // Only exit edit mode if the save succeeded (Finding 2).
+                        if (ok) setEditingIntro(false);
+                      }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
                       Done
@@ -727,7 +763,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 onToggleExpand={toggleSection}
                 onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
                 onChange={(html) => { setAutoSaveError(null); scheduleSectionSave(html); }}
-                onDone={async () => { await flushSection(); setEditingSection(null); }}
+                onDone={async () => {
+                  // Only exit edit mode if the save succeeded (Finding 2).
+                  const { ok } = await flushSection();
+                  if (ok) setEditingSection(null);
+                }}
                 onRegenerate={handleRegenerate}
                 onGenerateWithFeedback={(sectionIndex) => {
                   const s = post.sections.find(item => item.index === sectionIndex);
@@ -740,7 +780,22 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     variant="ghost"
                     size="sm"
                     icon={AlertTriangle}
-                    onClick={() => { setAutoSaveError(null); void flushSection(); }}
+                    onClick={() => {
+                      setAutoSaveError(null);
+                      // Retry uses the captured index+html from error time, not the current
+                      // editingSection, to prevent cross-section corruption (Finding 4).
+                      const capture = sectionSaveErrorCapture.current;
+                      if (capture !== null && post) {
+                        const sections = [...post.sections];
+                        const idx = sections.findIndex(s => s.index === capture.sectionIndex);
+                        if (idx !== -1) {
+                          sections[idx] = { ...sections[idx], content: capture.html, wordCount: countWordsFromHtml(capture.html) };
+                          saveField({ sections }).catch(() => {
+                            setAutoSaveError('section');
+                          });
+                        }
+                      }
+                    }}
                     className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                   >
                     Save failed — retry
@@ -784,7 +839,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       variant="secondary"
                       size="sm"
                       icon={Check}
-                      onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
+                      onClick={async () => {
+                        const { ok } = await flushConclusion();
+                        // Only exit edit mode if the save succeeded (Finding 2).
+                        if (ok) setEditingConclusion(false);
+                      }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
                       Done

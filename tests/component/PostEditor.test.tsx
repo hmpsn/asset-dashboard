@@ -104,7 +104,7 @@ vi.mock('../../src/hooks/admin', () => ({
 vi.mock('../../src/hooks/useAutoSave', () => ({
   useAutoSave: vi.fn(() => ({
     scheduleAutoSave: vi.fn(),
-    flush: vi.fn().mockResolvedValue(undefined),
+    flush: vi.fn().mockResolvedValue({ ok: true }),
     saveStatus: 'idle' as const,
   })),
 }));

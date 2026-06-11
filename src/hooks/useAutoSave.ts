@@ -6,6 +6,7 @@ export function useAutoSave(
   saveFn: (html: string) => Promise<void> | void,
   delay = 2000,
   onError?: (err: unknown) => void,
+  onSuccess?: () => void,
 ) {
   const saveFnRef = useRef(saveFn);
   saveFnRef.current = saveFn;
@@ -13,11 +14,17 @@ export function useAutoSave(
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingHtml = useRef<string | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
   const isMounted = useRef(true);
+  // Tracks whether the most recently completed save succeeded (true) or failed (false).
+  // Allows flush() to return a synchronous result without relying on React state timing.
+  const lastSaveOkRef = useRef<boolean>(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
   const doSave = useCallback((html: string): Promise<void> => {
@@ -26,7 +33,9 @@ export function useAutoSave(
       try {
         await saveFnRef.current(html);
         if (pendingHtml.current === html) pendingHtml.current = null;
+        lastSaveOkRef.current = true;
         if (!isMounted.current) return;
+        onSuccessRef.current?.();
         setSaveStatus('saved');
         if (savedTimer.current) clearTimeout(savedTimer.current);
         savedTimer.current = setTimeout(() => {
@@ -34,6 +43,7 @@ export function useAutoSave(
           if (isMounted.current) setSaveStatus(s => (s === 'saved' ? 'idle' : s));
         }, 1500);
       } catch (err) {
+        lastSaveOkRef.current = false;
         onErrorRef.current?.(err);
         if (isMounted.current) setSaveStatus('error');
       }
@@ -54,10 +64,12 @@ export function useAutoSave(
   // flush() awaits any in-flight save then drains the latest pendingHtml. This
   // prevents a race where flush fires a second concurrent PATCH while an earlier
   // save is still in flight (last-write-wins on the server, doubles network).
-  const flush = useCallback(async () => {
+  // Returns { ok: boolean } so callers can decide whether to exit edit mode.
+  const flush = useCallback(async (): Promise<{ ok: boolean }> => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     if (inFlight.current) await inFlight.current;
     if (pendingHtml.current !== null) await doSave(pendingHtml.current);
+    return { ok: lastSaveOkRef.current };
   }, [doSave]);
 
   useEffect(() => {

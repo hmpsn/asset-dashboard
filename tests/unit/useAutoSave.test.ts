@@ -141,6 +141,61 @@ describe('useAutoSave', () => {
     expect(saveFn).toHaveBeenCalledTimes(1);
   });
 
+  it('flush returns { ok: true } when save succeeds', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>hello</p>'); });
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(flushResult).toEqual({ ok: true });
+  });
+
+  it('flush returns { ok: false } when save fails', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => { result.current.scheduleAutoSave('<p>hello</p>'); });
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(flushResult).toEqual({ ok: false });
+  });
+
+  it('calls onSuccess when saveFn resolves', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() => useAutoSave(saveFn, 500, undefined, onSuccess));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(saveFn).toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onSuccess when saveFn rejects', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('failure'));
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() => useAutoSave(saveFn, 500, undefined, onSuccess));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(saveFn).toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('flush returns { ok: true } when nothing is pending', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    const flushResult = await act(async () => result.current.flush());
+
+    expect(saveFn).not.toHaveBeenCalled();
+    // lastSaveOkRef starts true, so flush with nothing pending returns ok: true
+    expect(flushResult).toEqual({ ok: true });
+  });
+
   it('does not crash or warn when component unmounts mid-save', async () => {
     let resolveSave!: () => void;
     const savePromise = new Promise<void>(r => { resolveSave = r; });

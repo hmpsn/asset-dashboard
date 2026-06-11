@@ -170,7 +170,10 @@ export function SchemaPageCard({
             title="Page type hint for schema generation"
           />
           {pageTypeError && (
-            <span className="badge-span-ok t-caption-sm text-red-400/80 flex items-center gap-0.5">
+            <span
+              className="badge-span-ok t-caption-sm text-red-400/80 flex items-center gap-0.5"
+              title={pageTypeError}
+            >
               <Icon as={AlertTriangle} size="sm" />
               Not saved
             </span>

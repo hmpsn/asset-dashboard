@@ -9,7 +9,7 @@ import {
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
-import { Icon, cn, Button } from './ui';
+import { Icon, cn, Button, IconButton } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -314,8 +314,28 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
-        <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
+        {singlePageError ? (
+          <div role="alert" className="w-full max-w-lg flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
+            <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="t-caption font-medium text-red-400">Page generation failed</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
+            </div>
+            <IconButton
+              icon={X}
+              label="Dismiss error"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSinglePageError(null)}
+              className="flex-shrink-0"
+            />
+          </div>
+        ) : (
+          <>
+            <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
+            <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
+          </>
+        )}
         <Button onClick={runScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
           Re-scan
         </Button>
@@ -406,14 +426,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             <span className="flex items-center gap-1 t-caption text-red-400/80">
               <Icon as={AlertTriangle} size="sm" />
               {sendToClientError}
-              <button
-                type="button"
+              <IconButton
+                icon={X}
+                label="Dismiss"
+                size="sm"
+                variant="ghost"
                 onClick={() => setSendToClientError(null)}
-                className="ml-1 opacity-60 hover:opacity-100"
-                aria-label="Dismiss"
-              >
-                <Icon as={X} size="sm" />
-              </button>
+                className="ml-1"
+              />
             </span>
           )}
           <div className="relative">
@@ -465,14 +485,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             <p className="t-caption font-medium text-red-400">Page generation failed</p>
             <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
           </div>
-          <button
-            type="button"
+          <IconButton
+            icon={X}
+            label="Dismiss error"
+            size="sm"
+            variant="ghost"
             onClick={() => setSinglePageError(null)}
-            className="flex-shrink-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
-            aria-label="Dismiss error"
-          >
-            <Icon as={X} size="md" />
-          </button>
+            className="flex-shrink-0"
+          />
         </div>
       )}
 
@@ -526,13 +546,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               templateSaveError={templateSaveError ?? undefined}
               pageTypeError={pageTypeErrors[page.pageId]}
               onPageTypeChange={(pid, t) => {
+                // Capture prior value BEFORE the optimistic update so we can restore on failure.
+                const priorType = pageTypes[pid];
                 setPageTypes(prev => ({ ...prev, [pid]: t }));
                 setPageTypeErrors(prev => { const n = { ...prev }; delete n[pid]; return n; });
                 // Persist page-type to server; surface failure so the user knows the selection wasn't saved
                 put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch((err: unknown) => {
-                  setPageTypeErrors(prev => ({ ...prev, [pid]: err instanceof Error ? err.message : 'Page type not saved — try again.' }));
-                  // Revert local state so it honestly reflects what the server has
-                  setPageTypes(prev => { const n = { ...prev }; delete n[pid]; return n; });
+                  const msg = err instanceof Error ? err.message : 'Page type not saved — try again.';
+                  setPageTypeErrors(prev => ({ ...prev, [pid]: msg }));
+                  // Revert local state to the prior saved value (not deleted — that would show 'auto' even if server has a different value)
+                  setPageTypes(prev => {
+                    const n = { ...prev };
+                    if (priorType !== undefined) { n[pid] = priorType; } else { delete n[pid]; }
+                    return n;
+                  });
                 });
               }}
               onToggleExpand={toggleExpand}

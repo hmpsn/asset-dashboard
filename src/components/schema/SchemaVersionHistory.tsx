@@ -5,8 +5,8 @@
 import { useState, useEffect } from 'react';
 import { formatDateTime } from '../../utils/formatDates';
 import { getSafe, post } from '../../api/client';
-import { AlertTriangle, Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
-import { Icon, Button } from '../ui';
+import { AlertTriangle, Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle, X } from 'lucide-react';
+import { Icon, Button, IconButton } from '../ui';
 
 interface PublishEntry {
   id: string;
@@ -84,14 +84,14 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
         <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-red-500/8 border border-red-500/20 text-red-400 t-caption-sm">
           <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
           <span>{rollbackError}</span>
-          <button
-            type="button"
+          <IconButton
+            icon={X}
+            label="Dismiss"
+            size="sm"
+            variant="ghost"
             onClick={() => setRollbackError(null)}
-            className="ml-auto flex-shrink-0 opacity-60 hover:opacity-100"
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
+            className="ml-auto flex-shrink-0"
+          />
         </div>
       )}
       <div className="space-y-1 max-h-64 overflow-y-auto">

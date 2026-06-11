@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { post, getSafe } from '../../api/client';
+import { get, post, getSafe } from '../../api/client';
 import { useSchemaSnapshot } from '../../hooks/admin';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { queryKeys } from '../../lib/queryKeys';
@@ -79,9 +79,9 @@ export function useSchemaSuggesterGeneration({
   }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAllPageOptions = useCallback(async () => {
-    const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(
+    // Use the throwing get() so callers (fetchPages) can catch and surface errors.
+    const pages = await get<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(
       `/api/webflow/all-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`,
-      [],
     );
     if (!Array.isArray(pages)) return [] as SchemaPageOption[];
     return pages
@@ -100,6 +100,7 @@ export function useSchemaSuggesterGeneration({
       .then((pages) => {
         if (!cancelled) setAvailablePages(pages);
       })
+      .catch(() => { /* silent — initial background load; fetchPages surfaces errors on demand */ })
       .finally(() => {
         if (!cancelled) setLoadingPages(false);
       });
@@ -227,7 +228,7 @@ export function useSchemaSuggesterGeneration({
       onPageGenerated(pageId);
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setSinglePageError(err instanceof Error ? err.message : 'Failed to regenerate schema for this page. Please try again.');
     } finally {
       setRegenerating(prev => {
         const next = new Set(prev);

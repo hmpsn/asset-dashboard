@@ -244,4 +244,37 @@ describe('ContentCalendar', () => {
     const panels = screen.getAllByText('SEO Strategy Brief');
     expect(panels.length).toBeGreaterThan(0);
   });
+
+  // ── FM-2: Error path behavioral tests ─────────────────────────────────────────
+
+  it('renders ErrorState when data load fails — not a silently empty calendar (FM-2)', async () => {
+    const hooks = await getAdminHooks();
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    // ErrorState title, not an empty calendar
+    expect(screen.getByText("Couldn't load calendar data")).toBeInTheDocument();
+    // Calendar grid should NOT render when in error state
+    expect(screen.queryByText('Content Calendar')).not.toBeInTheDocument();
+  });
+
+  it('ErrorState for calendar contains a Retry button that calls refetch (FM-2)', async () => {
+    const refetchMock = vi.fn().mockResolvedValue(undefined);
+    const hooks = await getAdminHooks();
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      refetch: refetchMock,
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    const retryBtn = screen.getByRole('button', { name: /retry/i });
+    expect(retryBtn).toBeInTheDocument();
+    fireEvent.click(retryBtn);
+    expect(refetchMock).toHaveBeenCalled();
+  });
 });

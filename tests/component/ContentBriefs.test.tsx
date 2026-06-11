@@ -501,15 +501,7 @@ describe('ContentBriefs', () => {
     });
   });
 
-  // 13. onRequestCountChange is called with pending count
-  it('calls onRequestCountChange with the count of requested items', () => {
-    const onRequestCountChange = vi.fn();
-    const req1 = makeRequest({ id: 'r1', status: 'requested' });
-    const req2 = makeRequest({ id: 'r2', status: 'brief_generated' });
-    setHooks({ requests: [req1, req2] });
-    renderComponent('ws-1', { onRequestCountChange });
-    expect(onRequestCountChange).toHaveBeenCalledWith(1);
-  });
+  // 13. (removed: onRequestCountChange dead prop)
 
   // 14. Generated posts list
   it('renders generated posts when posts exist', () => {
