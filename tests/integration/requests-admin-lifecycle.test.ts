@@ -229,6 +229,27 @@ describe('PATCH /api/requests/:id — update', () => {
     expect(res.status).toBe(404);
   });
 
+  // M1: an illegal status transition (closed → new, the B24 bug) returns 409 with the machine's
+  // message — distinct from the 404 reserved for genuine not-found — and does NOT mutate the row.
+  it('returns 409 for an illegal status transition (closed → new)', async () => {
+    const seeded = createRequest(workspaceId, {
+      title: 'Illegal transition test',
+      description: 'closed is terminal',
+      category: 'seo',
+    });
+    // new → closed is legal
+    const closeRes = await patchJson(`/api/requests/${seeded.id}`, { status: 'closed' });
+    expect(closeRes.status).toBe(200);
+
+    // closed → new is illegal → 409
+    const res = await patchJson(`/api/requests/${seeded.id}`, { status: 'new' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/transition/i);
+
+    // Row stays closed — the illegal move did not partially apply.
+    expect(getRequest(seeded.id)?.status).toBe('closed');
+  });
+
   it('logs activity when status transitions to completed', async () => {
     const seeded = createRequest(workspaceId, {
       title: 'Completion activity log test',

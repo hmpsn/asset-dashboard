@@ -157,6 +157,44 @@ describe('Content Matrices — CRUD', () => {
     expect(res.status).toBe(404);
   });
 
+  // M1: an illegal cell transition via PATCH returns 409 with the machine's message (not 500).
+  it('PATCH cell with an illegal status skip returns 409', async () => {
+    // firstCellId is 'keyword_validated' (set above); → 'published' is not a legal edge.
+    const res = await ctx.api(
+      `/api/content-matrices/${testWsId}/${matrixId}/cells/${firstCellId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'published' }),
+      },
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/transition/i);
+  });
+
+  // I2: the matrix-level PUT must NOT be able to bypass the cell state machine by writing a
+  // wholesale `cells` array with an illegal status skip (e.g. planned→published).
+  it('PUT with a wholesale cells rewrite cannot bypass the cell guard (illegal skip → 409)', async () => {
+    const getRes = await api(`/api/content-matrices/${testWsId}/${matrixId}`);
+    const matrix = await getRes.json();
+    const plannedCell = matrix.cells.find((c: { status: string }) => c.status === 'planned');
+    expect(plannedCell).toBeDefined();
+    const tamperedCells = matrix.cells.map((c: { id: string }) =>
+      c.id === plannedCell.id ? { ...c, status: 'published' } : c,
+    );
+    const res = await ctx.api(`/api/content-matrices/${testWsId}/${matrixId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cells: tamperedCells }),
+    });
+    expect(res.status).toBe(409);
+    // And the stored cell status is unchanged.
+    const afterRes = await api(`/api/content-matrices/${testWsId}/${matrixId}`);
+    const after = await afterRes.json();
+    const stillPlanned = after.cells.find((c: { id: string }) => c.id === plannedCell.id);
+    expect(stillPlanned.status).toBe('planned');
+  });
+
   it('standalone keyword recommendations return optional reasoning without breaking the base shape', async () => {
     const res = await postJson(`/api/content-matrices/${testWsId}/recommend-keywords`, {
       seedKeyword: 'Emergency plumber in Austin',
