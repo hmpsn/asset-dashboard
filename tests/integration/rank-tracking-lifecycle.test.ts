@@ -64,7 +64,9 @@ vi.mock('../../server/email.js', () => ({
   notifyTeamContentRequest: vi.fn(),
 }));
 
-const noopMiddleware = (_req: unknown, _res: unknown, next: () => void) => next();
+// vi.hoisted ensures noopMiddleware is available when vi.mock factories run
+// (vi.mock is hoisted to the top of the file by Vitest, before const declarations).
+const noopMiddleware = vi.hoisted(() => (_req: unknown, _res: unknown, next: () => void) => next());
 vi.mock('../../server/middleware.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/middleware.js')>();
   return {
@@ -564,17 +566,23 @@ describe('Public rank-tracking endpoints — basic contract', () => {
   // the 401 first. Full 200/401/cross-workspace coverage with a real session
   // lives in tests/integration/public-endpoint-auth.test.ts.
   it('GET /api/public/rank-tracking/:workspaceId/history without portal session returns 401', async () => {
-    const res = await api(`/api/public/rank-tracking/${wsId}/history`);
+    // x-no-auto-public-auth: suppress admin token injection so the request
+    // is truly unauthenticated and the auth gate can return 401.
+    const res = await api(`/api/public/rank-tracking/${wsId}/history`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('GET /api/public/rank-tracking/:workspaceId/latest without portal session returns 401', async () => {
-    const res = await api(`/api/public/rank-tracking/${wsId}/latest`);
+    // x-no-auto-public-auth: suppress admin token injection so the request
+    // is truly unauthenticated and the auth gate can return 401.
+    const res = await api(`/api/public/rank-tracking/${wsId}/latest`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('GET /api/public/rank-tracking/:workspaceId/history without portal session also 401s on invalid limit (auth runs first)', async () => {
-    const res = await api(`/api/public/rank-tracking/${wsId}/history?limit=-1`);
+    // x-no-auto-public-auth: suppress admin token injection so the request
+    // is truly unauthenticated and the auth gate can return 401.
+    const res = await api(`/api/public/rank-tracking/${wsId}/history?limit=-1`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 });

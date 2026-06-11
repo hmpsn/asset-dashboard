@@ -1,4 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { createHmac } from 'crypto';
+
+// E3: portals are closed until configured. Public API calls that need portal
+// auth use the admin HMAC token. SESSION_SECRET matches playwright.config.ts.
+const E2E_SESSION_SECRET = process.env.SESSION_SECRET ?? 'e2e-test-session-secret';
+const E2E_ADMIN_TOKEN = createHmac('sha256', E2E_SESSION_SECRET).update('admin').digest('hex');
+const publicAuthHeaders = { 'x-auth-token': E2E_ADMIN_TOKEN };
 
 let workspaceId = '';
 let freeTierWorkspaceId = '';
@@ -116,13 +123,15 @@ test.describe('Client workflow smoke pack', () => {
     approvalBatchId = batch.id;
     approvalItemId = batch.items[0].id;
 
-    const publicListRes = await request.get(`/api/public/approvals/${workspaceId}`);
+    // E3: approvals endpoint requires portal auth — pass admin token.
+    const publicListRes = await request.get(`/api/public/approvals/${workspaceId}`, { headers: publicAuthHeaders });
     expect(publicListRes.ok()).toBe(true);
     const publicList = await publicListRes.json() as Array<{ id: string }>;
     expect(publicList.some(item => item.id === approvalBatchId)).toBe(true);
 
     const publicApproveRes = await request.patch(`/api/public/approvals/${workspaceId}/${approvalBatchId}/${approvalItemId}`, {
       data: { status: 'approved' },
+      headers: publicAuthHeaders,
     });
     expect(publicApproveRes.ok()).toBe(true);
 
