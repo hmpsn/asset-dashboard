@@ -1,3 +1,12 @@
+# Abort the commit if ANY gate below fails. Without `set -e` the hook's exit
+# code is only the LAST command's (vitest), so a typecheck or pr-check failure
+# would print its error but the commit would still land (observed 2026-06-11:
+# commit 674eb497 was created despite a pr-check "✗ 1 error" violation). errexit
+# makes every gate blocking. Each gate is verified safe under errexit:
+# typecheck/pr-check exit non-zero only on real violations, and
+# `vitest run --changed HEAD` exits 0 when no test files are affected.
+set -e
+
 # Project-wide gates — these check the full project, not just staged files.
 # typecheck: ~5-10s, pr-check: ~3-5s (diffs against remote branch)
 npm run typecheck
