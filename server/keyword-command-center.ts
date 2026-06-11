@@ -19,7 +19,8 @@ import {
 import { computeKeywordValueScore, computeKeywordValueComponents, keywordValueReasons, type ScoringContext } from './scoring/keyword-value-score.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { createLogger } from './logger.js';
-import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
+import { addKeywordToPageInTxn, deletePageKeyword, listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
+import { slugify } from './helpers.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
@@ -3281,6 +3282,8 @@ function applyKeywordCommandCenterActionInternal(
   const now = new Date().toISOString();
   let trackedKeywords: TrackedKeyword[] | undefined;
   let message = '';
+  // M3/I1: compute plannedPath before the transaction so it's available for DECLINE cleanup.
+  const plannedPath = `/planned/${slugify(displayKeyword) || 'keyword'}`;
 
   const run = db.transaction(() => {
     switch (request.action) {
@@ -3291,6 +3294,17 @@ function applyKeywordCommandCenterActionInternal(
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           pagePath: request.pagePath,
         }, { preferSource: true });
+        // M6: write the page_keywords artifact INSIDE the same transaction as the feedback
+        // write — if either fails, the whole transaction rolls back (no phantom approved rows).
+        {
+          const pagePath = request.pagePath?.trim()
+            ? request.pagePath.trim()
+            : plannedPath;
+          // titleOverride: for planned pages use the displayKeyword (human-readable); for
+          // explicit paths the helper derives a clean title from the slug.
+          const titleOverride = !request.pagePath?.trim() ? displayKeyword : undefined;
+          addKeywordToPageInTxn(workspace.id, pagePath, displayKeyword, titleOverride);
+        }
         message = `"${keyword}" was added to the strategy operating loop.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE:
@@ -3350,6 +3364,12 @@ function applyKeywordCommandCenterActionInternal(
     }
   });
   run();
+
+  // I1: DECLINE removes the /planned/ artifact so it doesn't persist after the keyword is
+  // rejected. Run outside the transaction (deletePageKeyword uses its own run.immediate()).
+  if (request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE) {
+    deletePageKeyword(workspace.id, plannedPath);
+  }
 
   invalidateIntelligenceCache(workspace.id);
   const payload = { keyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
