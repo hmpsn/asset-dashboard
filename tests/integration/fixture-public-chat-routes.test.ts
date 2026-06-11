@@ -3,7 +3,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addMessage } from '../../server/chat-memory.js';
 
-const ctx = createTestContext(13729);
+const ctx = createTestContext(13729, { autoPublicAuth: true });
 const { api, postJson, del, clearCookies } = ctx;
 
 let openWs = '';
@@ -29,7 +29,7 @@ afterAll(async () => {
 describe('Fixture public chat routes', () => {
   it('returns 401 for protected workspace without auth', async () => {
     addMessage(protectedWs, 'fixture-chat-session', 'client', 'user', 'Need help');
-    const res = await api(`/api/public/chat-sessions/${protectedWs}`);
+    const res = await api(`/api/public/chat-sessions/${protectedWs}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 

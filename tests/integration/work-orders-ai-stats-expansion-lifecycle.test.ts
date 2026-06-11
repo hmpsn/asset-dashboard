@@ -66,6 +66,7 @@ import { createWorkOrder } from '../../server/work-orders.js';
 import { createPayment } from '../../server/payments.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { ProductType } from '../../shared/types/payments.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Server setup ──────────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ async function startTestServer(): Promise<void> {
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 async function getJson(path: string, headers?: Record<string, string>): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, { headers });
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, { headers }));
 }
 
 async function getJsonAdmin(path: string): Promise<Response> {

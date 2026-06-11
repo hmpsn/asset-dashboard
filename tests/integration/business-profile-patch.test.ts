@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 
-const ctx = createTestContext(13252);
+const ctx = createTestContext(13252, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 const CLIENT_PASSWORD = 'integration-test-pw';

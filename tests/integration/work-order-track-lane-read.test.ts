@@ -23,7 +23,7 @@ import { upsertDeliverable } from '../../server/client-deliverables.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
 // port-ok: 13878 (verified free; 13877 is taken by projected-review-respond-routes.test.ts).
-const ctx = createTestContext(13878);
+const ctx = createTestContext(13878, { autoPublicAuth: true });
 
 let pwless: SeededFullWorkspace;
 let pw: SeededFullWorkspace;
@@ -148,7 +148,9 @@ describe('GET /api/public/deliverables/:workspaceId — work-order TRACK lane (R
 
 describe('GET /api/public/deliverables/:workspaceId — auth (R5 track lane stays gated)', () => {
   it('401s unauthenticated on a password-protected workspace', async () => {
-    const res = await ctx.api(listUrl(pw.workspaceId));
+    const res = await ctx.api(listUrl(pw.workspaceId), {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 });

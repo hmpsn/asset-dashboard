@@ -74,7 +74,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return nativeFetch(`${baseUrl}${path}`, opts);
+  return nativeFetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
@@ -96,6 +96,7 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 // ── Workspace IDs ────────────────────────────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let wsA = '';
 let wsB = '';
@@ -477,7 +478,7 @@ describe('GET /api/public/anomalies/:workspaceId — requires portal auth', () =
   it('returns 401 without authentication headers', async () => {
     const id = seedAnomaly({ workspaceId: wsA });
     try {
-      const res = await api(`/api/public/anomalies/${wsA}`);
+      const res = await api(`/api/public/anomalies/${wsA}`, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
     } finally {
       db.prepare('DELETE FROM anomalies WHERE id = ?').run(id);

@@ -479,7 +479,7 @@ describe('P7.1 public-leak — local recs strip money fields + no dollarized gai
   it('the public recommendations route never emits emv/predictedEmv or a $ gain for local recs', async () => {
     const { createTestContext } = await import('./helpers.js');
     const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
-    const ctx = createTestContext(PORT);
+    const ctx = createTestContext(PORT, { autoPublicAuth: true });
     await ctx.startServer();
     const ws = createWorkspace('P7.1 Public Leak Test Workspace');
     const workspaceId = ws.id;

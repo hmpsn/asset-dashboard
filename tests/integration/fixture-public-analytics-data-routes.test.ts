@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13732);
+const ctx = createTestContext(13732, { autoPublicAuth: true });
 const { api } = ctx;
 
 let openWs = '';
@@ -23,10 +23,10 @@ afterAll(async () => {
 
 describe('Fixture public analytics data routes', () => {
   it('enforces auth for protected workspace overview routes', async () => {
-    const overview = await api(`/api/public/analytics-overview/${protectedWs}`);
+    const overview = await api(`/api/public/analytics-overview/${protectedWs}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(overview.status).toBe(401);
 
-    const insights = await api(`/api/public/insights/${protectedWs}`);
+    const insights = await api(`/api/public/insights/${protectedWs}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(insights.status).toBe(401);
   });
 

@@ -22,7 +22,7 @@ import db from '../../server/db/index.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13369); // port-ok: confirmed free
+const ctx = createTestContext(13369, { autoPublicAuth: true }); // port-ok: confirmed free
 const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────
@@ -489,7 +489,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
   it('returns 401 without auth', async () => {
     const res = await api(
       `/api/public/copy/${ws.workspaceId}/section/${sectionId}/approve`,
-      { method: 'POST' },
+      { method: 'POST', headers: { 'x-no-auto-public-auth': 'true' } },
     );
     expect(res.status).toBe(401);
   });
@@ -610,7 +610,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       `/api/public/copy/${ws.workspaceId}/section/${sectionId}/suggest`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
         body: JSON.stringify(validSuggestion),
       },
     );

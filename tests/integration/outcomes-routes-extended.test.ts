@@ -29,7 +29,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13371); // port-ok: unique, confirmed free
+const ctx = createTestContext(13371, { autoPublicAuth: true }); // port-ok: unique, confirmed free
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);
@@ -704,13 +704,13 @@ describe('Suite 8: Public routes — 401/403 for password-protected workspace', 
   });
 
   it('GET /api/public/outcomes/:wsId/summary returns 401 without auth', async () => {
-    const res = await api(`/api/public/outcomes/${wsId}/summary`);
+    const res = await api(`/api/public/outcomes/${wsId}/summary`, { headers: { 'x-no-auto-public-auth': 'true' } });
     // requireClientPortalAuth() should block unauthenticated requests
     expect([401, 403]).toContain(res.status);
   });
 
   it('GET /api/public/outcomes/:wsId/wins returns 401 without auth', async () => {
-    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const res = await api(`/api/public/outcomes/${wsId}/wins`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect([401, 403]).toContain(res.status);
   });
 });

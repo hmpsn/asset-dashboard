@@ -26,7 +26,7 @@ import db from '../../server/db/index.js';
 import { LEARNINGS_LOGIC_VERSION } from '../../server/workspace-learnings.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13366); // port-ok: next free after 13365
+const ctx = createTestContext(13366, { autoPublicAuth: true }); // port-ok: next free after 13365
 const { api } = ctx;
 
 // Seeded workspaces — created after server starts so DB is guaranteed up.

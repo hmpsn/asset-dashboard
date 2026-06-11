@@ -427,7 +427,7 @@ describe('P5 public-leak — new recs strip money fields + no dollarized gain', 
   it('the public recommendations route never emits emv/predictedEmv or a $ gain for new recs', async () => {
     const { createTestContext } = await import('./helpers.js');
     const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
-    const ctx = createTestContext(PORT);
+    const ctx = createTestContext(PORT, { autoPublicAuth: true });
     await ctx.startServer();
     // createWorkspace (no client_password) so the public GET is not session-gated by the
     // client-dashboard enforcement middleware (which 401s a public read on a passworded ws).

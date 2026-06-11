@@ -81,6 +81,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ─── Server lifecycle ─────────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ async function stopTestServer(): Promise<void> {
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
 function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 function postJson(path: string, body: unknown): Promise<Response> {

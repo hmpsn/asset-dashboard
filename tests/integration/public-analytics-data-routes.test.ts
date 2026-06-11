@@ -24,7 +24,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13368); // port-ok: confirmed free, above 13356 (current max)
+const ctx = createTestContext(13368, { autoPublicAuth: true }); // port-ok: confirmed free, above 13356 (current max)
 const { api } = ctx;
 
 // ── Workspace fixtures ──────────────────────────────────────────────────────
@@ -87,29 +87,29 @@ afterAll(async () => {
 
 describe('Auth boundary — password-protected workspace', () => {
   it('GET /api/public/insights/:workspaceId returns 401 without token on password-protected workspace', async () => {
-    const res = await api(`/api/public/insights/${wsProtectedId}`);
+    const res = await api(`/api/public/insights/${wsProtectedId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/analytics-overview/:workspaceId returns 401 without token on protected workspace', async () => {
-    const res = await api(`/api/public/analytics-overview/${wsProtectedId}`);
+    const res = await api(`/api/public/analytics-overview/${wsProtectedId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('GET /api/public/search-overview/:workspaceId returns 401 without token on protected workspace', async () => {
-    const res = await api(`/api/public/search-overview/${wsProtectedId}`);
+    const res = await api(`/api/public/search-overview/${wsProtectedId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('GET /api/public/insights/:workspaceId/narrative returns 401 without token on protected workspace', async () => {
-    const res = await api(`/api/public/insights/${wsProtectedId}/narrative`);
+    const res = await api(`/api/public/insights/${wsProtectedId}/narrative`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('GET /api/public/insights/:workspaceId/digest returns 401 without token on protected workspace', async () => {
-    const res = await api(`/api/public/insights/${wsProtectedId}/digest`);
+    const res = await api(`/api/public/insights/${wsProtectedId}/digest`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 

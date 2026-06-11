@@ -10,7 +10,7 @@ import { createJob, updateJob } from '../../server/jobs.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
-const ctx = createTestContext(13897);
+const ctx = createTestContext(13897, { autoPublicAuth: true });
 const { api, clearCookies } = ctx;
 
 let passwordlessWorkspaceId = '';
@@ -82,7 +82,9 @@ describe('GET /api/public/jobs/:workspaceId', () => {
   it('returns 401 for a protected workspace without a portal session', async () => {
     clearCookies();
 
-    const res = await api(`/api/public/jobs/${protectedWorkspaceId}`);
+    const res = await api(`/api/public/jobs/${protectedWorkspaceId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 });

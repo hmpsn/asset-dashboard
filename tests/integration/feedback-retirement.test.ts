@@ -13,7 +13,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { setBroadcast } from '../../server/broadcast.js';
 
-const ctx = createTestContext(13352); // port-ok: verified free as of 2026-05-10; retirement test extends range to 13352
+const ctx = createTestContext(13352, { autoPublicAuth: true }); // port-ok: verified free as of 2026-05-10; retirement test extends range to 13352
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

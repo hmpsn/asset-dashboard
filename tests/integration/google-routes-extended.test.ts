@@ -44,6 +44,7 @@ import type { AddressInfo } from 'net';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ---------------------------------------------------------------------------
 // vi.mock declarations (hoisted before imports)
@@ -193,7 +194,7 @@ async function req(
   path: string,
   opts?: RequestInit,
 ): Promise<{ status: number; body: unknown; headers: Headers }> {
-  const res = await fetch(`${baseUrl}${path}`, { ...opts, redirect: 'manual' });
+  const res = await fetch(`${baseUrl}${path}`, withPublicTestAuth(path, { ...opts, redirect: 'manual' }));
   let body: unknown;
   const ct = res.headers.get('content-type') ?? '';
   if (ct.includes('application/json')) {

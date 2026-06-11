@@ -4,7 +4,7 @@ import { createTestContext } from './helpers.js';
 import { seedDemoScenarioWorkspace, type SeededDemoScenario } from '../fixtures/demo-scenario-seed.js';
 import { getDemoScenarioById } from '../../shared/demo-workspace-scenarios.js';
 
-const ctx = createTestContext(13712);
+const ctx = createTestContext(13712, { autoPublicAuth: true });
 const { api } = ctx;
 
 const seeded: SeededDemoScenario[] = [];

@@ -10,7 +10,7 @@ import { upsertContentGapsBatch } from '../../server/content-gaps.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13770); // port-ok: unique in integration suite
+const ctx = createTestContext(13770, { autoPublicAuth: true }); // port-ok: unique in integration suite
 
 let ws: SeededFullWorkspace | null = null;
 

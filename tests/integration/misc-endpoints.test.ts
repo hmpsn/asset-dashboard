@@ -24,7 +24,7 @@ import { createContentSubscription, deleteContentSubscription } from '../../serv
 import { getUploadRoot } from '../../server/data-dir.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13209);
+const ctx = createTestContext(13209, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
@@ -484,12 +484,12 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
   });
 
   it('rejects passwordless billing portal access without an authenticated actor', async () => {
-    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST' });
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST', headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('rejects subscription cancellation without an authenticated actor', async () => {
-    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST' });
+    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST', headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 

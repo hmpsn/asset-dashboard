@@ -20,7 +20,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13364); // port-ok: next free after 13363
+const ctx = createTestContext(13364, { autoPublicAuth: true }); // port-ok: next free after 13363
 const { api } = ctx;
 
 let growthWs: SeededFullWorkspace | undefined;

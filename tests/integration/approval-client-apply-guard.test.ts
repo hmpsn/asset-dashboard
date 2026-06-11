@@ -4,7 +4,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createBatch, getBatch, updateItem } from '../../server/approvals.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13333); // port-ok: 13201-13332 already allocated in integration suite
+const ctx = createTestContext(13333, { autoPublicAuth: true }); // port-ok: 13201-13332 already allocated in integration suite
 const { postJson } = ctx;
 
 let wsId = '';

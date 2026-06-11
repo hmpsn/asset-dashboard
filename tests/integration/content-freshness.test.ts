@@ -6,7 +6,7 @@ import { upsertInsight } from '../../server/analytics-insights-store.js';
 const PORT = 13341;
 const STALE_DATE = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
 
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 
 describe('content freshness detection', () => {
   let seed: ReturnType<typeof seedWorkspace>;

@@ -6,7 +6,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 
-const ctx = createTestContext(13242);
+const ctx = createTestContext(13242, { autoPublicAuth: true });
 const { api } = ctx;
 
 let testWsId = '';

@@ -17,7 +17,7 @@ import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createTestContext } from './helpers.js';
 
-const ctx = createTestContext(13349); // port-ok: 13201-13348 already allocated in integration suite
+const ctx = createTestContext(13349, { autoPublicAuth: true }); // port-ok: 13201-13348 already allocated in integration suite
 const { api } = ctx;
 
 let wsId = '';
@@ -140,7 +140,7 @@ describe('Public business priorities mutations', () => {
   it('requires client auth before validating malformed priority payloads', async () => {
     const res = await api(`/api/public/business-priorities/${wsId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ priorities: [null] }),
     });
 

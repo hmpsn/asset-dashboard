@@ -29,7 +29,7 @@ import { updateWorkspace } from '../../server/workspaces.js';
 import { initializeSections, saveGeneratedCopy } from '../../server/copy-review.js';
 import { createBlueprint, addEntry } from '../../server/page-strategy.js';
 
-const ctx = createTestContext(13380); // port-ok: 13380
+const ctx = createTestContext(13380, { autoPublicAuth: true }); // port-ok: 13380
 const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ describe('GET /api/public/audit-traffic/:workspaceId', () => {
   it('returns 401 for a workspace with no clientPassword set (authenticated-portal gate)', async () => {
     const noIntWs = seedWorkspace({ clientPassword: '', gscPropertyUrl: undefined, ga4PropertyId: undefined });
     try {
-      const res = await api(`/api/public/audit-traffic/${noIntWs.workspaceId}`);
+      const res = await api(`/api/public/audit-traffic/${noIntWs.workspaceId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
     } finally {
       noIntWs.cleanup();
@@ -308,7 +308,7 @@ describe('POST /api/public/onboarding/:id — authentication', () => {
   it('returns 401 without auth cookies', async () => {
     const res = await api(`/api/public/onboarding/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ business: { businessName: 'Acme Inc.' } }),
     });
     expect(res.status).toBe(401);
@@ -646,7 +646,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
   it('returns 401 without auth', async () => {
     const res = await api(
       `/api/public/copy/${approveWs.workspaceId}/section/fake-section-id/approve`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' }, body: '{}' },
     );
     expect(res.status).toBe(401);
   });
@@ -815,7 +815,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       `/api/public/copy/${suggestWs.workspaceId}/section/fake-section-id/suggest`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
         body: JSON.stringify({ originalText: 'old', suggestedText: 'new' }),
       },
     );

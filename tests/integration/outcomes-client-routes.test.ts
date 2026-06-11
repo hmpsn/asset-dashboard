@@ -19,7 +19,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13386); // port-ok: next free after 13385
+const ctx = createTestContext(13386, { autoPublicAuth: true }); // port-ok: next free after 13385
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);

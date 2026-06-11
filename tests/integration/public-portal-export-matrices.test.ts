@@ -8,7 +8,7 @@
  *   (b) no credential + password-set workspace  → 401
  *   (c) admin HMAC x-auth-token                → 200 (admin can always export)
  *   (d) client JWT for workspace B against A   → 401 (cross-workspace isolation)
- *   (e) passwordless workspace + no credential → 200 (preserved)
+ *   (e) passwordless workspace + no credential → 401 (E3: closed until configured)
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
@@ -146,8 +146,9 @@ describe('GET /api/public/export/:workspaceId/matrices', () => {
     expect(res.status).toBe(401);
   });
 
-  it('(e) passwordless workspace accessible without any credential', async () => {
+  // E3: passwordless workspaces now return 401 — closed until configured.
+  it('(e) passwordless workspace + no credential → 401 (E3: closed until configured)', async () => {
     const res = await getUnauthenticated(csvPath(wsNoPass.workspaceId));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });

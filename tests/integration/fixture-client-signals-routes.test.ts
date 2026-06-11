@@ -3,7 +3,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientSignal } from '../../server/client-signals-store.js';
 
-const ctx = createTestContext(13737);
+const ctx = createTestContext(13737, { autoPublicAuth: true });
 const { api, patchJson, postJson } = ctx;
 
 let wsId = '';

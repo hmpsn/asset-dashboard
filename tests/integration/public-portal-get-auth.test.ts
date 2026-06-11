@@ -11,7 +11,7 @@
  *   (a) no credential + password-configured workspace → 401
  *   (b) admin HMAC x-auth-token                      → 200
  *   (c) client JWT cookie for workspace A             → 200
- *   (d) passwordless workspace + no credential        → 200 (preserved)
+ *   (d) passwordless workspace + no credential        → 401 (E3: closed until configured)
  *   (e) client JWT for workspace B against workspace A → 401 (cross-workspace)
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -159,11 +159,12 @@ describe('public-portal GET auth guards — case (c): client JWT for workspace A
   }
 });
 
-describe('public-portal GET auth guards — case (d): passwordless workspace + no credential → 200', () => {
+// E3: passwordless workspaces are now closed until configured — no longer pass through.
+describe('public-portal GET auth guards — case (d): passwordless workspace + no credential → 401', () => {
   for (const endpointFn of ENDPOINTS) {
-    it(`GET ${endpointFn('{wsNoPass}')} → 200 (passwordless preserved)`, async () => {
+    it(`GET ${endpointFn('{wsNoPass}')} → 401 (E3: closed until configured)`, async () => {
       const res = await getUnauthenticated(endpointFn(wsNoPass.workspaceId));
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(401);
     });
   }
 });

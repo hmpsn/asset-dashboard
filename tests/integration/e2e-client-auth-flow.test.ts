@@ -28,7 +28,7 @@ import {
 } from '../../server/client-users.js';
 import bcrypt from 'bcryptjs';
 
-const ctx = createTestContext(13233);
+const ctx = createTestContext(13233, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let testWsId = '';

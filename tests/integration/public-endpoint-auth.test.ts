@@ -312,15 +312,16 @@ describe('Soft-gated endpoint auth — unauthenticated callers on password-set w
   }
 });
 
-describe('Soft-gated endpoint auth — passwordless workspace passes through', () => {
+// E3: requireClientPortalAuth no longer passes through passwordless workspaces.
+// The "soft-gated" endpoints now return 401 for unconfigured workspaces too.
+describe('Soft-gated endpoint auth — passwordless workspace returns 401 (E3: closed until configured)', () => {
   for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
-    it(`GET ${label} on passwordless workspace without auth is not 401`, async () => {
+    it(`GET ${label} on passwordless workspace without auth → 401`, async () => {
       clearCookies();
       const realPath = path.replace('PLACEHOLDER', wsPasswordlessId);
       const res = await api(realPath);
-      // requireClientPortalAuth lets passwordless workspaces through; handler
-      // may return 200, 402, 403, or 404 depending on data state.
-      expect(res.status).not.toBe(401);
+      // E3 flip: requireClientPortalAuth now blocks passwordless workspaces.
+      expect(res.status).toBe(401);
     });
   }
 });

@@ -29,7 +29,7 @@ import { upsertAndCleanPageKeywords } from '../../server/page-keywords.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem, PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13889;
-const ctx = createTestContext(PORT);
+const ctx = createTestContext(PORT, { autoPublicAuth: true });
 const { api } = ctx;
 
 let fullWs = '';

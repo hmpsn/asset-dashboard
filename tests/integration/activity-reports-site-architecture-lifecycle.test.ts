@@ -94,7 +94,7 @@ beforeEach(() => {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function get(path: string): Promise<Response> {
-  return fetch(`${baseUrl}${path}`);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
@@ -109,6 +109,7 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let wsId = '';
 let wsBId = '';

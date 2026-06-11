@@ -6,7 +6,7 @@ import { createWorkOrder } from '../../server/work-orders.js';
 import type { ProductType } from '../../shared/types/payments.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13755);
+const ctx = createTestContext(13755, { autoPublicAuth: true });
 const { api, patchJson } = ctx;
 
 let wsA = '';

@@ -4,7 +4,7 @@ import { createTestContext } from './helpers.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13358); // port-ok: next free after 13357
+const ctx = createTestContext(13358, { autoPublicAuth: true }); // port-ok: next free after 13357
 
 let workspaceId = '';
 let workspaceToken = '';
@@ -73,7 +73,7 @@ describe('POST /api/public/onboarding/:id', () => {
   it('rejects unauthenticated submissions', async () => {
     const res = await ctx.api(`/api/public/onboarding/${workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(401);

@@ -52,6 +52,7 @@ import { getDeliverable } from '../../server/client-deliverables.js';
 import { mirrorApprovalBatchToDeliverable } from '../../server/domains/inbox/approval-batch-dual-write.js';
 import { markDeliverableApplied, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let server: http.Server | null = null;
 let baseUrl = '';
@@ -67,11 +68,11 @@ async function startTestServer(): Promise<void> {
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 /** Resolve a mirror item's id by its legacy page id (for building flaggedItems subsets). */

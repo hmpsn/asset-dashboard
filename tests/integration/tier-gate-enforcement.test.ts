@@ -25,7 +25,7 @@ import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import { addMessage } from '../../server/chat-memory.js';
 
-const ctx = createTestContext(13312);
+const ctx = createTestContext(13312, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let freeWs: SeededFullWorkspace;

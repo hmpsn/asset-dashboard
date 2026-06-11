@@ -18,7 +18,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { DecayAnalysis, DecayingPage } from '../../server/content-decay.js';
 
-const ctx = createTestContext(13311);
+const ctx = createTestContext(13311, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Workspace IDs ───────────────────────────────────────────────────────────

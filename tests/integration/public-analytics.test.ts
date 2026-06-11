@@ -24,7 +24,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 import { cleanSeedData } from '../global-setup.js';
 
-const ctx = createTestContext(13309);
+const ctx = createTestContext(13309, { autoPublicAuth: true });
 const { api } = ctx;
 
 // Workspace A — receives seeded analytics insights

@@ -27,7 +27,7 @@ import {
   getContentRequest,
 } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13273);
+const ctx = createTestContext(13273, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsAId = '';

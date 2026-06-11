@@ -26,7 +26,7 @@ import { cleanSeedData } from '../global-setup.js';
 import { addMessage, FREE_CHAT_LIMIT } from '../../server/chat-memory.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13381);
+const ctx = createTestContext(13381, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Workspace with no credentials (GSC/GA4 unconfigured) — passwordless
@@ -107,43 +107,45 @@ afterAll(async () => {
 
 describe('Auth guard — 401 for password-protected workspace with no credentials', () => {
   it('GET /api/public/insights/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/insights/:workspaceId/narrative returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}/narrative`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}/narrative`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/insights/:workspaceId/digest returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}/digest`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}/digest`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/search-overview/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/search-overview/${wsWithPasswordId}`);
+    const res = await api(`/api/public/search-overview/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/analytics-overview/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/analytics-overview/${wsWithPasswordId}`);
+    const res = await api(`/api/public/analytics-overview/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('POST /api/public/search-chat/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await postJson(`/api/public/search-chat/${wsWithPasswordId}`, {
-      question: 'What is my traffic like?',
+    const res = await api(`/api/public/search-chat/${wsWithPasswordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ question: 'What is my traffic like?' }),
     });
     expect(res.status).toBe(401);
     const body = await res.json();

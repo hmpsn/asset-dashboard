@@ -25,7 +25,7 @@ import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/conten
 import { randomUUID } from 'crypto';
 import type { BriefingStory, BriefingSourceMetadata } from '../../shared/types/briefing.js';
 
-const ctx = createTestContext(13330); // port-ok: verified free; extends range to 13330
+const ctx = createTestContext(13330, { autoPublicAuth: true }); // port-ok: verified free; extends range to 13330
 const { api } = ctx;
 
 // Workspace IDs — assigned in beforeAll

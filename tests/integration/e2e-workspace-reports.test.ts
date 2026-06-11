@@ -19,7 +19,7 @@ import {
 } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 
-const ctx = createTestContext(13232);
+const ctx = createTestContext(13232, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

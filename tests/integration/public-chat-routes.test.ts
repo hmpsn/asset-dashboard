@@ -4,7 +4,7 @@ import db from '../../server/db/index.js';
 import { addMessage, getSession } from '../../server/chat-memory.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13350); // port-ok: 13201-13349 already allocated in integration suite
+const ctx = createTestContext(13350, { autoPublicAuth: true }); // port-ok: 13201-13349 already allocated in integration suite
 const { api, postJson, del, clearCookies } = ctx;
 
 let workspaceId = '';
@@ -40,16 +40,20 @@ describe('public chat session routes', () => {
   it('requires client auth before reading or mutating protected workspace chat sessions', async () => {
     addMessage(protectedWorkspaceId, 'protected-chat-session', 'client', 'user', 'Protected question');
 
-    const listRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}`);
+    const listRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(listRes.status).toBe(401);
 
-    const getRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session`);
+    const getRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(getRes.status).toBe(401);
 
-    const deleteRes = await del(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session`);
+    const deleteRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session`, { method: 'DELETE', headers: { 'x-no-auto-public-auth': 'true' } });
     expect(deleteRes.status).toBe(401);
 
-    const summarizeRes = await postJson(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session/summarize`, {});
+    const summarizeRes = await api(`/api/public/chat-sessions/${protectedWorkspaceId}/protected-chat-session/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({}),
+    });
     expect(summarizeRes.status).toBe(401);
     expect(getSession(protectedWorkspaceId, 'protected-chat-session')).not.toBeNull();
 

@@ -12,7 +12,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser } from '../../server/client-users.js';
 
-const ctx = createTestContext(13407);
+const ctx = createTestContext(13407, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let wsId = '';

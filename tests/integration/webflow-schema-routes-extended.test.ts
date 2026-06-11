@@ -56,7 +56,7 @@ import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 // Must call at module level — vi.mock is hoisted.
 setupWebflowMocks();
 
-const ctx = createTestContext(13373);
+const ctx = createTestContext(13373, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 // ---------------------------------------------------------------------------
