@@ -1,6 +1,7 @@
 import { gsc } from '../../api/analytics';
 import { useGSCBase } from '../shared/useGSCBase';
 import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 import type { SearchOverview, PerformanceTrend, SearchComparison } from '../../components/client/types';
 import type { SearchDeviceBreakdown } from '../../../shared/types/analytics';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
@@ -27,6 +28,7 @@ export function useClientSearch(
   } = useGSCBase({
     enabled,
     makeKey: metric => queryKeys.client.gsc(wsId, metric, days, dr),
+    staleTime: STALE_TIMES.ANALYTICS,
     api: {
       overview: () => gsc.overview(wsId, days, dr),
       trend: () => gsc.trend(wsId, days, dr),

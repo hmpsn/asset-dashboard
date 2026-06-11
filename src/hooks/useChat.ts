@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { post, getOptional, ApiError } from '../api/client';
+import type { ChatLimitErrorResponse, ChatUsageResponse, ClientSearchChatResponse } from '../../shared/types/usage';
 import type {
   SearchOverview, PerformanceTrend, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary,
@@ -7,6 +9,8 @@ import type {
   SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview,
 } from '../components/client/types';
 import type { Tier } from '../components/ui';
+import { useClientChatUsage } from './client/useClientChatUsage';
+import { queryKeys } from '../lib/queryKeys';
 import type { ClientTab } from '../routes';
 
 /**
@@ -63,9 +67,10 @@ export interface ChatState {
   chatLoading: boolean;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
   chatSessionId: string;
+  chatHasServerBackedSession: boolean;
   chatSessions: Array<{ id: string; title: string; messageCount: number; updatedAt: string }>;
   showChatHistory: boolean;
-  chatUsage: { allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null;
+  chatUsage: ChatUsageResponse | null;
   roiValue: number | null;
   /** Intent detected from the most recent AI response — drives CTA rendering */
   lastIntent: 'content_interest' | 'service_interest' | null;
@@ -78,9 +83,10 @@ export interface ChatActions {
   setChatInput: React.Dispatch<React.SetStateAction<string>>;
   setChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setChatSessionId: React.Dispatch<React.SetStateAction<string>>;
+  setChatHasServerBackedSession: React.Dispatch<React.SetStateAction<boolean>>;
   setChatSessions: React.Dispatch<React.SetStateAction<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>>;
   setShowChatHistory: React.Dispatch<React.SetStateAction<boolean>>;
-  setChatUsage: React.Dispatch<React.SetStateAction<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>>;
+  setChatUsage: React.Dispatch<React.SetStateAction<ChatUsageResponse | null>>;
 
   /** Clear lastIntent — call after CTA is actioned so it doesn't re-appear on next render */
   clearIntent: () => void;
@@ -88,6 +94,7 @@ export interface ChatActions {
 }
 
 export function useChat(deps: ChatDeps): ChatState & ChatActions {
+  const queryClient = useQueryClient();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -96,18 +103,48 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const proactiveInsightSent = useRef(false);
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const [chatHasServerBackedSession, setChatHasServerBackedSession] = useState(false);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [chatUsage, setChatUsage] = useState<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>(null);
+  const [chatUsageOverride, setChatUsageOverride] = useState<ChatUsageResponse | null>(null);
   const [roiValue, setRoiValue] = useState<number | null>(null);
   const [lastIntent, setLastIntent] = useState<'content_interest' | 'service_interest' | null>(null);
+  const chatUsageQuery = useClientChatUsage(deps.ws?.id, chatOpen);
+  const fetchedChatUsage = chatUsageQuery.data ?? null;
+  const chatUsage = chatUsageOverride ?? fetchedChatUsage;
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+
+  useEffect(() => {
+    if (fetchedChatUsage) setChatUsageOverride(null);
+  }, [fetchedChatUsage]);
+
+  const chatLimitMessage = useCallback((body: Partial<ChatLimitErrorResponse> | undefined): string => {
+    if (body?.message) return body.message;
+    const tier = body?.tier ?? chatUsage?.tier ?? deps.effectiveTier;
+    const upgradeTier = tier === 'growth' ? 'Premium' : 'Growth';
+    if (tier === 'free') {
+      const roiMsg = roiValue && roiValue > 0
+        ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
+        : ' Upgrade to Growth for more chat access.';
+      return `You've used all your free conversations this month.${roiMsg}`;
+    }
+    return `You've used all your ${tier} chat conversations this month. Upgrade to ${upgradeTier} for more chat access.`;
+  }, [chatUsage, deps.effectiveTier, roiValue]);
 
   const askAi = useCallback(async (question: string) => {
     const { ws, overview, ga4Overview, betaMode, days, currentTab } = deps;
     if (!question.trim() || !ws) return;
     if (!overview && !ga4Overview) return;
+    const limitBlocksNewSession = !betaMode
+      && chatUsage
+      && chatUsage.limit !== null
+      && !chatUsage.allowed
+      && !chatHasServerBackedSession;
+    if (limitBlocksNewSession) {
+      setChatMessages(prev => prev.length > 0 ? prev : [{ role: 'assistant', content: chatLimitMessage(chatUsage) }]);
+      return;
+    }
     setChatMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setChatInput('');
     setChatLoading(true);
@@ -120,29 +157,36 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
         question: question.trim(), days, sessionId: chatSessionId, betaMode,
       };
       if (currentTab && CHAT_TAB_HINTS.has(currentTab)) payload.currentTab = currentTab;
-      let data: { answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null };
+      let data: ClientSearchChatResponse;
       try {
-        data = await post<{ answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null }>(`/api/public/search-chat/${ws.id}`, payload);
+        data = await post<ClientSearchChatResponse>(`/api/public/search-chat/${ws.id}`, payload);
       } catch (err) {
         if (err instanceof ApiError && err.status === 429) {
-          const roiMsg = roiValue && roiValue > 0
-            ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
-            : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
-          setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month.${roiMsg}` }]);
-          setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
+          const body = err.body as Partial<ChatLimitErrorResponse> | undefined;
+          setChatMessages(prev => [...prev, { role: 'assistant', content: chatLimitMessage(body) }]);
+          setChatUsageOverride(u => ({
+            allowed: false,
+            used: body?.used ?? u?.used ?? chatUsage?.used ?? 0,
+            limit: body?.limit ?? u?.limit ?? chatUsage?.limit ?? null,
+            remaining: body?.remaining ?? 0,
+            tier: body?.tier ?? u?.tier ?? chatUsage?.tier ?? deps.effectiveTier,
+          }));
           setChatLoading(false);
           return;
         }
         throw err;
       }
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
+      setChatHasServerBackedSession(true);
       setLastIntent(data.detectedIntent || null);
-      if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.chatUsage(ws.id) }).catch((err) => {
+        console.error('useChat operation failed:', err);
+      });
     } catch (err) {
       console.error('useChat operation failed:', err);
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
-  }, [deps, chatSessionId, roiValue]);
+  }, [chatHasServerBackedSession, chatLimitMessage, chatSessionId, chatUsage, deps, queryClient]);
 
   // Build a proactive greeting from already-loaded data (zero AI cost)
   const buildProactiveGreeting = useCallback((): string => {
@@ -225,10 +269,9 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     return `Here's what's happening with your site right now:\n\n${bullets.join('\n\n')}`;
   }, [deps]);
 
-  // Fetch chat usage and ROI data when chat opens
+  // Fetch ROI data when chat opens. Chat usage is fetched by React Query above.
   useEffect(() => {
     if (chatOpen && deps.ws) {
-      getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${deps.ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
       // Fetch ROI for upgrade prompts (best-effort, silent fail)
       if (roiValue === null) {
         getOptional<{ organicTrafficValue?: number }>(`/api/public/roi/${deps.ws.id}`).then(d => {
@@ -256,9 +299,10 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     chatLoading, setChatLoading,
     chatEndRef,
     chatSessionId, setChatSessionId,
+    chatHasServerBackedSession, setChatHasServerBackedSession,
     chatSessions, setChatSessions,
     showChatHistory, setShowChatHistory,
-    chatUsage, setChatUsage,
+    chatUsage, setChatUsage: setChatUsageOverride,
     roiValue,
     lastIntent,
     clearIntent: () => setLastIntent(null),

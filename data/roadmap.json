@@ -325,95 +325,6 @@
       ]
     },
     {
-      "id": "sprint-client-dashboard-qw1-stop-the-leaks-2026-06-11",
-      "name": "🩹 Client Dashboard Quick Wins 1 — Stop the Leaks",
-      "hours": "~20-28h",
-      "rationale": "First wave of the 2026-06 client dashboard audit. Items where silence is actively costing us: silent data-layer failures, Google API quota burn, silent trial expiry, and an unenforced Growth chat limit. Every item is a no-regret, hours-sized fix with no architectural change.",
-      "notes": "Source: docs/audits/client-dashboard-2026-06/ (00-findings + 01-quick-wins). Ship as small independent PRs, staging-first. Per-PR: data-flow rules 1-2 for any new broadcast, Four Laws for UI, npm run pr-check.",
-      "items": [
-        {
-          "id": "cda-qw1-statetime-ga4-gsc",
-          "title": "Add staleTime to GA4/GSC client hooks (quota + perf risk)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.1",
-          "est": "1-2h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "src/hooks/client/useClientGA4.ts + useClientSearch.ts. Every tab focus refires 7-12 parallel Google API calls. Pick ~10-15 min staleTime consistent with GA4's 24-48h lag."
-        },
-        {
-          "id": "cda-qw1-getsafe-to-get-inbox",
-          "title": "Convert getSafe()→get() on critical inbox/decision query paths",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.2",
-          "est": "3-5h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "src/hooks/client/useClientQueries.ts. getSafe renders endpoint failures as 'no data' — a 500 on approvals looks like an empty inbox. Convert approvals/client-actions/requests/content-requests to throwing get() so <ErrorState> renders with retry. Keep getSafe on optional decoration (annotations, anomalies)."
-        },
-        {
-          "id": "cda-qw1-ws-handlers-top5",
-          "title": "Wire top-5 missing WS event handlers (BRIEF_UPDATED, ANOMALIES_UPDATE, INTELLIGENCE_SIGNALS_UPDATED, OUTCOME_*, SCHEMA_*)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.3",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Only ~37 of 67 broadcast events have client handlers — stale caches until manual reload. Add useWorkspaceEvents handlers (never useGlobalAdminEvents) invalidating matching client-* query keys in src/components/ClientDashboard.tsx."
-        },
-        {
-          "id": "cda-qw1-trial-countdown-banner",
-          "title": "Trial countdown banner in client shell (trialDaysRemaining <= 5)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.1",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Trials currently end silently — worst conversion leak. ws.isTrial/ws.trialDaysRemaining already in public workspace payload (see PlansTab.tsx:32,139). Dismissible amber banner linking to Plans; hide in betaMode. Unbuilt MONETIZATION.md spec, not a new idea."
-        },
-        {
-          "id": "cda-qw1-day10-trial-email",
-          "title": "Day-10 trial warning email (scheduled, dedup-flagged)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.2",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Other half of the MONETIZATION.md trial spec. Daily scheduled check emailing once at day 10 with days remaining + Plans link; sent-flag (column or keyed activity entry) so it never double-sends."
-        },
-        {
-          "id": "cda-qw1-chat-usage-counter",
-          "title": "Chat usage counter in client chat widget ('2 of 3 free conversations left')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "GET /api/public/chat-usage/:workspaceId already exists (server/routes/public-chat.ts). Fetch + caption render in ClientChatWidget footer; client-* query key hook. Ship before or with Growth limit enforcement so the limit is never a surprise."
-        },
-        {
-          "id": "cda-qw1-growth-chat-enforcement",
-          "title": "Enforce Growth 50-chat/month limit (counted today, not enforced)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.4",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Extend checkChatRateLimit (server/chat-memory.ts / server/usage-tracking.ts, used by public-chat route) to return limit-reached for Growth with soft-gate upgrade-to-Premium message in widget. Integration test against the actual public chat route per test conventions."
-        },
-        {
-          "id": "cda-qw1-hygiene-sweep",
-          "title": "Code hygiene sweep: eslint-disable justification + role=dialog on DecisionDetailModal + ClientHeader menu roles/aria-labels",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §5.1-5.3",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "useClientWorkspaceBootstrap.ts:168 bare suppression (justify or fix dep array); DecisionDetailModal missing role=dialog/aria-modal/aria-labelledby; ClientHeader dropdown role=menu/menuitem + icon-button aria-labels. One small zero-product-risk PR."
-        }
-      ]
-    },
-    {
       "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
       "name": "📖 Client Dashboard Quick Wins 2 — Tell the Story",
       "hours": "~22-32h",
@@ -1649,6 +1560,104 @@
           "status": "done",
           "createdAt": "2026-06-11",
           "notes": "Done (52fcc9cb + cleanup). Palette Run Audit now startJob('seo-audit') matching SeoAudit's exact payload, with toasts + no-site fallback; anomaly scan honestly relabeled 'Scan All Workspaces' (server gap flagged: no workspace-scoped variant); badges on useWorkspaceBadges React Query hook invalidated by CONTENT_REQUEST_* events; onRequestCountChange threading fully removed."
+        }
+      ],
+      "shippedAt": "2026-06-11"
+    },
+    {
+      "id": "sprint-client-dashboard-qw1-stop-the-leaks-2026-06-11",
+      "name": "✅ SHIPPED — 🩹 Client Dashboard Quick Wins 1 — Stop the Leaks",
+      "hours": "~20-28h",
+      "rationale": "First wave of the 2026-06 client dashboard audit. Items where silence is actively costing us: silent data-layer failures, Google API quota burn, silent trial expiry, and an unenforced Growth chat limit. Every item is a no-regret, hours-sized fix with no architectural change.",
+      "notes": "Source: docs/audits/client-dashboard-2026-06/ (00-findings + 01-quick-wins). Ship as small independent PRs, staging-first. Per-PR: data-flow rules 1-2 for any new broadcast, Four Laws for UI, npm run pr-check.",
+      "items": [
+        {
+          "id": "cda-qw1-statetime-ga4-gsc",
+          "title": "Add staleTime to GA4/GSC client hooks (quota + perf risk)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.1",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: added 15-minute STALE_TIMES.ANALYTICS plumbing through shared GA4/GSC base hooks, applied only to client analytics wrappers, and pinned admin/client behavior plus disabled-query coverage.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-getsafe-to-get-inbox",
+          "title": "Convert getSafe()→get() on critical inbox/decision query paths",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.2",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: critical client inbox/decision hooks now use throwing get() so React Query surfaces endpoint failures instead of silent empty arrays; optional decorative queries still use getSafe().",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-ws-handlers-top5",
+          "title": "Wire top-5 missing WS event handlers (BRIEF_UPDATED, ANOMALIES_UPDATE, INTELLIGENCE_SIGNALS_UPDATED, OUTCOME_*, SCHEMA_*)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.3",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: added confirmed client-facing invalidation mappings and ClientDashboard subscriptions for BRIEF_UPDATED, OUTCOME_ACTION_RECORDED, and OUTCOME_PLAYBOOK_DISCOVERED; left speculative producer cleanup for a separate PR.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-trial-countdown-banner",
+          "title": "Trial countdown banner in client shell (trialDaysRemaining <= 5)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.1",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: existing client trial banner now appears only for active non-beta, non-external-billing trials with 1-5 days remaining, supports per-trial dismissal, and routes CTA to Plans.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-day10-trial-email",
+          "title": "Day-10 trial warning email (scheduled, dedup-flagged)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.2",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: formalized the 4-days-remaining reminder as the Day-10 warning for 14-day trials, preserved trial:{workspaceId}:4 dedupe, links to Plans, and only marks sent after sendEmail() succeeds.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-chat-usage-counter",
+          "title": "Chat usage counter in client chat widget ('2 of 3 free conversations left')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: added shared typed chat usage response, React Query client usage hook/key, Free/Growth counters in the chat widget, Premium unlimited hiding, and tier-specific exhausted messaging.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-growth-chat-enforcement",
+          "title": "Enforce Growth 50-chat/month limit (counted today, not enforced)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.4",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: usage_tracking.ai_chats now gates new chat sessions for Free/Growth/trial-as-Growth before AI calls, preserves existing-session continuation, refunds failed reservations, and returns typed 429 usage_limit responses.",
+          "shippedAt": "2026-06-11"
+        },
+        {
+          "id": "cda-qw1-hygiene-sweep",
+          "title": "Code hygiene sweep: eslint-disable justification + role=dialog on DecisionDetailModal + ClientHeader menu roles/aria-labels",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §5.1-5.3",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped 2026-06-11: removed the bare hook-deps suppression with real dependencies, converted ClientHeader account controls to accessible Popover/menu roles, labeled date range trigger, and pinned DecisionDetailModal dialog semantics.",
+          "shippedAt": "2026-06-11"
         }
       ],
       "shippedAt": "2026-06-11"

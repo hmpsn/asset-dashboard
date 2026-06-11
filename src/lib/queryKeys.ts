@@ -253,6 +253,7 @@ export const queryKeys = {
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
     briefing: (wsId: string) => ['client-briefing', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
+    chatUsage: (wsId: string) => ['client-chat-usage', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
     intelligence: (wsId: string) => ['client-intelligence', wsId] as const,

@@ -67,7 +67,7 @@ export function useClientAnomalies(wsId: string, enabled: boolean) {
 export function useClientApprovals(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.approvals(wsId),
-    queryFn: () => getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []),
+    queryFn: () => get<ApprovalBatch[]>(`/api/public/approvals/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -76,7 +76,7 @@ export function useClientApprovals(wsId: string, enabled: boolean) {
 export function useClientActions(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.clientActions(wsId),
-    queryFn: () => getSafe<ClientAction[]>(`/api/public/client-actions/${wsId}`, []),
+    queryFn: () => get<ClientAction[]>(`/api/public/client-actions/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -86,7 +86,7 @@ export function useClientActions(wsId: string, enabled: boolean) {
 export function useClientRequests(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.requests(wsId),
-    queryFn: () => getSafe<ClientRequest[]>(`/api/public/requests/${wsId}`, []),
+    queryFn: () => get<ClientRequest[]>(`/api/public/requests/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -96,7 +96,7 @@ export function useClientRequests(wsId: string, enabled: boolean) {
 export function useClientContentRequests(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.contentRequests(wsId),
-    queryFn: () => getSafe<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`, []),
+    queryFn: () => get<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });

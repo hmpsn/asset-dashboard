@@ -46,7 +46,7 @@ describe('GET /api/public/chat-usage/:workspaceId', () => {
     };
     expect(typeof body.allowed).toBe('boolean');
     expect(typeof body.used).toBe('number');
-    // limit/remaining may be Infinity (serialized as null in JSON) for non-free tiers
+    // limit/remaining are null only for unlimited premium-tier workspaces.
     expect(body).toHaveProperty('limit');
     expect(body).toHaveProperty('remaining');
     expect(typeof body.tier).toBe('string');
@@ -156,17 +156,17 @@ describe('GET /api/public/chat-sessions/:workspaceId — channel filter', () => 
     expect(Array.isArray(body)).toBe(true);
   });
 
-  it('returns 200 for valid channel=admin', async () => {
+  it('returns 400 for non-client channel=admin on the public route', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}?channel=admin`);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
   });
 
-  it('returns 200 for valid channel=search', async () => {
+  it('returns 400 for non-client channel=search on the public route', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}?channel=search`);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
   });
 
-  it('returns 200 with no channel filter (lists all sessions)', async () => {
+  it('returns 200 with no channel filter (defaults to client sessions)', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as unknown[];

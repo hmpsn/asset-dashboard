@@ -3,6 +3,7 @@ import type {
   GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4ConversionSummary,
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../components/client/types';
+import { STALE_TIMES } from '../../lib/queryClient';
 import { useGA4Base } from '../shared/useGA4Base';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
@@ -38,6 +39,7 @@ export function useClientGA4(
     keyPrefix: 'client-ga4',
     includeEvents: true,
     landingOpts: { organic: true, limit: 15 },
+    staleTime: STALE_TIMES.ANALYTICS,
   });
 
   // Aggregate partial failures

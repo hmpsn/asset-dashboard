@@ -500,6 +500,7 @@ function adminInvalidationKeys(
 function clientDashboardInvalidationKeys(
   eventName: WsEventName,
   workspaceId: string,
+  data?: unknown,
 ): readonly QueryInvalidationKey[] {
   switch (eventName) {
     case WS_EVENTS.ACTIVITY_NEW:
@@ -515,6 +516,13 @@ function clientDashboardInvalidationKeys(
     case WS_EVENTS.CONTENT_REQUEST_CREATED:
     case WS_EVENTS.CONTENT_REQUEST_UPDATE:
       return [queryKeys.client.contentRequests(workspaceId)] as const;
+    case WS_EVENTS.BRIEF_UPDATED:
+      return [
+        queryKeys.client.contentRequests(workspaceId),
+        queryKeys.client.contentPlan(workspaceId),
+        queryKeys.client.unifiedInbox(workspaceId),
+        queryKeys.client.intelligence(workspaceId),
+      ] as const;
     case WS_EVENTS.CONTENT_UPDATED:
       return [
         queryKeys.client.contentRequests(workspaceId),
@@ -567,6 +575,18 @@ function clientDashboardInvalidationKeys(
       ] as const;
     case WS_EVENTS.WORK_ORDER_UPDATE:
       return [queryKeys.client.workOrders(workspaceId)] as const;
+    case WS_EVENTS.WORK_ORDER_COMMENT: {
+      const orderId = readStringField(data, 'id');
+      return orderId
+        ? [
+            queryKeys.client.workOrderComments(workspaceId, orderId),
+            queryKeys.client.unifiedInbox(workspaceId),
+          ] as const
+        : [
+            queryKeys.client.workOrderCommentsAll(workspaceId),
+            queryKeys.client.unifiedInbox(workspaceId),
+          ] as const;
+    }
     case WS_EVENTS.OUTCOME_SCORED:
       return [
         queryKeys.client.outcomeSummary(workspaceId),
@@ -575,7 +595,14 @@ function clientDashboardInvalidationKeys(
       ] as const;
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
       return [queryKeys.client.outcomeWins(workspaceId)] as const;
+    case WS_EVENTS.OUTCOME_ACTION_RECORDED:
+      return [
+        queryKeys.client.outcomeSummary(workspaceId),
+        queryKeys.client.intelligence(workspaceId),
+      ] as const;
     case WS_EVENTS.OUTCOME_LEARNINGS_UPDATED:
+      return [queryKeys.client.intelligence(workspaceId)] as const;
+    case WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED:
       return [queryKeys.client.intelligence(workspaceId)] as const;
     case WS_EVENTS.INSIGHT_BRIDGE_UPDATED:
     case WS_EVENTS.INTELLIGENCE_CACHE_UPDATED:
@@ -684,7 +711,7 @@ export function getWorkspaceInvalidationKeys(
     case 'admin-deliverables':
       return adminDeliverablesInvalidationKeys(eventName, workspaceId);
     case 'client-dashboard':
-      return clientDashboardInvalidationKeys(eventName, workspaceId);
+      return clientDashboardInvalidationKeys(eventName, workspaceId, data);
     case 'client-unified-inbox':
       return clientUnifiedInboxInvalidationKeys(eventName, workspaceId, data);
     case 'client-copy-review':

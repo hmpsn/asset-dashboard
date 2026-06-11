@@ -9,6 +9,8 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { checkUsageLimit, decrementUsage, incrementIfAllowed } from './usage-tracking.js';
+import type { ChatLimitErrorResponse, ChatUsageResponse, UsageTier } from '../shared/types/usage.js';
 
 
 const log = createLogger('chat-memory');
@@ -172,6 +174,7 @@ export function addMessage(
 // ── Rate limiting ──
 
 export const FREE_CHAT_LIMIT = 3; // conversations per calendar month on free tier
+const CHAT_USAGE_FEATURE = 'ai_chats';
 
 /**
  * Count the number of unique conversations (sessions with >=1 user message)
@@ -190,27 +193,84 @@ export function getMonthlyConversationCount(workspaceId: string, channel: 'clien
  * Check if a workspace on free tier can start/continue a conversation.
  * Returns { allowed, used, limit, remaining }.
  */
-export function checkChatRateLimit(workspaceId: string, tier: string, sessionId?: string): {
+export interface ChatRateLimitResult {
   allowed: boolean;
   used: number;
   limit: number;
   remaining: number;
-} {
-  if (tier !== 'free') return { allowed: true, used: 0, limit: Infinity, remaining: Infinity };
+}
 
-  const used = getMonthlyConversationCount(workspaceId, 'client');
+export interface ChatUsageReservation extends ChatRateLimitResult {
+  reserved: boolean;
+}
+
+function normalizeUsageTier(tier: string): UsageTier {
+  return tier === 'growth' || tier === 'premium' ? tier : 'free';
+}
+
+export function formatChatUsageResponse(result: ChatRateLimitResult, tier: string): ChatUsageResponse {
+  return {
+    allowed: result.allowed,
+    used: result.used,
+    limit: Number.isFinite(result.limit) ? result.limit : null,
+    remaining: Number.isFinite(result.remaining) ? result.remaining : null,
+    tier: normalizeUsageTier(tier),
+  };
+}
+
+export function formatChatLimitError(result: ChatRateLimitResult, tier: string): ChatLimitErrorResponse {
+  const response = formatChatUsageResponse(result, tier);
+  const upgradeTier = response.tier === 'growth' ? 'Premium' : 'Growth';
+  const limitText = response.limit ?? 'your';
+  return {
+    ...response,
+    error: 'Chat limit reached',
+    code: 'usage_limit',
+    message: `You've used all ${limitText} ${response.tier} chat conversations this month. Upgrade to ${upgradeTier} for more chat access.`,
+  };
+}
+
+/**
+ * Check current chat usage. Usage tracking is authoritative for all tiers.
+ * The legacy session counter remains exported for historical tests/diagnostics,
+ * but monthly limits now come from usage_tracking.ai_chats.
+ */
+export function checkChatRateLimit(workspaceId: string, tier: string, sessionId?: string): ChatRateLimitResult {
+  const usage = checkUsageLimit(workspaceId, tier, CHAT_USAGE_FEATURE);
 
   // If continuing an existing session, always allow
   if (sessionId) {
     const existing = getSession(workspaceId, sessionId);
-    if (existing && existing.messages.length > 0) {
-      return { allowed: true, used, limit: FREE_CHAT_LIMIT, remaining: Math.max(0, FREE_CHAT_LIMIT - used) };
+    if (existing?.channel === 'client' && existing.messages.length > 0) {
+      return { ...usage, allowed: true };
     }
   }
 
-  // New conversation — check limit
-  const remaining = Math.max(0, FREE_CHAT_LIMIT - used);
-  return { allowed: remaining > 0, used, limit: FREE_CHAT_LIMIT, remaining };
+  return usage;
+}
+
+/**
+ * Reserve a monthly chat slot for a new conversation before calling AI.
+ * Existing conversations do not consume additional slots, which keeps the
+ * monthly limit scoped to new conversations while still allowing follow-ups.
+ */
+export function reserveChatUsageIfNeeded(workspaceId: string, tier: string, sessionId?: string): ChatUsageReservation {
+  if (sessionId) {
+    const existing = getSession(workspaceId, sessionId);
+    if (existing?.channel === 'client' && existing.messages.length > 0) {
+      return { ...checkChatRateLimit(workspaceId, tier, sessionId), reserved: false };
+    }
+  }
+
+  if (!incrementIfAllowed(workspaceId, tier, CHAT_USAGE_FEATURE)) {
+    return { ...checkUsageLimit(workspaceId, tier, CHAT_USAGE_FEATURE), allowed: false, reserved: false };
+  }
+
+  return { ...checkUsageLimit(workspaceId, tier, CHAT_USAGE_FEATURE), allowed: true, reserved: true };
+}
+
+export function refundReservedChatUsage(workspaceId: string): void {
+  decrementUsage(workspaceId, CHAT_USAGE_FEATURE);
 }
 
 // ── Cross-session context ──
@@ -225,7 +285,7 @@ export function buildConversationContext(
   channel: 'client' | 'admin' | 'search',
 ): { historyMessages: Array<{ role: 'user' | 'assistant'; content: string }>; priorContext: string } {
   const current = getSession(workspaceId, sessionId);
-  const historyMessages = (current?.messages || []).map(m => ({
+  const historyMessages = (current?.channel === channel ? current.messages : []).map(m => ({
     role: m.role,
     content: m.content,
   }));

@@ -165,6 +165,20 @@ export function useClientWorkspaceBootstrap({
           : 'Failed to load dashboard');
         setLoading(false);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]);
+  }, [
+    workspaceId,
+    loadDashboardData,
+    setWs,
+    setLoading,
+    setError,
+    setShowOnboarding,
+    setShowWelcome,
+    setResetToken,
+    setLoginView,
+    setToast,
+    setAuthMode,
+    setLoginTab,
+    setClientUser,
+    setAuthenticated,
+  ]);
 }

@@ -10,7 +10,7 @@
  *    without rendering.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -568,11 +568,12 @@ describe('ClientDashboard — trial banners', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
     mockGetOptional.mockResolvedValue(null);
   });
 
-  it('shows a countdown banner when trial has ≤10 days remaining', async () => {
-    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, tier: 'growth' });
+  it('shows a countdown banner when trial has 5 days remaining', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
     mockGet.mockResolvedValue(ws);
 
     renderDashboard();
@@ -582,8 +583,20 @@ describe('ClientDashboard — trial banners', () => {
     });
   });
 
+  it('does NOT show a countdown banner when trial has 6 days remaining', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 6, tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/days left on your Growth trial/i)).not.toBeInTheDocument();
+  });
+
   it('shows singular "day" when exactly 1 day remains', async () => {
-    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 1, tier: 'growth' });
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 1, trialEndsAt: '2026-06-12T00:00:00.000Z', tier: 'growth' });
     mockGet.mockResolvedValue(ws);
 
     renderDashboard();
@@ -591,6 +604,46 @@ describe('ClientDashboard — trial banners', () => {
     await waitFor(() => {
       expect(screen.getByText(/1 day\b/i)).toBeInTheDocument();
     });
+  });
+
+  it('opens Plans from the trial countdown CTA', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 days/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /view plans/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith('/client/ws-test/plans');
+  });
+
+  it('dismisses the trial countdown banner per workspace and trial end date', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    const view = renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 days/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss trial reminder/i }));
+
+    expect(screen.queryByText(/5 days/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem('client-trial-banner-dismissed:ws-test:2026-06-16T00:00:00.000Z')).toBe('1');
+
+    view.unmount();
+    mockGet.mockResolvedValue(ws);
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/5 days/i)).not.toBeInTheDocument();
   });
 
   it('shows "trial has ended" banner when trialDaysRemaining is 0', async () => {
@@ -622,6 +675,18 @@ describe('ClientDashboard — trial banners', () => {
     mockGet.mockResolvedValue(ws);
 
     renderDashboard({ betaMode: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/days left/i)).not.toBeInTheDocument();
+  });
+
+  it('does NOT show trial banners for external billing workspaces', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 3, tier: 'growth', billingMode: 'external' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
 
     await waitFor(() => {
       expect(screen.getByTestId('client-header')).toBeInTheDocument();

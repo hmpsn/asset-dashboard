@@ -11,20 +11,27 @@ import {
   deleteSession as deleteChatSession,
   generateSessionSummary,
   checkChatRateLimit,
+  formatChatUsageResponse,
+  type ChatSession,
 } from '../chat-memory.js';
 import { getUsageSummary } from '../usage-tracking.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 
 // --- Chat Session CRUD ---
-type ChatChannel = 'client' | 'admin' | 'search';
-const CHAT_CHANNELS = new Set<ChatChannel>(['client', 'admin', 'search']);
+type PublicChatChannel = 'client';
+const PUBLIC_CHAT_CHANNELS = new Set<PublicChatChannel>(['client']);
 
-function parseChatChannel(value: unknown): ChatChannel | undefined | null {
+function parseChatChannel(value: unknown): PublicChatChannel | undefined | null {
   // undefined means no filter was requested; null means the client sent an invalid filter.
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !CHAT_CHANNELS.has(value as ChatChannel)) return null;
-  return value as ChatChannel;
+  if (typeof value !== 'string' || !PUBLIC_CHAT_CHANNELS.has(value as PublicChatChannel)) return null;
+  return value as PublicChatChannel;
+}
+
+function getClientSession(workspaceId: string, sessionId: string): ChatSession | null {
+  const session = getChatSession(workspaceId, sessionId);
+  return session?.channel === 'client' ? session : null;
 }
 
 router.use('/api/public/chat-sessions/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res, next) => {
@@ -35,16 +42,18 @@ router.use('/api/public/chat-sessions/:workspaceId', requireClientPortalAuth('wo
 router.get('/api/public/chat-sessions/:workspaceId', (req, res) => {
   const channel = parseChatChannel(req.query.channel);
   if (channel === null) return res.status(400).json({ error: 'Invalid channel' });
-  res.json(listSessions(req.params.workspaceId, channel));
+  res.json(listSessions(req.params.workspaceId, channel ?? 'client'));
 });
 
 router.get('/api/public/chat-sessions/:workspaceId/:sessionId', (req, res) => {
-  const session = getChatSession(req.params.workspaceId, req.params.sessionId);
+  const session = getClientSession(req.params.workspaceId, req.params.sessionId);
   if (!session) return res.status(404).json({ error: 'Session not found' });
   res.json(session);
 });
 
 router.delete('/api/public/chat-sessions/:workspaceId/:sessionId', (req, res) => {
+  const session = getClientSession(req.params.workspaceId, req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
   const deleted = deleteChatSession(req.params.workspaceId, req.params.sessionId);
   if (!deleted) return res.status(404).json({ error: 'Session not found' });
   res.json({ ok: true });
@@ -52,7 +61,7 @@ router.delete('/api/public/chat-sessions/:workspaceId/:sessionId', (req, res) =>
 
 router.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async (req, res) => {
   try {
-    const session = getChatSession(req.params.workspaceId, req.params.sessionId);
+    const session = getClientSession(req.params.workspaceId, req.params.sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const summary = await generateSessionSummary(req.params.workspaceId, req.params.sessionId);
     res.json({ summary });
@@ -67,7 +76,7 @@ router.get('/api/public/chat-usage/:workspaceId', requireClientPortalAuth(), (re
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const tier = computeEffectiveTier(ws);
   const rl = checkChatRateLimit(ws.id, tier);
-  res.json({ ...rl, tier });
+  res.json(formatChatUsageResponse(rl, tier));
 });
 
 // Unified usage summary — all features for a workspace

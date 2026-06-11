@@ -3,8 +3,7 @@
  *
  * Most functions in chat-memory.ts hit SQLite, so we focus on:
  * - FREE_CHAT_LIMIT constant value
- * - checkChatRateLimit's pure non-free-tier fast-path (returns immediately
- *   without any DB access when tier !== 'free')
+ * - tier limit selection used by checkChatRateLimit
  * - The rate-limit math formulas (remaining, allowed)
  * - The auto-title generation logic used inside addMessage (replicated inline)
  * - The rowToSession mapper shape (replicated inline since it's not exported)
@@ -28,42 +27,36 @@ describe('FREE_CHAT_LIMIT', () => {
   });
 });
 
-// ── checkChatRateLimit — non-free tier fast path ─────────────────────────────
-// When tier !== 'free' the function returns immediately without DB access.
+// ── checkChatRateLimit — tier limit selection ────────────────────────────────
 
 /**
- * Replicates the non-free fast-path from checkChatRateLimit so we can test
- * the logic without a running DB.
+ * Replicates tier limit selection without a running DB.
  */
-function nonFreeRateLimitResult(tier: string) {
-  if (tier !== 'free') {
-    return { allowed: true, used: 0, limit: Infinity, remaining: Infinity };
-  }
-  // (free tier needs DB — not tested here)
-  throw new Error('free tier requires DB');
+function tierRateLimitResult(tier: string, used = 0) {
+  const limit = tier === 'premium' ? Infinity : tier === 'growth' ? 50 : FREE_CHAT_LIMIT;
+  const remaining = limit === Infinity ? Infinity : Math.max(0, limit - used);
+  return { allowed: remaining > 0 || limit === Infinity, used, limit, remaining };
 }
 
-describe('checkChatRateLimit — non-free tier fast path', () => {
-  it('allows growth tier unconditionally', () => {
-    const result = nonFreeRateLimitResult('growth');
+describe('checkChatRateLimit — tier limit selection', () => {
+  it('allows growth tier with a 50-chat monthly limit', () => {
+    const result = tierRateLimitResult('growth');
     expect(result.allowed).toBe(true);
     expect(result.used).toBe(0);
-    expect(result.limit).toBe(Infinity);
-    expect(result.remaining).toBe(Infinity);
+    expect(result.limit).toBe(50);
+    expect(result.remaining).toBe(50);
   });
 
   it('allows premium tier unconditionally', () => {
-    const result = nonFreeRateLimitResult('premium');
+    const result = tierRateLimitResult('premium');
     expect(result.allowed).toBe(true);
+    expect(result.limit).toBe(Infinity);
   });
 
-  it('allows any unrecognized non-"free" tier string', () => {
-    const result = nonFreeRateLimitResult('enterprise');
+  it('treats unrecognized tiers as free', () => {
+    const result = tierRateLimitResult('enterprise');
     expect(result.allowed).toBe(true);
-  });
-
-  it('does NOT fast-path "free" tier (falls through to DB)', () => {
-    expect(() => nonFreeRateLimitResult('free')).toThrow();
+    expect(result.limit).toBe(FREE_CHAT_LIMIT);
   });
 });
 

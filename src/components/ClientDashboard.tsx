@@ -107,6 +107,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const [customDateRange, setCustomDateRange] = useState<AnalyticsDateRange | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dataEnabled, setDataEnabled] = useState(false);
+  const [dismissedTrialBannerKey, setDismissedTrialBannerKey] = useState<string | null>(null);
 
   const dateRange = customDateRange ?? undefined;
   const search = useClientSearch(workspaceId, days, dateRange, dataEnabled && !!ws?.gscPropertyUrl);
@@ -325,6 +326,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.CLIENT_ACTION_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CLIENT_ACTION_UPDATE),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => invalidateClientEvent(WS_EVENTS.WORK_ORDER_UPDATE),
+    // ws-invalidation-ok — client dashboard keeps work-order comments fresh even when Inbox is not mounted
+    [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => invalidateClientEvent(WS_EVENTS.WORK_ORDER_COMMENT, data),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.REQUEST_CREATED]: () => invalidateClientEvent(WS_EVENTS.REQUEST_CREATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -333,6 +336,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_REQUEST_CREATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CONTENT_REQUEST_UPDATE),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.BRIEF_UPDATED]: () => invalidateClientEvent(WS_EVENTS.BRIEF_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.CONTENT_UPDATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -372,6 +377,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_EXTERNAL_DETECTED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_LEARNINGS_UPDATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_ACTION_RECORDED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.INSIGHT_BRIDGE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -528,6 +537,17 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // Upgrade modal, SEO services cart). Per-request actions still work via the
   // bypass path in usePayments + PricingConfirmationModal.
   const isExternalBilling = ws?.billingMode === 'external';
+  const trialCountdownDays = ws.trialDaysRemaining ?? 0;
+  const trialBannerDismissKey = `client-trial-banner-dismissed:${workspaceId}:${ws.trialEndsAt ?? 'unknown'}`;
+  const isTrialBannerDismissed = dismissedTrialBannerKey === trialBannerDismissKey || (() => {
+    try { return localStorage.getItem(trialBannerDismissKey) === '1'; } catch { return false; }
+  })();
+  const showTrialCountdownBanner = !betaMode
+    && !isExternalBilling
+    && ws.isTrial
+    && trialCountdownDays <= 5
+    && trialCountdownDays > 0
+    && !isTrialBannerDismissed;
   const NAV = buildClientDashboardNav({
     ws,
     effectiveTier,
@@ -601,14 +621,25 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           icon={<Icon as={ActiveTabIcon} size="lg" className="text-accent-brand" />}
         />
 
-        {/* Trial countdown banner — shows at day 10 and under */}
-        {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
+        {/* Trial countdown banner — shows at five days and under */}
+        {showTrialCountdownBanner && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
             <Icon as={Clock} size="md" className="text-accent-warning flex-shrink-0" />
-            <p className="t-body text-accent-warning">
-              <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
-              {' '}Upgrade to keep access to all features.
+            <p className="t-body text-accent-warning flex-1">
+              <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
+              {' '}Choose a plan to keep access to all features.
             </p>
+            <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
+            <IconButton
+              icon={X}
+              label="Dismiss trial reminder"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
+                setDismissedTrialBannerKey(trialBannerDismissKey);
+              }}
+            />
           </div>
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (

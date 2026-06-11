@@ -21,7 +21,15 @@ function makeWrapper() {
 }
 
 function makeWrapperWithClient(client?: QueryClient) {
-  const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const qc = client ?? new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+        throwOnError: false,
+      },
+    },
+  });
   return {
     client: qc,
     wrapper: ({ children }: { children: React.ReactNode }) => (
@@ -109,7 +117,9 @@ import {
   useClientAnnotations,
   useClientActions,
   useClientAuditSummary,
+  useClientContentRequests,
   useClientRawInsights,
+  useClientRequests,
 } from '../../../src/hooks/client/useClientQueries';
 import { useClientInsights } from '../../../src/hooks/client/useClientInsights';
 import { useClientOutcomeSummary, useClientOutcomeWins } from '../../../src/hooks/client/useClientOutcomes';
@@ -166,19 +176,31 @@ describe('useClientRankHistory', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('useClientApprovals', () => {
-  beforeEach(() => mockGetSafe.mockReset());
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockGetSafe.mockReset();
+  });
 
   it('does not fetch when enabled is false', () => {
     renderHook(() => useClientApprovals('ws-1', false), { wrapper: makeWrapper() });
-    expect(mockGetSafe).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('returns data on success', async () => {
     const batches = [{ id: 'b1', status: 'pending', title: 'Batch 1' }];
-    mockGetSafe.mockResolvedValue(batches);
+    mockGet.mockResolvedValue(batches);
     const { result } = renderHook(() => useClientApprovals('ws-1', true), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(batches);
+  });
+
+  it('surfaces rejected API calls as query errors', async () => {
+    const error = new Error('approvals failed');
+    mockGet.mockRejectedValue(error);
+    const { result } = renderHook(() => useClientApprovals('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
   });
 });
 
@@ -229,19 +251,91 @@ describe('useClientAnnotations', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('useClientActions', () => {
-  beforeEach(() => mockGetSafe.mockReset());
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockGetSafe.mockReset();
+  });
 
   it('does not fetch when enabled is false', () => {
     renderHook(() => useClientActions('ws-1', false), { wrapper: makeWrapper() });
-    expect(mockGetSafe).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('returns data on success', async () => {
     const actions = [{ id: 'ca1', type: 'approve', status: 'pending' }];
-    mockGetSafe.mockResolvedValue(actions);
+    mockGet.mockResolvedValue(actions);
     const { result } = renderHook(() => useClientActions('ws-1', true), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(actions);
+  });
+
+  it('surfaces rejected API calls as query errors', async () => {
+    const error = new Error('actions failed');
+    mockGet.mockRejectedValue(error);
+    const { result } = renderHook(() => useClientActions('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useClientRequests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('useClientRequests', () => {
+  beforeEach(() => mockGet.mockReset());
+
+  it('does not fetch when enabled is false', () => {
+    renderHook(() => useClientRequests('ws-1', false), { wrapper: makeWrapper() });
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('returns data on success', async () => {
+    const requests = [{ id: 'cr1', type: 'question', message: 'Need help', createdAt: '2024-01-01' }];
+    mockGet.mockResolvedValue(requests);
+    const { result } = renderHook(() => useClientRequests('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(requests);
+  });
+
+  it('surfaces rejected API calls as query errors', async () => {
+    const error = new Error('requests failed');
+    mockGet.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useClientRequests('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useClientContentRequests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('useClientContentRequests', () => {
+  beforeEach(() => mockGet.mockReset());
+
+  it('does not fetch when enabled is false', () => {
+    renderHook(() => useClientContentRequests('ws-1', false), { wrapper: makeWrapper() });
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('returns data on success', async () => {
+    const requests = [{ id: 'ccr1', title: 'New landing page', status: 'pending' }];
+    mockGet.mockResolvedValue(requests);
+    const { result } = renderHook(() => useClientContentRequests('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(requests);
+  });
+
+  it('surfaces rejected API calls as query errors', async () => {
+    const error = new Error('content requests failed');
+    mockGet.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useClientContentRequests('ws-1', true), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
   });
 });
 

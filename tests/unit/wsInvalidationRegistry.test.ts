@@ -51,6 +51,17 @@ describe('wsInvalidation registry', () => {
     expect(keys).toEqual([queryKeys.client.contentSubscription(WS_ID)]);
   });
 
+  it('maps BRIEF_UPDATED for the client dashboard to content, inbox, and intelligence readers', () => {
+    const keys = getWorkspaceInvalidationKeys(WS_EVENTS.BRIEF_UPDATED, WS_ID, undefined, 'client-dashboard');
+
+    expect(keys).toEqual([
+      queryKeys.client.contentRequests(WS_ID),
+      queryKeys.client.contentPlan(WS_ID),
+      queryKeys.client.unifiedInbox(WS_ID),
+      queryKeys.client.intelligence(WS_ID),
+    ]);
+  });
+
   it('maps SCHEMA_SNAPSHOT_UPDATED for the client dashboard to both schema plan and snapshot readers', () => {
     const keys = getWorkspaceInvalidationKeys(
       WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED,
@@ -63,6 +74,19 @@ describe('wsInvalidation registry', () => {
       queryKeys.client.schemaPlan(WS_ID),
       queryKeys.client.schemaSnapshot(WS_ID),
     ]);
+  });
+
+  it('maps outcome refresh events for the client dashboard without speculative fanout', () => {
+    expect(
+      getWorkspaceInvalidationKeys(WS_EVENTS.OUTCOME_ACTION_RECORDED, WS_ID, undefined, 'client-dashboard'),
+    ).toEqual([
+      queryKeys.client.outcomeSummary(WS_ID),
+      queryKeys.client.intelligence(WS_ID),
+    ]);
+
+    expect(
+      getWorkspaceInvalidationKeys(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, WS_ID, undefined, 'client-dashboard'),
+    ).toEqual([queryKeys.client.intelligence(WS_ID)]);
   });
 
   it('maps DELIVERABLE_UPDATED for the admin deliverables pane', () => {

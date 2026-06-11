@@ -146,15 +146,14 @@ describe('Trial active: Free workspace with future trial_ends_at', () => {
     expect(body.usage.strategy_generations.limit).toBe(3);
   });
 
-  it('chat-usage endpoint: trial workspace gets unlimited chat (Growth)', async () => {
+  it('chat-usage endpoint: trial workspace gets Growth chat limit', async () => {
     const res = await api(`/api/public/chat-usage/${trialActiveWs!.workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.tier).toBe('growth');
     expect(body.allowed).toBe(true);
-    // Growth/premium serializes Infinity to null in JSON
-    expect(body.limit).toBeNull();
-    expect(body.remaining).toBeNull();
+    expect(body.limit).toBe(50);
+    expect(body.remaining).toBe(50);
   });
 
   it('intelligence endpoint: trial workspace gets learningHighlights slice', async () => {

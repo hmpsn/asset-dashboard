@@ -45,13 +45,13 @@ describe('trial-reminders', () => {
     mocks.getClientPortalUrl.mockReturnValue('https://app.example.com/client/ws-1');
     mocks.hasReminder.mockReturnValue(false);
     mocks.renderDigest.mockReturnValue({ subject: 'Trial ending', html: '<p>Reminder</p>' });
-    mocks.sendEmail.mockResolvedValue(undefined);
+    mocks.sendEmail.mockResolvedValue(true);
     mocks.listWorkspaces.mockReturnValue([
       {
         id: 'ws-1',
         name: 'Workspace One',
         clientEmail: 'client@example.com',
-        trialEndsAt: '2026-05-28T12:00:00.000Z',
+        trialEndsAt: '2026-05-29T12:00:00.000Z',
       },
     ]);
   });
@@ -62,7 +62,7 @@ describe('trial-reminders', () => {
     vi.useRealTimers();
   });
 
-  it('runs startup check once and sends reminder when trial is near expiry', async () => {
+  it('sends the day-10 warning when 4 days remain and links to Plans', async () => {
     const mod = await import('../../server/trial-reminders.js');
     mod.startTrialReminders();
 
@@ -70,7 +70,91 @@ describe('trial-reminders', () => {
 
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
     expect(mocks.markReminderSent).toHaveBeenCalledWith('trial:ws-1:4');
+    expect(mocks.renderDigest).toHaveBeenCalledWith('trial_expiry_warning', [
+      expect.objectContaining({
+        dashboardUrl: 'https://app.example.com/client/ws-1/plans',
+        data: { daysRemaining: 4 },
+      }),
+    ]);
     expect(mocks.pruneReminders).toHaveBeenCalledWith('-30 days');
+  });
+
+  it('does not send the day-10 warning when 5 days remain', async () => {
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws-5',
+        name: 'Workspace Five',
+        clientEmail: 'five@example.com',
+        trialEndsAt: '2026-05-30T12:00:00.000Z',
+      },
+    ]);
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.markReminderSent).not.toHaveBeenCalled();
+  });
+
+  it('skips sending when the 4-day reminder was already sent', async () => {
+    mocks.hasReminder.mockImplementation((key: string) => key === 'trial:ws-1:4');
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.markReminderSent).not.toHaveBeenCalled();
+  });
+
+  it('skips workspaces without a client email', async () => {
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws-no-email',
+        name: 'No Email Workspace',
+        clientEmail: '',
+        trialEndsAt: '2026-05-28T12:00:00.000Z',
+      },
+    ]);
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.markReminderSent).not.toHaveBeenCalled();
+  });
+
+  it('does not mark the reminder as sent when email delivery returns false', async () => {
+    mocks.sendEmail.mockResolvedValue(false);
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+    expect(mocks.markReminderSent).not.toHaveBeenCalled();
+  });
+
+  it('omits dashboardUrl when the client portal URL is unavailable', async () => {
+    mocks.getClientPortalUrl.mockReturnValue(undefined);
+
+    const mod = await import('../../server/trial-reminders.js');
+    mod.startTrialReminders();
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    expect(mocks.renderDigest).toHaveBeenCalledWith('trial_expiry_warning', [
+      expect.objectContaining({
+        dashboardUrl: undefined,
+        data: { daysRemaining: 4 },
+      }),
+    ]);
   });
 
   it('prioritizes 1-day reminder key when only one day remains', async () => {
