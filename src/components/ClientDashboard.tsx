@@ -257,27 +257,30 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     handlePasswordSubmit, handleClientUserLogin, handleClientLogout,
   } = useClientAuth(workspaceId, ws, loadDashboardData, () => turnstileTokenRef.current, () => setTurnstileReset((r: number) => r + 1));
 
+  // Active tab — resolved from the route. Lifted above chatDeps so the chat
+  // widget can send it as the `currentTab` hint (E4 server-side grounding).
+  const initialTabId = initialTab?.split('/')[0];
+  const tab: ResolvedClientTab = resolveClientTab(initialTabId);
+
   // ── Chat deps (passed to ClientChatWidget which owns the useChat call) ──
   const chatDeps = useMemo(() => ({
     ws, overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices,
     ga4Countries, ga4Events, ga4Conversions, searchComparison, ga4Comparison,
     ga4NewVsReturning, ga4Organic, audit, auditDetail, strategyData,
     latestRanks, activityLog, annotations, approvalBatches, requests,
-    anomalies, days, betaMode,
+    anomalies, days, betaMode, currentTab: tab,
     effectiveTier: (betaMode ? 'premium' : ((ws?.tier as import('./ui').Tier) || 'free')) as import('./ui').Tier,
   }), [ws, overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices,
     ga4Countries, ga4Events, ga4Conversions, searchComparison, ga4Comparison,
     ga4NewVsReturning, ga4Organic, audit, auditDetail, strategyData,
     latestRanks, activityLog, annotations, approvalBatches, requests,
-    anomalies, days, betaMode]);
+    anomalies, days, betaMode, tab]);
 
   // API surface bubbled up from ClientChatWidget for cross-component usage
   const [chatApi, setChatApi] = useState<ClientChatWidgetApi | null>(null);
 
   // ── UI-only state ──
   const clientNavigate = useNavigate();
-  const initialTabId = initialTab?.split('/')[0];
-  const tab: ResolvedClientTab = resolveClientTab(initialTabId);
   const setTab = (t: ClientTab) => {
     clientNavigate(clientPath(workspaceId, t, betaMode));
   };

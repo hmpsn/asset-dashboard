@@ -431,98 +431,65 @@ describe('useChat — clearIntent', () => {
   });
 });
 
-describe('useChat — buildChatContext', () => {
+describe('useChat — askAi payload shape (E4 server-side grounding)', () => {
   beforeEach(() => {
     mockPost.mockReset();
     mockGetOptional.mockReset();
     mockGetOptional.mockResolvedValue(null);
   });
 
-  it('always includes days in context', () => {
-    const { result } = renderChat({ days: 90 });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.days).toBe(90);
+  function lastPayload() {
+    return mockPost.mock.calls[mockPost.mock.calls.length - 1][1] as Record<string, unknown>;
+  }
+
+  it('sends only the hint fields — question, days, sessionId, betaMode — and NOT a context blob', async () => {
+    mockPost.mockResolvedValue({ answer: 'OK' });
+    const { result } = renderChat({ days: 90, betaMode: true });
+
+    await act(async () => { await result.current.askAi('How is my traffic?'); });
+
+    const payload = lastPayload();
+    expect(payload).toMatchObject({ question: 'How is my traffic?', days: 90, betaMode: true });
+    expect(payload.sessionId).toEqual(expect.any(String));
+    // The opaque context blob (prompt-injection surface) must be gone.
+    expect(payload).not.toHaveProperty('context');
   });
 
-  it('includes search data when overview is present', () => {
-    const { result } = renderChat();
-    const ctx = result.current.buildChatContext();
-    expect(ctx.search).toBeDefined();
-    expect((ctx.search as Record<string, unknown>).totalClicks).toBe(1000);
+  it('sends currentTab when it is a known server hint', async () => {
+    mockPost.mockResolvedValue({ answer: 'OK' });
+    const { result } = renderChat({ currentTab: 'strategy' });
+
+    await act(async () => { await result.current.askAi('hello'); });
+
+    expect(lastPayload().currentTab).toBe('strategy');
   });
 
-  it('omits search when overview is null', () => {
-    const { result } = renderChat({ overview: null });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.search).toBeUndefined();
+  it('omits currentTab when deps did not supply one', async () => {
+    mockPost.mockResolvedValue({ answer: 'OK' });
+    const { result } = renderChat(); // makeDeps leaves currentTab undefined
+
+    await act(async () => { await result.current.askAi('hello'); });
+
+    expect(lastPayload()).not.toHaveProperty('currentTab');
   });
 
-  it('includes searchTrend when trend has >1 entries', () => {
-    const trend = [
-      { date: '2024-01-01', clicks: 10, impressions: 100, ctr: 0.1, position: 12 },
-      { date: '2024-01-02', clicks: 15, impressions: 120, ctr: 0.125, position: 11 },
-    ];
-    const { result } = renderChat({ trend });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.searchTrend).toBeDefined();
+  it('omits currentTab rather than sending an unknown value (would 400 the request)', async () => {
+    mockPost.mockResolvedValue({ answer: 'OK' });
+    // Cast through unknown: a value outside the server enum must be dropped, not sent.
+    const { result } = renderChat({ currentTab: 'not-a-real-tab' as unknown as ChatDeps['currentTab'] });
+
+    await act(async () => { await result.current.askAi('hello'); });
+
+    expect(lastPayload()).not.toHaveProperty('currentTab');
   });
 
-  it('omits searchTrend when trend has 1 or fewer entries', () => {
-    const { result } = renderChat({ trend: [] });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.searchTrend).toBeUndefined();
-  });
+  it('defaults days to the deps value (server falls back to 28 only when omitted)', async () => {
+    mockPost.mockResolvedValue({ answer: 'OK' });
+    const { result } = renderChat({ days: 7 });
 
-  it('includes ga4 when ga4Overview is present', () => {
-    const ga4Overview = {
-      totalUsers: 5000, totalSessions: 7000, avgEngagementTime: 120,
-      bounceRate: 0.35, newUsers: 3000, returningUsers: 2000,
-      organicUsers: 2500, organicSessions: 3500,
-    };
-    const { result } = renderChat({ ga4Overview });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.ga4).toBeDefined();
-  });
+    await act(async () => { await result.current.askAi('hello'); });
 
-  it('includes pendingApprovals when batches have pending status', () => {
-    const approvalBatches = [
-      { id: 'b1', status: 'pending', workspaceId: 'ws-123', title: 'Test', items: [], createdAt: '2024-01-01', updatedAt: '2024-01-01', type: 'content' as const },
-      { id: 'b2', status: 'approved', workspaceId: 'ws-123', title: 'Test2', items: [], createdAt: '2024-01-01', updatedAt: '2024-01-01', type: 'content' as const },
-    ];
-    const { result } = renderChat({ approvalBatches });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.pendingApprovals).toBe(1);
-  });
-
-  it('includes activeRequests for non-closed requests', () => {
-    const requests = [
-      { id: 'r1', workspaceId: 'ws-123', title: 'Fix nav', category: 'technical' as const, status: 'open' as const, createdAt: '2024-01-01', updatedAt: '2024-01-01', attachments: [], notes: [] },
-      { id: 'r2', workspaceId: 'ws-123', title: 'Old req', category: 'technical' as const, status: 'closed' as const, createdAt: '2024-01-01', updatedAt: '2024-01-01', attachments: [], notes: [] },
-    ];
-    const { result } = renderChat({ requests });
-    const ctx = result.current.buildChatContext();
-    const active = ctx.activeRequests as Array<{ title: string; category: string; status: string }>;
-    expect(active).toHaveLength(1);
-    expect(active[0].title).toBe('Fix nav');
-  });
-
-  it('includes detectedAnomalies when anomalies are present', () => {
-    const anomalies = [
-      { type: 'traffic_drop', severity: 'high', title: 'Traffic dropped', description: 'Dropped 30%', source: 'ga4', changePct: -30 },
-    ];
-    const { result } = renderChat({ anomalies });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.detectedAnomalies).toBeDefined();
-    const anomalyList = ctx.detectedAnomalies as typeof anomalies;
-    expect(anomalyList[0].title).toBe('Traffic dropped');
-  });
-
-  it('includes siteHealth when audit is present', () => {
-    const audit = { id: 'a1', createdAt: '2024-01-01', siteScore: 75, totalPages: 50, errors: 3, warnings: 10, previousScore: 70 };
-    const { result } = renderChat({ audit });
-    const ctx = result.current.buildChatContext();
-    expect(ctx.siteHealth).toBeDefined();
-    expect((ctx.siteHealth as Record<string, unknown>).score).toBe(75);
+    expect(lastPayload().days).toBe(7);
   });
 });
 
