@@ -41,7 +41,7 @@ export function useKeywordStrategy(workspaceId: string) {
     queryKey: queryKeys.admin.keywordStrategy(workspaceId),
     queryFn: async (): Promise<KeywordStrategyRead | null> => {
       if (!workspaceId) return null;
-      return get<KeywordStrategyRead>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null);
+      return get<KeywordStrategyRead>(`/api/webflow/keyword-strategy/${workspaceId}`);
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!workspaceId,
