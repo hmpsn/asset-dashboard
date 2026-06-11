@@ -35,22 +35,24 @@ const log = createLogger('client-intelligence');
 const ADMIN_ONLY_INSIGHT_TYPES = new Set(['strategy_alignment']);
 
 function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSummary {
-  // G3: byType is capped at 25/type and must never be used for counts or iteration.
-  // Iterate `all` (top 100 by impact — the slice's full-iteration surface) so the
-  // admin-only-type scrub stays exact joint type×severity filtering. Exact pre-cap
-  // per-type totals live in `countsByType`, but they cannot drive these counts because
-  // the scrub needs the joint distribution; on workspaces with >100 stored insights
-  // the summary is bounded by the `all` cap (a deliberate prompt/payload guard).
-  // Exclude positive-severity insights: they aren't actionable priority items and
-  // including them in 'total' would create a gap vs. highPriority + mediumPriority
-  // that clients would have no way to explain.
-  const visible = insights.all.filter(
-    i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive',
-  );
+  // G3: byType is capped at 25/type (and `all` at 100) — neither may drive counts.
+  // The summary's pinned contracts need jointly-filtered PRE-cap totals: exclude
+  // admin-only insight types (scrub) AND positive severity (not actionable priority
+  // items — counting them would create a gap vs. highPriority + mediumPriority that
+  // clients would have no way to explain). `countsByTypeBySeverity` is the full
+  // pre-cap type×severity matrix computed in the assembler, so these counts stay
+  // exact on workspaces of any size; total = high + medium by construction.
+  let highPriority = 0;
+  let mediumPriority = 0;
+  for (const [type, severityCounts] of Object.entries(insights.countsByTypeBySeverity)) {
+    if (ADMIN_ONLY_INSIGHT_TYPES.has(type) || !severityCounts) continue;
+    highPriority += (severityCounts.critical ?? 0) + (severityCounts.warning ?? 0);
+    mediumPriority += severityCounts.opportunity ?? 0;
+  }
   return {
-    total: visible.length,
-    highPriority: visible.filter(i => i.severity === 'critical' || i.severity === 'warning').length,
-    mediumPriority: visible.filter(i => i.severity === 'opportunity').length,
+    total: highPriority + mediumPriority,
+    highPriority,
+    mediumPriority,
     topInsights: insights.topByImpact
       .filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive')
       .slice(0, 3)

@@ -7,7 +7,7 @@ import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/type
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
-import { listAllInsightsFromSlice } from './intelligence/insights-slice.js';
+import { getInsights } from './analytics-insights-store.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { listBatches } from './approvals.js';
@@ -62,11 +62,21 @@ async function computeDigest(
   now: Date,
 ): Promise<MonthlyDigestData> {
   const cacheKey = `${ws.id}:${monthLabel}`;
-  const { intelligence: insightContext } = await buildRecommendationGenerationContext(ws.id, {
-    slices: ['insights'],
-    includeLocalSeo: false,
-  });
-  const insights = insightContext.insights ? listAllInsightsFromSlice(insightContext.insights) : [];
+  // Deterministic digest rollups (wins, resolved "issues addressed", pagesOptimized)
+  // need FULL insight coverage — resolved/positive items are typically low-impact and
+  // fall outside the slice's prompt-facing bounds (`all` top-100, `byType` top-25/type
+  // since G3). Full iteration is not slice-backed post-cap, so this is a documented
+  // direct-read exception per docs/rules/intelligence-consumer-builders.md; the AI
+  // prompt context below still goes through buildRecommendationGenerationContext.
+  let insights: AnalyticsInsight[] = [];
+  try {
+    insights = [...getInsights(ws.id)].sort( // intel-builder-ok: non-prompt deterministic rollups need full pre-cap coverage (see comment above)
+      (a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0),
+    );
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error reading insights');
+    // insights unavailable — digest degrades to integration metrics only
+  }
   const roiHighlights = getROIHighlightsFromOutcomes(ws.id, 5);
 
   // Wins: positive severity or positive ranking mover

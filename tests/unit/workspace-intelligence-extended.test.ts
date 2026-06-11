@@ -349,7 +349,7 @@ describe('buildWorkspaceIntelligence — insights capping and ordering', () => {
     expect(result.insights!.all.length).toBeLessThanOrEqual(100);
   });
 
-  it('keeps full insight rollups even when all is capped', async () => {
+  it('keeps full pre-cap count rollups even when all and byType are capped', async () => {
     const manyInsights = Array.from({ length: 150 }, (_, i) => ({
       id: `insight-${i}`,
       insightType: i < 120 ? 'content_decay' : 'ranking_opportunity',
@@ -363,8 +363,12 @@ describe('buildWorkspaceIntelligence — insights capping and ordering', () => {
     expect(result.insights!.all).toHaveLength(100);
     expect(result.insights!.bySeverity.warning).toBe(100);
     expect(result.insights!.bySeverity.critical).toBe(50);
-    expect(result.insights!.byType.content_decay).toHaveLength(120);
-    expect(result.insights!.byType.ranking_opportunity).toHaveLength(30);
+    // G3: byType lists are capped at 25/type (payload guard)...
+    expect(result.insights!.byType.content_decay).toHaveLength(25);
+    expect(result.insights!.byType.ranking_opportunity).toHaveLength(25);
+    // ...while countsByType preserves the full pre-cap totals.
+    expect(result.insights!.countsByType.content_decay).toBe(120);
+    expect(result.insights!.countsByType.ranking_opportunity).toBe(30);
   });
 
   it('sorts insights by impactScore descending (highest first)', async () => {

@@ -241,6 +241,13 @@ export interface InsightsSlice {
    * any "how many insights of type X" read.
    */
   countsByType: Partial<Record<InsightType, number>>;
+  /**
+   * Full PRE-cap type×severity count matrix (same complete-set basis as
+   * `countsByType`). For consumers that need jointly-filtered totals — e.g. the
+   * client portal summary excludes admin-only types AND positive severity, which
+   * neither `countsByType` nor `bySeverity` alone can express.
+   */
+  countsByTypeBySeverity: Partial<Record<InsightType, Record<InsightSeverity, number>>>;
   /** Full PRE-cap severity counts, computed from the complete workspace set. */
   bySeverity: Record<InsightSeverity, number>;
   topByImpact: AnalyticsInsight[];

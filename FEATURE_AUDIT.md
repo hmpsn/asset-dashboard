@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **482 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **483 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 483. InsightsSlice byType cap + pre-cap countsByType rollup (G3, audit 7b)
+
+**What it does:** Bounds the last unbounded payload in the workspace-intelligence bundle. `InsightsSlice.byType` is now capped at the top 25 insights per type ordered by `impactScore` (previously it carried *every* stored insight per type — on a 400-insight workspace the insights slice alone was ~443 KB, dominating AdminChat context, MCP `get_workspace_intelligence` responses, and generation-context payloads). Two new required pre-cap rollups keep count consumers honest: `countsByType` (full per-type totals) and `countsByTypeBySeverity` (full type×severity matrix for jointly-filtered totals). Every `byType` reader was redirected *before* the cap landed: `listAllInsightsFromSlice` now reads the `all` list (top 100 by impact — AdminChat, diagnostic context inherit), meeting-brief metrics/cache-key counts read `countsByType`, the client intelligence summary derives its counts from the matrix (exact admin-only-type + positive-severity exclusion at any workspace size — both pinned contracts hold beyond the 100-cap), and monthly-digest's deterministic wins/resolved rollups read the store directly (documented `intel-builder-ok` exception — full iteration is no longer slice-backed). Measured on a seeded 400-insight workspace: insights slice JSON 452,896 → 213,435 bytes (−52.9%); the byType portion 353,622 → 114,161 bytes (−67.7%).
+
+**Agency value:** AdminChat and AI generation prompts stop dragging hundreds of duplicate insight objects through every assembly; MCP consumers get a bounded, predictable payload. Counts shown in meeting briefs and digests remain exact pre-cap totals.
+
+**Client value:** Indirect — faster intelligence-backed surfaces and unchanged (still exact) client portal insight counts.
+
+**Mutual:** The prompt-size guard and the count-honesty contract now coexist explicitly: lists are bounded, counts are authoritative, and the contract test pins both so no future consumer silently under-reports from a capped list.
+
+**Files:** `shared/types/intelligence.ts` (`InsightsSlice.countsByType` + cap JSDoc), `server/intelligence/insights-slice.ts` (cap + rollup + helper redirect), `server/meeting-brief-generator.ts`, `server/routes/client-intelligence.ts`, `server/monthly-digest.ts`, `scripts/pr-check.ts` (KNOWN_UNRENDERED_FIELDS), `docs/rules/workspace-intelligence.md`. Tests: `tests/unit/insights-slice.test.ts`, `tests/integration/g3-insights-bytype-cap.test.ts`, `tests/contract/intelligence-slice-population.test.ts`, `tests/unit/workspace-intelligence-extended.test.ts`.
 
 ---
 

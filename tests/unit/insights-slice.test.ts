@@ -137,6 +137,13 @@ describe('assembleInsights', () => {
     // ...but the pre-cap totals are preserved.
     expect(result.countsByType.ranking_opportunity).toBe(31);
     expect(result.countsByType.content_decay).toBe(3);
+    // The type×severity matrix is also pre-cap (joint-filtering consumers).
+    expect(result.countsByTypeBySeverity.ranking_opportunity).toEqual({
+      critical: 0, warning: 0, opportunity: 31, positive: 0,
+    });
+    expect(result.countsByTypeBySeverity.content_decay).toEqual({
+      critical: 0, warning: 3, opportunity: 0, positive: 0,
+    });
     // Types under the cap are unaffected.
     expect(result.byType.content_decay).toHaveLength(3);
     // `all` is unaffected by the per-type cap (34 insights, under its own 100 cap).
