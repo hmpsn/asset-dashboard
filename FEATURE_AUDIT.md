@@ -6,7 +6,7 @@ A comprehensive value assessment of every feature in the platform — **481 feat
 
 ---
 
-### 481. Persisted AI review verdicts + scraped source evidence (audit #16)
+### 482. Persisted AI review verdicts + scraped source evidence (audit #16)
 
 **What it does:** Makes content QA durable in two places that previously evaporated. (1) AI review verdicts: the post AI-review run (`POST /api/content-posts/:wsId/:postId/ai-review`) now persists its full verdict pack (`StoredAIReview` — the post-provenance-marking review map, evidence snapshot, `reviewedAt`, model) on a new `content_posts.ai_review` column, so verdicts survive editor close and are retrievable on any fresh post GET. Provenance-sensitive items (`factual_accuracy`, `no_hallucinations`) are only ever stored `pass=false` + `humanReviewRequired` — the grounding contract is preserved at the storage layer, not just the response. (2) Scraped source text: the brief generation job now persists C1's enrichment output (`BriefSourceEvidence` on `content_briefs.source_evidence`) — scraped reference-page `bodyText`, real SERP result snippets (previously dropped at the `generateBrief` boundary), fetch timestamps, and style-example pages. Regenerating a brief carries the evidence forward. Both fields are admin-internal and stripped from public client brief/post responses.
 
@@ -16,7 +16,7 @@ A comprehensive value assessment of every feature in the platform — **481 feat
 
 **Mutual:** One review run now produces a durable QA artifact tied to the post, and one scrape now produces a durable evidence pack tied to the brief — both reusable by future features without re-fetching or re-paying for the work.
 
-**Files:** `server/db/migrations/131-c4-persist-review-results.sql`, `shared/types/content.ts` (`StoredAIReview`, `BriefSourceEvidence`, `BriefScrapedSource`), `server/schemas/content-schemas.ts`, `server/content-posts-db.ts`, `server/content-brief.ts`, `server/routes/content-posts.ts` (review seam + activity + broadcast), `server/content-brief-generation-job.ts` (persistence seam), `server/routes/public-content.ts` (client-boundary strips), `server/activity-log.ts` (`post_ai_review`). Tests: `tests/integration/c4-persist-review-results.test.ts`.
+**Files:** `server/db/migrations/132-c4-persist-review-results.sql`, `shared/types/content.ts` (`StoredAIReview`, `BriefSourceEvidence`, `BriefScrapedSource`), `server/schemas/content-schemas.ts`, `server/content-posts-db.ts`, `server/content-brief.ts`, `server/routes/content-posts.ts` (review seam + activity + broadcast), `server/content-brief-generation-job.ts` (persistence seam), `server/routes/public-content.ts` (client-boundary strips), `server/activity-log.ts` (`post_ai_review`). Tests: `tests/integration/c4-persist-review-results.test.ts`.
 
 ---
 

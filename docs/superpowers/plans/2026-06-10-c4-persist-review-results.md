@@ -28,7 +28,7 @@ client-facing" — these fields are NOT client-facing, so the public boundary mu
 - New shared type `StoredAIReview` in `shared/types/content.ts`:
   `{ review: AIReviewMap; evidence?: ContentReviewEvidence; reviewedAt: string; model?: string }`.
   `GeneratedPost.aiReview?: StoredAIReview`.
-- New column `content_posts.ai_review TEXT` (migration 131). Row interface + `rowToPost` +
+- New column `content_posts.ai_review TEXT` (migration 132). Row interface + `rowToPost` +
   `postToParams` + insert/update SQL in `server/content-posts-db.ts`, same commit (lockstep).
 - Zod: `storedAiReviewSchema` in `server/schemas/content-schemas.ts`. `evidence`/`model`
   optional (write path omits evidence when the brief has no saved sources — schema-vs-stored-shape
@@ -108,7 +108,7 @@ in-process pattern.
 
 ## File ownership (this PR only)
 
-`server/db/migrations/131-c4-persist-review-results.sql` (new), `shared/types/content.ts`,
+`server/db/migrations/132-c4-persist-review-results.sql` (new), `shared/types/content.ts`,
 `server/schemas/content-schemas.ts`, `server/content-brief.ts` (store + regenerate carry),
 `server/content-posts-db.ts`, `server/routes/content-posts.ts` (review seam),
 `server/content-brief-generation-job.ts` (persistence seam), `server/activity-log.ts`
