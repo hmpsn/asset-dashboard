@@ -161,6 +161,44 @@ const stmts = createStmtCache(() => ({
     FROM action_outcomes
     WHERE action_id IN (SELECT id FROM tracked_actions_archive)
   `),
+  // ── A2: Aggregate readers for GET /api/outcomes/overview ─────────────────
+  // Replaces the O(A) per-action loops in the overview route with 4 queries per
+  // workspace instead of ~3×A queries.
+  //
+  // Stats query: single aggregate LEFT JOIN over tracked_actions + action_outcomes.
+  // Returns counts needed for the overview entry WITHOUT deserializing any JSON columns.
+  //
+  // totalWins / totalScored semantics deliberately match computeScorecard() loop:
+  //   - scored = actions with at least one conclusive outcome (not insufficient_data/inconclusive)
+  //   - wins   = scored actions where that outcome is 'win' or 'strong_win'
+  //   - NOT filtering attribution='not_acted_on' here — computeScorecard includes them
+  //
+  // scoredLast30d = distinct actions with ANY outcome (any score) measured within 30 days —
+  // matches the loop: `outcomes.some(o => o.measuredAt >= thirtyDaysAgo)`.
+  overviewStats: db.prepare(`
+    SELECT
+      COALESCE(COUNT(DISTINCT ta.id), 0) AS total_actions,
+      COALESCE(SUM(CASE WHEN ta.measurement_complete = 0 THEN 1 ELSE 0 END), 0) AS pending_count,
+      COALESCE(COUNT(DISTINCT CASE
+        WHEN ao.score IS NOT NULL
+          AND ao.score NOT IN ('insufficient_data', 'inconclusive')
+        THEN ta.id END), 0) AS total_scored,
+      COALESCE(COUNT(DISTINCT CASE
+        WHEN ao.score IN ('win', 'strong_win')
+        THEN ta.id END), 0) AS total_wins,
+      COALESCE(COUNT(DISTINCT CASE
+        WHEN ao.measured_at >= datetime('now', '-30 days')
+        THEN ta.id END), 0) AS scored_last_30d
+    FROM tracked_actions ta
+    LEFT JOIN action_outcomes ao ON ao.action_id = ta.id
+    WHERE ta.workspace_id = ?
+  `),
+  // Lightweight ID-only query for trend computation.
+  // Returns action IDs ordered created_at DESC (same order as getByWorkspace).
+  // NO JSON column reads — avoids the deserialization cost of getActionsByWorkspace.
+  actionIdsByWorkspace: db.prepare(`
+    SELECT id FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC
+  `),
 }));
 
 // --- Public API ---
@@ -481,6 +519,104 @@ export function getWorkspaceCounts(workspaceId: string): { total: number; scored
 export function getRecentActions(workspaceId: string, limit = 50): TrackedAction[] {
   const rows = stmts().getRecentByWorkspace.all(workspaceId, limit) as TrackedActionRow[];
   return rows.map(rowToTrackedAction);
+}
+
+// ── A2: Aggregate readers for GET /api/outcomes/overview ──────────────────────
+// Replaces the O(A) per-action loops in the overview route. See the
+// docs/superpowers/plans/2026-06-10-a2-outcomes-overview-sql.md plan for
+// the behavioral parity contract and attribution-exclusion semantics.
+
+/**
+ * Pre-aggregated stats for one workspace used by the outcomes overview.
+ * Semantics match computeScorecard() / the scoredLast30d loop exactly:
+ * - `totalScored`: distinct actions with at least one conclusive outcome
+ *   (not 'insufficient_data' or 'inconclusive')
+ * - `totalWins`: subset of totalScored where score is 'win' or 'strong_win'
+ * - `scoredLast30d`: distinct actions with ANY outcome measured in the last 30 days
+ *   (matches `outcomes.some(o => o.measuredAt >= thirtyDaysAgo)`)
+ * - `not_acted_on` attribution is NOT excluded here — computeScorecard includes them
+ */
+export interface WorkspaceOverviewStats {
+  totalActions: number;
+  pendingCount: number;
+  totalScored: number;
+  totalWins: number;
+  scoredLast30d: number;
+}
+
+/**
+ * Single aggregate query replacing the dual `getWorkspaceCounts` + inner
+ * `getOutcomesForAction` loops in the overview route.
+ */
+export function getOverviewStats(workspaceId: string): WorkspaceOverviewStats {
+  const row = stmts().overviewStats.get(workspaceId) as {
+    total_actions: number;
+    pending_count: number;
+    total_scored: number;
+    total_wins: number;
+    scored_last_30d: number;
+  } | undefined;
+  if (!row) return { totalActions: 0, pendingCount: 0, totalScored: 0, totalWins: 0, scoredLast30d: 0 };
+  return {
+    totalActions: row.total_actions,
+    pendingCount: row.pending_count,
+    totalScored: row.total_scored,
+    totalWins: row.total_wins,
+    scoredLast30d: row.scored_last_30d,
+  };
+}
+
+/**
+ * Lightweight action ID list for a workspace, ordered created_at DESC.
+ * Used by the overview trend computation: avoids deserializing JSON columns
+ * (baseline_snapshot, trailing_history, context) that the trend split doesn't need.
+ */
+export function getActionIdsByWorkspace(workspaceId: string): string[] {
+  const rows = stmts().actionIdsByWorkspace.all(workspaceId) as Array<{ id: string }>;
+  return rows.map(r => r.id);
+}
+
+/**
+ * Aggregate win rate for a list of action IDs.
+ * Used by the overview trend split-half calculation. Returns { wins: 0, scored: 0 }
+ * for an empty list without hitting the DB.
+ *
+ * "Scored" = action has at least one conclusive outcome (not 'insufficient_data'/'inconclusive').
+ * "Win" = that conclusive outcome is 'win' or 'strong_win'.
+ * Uses the HIGHEST checkpoint per action to determine the latest score — matches the
+ * `latestScored[latestScored.length - 1]` pattern in computeScorecard's trend loops.
+ */
+export function getWinRateForActionIds(actionIds: string[]): { wins: number; scored: number } {
+  if (actionIds.length === 0) return { wins: 0, scored: 0 };
+  // Build parameterized IN clause — safe; IDs are UUIDs from our own DB (no user input).
+  const placeholders = actionIds.map(() => '?').join(', ');
+  const row = db.prepare(`
+    SELECT
+      COALESCE(COUNT(DISTINCT CASE
+        WHEN ao.score IS NOT NULL
+          AND ao.score NOT IN ('insufficient_data', 'inconclusive')
+          AND ao.checkpoint_days = (
+            SELECT MAX(ao2.checkpoint_days)
+            FROM action_outcomes ao2
+            WHERE ao2.action_id = ao.action_id
+              AND ao2.score IS NOT NULL
+              AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+          )
+        THEN ao.action_id END), 0) AS scored,
+      COALESCE(COUNT(DISTINCT CASE
+        WHEN ao.score IN ('win', 'strong_win')
+          AND ao.checkpoint_days = (
+            SELECT MAX(ao2.checkpoint_days)
+            FROM action_outcomes ao2
+            WHERE ao2.action_id = ao.action_id
+              AND ao2.score IS NOT NULL
+              AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+          )
+        THEN ao.action_id END), 0) AS wins
+    FROM action_outcomes ao
+    WHERE ao.action_id IN (${placeholders})
+  `).get(...actionIds) as { scored: number; wins: number } | undefined;
+  return row ?? { wins: 0, scored: 0 };
 }
 
 /** Win scores that qualify an outcome as a win for the RECENT WINS section. */
