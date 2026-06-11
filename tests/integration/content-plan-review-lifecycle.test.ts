@@ -52,7 +52,7 @@ vi.mock('../../server/email.js', () => ({
 // ── Server bootstrap ─────────────────────────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createMatrix } from '../../server/content-matrices.js';
+import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
 import db from '../../server/db/index.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
@@ -666,6 +666,41 @@ describe('POST /api/content-plan/:workspaceId/:matrixId/send-samples', () => {
     const body = await res.json();
     expect(body.error).toBeDefined();
   });
+
+  // I3: send-samples must validate every selected cell's transition to 'review' BEFORE creating
+  // the batch. A terminal 'published' cell can't go to 'review', so the whole op is rejected with
+  // a 409 and NO orphaned batch/deliverable is created (previously the batch was created+mirrored
+  // first, then the status loop threw mid-way, leaving partial state).
+  it('rejects send-samples atomically when a selected cell is ineligible (409, no orphaned batch)', async () => {
+    const tpl = createTemplate(samplesWs, { name: 'I3 Atomic Tpl', pageType: 'service' });
+    const mx = createMatrix(samplesWs, {
+      name: 'I3 Atomic Matrix',
+      templateId: tpl.id,
+      dimensions: [{ variableName: 'city', values: ['Tampa', 'Miami'] }],
+      urlPattern: '/services/{city}',
+      keywordPattern: 'pest control in {city}',
+    });
+    const eligibleCell = mx.cells[0].id;   // stays 'planned' → review is legal
+    const ineligibleCell = mx.cells[1].id; // promote to terminal 'published'
+    updateMatrixCell(samplesWs, mx.id, ineligibleCell, { status: 'approved' });
+    updateMatrixCell(samplesWs, mx.id, ineligibleCell, { status: 'published' });
+
+    const beforeCount = countDeliverablesByType(samplesWs, 'content_plan_sample');
+
+    const res = await postJson(
+      `/api/content-plan/${samplesWs}/${mx.id}/send-samples`,
+      { cellIds: [eligibleCell, ineligibleCell] },
+    );
+    expect(res.status).toBe(409);
+
+    // No batch/deliverable was created, and the eligible cell was NOT flipped to review.
+    expect(countDeliverablesByType(samplesWs, 'content_plan_sample')).toBe(beforeCount);
+    const pubRes = await getJson(`/api/public/content-plan/${samplesWs}/${mx.id}`);
+    const body = await pubRes.json();
+    const flipped = body?.cells?.find((c: { id: string }) => c.id === eligibleCell);
+    // eligibleCell is still 'planned' → not client-visible → absent from the public response.
+    expect(flipped).toBeUndefined();
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -898,6 +933,51 @@ describe('POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/fla
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toBeDefined();
+  });
+
+  // ── C2 regression: flagging an APPROVED or PUBLISHED cell must succeed (200), not 500. ──
+  // Before G2/C2 the MATRIX_CELL_TRANSITIONS machine had no approved→flagged / published→flagged
+  // edge, so updateMatrixCell threw InvalidTransitionError → the public flag route returned 500
+  // for an in-spec client review action (the flag form is shown for every client-visible cell).
+  it('returns 200 when flagging an APPROVED cell (C2)', async () => {
+    const tpl = createTemplate(flagWs, { name: 'C2 Approved Tpl', pageType: 'service' });
+    const mx = createMatrix(flagWs, {
+      name: 'C2 Approved Matrix',
+      templateId: tpl.id,
+      dimensions: [{ variableName: 'city', values: ['Denver'] }],
+      urlPattern: '/services/{city}',
+      keywordPattern: 'roofing in {city}',
+    });
+    const cellId = mx.cells[0].id;
+    // planned → approved (a legal admin-shortcut edge)
+    updateMatrixCell(flagWs, mx.id, cellId, { status: 'approved' });
+
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${mx.id}/cells/${cellId}/flag`, {
+      comment: 'Client wants a different angle on this approved page',
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+  });
+
+  it('returns 200 when flagging a PUBLISHED cell (C2)', async () => {
+    const tpl = createTemplate(flagWs, { name: 'C2 Published Tpl', pageType: 'service' });
+    const mx = createMatrix(flagWs, {
+      name: 'C2 Published Matrix',
+      templateId: tpl.id,
+      dimensions: [{ variableName: 'city', values: ['Austin'] }],
+      urlPattern: '/services/{city}',
+      keywordPattern: 'hvac in {city}',
+    });
+    const cellId = mx.cells[0].id;
+    // planned → approved → published (each a legal edge)
+    updateMatrixCell(flagWs, mx.id, cellId, { status: 'approved' });
+    updateMatrixCell(flagWs, mx.id, cellId, { status: 'published' });
+
+    const res = await postJson(`/api/public/content-plan/${flagWs}/${mx.id}/cells/${cellId}/flag`, {
+      comment: 'This published page has an error the client noticed',
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 
   it('returns 400 when comment is missing', async () => {

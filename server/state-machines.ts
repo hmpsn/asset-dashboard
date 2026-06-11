@@ -222,6 +222,11 @@ export function getDeliverableTransitions(type: string): Readonly<Record<string,
 // Admin shortcuts included:
 //   planned/keyword_validated/brief_generated → review  (send-samples admin action)
 //   planned/keyword_validated/brief_generated → approved (batch-approve admin action)
+// Client review action (G2/C2): a client may flag ANY client-visible cell for changes.
+// CLIENT_VISIBLE_CELL_STATUSES (review/flagged/approved/published) ALL surface the flag form
+// in the client UI (MatrixProgressView CellPreviewModal), so flagging must be a legal edge from
+// review/approved/published too — not just review. Without approved→flagged / published→flagged
+// the public flag route threw InvalidTransitionError → 500 for an in-spec client action.
 export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
   planned:           ['keyword_validated', 'brief_generated', 'draft', 'review', 'approved'],
   keyword_validated: ['brief_generated', 'draft', 'planned', 'review', 'approved'],
@@ -229,8 +234,8 @@ export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
   draft:             ['review', 'brief_generated'],
   review:            ['flagged', 'approved', 'draft'],
   flagged:           ['review', 'draft', 'approved'],
-  approved:          ['published', 'review'],
-  published:         [], // terminal
+  approved:          ['published', 'review', 'flagged'], // flagged: client flags an approved cell (G2/C2)
+  published:         ['flagged'], // client flags a published cell for changes (G2/C2) — otherwise terminal
 };
 
 // ── Client Request (support tickets) ──

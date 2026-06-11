@@ -374,6 +374,8 @@ describe('ROI pipeline — double-counting prevention', () => {
 
     const cellId = matrix.cells[0]?.id;
     if (cellId) {
+      // planned → approved → published (each a legal MATRIX_CELL transition)
+      updateMatrixCell(wsId, matrix.id, cellId, { status: 'approved' });
       updateMatrixCell(wsId, matrix.id, cellId, { status: 'published' });
     }
 
@@ -407,6 +409,8 @@ describe('ROI pipeline — double-counting prevention', () => {
 
     const cellId = matrix.cells[0]?.id;
     if (cellId) {
+      // planned → approved → published (each a legal MATRIX_CELL transition)
+      updateMatrixCell(wsId, matrix.id, cellId, { status: 'approved' });
       updateMatrixCell(wsId, matrix.id, cellId, { status: 'published' });
     }
 
