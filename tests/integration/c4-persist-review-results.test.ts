@@ -555,5 +555,20 @@ describe('Public boundary — admin-internal fields stripped from client respons
     expect(status).toBe(200);
     expect(body.title).toBe('C4 Test Post');
     expect((body as Record<string, unknown>).aiReview).toBeUndefined();
+
+    // The client-edit PATCH response is the third strip site — pin it too
+    // (same post_review setup; review M2: a mutation removing this strip
+    // previously passed all tests).
+    const editRes = await fetch(`${baseUrl}/api/public/content-posts/${wsId}/${postId}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': signAdminToken() },
+      body: JSON.stringify({ title: 'C4 Client Edited Title' }),
+    });
+    expect(editRes.status).toBe(200);
+    const edited = await editRes.json() as Record<string, unknown>;
+    expect(edited.title).toBe('C4 Client Edited Title');
+    expect(edited.aiReview).toBeUndefined();
+    // The strip is response-only: the stored row keeps the review.
+    expect(getPost(wsId, postId)?.aiReview).toBeDefined();
   });
 });
