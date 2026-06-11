@@ -84,7 +84,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "LIMIT 500 truncates max-budget refreshes and makes panel stats disagree with KCC; backfill loads every snapshot row into memory on the ~512MB host (local-seo.ts:2537); 'Remove' is soft-deactivate that resurrects markets. Retention values = decision D4. Report §3."
+          "notes": "LIMIT 500 truncates max-budget refreshes and makes panel stats disagree with KCC; backfill loads every snapshot row into memory on the ~512MB host (local-seo.ts:2537); 'Remove' is soft-deactivate that resurrects markets. D4 DECIDED: 180d raw + latest-per-(market,keyword) always kept + weekly thinning to 18mo. Report §3."
         },
         {
           "id": "aw2-content-brief-wiring",
@@ -221,7 +221,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5."
+          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5. D4 (schema_snapshots): keep version-history-referenced rows; prune unreferenced after 30d."
         },
         {
           "id": "aw6-wire-or-delete",
