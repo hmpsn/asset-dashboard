@@ -19,7 +19,8 @@ import {
 import { computeKeywordValueScore, computeKeywordValueComponents, keywordValueReasons, type ScoringContext } from './scoring/keyword-value-score.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { createLogger } from './logger.js';
-import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
+import { getPageKeyword, listPageKeywords, listPageKeywordsLite, upsertPageKeyword } from './page-keywords.js';
+import { slugify } from './helpers.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
@@ -3291,6 +3292,30 @@ function applyKeywordCommandCenterActionInternal(
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           pagePath: request.pagePath,
         }, { preferSource: true });
+        // Write the strategy artifact (page_keywords) so ADD_TO_STRATEGY is honest.
+        // Previously, only feedback + tracked_keyword were written — the UI showed "IN_STRATEGY"
+        // but the page_keywords table (the actual strategy artifact) was never updated (phantom).
+        {
+          const strategyPath = request.pagePath ?? `/planned/${slugify(displayKeyword) || 'page'}`;
+          const existingPageKw = getPageKeyword(workspace.id, strategyPath);
+          if (existingPageKw) {
+            const secondarySet = new Set(existingPageKw.secondaryKeywords.map(k => k.toLowerCase()));
+            if (
+              existingPageKw.primaryKeyword.toLowerCase() !== displayKeyword.toLowerCase()
+              && !secondarySet.has(displayKeyword.toLowerCase())
+            ) {
+              existingPageKw.secondaryKeywords = [...existingPageKw.secondaryKeywords, displayKeyword];
+            }
+            upsertPageKeyword(workspace.id, existingPageKw);
+          } else {
+            upsertPageKeyword(workspace.id, {
+              pagePath: strategyPath,
+              pageTitle: request.pagePath ? request.pagePath : displayKeyword,
+              primaryKeyword: displayKeyword,
+              secondaryKeywords: [],
+            });
+          }
+        }
         message = `"${keyword}" was added to the strategy operating loop.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE:
