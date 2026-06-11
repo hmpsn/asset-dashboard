@@ -5,6 +5,8 @@ const h = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   addActivity: vi.fn(),
   broadcastToWorkspace: vi.fn(),
+  addKeywordToPage: vi.fn(),
+  addKeywordToPageInTxn: vi.fn(),
   getPageKeyword: vi.fn(),
   upsertPageKeyword: vi.fn(),
   getConfiguredProvider: vi.fn(),
@@ -27,6 +29,8 @@ vi.mock('../../server/broadcast.js', () => ({
 }));
 
 vi.mock('../../server/page-keywords.js', () => ({
+  addKeywordToPage: h.addKeywordToPage,
+  addKeywordToPageInTxn: h.addKeywordToPageInTxn,
   getPageKeyword: h.getPageKeyword,
   upsertPageKeyword: h.upsertPageKeyword,
 }));
@@ -120,6 +124,14 @@ describe('mcp keyword action tools', () => {
   });
 
   it('add_keyword_to_strategy supports research_handle source and new_page target slugging', async () => {
+    // Set up getPageKeyword to return the newly-created row so the searchIntent patch runs.
+    h.getPageKeyword.mockReturnValueOnce({
+      pagePath: '/planned/ai-seo-2026',
+      pageTitle: 'AI & SEO 2026!!',
+      primaryKeyword: 'best hvac tips',
+      secondaryKeywords: [],
+    });
+
     const researched = await handleKeywordActionTool('research_keywords', {
       workspace_id: 'ws-1',
       terms: ['AI + SEO 2026'],
@@ -135,9 +147,11 @@ describe('mcp keyword action tools', () => {
     });
 
     expect(added.isError).toBeUndefined();
+    // addKeywordToPage (shared helper) is called first for the planned entry.
+    expect(h.addKeywordToPage).toHaveBeenCalledWith('ws-1', '/planned/ai-seo-2026', 'best hvac tips', 'AI & SEO 2026!!');
+    // searchIntent is patched onto the row via upsertPageKeyword after addKeywordToPage.
     expect(h.upsertPageKeyword).toHaveBeenCalledWith('ws-1', expect.objectContaining({
       pagePath: '/planned/ai-seo-2026',
-      primaryKeyword: 'best hvac tips',
       searchIntent: 'commercial',
     }));
     expect(h.broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'strategy:updated', expect.objectContaining({ action: 'mcp_keyword_added' }));
@@ -145,41 +159,26 @@ describe('mcp keyword action tools', () => {
     expect(h.addActivity).toHaveBeenCalledWith('ws-1', 'keyword_added', expect.any(String), expect.any(String), expect.objectContaining({ source: 'mcp-chat' }));
   });
 
-  it('add_keyword_to_strategy updates existing page keyword map with dedupe behavior', async () => {
-    h.getPageKeyword.mockReturnValue({
-      pagePath: '/services/hvac',
-      pageTitle: 'HVAC Services',
-      primaryKeyword: 'hvac services',
-      secondaryKeywords: ['ac repair'],
-    });
-
+  it('add_keyword_to_strategy routes existing_page target through addKeywordToPage helper', async () => {
+    // addKeywordToPage (shared helper) is now responsible for merge-as-secondary and dedupe.
+    // These unit tests verify that the MCP tool calls the shared helper with the correct args.
     const a = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
       term: 'furnace tune up',
       target: { kind: 'existing_page', page_url: 'https://example.com/services/hvac' },
     });
     expect(a.isError).toBeUndefined();
-    expect(h.upsertPageKeyword).toHaveBeenCalledWith('ws-1', expect.objectContaining({
-      pagePath: '/services/hvac',
-      secondaryKeywords: ['ac repair', 'furnace tune up'],
-    }));
+    expect(h.addKeywordToPage).toHaveBeenCalledWith('ws-1', '/services/hvac', 'furnace tune up');
 
-    h.upsertPageKeyword.mockClear();
-    h.getPageKeyword.mockReturnValue({
-      pagePath: '/services/hvac',
-      pageTitle: 'HVAC Services',
-      primaryKeyword: 'hvac services',
-      secondaryKeywords: ['ac repair'],
-    });
+    h.addKeywordToPage.mockClear();
+
     const b = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
       term: 'AC REPAIR',
       target: { kind: 'existing_page', page_url: 'https://example.com/services/hvac' },
     });
     expect(b.isError).toBeUndefined();
-    expect(h.upsertPageKeyword).toHaveBeenCalledWith('ws-1', expect.objectContaining({
-      secondaryKeywords: ['ac repair'],
-    }));
+    expect(h.addKeywordToPage).toHaveBeenCalledWith('ws-1', '/services/hvac', 'AC REPAIR');
   });
 
   it('rejects unresolved terms, invalid handles, and unknown tool names', async () => {
@@ -241,25 +240,23 @@ describe('mcp keyword action tools', () => {
     expect(semrush.isError).toBeUndefined();
     expect(h.getConfiguredProvider).toHaveBeenLastCalledWith('dataforseo');
 
+    // existing_page with root URL → addKeywordToPage called with pagePath '/'
     const rootPath = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
       term: 'furnace tune up',
       target: { kind: 'existing_page', page_url: 'https://example.com' },
     });
     expect(rootPath.isError).toBeUndefined();
-    expect(h.upsertPageKeyword).toHaveBeenLastCalledWith('ws-1', expect.objectContaining({
-      pagePath: '/',
-    }));
+    expect(h.addKeywordToPage).toHaveBeenLastCalledWith('ws-1', '/', 'furnace tune up');
 
+    // new_page with all-punctuation topic → slug falls back to 'page'
     const slugFallback = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
       term: 'furnace tune up',
       target: { kind: 'new_page', topic: '!!!', intent: 'informational' },
     });
     expect(slugFallback.isError).toBeUndefined();
-    expect(h.upsertPageKeyword).toHaveBeenLastCalledWith('ws-1', expect.objectContaining({
-      pagePath: '/planned/page',
-    }));
+    expect(h.addKeywordToPage).toHaveBeenLastCalledWith('ws-1', '/planned/page', 'furnace tune up', '!!!');
   });
 
   it('covers URL-parse fallback and remaining workspace/provider branches', async () => {

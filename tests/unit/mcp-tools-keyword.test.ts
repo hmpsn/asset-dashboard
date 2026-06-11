@@ -12,6 +12,8 @@ vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: vi.fn(),
 }));
 vi.mock('../../server/page-keywords.js', () => ({
+  addKeywordToPage: vi.fn(),
+  addKeywordToPageInTxn: vi.fn(),
   deletePageKeyword: vi.fn(),
   getPageKeyword: vi.fn(),
   listPageKeywords: vi.fn(),
@@ -33,6 +35,7 @@ vi.mock('../../server/activity-log.js', () => ({
 import { getConfiguredProvider } from '../../server/seo-data-provider.js';
 import { getWorkspace } from '../../server/workspaces.js';
 import {
+  addKeywordToPage,
   deletePageKeyword,
   getPageKeyword,
   listPageKeywords,
@@ -144,13 +147,6 @@ describe('mcp keyword action tools', () => {
   });
 
   it('add_keyword_to_strategy upserts + broadcasts + logs activity', async () => {
-    (getPageKeyword as ReturnType<typeof vi.fn>).mockReturnValue({
-      pagePath: '/blog/existing',
-      pageTitle: 'Existing',
-      primaryKeyword: 'old',
-      secondaryKeywords: ['legacy'],
-    });
-
     const research = await handleKeywordActionTool('research_keywords', {
       workspace_id: 'ws-1',
       terms: ['new keyword'],
@@ -165,7 +161,8 @@ describe('mcp keyword action tools', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(upsertPageKeyword).toHaveBeenCalledOnce();
+    // addKeywordToPage (shared helper) is called for existing_page targets.
+    expect(addKeywordToPage).toHaveBeenCalledOnce();
     expect(broadcastToWorkspace).toHaveBeenCalledWith(
       'ws-1',
       'strategy:updated',

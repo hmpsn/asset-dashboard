@@ -154,6 +154,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
     },
+    // M5: surface failures to the admin rather than silently swallowing them.
+    onError: () => {
+      setError('Failed to add keyword to strategy. Please try again.');
+    },
   });
 
   // Initialize SEO provider availability from React Query hook
@@ -317,17 +321,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const approvedFeedback = keywordFeedbackRows.filter(row => row.status === 'approved');
 
   // Nudge: surface when client feedback is newer than the last strategy generation.
-  // Covers both requested (unreviewed) and declined (suppress in next regen) rows.
-  const latestFeedbackAt = keywordFeedbackRows.reduce<string | null>((max, r) => {
-    const ts = r.updated_at ?? r.created_at;
-    if (!ts) return max;
-    return max && max > ts ? max : ts;
-  }, null);
-  const feedbackNewerThanStrategy = isRealStrategy
-    && strategy?.generatedAt != null
-    && latestFeedbackAt != null
-    && latestFeedbackAt > strategy.generatedAt
-    && (requestedFeedback.length > 0 || declinedFeedback.length > 0);
+  // M2: Limit to requested/declined rows only — approved rows (from ADD_TO_STRATEGY)
+  // must not trigger the nudge because they've already been acted on by the admin.
+  const feedbackNewerThanStrategy = isRealStrategy && strategy?.generatedAt != null
+    ? keywordFeedbackRows.some(row => {
+        if (row.status !== 'requested' && row.status !== 'declined') return false;
+        const ts = row.updated_at ?? row.created_at;
+        return ts != null && new Date(ts) > new Date(strategy.generatedAt!);
+      })
+    : false;
 
   if (loading) {
     return <LoadingState message="Loading keyword strategy..." />;

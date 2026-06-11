@@ -19,7 +19,7 @@ import {
 import { computeKeywordValueScore, computeKeywordValueComponents, keywordValueReasons, type ScoringContext } from './scoring/keyword-value-score.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { createLogger } from './logger.js';
-import { getPageKeyword, listPageKeywords, listPageKeywordsLite, upsertPageKeyword } from './page-keywords.js';
+import { addKeywordToPageInTxn, deletePageKeyword, listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { slugify } from './helpers.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
@@ -3282,6 +3282,8 @@ function applyKeywordCommandCenterActionInternal(
   const now = new Date().toISOString();
   let trackedKeywords: TrackedKeyword[] | undefined;
   let message = '';
+  // M3/I1: compute plannedPath before the transaction so it's available for DECLINE cleanup.
+  const plannedPath = `/planned/${slugify(displayKeyword) || 'keyword'}`;
 
   const run = db.transaction(() => {
     switch (request.action) {
@@ -3292,29 +3294,16 @@ function applyKeywordCommandCenterActionInternal(
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           pagePath: request.pagePath,
         }, { preferSource: true });
-        // Write the strategy artifact (page_keywords) so ADD_TO_STRATEGY is honest.
-        // Previously, only feedback + tracked_keyword were written — the UI showed "IN_STRATEGY"
-        // but the page_keywords table (the actual strategy artifact) was never updated (phantom).
+        // M6: write the page_keywords artifact INSIDE the same transaction as the feedback
+        // write — if either fails, the whole transaction rolls back (no phantom approved rows).
         {
-          const strategyPath = request.pagePath ?? `/planned/${slugify(displayKeyword) || 'page'}`;
-          const existingPageKw = getPageKeyword(workspace.id, strategyPath);
-          if (existingPageKw) {
-            const secondarySet = new Set(existingPageKw.secondaryKeywords.map(k => k.toLowerCase()));
-            if (
-              existingPageKw.primaryKeyword.toLowerCase() !== displayKeyword.toLowerCase()
-              && !secondarySet.has(displayKeyword.toLowerCase())
-            ) {
-              existingPageKw.secondaryKeywords = [...existingPageKw.secondaryKeywords, displayKeyword];
-            }
-            upsertPageKeyword(workspace.id, existingPageKw);
-          } else {
-            upsertPageKeyword(workspace.id, {
-              pagePath: strategyPath,
-              pageTitle: request.pagePath ? request.pagePath : displayKeyword,
-              primaryKeyword: displayKeyword,
-              secondaryKeywords: [],
-            });
-          }
+          const pagePath = request.pagePath?.trim()
+            ? request.pagePath.trim()
+            : plannedPath;
+          // titleOverride: for planned pages use the displayKeyword (human-readable); for
+          // explicit paths the helper derives a clean title from the slug.
+          const titleOverride = !request.pagePath?.trim() ? displayKeyword : undefined;
+          addKeywordToPageInTxn(workspace.id, pagePath, displayKeyword, titleOverride);
         }
         message = `"${keyword}" was added to the strategy operating loop.`;
         break;
@@ -3375,6 +3364,12 @@ function applyKeywordCommandCenterActionInternal(
     }
   });
   run();
+
+  // I1: DECLINE removes the /planned/ artifact so it doesn't persist after the keyword is
+  // rejected. Run outside the transaction (deletePageKeyword uses its own run.immediate()).
+  if (request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE) {
+    deletePageKeyword(workspace.id, plannedPath);
+  }
 
   invalidateIntelligenceCache(workspace.id);
   const payload = { keyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
