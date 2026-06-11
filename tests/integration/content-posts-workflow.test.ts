@@ -392,8 +392,8 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
       .filter(j => j.type === BACKGROUND_JOB_TYPES.CONTENT_PUBLISH)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 2);
-    expect(publishJobs).toHaveLength(2);
-    expect(publishJobs.every(j => j.status === 'done')).toBe(true);
+    expect(publishJobs.length).toBe(2);
+    expect(publishJobs.every(j => j.status === 'done')).toBe(true); // every-ok: length asserted to be 2 on the previous line
   });
 
   it('auto-publish job success stamps the post, broadcasts CONTENT_PUBLISHED, and logs activity', async () => {
