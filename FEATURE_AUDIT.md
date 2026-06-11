@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **481 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **483 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 483. Server-side grounding for client chat — kill the verbatim-context prompt-injection / token-sink surface (E4, audit #17)
+
+**What it does:** Hardens the public client chat endpoint (`POST /api/public/search-chat/:workspaceId`). Previously the endpoint accepted `context: z.record(z.unknown())` and serialized it VERBATIM into the system prompt (`JSON.stringify(context)`), so any client could inject arbitrary JSON below the guardrails (prompt injection) and there was no size cap (unbounded token sink). Now: (1) the opaque `context` field is removed from the Zod schema — Zod's default strip means the existing frontend keeps working but its `context` payload never reaches the prompt; (2) client input is limited to enum/size-capped HINTS only (`currentTab` from a fixed `ClientTab`-mirrored union, `days` bounded 1–366, plus the already-capped `question`/`sessionId`/`betaMode`); (3) the model's view of workspace data is now SERVER-ASSEMBLED — the data-inventory flags and the grounding block are derived from intelligence slices (`buildSeoPromptContext` with the client-safe slice set `seoContext`/`insights`/`siteHealth`/`learnings`) plus server-owned reads (search/GA4 headline overviews re-fetched server-side, audit-traffic, content plan, approval/request counts read from the DB — never client-claimed). The grounding deliberately EXCLUDES the agency-only `clientSignals` slice (churn risk, intent signals, approval rate) per the D1/EMV precedent, and the standard formatter path already omits admin-only fields like `emvPerWeek`. Slice failure degrades to minimal grounding and still returns 200 (FM-2), never 500. Response shape `{ answer, sessionId, detectedIntent }` is unchanged for the frontend. Reuses the existing `client-search-chat` named operation in the AI operation registry (prose output — no new registry entry needed).
+
+**Agency value:** Closes a real security hole on a public, client-facing endpoint — clients can no longer steer the advisor with injected instructions or poison its answers with fabricated metrics, and can no longer blow up token spend by posting megabytes of "context." The agency, not the browser, now decides exactly what the model sees, scoped to the workspace.
+
+**Client value:** The advisor's answers are grounded in authoritative, server-verified workspace data rather than whatever the browser happened to send, so its numbers are trustworthy and consistent. No behavior change in the chat UI.
+
+**Mutual:** A safer, more predictable advisor that can't be manipulated or made to leak agency-only intelligence, with answer quality preserved via real slice-derived grounding.
+
+**Files:** `server/routes/public-analytics.ts` (`chatSchema` hardened, `CLIENT_CHAT_TAB_HINTS`, server-side grounding + headline-overview re-fetch + approval/request reads, verbatim-context removal). Tests: `tests/integration/client-chat-grounding.test.ts` (injection-never-in-prompt via mocked `callAI` capture, oversized-context drop, client-safe slice set, enum-hint accept + invalid-enum 400, FM-2 minimal-grounding 200, response-shape preservation, 401-without-auth).
 
 ---
 
