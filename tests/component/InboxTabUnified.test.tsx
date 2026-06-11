@@ -8,7 +8,7 @@
  *     (Approve / Request changes / Decline), and the verbs call the respond mutation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable';
 
 // ── Mocks ──
@@ -157,6 +157,23 @@ function makeReadyToPublishDeliverable(): ClientDeliverable {
   });
 }
 
+function makeInlineApprovalDeliverable(): ClientDeliverable {
+  return makeDeliverable({
+    id: 'cd_inline',
+    kind: 'batch',
+    type: 'seo_edit',
+    title: 'Homepage SEO updates',
+    summary: '1 change waiting on your approval',
+    items: [
+      makeApplyableItem({
+        id: 'cdi_inline',
+        deliverableId: 'cd_inline',
+        status: 'pending',
+      }),
+    ],
+  });
+}
+
 /** A work-order (kind:'order') deliverable for the R5 read-only "Work in progress" track lane. */
 function makeWorkOrderDeliverable(overrides: Partial<ClientDeliverable> = {}): ClientDeliverable {
   return makeDeliverable({
@@ -268,7 +285,7 @@ describe('InboxTab unified inbox', () => {
     expect(within(conversations).getByText('We are on it.')).toBeInTheDocument();
   });
 
-  it('Approve calls the respond mutation with decision=approved', async () => {
+  it('Approve calls the respond mutation with decision=approved and shows the next-step toast', async () => {
     mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       deliverables: [makeDeliverable()],
@@ -278,9 +295,42 @@ describe('InboxTab unified inbox', () => {
     render(<InboxTab {...baseProps} />);
     fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
 
-    expect(mockMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ deliverableId: 'cd_abc', decision: 'approved' }),
-    );
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ deliverableId: 'cd_abc', decision: 'approved' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(baseProps.setToast).toHaveBeenCalledWith({
+        message: "Approved. We're publishing this. Track it in your inbox.",
+        type: 'success',
+      });
+    });
+  });
+
+  it('inline approval success also shows the next-step toast', async () => {
+    mockUseFeatureFlag.mockReturnValue(false);
+    mockUseUnifiedInbox.mockReturnValue({
+      deliverables: [makeInlineApprovalDeliverable()],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Looks good — implement 1 →' }));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ deliverableId: 'cd_inline', decision: 'approved' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(baseProps.setToast).toHaveBeenCalledWith({
+        message: "Approved. We're publishing this. Track it in your inbox.",
+        type: 'success',
+      });
+    });
   });
 
   it('empty list shows the all-caught-up state', () => {

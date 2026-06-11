@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **489 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **490 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 490. Client Dashboard QW2 PR3 — Workflow Confirmations
+
+**What it does:** Adds explicit feedback-loop confirmation to two client dashboard workflows. Unified inbox approvals now show a next-step toast after a successful approve, including inline approval cards. Content Plan cell flagging now optimistically marks the visible cell as flagged with the submitted note, confirms success with a toast, reconciles from the server, and rolls back the visible state if the API rejects.
+
+**Agency value:** Reduces follow-up questions after clients approve or flag work because the portal immediately confirms what happened and where the work goes next.
+
+**Client value:** Clients get immediate proof that their approval or feedback was received instead of watching the item disappear or remain visually unchanged.
+
+**Mutual:** Makes client decision workflows feel acknowledged and trustworthy without adding new routes, AI calls, or feature flags.
+
+**Files:** `src/components/client/inbox/UnifiedInbox.tsx`, `src/components/client/ContentPlanTab.tsx`, `src/components/client/MatrixProgressView.tsx`. Tests: `tests/component/InboxTabUnified.test.tsx`, `tests/component/client/ContentPlanTab.test.tsx`.
 
 ---
 
