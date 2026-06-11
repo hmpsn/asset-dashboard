@@ -9,7 +9,12 @@ import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js'
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
 import { replaceAllSiteKeywordMetrics } from './site-keyword-metrics.js';
 import db from './db/index.js';
-import { recordAction, getActionBySource } from './outcome-tracking.js';
+import {
+  recordAction,
+  getActionByWorkspaceAndSource,
+  STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,
+  strategyPageKeywordSourceId,
+} from './outcome-tracking.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
@@ -132,9 +137,14 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     const prevTopicClustersForHistory = listTopicClusters(ws.id);
     const prevCannibalizationForHistory = listCannibalizationIssues(ws.id);
 
+    // Entries actually persisted in this run — the candidate set for A3 per-keyword
+    // outcome actions below (full mode: the whole stamped map; incremental mode: only
+    // the pages re-analyzed/updated in this run).
+    let persistedEntries: PageKeywordMap[];
     if (strategyMode === 'full') {
       const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertAndCleanPageKeywords(ws.id, stampedMap);
+      persistedEntries = stampedMap;
     } else {
       // Only update pages actually re-analyzed in this incremental run.
       const analyzedPaths = new Set(pagesToAnalyze.map(p => normalizePageUrl(p.path)));
@@ -145,6 +155,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
         .filter((pm) => pathsToUpdate.has(normalizePageUrl(pm.pagePath)))
         .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
+      persistedEntries = analyzedMappings;
       for (const pagePath of explicitlyRemovedPaths) {
         db.prepare('DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id
         db.prepare('DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id
@@ -181,7 +192,11 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
 
     updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
-    if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
+    // A3 (audit #14): every regeneration is a distinct trackable event — record a
+    // strategy-level action unconditionally. The old `if (!getActionBySource(...))`
+    // once-ever guard suppressed every regen after the first, hiding all subsequent
+    // strategy work from outcome tracking forever.
+    recordAction({ // recordAction-ok: ws.id is workspaceId
       workspaceId: ws.id,
       actionType: 'strategy_keyword_added',
       sourceType: 'strategy',
@@ -191,6 +206,50 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       baselineSnapshot: { captured_at: now },
       attribution: 'platform_executed',
     });
+
+    // A3 (audit #14): per-keyword outcome actions for net-new pageMap primaries.
+    // Each carries a real pageUrl + targetKeyword so the measurement cron can score
+    // it later. Two gates keep this idempotent:
+    //   1. Net-new diff — the (page, primary) pair was not in the pre-write
+    //      page_keywords snapshot, so unchanged primaries on regen record nothing.
+    //   2. DB-backed key — no existing tracked action with the deterministic
+    //      strategyPageKeywordSourceId(), so a pair removed and later re-added (or a
+    //      future Hub-side writer using the same key shape) never duplicates.
+    const previousPrimaryPairs = new Set(
+      prevPageMapForHistory
+        .filter((pm) => pm.pagePath && pm.primaryKeyword?.trim())
+        .map((pm) => strategyPageKeywordSourceId(pm.pagePath, pm.primaryKeyword)),
+    );
+    for (const pm of persistedEntries) {
+      if (!pm.pagePath || !pm.primaryKeyword?.trim()) continue;
+      const normalizedPath = normalizePageUrl(pm.pagePath);
+      // B2's planned-page placeholders (`/planned/<slug>`) are not live URLs — there is
+      // nothing to measure against GSC, so they only become scoreable once the page
+      // ships under a real path (which then registers as a net-new pair).
+      if (normalizedPath.startsWith('/planned/')) continue;
+      const sourceId = strategyPageKeywordSourceId(pm.pagePath, pm.primaryKeyword);
+      if (previousPrimaryPairs.has(sourceId)) continue; // unchanged primary — not net-new
+      if (getActionByWorkspaceAndSource(ws.id, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, sourceId)) continue; // already tracked
+      const hasBaselineMetrics = typeof pm.currentPosition === 'number'
+        || typeof pm.clicks === 'number'
+        || typeof pm.impressions === 'number';
+      recordAction({ // recordAction-ok: ws.id is workspaceId
+        workspaceId: ws.id,
+        actionType: 'strategy_keyword_added',
+        sourceType: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,
+        sourceId,
+        pageUrl: normalizedPath,
+        targetKeyword: pm.primaryKeyword.trim(),
+        baselineSnapshot: {
+          captured_at: now,
+          ...(typeof pm.currentPosition === 'number' ? { position: pm.currentPosition } : {}),
+          ...(typeof pm.clicks === 'number' ? { clicks: pm.clicks } : {}),
+          ...(typeof pm.impressions === 'number' ? { impressions: pm.impressions } : {}),
+        },
+        baselineConfidence: hasBaselineMetrics ? 'exact' : 'estimated',
+        attribution: 'platform_executed',
+      });
+    }
   });
   // Run as BEGIN IMMEDIATE (not better-sqlite3's default deferred): the transaction body READS
   // table-backed prior state (listPageKeywords/listContentGaps/…) BEFORE it writes, so under a
