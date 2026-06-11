@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
-import { get, postForm } from './api/client';
+import { postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { type Page, adminPath, clientPath, GLOBAL_TABS, isClientInboxAlias } from './routes';
 import { StatusBar } from './components/StatusBar';
@@ -10,7 +10,7 @@ import { useAuth } from './hooks/useAuth';
 import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';
 import { useWsInvalidation } from './hooks/useWsInvalidation';
 import { ADMIN_EVENTS } from './lib/wsEvents';
-import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY } from './hooks/admin';
+import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY, useWorkspaceBadges } from './hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
 import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
@@ -254,7 +254,6 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
   const [searchParams] = useSearchParams();
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
-  const [pendingContentRequests, setPendingContentRequests] = useState(0);
   const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions' | 'deliverables'>('deliverables');
   // Keyword Hub (Wave 4): when ON, the `seo-keywords` tab renders the unified Hub
   // instead of the legacy Keyword Command Center. Dark (OFF) until P5 cutover.
@@ -281,18 +280,9 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   // Focus mode additionally hides the sidebar, but height containment is needed in both modes.
   const isFullHeightLayout = tab === 'rewrite' && !!selected;
 
-  // Fetch badge counts via dedicated lightweight endpoint
-  useEffect(() => {
-    if (!selected) return;
-    let cancelled = false;
-    get<{ pendingRequests: number; hasContent: boolean }>(`/api/workspace-badges/${selected.id}`)
-      .then(badges => {
-        if (cancelled) return;
-        setPendingContentRequests(badges.pendingRequests);
-      })
-      .catch((err) => { console.error('App operation failed:', err); });
-    return () => { cancelled = true; };
-  }, [selected]);
+  // Badge counts via React Query — invalidated by CONTENT_REQUEST_* WS events in useWsInvalidation.
+  const { data: badgeData } = useWorkspaceBadges(selected?.id);
+  const pendingContentRequests = badgeData?.pendingRequests ?? 0;
 
   // Keyboard shortcuts (⌘1-5 for tabs, ⌘, for settings)
   useEffect(() => {
@@ -445,8 +435,8 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} businessProfile={selected.businessProfile} intelligenceProfile={selected.intelligenceProfile} />;
-    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
-    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} fixContext={fixContext} clearFixContext={clearFixContext} />;
+    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;

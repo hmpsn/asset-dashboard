@@ -4,6 +4,7 @@ export { useAdminBriefsList, useAdminRequestsList, useAdminBriefTemplateCrossref
 export { useAdminPostsList, useAdminPost, useAdminPostVersions, usePublishTarget, useSendPostToClient } from './useAdminPosts';
 export { useWorkspaceHomeData } from './useWorkspaceHome';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';
+export { useWorkspaceBadges } from './useWorkspaceBadges';
 export { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule, useSchemaSnapshot, useWebflowPages } from './useAdminSeo';
 export { useWebflowAssets, useAssetAudit, useCmsImages } from './useAdminAssets';
 export { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY } from './useWorkspaces';

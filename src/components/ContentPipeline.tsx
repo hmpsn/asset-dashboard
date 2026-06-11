@@ -21,7 +21,6 @@ const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide'
 
 interface Props {
   workspaceId: string;
-  onRequestCountChange?: (count: number) => void;
   fixContext?: FixContext | null;
   clearFixContext?: () => void;
 }
@@ -44,7 +43,7 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
-export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
+export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Props) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
@@ -255,7 +254,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         </Suspense>
       )}
       {activeTab === 'briefs' && (
-        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} clearFixContext={clearFixContext} />
+        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} fixContext={fixContext} clearFixContext={clearFixContext} />
       )}
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />

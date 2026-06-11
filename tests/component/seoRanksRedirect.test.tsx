@@ -72,6 +72,7 @@ vi.mock('../../src/hooks/admin', () => ({
   useUnlinkSite: () => ({ mutateAsync: vi.fn() }),
   useHealthCheck: () => ({ data: { hasOpenAIKey: false, hasWebflowToken: true }, isSuccess: true }),
   useQueue: () => ({ data: [] }),
+  useWorkspaceBadges: () => ({ data: { pendingRequests: 0, hasContent: false } }),
   WORKSPACES_KEY: ['admin-workspaces'],
   QUEUE_KEY: ['admin-queue'],
 }));

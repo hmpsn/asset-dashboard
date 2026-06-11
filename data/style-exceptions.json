@@ -1,5 +1,24 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-15",
-  "exceptions": []
+  "updatedAt": "2026-06-11",
+  "exceptions": [
+    {
+      "id": "schema-suggester-raw-buttons-w1.5",
+      "rule": "raw-button-outside-primitives",
+      "file": "src/components/SchemaSuggester.tsx",
+      "reason": "Pre-existing raw buttons introduced by W1.5 agent (schema-silent-failures fix); W1.5 owns this file and must migrate these to Button/IconButton in its PR.",
+      "owner": "W1.5/schema-silent-failures",
+      "expiresOn": "2026-07-11",
+      "createdAt": "2026-06-11"
+    },
+    {
+      "id": "schema-version-history-raw-buttons-w1.5",
+      "rule": "raw-button-outside-primitives",
+      "file": "src/components/schema/SchemaVersionHistory.tsx",
+      "reason": "Pre-existing raw button introduced by W1.5 agent (schema-silent-failures fix); W1.5 owns this file and must migrate to Button/IconButton in its PR.",
+      "owner": "W1.5/schema-silent-failures",
+      "expiresOn": "2026-07-11",
+      "createdAt": "2026-06-11"
+    }
+  ]
 }

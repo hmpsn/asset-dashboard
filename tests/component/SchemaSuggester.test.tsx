@@ -61,6 +61,8 @@ vi.mock('../../src/components/schema/useSchemaSuggesterPublishingWorkflow', () =
     setApprovalRefreshKey: vi.fn(),
     sendingPage: new Set(),
     sentPages: new Set(),
+    sendPageErrors: {},
+    setSendToClientError: vi.fn(),
     retractingPages: new Set(),
     retractedPages: new Set(),
     bulkPublishing: false,
