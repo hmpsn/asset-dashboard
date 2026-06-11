@@ -25,9 +25,21 @@ import {
 } from '../workspace-mutation-helper.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { InvalidTransitionError } from '../state-machines.js';
 
 const log = createLogger('routes:content-matrices');
 const router = Router();
+
+/**
+ * Map an illegal status transition (thrown by updateMatrix / updateMatrixCell via the cell state
+ * machine) to a 409 with the machine's own message. Returning null defers to the default handling.
+ */
+function mapTransitionError(err: unknown): { status: number; error: string } | null {
+  if (err instanceof InvalidTransitionError) {
+    return { status: 409, error: err.message };
+  }
+  return null;
+}
 
 function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
   invalidateContentPipelineIntelligence(workspaceId);
@@ -103,6 +115,7 @@ router.put('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAcces
     const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
       defaultErrorMessage: 'Failed to update matrix',
+      mapError: mapTransitionError,
       mutate: ({ workspaceId }) => {
         const next = updateMatrix(workspaceId, req.params.matrixId, req.body);
         if (!next) throw mutationError(404, 'Matrix not found');
@@ -137,6 +150,7 @@ router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requi
     const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
       defaultErrorMessage: 'Failed to update matrix cell',
+      mapError: mapTransitionError,
       mutate: ({ workspaceId }) => {
         const next = updateMatrixCell(
           workspaceId,

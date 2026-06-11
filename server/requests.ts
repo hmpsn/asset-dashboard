@@ -10,6 +10,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getUploadRoot } from './data-dir.js';
 import { sanitizePlainText } from './html-sanitize.js';
+import { validateTransition, REQUEST_TRANSITIONS } from './state-machines.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 
@@ -158,6 +159,14 @@ export function updateRequest(workspaceId: string, id: string, updates: Partial<
     if (v !== undefined) cleanUpdates[k] = v;
   }
   const merged = { ...existing, ...cleanUpdates, updatedAt: new Date().toISOString() };
+
+  // Guard status transitions — illegal moves throw InvalidTransitionError, which the PATCH
+  // /api/requests/:id route maps to a 409 with the machine's message (M1). Throwing (rather
+  // than returning null) keeps the 404 path reserved for genuine not-found, so the client can
+  // distinguish "no such request" from "that status change isn't allowed".
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    validateTransition('request', REQUEST_TRANSITIONS, existing.status, updates.status);
+  }
 
   stmts().update.run({
     id: merged.id,

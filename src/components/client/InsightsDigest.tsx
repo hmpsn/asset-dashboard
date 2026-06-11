@@ -382,7 +382,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   page_health: Activity,
   ranking_opportunity: Target,
   cannibalization: Layers,
-  keyword_cluster: Sparkles,
+  keyword_cluster: Layers, // grouped keywords — distinct from the Sparkles fallback (M4)
   competitor_gap: Users,
   conversion_attribution: Zap,
   serp_opportunity: Globe,
@@ -429,6 +429,8 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   emerging_keyword: { label: 'View strategy', tab: 'strategy' },
   freshness_alert: { label: 'View strategy', tab: 'strategy' },
   lost_visibility: { label: 'View search data', tab: 'performance' },
+  audit_finding: { label: 'View site health', tab: 'health' },
+  milestone_attribution: { label: 'View performance', tab: 'performance' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
