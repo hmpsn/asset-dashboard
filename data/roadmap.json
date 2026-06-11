@@ -1,6 +1,350 @@
 {
   "sprints": [
     {
+      "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
+      "name": "🩹 Admin Surfaces W1 — Stop the Silent Failures",
+      "hours": "~18-26h",
+      "rationale": "Wave 1 of the 2026-06-11 admin surface audit. Every item is a fetch/mutation failure currently rendering as success or an empty state — the audit's #1 defect class. Six parallel lanes, exclusive file ownership, all S-effort.",
+      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 1. Per-lane FM-2 error-path test required. All findings adversarially verified (0/187 refuted).",
+      "items": [
+        {
+          "id": "aw1-strategy-error-channels",
+          "title": "Strategy: stop swallowing fetch errors + decouple add-to-strategy errors from the credit-burning generation retry",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "useKeywordStrategy.ts:44 `.catch(() => null)` renders 500s as the 'No keyword strategy yet' empty state; add-to-strategy failures share the generation ErrorState whose Try Again launches a full regeneration. Also fix trackKeyword swallowing all failures as duplicates. Report §1."
+        },
+        {
+          "id": "aw1-local-seo-panel-errorstate",
+          "title": "Local SEO: ErrorState before the panel's null return (3 mounts) + drawer edit-wipe guard + in-view save errors",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "LocalSeoVisibilityPanel.tsx:288 silently vanishes on load error on all three mount surfaces; setup drawer destroys unsaved edits when WS invalidation lands mid-session; save/validation errors render off-screen. Report §3."
+        },
+        {
+          "id": "aw1-editor-silent-save",
+          "title": "Content: editor stops claiming 'Saved' after failed saves + un-swallow ContentManager/PostEditor mutation errors",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Rethrow in PostEditor.saveField + add 'error' SaveStatus to useAutoSave; publish/approve/delete/score failures currently look like success; ContentManager/ContentCalendar show misleading empty states on query failure. Report §5."
+        },
+        {
+          "id": "aw1-kcc-ws-wiring",
+          "title": "KCC: copy Hub's wsHandlers block — production surface has zero useWorkspaceEvents wiring",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Server triple-broadcasts on every mutation; KCC never invalidates → 2-5 min stale data on external changes. Data Flow Rule 2 violation on the live surface. Report §2."
+        },
+        {
+          "id": "aw1-schema-silent-failures",
+          "title": "Schema: un-silence send-to-client/save-as-template/page-type/rollback failures + scoped single-page error UI",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Four mutation paths fail completely silently; a single-page generation failure replaces the entire results view with a full-screen error. Report §4."
+        },
+        {
+          "id": "aw1-shell-palette-badge",
+          "title": "Admin shell: palette 'Run Audit' actually runs an audit + pendingContentRequests badge onto React Query/WS",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "CommandPalette.tsx:174-180 'Run Audit' silently enables a schedule instead; 'Scan for Anomalies' fires globally while presented workspace-scoped; App.tsx:285-295 badge is a raw fetch that goes stale. Report §6."
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",
+      "name": "🔒 Admin Surfaces W2 — Data Integrity & Protection",
+      "hours": "~24-34h",
+      "rationale": "Wave 2: silent data loss, a real server-side protection bypass, unpersisted state, and unbounded storage. Five parallel lanes.",
+      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 2. Read-path integration tests mandatory (not admin-GET-only). W2.4 retention values blocked on owner decision D4.",
+      "items": [
+        {
+          "id": "aw2-strategy-sitekeywordmetrics",
+          "title": "Strategy: thread assembled.siteKeywordMetrics into buildKeywordStrategyUxPayload + broadcast/activity on POST /api/seo/competitors + fix dead entity-resolution pageMap read",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "keyword-strategy-ux.ts:458 reads siteKeywordMetrics from the blob persistence strips (keyword-strategy-persistence.ts:108-113) — volume/difficulty evidence silently lost on admin, diff, and client payloads. Report §1."
+        },
+        {
+          "id": "aw2-hub-protection-holes",
+          "title": "Keyword Hub: fix gap-approved protection bypass (findTracked vs stripUndefinedKeys, 409 + test) + ConfirmDialog on drawer force-bypass",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "findTracked reads through stripUndefinedKeys which deletes sourceGapKey/strategyOwned → unforced retire/decline returns 200 today for any API/MCP caller; Hub drawer force-bypasses protection in one click with no confirm. Report §2."
+        },
+        {
+          "id": "aw2-schema-persistence",
+          "title": "Schema: persist single-page generation to snapshot + broadcast; seed published state from lastPublishedAt; guard stale manual edits",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "webflow-schema.ts:378-392 single-page output reverts on reload and is clobbered by snapshot refetches; published Set is session-only; stale manual JSON silently overrides regenerated schema. Prerequisite for the W3 CMS unlock. Report §4."
+        },
+        {
+          "id": "aw2-local-seo-storage",
+          "title": "Local SEO: GROUP BY MAX(captured_at) replaces both LIMIT 500 callers; stream backfill; retention policy; honest Remove semantics",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "LIMIT 500 truncates max-budget refreshes and makes panel stats disagree with KCC; backfill loads every snapshot row into memory on the ~512MB host (local-seo.ts:2537); 'Remove' is soft-deactivate that resurrects markets. Retention values = decision D4. Report §3."
+        },
+        {
+          "id": "aw2-content-brief-wiring",
+          "title": "Content: brief job dispatcher stops dropping fixContext targetPageId/Slug; dedupe repeat Send-to-Client; fix regenerateBrief orphan accumulation",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "fixContext page targeting silently dropped server-side; repeated brief sends create duplicate client requests; regenerateBrief accumulates orphaned sibling briefs. Report §5."
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",
+      "name": "🔗 Admin Surfaces W3 — Unlocks & Broken Handoffs",
+      "hours": "~22-32h",
+      "rationale": "Wave 3: finished pipelines gated off and cross-surface handoffs that drop their payload. The integration intent exists everywhere; the receiving half keeps failing.",
+      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 3. 3.2 depends on aw2-schema-persistence. 3.4 is sequential (shared nav files) and adds a pr-check rule. Every repaired link gets a ?tab= two-halves contract test.",
+      "items": [
+        {
+          "id": "aw3-ai-suggested-keyword",
+          "title": "Pipeline: AI Suggested 'Create Brief' carries the suggestion's keyword via fixContext prefill + refresh_suggestion button",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "ContentPipeline.tsx:110-112 discards both args — the flagship insight→action flow is a dead end; refresh_suggestion signals get no button at all. Report §5."
+        },
+        {
+          "id": "aw3-cms-publish-unlock",
+          "title": "Schema: unlock CMS-field publishing — add cmsDeliveryStatus to frontend type, show Publish for 'ready', route retract/rollback through CMS mode",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Complete server pipeline unreachable behind blanket cms- gate at SchemaPageCard.tsx:308. Unlocks hundreds of one-click CMS publishes. Depends on aw2-schema-persistence. Report §4."
+        },
+        {
+          "id": "aw3-deeplink-repair-batch",
+          "title": "Deep-link repair: PI→Schema pageSlug→pageId; WorkspaceHome's 3 broken senders; Strategy KeywordGaps→Hub; RepeatCompetitorList one-click Track; Decay→pipeline/PI handoffs",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Each is a sender/receiver contract failure; receivers (fixContext, useRankTrackingAddKeyword, review_page) already exist. Report §7 Missing seams."
+        },
+        {
+          "id": "aw3-nav-registry",
+          "title": "Single nav metadata registry for Sidebar + CommandPalette + Breadcrumbs + drop needsSite from requests + pr-check rule",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Nav metadata triplicated and already drifted (diagnostics missing from 2 of 3, stale palette entries, disagreeing needsSite gating); requests gating cuts off client communication exactly during onboarding. Sequential after aw3-deeplink-repair-batch. Report §6/§8."
+        },
+        {
+          "id": "aw3-journey-visibility",
+          "title": "Journey: resolve TaskPanel-vs-NotificationBell (delete dead TaskPanel, fix CLAUDE.md ref, verify cross-tab job visibility) + live audit progress/cancel + real Webflow-link path from onboarding",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "10-15 min jobs go dark on navigation; audit run is a static spinner (SeoAudit.tsx:491-499); both 'Link Webflow site' onboarding paths land on read-only pages. Report §8."
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w5-close-the-loop-2026-06-11",
+      "name": "♻️ Admin Surfaces W5 — Close the Loop (read-side)",
+      "hours": "~16-24h",
+      "rationale": "Wave 5: the platform already writes outcome baselines, AI review verdicts, and a visibility time series — nothing reads them back. Read-side work only; the write halves are done.",
+      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 5. Wave 4 (Keyword Hub cutover) is tracked on the existing simp-feature-keyword-hub-kcc-rank-consolidation item — see its updated notes for the audit's precondition + blocker list.",
+      "items": [
+        {
+          "id": "aw5-outcome-chips",
+          "title": "Outcome read-back: tracked_actions/outcome_actions chips on Strategy pageMap/Quick Wins, Hub drawer (baseline→current + verdict), and Briefs/Posts lists (90-day delta)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "recordKeywordTrackingAction writes baselines on every track/promote/add and the measurement cron scores them; no surface reads back. OUTCOME_SCORED invalidation already mapped. Report §1/§2/§5 integration ideas."
+        },
+        {
+          "id": "aw5-ai-review-readback",
+          "title": "Posts: seed ReviewChecklist from persisted post.aiReview",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "StoredAIReview is persisted server-side but write-only — verdicts vanish on editor close and every session re-pays the AI call. Report §5."
+        },
+        {
+          "id": "aw5-local-visibility-insights",
+          "title": "Local SEO: insights bridge on refresh-job snapshot diffs (visible↔not_visible transitions, repeat competitors) + visibility trend from the existing time series",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Append-only local_visibility_snapshots is read latest-only everywhere; diff data already exists and the hook point already broadcasts. Follow docs/rules/bridge-authoring.md. Report §3."
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w6-quality-debias-2026-06-11",
+      "name": "⚖️ Admin Surfaces W6 — Quality & De-bias",
+      "hours": "~20-30h",
+      "rationale": "Wave 6: systematic-quality fixes — first-client bias in classifiers, sync AI in route handlers, unbounded tables, state-machine bypasses. Some lanes gated on owner decisions D2/D3.",
+      "notes": "PR map + decisions D1-D4: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 6. Schema value-prioritization is NOT here — merged into existing kwv-titles-metas-schema-priority (notes updated).",
+      "items": [
+        {
+          "id": "aw6-local-seo-debias",
+          "title": "Local SEO: derive city/service classifiers from configured markets + business profile (kill hardcoded Texas cities + dental/legal regexes)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "server/local-seo.ts:556/:1526/:1543/:1839 bias candidate generation for every non-Texas, non-dental workspace — biggest data-quality lift per new client. Report §3."
+        },
+        {
+          "id": "aw6-sync-ai-to-jobs",
+          "title": "Move the 5 synchronous heavyweight AI route handlers onto the job platform + paginate unbounded post/brief list endpoints + prune schema_snapshots",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5."
+        },
+        {
+          "id": "aw6-wire-or-delete",
+          "title": "Wire-or-delete: suggested-briefs subsystem (D2), calendar intelligence dead code (D3), half-built pending-schemas pipeline",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Entire suggested-briefs subsystem has zero UI; calendar intelligence is dead code. Blocked on owner decisions D2/D3 in the remediation plan. Report §5/§4."
+        },
+        {
+          "id": "aw6-state-machine-validation",
+          "title": "Schema plan transitions through validateTransition + content-templates routes onto validate() Zod middleware",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Schema plan status mutations bypass server/state-machines.ts entirely; content-templates routes skip the mandatory validation middleware. Report §4/§5."
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-surfaces-polish-2026-06-11",
+      "name": "✨ Admin Surfaces — Polish Sweeps (minors, batched per surface)",
+      "hours": "~24-36h",
+      "rationale": "All 🟡 minors from the audit, one batched PR per surface. The report's per-surface minors lists are the line-item spec — items here are deliberately coarse to keep the roadmap readable.",
+      "notes": "Line items: docs/audits/2026-06-11-admin-surface-audit.md §1-§6 Minor lists. Includes all Four-Laws fixes (orange-as-active, sky-*, cyan CTAs, violet/green StatCard iconColor hexes), a11y batches, dead-code deletes, hand-rolled→primitive migrations.",
+      "items": [
+        {
+          "id": "awp-strategy-sweep",
+          "title": "Strategy polish sweep (report §1 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. orange→teal active states, sky-* removal, aria-expanded on collapsibles, in-page nav for 16 stacked sections, dead discovery code delete, Guide claim fix."
+        },
+        {
+          "id": "awp-keyword-hub-sweep",
+          "title": "Keyword Hub polish sweep (report §2 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. keepPreviousData, filter-aware empty states, mobile overflow, bulk-bar/pagination overlap, dead Not-Checked filter, O(n²) bulk lifecycle, sort affordances."
+        },
+        {
+          "id": "awp-local-seo-sweep",
+          "title": "Local SEO polish sweep (report §3 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. primary-market alphabetical fallback, degradedCount surfacing, useSetPrimaryMarket invalidation, hardcoded unit price, unsaved-changes guard, window/label copy."
+        },
+        {
+          "id": "awp-schema-sweep",
+          "title": "Schema polish sweep (report §4 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. setup-hero flash, Workflow Guide dead ends, header action row layout, sub-tab bar → TabBar, page-type triplication, vocabulary/token drift, dead context fields."
+        },
+        {
+          "id": "awp-content-sweep",
+          "title": "Content polish sweep (report §5 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. StatusBadge registry adoption (4 hand-rolled maps), cyan→teal CTAs, dual Send-to-Client label split, briefs IA inversion, FAB collision, checkbox/hover a11y, undo on delete."
+        },
+        {
+          "id": "awp-shell-sweep",
+          "title": "Admin shell polish sweep (report §6 minors)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-11",
+          "notes": "Incl. tab naming drift, SchemaSuggester PageHeader/TabBar adoption, WorkspaceHome hand-rolled stat card, ad-hoc z-index scale, palette no-workspace no-ops, ?tab= cleanup comment fix, duplicate sidebar icons."
+        }
+      ]
+    },
+    {
       "id": "sprint-client-dashboard-qw1-stop-the-leaks-2026-06-11",
       "name": "🩹 Client Dashboard Quick Wins 1 — Stop the Leaks",
       "hours": "~20-28h",
@@ -390,7 +734,7 @@
           "est": "phased",
           "priority": "P1",
           "status": "pending",
-          "notes": "Audit update 2026-06-10: this is no longer a table/data-model unification item. The backend read model is already canonical through the Keyword Command Center routes/hooks, and the remaining work is admin-surface cutover + authority cleanup. Current state: `seo-keywords` already flag-switches between `KeywordHub` and legacy `KeywordCommandCenter`, `seo-ranks` already redirects into the Hub when the flag is on, and both Hub + KCC read the same KCC summary/rows/detail APIs. Remaining live duplication: `KeywordHub` and `KeywordCommandCenter` both still own search/deep-link/drawer/bulk-action UI concerns, and standalone `RankTracker` is still a writable surface (add/remove/pin/snapshot), not measurement-only yet. Safe follow-up scope: remove duplicated Hub-local websocket invalidation in favor of the shared admin invalidation registry, align rank-tracking route/error-contract and action-metadata drift with the KCC/Hub contract, extract one shared rank-tracking mutation/invalidation authority used by Hub/RankTracker/Strategy, then retire the flag-off `KeywordCommandCenter` shell and writable standalone `RankTracker` behavior only after parity is confirmed. Preserve keyword lifecycle actions, rank history, snapshot capture, pinned trends, strategy feedback, View-in-Hub deep links, and local SEO segments. Tests/guardrails: `KeywordHub.test.tsx`, `KeywordCommandCenterDeepLink.test.tsx`, `RankTracker.test.tsx`, rank/KCC route tests, `route-fold-in-seo-ranks`, shared-cache coherence tests, and a contract that `RANK_TRACKING_UPDATED` invalidates Hub, latest/history ranks, strategy, and client rank reads.",
+          "notes": "Audit update 2026-06-10: this is no longer a table/data-model unification item. The backend read model is already canonical through the Keyword Command Center routes/hooks, and the remaining work is admin-surface cutover + authority cleanup. Current state: `seo-keywords` already flag-switches between `KeywordHub` and legacy `KeywordCommandCenter`, `seo-ranks` already redirects into the Hub when the flag is on, and both Hub + KCC read the same KCC summary/rows/detail APIs. Remaining live duplication: `KeywordHub` and `KeywordCommandCenter` both still own search/deep-link/drawer/bulk-action UI concerns, and standalone `RankTracker` is still a writable surface (add/remove/pin/snapshot), not measurement-only yet. Safe follow-up scope: remove duplicated Hub-local websocket invalidation in favor of the shared admin invalidation registry, align rank-tracking route/error-contract and action-metadata drift with the KCC/Hub contract, extract one shared rank-tracking mutation/invalidation authority used by Hub/RankTracker/Strategy, then retire the flag-off `KeywordCommandCenter` shell and writable standalone `RankTracker` behavior only after parity is confirmed. Preserve keyword lifecycle actions, rank history, snapshot capture, pinned trends, strategy feedback, View-in-Hub deep links, and local SEO segments. Tests/guardrails: `KeywordHub.test.tsx`, `KeywordCommandCenterDeepLink.test.tsx`, `RankTracker.test.tsx`, rank/KCC route tests, `route-fold-in-seo-ranks`, shared-cache coherence tests, and a contract that `RANK_TRACKING_UPDATED` invalidates Hub, latest/history ranks, strategy, and client rank reads. | Admin surface audit 2026-06-11 (§7): HARD PRECONDITION — port LocalSeoVisibilityPanel mode=keywords + market-setup drawer entry into the Hub before flipping (KCC is their only keyword-mode mount; KeywordCommandCenter.tsx:433-450). Flag-ON blockers + cutover sequencing: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 4.",
           "createdAt": "2026-06-09"
         },
         {
@@ -575,7 +919,7 @@
           "est": "small-medium",
           "priority": "P2",
           "status": "pending",
-          "notes": "Wave 5 (wiring-audit gap). Title/meta + schema generation ARE keyword-targeted per page but get NO prioritization signal — they lead by strategy slot order, not value, and SchemaContext.searchIntent is declared (schema-suggester.ts:314) but never populated or consumed (dead field). Make seo-copy + buildSchemaContext lead with the highest-value target keyword and use intent to shape schema (Article vs Service/FAQ). HOME: existing seo-copy + buildSchemaContext (server/helpers.ts). PLACEMENT [enrich existing generation path]."
+          "notes": "Wave 5 (wiring-audit gap). Title/meta + schema generation ARE keyword-targeted per page but get NO prioritization signal — they lead by strategy slot order, not value, and SchemaContext.searchIntent is declared (schema-suggester.ts:314) but never populated or consumed (dead field). Make seo-copy + buildSchemaContext lead with the highest-value target keyword and use intent to shape schema (Article vs Service/FAQ). HOME: existing seo-copy + buildSchemaContext (server/helpers.ts). PLACEMENT [enrich existing generation path]. | Absorbs admin-audit W6.2 (2026-06-11, report §4): populate dead ctx.searchIntent + per-page value score in buildSchemaContext; sort schema page list + bulk-generation order by value."
         },
         {
           "id": "kwv-internal-linking-value-priority",
@@ -639,7 +983,7 @@
           "priority": "P3",
           "status": "pending",
           "createdAt": "2026-06-03",
-          "notes": "After the SEO generation-quality batch (P0–P5, flags seo-generation-quality) is canaried/rolled out, audit every client-facing keyword/strategy surface (Strategy tab, content gaps, RecommendedForYou, FixRecommendations, InsightsEngine, keyword command center, etc.) for DUPLICATED displays of the same data and streamline so each surface shows the single best representation. Trigger: full gen-quality rollout complete."
+          "notes": "After the SEO generation-quality batch (P0–P5, flags seo-generation-quality) is canaried/rolled out, audit every client-facing keyword/strategy surface (Strategy tab, content gaps, RecommendedForYou, FixRecommendations, InsightsEngine, keyword command center, etc.) for DUPLICATED displays of the same data and streamline so each surface shows the single best representation. Trigger: full gen-quality rollout complete. | Admin surface audit 2026-06-11 §7 supplies the verified overlap map (what each of KeywordStrategy/Hub/KCC shows, backing stores, recommendation: Option A cutover; Strategy stays separate as plan-vs-operate)."
         },
         {
           "id": "seo-genquality-p6-semantic-fit",
