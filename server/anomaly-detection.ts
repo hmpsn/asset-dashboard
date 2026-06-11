@@ -48,6 +48,35 @@ const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
 const MIN_SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // Skip startup scan if last scan < 6h ago
 const COMPARISON_DAYS = 28;
 
+// Anomaly de-duplication window. `alreadyDetected()` suppresses re-emission of the same
+// anomaly type for this many hours (its default `withinHours`). Scans run every 6–12h, so an
+// ONGOING anomaly is intentionally absent from `detected` for most of this window — its
+// anomaly_digest row is NOT re-stamped each cycle even though the anomaly is still active.
+// The stale-prune cutoff MUST therefore lag `cycleStart` by at least this window; otherwise a
+// cycle that fires a *different* anomaly would delete the still-active row (wiping
+// firstDetected / durationDays continuity, anomaly-detection.ts:659-666).
+const ANOMALY_DEDUP_WINDOW_HOURS = 48;
+const ANOMALY_DEDUP_WINDOW_MS = ANOMALY_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
+
+/**
+ * Prune stale anomaly_digest insight rows for a workspace.
+ *
+ * Runs UNCONDITIONALLY (every workspace, every cycle — including the no-data-connection
+ * `continue` path and the detected.length === 0 path) so that rows minted by a previous
+ * cycle are cleaned once their anomaly clears. The cutoff lags `cycleStart` by the dedup
+ * window so a still-active anomaly (absent from `detected` because of the 48h re-emission
+ * suppression) is NOT deleted. Mirrors the competitor_alert cleanup precedent
+ * (intelligence-crons.ts:104/109/224-226) and analytics-insights.md §8.2.
+ */
+function pruneStaleAnomalyDigests(workspaceId: string, cycleStart: string): void {
+  const cutoff = new Date(new Date(cycleStart).getTime() - ANOMALY_DEDUP_WINDOW_MS).toISOString();
+  try {
+    deleteStaleInsightsByType(workspaceId, 'anomaly_digest', cutoff);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'anomaly_digest stale prune failed');
+  }
+}
+
 // --- Minimum traffic floors — skip anomalies on low-volume pages to reduce noise ---
 const MIN_CLICKS = 200;        // previous period clicks must be ≥200 to trigger click anomaly
 const MIN_IMPRESSIONS = 2000;  // previous period impressions must be ≥2000 to trigger impression anomaly
@@ -539,8 +568,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
   const allNew: Anomaly[] = [];
 
   for (const ws of workspaces) {
-    // Skip workspaces without data connections
-    if (!ws.gscPropertyUrl && !ws.ga4PropertyId && !ws.webflowSiteId) continue;
+    // Skip workspaces without data connections. A workspace that previously had a connection
+    // (and minted anomaly_digest rows) but has since lost it must still be pruned — otherwise
+    // its orphaned digest rows live in the client feed forever (mirrors the competitor cron's
+    // wipe of unconfigured workspaces, intelligence-crons.ts:104/109).
+    if (!ws.gscPropertyUrl && !ws.ga4PropertyId && !ws.webflowSiteId) {
+      pruneStaleAnomalyDigests(ws.id, cycleStart);
+      continue;
+    }
 
     try {
       const detected = await detectForWorkspace(ws);
@@ -705,14 +740,6 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // Invalidate intelligence cache AFTER all insight writes complete
         invalidateIntelligenceCache(ws.id);
 
-        // ── G2: Prune stale anomaly_digest insight rows ──────────────────────
-        // deleteStaleInsightsByType removes rows whose computed_at < cycleStart that were
-        // NOT refreshed this cycle. Called unconditionally here (outside try) so that a
-        // failed detection run still prunes rows minted by a previous successful run that
-        // are no longer valid. Mirrors the competitor_alert cleanup pattern (analytics-
-        // insights.md §8.2 — outside try, outside workspace-guard).
-        deleteStaleInsightsByType(ws.id, 'anomaly_digest', cycleStart);
-
         // ── Bridge #10: Anomaly → boost existing insight severity ──────────
         // When anomalies are detected, boost insights in the MATCHING domain
         // so that related insights surface faster. Domain mapping mirrors the
@@ -764,6 +791,13 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         });
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}: programming error`); else log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}`); } // url-fetch-ok
+
+    // ── G2/C1: Prune stale anomaly_digest insight rows ───────────────────────
+    // UNCONDITIONAL — outside the try AND outside the detected.length>0 guard — so the prune
+    // runs (a) when this workspace's anomalies clear (detected.length===0), and (b) even when
+    // detection threw. The cutoff lags cycleStart by the dedup window so a still-active anomaly
+    // (suppressed from `detected` by alreadyDetected's 48h window) survives. analytics-insights.md §8.2.
+    pruneStaleAnomalyDigests(ws.id, cycleStart);
   }
 
   if (allNew.length > 0) {
