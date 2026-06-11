@@ -2,19 +2,34 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 
-const generateLlmsTxt = vi.fn();
+// C2 migrated generation to the background job platform: POST /generate returns
+// { jobId } (covered in tests/integration/c2-ai-to-jobs.test.ts). The GET routes
+// here serve the result persisted by the job runner via getStoredResult() and
+// never trigger a fresh crawl — that read-path contract is what this file covers.
+const getStoredResult = vi.fn();
 const getLastGenerated = vi.fn();
 
-vi.mock('../../server/llms-txt-generator.js', () => ({
-  generateLlmsTxt: (...args: unknown[]) => generateLlmsTxt(...args),
-  getLastGenerated: (...args: unknown[]) => getLastGenerated(...args),
-}));
+vi.mock('../../server/llms-txt-generator.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/llms-txt-generator.js')>();
+  return {
+    ...actual,
+    getStoredResult: (...args: unknown[]) => getStoredResult(...args),
+    getLastGenerated: (...args: unknown[]) => getLastGenerated(...args),
+  };
+});
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn(),
 }));
+
+const storedResult = {
+  content: '# Test Site\n\n- [Home](https://example.com/)',
+  fullContent: '# Test Site\n\n### Home\nFull summary.',
+  pageCount: 1,
+  generatedAt: '2026-05-01T00:00:00.000Z',
+};
 
 async function startTestServer(): Promise<{
   baseUrl: string;
@@ -53,14 +68,9 @@ describe('LLMs.txt routes', () => {
   let stopServer: (() => Promise<void>) | null = null;
 
   beforeEach(async () => {
-    generateLlmsTxt.mockReset();
+    getStoredResult.mockReset();
     getLastGenerated.mockReset();
-    generateLlmsTxt.mockResolvedValue({
-      content: '# Test Site\n\n- [Home](https://example.com/)',
-      fullContent: '# Test Site\n\n### Home\nFull summary.',
-      pageCount: 1,
-      generatedAt: '2026-05-01T00:00:00.000Z',
-    });
+    getStoredResult.mockReturnValue(storedResult);
     getLastGenerated.mockReturnValue('2026-05-01T00:00:00.000Z');
 
     const server = await startTestServer();
@@ -73,21 +83,26 @@ describe('LLMs.txt routes', () => {
     stopServer = null;
   });
 
-  it('returns generated llms.txt JSON for a workspace', async () => {
+  it('returns the stored llms.txt result as JSON without regenerating', async () => {
     const res = await get(baseUrl, '/api/llms-txt/ws_route_test');
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({
-      content: '# Test Site\n\n- [Home](https://example.com/)',
-      fullContent: '# Test Site\n\n### Home\nFull summary.',
-      pageCount: 1,
-      generatedAt: '2026-05-01T00:00:00.000Z',
-    });
-    expect(generateLlmsTxt).toHaveBeenCalledWith('ws_route_test');
+    expect(body).toEqual(storedResult);
+    expect(getStoredResult).toHaveBeenCalledWith('ws_route_test');
   });
 
-  it('downloads the index file with text headers', async () => {
+  it('returns 404 JSON when no result has been stored yet', async () => {
+    getStoredResult.mockReturnValue(null);
+
+    const res = await get(baseUrl, '/api/llms-txt/ws_route_test');
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toContain('No LLMs.txt has been generated yet');
+  });
+
+  it('downloads the stored index file with text headers', async () => {
     const res = await get(baseUrl, '/api/llms-txt/ws_route_test/download');
     const body = await res.text();
 
@@ -97,7 +112,7 @@ describe('LLMs.txt routes', () => {
     expect(body).toBe('# Test Site\n\n- [Home](https://example.com/)');
   });
 
-  it('downloads the full file with text headers', async () => {
+  it('downloads the stored full file with text headers', async () => {
     const res = await get(baseUrl, '/api/llms-txt/ws_route_test/download-full');
     const body = await res.text();
 
@@ -107,23 +122,23 @@ describe('LLMs.txt routes', () => {
     expect(body).toBe('# Test Site\n\n### Home\nFull summary.');
   });
 
-  it('returns freshness without regenerating content', async () => {
+  it('returns 404 on download when no result has been stored yet', async () => {
+    getStoredResult.mockReturnValue(null);
+
+    const res = await get(baseUrl, '/api/llms-txt/ws_route_test/download');
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toContain('No LLMs.txt has been generated yet');
+  });
+
+  it('returns freshness without reading the stored result', async () => {
     const res = await get(baseUrl, '/api/llms-txt/ws_route_test/freshness');
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ lastGeneratedAt: '2026-05-01T00:00:00.000Z' });
     expect(getLastGenerated).toHaveBeenCalledWith('ws_route_test');
-    expect(generateLlmsTxt).not.toHaveBeenCalled();
-  });
-
-  it('returns JSON 500 when generation fails', async () => {
-    generateLlmsTxt.mockRejectedValueOnce(new Error('Workspace not found'));
-
-    const res = await get(baseUrl, '/api/llms-txt/ws_missing');
-    const body = await res.json();
-
-    expect(res.status).toBe(500);
-    expect(body).toEqual({ error: 'Workspace not found' });
+    expect(getStoredResult).not.toHaveBeenCalled();
   });
 });

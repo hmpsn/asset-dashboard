@@ -5025,6 +5025,28 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── C2 lane guardrail: sync calls to C2-migrated generators in route handlers ──
+    //
+    // The four generators migrated in C2 (generateLlmsTxt, generateBlueprint,
+    // generateCopyForEntry, reviewSitePages) must not be called synchronously in
+    // route handlers after migration — they run inside job runners, invoked via
+    // POST /api/jobs. A direct call in a route handler re-introduces the sync AI
+    // anti-pattern that C2 eliminated. Escape hatch: // c2-sync-generation-ok
+    name: 'C2-migrated generators must not be called synchronously in route handlers',
+    pattern: '\\b(generateLlmsTxt|generateBlueprint|generateCopyForEntry|reviewSitePages)\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// c2-sync-generation-ok'],
+    message:
+      'generateLlmsTxt, generateBlueprint, generateCopyForEntry, and reviewSitePages are C2-migrated generators ' +
+      'that must run inside job runners (via POST /api/jobs), not inline in route handlers. ' +
+      'Add // c2-sync-generation-ok if this is an intentional reviewed exception.',
+    severity: 'error',
+    rationale:
+      'Calling these generators synchronously in route handlers re-introduces the sync-AI anti-pattern that C2 eliminated — long-running AI crawls block the request/response cycle.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
     // ── Route read/write contracts ────────────────────────────────────────
     //
     // High-churn route files need an explicit, grep-friendly contract for the

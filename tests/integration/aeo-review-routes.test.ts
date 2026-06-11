@@ -267,7 +267,7 @@ describe('AEO review routes', () => {
     expect(state.reviewSiteCalls).toHaveLength(0);
   });
 
-  it('POST /api/aeo-review/:workspaceId/site reviews discovered pages and persists the result', async () => {
+  it('POST /api/aeo-review/:workspaceId/site enqueues a job that reviews discovered pages and persists the result', async () => {
     const ws = createWorkspace('AEO Site Review Workspace', 'wf-site-batch', 'Batch Site');
     workspaceIds.add(ws.id);
     updateWorkspace(ws.id, { liveDomain: 'example.test' });
@@ -288,15 +288,23 @@ describe('AEO review routes', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({
-      workspaceId: ws.id,
-      sitewideSummary: 'Reviewed 3 pages',
-      pages: [
-        { pageUrl: 'https://example.test/blog/ai-search' },
-        { pageUrl: 'https://example.test/resources/faq' },
-        { pageUrl: 'https://example.test/contact' },
-      ],
-    });
+    expect(typeof body.jobId).toBe('string');
+
+    // The review runs as a background job — poll until it reaches a terminal state.
+    const deadline = Date.now() + 10_000;
+    let job: Record<string, unknown> | null = null;
+    while (Date.now() < deadline) {
+      const jobRes = await api(`/api/jobs/${body.jobId}`);
+      if (jobRes.status === 200) {
+        const candidate = (await jobRes.json()) as Record<string, unknown>;
+        if (candidate.status === 'done' || candidate.status === 'error' || candidate.status === 'cancelled') {
+          job = candidate;
+          break;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(job?.status).toBe('done');
 
     expect(state.reviewSiteCalls).toHaveLength(1);
     expect(state.reviewSiteCalls[0]).toMatchObject({

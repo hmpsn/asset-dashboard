@@ -111,6 +111,53 @@ export function cleanupOldLlmsTxt(maxAgeDays: number = 90): number {
   return info.changes;
 }
 
+// ── Stored Result (full blob, served by GET routes) ──
+
+const storedResultStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT INTO llms_txt_stored_result (workspace_id, content, full_content, page_count, generated_at)
+    VALUES (@workspace_id, @content, @full_content, @page_count, @generated_at)
+    ON CONFLICT(workspace_id) DO UPDATE SET
+      content = excluded.content,
+      full_content = excluded.full_content,
+      page_count = excluded.page_count,
+      generated_at = excluded.generated_at
+  `),
+  get: db.prepare<[workspaceId: string]>(
+    'SELECT content, full_content, page_count, generated_at FROM llms_txt_stored_result WHERE workspace_id = ?',
+  ),
+}));
+
+interface StoredResultRow {
+  content: string;
+  full_content: string;
+  page_count: number;
+  generated_at: string;
+}
+
+/** Persist the full generation result so GET routes can serve it without re-crawling. */
+export function storeResult(workspaceId: string, result: LlmsTxtResult): void {
+  storedResultStmts().upsert.run({
+    workspace_id: workspaceId,
+    content: result.content,
+    full_content: result.fullContent,
+    page_count: result.pageCount,
+    generated_at: result.generatedAt,
+  });
+}
+
+/** Return the last stored result, or null if none exists yet. */
+export function getStoredResult(workspaceId: string): LlmsTxtResult | null {
+  const row = storedResultStmts().get.get(workspaceId) as StoredResultRow | undefined;
+  if (!row) return null;
+  return {
+    content: row.content,
+    fullContent: row.full_content,
+    pageCount: row.page_count,
+    generatedAt: row.generated_at,
+  };
+}
+
 // ── Freshness Tracking ──
 
 const freshnessStmts = createStmtCache(() => ({

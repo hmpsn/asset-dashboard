@@ -25,7 +25,7 @@ import { getBrief } from '../content-brief.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
 import type { StandaloneContentBriefGenerationParams } from '../content-brief-generation-job.js';
 import { getContentRequest } from '../content-requests.js';
-import { getBlueprint } from '../page-strategy.js';
+import { getBlueprint, getEntry } from '../page-strategy.js';
 import {
   createContentPostGenerationJob,
   runContentPostGenerationJob,
@@ -41,6 +41,11 @@ import {
   KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
+import { runCopyEntryGenerationJob } from '../copy-entry-generation-job.js';
+import { runBlueprintGenerationJob } from '../blueprint-generation-job.js';
+import { runLlmsTxtGenerationJob } from '../llms-txt-generation-job.js';
+import { runAeoSiteReviewJob } from '../aeo-site-review-job.js';
+import type { BlueprintGenerationInput } from '../../shared/types/page-strategy.js';
 import {
   schemaPlanGenerationErrorResponse,
   startSchemaPlanGenerationJob,
@@ -523,6 +528,85 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'error', message: 'Deep diagnostic failed' });
           }
         })();
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const blueprintId = typeof params.blueprintId === 'string' ? params.blueprintId : '';
+        const entryId = typeof params.entryId === 'string' ? params.entryId : '';
+        const accumulatedSteering = Array.isArray(params.accumulatedSteering)
+          ? params.accumulatedSteering.filter((s): s is string => typeof s === 'string')
+          : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!blueprintId) return res.status(400).json({ error: 'blueprintId required' });
+        if (!entryId) return res.status(400).json({ error: 'entryId required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        if (!getEntry(wsId, blueprintId, entryId)) return res.status(404).json({ error: 'Entry not found' });
+        const copyJob = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: copyJob.id });
+        setImmediate(() => {
+          void runCopyEntryGenerationJob({ jobId: copyJob.id, workspaceId: wsId, blueprintId, entryId, accumulatedSteering });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const industryType = typeof params.industryType === 'string' ? params.industryType.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!industryType) return res.status(400).json({ error: 'industryType required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        const bpInput: BlueprintGenerationInput = {
+          industryType,
+          brandscriptId: typeof params.brandscriptId === 'string' ? params.brandscriptId : undefined,
+          domain: typeof params.domain === 'string' ? params.domain : undefined,
+          targetPageCount: typeof params.targetPageCount === 'number' ? params.targetPageCount : undefined,
+          includeContentPages: typeof params.includeContentPages === 'boolean' ? params.includeContentPages : undefined,
+          includeLocationPages: typeof params.includeLocationPages === 'boolean' ? params.includeLocationPages : undefined,
+          locationCount: typeof params.locationCount === 'number' ? params.locationCount : undefined,
+        };
+        const bpJob = createJob(BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: bpJob.id });
+        setImmediate(() => {
+          void runBlueprintGenerationJob({ jobId: bpJob.id, workspaceId: wsId, input: bpInput });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        const llmsJob = createJob(BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: llmsJob.id });
+        setImmediate(() => {
+          void runLlmsTxtGenerationJob({ jobId: llmsJob.id, workspaceId: wsId });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const aeoWs = getWorkspace(wsId);
+        if (!aeoWs) return res.status(404).json({ error: 'Workspace not found' });
+        if (!aeoWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+        if (!aeoWs.liveDomain) return res.status(400).json({ error: 'No live domain configured for this workspace' });
+        const rawMaxPages = params.maxPages;
+        const requestedMaxPages = rawMaxPages == null ? 10 : Number(rawMaxPages);
+        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
+        if (requestedMaxPages > 25) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 25' });
+        }
+        const maxPages = Math.min(requestedMaxPages, 25);
+        const aeoJob = createJob(BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW, { workspaceId: wsId });
+        res.json({ jobId: aeoJob.id });
+        setImmediate(() => {
+          void runAeoSiteReviewJob({ jobId: aeoJob.id, workspaceId: wsId, maxPages });
+        });
         break;
       }
 

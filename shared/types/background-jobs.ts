@@ -23,6 +23,10 @@ export const BACKGROUND_JOB_TYPES = {
   RECOMMENDATIONS_GENERATION: 'recommendations-generation',
   LOCAL_SEO_REFRESH: 'local-seo-refresh',
   LOCAL_SEO_LOCATION_BACKFILL: 'local-seo-location-backfill',
+  COPY_ENTRY_GENERATION: 'copy-entry-generation',
+  BLUEPRINT_GENERATION: 'blueprint-generation',
+  LLMS_TXT_GENERATION: 'llms-txt-generation',
+  AEO_SITE_REVIEW: 'aeo-site-review',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -206,6 +210,30 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Re-evaluates saved local visibility snapshots against configured client locations.',
     cancellable: false,
     resultBehavior: 'ephemeral',
+  },
+  [BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION]: {
+    label: 'Copy Entry Generation',
+    description: 'Generates copy sections for a blueprint entry.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION]: {
+    label: 'Blueprint Generation',
+    description: 'Generates a blueprint from workspace intelligence.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION]: {
+    label: 'LLMs.txt Generation',
+    description: 'Generates an LLMs.txt file with AI page summaries.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW]: {
+    label: 'AEO Site Review',
+    description: 'Runs an AI-powered AEO review across site pages.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
   },
 };
 

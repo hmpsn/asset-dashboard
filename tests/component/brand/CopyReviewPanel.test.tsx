@@ -75,7 +75,8 @@ function setupMocks() {
   mockUseCopySections.mockReturnValue({ data: [], isLoading: false, isError: false });
   mockUseCopyStatus.mockReturnValue({ data: null });
   mockUseCopyMetadata.mockReturnValue({ data: null });
-  mockUseGenerateCopy.mockReturnValue({ mutate: defaultMutateFn, isPending: false });
+  // useGenerateCopy is job-based (C2): it exposes startGenerate/isRunning, not mutate/isPending.
+  mockUseGenerateCopy.mockReturnValue({ startGenerate: defaultMutateFn, isRunning: false });
   mockUseSendEntryToClientReview.mockReturnValue({ mutate: defaultMutateFn, isPending: false });
   mockUseUpdateSectionStatus.mockReturnValue({ mutate: defaultMutateFn, isPending: false, variables: undefined });
   mockUseUpdateSectionText.mockReturnValue({ mutate: defaultMutateFn, isPending: false });
@@ -133,13 +134,15 @@ describe('CopyReviewPanel', () => {
   });
 
   // Calls generate in empty state
-  it('calls generateCopy.mutate when Generate Copy button is clicked in empty state', () => {
-    const mutateMock = vi.fn();
+  it('calls startGenerate when Generate Copy button is clicked in empty state', () => {
+    const startGenerateMock = vi.fn();
     mockUseCopySections.mockReturnValue({ data: [], isLoading: false, isError: false });
-    mockUseGenerateCopy.mockReturnValue({ mutate: mutateMock, isPending: false });
+    mockUseGenerateCopy.mockReturnValue({ startGenerate: startGenerateMock, isRunning: false });
     renderPanel();
     fireEvent.click(screen.getByRole('button', { name: /generate copy/i }));
-    expect(mutateMock).toHaveBeenCalledWith('entry-1');
+    // entryId is bound at the hook call site (useGenerateCopy(wsId, blueprintId, entryId)),
+    // so the click handler invokes startGenerate with no per-call args.
+    expect(startGenerateMock).toHaveBeenCalledWith();
   });
 
   // Renders without crash with sections

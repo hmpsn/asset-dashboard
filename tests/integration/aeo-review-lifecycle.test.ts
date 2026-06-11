@@ -140,6 +140,15 @@ vi.mock('../../server/reports.js', async (importOriginal) => {
   };
 });
 
+// ── Mock broadcast (singleton not initialized without initWebSocket) ──────────
+// In the inline server pattern, createApp() is used without initWebSocket(),
+// so broadcastToWorkspace() would throw. No-op the broadcast functions.
+vi.mock('../../server/broadcast.js', () => ({
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+  setBroadcast: vi.fn(),
+}));
+
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 
 const nativeFetch = globalThis.fetch;
@@ -184,6 +193,38 @@ function reviewFilePath(workspaceId: string): string {
 
 function clearActivityLog(wsId: string): void {
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
+}
+
+/**
+ * POST /api/aeo-review/:wsId/site now returns { jobId }.
+ * This helper starts the job and polls until it reaches a terminal state,
+ * then returns the job record. Throw on timeout.
+ */
+async function startSiteReviewAndWait(
+  workspaceId: string,
+  body: Record<string, unknown> = {},
+  timeoutMs = 10_000,
+): Promise<{ startRes: Response; startBody: { jobId?: string; error?: string }; job: Record<string, unknown> | null }> {
+  const startRes = await postJson(`/api/aeo-review/${workspaceId}/site`, body);
+  if (!startRes.ok) {
+    const startBody = await startRes.json() as { error?: string };
+    return { startRes, startBody, job: null };
+  }
+  const startBody = await startRes.json() as { jobId: string };
+  const { jobId } = startBody;
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await api(`/api/jobs/${jobId}`);
+    if (res.status === 200) {
+      const job = await res.json() as Record<string, unknown>;
+      if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+        return { startRes, startBody, job };
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for AEO site review job ${jobId}`);
 }
 
 // ─── Lifecycle helpers ────────────────────────────────────────────────────────
@@ -245,8 +286,9 @@ describe('GET /api/aeo-review/:workspaceId — load saved review', () => {
 
     state.publishedPages = [{ slug: '/about', title: 'About' }];
 
-    const siteRes = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
-    expect(siteRes.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     const getRes = await api(`/api/aeo-review/${ws.id}`);
     expect(getRes.status).toBe(200);
@@ -266,8 +308,9 @@ describe('GET /api/aeo-review/:workspaceId — load saved review', () => {
     state.publishedPages = [{ slug: '/about', title: 'About' }];
 
     // Seed a review for workspace A
-    const siteRes = await postJson(`/api/aeo-review/${wsA.id}/site`, { maxPages: 1 });
-    expect(siteRes.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(wsA.id, { maxPages: 1 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     // Workspace B should still get null — reviews are workspace-scoped files
     const getB = await api(`/api/aeo-review/${wsB.id}`);
@@ -442,10 +485,12 @@ describe('POST /api/aeo-review/:workspaceId/site — page discovery', () => {
     updateWorkspace(ws.id, { liveDomain: 'empty.test' });
 
     // publishedPages and cmsUrls are empty (default state)
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 5 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 5 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
     expect(body.workspaceId).toBe(ws.id);
     expect(body.pages).toHaveLength(0);
     expect(body.totalChanges).toBe(0);
@@ -465,12 +510,15 @@ describe('POST /api/aeo-review/:workspaceId/site — page discovery', () => {
       title: `Page ${i + 1}`,
     }));
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, {});
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, {});
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
     expect(state.reviewSiteCalls).toHaveLength(1);
     expect(state.reviewSiteCalls[0].pageCount).toBe(10);
+
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
     expect(body.pages).toHaveLength(10);
   });
 
@@ -485,8 +533,9 @@ describe('POST /api/aeo-review/:workspaceId/site — page discovery', () => {
       { slug: '/privacy-policy', title: 'Privacy Policy' },
     ];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 10 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 10 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     // Only /about should reach reviewSitePages
     expect(state.reviewSiteCalls).toHaveLength(1);
@@ -511,13 +560,16 @@ describe('POST /api/aeo-review/:workspaceId/site — page discovery', () => {
       },
     };
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 5 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 5 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
     // Should have discovered the snapshot fallback page
     expect(state.reviewSiteCalls).toHaveLength(1);
     expect(state.reviewSiteCalls[0].pageCount).toBe(1);
+
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
     expect(body.pages).toHaveLength(1);
   });
 
@@ -534,8 +586,9 @@ describe('POST /api/aeo-review/:workspaceId/site — page discovery', () => {
       { slug: '/resources/faq', title: 'FAQ' },
     ];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 2 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 2 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     expect(state.reviewSiteCalls).toHaveLength(1);
     const reviewedUrls = state.reviewSiteCalls[0].pageUrls;
@@ -555,19 +608,20 @@ describe('POST /api/aeo-review/:workspaceId/site — persistence and re-generati
     state.publishedPages = [{ slug: '/page-one', title: 'Page One' }];
 
     // First review
-    const res1 = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
+    const { startRes: res1, job: job1 } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
     expect(res1.status).toBe(200);
-    const body1 = await res1.json();
+    expect(job1?.status).toBe('done');
+    const firstGet = await api(`/api/aeo-review/${ws.id}`);
+    const body1 = await firstGet.json();
     expect(body1.pages).toHaveLength(1);
     expect(body1.pages[0].pageUrl).toContain('/page-one');
 
     // Second review with different pages
     state.publishedPages = [{ slug: '/page-two', title: 'Page Two' }];
 
-    const res2 = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
+    const { startRes: res2, job: job2 } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
     expect(res2.status).toBe(200);
-    const body2 = await res2.json();
-    expect(body2.pages[0].pageUrl).toContain('/page-two');
+    expect(job2?.status).toBe('done');
 
     // GET should return the second (latest) review
     const getRes = await api(`/api/aeo-review/${ws.id}`);
@@ -583,8 +637,9 @@ describe('POST /api/aeo-review/:workspaceId/site — persistence and re-generati
 
     state.publishedPages = [{ slug: '/home', title: 'Home' }];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     const entries = listActivity(ws.id, 10);
     expect(entries.length).toBeGreaterThan(0);
@@ -595,17 +650,21 @@ describe('POST /api/aeo-review/:workspaceId/site — persistence and re-generati
 });
 
 describe('POST /api/aeo-review/:workspaceId/site — response shape', () => {
-  it('returns all expected AeoSiteReview top-level fields', async () => {
+  it('returns { jobId } and the saved result contains all expected AeoSiteReview top-level fields', async () => {
     const ws = createWorkspace('AEO Site Shape Workspace', 'wf-site-shape', 'Site Shape Workspace');
     workspaceIds.add(ws.id);
     updateWorkspace(ws.id, { liveDomain: 'siteshape.test' });
 
     state.publishedPages = [{ slug: '/about', title: 'About' }];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
-    expect(res.status).toBe(200);
+    const { startRes, startBody, job } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
+    expect(startRes.status).toBe(200);
+    expect(typeof startBody.jobId).toBe('string');
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
+    // The result is stored on disk; verify via GET
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
     expect(body.workspaceId).toBe(ws.id);
     expect(typeof body.generatedAt).toBe('string');
     expect(Array.isArray(body.pages)).toBe(true);
@@ -621,10 +680,12 @@ describe('POST /api/aeo-review/:workspaceId/site — response shape', () => {
 
     state.publishedPages = [{ slug: '/services', title: 'Services' }];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 1 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 1 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
     expect(body.pages.length).toBeGreaterThan(0);
     const page = body.pages[0];
     expect(typeof page.pageUrl).toBe('string');
@@ -646,12 +707,14 @@ describe('POST /api/aeo-review/:workspaceId/site — response shape', () => {
       title: `Page ${i + 1}`,
     }));
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 3 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 3 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
-    const body = await res.json();
-    expect(body.pages).toHaveLength(3);
     expect(state.reviewSiteCalls[0].pageCount).toBe(3);
+    const getRes = await api(`/api/aeo-review/${ws.id}`);
+    const body = await getRes.json();
+    expect(body.pages).toHaveLength(3);
   });
 });
 
@@ -666,8 +729,9 @@ describe('POST /api/aeo-review/:workspaceId/site — CMS pages included', () => 
       { url: 'https://cmspages.test/blog/intro', path: '/blog/intro', pageName: 'Intro Post' },
     ];
 
-    const res = await postJson(`/api/aeo-review/${ws.id}/site`, { maxPages: 5 });
-    expect(res.status).toBe(200);
+    const { startRes, job } = await startSiteReviewAndWait(ws.id, { maxPages: 5 });
+    expect(startRes.status).toBe(200);
+    expect(job?.status).toBe('done');
 
     expect(state.reviewSiteCalls).toHaveLength(1);
     expect(state.reviewSiteCalls[0].pageCount).toBe(2);

@@ -681,8 +681,15 @@ describe('siteArchitecture.schemaCoverage', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('llmsTxt.generate', () => {
-  it('calls GET with workspaceId in path', async () => {
+  it('POSTs the async generate endpoint (C2 jobs migration; returns { jobId })', async () => {
     await llmsTxt.generate('ws-1');
+    expect(mockPost).toHaveBeenCalledWith('/api/llms-txt/ws-1/generate', {});
+  });
+});
+
+describe('llmsTxt.getLast', () => {
+  it('GETs the stored result without re-generating', async () => {
+    await llmsTxt.getLast('ws-1');
     expect(mockGet).toHaveBeenCalledWith('/api/llms-txt/ws-1');
   });
 });

@@ -119,8 +119,9 @@ export const blueprints = {
   remove: (wsId: string, blueprintId: string) =>
     del(`/api/page-strategy/${wsId}/${blueprintId}`),
 
+  /** Enqueue async blueprint generation. Returns { jobId }. */
   generate: (wsId: string, body: BlueprintGenerationInput) =>
-    post<SiteBlueprint>(`/api/page-strategy/${wsId}/generate`, body),
+    post<{ jobId: string }>(`/api/page-strategy/${wsId}/generate`, body),
 };
 
 type BlueprintEntryCreateBody = {
@@ -171,8 +172,9 @@ export const blueprintVersions = {
 // ═══ COPY PIPELINE ═══
 
 export const copyGeneration = {
+  /** Enqueue async copy generation. Returns { jobId }. */
   generate: (wsId: string, blueprintId: string, entryId: string, body?: { accumulatedSteering?: string[]; force?: boolean }) =>
-    post<{ sections: CopySection[]; metadata: CopyMetadata }>(
+    post<{ jobId: string }>(
       `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
       body ?? {}
     ),

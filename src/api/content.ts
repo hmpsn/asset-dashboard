@@ -372,7 +372,12 @@ export const siteArchitecture = {
 // ── LLMs.txt Generator ──────────────────────────────────────────
 
 export const llmsTxt = {
+  /** Enqueue async generation. Returns { jobId }. */
   generate: (wsId: string) =>
+    post<{ jobId: string }>(`/api/llms-txt/${wsId}/generate`, {}),
+
+  /** Return last stored result without re-generating. */
+  getLast: (wsId: string) =>
     get<{ content: string; fullContent: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
 
   freshness: (wsId: string) =>
