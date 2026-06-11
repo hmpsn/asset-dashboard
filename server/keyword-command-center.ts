@@ -31,6 +31,7 @@ import {
   type AddTrackedKeywordOptions,
 } from './rank-tracking.js';
 import { listTrackedKeywordRows } from './tracked-keywords-store.js';
+import { recordKeywordTrackingAction } from './outcome-measurement-keywords.js';
 import { InvalidTransitionError, TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -3369,6 +3370,30 @@ function applyKeywordCommandCenterActionInternal(
   // rejected. Run outside the transaction (deletePageKeyword uses its own run.immediate()).
   if (request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE) {
     deletePageKeyword(workspace.id, plannedPath);
+  }
+
+  // A4 (audit #15): Hub track/promote/add-to-strategy actions enter outcome
+  // tracking. recordKeywordTrackingAction is idempotent (shares A3's
+  // strategy_page_keyword dedup space), captures a keyword-level rank-snapshot
+  // baseline when one is fresh, and never fabricates a baseline (FM-2). Runs
+  // after the lifecycle transaction so a recording failure cannot roll back the
+  // user-visible action, and a failed transaction never records a phantom action.
+  if (
+    request.action === KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.TRACK
+    || request.action === KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE
+  ) {
+    // Outcome tracking is a side-channel: the user-visible action committed above,
+    // so a recording failure must log, never surface as an error to the caller.
+    try {
+      recordKeywordTrackingAction({
+        workspaceId: workspace.id,
+        keyword: displayKeyword,
+        pagePath: request.pagePath ?? existing?.pagePath,
+      });
+    } catch (err) {
+      log.error({ err, workspaceId: workspace.id, keyword: displayKeyword, action: request.action }, 'keyword outcome recording failed — Hub action already committed');
+    }
   }
 
   invalidateIntelligenceCache(workspace.id);

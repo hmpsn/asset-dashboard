@@ -17,6 +17,7 @@ import { StrategyKeywordDrawer } from './strategy/StrategyKeywordDrawer';
 import { StrategyKeywordsSection } from './strategy/StrategyKeywordsSection';
 import { StrategyNextStepsSection } from './strategy/StrategyNextStepsSection';
 import { StrategyPageKeywordMapSection } from './strategy/StrategyPageKeywordMapSection';
+import { StrategyRequestedKeywordTrendSection } from './strategy/StrategyRequestedKeywordTrendSection';
 import { StrategyPageImprovementsSection } from './strategy/StrategyPageImprovementsSection';
 import { StrategyRefreshSummarySection } from './strategy/StrategyRefreshSummarySection';
 import { StrategySnapshotSection } from './strategy/StrategySnapshotSection';
@@ -801,6 +802,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           />
         </TierGate>
       </div>
+
+      {/* ── REQUESTED KEYWORD RANK TREND (A4, audit #15) ── */}
+      <StrategyRequestedKeywordTrendSection
+        workspaceId={workspaceId}
+        trackedKeywords={trackedKeywords}
+        effectiveTier={effectiveTier}
+      />
 
       <StrategyPageKeywordMapSection
         effectiveTier={effectiveTier}

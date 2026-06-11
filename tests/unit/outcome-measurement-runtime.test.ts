@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   getActionsByPage: vi.fn(),
   updateActionContext: vi.fn(),
   updateBaselineSnapshot: vi.fn(),
+  markActionComplete: vi.fn(),
+  readKeywordRankSnapshot: vi.fn(() => null),
   resolveScoringConfig: vi.fn(),
   getWorkspace: vi.fn(),
   getPageTrend: vi.fn(),
@@ -26,6 +28,13 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getActionsByPage: h.getActionsByPage,
   updateActionContext: h.updateActionContext,
   updateBaselineSnapshot: h.updateBaselineSnapshot,
+  markActionComplete: h.markActionComplete,
+}));
+
+// A4: keyword-level rank-snapshot reader (touches the real DB) — mocked so the
+// runtime tests stay hermetic. Default: no snapshot (null), the FM-2 baseline.
+vi.mock('../../server/outcome-measurement-keywords.js', () => ({
+  readKeywordRankSnapshot: h.readKeywordRankSnapshot,
 }));
 
 vi.mock('../../server/outcome-scoring-defaults.js', () => ({
