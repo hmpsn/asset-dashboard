@@ -6,7 +6,7 @@ A comprehensive value assessment of every feature in the platform — **483 feat
 
 ---
 
-### 483. InsightsSlice byType cap + pre-cap countsByType rollup (G3, audit 7b)
+### 485. InsightsSlice byType cap + pre-cap countsByType rollup (G3, audit 7b)
 
 **What it does:** Bounds the last unbounded payload in the workspace-intelligence bundle. `InsightsSlice.byType` is now capped at the top 25 insights per type ordered by `impactScore` (previously it carried *every* stored insight per type — on a 400-insight workspace the insights slice alone was ~443 KB, dominating AdminChat context, MCP `get_workspace_intelligence` responses, and generation-context payloads). Two new required pre-cap rollups keep count consumers honest: `countsByType` (full per-type totals) and `countsByTypeBySeverity` (full type×severity matrix for jointly-filtered totals). Every `byType` reader was redirected *before* the cap landed: `listAllInsightsFromSlice` now reads the `all` list (top 100 by impact — AdminChat, diagnostic context inherit), meeting-brief metrics/cache-key counts read `countsByType`, the client intelligence summary derives its counts from the matrix (exact admin-only-type + positive-severity exclusion at any workspace size — both pinned contracts hold beyond the 100-cap), and monthly-digest's deterministic wins/resolved rollups read the store directly (documented `intel-builder-ok` exception — full iteration is no longer slice-backed). Measured on a seeded 400-insight workspace: insights slice JSON 452,896 → 213,435 bytes (−52.9%); the byType portion 353,622 → 114,161 bytes (−67.7%).
 
