@@ -269,6 +269,13 @@ export function createApp(): express.Express {
     if (ws?.clientPortalEnabled != null && !ws.clientPortalEnabled) {
       return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
     }
+    // Advance-only defense-in-depth: this global gate does NOT reject
+    // passwordless workspaces — it only advances them to the route. As of E3
+    // (passwordless portal closure) the per-route requireClientPortalAuth /
+    // requireAuthenticatedClientPortalAuth middleware is the real backstop and
+    // returns 401 for passwordless portals. Do NOT rely on this gate alone for a
+    // new public route — add a per-route guard (enforced by the pr-check rule
+    // "Public route under /api/public/ missing client-portal auth middleware").
     if (!ws || !ws.clientPassword) return next();
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();

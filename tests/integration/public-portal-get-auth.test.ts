@@ -169,6 +169,19 @@ describe('public-portal GET auth guards — case (d): passwordless workspace + n
   }
 });
 
+describe('public-portal GET auth guards — case (d2): admin HMAC on a PASSWORDLESS workspace → 200', () => {
+  // The one path E3 must NOT break: admins must still preview unconfigured
+  // (passwordless) portals. The admin HMAC check precedes the removed
+  // passwordless pass-through in the guard, so this must stay 200 even though
+  // an unauthenticated request to the same workspace now gets 401 (case d).
+  for (const endpointFn of ENDPOINTS) {
+    it(`GET ${endpointFn('{wsNoPass}')} with admin HMAC → 200`, async () => {
+      const res = await getAsAdmin(endpointFn(wsNoPass.workspaceId));
+      expect(res.status).toBe(200);
+    });
+  }
+});
+
 describe('public-portal GET auth guards — case (e): client JWT for workspace B against workspace A → 401', () => {
   for (const endpointFn of ENDPOINTS) {
     it(`GET ${endpointFn('{wsA}')} with forged workspace-A cookie carrying workspace-B token → 401`, async () => {
