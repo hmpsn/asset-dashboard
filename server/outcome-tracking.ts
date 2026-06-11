@@ -178,13 +178,37 @@ const stmts = createStmtCache(() => ({
   overviewStats: db.prepare(`
     SELECT
       COALESCE(COUNT(DISTINCT ta.id), 0) AS total_actions,
-      COALESCE(SUM(CASE WHEN ta.measurement_complete = 0 THEN 1 ELSE 0 END), 0) AS pending_count,
+      -- C2 fix: pending_count must count each action ONCE regardless of how many
+      -- action_outcomes rows it has. The LEFT JOIN fans out one row per outcome, so
+      -- an aggregate over all rows would count N outcomes as N pending actions.
+      -- COUNT(DISTINCT ...) collapses the fan-out. Matches getWorkspaceCounts
+      -- which runs FROM tracked_actions with NO join (one row per action).
+      COALESCE(COUNT(DISTINCT CASE WHEN ta.measurement_complete = 0 THEN ta.id END), 0) AS pending_count,
       COALESCE(COUNT(DISTINCT CASE
         WHEN ao.score IS NOT NULL
           AND ao.score NOT IN ('insufficient_data', 'inconclusive')
+          AND ao.checkpoint_days = (
+            SELECT MAX(ao2.checkpoint_days)
+            FROM action_outcomes ao2
+            WHERE ao2.action_id = ao.action_id
+              AND ao2.score IS NOT NULL
+              AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+          )
         THEN ta.id END), 0) AS total_scored,
+      -- C1 fix: total_wins must use the LATEST qualifying checkpoint per action, not
+      -- any qualifying checkpoint. An action with win@30 + neutral@90 would be counted
+      -- as a win by ANY-checkpoint logic but should yield 0 wins (latest scored is
+      -- neutral). The MAX(checkpoint_days) subquery matches computeScorecard()'s
+      -- latestScored[latestScored.length-1] pattern and getWinRateForActionIds.
       COALESCE(COUNT(DISTINCT CASE
         WHEN ao.score IN ('win', 'strong_win')
+          AND ao.checkpoint_days = (
+            SELECT MAX(ao2.checkpoint_days)
+            FROM action_outcomes ao2
+            WHERE ao2.action_id = ao.action_id
+              AND ao2.score IS NOT NULL
+              AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+          )
         THEN ta.id END), 0) AS total_wins,
       COALESCE(COUNT(DISTINCT CASE
         WHEN ao.measured_at >= datetime('now', '-30 days')
@@ -589,6 +613,8 @@ export function getActionIdsByWorkspace(workspaceId: string): string[] {
 export function getWinRateForActionIds(actionIds: string[]): { wins: number; scored: number } {
   if (actionIds.length === 0) return { wins: 0, scored: 0 };
   // Build parameterized IN clause — safe; IDs are UUIDs from our own DB (no user input).
+  // SQLite variable limit in better-sqlite3 is 32766 (not 999); only a workspace with
+  // >32k actions in one trend half would hit this ceiling (not a practical concern today).
   const placeholders = actionIds.map(() => '?').join(', ');
   const row = db.prepare(`
     SELECT

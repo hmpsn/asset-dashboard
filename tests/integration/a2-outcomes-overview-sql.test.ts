@@ -3,16 +3,22 @@
  *
  * Verifies that the refactored GET /api/outcomes/overview endpoint (which uses
  * aggregate SQL readers instead of per-action loops) returns byte-identical JSON
- * to the documented expected values across two divergent workspaces:
+ * to the documented expected values across four divergent workspaces:
  *
  * Workspace A: 3 actions, 2 wins (all platform_executed), 1 scored outside 30d window
  * Workspace B: 4 actions including 1 not_acted_on win, 1 inconclusive, 1 pending
+ * Workspace C (I3/C1): 1 action with win@day30 + neutral@day90 — latest checkpoint is
+ *   non-win, so winRate must be 0 (not 1.0 as the pre-fix ANY-checkpoint SQL returned)
+ * Workspace D (I3/C2): 1 pending action with 2 outcomes — activeActions must be 1
+ *   (not 2 as the pre-fix SUM fan-out SQL returned)
  *
  * Key parity assertions:
+ * - winRate uses LATEST qualifying checkpoint per action (matches computeScorecard loop)
  * - winRate includes not_acted_on in denominator/numerator (matches computeScorecard loop)
  * - scoredLast30d counts ANY outcome measured within 30d (including inconclusive)
  * - topWin excludes not_acted_on (per A1 — getTopWinsForWorkspace filters them)
  * - workspace isolation: ws_a values don't bleed into ws_b
+ * - pending_count counts each action once regardless of outcome fan-out
  *
  * Port: 13906 (range 13906–13909)
  */
@@ -30,6 +36,8 @@ const { api } = ctx;
 
 let wsA = '';
 let wsB = '';
+let wsC = ''; // I3/C1: multi-checkpoint win→neutral — winRate must use latest checkpoint
+let wsD = ''; // I3/C2: pending action with 2 outcomes — activeActions must not fan-out
 
 // Timestamps for fixture outcomes
 const NOW = new Date().toISOString();
@@ -100,11 +108,122 @@ function seedActionWithOutcome(
   return action.id;
 }
 
+/**
+ * I3/C1 fixture helper: seeds one action and inserts TWO outcomes at different
+ * checkpoints. The first is a win at day 30; the second is a neutral 'loss' at
+ * day 90 (latest qualifying checkpoint). computeScorecard() takes
+ * latestScored[latestScored.length-1], so the action is NOT a win — winRate must be 0.
+ * The pre-fix SQL (ANY-checkpoint) returned total_wins=1 (winRate=1.0) — wrong.
+ */
+function seedActionWithMultiCheckpointOutcomes(workspaceId: string, idx: number): string {
+  const action = recordAction({
+    workspaceId,
+    actionType: 'content_published',
+    sourceType: 'post',
+    sourceId: `a2-multi-ckpt-${workspaceId}-${idx}`,
+    pageUrl: `/page-multi-${workspaceId}-${idx}`,
+    targetKeyword: `kw-a2-multi-${idx}`,
+    baselineSnapshot: BASELINE,
+    attribution: 'platform_executed',
+    sourceFlag: 'live',
+    baselineConfidence: 'exact',
+  });
+
+  // First outcome: win at day 30
+  db.prepare(`
+    INSERT OR REPLACE INTO action_outcomes
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal,
+       delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (?, ?, 30, ?, 'win', NULL, ?, '{}', ?, NULL, NULL)
+  `).run(
+    `a2-ckpt30-${workspaceId}-${idx}`,
+    action.id,
+    JSON.stringify({ captured_at: FIVE_DAYS_AGO, position: 5, clicks: 50 }),
+    JSON.stringify(DELTA),
+    FIVE_DAYS_AGO,
+  );
+
+  // Second outcome: loss at day 90 (later checkpoint — this is the LATEST scored)
+  // This makes the action NOT a win when using latest-checkpoint semantics.
+  db.prepare(`
+    INSERT OR REPLACE INTO action_outcomes
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal,
+       delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (?, ?, 90, ?, 'loss', NULL, ?, '{}', ?, NULL, NULL)
+  `).run(
+    `a2-ckpt90-${workspaceId}-${idx}`,
+    action.id,
+    JSON.stringify({ captured_at: TWO_DAYS_AGO, position: 18, clicks: 6 }),
+    JSON.stringify({ ...DELTA, direction: 'declined' }),
+    TWO_DAYS_AGO,
+  );
+
+  return action.id;
+}
+
+/**
+ * I3/C2 fixture helper: seeds one pending action (measurement_complete=0) and inserts
+ * TWO outcome rows for it (day 30 and day 60 — neither marks complete, only day 90 does).
+ * activeActions must be 1 (not 2). The pre-fix SUM() fan-out returned 2 — wrong.
+ */
+function seedPendingActionWithTwoOutcomes(workspaceId: string, idx: number): string {
+  const action = recordAction({
+    workspaceId,
+    actionType: 'content_published',
+    sourceType: 'post',
+    sourceId: `a2-pending-fanout-${workspaceId}-${idx}`,
+    pageUrl: `/page-pending-${workspaceId}-${idx}`,
+    targetKeyword: `kw-a2-pending-${idx}`,
+    baselineSnapshot: BASELINE,
+    attribution: 'platform_executed',
+    sourceFlag: 'live',
+    baselineConfidence: 'exact',
+  });
+
+  // Day-30 outcome (does NOT set measurement_complete=1 — only day 90 does)
+  db.prepare(`
+    INSERT OR REPLACE INTO action_outcomes
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal,
+       delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (?, ?, 30, ?, 'neutral', NULL, ?, '{}', ?, NULL, NULL)
+  `).run(
+    `a2-pending-ckpt30-${workspaceId}-${idx}`,
+    action.id,
+    JSON.stringify({ captured_at: FIVE_DAYS_AGO, position: 15, clicks: 30 }),
+    JSON.stringify(DELTA),
+    FIVE_DAYS_AGO,
+  );
+
+  // Day-60 outcome (also does NOT set measurement_complete=1)
+  db.prepare(`
+    INSERT OR REPLACE INTO action_outcomes
+      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal,
+       delta_summary, competitor_context, measured_at, attributed_value, value_basis)
+    VALUES (?, ?, 60, ?, 'neutral', NULL, ?, '{}', ?, NULL, NULL)
+  `).run(
+    `a2-pending-ckpt60-${workspaceId}-${idx}`,
+    action.id,
+    JSON.stringify({ captured_at: TWO_DAYS_AGO, position: 12, clicks: 45 }),
+    JSON.stringify(DELTA),
+    TWO_DAYS_AGO,
+  );
+
+  // Confirm action is still pending (measurement_complete=0) — day 90 would have set it
+  const row = db.prepare('SELECT measurement_complete FROM tracked_actions WHERE id = ?').get(action.id) as { measurement_complete: number } | undefined;
+  if (row?.measurement_complete !== 0) {
+    throw new Error(`I3/C2 fixture: expected measurement_complete=0 for action ${action.id}`);
+  }
+
+  return action.id;
+}
+
 beforeAll(async () => {
   await ctx.startServer();
 
   wsA = createWorkspace('A2 Parity Workspace A').id;
   wsB = createWorkspace('A2 Parity Workspace B').id;
+  wsC = createWorkspace('A2 Parity Workspace C — multi-checkpoint').id;
+  wsD = createWorkspace('A2 Parity Workspace D — pending fan-out').id;
 
   // ── Workspace A: 3 actions ────────────────────────────────────────────────
   // action1: platform_executed, win scored 5 days ago (within 30d)
@@ -125,11 +244,21 @@ beforeAll(async () => {
   seedActionWithOutcome(wsB, 'platform_executed', 'inconclusive', TWO_DAYS_AGO, 6);
   // action7: platform_executed, no outcome (pending)
   seedActionWithOutcome(wsB, 'platform_executed', null, null, 7);
+
+  // ── Workspace C (I3/C1): 1 action, win@30 then loss@90 ────────────────────
+  // Latest qualifying checkpoint is loss → action is NOT a win.
+  // Pre-fix SQL returned total_wins=1 (ANY-checkpoint). Fixed SQL must return 0.
+  seedActionWithMultiCheckpointOutcomes(wsC, 1);
+
+  // ── Workspace D (I3/C2): 1 pending action with 2 outcomes ──────────────────
+  // measurement_complete=0, outcomes at day 30 and day 60.
+  // Pre-fix SUM() fan-out returned pending_count=2. Fixed COUNT(DISTINCT) must return 1.
+  seedPendingActionWithTwoOutcomes(wsD, 1);
 }, 60_000);
 
 afterAll(async () => {
-  // Clean up outcomes then actions for both workspaces
-  for (const ws of [wsA, wsB]) {
+  // Clean up outcomes then actions for all workspaces
+  for (const ws of [wsA, wsB, wsC, wsD]) {
     db.prepare('DELETE FROM action_outcomes WHERE action_id IN (SELECT id FROM tracked_actions WHERE workspace_id = ?)').run(ws);
     db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(ws);
     deleteWorkspace(ws);
@@ -281,6 +410,77 @@ describe('GET /api/outcomes/overview — A2 aggregate SQL parity', () => {
       // And scoredLast30d are different
       expect(entryA!.scoredLast30d).toBe(1);
       expect(entryB!.scoredLast30d).toBe(3);
+    });
+  });
+
+  // ── I3/C1 — latest-checkpoint semantics for total_wins ────────────────────
+  //
+  // Reproduces the exact bug from code review finding C1:
+  // An action with win@day30 + loss@day90 should NOT count as a win.
+  // computeScorecard() uses latestScored[latestScored.length-1] → loss (day90).
+  // Pre-fix ANY-checkpoint SQL yielded total_wins=1 (winRate=1.0) — wrong.
+  // Post-fix MAX(checkpoint_days) subquery yields total_wins=0 (winRate=0) — correct.
+  describe('Workspace C — I3/C1: multi-checkpoint win→loss, winRate uses latest checkpoint', () => {
+    it('workspace C appears in the overview', async () => {
+      const res = await api('/api/outcomes/overview');
+      const body = await res.json() as Array<Record<string, unknown>>;
+      const entry = body.find(e => e.workspaceId === wsC);
+      expect(entry).toBeDefined();
+    });
+
+    it('winRate = 0 — action has win@day30 but loss@day90; latest checkpoint is loss (not a win)', async () => {
+      // The pre-fix SQL (ANY checkpoint) returned winRate=1.0 for this action.
+      // The fixed SQL (MAX checkpoint subquery) must return winRate=0.
+      // This assertion FAILS against pre-fix SQL and PASSES after C1 fix.
+      const res = await api('/api/outcomes/overview');
+      const body = await res.json() as Array<Record<string, unknown>>;
+      const entry = body.find(e => e.workspaceId === wsC);
+      expect(entry).toBeDefined();
+      expect(entry!.winRate).toBe(0);
+    });
+
+    it('activeActions = 1 (measurement_complete=0; day90 outcome sets complete, but fixture has none)', async () => {
+      // The action has day30+day90 outcomes. day90 recordOutcome() DOES set measurement_complete=1
+      // — but we wrote these directly to DB without going through recordOutcome(), so the
+      // mark-complete side-effect did NOT run. The action is still pending.
+      // Verify activeActions reflects the actual DB state, not the checkpoint logic.
+      const actionRow = db.prepare('SELECT measurement_complete FROM tracked_actions WHERE workspace_id = ?').get(wsC) as { measurement_complete: number } | undefined;
+      // If the action IS complete (measurement_complete=1) in our fixture, activeActions=0.
+      // If NOT complete (=0), activeActions=1. We seeded via raw INSERT, so it's 0.
+      expect(actionRow?.measurement_complete).toBe(0);
+
+      const res = await api('/api/outcomes/overview');
+      const body = await res.json() as Array<Record<string, unknown>>;
+      const entry = body.find(e => e.workspaceId === wsC);
+      expect(entry).toBeDefined();
+      expect(entry!.activeActions).toBe(1);
+    });
+  });
+
+  // ── I3/C2 — pending_count fan-out when action has multiple outcomes ─────────
+  //
+  // Reproduces the exact bug from code review finding C2:
+  // A pending action (measurement_complete=0) with 2 outcome rows (day30 + day60)
+  // contributed 2 to the SUM() pre-fix SQL (one per join row).
+  // Post-fix COUNT(DISTINCT ta.id) collapses them back to 1.
+  describe('Workspace D — I3/C2: pending action with 2 outcomes, activeActions counts it ONCE', () => {
+    it('workspace D appears in the overview', async () => {
+      const res = await api('/api/outcomes/overview');
+      const body = await res.json() as Array<Record<string, unknown>>;
+      const entry = body.find(e => e.workspaceId === wsD);
+      expect(entry).toBeDefined();
+    });
+
+    it('activeActions = 1 — pending action with day30+day60 outcomes is counted once, not twice', async () => {
+      // The pre-fix SUM(CASE WHEN measurement_complete=0 THEN 1 ELSE 0 END) fanned out:
+      // 1 action × 2 outcome rows = SUM returned 2 (activeActions=2) — wrong.
+      // The fixed COUNT(DISTINCT CASE WHEN measurement_complete=0 THEN ta.id END) returns 1.
+      // This assertion FAILS against pre-fix SQL and PASSES after C2 fix.
+      const res = await api('/api/outcomes/overview');
+      const body = await res.json() as Array<Record<string, unknown>>;
+      const entry = body.find(e => e.workspaceId === wsD);
+      expect(entry).toBeDefined();
+      expect(entry!.activeActions).toBe(1);
     });
   });
 });
