@@ -457,7 +457,7 @@ export function UnifiedInbox({
           decision === 'approved'
             ? heldCount > 0
               ? `Approved. ${heldCount} item${heldCount === 1 ? '' : 's'} held for your team to review.`
-              : 'Approved. Your team will handle the rest.'
+              : "Approved. We're publishing this. Track it in your inbox."
             : decision === 'declined'
               ? 'Declined. Your team has been notified.'
               : 'Feedback sent to your team.',

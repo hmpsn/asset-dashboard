@@ -112,7 +112,7 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
 }
 
 export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownload }: MatrixProgressViewProps) {
-  const [previewCell, setPreviewCell] = useState<MatrixCell | null>(null);
+  const [previewCellId, setPreviewCellId] = useState<string | null>(null);
 
   const completedCount = matrix.cells.filter(c => ['approved', 'draft', 'published'].includes(c.status)).length;
   const publishedCount = matrix.cells.filter(c => c.status === 'published').length;
@@ -130,15 +130,19 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
   };
 
   const handleCellClick = (cell: MatrixCell) => {
-    setPreviewCell(cell);
+    setPreviewCellId(cell.id);
     onCellPreview(cell);
   };
 
   const handleFlag = (comment: string) => {
-    if (previewCell) {
-      onFlagCell(previewCell.id, comment);
+    if (previewCellId) {
+      onFlagCell(previewCellId, comment);
     }
   };
+
+  const previewCell = previewCellId
+    ? matrix.cells.find(cell => cell.id === previewCellId) ?? null
+    : null;
 
   return (
     <div className="space-y-8">
@@ -297,7 +301,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
       {previewCell && (
         <CellPreviewModal
           cell={previewCell}
-          onClose={() => setPreviewCell(null)}
+          onClose={() => setPreviewCellId(null)}
           onFlag={handleFlag}
         />
       )}

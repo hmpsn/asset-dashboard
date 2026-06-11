@@ -377,9 +377,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.1",
           "est": "2-3h",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "After approve, item silently leaves Decisions — clients re-ask. Toast on successful respond: 'Approved — we're publishing this. Track it in Reviews.' Pure frontend; mutation exists (useUnifiedInbox respond handler, DecisionCard, DecisionDetailModal)."
+          "notes": "Shipped in PR 3. Successful unified-inbox approve responses now show a next-step toast: \"Approved. We're publishing this. Track it in your inbox.\" This covers both standard DecisionCard approval and inline approval-family cards while preserving held-item, declined, feedback, and apply-to-website flows."
         },
         {
           "id": "cda-qw2-flag-confirmation",
@@ -387,9 +387,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.2",
           "est": "1-2h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "ContentPlanTab.tsx flag mutation is silent today, making the tab feel read-only. Success toast + optimistic cell state. Same pattern as the post-approval toast — back-to-back or same PR."
+          "notes": "Shipped in PR 3. Content Plan cell flagging now updates the visible cell to flagged immediately with the submitted note, reconciles from the server after success, rolls back on API failure, and shows success/error toasts so the tab confirms the client was heard."
         },
         {
           "id": "cda-qw2-comment-count-badges",
