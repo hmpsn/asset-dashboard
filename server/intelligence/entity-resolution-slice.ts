@@ -1,6 +1,7 @@
 import type { EntityCandidate, EntityResolutionSlice, EntitySurface } from '../../shared/types/entity-resolution.js';
 import type { IntelligenceOptions } from '../../shared/types/intelligence.js';
 import { getWorkspace } from '../workspaces.js';
+import { listPageKeywords } from '../page-keywords.js';
 import { slugify } from '../helpers.js';
 import { resolveCandidateWithWikidata } from './entity-resolution-wikidata.js';
 
@@ -94,8 +95,13 @@ export async function assembleEntityResolution(
     if (candidates.length >= MAX_ENTITY_CANDIDATES) break;
   }
 
-  if (opts?.pagePath && ws.keywordStrategy?.pageMap?.length) {
-    const match = ws.keywordStrategy.pageMap.find(entry => entry.pagePath === opts.pagePath);
+  // pageMap is table-only (stripped from the blob before persistence — ws.keywordStrategy?.pageMap
+  // is always undefined at read time). Read from the page_keywords table, matching
+  // seo-context-slice.ts:42 (listPageKeywords) and keyword-strategy-assembler.ts (table-only
+  // pageMap). Without this the page-level entity candidates block was permanently dead code.
+  if (opts?.pagePath) {
+    const tablePageMap = listPageKeywords(workspaceId);
+    const match = tablePageMap.find(entry => entry.pagePath === opts.pagePath);
     if (match?.primaryKeyword) {
       addCandidate(candidates, seen, {
         label: match.primaryKeyword,

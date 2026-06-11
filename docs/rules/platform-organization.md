@@ -89,7 +89,7 @@ Owns the admin workspace shell, overview surfaces, and cross-workspace operator 
 - Owned routes/modules:
   `server/routes/workspaces.ts`, `server/routes/workspace-home.ts`, `server/routes/workspace-badges.ts`, `server/routes/activity.ts`, `server/routes/reports.ts`, `server/routes/roadmap.ts`, `server/workspaces.ts`, `server/activity-log.ts`
 - Owned components/hooks/API wrappers/shared types:
-  `src/components/WorkspaceHome.tsx`, `src/components/WorkspaceOverview.tsx`, `src/components/workspace-home/`, `src/components/NotificationBell.tsx`, `src/components/TaskPanel.tsx`, `src/hooks/admin/useWorkspaceHome.ts`, `src/hooks/admin/useWorkspaceOverview.ts`, `src/hooks/admin/useNotifications.ts`, `src/hooks/admin/useWorkspaces.ts`, `src/api/workspaces.ts`, `shared/types/workspace.ts`, `shared/types/features.ts`, `shared/types/roadmap.ts`
+  `src/components/WorkspaceHome.tsx`, `src/components/WorkspaceOverview.tsx`, `src/components/workspace-home/`, `src/components/NotificationBell.tsx`, `src/hooks/admin/useWorkspaceHome.ts`, `src/hooks/admin/useWorkspaceOverview.ts`, `src/hooks/admin/useNotifications.ts`, `src/hooks/admin/useWorkspaces.ts`, `src/api/workspaces.ts`, `shared/types/workspace.ts`, `shared/types/features.ts`, `shared/types/roadmap.ts`
 - WebSocket/events:
   `WS_EVENTS.WORKSPACE_UPDATED`, `WS_EVENTS.ACTIVITY_NEW`, admin-global workspace events when changes fan out across the admin shell
 - Tests/docs:

@@ -148,4 +148,33 @@ describe('GET /api/webflow/keyword-strategy/:id — admin assembler byte-identit
       deleteWorkspace(empty);
     }
   });
+
+  it('Bug 1 — strategyUx site_keyword explanations carry TABLE-sourced volume/difficulty, not undefined', async () => {
+    // The blob carries stale siteKeywordMetrics (volume 1, difficulty 1) and the table
+    // carries the REAL values (volume 1000, difficulty 30). The strategyUx explanation
+    // for the site keyword must reference the TABLE values — proving buildKeywordStrategyUxPayload
+    // receives options.siteKeywordMetrics from the table, not options.strategy?.siteKeywordMetrics
+    // (which is always undefined post-strip).
+    const res = await api(`/api/webflow/keyword-strategy/${fullWs}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { strategyUx?: { explanations?: Array<{ keyword: string; role: string; sourceEvidence?: string[] }> } };
+    const explanations = body.strategyUx?.explanations ?? [];
+    const siteKwExplanation = explanations.find(e => e.role === 'site_keyword' && e.keyword === 'admin site kw');
+    expect(siteKwExplanation).toBeTruthy();
+    // Volume 1,000 must appear in sourceEvidence — proves the TABLE value (1000) is used,
+    // not the stale blob value (1) or undefined.
+    expect(siteKwExplanation?.sourceEvidence?.some(s => s.includes('1,000'))).toBe(true);
+    expect(siteKwExplanation?.sourceEvidence?.some(s => s.includes('30'))).toBe(true);
+  });
+
+  it('Bug 1 — public /api/public/seo-strategy strategyUx site_keyword explanations also carry TABLE metrics', async () => {
+    const res = await api(`/api/public/seo-strategy/${fullWs}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { strategyUx?: { explanations?: Array<{ keyword: string; role: string; sourceEvidence?: string[] }> } };
+    const explanations = body.strategyUx?.explanations ?? [];
+    const siteKwExplanation = explanations.find(e => e.role === 'site_keyword' && e.keyword === 'admin site kw');
+    expect(siteKwExplanation).toBeTruthy();
+    // TABLE volume 1,000 must appear in the public route's explanation too.
+    expect(siteKwExplanation?.sourceEvidence?.some(s => s.includes('1,000'))).toBe(true);
+  });
 });

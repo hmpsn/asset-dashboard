@@ -65,6 +65,8 @@ export interface ContentBrief {
   generationStyle?: ContentGenerationStyle;
   // Scraped source evidence (C4 / v9) — persisted SERP + reference source text
   sourceEvidence?: BriefSourceEvidence;
+  // W2.5 lineage: set to the new brief's id when this brief is superseded by a regeneration
+  supersededBy?: string;
 }
 
 export interface BriefTemplateCrossrefSection {

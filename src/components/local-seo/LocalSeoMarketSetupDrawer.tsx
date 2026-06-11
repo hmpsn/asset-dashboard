@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
 import type {
   LocalSeoLocationLookupCandidate,
   LocalSeoMarket,
@@ -246,14 +246,15 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
 
     if (justOpened) {
       // Opening fresh: always sync — no in-progress drafts exist yet.
+      // Split server markets into active (configurable) vs inactive (deactivated).
       lastSyncedRef.current = {
         markets: data.markets,
         posture: data.settings.posture,
         keywordsPerRefresh: data.settings.keywordsPerRefresh,
       };
       setPosture(data.settings.posture);
-      setMarkets(data.markets.map(market => draftFromMarket(market)));
-      setRemovedMarkets([]);
+      setMarkets(data.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
+      setRemovedMarkets(data.markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
       setKeywordsPerRefreshInput(
         typeof data.settings.keywordsPerRefresh === 'number'
           ? String(data.settings.keywordsPerRefresh)
@@ -280,7 +281,8 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
     const isDirtyKeywords = keywordsPerRefreshInput !== syncedKeywords;
 
     // Draft markets are dirty if any field was changed vs. the last-synced snapshot.
-    const syncedDrafts = synced.markets.map(m => draftFromMarket(m));
+    // Inactive markets are tracked in removedMarkets — exclude them from the active comparison.
+    const syncedDrafts = synced.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(m => draftFromMarket(m));
     const isDirtyMarkets = markets.length !== syncedDrafts.length
       || markets.some((draft, i) => {
         const s = syncedDrafts[i];
@@ -304,14 +306,15 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
     }
 
     // Pristine: resync from the fresh server data.
+    // Split server markets into active (configurable) vs inactive (deactivated).
     lastSyncedRef.current = {
       markets: data.markets,
       posture: data.settings.posture,
       keywordsPerRefresh: data.settings.keywordsPerRefresh,
     };
     setPosture(data.settings.posture);
-    setMarkets(data.markets.map(market => draftFromMarket(market)));
-    setRemovedMarkets([]);
+    setMarkets(data.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
+    setRemovedMarkets(data.markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
     setKeywordsPerRefreshInput(
       typeof data.settings.keywordsPerRefresh === 'number'
         ? String(data.settings.keywordsPerRefresh)
@@ -688,18 +691,16 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
                     )}
                     <IconButton
                       icon={Trash2}
-                      label={`Remove ${marketLabel(market)}`}
+                      label={`Deactivate ${marketLabel(market)}`}
                       variant="ghost"
                       size="sm"
                       className="text-[var(--brand-text-muted)] hover:text-red-400"
                       onClick={() => {
                         setMarkets(current => current.filter((_, i) => i !== index));
-                        if (market.id) {
-                          setRemovedMarkets(current => [
-                            ...current.filter(item => item.id !== market.id),
-                            { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
-                          ]);
-                        }
+                        setRemovedMarkets(current => [
+                          ...current.filter(item => item.id !== market.id),
+                          { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
+                        ]);
                       }}
                     />
                   </div>
@@ -796,6 +797,31 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
               </div>
             ))}
           </section>
+
+          {removedMarkets.length > 0 && (
+            <section aria-label="Inactive markets" className="space-y-3">
+              <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Inactive markets</h3>
+              {removedMarkets.map(market => (
+                <div key={market.id ?? market.label} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/20 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="t-caption font-semibold text-[var(--brand-text-muted)] truncate">{marketLabel(market)}</p>
+                    <p className="t-caption-sm text-[var(--brand-text-muted)]">Deactivated — not included in refreshes</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={() => {
+                      setRemovedMarkets(current => current.filter(m => m.id !== market.id || m.label !== market.label));
+                      setMarkets(current => [...current, { ...market, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }]);
+                    }}
+                  >
+                    Reactivate
+                  </Button>
+                </div>
+              ))}
+            </section>
+          )}
 
           <section className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
             <div className="mb-3">

@@ -17,7 +17,7 @@ import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
 import { adminRichTextClass } from './post-editor/richTextStyles';
-import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
+import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey, StoredAIReview } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 import { formatDate } from '../utils/formatDates';
@@ -52,6 +52,8 @@ interface GeneratedPost {
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
+  /** Persisted AI review verdicts — seeded into ReviewChecklist on open (C4). */
+  aiReview?: StoredAIReview;
   webflowItemId?: string;
   webflowCollectionId?: string;
   publishedAt?: string;
@@ -664,6 +666,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           }}
           onRequestFix={handleRequestFix}
           evidence={reviewEvidence}
+          persistedAIReview={post.aiReview}
         />
       )}
 

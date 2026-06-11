@@ -2,11 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
+  listPageKeywords: vi.fn(),
   resolveCandidateWithWikidata: vi.fn(),
 }));
 
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: mocks.getWorkspace,
+}));
+// Bug 3 fix: the slice now reads pageMap from the page_keywords TABLE via
+// listPageKeywords, not from ws.keywordStrategy.pageMap (which is always
+// undefined post-strip — the blob field is stripped before persistence).
+vi.mock('../../server/page-keywords.js', () => ({
+  listPageKeywords: mocks.listPageKeywords,
 }));
 vi.mock('../../server/intelligence/entity-resolution-wikidata.js', () => ({
   resolveCandidateWithWikidata: mocks.resolveCandidateWithWikidata,
@@ -17,6 +24,8 @@ const { assembleEntityResolution } = await import('../../server/intelligence/ent
 describe('assembleEntityResolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: empty page map (table has no rows for this workspace)
+    mocks.listPageKeywords.mockReturnValue([]);
     mocks.resolveCandidateWithWikidata.mockResolvedValue({
       status: 'unresolved',
       confidence: 0,
@@ -36,15 +45,10 @@ describe('assembleEntityResolution', () => {
   it('assembles thing/place candidates from workspace and page context', async () => {
     mocks.getWorkspace.mockReturnValue({
       id: 'ws-1',
+      // pageMap is NOT on keywordStrategy blob (stripped before storage — always undefined
+      // at read time). siteKeywords comes from the blob.
       keywordStrategy: {
         siteKeywords: ['web design', 'seo strategy'],
-        pageMap: [
-          {
-            pagePath: '/services',
-            primaryKeyword: 'austin web design',
-            secondaryKeywords: ['conversion optimization'],
-          },
-        ],
       },
       businessProfile: {
         address: {
@@ -53,6 +57,14 @@ describe('assembleEntityResolution', () => {
         },
       },
     });
+    // Bug 3 fix: page-level entity candidates now come from the TABLE via listPageKeywords.
+    mocks.listPageKeywords.mockReturnValue([
+      {
+        pagePath: '/services',
+        primaryKeyword: 'austin web design',
+        secondaryKeywords: ['conversion optimization'],
+      },
+    ]);
 
     const result = await assembleEntityResolution('ws-1', { pagePath: '/services' });
 
@@ -64,6 +76,52 @@ describe('assembleEntityResolution', () => {
     expect(result.entities.some(entity => entity.surfaces.includes('area_served'))).toBe(true);
     expect(result.unresolved.length).toBeGreaterThan(0);
     expect(result.generatedAt).toBeTruthy();
+  });
+
+  it('Bug 3 — page-level entity candidates come from the table (listPageKeywords), not the blob', async () => {
+    // Workspace has NO pageMap on its keywordStrategy (simulates the post-strip state:
+    // ws.keywordStrategy.pageMap is always undefined at read time).
+    mocks.getWorkspace.mockReturnValue({
+      id: 'ws-bug3',
+      keywordStrategy: { siteKeywords: [] },
+    });
+    // The TABLE has a page keyword row for the target path.
+    mocks.listPageKeywords.mockReturnValue([
+      {
+        pagePath: '/about',
+        primaryKeyword: 'about keyword from table',
+        secondaryKeywords: ['secondary from table'],
+      },
+    ]);
+
+    const result = await assembleEntityResolution('ws-bug3', { pagePath: '/about' });
+
+    // article_about and article_mentions must come from the table row, not the blob.
+    expect(result.entities.some(e => e.surfaces.includes('article_about'))).toBe(true);
+    const articleAbout = result.entities.find(e => e.surfaces.includes('article_about'));
+    expect(articleAbout?.label).toBe('about keyword from table');
+    // listPageKeywords must have been called (not the never-populated blob path).
+    expect(mocks.listPageKeywords).toHaveBeenCalledWith('ws-bug3');
+  });
+
+  it('Bug 3 — page-level candidates are absent when table is empty (even if blob carried pageMap)', async () => {
+    // Simulates the broken state before the fix: ws.keywordStrategy.pageMap had data
+    // but was inaccessible via the blob path. Post-fix: table is empty → no article_about.
+    mocks.getWorkspace.mockReturnValue({
+      id: 'ws-bug3-empty',
+      keywordStrategy: {
+        siteKeywords: ['site kw'],
+        // blob pageMap would have been here pre-strip, but is never populated now
+        pageMap: [{ pagePath: '/old', primaryKeyword: 'blob keyword', secondaryKeywords: [] }],
+      },
+    });
+    // Table is empty for this workspace
+    mocks.listPageKeywords.mockReturnValue([]);
+
+    const result = await assembleEntityResolution('ws-bug3-empty', { pagePath: '/old' });
+
+    // No article_about from the blob path (table is authoritative; table is empty)
+    expect(result.entities.some(e => e.surfaces.includes('article_about'))).toBe(false);
   });
 
   it('resolves candidates to Wikidata references when enabled', async () => {

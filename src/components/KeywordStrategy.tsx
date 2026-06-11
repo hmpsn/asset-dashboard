@@ -931,7 +931,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
 
           {/* Keyword Gaps */}
-          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={kdColor} />
+          <KeywordGaps
+            keywordGaps={strategy.keywordGaps || []}
+            difficultyColor={kdColor}
+            workspaceId={workspaceId}
+            navigate={navigate}
+            keywordHubEnabled={keywordHubEnabled}
+          />
 
           {/* ── Reference & Analysis ── */}
           <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">

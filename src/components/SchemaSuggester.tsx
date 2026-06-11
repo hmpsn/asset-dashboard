@@ -110,6 +110,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     onPageGenerated: pageId => {
       setExpanded(prev => new Set(prev).add(pageId));
       clearManualDeliveryForPage(pageId);
+      // Drop any stale manual JSON edit so the regenerated schema is authoritative
+      // (getEffectiveSchema prefers editedSchemaJson — an un-cleared edit would
+      // silently override the new generation in preview/Publish/Copy/send).
+      clearManualEditForPage(pageId);
     },
   });
   const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
@@ -183,7 +187,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
+    clearManualEditForPage,
+    clearAllManualEdits,
   } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData, bulkPublishBlocked });
+
+  // Full re-scan regenerates every page — drop ALL stale manual edits first so the
+  // freshly-generated schemas are authoritative (mirrors per-page clearing in onPageGenerated).
+  const handleRunScan = () => {
+    clearAllManualEdits();
+    runScan();
+  };
   const impactData = useSchemaImpactData(workspaceId);
 
   const toggleExpand = (id: string) => {
@@ -240,7 +253,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           />
         )}
         <SchemaGeneratorHero
-          onRunScan={runScan}
+          onRunScan={handleRunScan}
         />
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         <SchemaBusinessProfileCallout
@@ -304,7 +317,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           type="general"
           title="Schema Scan Failed"
           message={scanError}
-          action={{ label: 'Scan Again', onClick: runScan }}
+          action={{ label: 'Scan Again', onClick: handleRunScan }}
         />
       </div>
     );
@@ -336,7 +349,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
           </>
         )}
-        <Button onClick={runScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
+        <Button onClick={handleRunScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
           Re-scan
         </Button>
       </div>
@@ -465,7 +478,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               </div>
             )}
           </div>
-          <Button onClick={runScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
+          <Button onClick={handleRunScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
             Re-generate All
           </Button>
         </div>

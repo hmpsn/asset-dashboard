@@ -24,7 +24,8 @@ import {
   regenerateBrief,
   regenerateOutline,
 } from '../content-brief.js';
-import { createContentRequest, updateContentRequest } from '../content-requests.js';
+import { createContentRequest, getOpenRequestForBrief, updateContentRequest } from '../content-requests.js';
+import db from '../db/index.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
@@ -245,34 +246,43 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
 
   const ws = getWorkspace(req.params.workspaceId);
 
-  // Create a content request linked to this brief
-  const request = createContentRequest(req.params.workspaceId, {
-    topic: brief.suggestedTitle,
-    targetKeyword: brief.targetKeyword,
-    intent: brief.intent || 'informational',
-    priority: 'medium',
-    rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
-    source: 'strategy',
-    serviceType: 'brief_only',
-    pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
-    initialStatus: 'brief_generated',
-    dedupe: false,
-  });
+  // Bug 2 fix: avoid duplicate client requests by checking for an existing open request
+  // linked to this brief before creating a new one.
+  const existing = getOpenRequestForBrief(req.params.workspaceId, brief.id);
+  if (existing) {
+    return res.json({ ok: true, requestId: existing.id });
+  }
 
-  // Link the brief and set to client_review
-  updateContentRequest(req.params.workspaceId, request.id, {
-    briefId: brief.id,
-    status: 'client_review',
-  });
+  // Bug 2 fix: wrap create + link in a single transaction so the two writes are atomic.
+  let request: ReturnType<typeof createContentRequest> | null = null;
+  db.transaction(() => {
+    request = createContentRequest(req.params.workspaceId, {
+      topic: brief.suggestedTitle,
+      targetKeyword: brief.targetKeyword,
+      intent: brief.intent || 'informational',
+      priority: 'medium',
+      rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
+      source: 'strategy',
+      serviceType: 'brief_only',
+      pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
+      initialStatus: 'brief_generated',
+      dedupe: false,
+    });
+    // Link the brief and set to client_review
+    updateContentRequest(req.params.workspaceId, request!.id, {
+      briefId: brief.id,
+      status: 'client_review',
+    });
+  })();
 
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id });
-  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request!.id });
+  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' });
   addActivity(
     req.params.workspaceId,
     'brief_generated',
     `Sent brief "${brief.suggestedTitle}" to client`,
     `Keyword: ${brief.targetKeyword}`,
-    { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' },
+    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' },
   );
 
   // Send email notification
@@ -289,8 +299,8 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     });
   }
 
-  log.info(`Brief ${brief.id} sent to client via request ${request.id}`);
-  res.json({ ok: true, requestId: request.id });
+  log.info(`Brief ${brief.id} sent to client via request ${request!.id}`);
+  res.json({ ok: true, requestId: request!.id });
 });
 
 // Delete a brief

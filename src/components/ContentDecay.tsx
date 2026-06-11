@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp, Send, Check } from 'lucide-react';
+import { RefreshCw, AlertTriangle, AlertCircle, Eye, FileText, Search, Sparkles, ArrowDown, ArrowUp, Send, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { contentDecay } from '../api/content';
 import { clientActions } from '../api/clientActions';
 import { EmptyState, Icon, Button, ClickableRow, FormTextarea } from './ui';
 import { formatDate } from '../utils/formatDates';
+import { adminPath } from '../routes';
 
 interface DecayingPage {
   page: string;
@@ -45,6 +47,7 @@ const SEV_CONFIG = {
 };
 
 export default function ContentDecay({ workspaceId }: Props) {
+  const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<DecayAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -254,6 +257,31 @@ export default function ContentDecay({ workspaceId }: Props) {
                               <div className={`t-caption-sm font-medium ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.previousPosition} → {page.currentPosition}</div>
                               <div className={`t-micro ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
                             </div>
+                          </div>
+                          {/* Quick-action handoffs */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={FileText}
+                              onClick={() => navigate(
+                                adminPath(workspaceId, 'content-pipeline'),
+                                { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: page.page } } },
+                              )}
+                            >
+                              Refresh brief
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={Search}
+                              onClick={() => navigate(
+                                adminPath(workspaceId, 'page-intelligence'),
+                                { state: { fixContext: { targetRoute: 'page-intelligence', pageSlug: page.page, pageName: page.page } } },
+                              )}
+                            >
+                              Review page
+                            </Button>
                           </div>
                           {page.refreshRecommendation && (
                             <div className="bg-accent-brand-soft border border-accent-brand-soft rounded-[var(--radius-lg)] p-3 mt-2">

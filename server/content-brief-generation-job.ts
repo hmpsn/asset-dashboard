@@ -41,6 +41,10 @@ export interface StandaloneContentBriefGenerationParams {
     searchIntent?: string;
   };
   generationStyle?: ContentGenerationStyle;
+  /** W2.5 Bug 1 fix: Page Intelligence "Draft Brief" flow — the page being refreshed/updated */
+  targetPageId?: string;
+  /** W2.5 Bug 1 fix: Slug of the target page for decay-query context injection */
+  targetPageSlug?: string;
 }
 
 export interface RequestContentBriefGenerationParams {
@@ -111,7 +115,7 @@ function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
 }
 
 async function generateStandaloneBrief(params: StandaloneContentBriefGenerationParams): Promise<ContentBrief> {
-  const { workspaceId, targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle } = params;
+  const { workspaceId, targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle, targetPageSlug } = params;
   const ws = getWorkspace(workspaceId);
   if (!ws) throw new Error('Workspace not found');
   const templateCrossref = resolveBriefTemplateCrossref(workspaceId, targetKeyword);
@@ -174,6 +178,32 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
   });
 
   const resolvedPageType = toBriefPageType(pageType) ?? templateCrossref?.pageType ?? undefined;
+
+  // W2.5 Bug 1 fix: inject decay-query context when a targetPageSlug is provided
+  // (mirrors the same block in generateBriefForRequest at the request-path).
+  let standaloneDecayQueryContext: string | undefined;
+  if (targetPageSlug && ws.gscPropertyUrl && ws.webflowSiteId) {
+    try {
+      const decay = loadDecayAnalysis(workspaceId);
+      const normalizeTarget = normalizePageUrl(targetPageSlug);
+      const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
+      if (decayPage) {
+        const qpRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+        const pageQueries = qpRows
+          .filter(r => normalizePageUrl(r.page) === decayPage.page)
+          .sort((a, b) => b.impressions - a.impressions)
+          .slice(0, 15);
+        if (pageQueries.length > 0) {
+          standaloneDecayQueryContext =
+            `DECAY CONTEXT: This page has lost ${Math.abs(decayPage.clickDeclinePct)}% of search clicks. Top queries:\n` +
+            pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
+        }
+      }
+    } catch (err) {
+      log.debug({ err }, 'Standalone decay query context enrichment failed — continuing without it');
+    }
+  }
+
   let brief = await generateBrief(workspaceId, targetKeyword, {
     relatedQueries,
     businessContext: businessContext || ws.keywordStrategy?.businessContext,
@@ -201,6 +231,7 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     ga4PagePerformance: ga4Performance.length > 0 ? ga4Performance : undefined,
     styleExamples: stylePages.length > 0 ? stylePages : undefined,
     pageAnalysisContext,
+    decayQueryContext: standaloneDecayQueryContext,
   });
 
   // C4: persist the scraped source text (bodyText, SERP snippets, fetch timestamps)

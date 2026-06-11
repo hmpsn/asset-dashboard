@@ -60,6 +60,9 @@ const stmts = createStmtCache(() => ({
   selectByKeyword: db.prepare(
     `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND target_keyword = ? AND status != 'declined'`,
   ),
+  selectOpenByBriefId: db.prepare(
+    `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND brief_id = ? AND status NOT IN ('declined', 'published') LIMIT 1`,
+  ),
   update: db.prepare(
     `UPDATE content_topic_requests SET
            status = @status, brief_id = @brief_id, post_id = @post_id, client_note = @client_note,
@@ -111,6 +114,16 @@ export function listContentRequests(workspaceId: string): ContentTopicRequest[] 
 
 export function getContentRequest(workspaceId: string, id: string): ContentTopicRequest | undefined {
   const row = stmts().selectById.get(id, workspaceId) as RequestRow | undefined;
+  return row ? rowToRequest(row) : undefined;
+}
+
+/**
+ * Returns the first open (non-declined, non-published) content request already
+ * linked to the given brief, or undefined if none exists.
+ * Used by the send-to-client route to avoid creating duplicate client requests.
+ */
+export function getOpenRequestForBrief(workspaceId: string, briefId: string): ContentTopicRequest | undefined {
+  const row = stmts().selectOpenByBriefId.get(workspaceId, briefId) as RequestRow | undefined;
   return row ? rowToRequest(row) : undefined;
 }
 

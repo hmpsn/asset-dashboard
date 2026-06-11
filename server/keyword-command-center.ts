@@ -1185,6 +1185,10 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       workspaceId: bundle.workspaceId,
       workspaceName: bundle.workspaceName,
       strategy: strategy ?? null,
+      // Bug 1 fix: strategy here is withResolvedSiteKeywordMetrics result —
+      // siteKeywordMetrics is already table-resolved. Pass explicitly since
+      // buildKeywordStrategyUxPayload no longer reads options.strategy?.siteKeywordMetrics.
+      siteKeywordMetrics: strategy?.siteKeywordMetrics,
       pageMap: bundle.pageMap,
       contentGaps: bundle.contentGaps,
       keywordGaps: bundle.keywordGaps,
@@ -3128,11 +3132,6 @@ function canModifyProtected(keyword: TrackedKeyword | undefined, force?: boolean
   return { ok: false, reason: `${reason} requires explicit confirmation before this action.` };
 }
 
-function findTracked(workspaceId: string, keyword: string): TrackedKeyword | undefined {
-  const normalized = keywordComparisonKey(keyword);
-  return getTrackedKeywords(workspaceId, { includeInactive: true }).find(entry => keywordComparisonKey(entry.query) === normalized);
-}
-
 function deleteFeedbackByKeywordKey(workspaceId: string, keyword: string): number {
   const normalized = keywordComparisonKey(keyword);
   if (!normalized) return 0;
@@ -3278,7 +3277,14 @@ function applyKeywordCommandCenterActionInternal(
   if (!keyword) throw new Error('keyword required');
   const displayKeyword = request.keyword.trim();
 
-  const existing = findTracked(workspace.id, keyword);
+  // Resolve from the PROVENANCE-BEARING table read (listTrackedKeywordRows), NOT
+  // findTracked/getTrackedKeywords — those strip `sourceGapKey` via stripUndefinedKeys,
+  // which makes protectedReason()'s "Gap-approved keyword" arm unreachable and
+  // silently allows unforced retire/decline/pause of client-approved gap keywords.
+  // See deleteKeywordHard for the documented trap this mirrors.
+  const existing = listTrackedKeywordRows(workspace.id).find(
+    entry => keywordComparisonKey(entry.query) === keyword,
+  );
   const protectedCheck = canModifyProtected(existing, request.force);
   const now = new Date().toISOString();
   let trackedKeywords: TrackedKeyword[] | undefined;

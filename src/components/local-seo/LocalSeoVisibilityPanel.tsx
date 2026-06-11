@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Globe2, MapPin, RefreshCw, Search, Settings2, Swords, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Globe2, MapPin, Plus, RefreshCw, Search, Settings2, Swords, XCircle } from 'lucide-react';
 import type { LocalSeoKeywordVisibility, LocalSeoReadResponse, LocalSeoRepeatCompetitor, LocalSeoReportSummary, LocalSeoVisibilityPosture } from '../../../shared/types/local-seo';
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
+import { useRankTrackingAddKeyword } from '../../hooks/admin/useKeywordCommandCenter';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
-import { Badge, Button, ErrorState, Icon, SectionCard, StatCard, cn } from '../ui';
+import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn } from '../ui';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 
 type LocalSeoVisibilityPanelMode = 'strategy' | 'keywords' | 'page';
@@ -62,7 +63,19 @@ export function LocalSeoVisibilityBadge({ visibility, subtle = false }: { visibi
   );
 }
 
-function RepeatCompetitorList({ competitors }: { competitors: LocalSeoRepeatCompetitor[] }) {
+function RepeatCompetitorList({
+  competitors,
+  onTrackKeyword,
+  trackingPending,
+  trackedKeywords,
+  trackingErrors,
+}: {
+  competitors: LocalSeoRepeatCompetitor[];
+  onTrackKeyword: (kw: string) => void;
+  trackingPending: Set<string>;
+  trackedKeywords: Set<string>;
+  trackingErrors: Map<string, string>;
+}) {
   if (competitors.length === 0) return null;
   return (
     <SectionCard title="Repeat Competitors">
@@ -95,15 +108,38 @@ function RepeatCompetitorList({ competitors }: { competitors: LocalSeoRepeatComp
               </div>
             </div>
             {competitor.suggestedTrackingKeywords.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {competitor.suggestedTrackingKeywords.map(kw => (
-                  <span
-                    key={kw}
-                    className="inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-0.5 t-caption-sm text-[var(--brand-text-muted)]"
-                  >
-                    {kw}
-                  </span>
-                ))}
+              <div className="flex flex-col gap-1 mt-2">
+                {competitor.suggestedTrackingKeywords.map(kw => {
+                  const isPending = trackingPending.has(kw);
+                  const isTracked = trackedKeywords.has(kw);
+                  const trackError = trackingErrors.get(kw);
+                  return (
+                    <div key={kw} className="flex flex-col gap-0.5">
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-0.5 t-caption-sm text-[var(--brand-text-muted)]">
+                          {kw}
+                        </span>
+                        {isTracked ? (
+                          <span className="t-caption-sm text-accent-success font-medium">Tracked</span>
+                        ) : (
+                          <IconButton
+                            onClick={() => onTrackKeyword(kw)}
+                            title={isPending ? 'Adding...' : 'Track'}
+                            label={isPending ? 'Adding...' : 'Track'}
+                            icon={Plus}
+                            size="sm"
+                            variant="ghost"
+                            disabled={isPending}
+                            className={isPending ? 'text-[var(--brand-text-muted)] opacity-60' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}
+                          />
+                        )}
+                      </div>
+                      {trackError && (
+                        <div role="alert" className="t-caption-sm text-accent-danger">{trackError}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -263,6 +299,24 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
   const { data, isLoading, isError, error, refetch } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
   const { findActiveJob } = useBackgroundTasks();
+  const addKeywordMutation = useRankTrackingAddKeyword(workspaceId);
+  const [trackingPending, setTrackingPending] = useState<Set<string>>(new Set());
+  const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+  const [trackingErrors, setTrackingErrors] = useState<Map<string, string>>(new Map());
+
+  const handleTrackKeyword = async (kw: string) => {
+    setTrackingPending(prev => new Set(prev).add(kw));
+    setTrackingErrors(prev => { const m = new Map(prev); m.delete(kw); return m; });
+    try {
+      await addKeywordMutation.mutateAsync(kw);
+      setTrackedKeywords(prev => new Set(prev).add(kw));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not add keyword. Try again.';
+      setTrackingErrors(prev => new Map(prev).set(kw, msg));
+    } finally {
+      setTrackingPending(prev => { const s = new Set(prev); s.delete(kw); return s; });
+    }
+  };
   const activeRefreshJob = findActiveJob({
     type: BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH,
     workspaceId,
@@ -380,7 +434,13 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
       />
     </SectionCard>
     {mode === 'keywords' && (report.setupState === 'has_data' || report.setupState === 'ready_no_data') && data.competitorBrands.length > 0 && (
-      <RepeatCompetitorList competitors={data.competitorBrands} />
+      <RepeatCompetitorList
+        competitors={data.competitorBrands}
+        onTrackKeyword={handleTrackKeyword}
+        trackingPending={trackingPending}
+        trackedKeywords={trackedKeywords}
+        trackingErrors={trackingErrors}
+      />
     )}
     </>
   );

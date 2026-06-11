@@ -97,6 +97,8 @@ function makePublishingHook(overrides: Record<string, unknown> = {}) {
     retractSchema: vi.fn(),
     restoreSchema: vi.fn(),
     clearManualDeliveryForPage: vi.fn(),
+    clearManualEditForPage: vi.fn(),
+    clearAllManualEdits: vi.fn(),
     ...overrides,
   };
 }
@@ -449,6 +451,23 @@ describe('SchemaSuggester', () => {
     );
     render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
     fireEvent.click(screen.getByRole('button', { name: /re-generate all/i }));
+    expect(runScanMock).toHaveBeenCalled();
+  });
+
+  it('Re-generate All clears all stale manual edits before scanning (Bug #3)', async () => {
+    const clearAllManualEdits = vi.fn();
+    const pages = [makePage()];
+    const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+    vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(
+      makeGenerationHook({ started: true, loading: false, data: pages }) as ReturnType<typeof genMod.useSchemaSuggesterGeneration>,
+    );
+    const pubMod = await import('../../src/components/schema/useSchemaSuggesterPublishingWorkflow');
+    vi.mocked(pubMod.useSchemaSuggesterPublishingWorkflow).mockReturnValue(
+      makePublishingHook({ clearAllManualEdits }) as ReturnType<typeof pubMod.useSchemaSuggesterPublishingWorkflow>,
+    );
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+    fireEvent.click(screen.getByRole('button', { name: /re-generate all/i }));
+    expect(clearAllManualEdits).toHaveBeenCalled();
     expect(runScanMock).toHaveBeenCalled();
   });
 

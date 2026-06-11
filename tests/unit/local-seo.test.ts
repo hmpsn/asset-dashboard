@@ -670,7 +670,10 @@ describe('local SEO provider selection', () => {
         workspaceId: ws.id,
       }),
     }));
-  });
+  // 15 000 ms: this test runs a full refresh + retention prune + recommendation regen
+  // (dynamic import of recommendations.ts). Combined cost can exceed the 5s default on
+  // slower CI runs or when other tests contend for the same SQLite in-memory instance.
+  }, 15_000);
 
   it('counts local visibility per market and keyword instead of collapsing multi-market evidence', async () => {
     setBroadcast(vi.fn(), vi.fn());

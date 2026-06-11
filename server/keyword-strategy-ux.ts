@@ -23,6 +23,7 @@ import {
   TRACKED_KEYWORD_STATUS,
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
+import type { KeywordStrategySiteKeywordMetric } from './keyword-strategy-enrichment.js';
 import type {
   ContentGap,
   KeywordGapItem,
@@ -71,6 +72,12 @@ interface BuildKeywordStrategyUxOptions {
   workspaceId: string;
   workspaceName?: string;
   strategy?: KeywordStrategy | null;
+  /** Table-backed site keyword metrics (from site_keyword_metrics — NOT from the
+   *  strategy blob, which has siteKeywordMetrics stripped). Callers must pass this
+   *  from assembleStoredKeywordStrategy().siteKeywordMetrics or equivalent so that
+   *  site-keyword explanations include real volume/difficulty evidence.
+   *  Without this, every site-keyword explanation ships metric=undefined. */
+  siteKeywordMetrics?: KeywordStrategySiteKeywordMetric[];
   pageMap: PageKeywordMap[];
   contentGaps: ContentGap[];
   keywordGaps: KeywordGapItem[];
@@ -455,7 +462,9 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     return keywordValueReasons(components, { cpc: exposeCpc ? raw.cpc : undefined, volume: raw.volume, difficulty: raw.difficulty });
   };
 
-  const siteMetricByKeyword = new Map((options.strategy?.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
+  // siteKeywordMetrics is table-only post-strip — options.strategy?.siteKeywordMetrics is always
+  // undefined at read time. Callers must pass the table-backed value via options.siteKeywordMetrics.
+  const siteMetricByKeyword = new Map((options.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
   for (const keyword of options.strategy?.siteKeywords ?? []) {
     const normalized = normalizeKeyword(keyword);
     if (!normalized) continue;
