@@ -185,6 +185,114 @@ grep -r "purple-" src/components/client/   # must be clean
 
 ---
 
+## Review amendments (post-merge verified review — commit "(review)")
+
+A verified review found 2 Critical + 5 Important + minors. All fixed in the same PR; the
+spec deviations they introduced are recorded here (spec-amendment-sync).
+
+### C1 — anomaly_digest prune wired into the wrong branch (`server/anomaly-detection.ts`)
+The Task-2 prune was placed INSIDE `if (detected.length > 0)` and inside the per-workspace `try`,
+and used a `cycleStart` cutoff. Three defects: (a) a workspace whose anomalies clear
+(`detected.length === 0`) never pruned → stale rows lived forever; (b) `alreadyDetected()` suppresses
+re-emission for 48h while scans run every 6–12h, so an ONGOING anomaly is absent from `detected` and
+its digest row is not re-stamped — a `cycleStart` cutoff in a cycle that fires a *different* anomaly
+would delete the still-active row, breaking firstDetected/durationDays continuity; (c) the
+no-data-connection `continue` path (M3) never pruned at all.
+
+**Fix (mirrors the competitor precedent, `intelligence-crons.ts:104/109/224-226`):**
+- Added `ANOMALY_DEDUP_WINDOW_HOURS = 48` and a `pruneStaleAnomalyDigests(workspaceId, cycleStart)`
+  helper using cutoff `cycleStart − 48h` so still-active (within-window) rows survive.
+- The prune now runs UNCONDITIONALLY per workspace: on the no-connection `continue` path (M3 wipe)
+  AND after the per-workspace `catch` (so it runs for `detected.length === 0` and even when detection
+  throws). Removed the in-guard prune. Replaced the false "outside try" comment (M2).
+
+### C2 — client flagging of approved/published cells 500'd (`server/state-machines.ts`, `routes/content-plan-review.ts`)
+`MATRIX_CELL_TRANSITIONS` had no `approved→flagged` / `published→flagged` edge, but
+`CLIENT_VISIBLE_CELL_STATUSES = {review, flagged, approved, published}` and the client UI
+(MatrixProgressView CellPreviewModal) shows the flag form for ALL of them. Flagging an approved or
+published cell threw `InvalidTransitionError` → 500.
+**Fix:** added `approved→flagged` and `published→flagged` edges (flagging is a legitimate client
+review action from any client-visible status), AND mapped `InvalidTransitionError` → 409 in the
+public flag route as defense-in-depth.
+
+### Task 5 — final MATRIX_CELL_TRANSITIONS edge set (deviation from "READS-only")
+`state-machines.ts` was listed READS-only in the plan but gained edges. Justification per edge below.
+The map is the minimal set that ADMITS every transition the real code paths perform:
+
+| From | To | Backing code path |
+|---|---|---|
+| planned | keyword_validated, brief_generated, draft | keyword validation / brief gen / draft start (updateMatrixCell) |
+| planned | review | send-samples admin action (sendSamplesForReview) |
+| planned | approved | batch-approve admin action (batchApproveMatrixCells, APPROVABLE set) |
+| keyword_validated | brief_generated, draft, planned | pipeline + send-back (updateMatrixCell) |
+| keyword_validated | review | send-samples admin action |
+| keyword_validated | approved | batch-approve admin action |
+| brief_generated | draft, keyword_validated | pipeline + send-back |
+| brief_generated | review | send-samples admin action |
+| brief_generated | approved | batch-approve admin action |
+| draft | review, brief_generated | submit for review / regen brief |
+| review | flagged, approved, draft | client flag / approve / send-back |
+| flagged | review, draft, approved | re-review / send-back / approve |
+| approved | published | publish |
+| approved | review | operator pulls an approved cell back to review |
+| **approved | flagged** | **client flags an approved cell (G2/C2 — new)** |
+| published | **flagged** | **client flags a published cell for changes (G2/C2 — new); otherwise terminal** |
+
+The `approved→review` / `approved→published` / `review→*` / `flagged→*` edges already existed in the
+committed map; the two **bold** edges are the C2 additions.
+
+### I1 — contract test client half was vacuous (`tests/contract/insight-renderer-coverage.test.ts`)
+The two client-half assertions were file-wide `source.includes('${type}:') && source.includes('INSIGHT_TYPE_ICONS')`
+substring checks — mutation-proven vacuous (removing a type from one map still passed because the type
+appears in the other map).
+**Fix:** (a) the canonical type list is now PARSED from the `InsightDataMap` interface source in
+`shared/types/analytics.ts` (hand-maintained `ALL_INSIGHT_TYPES` removed — a future type is auto-caught);
+(b) `INSIGHT_TYPE_ICONS` and `INSIGHT_TYPE_ACTIONS` are sliced (balanced-brace, anchored on `=` to skip
+the type annotation's inner braces) and membership is asserted PER MAP, so a missing entry in EITHER map
+fails. Re-proven by mutation: deleting one entry from each map fails the corresponding assertion.
+The "non-Sparkles" claim was dropped (description and code now agree); per M4 `keyword_cluster` was
+changed from `Sparkles` (== the fallback icon) to `Layers` so its icon is meaningfully distinct.
+
+### I2 — matrix-level PUT bypassed the cell guard (`server/content-matrices.ts`, `routes/content-matrices.ts`)
+`PUT /api/content-matrices/:ws/:matrixId` → `updateMatrix` accepted `updates.cells` wholesale with zero
+transition validation (any caller could rewrite every cell status, e.g. published→planned).
+**Fix:** `updateMatrix` now validates each incoming cell's status against its stored status (matched by
+id, skipping unchanged statuses so the internal `updateMatrixCell` re-save and terminal cells don't
+false-trip). Illegal moves throw `InvalidTransitionError`, mapped to 409 by both PUT and PATCH routes
+via a shared `mapTransitionError` `mapError` callback.
+
+### I3 — sendSamplesForReview non-atomic under the guard (`server/domains/content-plan/review-mutations.ts`)
+The batch was created + mirrored BEFORE the cell-status loop, so a selected terminal cell threw
+mid-loop, leaving some cells flipped and an orphaned batch.
+**Fix:** all selected cells' transitions to `review` are validated BEFORE `createBatch` (cells already in
+`review` are no-op-skipped). An ineligible cell yields a clean 409 with no batch created and no partial flips.
+
+### M1 — illegal transitions surfaced wrong status codes
+- `updateRequest` now THROWS `InvalidTransitionError` (was: catch→null, which the route mapped to 404).
+  `PATCH /api/requests/:id` maps it to 409 with the machine message; 404 stays reserved for not-found.
+- `PATCH /api/content-matrices/.../cells/:cellId` and the matrix PUT map `InvalidTransitionError` → 409
+  (was generic 500).
+
+### Tests added/changed
+- `tests/integration/competitor-alert-enrichment.test.ts` (I4) — asserts `impactScore > 0`,
+  `domain === 'search'` post-enrichment; `classifyDomain('competitor_alert') === 'search'`.
+- `tests/integration/anomaly-digest-pruning.test.ts` (I4/C1) — seeds a stale + an active (within-window)
+  `anomaly_digest` row on a no-connection workspace, runs `runAnomalyDetection(true)`, asserts the stale
+  row is pruned AND the active row survives. Verified to FAIL against pre-C1-fix code.
+- `content-plan-review-lifecycle.test.ts` — C2 cases (flag approved/published → 200; FAIL pre-fix) and
+  I3 atomicity case (ineligible cell → 409, no orphaned batch).
+- `content-matrices-routes.test.ts` — I2 PUT-bypass → 409 (status unchanged) and M1 PATCH illegal → 409.
+- `requests-admin-lifecycle.test.ts` — M1 closed→new illegal → 409, row stays closed.
+- `insight-renderer-coverage.test.ts` — rewritten per I1 (source-parsed types, per-map slicing).
+
+### File ownership expansion (justified by findings)
+Beyond the original OWNS set, the review touched: `server/routes/content-plan-review.ts`,
+`server/routes/content-matrices.ts`, `server/routes/requests.ts`, `server/content-matrices.ts`,
+`server/domains/content-plan/review-mutations.ts`, `src/components/client/InsightsDigest.tsx`,
+and the integration test files above. `server/state-machines.ts` moved from READS-only to OWNS (C2 edges).
+
+---
+
 ## Definition of done
 
 - [ ] Contract test: insight-renderer-coverage — both assertions green

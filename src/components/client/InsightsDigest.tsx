@@ -382,7 +382,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   page_health: Activity,
   ranking_opportunity: Target,
   cannibalization: Layers,
-  keyword_cluster: Sparkles,
+  keyword_cluster: Layers, // grouped keywords — distinct from the Sparkles fallback (M4)
   competitor_gap: Users,
   conversion_attribution: Zap,
   serp_opportunity: Globe,
