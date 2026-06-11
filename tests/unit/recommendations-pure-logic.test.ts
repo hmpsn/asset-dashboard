@@ -7,6 +7,9 @@
  * All functions under test are pure / non-async / non-DB.
  */
 import { describe, it, expect } from 'vitest';
+import { isProductType, getProductConfig } from '../../server/stripe.js';
+import type { RecType } from '../../shared/types/recommendations.js';
+import type { ContentGap } from '../../shared/types/workspace.js';
 import {
   getRecoveryRate,
   migrateSourceKey,
@@ -365,6 +368,41 @@ describe('checkToRecType', () => {
 // ─── mapToProduct ─────────────────────────────────────────────────────────────
 
 describe('mapToProduct', () => {
+  // ── Checkout-guard contract ────────────────────────────────────────────────
+  // Every productType mapToProduct can EVER return must pass isProductType and
+  // carry the catalog price — otherwise the rec card renders a purchase CTA
+  // that fails at cart checkout (the exact pre-existing bug this pins shut).
+  // The Record<RecType, true> forces a typecheck failure when a new RecType is
+  // added, so this sweep can never silently go stale.
+  it('every returned productType passes isProductType at the catalog price (exhaustive over RecType)', () => {
+    const ALL_REC_TYPES: Record<RecType, true> = {
+      technical: true, content: true, content_refresh: true, schema: true,
+      metadata: true, performance: true, accessibility: true, strategy: true,
+      aeo: true, keyword_gap: true, topic_cluster: true, cannibalization: true,
+      local_visibility: true, local_service_gap: true,
+    };
+    const PAGE_COUNTS = [1, 4, 5, 9, 10, 100];
+    const PAGE_TYPES: Array<ContentGap['suggestedPageType']> = [
+      undefined, 'blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource',
+    ];
+    let purchasable = 0;
+    for (const recType of Object.keys(ALL_REC_TYPES) as RecType[]) {
+      for (const pageCount of PAGE_COUNTS) {
+        for (const pageType of PAGE_TYPES) {
+          const { productType, productPrice } = mapToProduct(recType, pageCount, pageType);
+          if (productType === undefined) {
+            expect(productPrice).toBeUndefined();
+            continue;
+          }
+          purchasable++;
+          expect(isProductType(productType), `${recType}/${pageCount}/${pageType} → ${productType} must be a real ProductType`).toBe(true);
+          expect(productPrice, `${recType}/${pageCount}/${pageType} → ${productType} price must match the catalog`).toBe(getProductConfig(productType as Parameters<typeof getProductConfig>[0])!.priceUsd);
+        }
+      }
+    }
+    expect(purchasable).toBeGreaterThan(0); // the sweep must exercise real products, not vacuously skip
+  });
+
   it('metadata with pageCount < 10 → fix_meta at $20', () => {
     const r = mapToProduct('metadata', 9);
     expect(r.productType).toBe('fix_meta');
@@ -406,28 +444,17 @@ describe('mapToProduct', () => {
     expect(mapToProduct('accessibility', 100)).toEqual({ productType: 'fix_alt', productPrice: 50 });
   });
 
-  it('aeo with pageCount < 5 → aeo_page_review at $99', () => {
-    const r = mapToProduct('aeo', 4);
-    expect(r.productType).toBe('aeo_page_review');
-    expect(r.productPrice).toBe(99);
+  // aeo/content_refresh deliberately have NO product: the values they used to
+  // return are not in the ProductType union / PRODUCT_MAP, so their CTAs failed
+  // isProductType at cart checkout. Re-add cases only with real PRODUCT_MAP entries.
+  it('aeo → empty object (no purchasable product in the catalog)', () => {
+    expect(mapToProduct('aeo', 4)).toEqual({});
+    expect(mapToProduct('aeo', 5)).toEqual({});
   });
 
-  it('aeo with pageCount >= 5 → aeo_site_review at $499', () => {
-    const r = mapToProduct('aeo', 5);
-    expect(r.productType).toBe('aeo_site_review');
-    expect(r.productPrice).toBe(499);
-  });
-
-  it('content_refresh with pageCount < 5 → content_refresh at $199', () => {
-    const r = mapToProduct('content_refresh', 3);
-    expect(r.productType).toBe('content_refresh');
-    expect(r.productPrice).toBe(199);
-  });
-
-  it('content_refresh with pageCount >= 5 → content_refresh_5 at $799', () => {
-    const r = mapToProduct('content_refresh', 5);
-    expect(r.productType).toBe('content_refresh_5');
-    expect(r.productPrice).toBe(799);
+  it('content_refresh → empty object (no purchasable product in the catalog)', () => {
+    expect(mapToProduct('content_refresh', 3)).toEqual({});
+    expect(mapToProduct('content_refresh', 5)).toEqual({});
   });
 
   it('technical → empty object (no product)', () => {
@@ -460,10 +487,6 @@ describe('mapToProduct', () => {
     expect(mapToProduct('metadata', 10).productType).toBe('fix_meta_10');
   });
 
-  it('aeo threshold is exactly 5 (not 4)', () => {
-    expect(mapToProduct('aeo', 4).productType).toBe('aeo_page_review');
-    expect(mapToProduct('aeo', 5).productType).toBe('aeo_site_review');
-  });
 });
 
 // ─── auditInsight ─────────────────────────────────────────────────────────────
