@@ -28,7 +28,7 @@ import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridg
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
-import { toInsightPageId } from './helpers.js';
+import { toInsightPageId, normalizePageUrl } from './helpers.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -226,6 +226,28 @@ const stmts = createStmtCache(() => ({
 }));
 
 // --- Public API ---
+
+/**
+ * A3 (audit #14): sourceType for per-keyword strategy actions — one tracked action per
+ * net-new (page, primary keyword) pair persisted by keyword strategy generation.
+ * Future Hub-side recording (A4 track/promote) must reuse this sourceType + the
+ * strategyPageKeywordSourceId() key shape so both write sites share one dedup space.
+ */
+export const STRATEGY_PAGE_KEYWORD_SOURCE_TYPE = 'strategy_page_keyword';
+
+/**
+ * Deterministic idempotency key for per-keyword strategy actions. Re-running strategy
+ * regeneration must NOT duplicate the action for the same (page, primary keyword) pair:
+ * callers check `getActionByWorkspaceAndSource(workspaceId,
+ * STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, key)` before `recordAction()`.
+ *
+ * Self-normalizing — full URLs, missing leading slashes, trailing slashes, casing, and
+ * surrounding whitespace all collapse to the same key, so every caller produces the same
+ * sourceId for the same logical pair.
+ */
+export function strategyPageKeywordSourceId(pagePath: string, primaryKeyword: string): string {
+  return `${normalizePageUrl(pagePath).toLowerCase()}::${primaryKeyword.trim().toLowerCase()}`;
+}
 
 export interface RecordActionParams {
   workspaceId: string;

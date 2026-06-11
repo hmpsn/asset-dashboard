@@ -22,7 +22,7 @@ const mockReplaceAllTopicClusters = vi.fn();
 const mockListCannibalizationIssues = vi.fn(() => []);
 const mockReplaceAllCannibalizationIssues = vi.fn();
 const mockRecordAction = vi.fn();
-const mockGetActionBySource = vi.fn<(sourceType: string, workspaceId: string) => unknown>(() => null);
+const mockGetActionByWorkspaceAndSource = vi.fn<(workspaceId: string, sourceType: string, sourceId: string) => unknown>(() => null);
 const mockBroadcastToWorkspace = vi.fn();
 const mockAddActivity = vi.fn();
 const mockNormalizePageUrl = vi.fn((p: string) => p);
@@ -86,7 +86,10 @@ vi.mock('../../server/db/index.js', () => ({
 }));
 vi.mock('../../server/outcome-tracking.js', () => ({
   recordAction: mockRecordAction,
-  getActionBySource: mockGetActionBySource,
+  getActionByWorkspaceAndSource: mockGetActionByWorkspaceAndSource,
+  STRATEGY_PAGE_KEYWORD_SOURCE_TYPE: 'strategy_page_keyword',
+  strategyPageKeywordSourceId: (pagePath: string, primaryKeyword: string) =>
+    `${pagePath.trim().toLowerCase()}::${primaryKeyword.trim().toLowerCase()}`,
 }));
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mockBroadcastToWorkspace }));
 vi.mock('../../server/ws-events.js', () => ({
