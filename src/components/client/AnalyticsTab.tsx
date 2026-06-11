@@ -39,6 +39,38 @@ interface AnalyticsTabProps {
   dataUpdatedAt?: number | null;
 }
 
+function formatTakeawayNumber(value: number): string {
+  return Math.round(value).toLocaleString();
+}
+
+function formatTakeawayPercent(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(1).replace(/\.0$/, '');
+}
+
+function topBy<T>(items: T[], valueFor: (item: T) => number): T | null {
+  let winner: T | null = null;
+  let winnerValue = Number.NEGATIVE_INFINITY;
+  for (const item of items) {
+    const value = valueFor(item);
+    if (value > winnerValue) {
+      winner = item;
+      winnerValue = value;
+    }
+  }
+  return winner;
+}
+
+function sourceLabel(source: GA4TopSource): string {
+  return source.medium !== '(none)' ? `${source.source} / ${source.medium}` : source.source;
+}
+
+function conversionRateTone(rate: number): string {
+  if (rate >= 5) return 'text-accent-success';
+  if (rate >= 2) return 'text-accent-warning';
+  return 'text-accent-danger';
+}
+
 export function AnalyticsTab({
   ga4Overview, ga4Comparison, ga4Trend, ga4Devices, ga4Pages, ga4Sources,
   ga4Organic, ga4LandingPages, ga4NewVsReturning,
@@ -175,6 +207,38 @@ export function AnalyticsTab({
     );
   }
 
+  const analyticsTakeaway = (() => {
+    const pieces: string[] = [];
+    const usersDelta = ga4Comparison?.changePercent.users;
+
+    if (typeof usersDelta === 'number') {
+      if (Math.abs(usersDelta) >= 1) {
+        pieces.push(`Traffic is ${usersDelta > 0 ? 'up' : 'down'} ${formatTakeawayPercent(Math.abs(usersDelta))}% from the previous period`);
+      } else {
+        pieces.push('Traffic is steady compared with the previous period');
+      }
+    } else {
+      pieces.push(`Your site brought in ${formatTakeawayNumber(ga4Overview.totalUsers)} users across ${formatTakeawayNumber(ga4Overview.totalSessions)} sessions`);
+    }
+
+    const topSource = topBy(ga4Sources, source => source.sessions);
+    const topPage = topBy(ga4Pages, page => page.pageviews);
+    if (topSource && topPage) {
+      pieces.push(`${sourceLabel(topSource)} is the top source, and ${topPage.path} led page views`);
+    } else if (topSource) {
+      pieces.push(`${sourceLabel(topSource)} is the top source with ${formatTakeawayNumber(topSource.sessions)} sessions`);
+    } else if (topPage) {
+      pieces.push(`${topPage.path} led page views with ${formatTakeawayNumber(topPage.pageviews)} views`);
+    }
+
+    const topConversion = topBy(ga4Conversions, conversion => conversion.conversions);
+    if (topConversion && topConversion.conversions > 0) {
+      pieces.push(`${eventDisplayName(topConversion.eventName)} is the top tracked action at ${formatTakeawayPercent(topConversion.rate)}% conversion rate`);
+    }
+
+    return `${pieces.join('. ')}.`;
+  })();
+
   return (<>
     <div className="space-y-6">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -188,6 +252,10 @@ export function AnalyticsTab({
         {analyticsActionError}
       </div>
     )}
+
+    <SectionCard title="Analytics takeaway" titleIcon={<Icon as={LineChartIcon} size="sm" className="text-accent-info" />}>
+      <p className="t-body text-[var(--brand-text)]">{analyticsTakeaway}</p>
+    </SectionCard>
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -352,7 +420,7 @@ export function AnalyticsTab({
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
                 {pinned && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" title="Pinned" />}
-                {c.rate > 0 && <span className="t-caption-sm font-medium text-accent-success">{c.rate}%</span>}
+                {Number.isFinite(c.rate) && <span className={`t-caption-sm font-medium ${conversionRateTone(c.rate)}`}>{formatTakeawayPercent(c.rate)}%</span>}
               </div>
             </div>
             <div className="t-stat text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>

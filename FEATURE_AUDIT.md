@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **488 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **489 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 489. Client Dashboard QW2 PR2 — Analytics Takeaway
+
+**What it does:** Adds a deterministic "Analytics takeaway" section to the client Analytics tab. The summary explains traffic movement, top source/page, and the top tracked action using existing GA4 metrics only, with no AI call. Conversion-rate badges on tracked action cards now use judgment colors while preserving the existing percentage contract.
+
+**Agency value:** Gives client-facing GA4 reporting an interpretation layer without adding review burden or model cost. The deterministic copy makes the tab easier to trust in demos and recurring reporting.
+
+**Client value:** Clients no longer have to infer the story from raw users, sessions, sources, and event cards. Conversion rates now visually separate strong, watch, and weak signals.
+
+**Mutual:** Turns the Analytics tab from a data dump into a concise explanation while keeping counts blue/neutral and reserving emerald, amber, and red for actual performance judgments.
+
+**Files:** `src/components/client/AnalyticsTab.tsx`. Tests: `tests/component/client/AnalyticsTab.test.tsx`.
 
 ---
 

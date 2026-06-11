@@ -83,7 +83,7 @@
     {
       "id": 9,
       "title": "Client Portal",
-      "oneLiner": "White-labeled dashboard with search data, freshness stamps, health scores, strategy, content hub, approvals, fail-loud inbox states, live refreshes, trial prompts, and AI chatbot",
+      "oneLiner": "White-labeled dashboard with search data, freshness stamps, analytics takeaways, conversion cues, health scores, strategy, content hub, approvals, fail-loud inbox states, live refreshes, trial prompts, and AI chatbot",
       "category": "client",
       "painPoints": ["client-transparency", "reporting"],
       "tier": "free",
