@@ -23,6 +23,12 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { addActivity } from '../activity-log.js';
+import {
+  RECOMMENDATION_TRANSITIONS,
+  validateTransition,
+  InvalidTransitionError,
+} from '../state-machines.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 const log = createLogger('routes:recommendations');
@@ -231,6 +237,12 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
     });
   }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status });
+  addActivity(
+    workspaceId,
+    'rec_status_updated',
+    `Recommendation updated: ${rec.title}`,
+    `Status changed to "${status}"`,
+  );
   // Client-facing single-rec response — strip the admin/AI-only dollar figures
   // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
   res.json(stripEmvFromPublicRecs([rec])[0]);
@@ -239,6 +251,9 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
 // Dismiss a recommendation
 router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
+  // Read before dismiss so we have context for the activity log.
+  const existing = loadRecommendations(workspaceId);
+  const recToLog = existing?.recommendations.find(r => r.id === recId) ?? null;
   let ok: boolean;
   try {
     ok = dismissRecommendation(workspaceId, recId);
@@ -248,7 +263,77 @@ router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenti
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'dismissed', deleted: true });
+  addActivity(
+    workspaceId,
+    'rec_dismissed',
+    `Recommendation dismissed: ${recToLog?.title ?? recId}`,
+    recToLog?.description,
+  );
   res.json({ ok: true });
+});
+
+// ─── Admin endpoints ────────────────────────────────────────────────────────
+// These routes are NOT prefixed with /api/public/ so they are admin-only
+// (protected by the global APP_PASSWORD HMAC gate in app.ts). They return the
+// full rec data including the admin/AI-only dollar fields (emvPerWeek, etc.)
+// that are stripped on the public client-facing routes above.
+
+// Admin list — returns the full set for a workspace (all statuses, no EMV strip).
+// Supports ?status= and ?priority= filters.
+router.get('/api/recommendations/:workspaceId', (req, res) => { // activity-ok: read-only
+  try {
+    const { workspaceId } = req.params;
+    const set = loadRecommendations(workspaceId);
+    if (!set) {
+      if (!getWorkspace(workspaceId)) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      return res.json({
+        workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [],
+        summary: computeRecommendationSummary([]),
+      });
+    }
+    const status = req.query.status as string | undefined;
+    const priority = req.query.priority as string | undefined;
+    let recs = set.recommendations;
+    if (status) recs = recs.filter(r => r.status === status);
+    if (priority) recs = recs.filter(r => r.priority === priority);
+    res.json({ ...set, recommendations: recs });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Admin un-dismiss — transitions a dismissed rec back to pending.
+// Uses validateTransition (dismissed → pending is a legal backward edge in
+// RECOMMENDATION_TRANSITIONS) so any future machine changes are honoured.
+router.patch('/api/recommendations/:workspaceId/:recId/undismiss', (req, res) => {
+  const { workspaceId, recId } = req.params;
+  const set = loadRecommendations(workspaceId);
+  if (!set) return res.status(404).json({ error: 'Workspace has no recommendation set' });
+  const rec = set.recommendations.find(r => r.id === recId);
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  try {
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending');
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
+  const updated = updateRecommendationStatus(workspaceId, recId, 'pending');
+  if (!updated) return res.status(404).json({ error: 'Recommendation not found after transition' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'pending' });
+  addActivity(
+    workspaceId,
+    'rec_status_updated',
+    `Recommendation un-dismissed: ${rec.title}`,
+    `Status restored to "pending"`,
+  );
+  res.json(updated);
 });
 
 export default router;

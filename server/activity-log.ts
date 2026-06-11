@@ -138,7 +138,9 @@ export type ActivityType =
   | 'action_backlog_alert'
   | 'post_approved'
   | 'post_changes_requested'
-  | 'post_client_edit';
+  | 'post_client_edit'
+  | 'rec_status_updated'   // client triage: pending/in_progress/completed
+  | 'rec_dismissed';       // client dismissed a recommendation
 
 export interface ActivityEntry {
   id: string;

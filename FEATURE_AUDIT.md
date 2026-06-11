@@ -7515,3 +7515,14 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Files:** `server/ai-operation-registry.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-generation.ts`; `server/generation-quality-store.ts` (NEW); `server/db/migrations/129-generation-quality.sql` (NEW); `server/routes/keyword-strategy.ts`; `shared/types/` (StoredGenerationQuality); `tests/contract/keyword-site-synthesis-operation.test.ts` (NEW); `tests/integration/generation-quality-persistence.test.ts` (NEW); `tests/integration/keyword-strategy-admin-assembler.test.ts`.
 
 **PR:** core-features remediation F1 (audit #6 + #7).
+
+### 457. Admin Recommendations Surface (D1 — audit #19)
+**What it does:** Replaces the borrowed client `InsightsEngine` component (mounted with `tier="premium"` hardcoded) in `WorkspaceHome` with a purpose-built `AdminRecommendationQueue`. The new admin surface shows: (1) full rec queue across all statuses (pending/in_progress/completed/dismissed) with priority grouping and OV-score sorting; (2) a Dismissed tab with per-rec Un-dismiss action (uses `validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending')` — the `dismissed → pending` backward edge was already defined in the state machine); (3) full OV breakdown per rec including `emvPerWeek` and confidence (admin-only fields stripped on client routes); (4) activity logging on client PATCH/DELETE (`rec_status_updated` / `rec_dismissed`) so admins can see client triage in the activity feed. New admin API endpoints: `GET /api/recommendations/:workspaceId` (full set, all statuses) and `PATCH /api/recommendations/:workspaceId/:recId/undismiss`.
+
+**Agency value:** Admins now see the actual full recommendation queue — including what clients have dismissed — and can restore dismissed items without touching the client portal. The OV breakdown and EMV data help prioritize conversations with clients about which items to act on.
+
+**Client value:** None directly — this is an admin-only surface. Indirectly, admins who can see and act on dismissed recs can have more informed conversations with clients.
+
+**Files:** `src/components/admin/AdminRecommendationQueue.tsx` (NEW); `src/hooks/admin/useAdminRecommendations.ts` (NEW); `src/components/WorkspaceHome.tsx` (mount swap); `server/routes/recommendations.ts` (activity logging + admin endpoints); `server/activity-log.ts` (ActivityType: `rec_status_updated`, `rec_dismissed`); `src/lib/queryKeys.ts` (`admin.recommendations`); `src/lib/wsInvalidation.ts` (RECOMMENDATIONS_UPDATED → admin key); `tests/integration/admin-recommendations-surface.test.ts` (NEW); `docs/superpowers/plans/2026-06-10-d1-admin-recs-surface.md` (NEW).
+
+**PR:** core-features remediation D1 (audit #19).
