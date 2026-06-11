@@ -143,12 +143,6 @@ export const WS_EVENTS = {
 
   // E-E-A-T asset inventory
   EEAT_ASSETS_UPDATED: 'eeat-assets:updated',
-
-  // LLMs.txt generation
-  LLMS_TXT_GENERATED: 'llms_txt:generated',
-
-  // AEO site review
-  AEO_SITE_REVIEW_COMPLETE: 'aeo_review:complete',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

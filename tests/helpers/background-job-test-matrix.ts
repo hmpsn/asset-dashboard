@@ -208,4 +208,43 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/client-locations.test.ts',
   ),
+  // C2 (sync-AI-to-jobs migration): all four lifecycle-covered by the
+  // c2-ai-to-jobs integration suite, incl. the POST /api/jobs dispatcher path
+  // and FM-2 (AI failure → job 'error', no partial result) per type.
+  [BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION]: entry(
+    'COPY_ENTRY_GENERATION',
+    {
+      expectedLabel: 'Copy Entry Generation',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/integration/c2-ai-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION]: entry(
+    'BLUEPRINT_GENERATION',
+    {
+      expectedLabel: 'Blueprint Generation',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/c2-ai-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION]: entry(
+    'LLMS_TXT_GENERATION',
+    {
+      expectedLabel: 'LLMs.txt Generation',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/c2-ai-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW]: entry(
+    'AEO_SITE_REVIEW',
+    {
+      expectedLabel: 'AEO Site Review',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/c2-ai-to-jobs.test.ts',
+  ),
 };
