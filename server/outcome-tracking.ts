@@ -705,10 +705,13 @@ export function getTopWinsFromActions(
         wins.push({
           actionId: action.id,
           actionType: action.actionType,
+          sourceType: action.sourceType,
+          sourceId: action.sourceId,
           pageUrl: action.pageUrl,
           targetKeyword: action.targetKeyword,
           delta: outcome.deltaSummary,
           score: outcome.score,
+          attributedValue: outcome.attributedValue ?? null,
           createdAt: action.createdAt,
           scoredAt: outcome.measuredAt ?? action.updatedAt,
         });

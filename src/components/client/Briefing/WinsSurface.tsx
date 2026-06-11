@@ -73,11 +73,20 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
   const pctSign = entry.delta.delta_percent >= 0 ? '+' : '';
   const deltaStr = `${deltaSign}${entry.delta.delta_absolute.toFixed(1)} (${pctSign}${entry.delta.delta_percent.toFixed(1)}%)`;
 
+  // E5: the server resolves the real source title (recommendation/post/brief) into
+  // `recommendation`, falling back to an honest generic. Older cached entries may
+  // carry an empty string — fall back to the action-type label locally.
+  const heading = entry.recommendation || actionLabel(entry.actionType);
+
+  // Realized dollar attribution (action_outcomes.attributed_value). Blue = data
+  // per the Four Laws — this is a read-only metric, not a CTA.
+  const showValue = typeof entry.attributedValue === 'number' && entry.attributedValue > 0;
+
   return (
     <div className="flex items-start gap-3 py-3 border-b border-[var(--brand-border)] last:border-b-0">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="t-ui font-medium text-[var(--brand-text-bright)]">{actionLabel(entry.actionType)}</span>
+          <span className="t-ui font-medium text-[var(--brand-text-bright)]">{heading}</span>
           <ScoreBadge score={entry.score} />
         </div>
         {pageLabel && (
@@ -85,6 +94,12 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
         )}
         <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
           {entry.delta.primary_metric}: <span className="text-accent-success font-medium">{deltaStr}</span>
+          {showValue && (
+            <>
+              {' · '}
+              <span className="text-accent-info font-medium">≈ ${Math.round(entry.attributedValue!).toLocaleString()} in added traffic value</span>
+            </>
+          )}
         </p>
       </div>
       <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 pt-0.5">{relativeTime(entry.detectedAt)}</span>

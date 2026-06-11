@@ -679,6 +679,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
+    },
+    {
+      "id": 69,
+      "title": "Client Outcome Scorecard & Wins Ledger",
+      "oneLiner": "Tiered 'Your results' win-rate scorecard plus a wins ledger with real recommendation titles and estimated dollar value, right on the client overview",
+      "category": "reporting",
+      "painPoints": ["proof-of-value", "reporting", "retention"],
+      "tier": "free",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

@@ -351,7 +351,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Surface outcome playbooks ('schema fixes worked 73% of the time in your vertical') behind each recommendation/outcome via a scrubbed learnings projection. Shifts win rates from raw numbers to grounded evidence."
+          "notes": "Surface outcome playbooks ('schema fixes worked 73% of the time in your vertical') behind each recommendation/outcome via a scrubbed learnings projection. Shifts win rates from raw numbers to grounded evidence. || 2026-06-11 core-features E5 shipped the base layer: OutcomeSummary scorecard + WinsSurface wins ledger mounted on the legacy client Overview, full public scorecard serialization, real source-title resolution for win entries, and attributed_value surfaced client+admin. Remaining scope here is the playbook-justification projection only."
         },
         {
           "id": "cda-sc5-diagnostics-rootcause",
@@ -2908,6 +2908,25 @@
           "notes": "Completed 2026-06-04. Retired the legacy `server/db/json-column.ts` shim and removed its tests; all JSON parsing coverage now targets `server/db/json-validation.ts`. Collapsed server/frontend title-casing onto shared `capitalizeWord` helpers, migrated schema data-source and insight-feed title generation, collapsed keyword-strategy `compact()` siblings onto `compactStrings`, and promoted `sleep(ms)` from `server/local-seo.ts` into `server/helpers.ts`. Follow-up review also removed the clipboard-upload `sips` shellout in favor of existing `sharp` resizing after invalid test image bytes triggered native macOS `sips` crashes. Prior work had already completed `useDebouncedValue`, `daysSince`, and quickWins parity. Verification sweep now leaves no `parseJsonColumn`/`stringifyJsonColumn`, local `compact()`, local `sleep()`, `titleCaseWord`, or `capitalizeSlugSegment` callsites outside roadmap history."
         }
       ]
+    },
+    {
+      "id": "sprint-core-features-remediation-2026-06-10",
+      "name": "✅ SHIPPED — Core-Features Remediation — 2026-06-10 audit",
+      "hours": "ongoing",
+      "rationale": "Close the 2026-06-10 core-features audit findings. One PR per lane item; full plan in docs/superpowers/plans/2026-06-10-core-features-remediation-master.md.",
+      "items": [
+        {
+          "id": "core-e5-client-outcome-scorecard",
+          "title": "E5 — Mount OutcomeSummary + dollar attribution (audit #5)",
+          "source": "Core-features remediation master plan 2026-06-10 — lane E, gated on A1+A2",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-06-11",
+          "owner": "outcomes",
+          "notes": "Mounted OutcomeSummary ('Your results' tiered scorecard) and backported WinsSurface (wins ledger, owner decision #23) onto the LIVE legacy client Overview (no briefing-v2 work). Fixed the fabricated '<action_type> action' recommendation string in GET /api/public/outcomes/:wsId/wins — real source titles resolved via sourceType/sourceId (recommendation/client_action/post/brief/content_request) with an honest exhaustive per-ActionType generic fallback. Public summary now serializes the full scorecard (strongWinRate + pendingMeasurement were omitted → NaN% in the component). TopWin/OutcomeWinEntry gained sourceType/sourceId/attributedValue; attributed_value renders in admin OutcomeTopWins and client WinsSurface (blue=data). OutcomeSummary trimmed to show its empty state until totalScored > 0. WS refresh already wired (OUTCOME_SCORED → client-outcome-* invalidation). Tests: tests/integration/e5-client-outcome-scorecard.test.ts (public read paths), tests/component/OutcomeSummary.test.tsx, tests/unit/WinsSurface.test.tsx extended."
+        }
+      ],
+      "shippedAt": "2026-06-11"
     },
     {
       "id": "sprint-audit-remediation-2026-06-09",
