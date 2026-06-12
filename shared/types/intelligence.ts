@@ -688,6 +688,16 @@ export interface ClientCompositeHealthBreakdown {
   rows: ClientCompositeHealthBreakdownRow[];
 }
 
+export interface ClientKeywordFeedbackSummary {
+  approvedCount: number;
+  rejectedCount: number;
+  /** Decimal fraction (0.91 for 91%). Multiply by 100 for display. */
+  approveRate: number;
+  approvedSamples: string[];
+  rejectedSamples: string[];
+  rejectionReasons: string[];
+}
+
 export interface ClientIntelligence {
   workspaceId: string;
   assembledAt: string;
@@ -705,6 +715,8 @@ export interface ClientIntelligence {
   compositeHealthScore?: number | null;
   /** Client-safe component breakdown for the composite health score. */
   compositeHealthBreakdown?: ClientCompositeHealthBreakdown | null;
+  /** Client-safe summary of keyword approve/decline feedback. */
+  keywordFeedbackSummary?: ClientKeywordFeedbackSummary | null;
   /** Predictions that came true — strongest wins from outcome tracking. */
   weCalledIt?: WeCalledItEntry[];
   copyPipelineStatus?: ClientCopyPipelineStatus | null;
@@ -811,6 +823,7 @@ export interface ROIAttribution {
 export interface WeCalledItEntry {
   actionId: string;
   prediction: string;
+  /** Client-readable outcome sentence. Machine score stays in `score`. */
   outcome: string;
   score: string;
   pageUrl: string;

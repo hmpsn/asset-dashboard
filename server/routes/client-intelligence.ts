@@ -19,11 +19,13 @@ import type {
   ClientSiteHealthSummary,
   ClientDecayAlert,
   ClientCopyPipelineStatus,
+  ClientKeywordFeedbackSummary,
   InsightsSlice,
   ContentPipelineSlice,
   LearningsSlice,
   SiteHealthSlice,
   SeoContextSlice,
+  ClientSignalsSlice,
   RankTrackingSummary,
   DecayAlert,
 } from '../../shared/types/intelligence.js';
@@ -141,6 +143,25 @@ function formatCopyPipelineForClient(pipeline: ContentPipelineSlice): ClientCopy
   };
 }
 
+function formatKeywordFeedbackForClient(
+  clientSignals: ClientSignalsSlice | undefined,
+): ClientKeywordFeedbackSummary | null {
+  const feedback = clientSignals?.keywordFeedback;
+  if (!feedback) return null;
+  const approvedCount = feedback.approved.length;
+  const rejectedCount = feedback.rejected.length;
+  if (approvedCount + rejectedCount === 0) return null;
+
+  return {
+    approvedCount,
+    rejectedCount,
+    approveRate: feedback.patterns.approveRate,
+    approvedSamples: feedback.approved.slice(0, 3),
+    rejectedSamples: feedback.rejected.slice(0, 3),
+    rejectionReasons: feedback.patterns.topRejectionReasons.slice(0, 3),
+  };
+}
+
 // GET /api/public/intelligence/:workspaceId
 router.get('/api/public/intelligence/:workspaceId', requireClientPortalAuth(), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -170,6 +191,7 @@ router.get('/api/public/intelligence/:workspaceId', requireClientPortalAuth(), a
         serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
         compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
         compositeHealthBreakdown: intel.clientSignals?.compositeHealthBreakdown ?? null,
+        keywordFeedbackSummary: formatKeywordFeedbackForClient(intel.clientSignals),
         weCalledIt: intel.learnings?.availability === 'ready' ? (intel.learnings.weCalledIt ?? []) : [],
         copyPipelineStatus: intel.contentPipeline
           ? formatCopyPipelineForClient(intel.contentPipeline)

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { ClientIntelligence, ClientInsightsSummary, ClientPipelineStatus, ClientLearningHighlights, ClientSiteHealthSummary } from '../shared/types/intelligence.js';
+import type {
+  ClientIntelligence,
+  ClientInsightsSummary,
+  ClientKeywordFeedbackSummary,
+  ClientLearningHighlights,
+  ClientPipelineStatus,
+  ClientSiteHealthSummary,
+} from '../shared/types/intelligence.js';
 
 describe('ClientIntelligence type contract', () => {
   it('ClientIntelligence has insightsSummary and pipelineStatus for all tiers', () => {
@@ -22,6 +29,7 @@ describe('ClientIntelligence type contract', () => {
       pipelineStatus: null,
       learningHighlights: null,
       siteHealthSummary: null,
+      keywordFeedbackSummary: null,
     };
     expect(premium).toBeDefined();
   });
@@ -62,5 +70,18 @@ describe('ClientIntelligence type contract', () => {
       deadLinks: 1,
     };
     expect(health.deadLinks).toBe(1);
+  });
+
+  it('ClientKeywordFeedbackSummary carries client-safe counts and display samples', () => {
+    const summary: ClientKeywordFeedbackSummary = {
+      approvedCount: 10,
+      rejectedCount: 1,
+      approveRate: 10 / 11,
+      approvedSamples: ['seo consulting'],
+      rejectedSamples: ['cheap backlinks'],
+      rejectionReasons: ['Off-brand'],
+    };
+    expect(summary.approvedSamples).toEqual(['seo consulting']);
+    expect(summary.rejectionReasons).toEqual(['Off-brand']);
   });
 });

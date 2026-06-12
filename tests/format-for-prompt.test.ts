@@ -53,7 +53,7 @@ function makeLearnings(): LearningsSlice {
     recentTrend: 'improving',
     playbooks: [],
     weCalledIt: [
-      { actionId: 'a1', prediction: 'Meta update will boost CTR', outcome: 'strong_win', score: 'strong_win', pageUrl: '/blog/test', measuredAt: '2026-03-28' },
+      { actionId: 'a1', prediction: 'Meta update will boost CTR', outcome: 'CTR improved from 2.1 to 3.4 (+62%).', score: 'strong_win', pageUrl: '/blog/test', measuredAt: '2026-03-28' },
     ],
     roiAttribution: [
       { actionId: 'a2', pageUrl: '/pricing', actionType: 'content_refreshed', clicksBefore: 100, clicksAfter: 180, clickGain: 80, measuredAt: '2026-03-27' },
@@ -198,7 +198,7 @@ describe('formatForPrompt', () => {
   describe('bug fixes — learnings', () => {
     it('includes WeCalledIt entries at standard verbosity', () => {
       const standard = formatForPrompt(makeFullIntelligence(), { verbosity: 'standard' });
-      expect(standard).toContain('strong_win');
+      expect(standard).toContain('CTR improved from 2.1 to 3.4');
     });
 
     it('includes ROI attribution at detailed verbosity', () => {
@@ -397,7 +397,7 @@ describe('formatForPrompt', () => {
         overallWinRate: 0,
         recentTrend: null,
         playbooks: [],
-        weCalledIt: [{ actionId: 'a1', prediction: 'rank top 3', outcome: 'win', score: 'strong_win', pageUrl: '/p', measuredAt: '2026-03-01' }],
+        weCalledIt: [{ actionId: 'a1', prediction: 'rank top 3', outcome: 'Position improved from 8 to 3 (+5 spots).', score: 'strong_win', pageUrl: '/p', measuredAt: '2026-03-01' }],
         roiAttribution: [{ actionId: 'a2', actionType: 'content_refreshed', pageUrl: '/p', clickGain: 120, measuredAt: '2026-03-01' }],
       };
       const compact = formatForPrompt(intel, { verbosity: 'compact' });
@@ -426,7 +426,7 @@ describe('formatForPrompt', () => {
         weCalledIt: Array.from({ length: 8 }, (_, i) => ({
           actionId: `a${i}`,
           prediction: `Prediction ${i}`,
-          outcome: 'win',
+          outcome: `Outcome ${i}`,
           score: 'strong_win',
           pageUrl: `/page-${i}`,
           measuredAt: '2026-03-28',

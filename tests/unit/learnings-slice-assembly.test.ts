@@ -114,7 +114,14 @@ function makeOutcome(actionId: string, score: string | null = 'strong_win') {
     // metricsSnapshot.clicks is read by the roiAttribution loop (Task 2.3)
     metricsSnapshot: { clicks: 150 },
     score,
-    deltaSummary: { delta_percent: 20 },
+    deltaSummary: {
+      primary_metric: 'clicks',
+      baseline_value: 100,
+      current_value: 150,
+      delta_absolute: 50,
+      delta_percent: 50,
+      direction: 'improved',
+    },
     competitorContext: null,
     measuredAt: '2024-06-01T00:00:00Z',
   };
@@ -373,7 +380,7 @@ describe('assembleLearnings', () => {
       vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
       vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'strong_win')] as any);
       const result = await assembleLearnings(WS_ID);
-      expect(result.weCalledIt![0].prediction).toBe('title_rewrite on /about');
+      expect(result.weCalledIt![0].prediction).toBe('title rewrite on /about');
     });
 
     it('prediction falls back to "site" when pageUrl is null', async () => {
@@ -400,12 +407,12 @@ describe('assembleLearnings', () => {
       expect(result.weCalledIt![0].pageUrl).toBe('/my-page');
     });
 
-    it('sets outcome and score both to "strong_win"', async () => {
+    it('sets a client-readable outcome and preserves score as "strong_win"', async () => {
       const action = makeAction('a1');
       vi.mocked(getActionsByWorkspace).mockReturnValue([action] as any);
       vi.mocked(getOutcomesForAction).mockReturnValue([makeOutcome('a1', 'strong_win')] as any);
       const result = await assembleLearnings(WS_ID);
-      expect(result.weCalledIt![0].outcome).toBe('strong_win');
+      expect(result.weCalledIt![0].outcome).toBe('Clicks improved from 100 to 150 (+50%).');
       expect(result.weCalledIt![0].score).toBe('strong_win');
     });
 
