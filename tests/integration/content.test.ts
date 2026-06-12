@@ -508,7 +508,10 @@ describe('Content Posts API', () => {
     const res = await postJson(`/api/content-posts/${testWsId}/generate`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('briefId required');
+    // The validate() middleware prefixes the failing field path onto the message
+    // ("briefId: briefId required"). The 400-on-missing-briefId contract still stands;
+    // only the wording gained the field prefix.
+    expect(body.error).toBe('briefId: briefId required');
   });
 
   it('POST /api/content-posts/:wsId/generate rejects invalid generationStyle', async () => {

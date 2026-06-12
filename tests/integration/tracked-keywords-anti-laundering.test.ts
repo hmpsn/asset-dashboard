@@ -40,6 +40,7 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn(),
 }));
+
 const ctx = createEphemeralTestContext(import.meta.url);
 
 let workspaceId = '';

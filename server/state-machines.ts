@@ -254,6 +254,38 @@ export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type RequestTransitionStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 
+// ── Schema Site Plan ──
+// Five statuses derived from SchemaSitePlan['status']:
+//   draft → sent_to_client         admin sends for review
+//   draft → active                  admin activates without client review (SchemaPlanPanel
+//                                    offers "Activate Plan" alongside "Send to client" on drafts)
+//   sent_to_client → client_approved | client_changes_requested   client responds
+//   client_changes_requested → draft | sent_to_client              admin revises or resends
+//   client_approved → active        admin activates the plan
+//   sent_to_client → active         admin fast-tracks without waiting for client response
+//   active → draft                  admin resets to rework (e.g. site redesign)
+//
+// The `sendSchemaPlanToClientForReview` mutation is UI-gated to draft plans only.
+// `activateSchemaPlanForAdmin` is allowed from draft, sent_to_client, or client_approved —
+// the SchemaPlanPanel renders "Activate Plan" whenever status is draft or client_approved,
+// so direct draft → active must be legal (admin self-serve activation, no client gate).
+// No self-transitions and no backward jumps from client_approved → draft directly
+// (force the admin to activate, then reset if needed).
+export const SCHEMA_PLAN_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:                    ['sent_to_client', 'active'],
+  sent_to_client:           ['client_approved', 'client_changes_requested', 'active'],
+  client_changes_requested: ['draft', 'sent_to_client'],
+  client_approved:          ['active'],
+  active:                   ['draft'],  // admin resets to rework
+};
+
+export type SchemaPlanStatus =
+  | 'draft'
+  | 'sent_to_client'
+  | 'client_approved'
+  | 'client_changes_requested'
+  | 'active';
+
 // ── Tracked Keyword (rank-tracking lifecycle) ──
 // The four TRACKED_KEYWORD_STATUS values (shared/types/rank-tracking.ts). Until P3
 // (Keyword Hub Wave 4) the tracked-keyword lifecycle was the ONLY status entity whose

@@ -145,7 +145,11 @@ export type ActivityType =
   // rec_status_updated / rec_dismissed are deliberately NOT in CLIENT_VISIBLE_TYPES:
   // recommendation triage is an internal admin-facing audit trail, not a client deliverable.
   | 'rec_status_updated'   // client triage: pending/in_progress/completed
-  | 'rec_dismissed';       // client dismissed a recommendation
+  | 'rec_dismissed'        // client dismissed a recommendation
+  | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
+  | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
+  | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
+  | 'post_voice_scored';         // admin-only: voice score persisted for a post
 
 export interface ActivityEntry {
   id: string;

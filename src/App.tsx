@@ -48,10 +48,8 @@ const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStr
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
-const ContentBriefs = lazyWithRetry(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
 const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
 const LinksPanel = lazyWithRetry(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
-const ContentManager = lazyWithRetry(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
 const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
@@ -431,8 +429,10 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} businessProfile={selected.businessProfile} intelligenceProfile={selected.intelligenceProfile} />;
     if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} fixContext={fixContext} clearFixContext={clearFixContext} />;
-    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} fixContext={fixContext} clearFixContext={clearFixContext} />;
-    if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
+    // seo-briefs and content are zombie routes (removed from nav registry in W3.3).
+    // Redirect bookmarks to the correct content-pipeline sub-tab.
+    if (tab === 'seo-briefs') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=briefs'} replace />;
+    if (tab === 'content') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=posts'} replace />;
     if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;

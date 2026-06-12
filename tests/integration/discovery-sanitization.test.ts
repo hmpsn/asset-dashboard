@@ -9,7 +9,7 @@
  *
  * Architecture note: the injection-envelope tests call processSource() directly
  * in-process so that vi.mock() can intercept callAI's delegated OpenAI call. The size-cap
- * tests use createEphemeralTestContext (child process) because they exercise the HTTP
+ * tests use createEphemeralTestContext(import.meta.url) because they exercise the HTTP
  * validation layer (Zod .max + DB trigger).
  */
 

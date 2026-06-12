@@ -2,27 +2,21 @@ import { useState, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, FileText, Clipboard, MessageSquare,
   Sparkles, PenLine, Eye, CheckCircle2, Clock, Send, Globe,
-  Calendar as CalendarIcon, Layers,
+  Calendar as CalendarIcon, Layers, CalendarClock, Wand2, Plus, ArrowUpRight, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useContentCalendar } from '../hooks/admin';
-import { Button, EmptyState, ErrorState, Icon, IconButton } from './ui';
+import { useQueryClient } from '@tanstack/react-query';
+import { useContentCalendar, useAdminPostsList } from '../hooks/admin';
+import type { CalendarItem } from '../hooks/admin/useContentCalendar';
+import { Badge, Button, EmptyState, ErrorState, Icon, IconButton } from './ui';
 import { adminPath } from '../routes';
-import { timeAgo } from '../lib/timeAgo';
+import { contentPosts } from '../api/content';
+import { queryKeys } from '../lib/queryKeys';
+import { useToast } from './Toast';
 
 // ── Types ──
 
 type ItemType = 'brief' | 'post' | 'request' | 'matrix';
-
-interface CalendarItem {
-  id: string;
-  type: ItemType;
-  label: string;
-  sublabel: string;
-  status: string;
-  date: string; // ISO date string
-  publishedAt?: string;
-}
 
 // ── Config ──
 
@@ -33,6 +27,13 @@ const TYPE_CONFIG: Record<ItemType, { icon: typeof FileText; color: string; bg: 
   matrix:  { icon: Layers,         color: 'text-accent-brand', bg: 'bg-teal-500/10', border: 'border-teal-500/20', label: 'Matrix Cell' },
 };
 
+// W6.6: planned items get a distinct teal "intent" treatment (teal = action/intent
+// per the Four Laws — these are forward-looking commitments the admin sets), vs the
+// per-type colors used for created/published items.
+const PLANNED_DOT = 'bg-teal-500/15 text-accent-brand border border-teal-500/30 border-dashed';
+
+// status-semantic-ok: CalendarItem spans multiple domain statuses (briefs, posts, requests,
+// matrices). StatusBadge domain mappings are per-entity; a unified icon map is intentional here.
 const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
   generating:       { icon: Sparkles,     color: 'text-accent-warning' },
   draft:            { icon: PenLine,      color: 'text-accent-info' },
@@ -76,6 +77,8 @@ function dayKey(d: Date): string {
 
 export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -83,6 +86,109 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   const { data: rawItems, isLoading, isError, refetch } = useContentCalendar(workspaceId);
   const items = rawItems ?? [];
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
+
+  // Posts list — used by the schedule-a-draft picker (unscheduled drafts only).
+  const { data: postsData } = useAdminPostsList(workspaceId);
+
+  // ── Interaction state (W6.6) ──
+  const [scheduleDayKey, setScheduleDayKey] = useState<string | null>(null); // future day awaiting a draft pick
+  const [busy, setBusy] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ draftId: string; suggestedDate: string; title: string }> | null>(null);
+
+  const invalidateCalendar = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+  };
+
+  // Drafts with no planned date and not yet published — schedulable onto a future day.
+  const unscheduledDrafts = useMemo(() => {
+    const list = (postsData ?? []) as Array<{ id: string; title: string; status: string; publishedAt?: string; plannedPublishAt?: string }>;
+    return list.filter(p => !p.plannedPublishAt && !p.publishedAt && p.status !== 'generating');
+  }, [postsData]);
+
+  // Open a calendar item's underlying artifact.
+  //  - post    → Posts tab + ?post=<id> deep-link (ContentManager opens the editor)
+  //  - brief   → Briefs tab
+  //  - request → pipeline (Posts tab is the closest landing; requests live in the inbox/pipeline)
+  //  - matrix  → Planner tab
+  const openItem = (item: CalendarItem) => {
+    const base = adminPath(workspaceId, 'content-pipeline');
+    if (item.type === 'post') {
+      navigate(`${base}?tab=posts&post=${encodeURIComponent(item.id)}`);
+    } else if (item.type === 'brief') {
+      navigate(`${base}?tab=briefs`);
+    } else if (item.type === 'matrix') {
+      navigate(`${base}?tab=planner`);
+    } else {
+      navigate(`${base}?tab=posts`);
+    }
+  };
+
+  // Assign a planned publish date to a draft (schedule-a-draft + suggest-confirm).
+  const schedule = async (postId: string, isoDate: string) => {
+    setBusy(true);
+    try {
+      await contentPosts.setPlannedDate(workspaceId, postId, isoDate);
+      invalidateCalendar();
+      setScheduleDayKey(null);
+      toast('Draft scheduled', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to schedule draft', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Clear a post's planned date (unschedule).
+  const unschedule = async (postId: string) => {
+    setBusy(true);
+    try {
+      await contentPosts.setPlannedDate(workspaceId, postId, null);
+      invalidateCalendar();
+      toast('Draft unscheduled', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to unschedule draft', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Fetch AI-proposed publish dates for unscheduled drafts (wires suggestPublishDates).
+  const loadSuggestions = async () => {
+    setBusy(true);
+    try {
+      const res = await contentPosts.suggestDates(workspaceId);
+      setSuggestions(res.suggestions);
+      if (res.suggestions.length === 0) {
+        toast('No unscheduled drafts to suggest dates for', 'info');
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to load suggestions', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Apply all proposed dates at once.
+  const applyAllSuggestions = async () => {
+    if (!suggestions || suggestions.length === 0) return;
+    setBusy(true);
+    try {
+      for (const s of suggestions) {
+        await contentPosts.setPlannedDate(workspaceId, s.draftId, s.suggestedDate);
+      }
+      invalidateCalendar();
+      setSuggestions(null);
+      toast(`Scheduled ${suggestions.length} draft${suggestions.length !== 1 ? 's' : ''}`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to apply suggestions', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Day-key in local time for a future-day comparison.
+  const todayKey = dayKey(new Date());
 
   // ── Calendar grid ──
 
@@ -194,6 +300,18 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           <h2 className="t-h2 text-[var(--brand-text-bright)]">Content Calendar</h2>
         </div>
         <div className="flex items-center gap-2">
+          {/* Suggest dates — proposes publish dates for unscheduled drafts (teal=action) */}
+          <Button
+            onClick={() => { void loadSuggestions(); }}
+            disabled={busy || unscheduledDrafts.length === 0}
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm gap-1.5 px-2.5 py-1 rounded-[var(--radius-pill)] border border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 font-medium transition-colors disabled:opacity-40"
+            title="Suggest publish dates for unscheduled drafts"
+          >
+            <Icon as={Wand2} size="sm" />
+            Suggest dates
+          </Button>
           {/* Type filter pills */}
           {(['all', 'brief', 'post', 'request', 'matrix'] as const).map(t => (
             <Button
@@ -228,6 +346,59 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           </div>
         ))}
       </div>
+
+      {/* Suggested dates panel (W6.6) — proposals the admin can apply in one click */}
+      {suggestions && suggestions.length > 0 && (
+        // pr-check-disable-next-line -- Suggestion panel chrome paired with the calendar, shares its signature shell.
+        <div className="bg-[var(--surface-2)] border border-teal-500/30 overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+          <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Icon as={Wand2} size="sm" className="text-accent-brand" />
+              <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
+                {suggestions.length} suggested publish date{suggestions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => { void applyAllSuggestions(); }}
+                disabled={busy}
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/30 text-accent-brand hover:bg-teal-500/20 font-medium transition-colors disabled:opacity-40"
+              >
+                Apply all
+              </Button>
+              <IconButton
+                onClick={() => setSuggestions(null)}
+                icon={X}
+                label="Dismiss suggestions"
+                size="sm"
+                variant="ghost"
+              />
+            </div>
+          </div>
+          <div className="divide-y divide-[var(--brand-border)]/50">
+            {suggestions.map(s => (
+              <div key={s.draftId} className="px-4 py-2.5 flex items-center gap-3">
+                <Icon as={FileText} size="sm" className="text-accent-warning flex-shrink-0" />
+                <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{s.title || 'Untitled draft'}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
+                  {new Date(s.suggestedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+                <Button
+                  onClick={() => { void schedule(s.draftId, s.suggestedDate); }}
+                  disabled={busy}
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption-sm px-2 py-0.5 rounded border border-teal-500/30 text-accent-brand hover:bg-teal-500/10 transition-colors disabled:opacity-40"
+                >
+                  Schedule
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Month navigation */}
       {/* pr-check-disable-next-line -- Calendar navigation toolbar uses brand signature radius as control chrome, not a content card. */}
@@ -301,15 +472,18 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                   {!isToday && day.getDate()}
                 </div>
 
-                {/* Item dots / mini cards */}
+                {/* Item dots / mini cards — planned items get the dashed teal intent treatment */}
                 <div className="space-y-0.5">
                   {dayItems.slice(0, 3).map(item => {
                     const cfg = TYPE_CONFIG[item.type];
+                    const isPlanned = item.kind === 'planned';
                     return (
                       <div
                         key={item.id}
-                        className={`t-micro px-1 py-0.5 rounded-[var(--radius-sm)] ${cfg.bg} ${cfg.color} truncate leading-tight`}
-                        title={item.label}
+                        className={`t-micro px-1 py-0.5 rounded-[var(--radius-sm)] truncate leading-tight ${
+                          isPlanned ? PLANNED_DOT : `${cfg.bg} ${cfg.color}`
+                        }`}
+                        title={isPlanned ? `Planned: ${item.label}` : item.label}
                       >
                         {item.label}
                       </div>
@@ -326,52 +500,119 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Selected day detail panel */}
-      {selectedDay && (
-        // pr-check-disable-next-line -- Selected-day detail is paired with the calendar grid and shares its signature shell.
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
-            <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
-              {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-            </span>
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
-          </div>
-
-          {selectedItems.length === 0 ? (
-            <div className="px-4 py-8 text-center t-caption-sm text-[var(--brand-text-muted)]">No content items on this day</div>
-          ) : (
-            <div className="divide-y divide-[var(--brand-border)]/50">
-              {selectedItems.map(item => {
-                const cfg = TYPE_CONFIG[item.type];
-                const ItemIcon = cfg.icon;
-                const statusCfg = STATUS_ICONS[item.status];
-                const StatusIcon = statusCfg?.icon || Clock;
-                const statusColor = statusCfg?.color || 'text-[var(--brand-text-muted)]';
-
-                return (
-                  <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-[var(--surface-3)]/30 transition-colors">
-                    <div className={`mt-0.5 p-1.5 rounded-[var(--radius-lg)] ${cfg.bg} border ${cfg.border}`}>
-                      <Icon as={ItemIcon} size="md" className={cfg.color} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="t-ui text-[var(--brand-text-bright)] truncate">{item.label}</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate mt-0.5">{item.sublabel}</div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Icon as={StatusIcon} size="sm" className={statusColor} />
-                      <span className={`t-caption-sm capitalize ${statusColor}`}>
-                        {item.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
-                      {timeAgo(item.date)}
-                    </div>
-                  </div>
-                );
-              })}
+      {selectedDay && (() => {
+        // Future (or today) days can have a draft scheduled onto them.
+        const canSchedule = selectedDay >= todayKey;
+        const selectedDateIso = new Date(selectedDay + 'T12:00:00').toISOString();
+        return (
+          // pr-check-disable-next-line -- Selected-day detail is paired with the calendar grid and shares its signature shell.
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+            <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
+              <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
+                {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+              <div className="flex items-center gap-2">
+                {canSchedule && unscheduledDrafts.length > 0 && (
+                  <Button
+                    onClick={() => setScheduleDayKey(scheduleDayKey === selectedDay ? null : selectedDay)}
+                    variant="ghost"
+                    size="sm"
+                    className="t-caption-sm gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] border border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 font-medium transition-colors"
+                  >
+                    <Icon as={Plus} size="sm" />
+                    Schedule a draft
+                  </Button>
+                )}
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Schedule-a-draft picker (inline, no drag-and-drop in v1) */}
+            {scheduleDayKey === selectedDay && (
+              <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 bg-[var(--surface-3)]/40">
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Pick a draft to schedule on this day:</div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {unscheduledDrafts.map(d => (
+                    <Button
+                      key={d.id}
+                      onClick={() => { void schedule(d.id, selectedDateIso); }}
+                      disabled={busy}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start t-caption-sm px-2 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:border-teal-500/40 hover:bg-teal-500/5 transition-colors disabled:opacity-40"
+                    >
+                      <Icon as={FileText} size="sm" className="text-accent-warning flex-shrink-0" />
+                      <span className="truncate">{d.title || 'Untitled draft'}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedItems.length === 0 ? (
+              <div className="px-4 py-8 text-center t-caption-sm text-[var(--brand-text-muted)]">
+                {canSchedule ? 'No content scheduled for this day' : 'No content items on this day'}
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--brand-border)]/50">
+                {selectedItems.map(item => {
+                  const cfg = TYPE_CONFIG[item.type];
+                  const ItemIcon = cfg.icon;
+                  const statusCfg = STATUS_ICONS[item.status];
+                  const StatusIcon = statusCfg?.icon || Clock;
+                  const statusColor = statusCfg?.color || 'text-[var(--brand-text-muted)]'; // status-semantic-ok: unified calendar icon color map spans multiple domains
+                  const isPlanned = item.kind === 'planned';
+
+                  // Day-panel rows are now clickable — open the underlying artifact.
+                  return (
+                    <div key={item.id} className="flex items-start gap-1 hover:bg-[var(--surface-3)]/30 transition-colors">
+                      <Button
+                        onClick={() => openItem(item)}
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 min-w-0 px-4 py-3 flex items-start gap-3 text-left rounded-none"
+                        title="Open"
+                      >
+                        <span className={`mt-0.5 p-1.5 rounded-[var(--radius-lg)] flex-shrink-0 ${isPlanned ? PLANNED_DOT : `${cfg.bg} border ${cfg.border}`}`}>
+                          <Icon as={isPlanned ? CalendarClock : ItemIcon} size="md" className={isPlanned ? 'text-accent-brand' : cfg.color} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className="t-ui text-[var(--brand-text-bright)] truncate">{item.label}</span>
+                            {isPlanned && (
+                              <Badge label="Planned" tone="teal" />
+                            )}
+                          </span>
+                          <span className="block t-caption-sm text-[var(--brand-text-muted)] truncate mt-0.5">{item.sublabel}</span>
+                        </span>
+                        <span className="flex items-center gap-1.5 flex-shrink-0">
+                          <Icon as={StatusIcon} size="sm" className={statusColor} />
+                          <span className={`t-caption-sm capitalize ${statusColor}`}>
+                            {item.status.replace(/_/g, ' ')}
+                          </span>
+                        </span>
+                        <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0 mt-0.5" />
+                      </Button>
+                      {isPlanned && (
+                        <IconButton
+                          onClick={() => { void unschedule(item.id); }}
+                          disabled={busy}
+                          icon={X}
+                          label="Unschedule draft"
+                          title="Clear planned date"
+                          size="sm"
+                          variant="ghost"
+                          className="mt-3 mr-2 flex-shrink-0"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Empty state */}
       {items.length === 0 && !isLoading && (
@@ -381,7 +622,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           description="Create a content brief to get started"
           action={
             <Button
-              onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
+              onClick={() => navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`)}
               variant="ghost"
               size="sm"
               className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"

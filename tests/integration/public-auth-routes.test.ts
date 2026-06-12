@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createClientUser, createResetToken, deleteClientUser } from '../../server/client-users.js';
+
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 

@@ -23,7 +23,6 @@
 //   - GET  /api/webflow/schema-validations/:siteId
 //   - DELETE /api/webflow/schema-validation/:siteId  (missing pageId, success)
 //   - POST /api/webflow/schema-publish/:siteId  (missing body, structural validation errors)
-//   - GET  /api/pending-schemas/:workspaceId
 //   - Cross-workspace isolation for schema-publish and schema-plan
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
@@ -724,28 +723,6 @@ describe('POST /api/webflow/schema-publish/:siteId — error paths', () => {
     // With skipValidation the gate is bypassed — route proceeds to Webflow which fails → 500
     expect([422, 500]).toContain(res.status);
     resetWebflowMocks();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Pending Schemas
-// ---------------------------------------------------------------------------
-
-describe('GET /api/pending-schemas/:workspaceId', () => {
-  it('returns empty list for workspace with no pending schemas', async () => {
-    const res = await api(`/api/pending-schemas/${workspaceId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('pendingSchemas');
-    expect(Array.isArray(body.pendingSchemas)).toBe(true);
-  });
-
-  it('returns 200 with empty list for nonexistent workspace', async () => {
-    const res = await api(`/api/pending-schemas/nonexistent-ws-xyz`);
-    // The route calls listPendingSchemas which just queries DB — 200 with empty list
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('pendingSchemas');
   });
 });
 

@@ -255,10 +255,13 @@ describe('public-analytics.ts AI review migration contracts', () => {
   });
 });
 
-// ── content-posts.ts (post AI review) ────────────────────────────────────────
+// ── content-posts-ai-jobs.ts (post AI review worker — W6.2 migration) ────────
+// W6.2 moved the AI review/fix/voice-score call sites from routes/content-posts.ts
+// into content-posts-ai-jobs.ts (background-job workers). The slice contract must
+// hold in the new module — the worker owns the heavy AI bodies.
 
-describe('content-posts.ts AI review migration contracts', () => {
-  const src = readRoute('content-posts.ts');
+describe('content-posts-ai-jobs.ts AI review migration contracts', () => {
+  const src = read('content-posts-ai-jobs.ts');
 
   it('requests seoContext + learnings slices for post brand-voice review', () => {
     expect(hasSlicesSeoContextLearnings(src)).toBe(true);
@@ -373,7 +376,7 @@ describe('slices/sections consistency — learnings section requires learnings s
     { label: 'page-analysis-job.ts', src: read('page-analysis-job.ts') },
     { label: 'routes/google.ts', src: readRoute('google.ts') },
     { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
-    { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
+    { label: 'content-posts-ai-jobs.ts', src: read('content-posts-ai-jobs.ts') },
     { label: 'routes/jobs.ts', src: readRoute('jobs.ts') },
   ];
 

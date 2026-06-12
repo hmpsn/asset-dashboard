@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **499 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **500 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 500. W6 Final Audit Wave — Calendar Planning v1, Suggested-Brief Lifecycle, AI Ops on Jobs, De-biased Local Classifiers
+
+**What it does:** Four shipped capabilities from the audit's final wave. (1) Forward-planning Content Calendar v1: posts gain `plannedPublishAt` (migration 136); planned drafts plot on future days with a dashed-teal intent treatment; day rows are clickable and open their artifact; a schedule-a-draft picker assigns dates from the calendar; `suggestPublishDates` finally has a consumer via the suggest-dates flow (noon-UTC anchored). (2) The AI Suggested panel now reads the persistent suggested-briefs store — dismiss/snooze/accept lifecycle with SHA dedup, ranking-opportunity signals seeded on the real read path with a TTL guard, decay suggestions surfacing. (3) Five heavyweight AI operations (brief regenerate/outline, ai-review, ai-fix, voice scoring) moved onto the background job platform — 202 jobId, 409 dedupe, progress in the bell, no more 30–120s open HTTP holds. (4) Local SEO candidate classifiers are workspace-derived (markets + business profile + industry taxonomy + strategy keywords with a stopword filter) — the founding client's Texas/dental vocabulary no longer biases every other workspace.
+
+**Agency value:** Content scheduling becomes plannable instead of retrospective; suggestions gain memory; long AI operations stop dying with the browser tab; every new local-SEO client gets classifiers fit to their market.
+
+**Client value:** Better local candidates and steadier content cadence flow downstream into client-facing recommendations.
+
+**Mutual:** This closes the 2026-06-11 admin surface audit — every wave (W1–W6) shipped.
+
+**Files:** see PR; highlights: `server/content-posts-ai-jobs.ts`, `server/content-brief-regenerate-job.ts`, `src/components/ContentCalendar.tsx`, `src/components/pipeline/AiSuggested.tsx`, `server/local-seo.ts` classifiers, migration 136.
 
 ---
 

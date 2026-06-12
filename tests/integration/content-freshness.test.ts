@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
+
 const STALE_DATE = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });

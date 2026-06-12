@@ -689,11 +689,6 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     expect(res.status).toBe(200);
   });
 
-  it('rejects pending schema reads for a workspace outside the JWT scope', async () => {
-    const res = await api(`/api/pending-schemas/${otherWsId}`, { headers: scopedHeaders() });
-    expect(res.status).toBe(403);
-  });
-
   it('rejects SEMRush workspace routes outside the JWT scope', async () => {
     const headers = scopedHeaders();
     const checks = await Promise.all([

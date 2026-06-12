@@ -439,7 +439,10 @@ describe('Reports — action items CRUD', () => {
     const res = await postJson(`/api/reports/snapshot/${snapshotId}/actions`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Title is required');
+    // The validate() middleware prefixes the failing field path onto the message
+    // ("title: Title is required"). The 400-on-missing-title contract still stands;
+    // only the wording gained the field prefix.
+    expect(body.error).toBe('title: Title is required');
   });
 
   it('POST /api/reports/snapshot/:id/actions rejects invalid priority', async () => {

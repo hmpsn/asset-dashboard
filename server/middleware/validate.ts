@@ -28,7 +28,14 @@ export function validate(schema: ZodType): RequestHandler {
         message: issue.message,
       }));
       log.warn({ path: req.path, issues }, 'Request body validation failed');
-      return res.status(400).json({ error: issues[0].message, errors: issues });
+      // Prefix the offending field path so the top-level `error` string names the
+      // failing field (e.g. "name: Required"). Hand-written guards across the
+      // codebase reference the field name in their 400 messages; routes migrated to
+      // this middleware must keep that actionable convention. Falls back to the bare
+      // message for top-level/whole-body issues with an empty path.
+      const first = issues[0];
+      const errorMessage = first.path ? `${first.path}: ${first.message}` : first.message;
+      return res.status(400).json({ error: errorMessage, errors: issues });
     }
     // Replace body with parsed+transformed output (strips unknown keys, applies defaults, etc.)
     req.body = result.data;

@@ -259,4 +259,40 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/content-posts-workflow.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE]: entry(
+    'CONTENT_BRIEF_REGENERATE',
+    {
+      expectedLabel: 'Brief Regeneration',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/integration/w6-ai-ops-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW]: entry(
+    'CONTENT_POST_REVIEW',
+    {
+      expectedLabel: 'AI Content Review',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/w6-ai-ops-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_FIX]: entry(
+    'CONTENT_POST_FIX',
+    {
+      expectedLabel: 'AI Content Fix',
+      expectedCancellable: false,
+      expectedResultBehavior: 'ephemeral',
+    },
+    'tests/integration/w6-ai-ops-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE]: entry(
+    'CONTENT_POST_VOICE_SCORE',
+    {
+      expectedLabel: 'Brand Voice Scoring',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/w6-ai-ops-to-jobs.test.ts',
+  ),
 };

@@ -41,6 +41,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
     globalPublicLimiter: noopMiddleware,
   };
 });
+
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 

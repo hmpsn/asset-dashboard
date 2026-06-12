@@ -11,6 +11,7 @@ import {
   getSchemaSnapshot,
   getSiteTemplate,
   patchSiteTemplate,
+  pruneSchemaSnapshotOrphans,
   removePageFromSnapshot,
   savePageType,
   savePageTypes,
@@ -23,6 +24,7 @@ import {
   updateSchemaPlanRoles,
   updateSchemaPlanStatus,
 } from '../../server/schema-store.js';
+import { InvalidTransitionError } from '../../server/state-machines.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
@@ -50,6 +52,125 @@ function cleanup() {
 
 describe('schema-store', () => {
   beforeEach(cleanup);
+
+  // ── saveSchemaSnapshot single-row invariant (W6.3) ──
+
+  it('saveSchemaSnapshot reuses the same row id and created_at on repeated saves', () => {
+    const first = saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' }),
+    ]);
+    const second = saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Updated Home' }),
+      pageSuggestion('service', '/services', { '@type': 'Service', name: 'Service' }),
+    ]);
+
+    expect(second.id).toBe(first.id);
+    expect(second.createdAt).toBe(first.createdAt);
+    expect(second.pageCount).toBe(2);
+
+    // Only one row should exist in the DB after multiple saves
+    const rowCount = (db.prepare('SELECT COUNT(*) as n FROM schema_snapshots WHERE site_id = ?').get(SITE_ID) as { n: number }).n;
+    expect(rowCount).toBe(1);
+  });
+
+  it('pruneSchemaSnapshotOrphans removes extra rows and returns the count', () => {
+    // Simulate pre-fix behavior: insert two extra rows with different ids
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO schema_snapshots (id, site_id, workspace_id, created_at, results, page_count)
+                VALUES (?, ?, ?, ?, ?, ?)`).run('snap-old-1', SITE_ID, WS_ID, '2026-01-01T00:00:00.000Z', '[]', 0);
+    db.prepare(`INSERT INTO schema_snapshots (id, site_id, workspace_id, created_at, results, page_count)
+                VALUES (?, ?, ?, ?, ?, ?)`).run('snap-old-2', SITE_ID, WS_ID, '2026-01-02T00:00:00.000Z', '[]', 0);
+    db.prepare(`INSERT INTO schema_snapshots (id, site_id, workspace_id, created_at, results, page_count)
+                VALUES (?, ?, ?, ?, ?, ?)`).run('snap-newest', SITE_ID, WS_ID, now, '[{"pageId":"home"}]', 1);
+
+    const pruned = pruneSchemaSnapshotOrphans(SITE_ID);
+    expect(pruned).toBe(2);
+
+    const remaining = db.prepare('SELECT id FROM schema_snapshots WHERE site_id = ?').all(SITE_ID) as Array<{ id: string }>;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe('snap-newest');
+  });
+
+  it('pruneSchemaSnapshotOrphans is a no-op when only one row exists', () => {
+    saveSchemaSnapshot(SITE_ID, WS_ID, [pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' })]);
+    const pruned = pruneSchemaSnapshotOrphans(SITE_ID);
+    expect(pruned).toBe(0);
+  });
+
+  it('pruneSchemaSnapshotOrphans is safe when no rows exist', () => {
+    expect(pruneSchemaSnapshotOrphans(SITE_ID)).toBe(0);
+  });
+
+  // ── updateSchemaPlanStatus state machine guard (W6.3) ──
+
+  it('updateSchemaPlanStatus throws InvalidTransitionError for illegal transitions', () => {
+    const plan: SchemaSitePlan = {
+      id: 'plan-sm-guard',
+      siteId: SITE_ID,
+      workspaceId: WS_ID,
+      siteUrl: 'https://example.com',
+      canonicalEntities: [],
+      pageRoles: [],
+      status: 'draft',
+      generatedAt: '2026-06-12T00:00:00.000Z',
+      updatedAt: '2026-06-12T00:00:00.000Z',
+    };
+    saveSchemaPlan(plan);
+
+    // draft → client_approved is not legal (cannot skip the send step)
+    expect(() => updateSchemaPlanStatus(SITE_ID, 'client_approved')).toThrow(InvalidTransitionError);
+    // draft → client_changes_requested is not legal (plan was never sent)
+    expect(() => updateSchemaPlanStatus(SITE_ID, 'client_changes_requested')).toThrow(InvalidTransitionError);
+    // The plan status should remain unchanged
+    expect(getSchemaPlan(SITE_ID)?.status).toBe('draft');
+  });
+
+  it('updateSchemaPlanStatus allows direct draft → active (admin self-serve activation)', () => {
+    const plan: SchemaSitePlan = {
+      id: 'plan-sm-direct-activate',
+      siteId: SITE_ID,
+      workspaceId: WS_ID,
+      siteUrl: 'https://example.com',
+      canonicalEntities: [],
+      pageRoles: [],
+      status: 'draft',
+      generatedAt: '2026-06-12T00:00:00.000Z',
+      updatedAt: '2026-06-12T00:00:00.000Z',
+    };
+    saveSchemaPlan(plan);
+
+    // SchemaPlanPanel offers "Activate Plan" on drafts, so this path must be legal.
+    const activated = updateSchemaPlanStatus(SITE_ID, 'active');
+    expect(activated?.status).toBe('active');
+  });
+
+  it('updateSchemaPlanStatus accepts valid transitions', () => {
+    const plan: SchemaSitePlan = {
+      id: 'plan-sm-valid',
+      siteId: SITE_ID,
+      workspaceId: WS_ID,
+      siteUrl: 'https://example.com',
+      canonicalEntities: [],
+      pageRoles: [],
+      status: 'draft',
+      generatedAt: '2026-06-12T00:00:00.000Z',
+      updatedAt: '2026-06-12T00:00:00.000Z',
+    };
+    saveSchemaPlan(plan);
+
+    const sent = updateSchemaPlanStatus(SITE_ID, 'sent_to_client');
+    expect(sent?.status).toBe('sent_to_client');
+
+    const clientApproved = updateSchemaPlanStatus(SITE_ID, 'client_approved');
+    expect(clientApproved?.status).toBe('client_approved');
+
+    const activated = updateSchemaPlanStatus(SITE_ID, 'active');
+    expect(activated?.status).toBe('active');
+
+    // active → draft is a legal reset
+    const reset = updateSchemaPlanStatus(SITE_ID, 'draft');
+    expect(reset?.status).toBe('draft');
+  });
 
   it('saves, retrieves, updates, prunes, and deletes schema snapshots', () => {
     const snapshot = saveSchemaSnapshot(SITE_ID, WS_ID, [

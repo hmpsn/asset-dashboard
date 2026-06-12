@@ -28,7 +28,8 @@ const log = createLogger('schema-plan-admin-mutations');
 
 type SchemaPlanMutationError =
   | { ok: false; status: 404; error: string }
-  | { ok: false; status: 409; error: string; jobId: string };
+  | { ok: false; status: 409; error: string; jobId: string }
+  | { ok: false; status: 422; error: string };
 
 type SchemaPlanMutationResult<T> = SchemaPlanMutationError | { ok: true; value: T };
 
@@ -87,6 +88,17 @@ export function sendSchemaPlanToClientForReview(
 
   const conflict = schemaPlanConflict(plan.workspaceId);
   if (conflict) return conflict;
+
+  // State-machine precondition: only draft plans may be sent to the client.
+  // (client_changes_requested → sent_to_client is also legal but the UI re-routes
+  // to draft first; this guard matches the state-machine map exactly.)
+  if (plan.status !== 'draft' && plan.status !== 'client_changes_requested') {
+    return {
+      ok: false,
+      status: 422,
+      error: `Cannot send a plan with status '${plan.status}' to the client. Revise the plan first.`,
+    };
+  }
 
   const ws = getWorkspace(plan.workspaceId);
   if (!ws) return { ok: false, status: 404, error: 'Workspace not found' };

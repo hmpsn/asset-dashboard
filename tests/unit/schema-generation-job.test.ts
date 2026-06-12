@@ -31,7 +31,10 @@ vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadc
 vi.mock('../../server/schema-generation-context.js', () => ({
   prepareBulkSchemaGenerationContext: mocks.prepareBulkSchemaGenerationContext,
 }));
-vi.mock('../../server/schema-store.js', () => ({ saveSchemaSnapshot: mocks.saveSchemaSnapshot }));
+vi.mock('../../server/schema-store.js', () => ({
+  saveSchemaSnapshot: mocks.saveSchemaSnapshot,
+  pruneSchemaSnapshotOrphans: vi.fn().mockReturnValue(0), // W6.3: pruning hook added at job completion
+}));
 vi.mock('../../server/schema-suggester.js', () => ({
   generateSchemaSuggestions: mocks.generateSchemaSuggestions,
 }));

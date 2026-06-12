@@ -37,6 +37,7 @@ interface PostRow {
   webflow_collection_id: string | null;
   published_at: string | null;
   published_slug: string | null;
+  planned_publish_at: string | null;
   review_checklist: string | null;
   ai_review: string | null;
   voice_score: number | null;
@@ -159,6 +160,7 @@ const stmts = createStmtCache(() => ({
             total_word_count, target_word_count, status, unification_status,
             unification_note, review_checklist, ai_review,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
+            planned_publish_at,
             voice_score, voice_feedback, generation_style,
             created_at, updated_at)
          VALUES
@@ -167,6 +169,7 @@ const stmts = createStmtCache(() => ({
             @total_word_count, @target_word_count, @status, @unification_status,
             @unification_note, @review_checklist, @ai_review,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
+            @planned_publish_at,
             @voice_score, @voice_feedback, @generation_style,
             @created_at, @updated_at)`,
   ),
@@ -187,6 +190,7 @@ const stmts = createStmtCache(() => ({
            ai_review = @ai_review,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
+           planned_publish_at = @planned_publish_at,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
            generation_style = @generation_style,
            updated_at = @updated_at
@@ -228,6 +232,7 @@ function rowToPost(row: PostRow): GeneratedPost {
     webflowCollectionId: row.webflow_collection_id ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
+    plannedPublishAt: row.planned_publish_at ?? undefined,
     reviewChecklist: row.review_checklist
       ? parseJsonSafe(row.review_checklist, reviewChecklistSchema, {
           factual_accuracy: false, brand_voice: false, internal_links: false,
@@ -267,6 +272,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     webflow_collection_id: post.webflowCollectionId ?? null,
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
+    planned_publish_at: post.plannedPublishAt ?? null,
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
     ai_review: post.aiReview ? JSON.stringify(post.aiReview) : null,
     voice_score: post.voiceScore ?? null,

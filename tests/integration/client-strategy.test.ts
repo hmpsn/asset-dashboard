@@ -183,7 +183,7 @@ async function captureWorkspaceEvent<T>(
   event: string,
   action: () => Promise<void>,
 ): Promise<T> {
-  const socket = new WebSocket(`ws://localhost:${ctx.PORT}/ws`);
+  const socket = new WebSocket(`${ctx.BASE.replace(/^http/, 'ws')}/ws`);
   try {
     await new Promise<void>((resolve, reject) => {
       socket.once('open', resolve);
