@@ -33,6 +33,8 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 import { seedWorkspace, seedTwoWorkspaces } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
+import { listActivity } from '../../server/activity-log.js';
 import type {
   SeoDataProvider,
   DomainOverview,
@@ -867,5 +869,43 @@ describe('GET /api/seo/competitive-intel — empty provider data', () => {
     expect(b.domains.length).toBeGreaterThan(0);
     // Own domain entry should always be present
     expect(b.domains.some((d) => d.domain === 'test.example.com')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 13: Bug 2 — POST /api/seo/competitors broadcasts + records activity
+// ---------------------------------------------------------------------------
+
+describe('Bug 2 — POST /api/seo/competitors/:workspaceId — broadcastToWorkspace + addActivity', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(async () => {
+    await startSharedServer();
+    ws = seedWorkspace();
+    mockProviderRef = null;
+    broadcastState.calls.length = 0;
+  });
+
+  afterAll(() => {
+    ws.cleanup();
+  });
+
+  it('broadcasts STRATEGY_UPDATED for the correct workspace after saving competitors', async () => {
+    broadcastState.calls.length = 0;
+    const { status } = await postJson(`/api/seo/competitors/${ws.workspaceId}`, { domains: ['broadcast-test.com'] });
+    expect(status).toBe(200);
+    const strategyBroadcasts = broadcastState.calls.filter(
+      c => c.workspaceId === ws.workspaceId && c.event === WS_EVENTS.STRATEGY_UPDATED,
+    );
+    expect(strategyBroadcasts.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('records an activity entry for the workspace after saving competitors', async () => {
+    const before = listActivity(ws.workspaceId, 50).length;
+    const { status } = await postJson(`/api/seo/competitors/${ws.workspaceId}`, { domains: ['activity-test.com'] });
+    expect(status).toBe(200);
+    const after = listActivity(ws.workspaceId, 50);
+    expect(after.length).toBeGreaterThan(before);
+    expect(after.some(a => a.title.toLowerCase().includes('competitor'))).toBe(true);
   });
 });

@@ -142,6 +142,9 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy,
+      // Bug 1 fix: pass table-backed siteKeywordMetrics so client explanations
+      // include real metric data (strategy blob has this stripped — always undefined).
+      siteKeywordMetrics: siteKeywordMetrics ?? undefined,
       pageMap: fullPageMap,
       contentGaps,
       keywordGaps,

@@ -19,6 +19,7 @@ import {
   saveSchemaSnapshot,
   saveSiteTemplate,
   updatePageSchemaInSnapshot,
+  upsertPageResultInSnapshot,
   updateSchemaPlanRoles,
   updateSchemaPlanStatus,
 } from '../../server/schema-store.js';
@@ -70,6 +71,84 @@ describe('schema-store', () => {
     expect(deleteSchemaSnapshot(SITE_ID)).toBe(true);
     expect(getSchemaSnapshot(SITE_ID)).toBeNull();
     expect(deleteSchemaSnapshot(SITE_ID)).toBe(false);
+  });
+
+  it('upsertPageResultInSnapshot creates a snapshot when none exists', () => {
+    expect(getSchemaSnapshot(SITE_ID)).toBeNull();
+
+    const result = upsertPageResultInSnapshot(
+      SITE_ID,
+      WS_ID,
+      pageSuggestion('service', '/services', { '@type': 'Service', name: 'New Service' }),
+    );
+    expect(result).toBe(true);
+
+    const snapshot = getSchemaSnapshot(SITE_ID);
+    expect(snapshot?.pageCount).toBe(1);
+    expect(snapshot?.workspaceId).toBe(WS_ID);
+    expect(snapshot?.results[0].pageId).toBe('service');
+    expect(snapshot?.results[0].suggestedSchemas[0].template).toMatchObject({ name: 'New Service' });
+  });
+
+  it('upsertPageResultInSnapshot appends a missing page and preserves existing pages + metadata', () => {
+    saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' }),
+    ]);
+    const before = getSchemaSnapshot(SITE_ID);
+    const homeCreatedAt = before?.createdAt;
+
+    expect(upsertPageResultInSnapshot(
+      SITE_ID,
+      WS_ID,
+      pageSuggestion('service', '/services', { '@type': 'Service', name: 'Service' }),
+    )).toBe(true);
+
+    const after = getSchemaSnapshot(SITE_ID);
+    expect(after?.pageCount).toBe(2);
+    expect(after?.id).toBe(before?.id);
+    expect(after?.createdAt).toBe(homeCreatedAt);
+    expect(after?.results.map(r => r.pageId).sort()).toEqual(['home', 'service']);
+    expect(after?.results.find(r => r.pageId === 'home')?.suggestedSchemas[0].template).toMatchObject({ name: 'Home' });
+  });
+
+  it('upsertPageResultInSnapshot replaces the full result for an existing page', () => {
+    saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' }),
+      pageSuggestion('service', '/services', { '@type': 'Service', name: 'Old Service' }),
+    ]);
+
+    expect(upsertPageResultInSnapshot(
+      SITE_ID,
+      WS_ID,
+      pageSuggestion('service', '/services', { '@type': 'Service', name: 'Regenerated Service' }),
+    )).toBe(true);
+
+    const snapshot = getSchemaSnapshot(SITE_ID);
+    expect(snapshot?.pageCount).toBe(2);
+    expect(snapshot?.results.find(r => r.pageId === 'service')?.suggestedSchemas[0].template).toMatchObject({ name: 'Regenerated Service' });
+    expect(snapshot?.results.find(r => r.pageId === 'home')?.suggestedSchemas[0].template).toMatchObject({ name: 'Home' });
+  });
+
+  it('upsertPageResultInSnapshot is atomic: sequential per-page upserts never drop a prior page', () => {
+    // Review fix #6: the read-modify-write (read snapshot → merge page → rewrite full
+    // blob) is wrapped in db.transaction(). Each call must observe the prior call's
+    // committed write so accumulating many single-page generations never clobbers an
+    // earlier page (the last-writer-wins data-loss scenario the txn prevents).
+    saveSchemaSnapshot(SITE_ID, WS_ID, [
+      pageSuggestion('home', '/', { '@type': 'WebPage', name: 'Home' }),
+    ]);
+
+    for (const pid of ['p1', 'p2', 'p3', 'p4']) {
+      expect(upsertPageResultInSnapshot(
+        SITE_ID,
+        WS_ID,
+        pageSuggestion(pid, `/${pid}`, { '@type': 'WebPage', name: pid }),
+      )).toBe(true);
+    }
+
+    const snapshot = getSchemaSnapshot(SITE_ID);
+    expect(snapshot?.pageCount).toBe(5);
+    expect(snapshot?.results.map(r => r.pageId).sort()).toEqual(['home', 'p1', 'p2', 'p3', 'p4']);
   });
 
   it('normalizes corrupt snapshot results payload to empty array instead of leaking wrong shape', () => {

@@ -284,6 +284,10 @@ router.post('/api/jobs', async (req, res) => {
             ? params.pageAnalysisContext as StandaloneContentBriefGenerationParams['pageAnalysisContext']
             : undefined,
           generationStyle,
+          // W2.5 Bug 1 fix: thread targetPageId/targetPageSlug for the Page Intelligence
+          // "Draft Brief" standalone flow so decay-query context can be injected.
+          targetPageId: typeof params.targetPageId === 'string' ? params.targetPageId : undefined,
+          targetPageSlug: typeof params.targetPageSlug === 'string' ? params.targetPageSlug : undefined,
         });
         res.json(started);
         break;

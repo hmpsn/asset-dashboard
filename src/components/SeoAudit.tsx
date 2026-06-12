@@ -12,7 +12,7 @@ import {
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
-  BookOpen,
+  BookOpen, Loader2,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, ClickableRow, IconButton, Checkbox } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
@@ -489,11 +489,33 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   }
 
   if (loading) {
+    const runningAuditJob = auditJobId.current ? jobs.find(j => j.id === auditJobId.current) : undefined;
+    const auditProgress = runningAuditJob && runningAuditJob.total && runningAuditJob.progress != null
+      ? Math.round((runningAuditJob.progress / runningAuditJob.total) * 100)
+      : null;
+    const auditMessage = runningAuditJob?.message ?? 'Analyzing site health...';
     return (
       <div>
         {auditTabBar}
         {pageHeader}
-        <LoadingState message="Analyzing site health..." />
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
+            <Icon as={Loader2} size="xl" className="animate-spin text-teal-400" />
+          </div>
+          <p className="t-caption text-[var(--brand-text)]">{auditMessage}</p>
+          {auditProgress != null && (
+            <div className="w-64 flex flex-col gap-1">
+              <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                <div
+                  className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all duration-300"
+                  style={{ width: `${auditProgress}%` }}
+                />
+              </div>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] text-center tabular-nums">{auditProgress}%</span>
+            </div>
+          )}
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">SEO Audit — non-cancellable, results save automatically</p>
+        </div>
       </div>
     );
   }

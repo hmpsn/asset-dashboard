@@ -290,6 +290,10 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy,
+      // Bug 1 fix: pass table-backed siteKeywordMetrics so site-keyword explanations
+      // include real metric data. options.strategy?.siteKeywordMetrics is always undefined
+      // post-strip; the table-assembled value must be threaded explicitly.
+      siteKeywordMetrics: siteKeywordMetrics ?? undefined,
       pageMap,
       contentGaps,
       keywordGaps,
@@ -373,10 +377,14 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     });
     const keywordGapsFromTable = listKeywordGaps(ws.id);
     const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (current.keywordGaps || []);
+    // Bug 1 fix: read table-backed siteKeywordMetrics for the diff UX so explanations
+    // carry real metric data (strategy blob has this stripped — always undefined).
+    const assembledForDiff = assembleStoredKeywordStrategy(ws.id);
     const strategyUx = await buildKeywordStrategyUxPayload({
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy: current,
+      siteKeywordMetrics: assembledForDiff?.siteKeywordMetrics ?? undefined,
       pageMap: currentPageMap,
       contentGaps: currentContentGaps,
       keywordGaps,

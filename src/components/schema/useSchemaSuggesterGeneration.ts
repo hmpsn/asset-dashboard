@@ -7,10 +7,15 @@ import { queryKeys } from '../../lib/queryKeys';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type { SchemaPageOption, SchemaPageSuggestion } from './schemaSuggesterTypes';
 
+/** Normalize a slug for comparison — trim, lowercase, strip leading/trailing slashes. */
+function normalizeSlug(slug: string | undefined | null): string {
+  return (slug || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+}
+
 interface UseSchemaSuggesterGenerationOptions {
   siteId: string;
   workspaceId?: string;
-  fixContext?: { pageId?: string; targetRoute?: string } | null;
+  fixContext?: { pageId?: string; pageSlug?: string; targetRoute?: string } | null;
   onPageGenerated: (pageId: string) => void;
 }
 
@@ -42,6 +47,7 @@ export function useSchemaSuggesterGeneration({
   const { jobs, startJob, cancelJob } = useBackgroundTasks();
   const jobIdRef = useRef<string | null>(null);
   const fixConsumed = useRef(false);
+  const fixTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: snapshotData } = useSchemaSnapshot(siteId, workspaceId);
   useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
@@ -205,14 +211,41 @@ export function useSchemaSuggesterGeneration({
   }, [onPageGenerated, queryClient, singlePageTypeOverrides, siteId, workspaceId]);
 
   useEffect(() => {
-    if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
-      fixConsumed.current = true;
-      const timer = setTimeout(() => {
-        generateSinglePage(fixContext.pageId!);
-      }, 600);
-      return () => clearTimeout(timer);
+    if (fixContext?.targetRoute !== 'seo-schema' || fixConsumed.current) return;
+
+    // The PI "Add Schema" handoff sends pageSlug (not pageId). Resolve it to a pageId
+    // against the loaded page inventory / snapshot before triggering generation — the
+    // single-page route requires a pageId, so a raw slug would silently no-op.
+    let resolvedPageId = fixContext.pageId;
+    if (!resolvedPageId && fixContext.pageSlug) {
+      const target = normalizeSlug(fixContext.pageSlug);
+      resolvedPageId =
+        availablePages.find(p => normalizeSlug(p.slug) === target)?.id
+        || data?.find(p => normalizeSlug(p.slug) === target)?.pageId;
+      // Page inventory loads asynchronously — if we can't resolve yet, wait for a
+      // later render (availablePages/data in the dep array) rather than consuming.
+      if (!resolvedPageId) return;
     }
-  }, [fixContext, generateSinglePage]);
+    if (!resolvedPageId) return;
+
+    // Consume the handoff exactly once. The trigger timer is stored in a ref —
+    // NOT returned as the effect's cleanup — because this effect re-runs on every
+    // identity change of its deps (e.g. `generateSinglePage`, which depends on the
+    // caller's `onPageGenerated`). A returned-cleanup timer would be cancelled by
+    // the very next re-render before it ever fires, silently no-op'ing the handoff.
+    // The ref-held timer is cleared only on unmount (see the unmount effect below).
+    fixConsumed.current = true;
+    const pageId = resolvedPageId;
+    fixTriggerTimerRef.current = setTimeout(() => {
+      fixTriggerTimerRef.current = null;
+      generateSinglePage(pageId);
+    }, 600);
+  }, [fixContext, availablePages, data, generateSinglePage]);
+
+  // Clear the pending fix-handoff trigger on unmount only — never on re-render.
+  useEffect(() => () => {
+    if (fixTriggerTimerRef.current) clearTimeout(fixTriggerTimerRef.current);
+  }, []);
 
   const regeneratePage = useCallback(async (pageId: string) => {
     setRegenerating(prev => new Set(prev).add(pageId));

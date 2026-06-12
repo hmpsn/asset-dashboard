@@ -12,7 +12,7 @@
  *     force-flagging a protected lifecycle action (review finding)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordHub } from '../../src/components/KeywordHub';
@@ -182,15 +182,38 @@ describe('KeywordHub — drawer action dispatch (no silent no-op)', () => {
       /Retire keyword/,
     );
     expect(rowActionMutate).toHaveBeenCalledWith(
-      expect.objectContaining({ action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE, keyword: DISPLAY, force: undefined }),
+      expect.objectContaining({ action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE, keyword: DISPLAY }),
+    );
+    expect(rowActionMutate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ force: true }),
     );
   });
 
-  it('force-flags a PROTECTED lifecycle action (disabledReason set) so the server does not reject it', () => {
-    openDrawerAndClick(
-      [{ type: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE, label: 'Retire keyword', detail: '', tone: 'amber', keyword: DISPLAY, disabledReason: 'Client-requested keyword' }],
-      /Retire keyword/,
-    );
+  it('force-flags a PROTECTED lifecycle action (disabledReason set) so the server does not reject it', async () => {
+    // Protected click → ConfirmDialog appears first; mutation NOT called yet.
+    // Confirming the dialog dispatches the mutation with force: true.
+    setRows([{ type: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE, label: 'Retire keyword', detail: '', tone: 'amber', keyword: DISPLAY, disabledReason: 'Client-requested keyword' }]);
+    renderHub();
+
+    // Open the drawer
+    await act(async () => {
+      fireEvent.click(screen.getByText(DISPLAY));
+    });
+
+    const dialog = screen.getByRole('dialog');
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: /Retire keyword/i }));
+    });
+
+    // Mutation must NOT have fired yet — ConfirmDialog is shown instead
+    expect(rowActionMutate).not.toHaveBeenCalled();
+    expect(screen.getByText(/Client-requested keyword/i)).toBeInTheDocument();
+
+    // Confirm the dialog → mutation fires with force: true
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+    });
+
     expect(rowActionMutate).toHaveBeenCalledWith(
       expect.objectContaining({ action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE, keyword: DISPLAY, force: true }),
     );

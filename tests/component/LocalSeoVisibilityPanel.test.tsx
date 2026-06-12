@@ -55,6 +55,16 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({ findActiveJob: () => null }),
 }));
 
+// Wave 1 added useRankTrackingAddKeyword to LocalSeoVisibilityPanel; mock it here so
+// the test renderer doesn't need a QueryClientProvider wrapper.
+vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useRankTrackingAddKeyword: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+    error: null,
+  }),
+}));
+
 function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalSeoReadResponse {
   const base: LocalSeoReadResponse = {
     featureEnabled: true,
@@ -424,7 +434,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
-    fireEvent.click(screen.getByRole('button', { name: /remove round rock/i }));
+    fireEvent.click(screen.getByRole('button', { name: /deactivate round rock/i }));
     fireEvent.click(screen.getByRole('button', { name: /^save market$/i }));
 
     await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledWith({

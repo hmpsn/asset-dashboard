@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { post, put } from '../../api/client';
 import { schema as schemaApi } from '../../api/schema';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
@@ -47,6 +47,29 @@ export function useSchemaSuggesterPublishingWorkflow({
   const [sendPageErrors, setSendPageErrors] = useState<Record<string, string>>({});
 
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
+
+  // Seed the published Set from each page's lastPublishedAt so the Published badge,
+  // Retract CTA, and Publish All count survive reload. Without this the Set starts
+  // empty on every mount: previously-published pages would show the Publish CTA again
+  // and Publish All would over-count + re-publish already-live pages.
+  //
+  // Merge semantics: we ADD pages that the server reports as published, but never
+  // REMOVE in-session state. Pages the user retracted this session (retractedPages)
+  // are excluded so a stale lastPublishedAt cannot resurrect a just-retracted page.
+  useEffect(() => { // effect-layout-ok: snapshot data (with lastPublishedAt) arrives asynchronously from React Query.
+    if (!data) return;
+    const serverPublished = data
+      .filter(page => !!page.lastPublishedAt && !retractedPages.has(page.pageId))
+      .map(page => page.pageId);
+    if (serverPublished.length === 0) return;
+    setPublished(prev => {
+      const missing = serverPublished.filter(id => !prev.has(id));
+      if (missing.length === 0) return prev; // no change — avoid re-render churn
+      const next = new Set(prev);
+      for (const id of missing) next.add(id);
+      return next;
+    });
+  }, [data, retractedPages]);
 
   const getEffectiveSchema = useCallback((pageId: string, original: Record<string, unknown>): Record<string, unknown> => {
     if (editedSchemaJson[pageId]) {
@@ -280,6 +303,39 @@ export function useSchemaSuggesterPublishingWorkflow({
     });
   }, []);
 
+  // Clear a single page's stale manual JSON edit (+ parse error + open editor) when its
+  // schema is regenerated. getEffectiveSchema prefers editedSchemaJson[pageId], so an
+  // un-cleared edit silently overrides the freshly-regenerated schema in preview, Publish,
+  // Copy, and send-to-client — stale schema could ship to a client. Clearing makes the
+  // regenerated schema authoritative.
+  const clearManualEditForPage = useCallback((pageId: string) => {
+    setEditedSchemaJson(prev => {
+      if (!(pageId in prev)) return prev;
+      const next = { ...prev };
+      delete next[pageId];
+      return next;
+    });
+    setSchemaParseError(prev => {
+      if (!(pageId in prev)) return prev;
+      const next = { ...prev };
+      delete next[pageId];
+      return next;
+    });
+    setEditingSchema(prev => {
+      if (!prev.has(pageId)) return prev;
+      const next = new Set(prev);
+      next.delete(pageId);
+      return next;
+    });
+  }, []);
+
+  // Clear ALL manual JSON edits — used on full re-scan (every page is regenerated).
+  const clearAllManualEdits = useCallback(() => {
+    setEditedSchemaJson(prev => (Object.keys(prev).length === 0 ? prev : {}));
+    setSchemaParseError(prev => (Object.keys(prev).length === 0 ? prev : {}));
+    setEditingSchema(prev => (prev.size === 0 ? prev : new Set()));
+  }, []);
+
   const unpublishedCount = data?.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length ?? 0;
 
   return {
@@ -327,5 +383,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
+    clearManualEditForPage,
+    clearAllManualEdits,
   };
 }

@@ -168,7 +168,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   // Action items — priority: 1=critical, 2=important, 3=setup suggestions
   type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string; onClick?: () => void };
   const actions: ActionItem[] = [];
-  if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
+  if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', queryString: 'tab=requests', priority: 1 });
   // Open orders = any non-terminal order (NOT closed/cancelled). Includes `completed`
   // so the operator can still reach the panel to reply or close out a fulfilled order
   // once nothing else is pending — `completed` is the exact state you close FROM.
@@ -277,7 +277,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
       label: 'Content',
       percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
-      onClick: () => navigate(adminPath(workspaceId, 'content')),
+      onClick: () => navigate(adminPath(workspaceId, 'content-pipeline')),
     }] : []),
   ];
 
@@ -489,7 +489,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               icon={Layers}
               iconColor={themeColor('#71717a', '#94a3b8')}
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
-              onClick={() => navigate(adminPath(workspaceId, 'content'))}
+              onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
               size="hero"
               staggerIndex={6}
             />

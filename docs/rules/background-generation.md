@@ -6,8 +6,7 @@ Long-running admin generation uses the existing background job platform:
 - `server/routes/jobs.ts` owns the central `/api/jobs` dispatcher.
 - Dedicated `server/*-job.ts` worker modules own crawl-heavy or AI-heavy job bodies.
 - `src/hooks/useBackgroundTasks.tsx` owns frontend job state and rediscovery.
-- `src/components/NotificationBell.tsx` owns the production task surface in the admin shell.
-- `src/components/TaskPanel.tsx` remains a reusable task viewer, but do not assume it is production-mounted.
+- `src/components/NotificationBell.tsx` owns the production task surface in the admin shell (TaskPanel was retired).
 - `shared/types/background-jobs.ts` owns job type metadata, labels, and cancellation semantics.
 
 Do not add a new queue, ad hoc progress channel, or anonymous fire-and-forget promise for long-running admin generation.

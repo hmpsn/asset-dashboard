@@ -107,7 +107,7 @@ W1 ∥ W2 is allowed EXCEPT lanes touching the same files (1.1/2.1 both touch st
 - **D1 — Fold `seo-briefs` into `content-pipeline?tab=briefs`?** (audit recommends yes; route-removal checklist applies). Blocks nothing until Wave 4-adjacent.
 - **D2 — Suggested-briefs subsystem:** build the missing UI or delete the subsystem? Blocks 6.4.
 - **D3 — Calendar intelligence:** wire it or delete dead code? Blocks 6.4.
-- **D4 — Snapshot retention values** for `local_visibility_snapshots` + `schema_snapshots` (e.g. 180d / last-N). Blocks 2.4/6.3 pruning halves only.
+- **D4 — DECIDED 2026-06-11:** `local_visibility_snapshots`: keep 180 days raw + always retain the latest row per (market, keyword) regardless of age + thin older history to weekly granularity up to 18 months (preserves W5.3 trend charts). `schema_snapshots`: keep rows referenced by version history; prune unreferenced generation-progress rows after 30 days.
 
 ## Deferred ideas (NOT migrated to roadmap — promote deliberately)
 

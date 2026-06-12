@@ -178,6 +178,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
         </Button>
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <PostEditor
+            key={activePostId}
             workspaceId={workspaceId}
             postId={activePostId}
             onClose={() => { setActivePostId(null); invalidatePosts(); }}

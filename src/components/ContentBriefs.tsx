@@ -535,6 +535,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         // pr-check-disable-next-line -- Post editor shell uses the brand signature radius outside SectionCard because PostEditor owns its inner chrome.
         <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <PostEditor
+            key={activePostId}
             workspaceId={workspaceId}
             postId={activePostId}
             onClose={() => setActivePostId(null)}

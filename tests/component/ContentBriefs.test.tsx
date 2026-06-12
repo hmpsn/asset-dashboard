@@ -630,3 +630,25 @@ describe('ContentBriefs', () => {
     });
   });
 });
+
+// ─── PostEditor remount on post switch (C4 review hardening) ─────────────────
+// ReviewChecklist seeds its AI-review state from `persistedAIReview` via mount-only
+// useState — it relies on PostEditor remounting per post. Both PostEditor render
+// sites must carry `key={activePostId}` so switching the active post forces a fresh
+// mount (and fresh seeding). Without the key, React reuses the same instance and the
+// previous post's persisted review verdicts bleed into the next post's checklist.
+describe('PostEditor render sites — key forces remount per post', () => {
+  it('ContentBriefs renders <PostEditor> with key={activePostId}', async () => {
+    const { readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok — static analysis of remount key
+    expect(src).toMatch(/<PostEditor\s+key=\{activePostId\}/);
+  });
+
+  it('ContentManager renders <PostEditor> with key={activePostId}', async () => {
+    const { readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const src = readFileSync(join(__dirname, '../../src/components/ContentManager.tsx'), 'utf8'); // readFile-ok — static analysis of remount key
+    expect(src).toMatch(/<PostEditor\s+key=\{activePostId\}/);
+  });
+});

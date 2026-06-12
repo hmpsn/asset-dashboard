@@ -24,7 +24,8 @@ import {
   regenerateBrief,
   regenerateOutline,
 } from '../content-brief.js';
-import { createContentRequest, updateContentRequest } from '../content-requests.js';
+import { createContentRequest, getOpenRequestForBrief, updateContentRequest } from '../content-requests.js';
+import db from '../db/index.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
@@ -245,34 +246,53 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
 
   const ws = getWorkspace(req.params.workspaceId);
 
-  // Create a content request linked to this brief
-  const request = createContentRequest(req.params.workspaceId, {
-    topic: brief.suggestedTitle,
-    targetKeyword: brief.targetKeyword,
-    intent: brief.intent || 'informational',
-    priority: 'medium',
-    rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
-    source: 'strategy',
-    serviceType: 'brief_only',
-    pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
-    initialStatus: 'brief_generated',
-    dedupe: false,
-  });
+  // Bug 2 fix: wrap dedupe-check + create + link in a single transaction so the
+  // check-then-create sequence is atomic. Re-checking INSIDE the transaction (not
+  // before it) closes the TOCTOU window where two concurrent send-to-client calls
+  // both pass an outside-the-txn check and each create a request. The serialized
+  // transaction guarantees the second caller sees the first caller's row and
+  // early-returns its id instead of inserting a duplicate.
+  let request: ReturnType<typeof createContentRequest> | null = null;
+  let dedupedRequestId: string | null = null;
+  db.transaction(() => {
+    const existing = getOpenRequestForBrief(req.params.workspaceId, brief.id);
+    if (existing) {
+      dedupedRequestId = existing.id;
+      return;
+    }
+    request = createContentRequest(req.params.workspaceId, {
+      topic: brief.suggestedTitle,
+      targetKeyword: brief.targetKeyword,
+      intent: brief.intent || 'informational',
+      priority: 'medium',
+      rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
+      source: 'strategy',
+      serviceType: 'brief_only',
+      pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
+      initialStatus: 'brief_generated',
+      dedupe: false,
+    });
+    // Link the brief and set to client_review
+    updateContentRequest(req.params.workspaceId, request!.id, {
+      briefId: brief.id,
+      status: 'client_review',
+    });
+  })();
 
-  // Link the brief and set to client_review
-  updateContentRequest(req.params.workspaceId, request.id, {
-    briefId: brief.id,
-    status: 'client_review',
-  });
+  // Dedupe hit — an open request already covers this brief; return it without
+  // re-broadcasting, re-notifying, or re-logging (no new work was done).
+  if (dedupedRequestId) {
+    return res.json({ ok: true, requestId: dedupedRequestId });
+  }
 
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id });
-  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request!.id });
+  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' });
   addActivity(
     req.params.workspaceId,
     'brief_generated',
     `Sent brief "${brief.suggestedTitle}" to client`,
     `Keyword: ${brief.targetKeyword}`,
-    { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' },
+    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' },
   );
 
   // Send email notification
@@ -289,8 +309,8 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     });
   }
 
-  log.info(`Brief ${brief.id} sent to client via request ${request.id}`);
-  res.json({ ok: true, requestId: request.id });
+  log.info(`Brief ${brief.id} sent to client via request ${request!.id}`);
+  res.json({ ok: true, requestId: request!.id });
 });
 
 // Delete a brief

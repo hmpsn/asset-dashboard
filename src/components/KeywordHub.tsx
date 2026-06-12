@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { Button, FormInput, PageHeader, SectionCard } from './ui';
+import { Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
@@ -254,6 +254,10 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const [pendingBulk, setPendingBulk] = useState<KeywordBulkActionSummary | null>(null);
   const [bulkResult, setBulkResult] = useState<KeywordCommandCenterBulkActionResult | null>(null);
 
+  // Protected drawer action gate: mirrors the KeywordActionMenu ConfirmDialog pattern.
+  // The first click sets this; the confirmed click sends force: true.
+  const [pendingDrawerForceAction, setPendingDrawerForceAction] = useState<KeywordCommandCenterNextAction | null>(null);
+
   // The currently-selected rows (for protection/tracking-state summarization).
   const selectedBulkRows = useMemo(
     () => rows.filter((r) => hub.selectedKeys.has(r.normalizedKeyword)),
@@ -344,15 +348,18 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     if (!isServerAction(action.type)) return;
     // Protected keywords (client-requested, strategy-owned, gap-sourced, pinned)
     // come back with `disabledReason` set on their lifecycle actions — but NOT
-    // `disabled` — so the drawer renders them as live buttons. The server rejects
-    // an UNFORCED protected mutation, so force-flag exactly as the list's
-    // KeywordActionMenu does (`a.disabledReason ? { force: true }`); otherwise a
-    // protected retire/decline/pause would throw instead of applying.
+    // `disabled` — so the drawer renders them as live buttons. Gate behind a
+    // ConfirmDialog (same as KeywordActionMenu) so the user sees WHY the keyword
+    // is protected before the force is sent. The old code silently set force: true
+    // in one click — that was the bug. On confirm the dialog dispatches with force.
+    if (action.disabledReason) {
+      setPendingDrawerForceAction(action);
+      return;
+    }
     rowAction.mutate({
       action: action.type,
       keyword: row.keyword,
       pagePath: action.pagePath,
-      force: action.disabledReason ? true : undefined,
     });
   };
 
@@ -522,7 +529,12 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         isLoading={detail.isFetching && !!selectedKey && !detail.data}
         loadingAction={localRefresh.isPending ? 'check_local_visibility' : rowAction.isPending ? rowAction.variables?.action : undefined}
         onAction={handleDrawerAction}
-        onClose={() => setSelectedKey(null)}
+        onClose={() => {
+          setSelectedKey(null);
+          // Drop any pending force-override gate tied to the now-closed drawer so a
+          // stale dialog can't fire against a different keyword on reopen.
+          setPendingDrawerForceAction(null);
+        }}
       />
 
       {/* Per-item bulk result summary (applied / skipped / failed). */}
@@ -548,6 +560,33 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           if (pendingBulk) runBulkAction(pendingBulk, force);
         }}
         onCancel={() => setPendingBulk(null)}
+      />
+
+      {/* Protected-drawer force gate — mirrors KeywordActionMenu's ConfirmDialog.
+          First click opens this dialog; confirmed click sends force: true. */}
+      <ConfirmDialog
+        open={!!pendingDrawerForceAction}
+        variant="default"
+        title="Override keyword protection?"
+        message={pendingDrawerForceAction?.disabledReason ?? ''}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setPendingDrawerForceAction(null)}
+        onConfirm={() => {
+          // Use the keyword/pagePath captured ON the action when the dialog opened —
+          // NOT resolved from selectedRow at confirm time. If the drawer's selected
+          // row changes while the dialog is open, reading selectedRow would force the
+          // override against the wrong keyword. The action carries both fields.
+          if (pendingDrawerForceAction && isServerAction(pendingDrawerForceAction.type)) {
+            rowAction.mutate({
+              action: pendingDrawerForceAction.type,
+              keyword: pendingDrawerForceAction.keyword,
+              pagePath: pendingDrawerForceAction.pagePath,
+              force: true,
+            });
+          }
+          setPendingDrawerForceAction(null);
+        }}
       />
     </div>
   );

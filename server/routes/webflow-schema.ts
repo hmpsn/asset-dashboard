@@ -14,7 +14,7 @@ import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { buildSchemaIntelligence } from '../schema-intelligence.js';
-import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
+import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, upsertPageResultInSnapshot, getSchemaPlan, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
 import { SCHEMA_ROLE_LABELS, type SchemaPageRole } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -383,6 +383,15 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSite
     const { ctx } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, pageType);
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
     if (!result) return res.status(404).json({ error: 'Page not found' });
+
+    // Persist the freshly-generated page result so it survives reload and a
+    // SCHEMA_SNAPSHOT_UPDATED refetch does not clobber it. Insert-if-missing
+    // (the page may not yet exist in the snapshot for an "Add Page" generation).
+    const ws = getWorkspaceBySiteId(req.params.siteId)
+      || (ctx.workspaceId ? getWorkspace(ctx.workspaceId) : undefined);
+    upsertPageResultInSnapshot(req.params.siteId, ws?.id || ctx.workspaceId || '', result);
+    broadcastSchemaSnapshotUpdated(req.params.siteId, ws?.id, 'generated', pageId);
+
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

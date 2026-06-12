@@ -5,13 +5,14 @@
 import { useState } from 'react';
 import {
   Check, ChevronDown, ChevronUp, Eye, ClipboardCheck, Square, CheckSquare,
-  Sparkles, Loader2, ExternalLink,
+  Sparkles, Loader2, ExternalLink, Clock,
 } from 'lucide-react';
 import { SectionCard, Icon, Button, ClickableRow } from '../ui';
 import {
   type AIReviewMap,
   type AIReviewResponse,
   type ContentReviewEvidence,
+  type StoredAIReview,
   PROVENANCE_SENSITIVE_REVIEW_KEYS,
   type ReviewChecklistKey,
 } from '../../../shared/types/content';
@@ -53,18 +54,29 @@ export interface ReviewChecklistProps {
   onRunAIReview?: () => Promise<AIReviewResponse | null>;
   onRequestFix?: (issueKey: string, reason: string) => Promise<void>;
   evidence?: ContentReviewEvidence;
+  /** Persisted AI review result from the last run — displayed without re-triggering the review. */
+  persistedAIReview?: StoredAIReview;
 }
 
 export function ReviewChecklist({
   postStatus, reviewChecklist, showChecklist,
   onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview, onRequestFix, evidence,
+  persistedAIReview,
 }: ReviewChecklistProps) {
   const checklist = reviewChecklist ?? EMPTY_CHECKLIST;
   const checkedCount = CHECKLIST_ITEMS.filter(item => checklist[item.key]).length;
   const allChecked = checkedCount === CHECKLIST_ITEMS.length;
   const [aiRunning, setAiRunning] = useState(false);
-  const [aiResults, setAiResults] = useState<AIReviewMap | null>(null);
-  const [reviewEvidence, setReviewEvidence] = useState<ContentReviewEvidence | undefined>(undefined);
+  // Seed from persisted review if present — a fresh run will overwrite.
+  const [aiResults, setAiResults] = useState<AIReviewMap | null>(
+    persistedAIReview?.review ?? null,
+  );
+  const [reviewEvidence, setReviewEvidence] = useState<ContentReviewEvidence | undefined>(
+    persistedAIReview?.evidence,
+  );
+  // Track whether the currently-shown results are from persistence (not a fresh run).
+  const [isFromPersisted, setIsFromPersisted] = useState(persistedAIReview != null);
+  const [persistedAt, setPersistedAt] = useState<string | undefined>(persistedAIReview?.reviewedAt);
   const [fixingKey, setFixingKey] = useState<string | null>(null);
   const evidenceToShow = reviewEvidence ?? evidence;
 
@@ -82,6 +94,8 @@ export function ReviewChecklist({
     if (!onRunAIReview || aiRunning) return;
     setAiRunning(true);
     setAiResults(null);
+    setIsFromPersisted(false);
+    setPersistedAt(undefined);
     try {
       const response = await onRunAIReview();
       if (response) {
@@ -136,6 +150,16 @@ export function ReviewChecklist({
                   <Icon as={aiRunning ? Loader2 : Sparkles} size="sm" className={aiRunning ? 'animate-spin' : ''} />
                   {aiRunning ? 'Running AI Review...' : 'AI Pre-Check'}
                 </Button>
+              )}
+              {isFromPersisted && aiResults && (
+                <div className="mb-2 flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
+                  <Icon as={Clock} size="xs" className="shrink-0" />
+                  <span>
+                    From last review
+                    {persistedAt ? ` · ${new Date(persistedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                    {' — '}re-run to refresh
+                  </span>
+                </div>
               )}
               {evidenceToShow && (
                 <div className="mb-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/5 px-3 py-2">

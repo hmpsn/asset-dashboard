@@ -15,6 +15,9 @@ import { MAX_COMPETITORS } from '../constants.js';
 import { cleanCompetitorDomains, filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
 import fs from 'fs';
 import path from 'path';
 import { isProgrammingError } from '../errors.js';
@@ -190,6 +193,14 @@ router.post('/api/seo/competitors/:workspaceId', requireWorkspaceAccess('workspa
   const cleaned = cleanCompetitorDomains(domainList, myDomain).slice(0, MAX_COMPETITORS);
 
   updateWorkspace(ws.id, { competitorDomains: cleaned });
+  // Bug 2 fix: broadcast so admin/client strategy caches invalidate immediately,
+  // and record an activity entry for audit trails.
+  addActivity(ws.id, 'strategy_generated', 'Competitor domains updated', `${cleaned.length} competitor domain${cleaned.length === 1 ? '' : 's'} saved`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    pageCount: 0,
+    siteKeywords: 0,
+    partial: true,
+  });
   res.json({ competitors: cleaned });
 });
 

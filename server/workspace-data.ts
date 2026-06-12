@@ -168,8 +168,11 @@ export function getPageCacheStats(): { entries: number; maxEntries: number } {
 // ── Content pipeline summary ─────────────────────────────────────────────
 
 const pipelineStmts = createStmtCache(() => ({
-  briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ?`),
-  briefsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? GROUP BY status`),
+  // `superseded_by IS NULL` keeps these pipeline counts in lockstep with listBriefs,
+  // which excludes superseded (regenerated-predecessor) briefs by default. Without
+  // the filter the totals overcount every regeneration's stale lineage rows.
+  briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? AND superseded_by IS NULL`),
+  briefsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? AND superseded_by IS NULL GROUP BY status`),
   postsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_posts WHERE workspace_id = ?`),
   postsByStatus: db.prepare(
     `SELECT CASE WHEN published_at IS NOT NULL THEN 'published' ELSE status END as status, COUNT(*) as cnt

@@ -131,6 +131,65 @@ export function updatePageSchemaInSnapshot(
   return true;
 }
 
+/**
+ * Insert-or-update a full page result within a snapshot.
+ *
+ * Unlike updatePageSchemaInSnapshot (which only mutates the first suggested
+ * schema template of an EXISTING page), this persists a complete freshly-generated
+ * SchemaPageSuggestion. If the page is missing it is appended; if it exists the whole
+ * result is replaced. When no snapshot exists yet a new one is created seeded with
+ * just this page.
+ *
+ * Used by single-page generation/regeneration so output survives reload and a
+ * SCHEMA_SNAPSHOT_UPDATED refetch does not clobber unsaved generations. Existing
+ * pages and the snapshot row's id/created_at metadata are preserved on re-save.
+ */
+export function upsertPageResultInSnapshot(
+  siteId: string,
+  workspaceId: string,
+  result: SchemaPageSuggestion,
+): boolean {
+  // Unguarded read-modify-write fix: the read (getSchemaSnapshot/getBySite), the
+  // in-memory merge, and the full-blob rewrite (upsert) must be atomic so two
+  // concurrent single-page generations cannot read the same base snapshot and
+  // clobber each other's page (last-writer-wins data loss). The upstream AI call
+  // happens in the route BEFORE this function, so it is intentionally OUTSIDE the
+  // transaction — only the DB read+write is wrapped.
+  return db.transaction(() => {
+    const existingSnapshot = getSchemaSnapshot(siteId);
+
+    // No snapshot yet — create one seeded with just this page.
+    if (!existingSnapshot) {
+      saveSchemaSnapshot(siteId, workspaceId || '', [result]);
+      log.info(`Created snapshot seeded with page ${result.pageId} for site ${siteId}`);
+      return true;
+    }
+
+    const nextResults = [...existingSnapshot.results];
+    const pageIdx = nextResults.findIndex(r => r.pageId === result.pageId);
+    if (pageIdx >= 0) {
+      nextResults[pageIdx] = result;
+    } else {
+      nextResults.push(result);
+    }
+
+    // Re-save preserving the existing snapshot row's id + created_at metadata
+    // (delete-then-reinsert metadata-preservation rule).
+    const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
+    if (!row) return false;
+    snapshotStmts().upsert.run({
+      id: row.id,
+      site_id: siteId,
+      workspace_id: row.workspace_id || workspaceId || '',
+      created_at: row.created_at,
+      results: JSON.stringify(nextResults),
+      page_count: nextResults.length,
+    });
+    log.info(`Upserted page ${result.pageId} into snapshot for site ${siteId}`);
+    return true;
+  })();
+}
+
 // ── Site template: canonical Organization + WebSite nodes ──
 
 export interface SchemaSiteTemplate {

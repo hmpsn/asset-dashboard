@@ -175,6 +175,23 @@ async function waitForMemoryHeadroom(): Promise<void> {
     await sleep(refreshTimings.heapHeadroomWaitMs);
   }
 }
+// Snapshot retention policy constants (Bug 3 / owner decision D4).
+//   - Raw retention window: keep all rows captured within RETENTION_RAW_DAYS.
+//   - Weekly thinning: for rows older than RETENTION_RAW_DAYS, keep one row per
+//     (market_id, normalized_keyword, device, language_code) per week up to
+//     RETENTION_WEEKLY_MAX_DAYS. Weeks are bucketed by start DATE (no year-boundary
+//     artifact), and per-device/per-language history is thinned independently.
+//   - Hard cutoff: delete all rows beyond RETENTION_WEEKLY_MAX_DAYS.
+//   - Exception: ALWAYS keep the latest row per
+//     (market_id, normalized_keyword, device, language_code) regardless of age so a
+//     market-keyword-device-language series is never invisible (matches the
+//     latestSnapshots read granularity).
+// Batch size: 200 rows per DELETE to stay within SQLite's safe per-statement
+// range on memory-constrained hosts.
+export const RETENTION_RAW_DAYS = 180;
+export const RETENTION_WEEKLY_MAX_DAYS = 548; // 18 months ≈ 18 × 30.44 days
+export const RETENTION_PRUNE_BATCH_SIZE = 200;
+
 /**
  * Fire a `LOCAL_SEO_UPDATED` broadcast every N completed snapshots during a
  * refresh so the UI invalidates its KCC + local-seo caches incrementally
@@ -332,6 +349,17 @@ const stmts = createStmtCache(() => ({
       ORDER BY s.captured_at DESC
       LIMIT 1`,
   ),
+  // Count of markets currently flagged primary AND still eligible (active + has a
+  // provider location code). Used to detect the "orphaned primary" state after a
+  // configuration update deactivates the primary market.
+  countEligiblePrimary: db.prepare(
+    "SELECT COUNT(*) AS count FROM local_seo_markets WHERE workspace_id = ? AND is_primary = 1 AND status = 'active' AND provider_location_code IS NOT NULL",
+  ),
+  // Deterministic first eligible active market for primary-successor promotion.
+  // Ordered by (created_at, id) so the choice is stable across calls.
+  firstEligibleActiveMarket: db.prepare(
+    "SELECT * FROM local_seo_markets WHERE workspace_id = ? AND status = 'active' AND provider_location_code IS NOT NULL ORDER BY created_at ASC, id ASC LIMIT 1",
+  ),
   clearPrimary: db.prepare(
     'UPDATE local_seo_markets SET is_primary = 0 WHERE workspace_id = @workspaceId',
   ),
@@ -403,17 +431,180 @@ const stmts = createStmtCache(() => ({
     SELECT MAX(captured_at) AS max_captured_at FROM local_visibility_snapshots
     WHERE workspace_id = ? AND status != ?
   `),
+  // Bug 1 fix: replaced LIMIT-500 + JS-dedupe with GROUP BY MAX(captured_at) to avoid
+  // truncating large workspaces (300 keywords × 3 markets = 900 rows > 500).
+  // Migration 097's composite index on (workspace_id, market_id, normalized_keyword,
+  // device, language_code) already supports this query.
+  // Tiebreaker fix: when two rows in the same (market, keyword, device, language)
+  // group share the MAX(captured_at) timestamp, joining on captured_at alone returns
+  // BOTH rows (duplicate "latest" entries). The id IN (SELECT MIN(id) ... GROUP BY ...)
+  // guard collapses each group to a single deterministic row (MIN(id) among the rows
+  // tied at the group's MAX(captured_at)).
   latestSnapshots: db.prepare(`
-    SELECT * FROM local_visibility_snapshots
-    WHERE workspace_id = ?
-    ORDER BY captured_at DESC
-    LIMIT 500
+    SELECT s.*
+    FROM local_visibility_snapshots s
+    WHERE s.workspace_id = ?
+      AND s.id IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
+            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
   `),
   latestSnapshotsByKeyword: db.prepare(`
+    SELECT s.*
+    FROM local_visibility_snapshots s
+    WHERE s.workspace_id = ? AND s.normalized_keyword = ?
+      AND s.id IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ? AND normalized_keyword = ?
+          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
+            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ? AND normalized_keyword = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
+  `),
+  // Bug 2 fix: keyset-paginated read for the backfill job so it never materialises
+  // all rows into memory at once. Cursor is (captured_at DESC, id ASC) for stable pagination.
+  listSnapshotsPageForBackfill: db.prepare(`
     SELECT * FROM local_visibility_snapshots
-    WHERE workspace_id = ? AND normalized_keyword = ?
-    ORDER BY captured_at DESC
-    LIMIT 50
+    WHERE workspace_id = ?
+      AND (captured_at < ? OR (captured_at = ? AND id > ?))
+    ORDER BY captured_at DESC, id ASC
+    LIMIT ?
+  `),
+  listSnapshotsFirstPageForBackfill: db.prepare(`
+    SELECT * FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+    ORDER BY captured_at DESC, id ASC
+    LIMIT ?
+  `),
+  // Bug 3 fix: retention prune (owner decision D4).
+  //
+  // Grouping fix: every grouping here is on the FULL 4-column identity
+  // (market_id, normalized_keyword, device, language_code) — the SAME granularity as
+  // the latestSnapshots read query. Grouping on (market, keyword) alone would let the
+  // immortal guard protect only ONE device/language variant and would thin per-device
+  // history into a single shared row, destroying the other device's series.
+  //
+  // The "immortal" guard selects EXACTLY ONE row per 4-col identity using
+  // (MAX(captured_at), MIN(id)) — same tie-breaking as the read query — so it never
+  // protects ALL rows that share a captured_at timestamp.
+  //
+  // Week key fix: the weekly bucket is keyed on the week's START DATE
+  // (date(captured_at, '-' || strftime('%w', captured_at) || ' days') → the Sunday of
+  // that week) instead of strftime('%Y-%W'). The %Y-%W form concatenates the CALENDAR
+  // year with the week number, which mis-buckets the days around a year boundary (e.g.
+  // 2024-W52 vs 2025-W00 for the same Sun–Sat week). The start-date key has no such
+  // artifact.
+  //
+  // Step 1 — IDs to thin from the weekly window (RETENTION_RAW_DAYS → RETENTION_WEEKLY_MAX_DAYS):
+  //   rows that are NOT the canonical row per (market, keyword, device, language, week) —
+  //   i.e. not the latest-per-bucket keeper (MAX(captured_at), tie-broken by MIN(id)) —
+  //   AND are not the single immortal row per 4-col identity.
+  //
+  //   The keeper uses MAX(captured_at) per week bucket (not MIN(id) per group) so that the
+  //   weekly survivor is always the most-recent snapshot in that bucket. This makes the
+  //   keeper coincide with the immortal row whenever the bucket holds the pair's overall
+  //   latest, eliminating a nondeterministic interaction: when the bucket's latest row is
+  //   also the immortal (e.g. Dec 31 vs Jan 1 straddling a year boundary), a random-UUID
+  //   MIN(id) coin flip could keep the older row while the immortal guard protects the
+  //   newer one — leaving both alive and returning pruned=0 instead of 1.
+  //
+  //   Two-level keepers subquery:
+  //     Inner: MAX(captured_at) per (market, keyword, device, language, week_start)
+  //     Outer: JOIN on that max, MIN(id) to break ties among rows sharing the max timestamp
+  //   Parameters (12 total):
+  //     1-3: inner subquery WHERE (workspace_id, raw_days, weekly_max)
+  //     4-6: outer keepers WHERE (workspace_id, raw_days, weekly_max)
+  //     7-9: main outer WHERE (workspace_id, raw_days, weekly_max)
+  //     10-11: immortal NOT IN guard (workspace_id inner, workspace_id outer)
+  //     12: LIMIT
+  pruneWeeklyThinIds: db.prepare(`
+    SELECT s.id
+    FROM local_visibility_snapshots s
+    JOIN (
+      SELECT outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
+             outer_k.language_code, top.week_start,
+             MIN(outer_k.id) AS keep_id
+      FROM local_visibility_snapshots outer_k
+      JOIN (
+        SELECT market_id, normalized_keyword, device, language_code,
+               date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
+               MAX(captured_at) AS max_captured_at
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND captured_at < datetime('now', '-' || ? || ' days')
+          AND captured_at >= datetime('now', '-' || ? || ' days')
+        GROUP BY market_id, normalized_keyword, device, language_code, week_start
+      ) top ON outer_k.market_id = top.market_id
+           AND outer_k.normalized_keyword = top.normalized_keyword
+           AND outer_k.device = top.device
+           AND outer_k.language_code = top.language_code
+           AND date(outer_k.captured_at, '-' || strftime('%w', outer_k.captured_at) || ' days') = top.week_start
+           AND outer_k.captured_at = top.max_captured_at
+      WHERE outer_k.workspace_id = ?
+        AND outer_k.captured_at < datetime('now', '-' || ? || ' days')
+        AND outer_k.captured_at >= datetime('now', '-' || ? || ' days')
+      GROUP BY outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
+               outer_k.language_code, top.week_start
+    ) keepers ON keepers.market_id = s.market_id
+             AND keepers.normalized_keyword = s.normalized_keyword
+             AND keepers.device = s.device
+             AND keepers.language_code = s.language_code
+             AND date(s.captured_at, '-' || strftime('%w', s.captured_at) || ' days') = keepers.week_start
+    WHERE s.workspace_id = ?
+      AND s.captured_at < datetime('now', '-' || ? || ' days')
+      AND s.captured_at >= datetime('now', '-' || ? || ' days')
+      AND s.id != keepers.keep_id
+      AND s.id NOT IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
+            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
+    LIMIT ?
+  `),
+  // Step 2 — IDs beyond the hard cutoff (> RETENTION_WEEKLY_MAX_DAYS) that are not the
+  // immortal row (latest per 4-col identity).
+  pruneHardCutoffIds: db.prepare(`
+    SELECT s.id
+    FROM local_visibility_snapshots s
+    WHERE s.workspace_id = ?
+      AND s.captured_at < datetime('now', '-' || ? || ' days')
+      AND s.id NOT IN (
+        SELECT MIN(id)
+        FROM local_visibility_snapshots
+        WHERE workspace_id = ?
+          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
+            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
+            FROM local_visibility_snapshots
+            WHERE workspace_id = ?
+            GROUP BY market_id, normalized_keyword, device, language_code
+          )
+        GROUP BY market_id, normalized_keyword, device, language_code
+      )
+    LIMIT ?
+  `),
+  // Step 3 — single-row delete used inside the prune batch loop.
+  deleteSnapshotById: db.prepare(`
+    DELETE FROM local_visibility_snapshots WHERE id = ? AND workspace_id = ?
   `),
   competitorSnapshots: db.prepare(`
     SELECT workspace_id, business_found, local_pack_present, market_label, top_competitors
@@ -829,6 +1020,10 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           Math.min(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP, Math.trunc(request.keywordsPerRefresh)),
         );
 
+  // Set inside the transaction when an orphaned primary is auto-promoted to a
+  // successor; surfaced in the activity detail after the transaction commits.
+  let promotedPrimaryLabel: string | null = null;
+
   const run = db.transaction(() => {
     writeSettings({
       ...current,
@@ -907,35 +1102,49 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
           is_primary: 0,
         });
       }
+
+      // Orphaned-primary recovery: deactivating the primary market (or any update
+      // that leaves no eligible primary) would otherwise silently degrade every
+      // downstream `is_primary = 1` read (keyword geo-targeting, language resolution).
+      // If no eligible primary remains but at least one active+code-bearing market
+      // exists, promote the first one (deterministic created_at/id order).
+      const eligiblePrimaryCount = (stmts().countEligiblePrimary.get(workspace.id) as { count: number }).count;
+      if (eligiblePrimaryCount === 0) {
+        const successor = stmts().firstEligibleActiveMarket.get(workspace.id) as MarketRow | undefined;
+        if (successor) {
+          stmts().clearPrimary.run({ workspaceId: workspace.id });
+          stmts().setMarketPrimary.run({ workspaceId: workspace.id, marketId: successor.id });
+          promotedPrimaryLabel = successor.label;
+        }
+      }
     }
   });
   run();
 
-  addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', 'Updated local SEO posture or market setup', { source: 'local_seo' });
+  const activityDetail = promotedPrimaryLabel
+    ? `Updated local SEO posture or market setup — auto-promoted "${promotedPrimaryLabel}" to primary market`
+    : 'Updated local SEO posture or market setup';
+  addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', activityDetail, { source: 'local_seo', ...(promotedPrimaryLabel ? { promotedPrimaryLabel } : {}) });
   notifyLocalSeoUpdated(workspace.id, { action: 'configuration_updated', updatedAt: now });
   return getLocalSeoReadModel(workspace.id, featureEnabled);
 }
 
 export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
-  const rows = stmts().latestSnapshots.all(workspaceId) as SnapshotRow[];
-  return latestSnapshotsFromRows(rows);
-}
-
-function latestSnapshotsFromRows(rows: SnapshotRow[]): LocalVisibilitySnapshot[] {
-  const seen = new Set<string>();
-  const snapshots: LocalVisibilitySnapshot[] = [];
-  for (const row of rows) {
-    const key = `${row.market_id}:${row.normalized_keyword}:${row.device}:${row.language_code}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    snapshots.push(rowToSnapshot(row));
-  }
-  return snapshots;
+  // Bug 1 + tiebreaker fix: query takes (workspaceId × 3) — outer WHERE, the
+  // MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
+  const rows = stmts().latestSnapshots.all(workspaceId, workspaceId, workspaceId) as SnapshotRow[];
+  return rows.map(rowToSnapshot);
 }
 
 function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, normalizedKeyword: string): LocalVisibilitySnapshot[] {
-  const rows = stmts().latestSnapshotsByKeyword.all(workspaceId, normalizedKeyword) as SnapshotRow[];
-  return latestSnapshotsFromRows(rows);
+  // Bug 1 + tiebreaker fix: query takes (workspaceId, normalizedKeyword) × 3 — outer
+  // WHERE, the MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
+  const rows = stmts().latestSnapshotsByKeyword.all(
+    workspaceId, normalizedKeyword,
+    workspaceId, normalizedKeyword,
+    workspaceId, normalizedKeyword,
+  ) as SnapshotRow[];
+  return rows.map(rowToSnapshot);
 }
 
 function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
@@ -2419,6 +2628,14 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
     addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
 
+    // Bug 3 / D4: retention prune after successful refresh. Wrapped in try/catch
+    // so a prune failure never fails the already-successful refresh job.
+    try {
+      runSnapshotRetentionPrune(workspaceId);
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Snapshot retention prune after local SEO refresh failed (non-fatal)');
+    }
+
   // Fresh local visibility snapshots are the spine of the local recs (B1/B2/B3). After a refresh
   // completes, regenerate recommendations so the new evidence surfaces immediately — mirroring the
   // post-scheduled-audit regen in scheduled-audits.ts. This remains posture-gated so non-local
@@ -2524,6 +2741,85 @@ export function latestLocalSnapshotAt(workspaceId: string): string | null {
   return row.max_captured_at ?? null;
 }
 
+/**
+ * Bug 3 / owner decision D4 — Idempotent snapshot retention pruner.
+ *
+ * Policy:
+ *   - Rows within RETENTION_RAW_DAYS (180 d): always kept.
+ *   - Rows between RETENTION_RAW_DAYS and RETENTION_WEEKLY_MAX_DAYS (18 months):
+ *     weekly thinning — keep exactly one row per
+ *     (market_id, normalized_keyword, device, language_code, week-start-date).
+ *   - Rows beyond RETENTION_WEEKLY_MAX_DAYS: hard delete.
+ *   - ALWAYS keep the latest row per
+ *     (market_id, normalized_keyword, device, language_code) regardless of age.
+ *
+ * Runs inside a db.transaction() per batch (RETENTION_PRUNE_BATCH_SIZE rows). Returns
+ * the total pruned count for logging. Safe to call multiple times — no-op when the
+ * table is already within policy.
+ *
+ * @internal Exported only for testing. Call from job hooks, not route handlers.
+ */
+export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number } {
+  let totalPruned = 0;
+
+  // Collect and delete weekly-thinning candidates in batches.
+  let batch: Array<{ id: string }>;
+  do {
+    batch = stmts().pruneWeeklyThinIds.all(
+      // inner subquery (max captured_at per week bucket): workspace_id, raw_days, weekly_max
+      workspaceId,
+      RETENTION_RAW_DAYS,
+      RETENTION_WEEKLY_MAX_DAYS,
+      // outer keepers WHERE (rows at max captured_at): workspace_id, raw_days, weekly_max
+      workspaceId,
+      RETENTION_RAW_DAYS,
+      RETENTION_WEEKLY_MAX_DAYS,
+      // main outer WHERE: workspace_id, raw_days, weekly_max
+      workspaceId,
+      RETENTION_RAW_DAYS,
+      RETENTION_WEEKLY_MAX_DAYS,
+      // NOT IN immortal guard: workspace_id (inner), workspace_id (outer)
+      workspaceId,
+      workspaceId,
+      RETENTION_PRUNE_BATCH_SIZE,
+    ) as Array<{ id: string }>;
+    if (batch.length > 0) {
+      db.transaction(() => {
+        for (const row of batch) {
+          stmts().deleteSnapshotById.run(row.id, workspaceId);
+        }
+      })();
+      totalPruned += batch.length;
+    }
+  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
+
+  // Collect and delete hard-cutoff candidates in batches.
+  do {
+    batch = stmts().pruneHardCutoffIds.all(
+      // outer WHERE: workspace_id, weekly_max
+      workspaceId,
+      RETENTION_WEEKLY_MAX_DAYS,
+      // NOT IN immortal guard: workspace_id (inner), workspace_id (outer)
+      workspaceId,
+      workspaceId,
+      RETENTION_PRUNE_BATCH_SIZE,
+    ) as Array<{ id: string }>;
+    if (batch.length > 0) {
+      db.transaction(() => {
+        for (const row of batch) {
+          stmts().deleteSnapshotById.run(row.id, workspaceId);
+        }
+      })();
+      totalPruned += batch.length;
+    }
+  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
+
+  if (totalPruned > 0) {
+    log.info({ workspaceId, pruned: totalPruned }, 'local visibility snapshot retention prune complete');
+  }
+  return { pruned: totalPruned };
+}
+
 export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {
   if (getJob(jobId)?.status === 'cancelled') return;
 
@@ -2534,8 +2830,7 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
   }
 
   const locations = getEffectiveLocations(workspace);
-  const rows = stmts().listAllSnapshotsForWorkspace.all(workspaceId) as SnapshotRow[];
-  const total = rows.length;
+  const total = countLocalVisibilitySnapshots(workspaceId);
 
   if (total === 0) {
     updateJob(jobId, {
@@ -2555,13 +2850,34 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
     message: `Recalculating match data for ${total} snapshots...`,
   });
 
-  const batchSize = 100;
+  // Bug 2 fix: keyset-paginated read so we never materialise all rows into memory.
+  // Cursor tracks (captured_at, id) for stable, deterministic pagination over
+  // ORDER BY captured_at DESC, id ASC.
+  const pageSize = 100;
   let processed = 0;
   let lastProgressBroadcastAt = 0;
+  let cursorCapturedAt: string | null = null;
+  let cursorId: string | null = null;
 
-  for (let i = 0; i < rows.length; i += batchSize) {
+  while (true) {
     if (getJob(jobId)?.status === 'cancelled') return;
-    const batch = rows.slice(i, i + batchSize);
+
+    const batch: SnapshotRow[] = cursorCapturedAt === null
+      ? stmts().listSnapshotsFirstPageForBackfill.all(workspaceId, pageSize) as SnapshotRow[]
+      : stmts().listSnapshotsPageForBackfill.all(
+          workspaceId,
+          cursorCapturedAt,
+          cursorCapturedAt,
+          cursorId!,
+          pageSize,
+        ) as SnapshotRow[];
+
+    if (batch.length === 0) break;
+
+    // Advance cursor to the last row in this page
+    const lastRow = batch[batch.length - 1];
+    cursorCapturedAt = lastRow.captured_at;
+    cursorId = lastRow.id;
 
     db.transaction(() => {
       for (const row of batch) {
@@ -2606,27 +2922,39 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
         updatedAt: new Date().toISOString(),
       });
     }
+
+    if (batch.length < pageSize) break; // last page
   }
 
   if (getJob(jobId)?.status === 'cancelled') return;
+
+  // Bug 3 / D4: retention prune at backfill completion — backfill is the other
+  // natural hook point (alongside refresh). Wrapped in try/catch so a prune
+  // failure never fails the already-completed backfill job.
+  try {
+    runSnapshotRetentionPrune(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'Snapshot retention prune after backfill failed (non-fatal)');
+  }
+
   notifyLocalSeoUpdated(workspaceId, {
     action: 'backfill_completed',
-    updated: total,
+    updated: processed,
     updatedAt: new Date().toISOString(),
   });
   addActivity(
     workspaceId,
     'local_seo_updated',
     'Local match history recalculated',
-    `${total} snapshots updated with multi-location match data`,
-    { source: 'local_seo', updated: total },
+    `${processed} snapshots updated with multi-location match data`,
+    { source: 'local_seo', updated: processed },
   );
 
   updateJob(jobId, {
     status: 'done',
-    progress: total,
+    progress: processed,
     total,
-    message: `Match history updated for ${total} snapshots`,
-    result: { workspaceId, updated: total },
+    message: `Match history updated for ${processed} snapshots`,
+    result: { workspaceId, updated: processed },
   });
 }

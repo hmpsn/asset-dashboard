@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
-import { LoadingState, Icon, IconButton, Button, cn, PageHeader } from './ui';
+import { ArrowUpRight, Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
+import { LoadingState, Icon, IconButton, Button, ClickableRow, cn, PageHeader } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
@@ -138,9 +138,13 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
         </div>
       )}
 
-      {/* Content decay alert */}
+      {/* Content decay alert — clickable through to Content Decay in SEO Audit */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: 'var(--radius-signature)' }}>
+        <ClickableRow
+          onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+          className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10')}
+          style={{ borderRadius: 'var(--radius-signature)' }}
+        >
           <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-accent-danger' : 'text-accent-warning')} />
           <div className="flex-1">
             <span className="font-medium text-[var(--brand-text-bright)]">
@@ -153,15 +157,16 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
               <span className="ml-1.5">· avg {Math.abs(decay.avgDeclinePct).toFixed(0)}% decline</span>
             </span>
           </div>
+          <Icon as={ArrowUpRight} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
           <IconButton
-            onClick={() => setDecayDismissed(true)}
+            onClick={(e) => { e.stopPropagation(); setDecayDismissed(true); }}
             icon={X}
             label="Dismiss decay alert"
             size="sm"
             variant="ghost"
             className="flex-shrink-0"
           />
-        </div>
+        </ClickableRow>
       )}
 
       {/* Cannibalization warnings from intelligence — string-path entries mapped to CannibalizationEntry[] */}

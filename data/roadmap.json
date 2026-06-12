@@ -40,65 +40,6 @@
       ]
     },
     {
-      "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",
-      "name": "🔒 Admin Surfaces W2 — Data Integrity & Protection",
-      "hours": "~24-34h",
-      "rationale": "Wave 2: silent data loss, a real server-side protection bypass, unpersisted state, and unbounded storage. Five parallel lanes.",
-      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 2. Read-path integration tests mandatory (not admin-GET-only). W2.4 retention values blocked on owner decision D4.",
-      "items": [
-        {
-          "id": "aw2-strategy-sitekeywordmetrics",
-          "title": "Strategy: thread assembled.siteKeywordMetrics into buildKeywordStrategyUxPayload + broadcast/activity on POST /api/seo/competitors + fix dead entity-resolution pageMap read",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-5h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "keyword-strategy-ux.ts:458 reads siteKeywordMetrics from the blob persistence strips (keyword-strategy-persistence.ts:108-113) — volume/difficulty evidence silently lost on admin, diff, and client payloads. Report §1."
-        },
-        {
-          "id": "aw2-hub-protection-holes",
-          "title": "Keyword Hub: fix gap-approved protection bypass (findTracked vs stripUndefinedKeys, 409 + test) + ConfirmDialog on drawer force-bypass",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "findTracked reads through stripUndefinedKeys which deletes sourceGapKey/strategyOwned → unforced retire/decline returns 200 today for any API/MCP caller; Hub drawer force-bypasses protection in one click with no confirm. Report §2."
-        },
-        {
-          "id": "aw2-schema-persistence",
-          "title": "Schema: persist single-page generation to snapshot + broadcast; seed published state from lastPublishedAt; guard stale manual edits",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "webflow-schema.ts:378-392 single-page output reverts on reload and is clobbered by snapshot refetches; published Set is session-only; stale manual JSON silently overrides regenerated schema. Prerequisite for the W3 CMS unlock. Report §4."
-        },
-        {
-          "id": "aw2-local-seo-storage",
-          "title": "Local SEO: GROUP BY MAX(captured_at) replaces both LIMIT 500 callers; stream backfill; retention policy; honest Remove semantics",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "LIMIT 500 truncates max-budget refreshes and makes panel stats disagree with KCC; backfill loads every snapshot row into memory on the ~512MB host (local-seo.ts:2537); 'Remove' is soft-deactivate that resurrects markets. Retention values = decision D4. Report §3."
-        },
-        {
-          "id": "aw2-content-brief-wiring",
-          "title": "Content: brief job dispatcher stops dropping fixContext targetPageId/Slug; dedupe repeat Send-to-Client; fix regenerateBrief orphan accumulation",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "fixContext page targeting silently dropped server-side; repeated brief sends create duplicate client requests; regenerateBrief accumulates orphaned sibling briefs. Report §5."
-        }
-      ]
-    },
-    {
       "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",
       "name": "🔗 Admin Surfaces W3 — Unlocks & Broken Handoffs",
       "hours": "~22-32h",
@@ -131,9 +72,9 @@
           "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
           "est": "5-7h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Each is a sender/receiver contract failure; receivers (fixContext, useRankTrackingAddKeyword, review_page) already exist. Report §7 Missing seams."
+          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead of schedule with W2). WorkspaceHome senders fixed (?tab=requests two-halves + content→content-pipeline), KeywordGaps→Hub links, RepeatCompetitorList one-click Track, Decay→briefs (pageSlug contract) + Decay→PI handoffs, pipeline decay banner clickable. PI→Schema receiver accepts pageSlug (handled in schema lane)."
         },
         {
           "id": "aw3-nav-registry",
@@ -151,9 +92,9 @@
           "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
           "est": "5-7h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "10-15 min jobs go dark on navigation; audit run is a static spinner (SeoAudit.tsx:491-499); both 'Link Webflow site' onboarding paths land on read-only pages. Report §8."
+          "notes": "Done in fix/admin-surfaces-w2-batch. TaskPanel retired (stub + doc sweep incl. CLAUDE.md and golden-paths); NotificationBell cross-tab visibility verified (no gap — provider rehydrates from GET /api/jobs); SEO audit shows live job progress (non-cancellable job type, progress-only); ConnectionsTab gets a real link-site flow via useLinkSiteFlow with per-row pending + error surfacing."
         }
       ]
     },
@@ -180,9 +121,9 @@
           "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
           "est": "2-3h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "StoredAIReview is persisted server-side but write-only — verdicts vanish on editor close and every session re-pays the AI call. Report §5."
+          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead with W2). ReviewChecklist seeds from persisted post.aiReview with from-last-review provenance note; fresh runs overwrite; key={postId} guards remount seeding."
         },
         {
           "id": "aw5-local-visibility-insights",
@@ -221,7 +162,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5."
+          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5. D4 (schema_snapshots): keep version-history-referenced rows; prune unreferenced after 30d."
         },
         {
           "id": "aw6-wire-or-delete",
@@ -1493,6 +1434,66 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",
+      "name": "✅ SHIPPED — 🔒 Admin Surfaces W2 — Data Integrity & Protection",
+      "hours": "~24-34h",
+      "rationale": "Wave 2: silent data loss, a real server-side protection bypass, unpersisted state, and unbounded storage. Five parallel lanes.",
+      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 2. Read-path integration tests mandatory (not admin-GET-only). W2.4 retention values blocked on owner decision D4.",
+      "items": [
+        {
+          "id": "aw2-strategy-sitekeywordmetrics",
+          "title": "Strategy: thread assembled.siteKeywordMetrics into buildKeywordStrategyUxPayload + broadcast/activity on POST /api/seo/competitors + fix dead entity-resolution pageMap read",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w2-batch. Metrics threaded at all 4 strategyUx call sites (admin GET, diff, public, KCC); competitors POST broadcasts STRATEGY_UPDATED + addActivity; entity-resolution slice reads listPageKeywords. Read-path integration tests."
+        },
+        {
+          "id": "aw2-hub-protection-holes",
+          "title": "Keyword Hub: fix gap-approved protection bypass (findTracked vs stripUndefinedKeys, 409 + test) + ConfirmDialog on drawer force-bypass",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. findTracked removed; lifecycle path resolves un-stripped rows so gap-approved protection 409s server-side (integration-tested incl. forced path); Hub drawer protected actions gated behind ConfirmDialog with action-captured keyword + onClose cleanup."
+        },
+        {
+          "id": "aw2-schema-persistence",
+          "title": "Schema: persist single-page generation to snapshot + broadcast; seed published state from lastPublishedAt; guard stale manual edits",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. Single-page generation persisted via transactional insert-if-missing upsert + SCHEMA_SNAPSHOT_UPDATED broadcast; published Set seeded from lastPublishedAt (merge-only, retraction-safe); stale manual edits cleared on regenerate/rescan; fixContext receiver resolves pageSlug (and the auto-trigger timer bug found in review was fixed + regression-tested)."
+        },
+        {
+          "id": "aw2-local-seo-storage",
+          "title": "Local SEO: GROUP BY MAX(captured_at) replaces both LIMIT 500 callers; stream backfill; retention policy; honest Remove semantics",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. GROUP BY MAX read (4-col identity + tiebreaker) replaces LIMIT 500 for all callers; keyset-paginated backfill; D4 retention prune (180d raw / weekly thin to 18mo / latest-per-(market,keyword,device,lang) immortal, week-start bucketing); honest Deactivate/Reactivate with primary auto-promotion."
+        },
+        {
+          "id": "aw2-content-brief-wiring",
+          "title": "Content: brief job dispatcher stops dropping fixContext targetPageId/Slug; dedupe repeat Send-to-Client; fix regenerateBrief orphan accumulation",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. fixContext targetPageSlug threaded through dispatcher (targetPageId documented slug-only); send-to-client deduped inside the transaction with state-machine-derived concluded statuses (delivered no longer blocks re-send); superseded_by lineage (migration 134, ON DELETE SET NULL) with filtered list reads + count stats in lockstep."
+        }
+      ],
+      "shippedAt": "2026-06-11"
     },
     {
       "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
