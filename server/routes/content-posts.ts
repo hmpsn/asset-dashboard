@@ -9,6 +9,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
 import {
   listPosts,
+  enrichPostsWithOutcomes,
   getPost,
   updatePostField,
   deletePost,
@@ -215,7 +216,10 @@ const regenerateSectionSchema = z.object({
 
 // List all generated posts for a workspace
 router.get('/api/content-posts/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(listPosts(req.params.workspaceId));
+  // W5.1: badge published posts with their read-back outcome verdict (90-day
+  // clicks/position delta). Read-side decoration; listPosts stays pure for the
+  // many non-list consumers.
+  res.json(enrichPostsWithOutcomes(req.params.workspaceId, listPosts(req.params.workspaceId)));
 });
 
 // Get a single post

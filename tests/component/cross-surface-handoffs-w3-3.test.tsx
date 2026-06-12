@@ -179,6 +179,7 @@ vi.mock('../../src/hooks/admin', () => ({
           suggestedTrackingKeywords: ['best dentist chicago', 'dental implants chicago'],
         },
       ],
+      visibilityTrend: [],
     },
     isLoading: false,
     isError: false,

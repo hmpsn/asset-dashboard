@@ -87,6 +87,16 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
                   Create Brief
                 </Button>
               )}
+              {onCreateBrief && signal.type === 'refresh_suggestion' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => onCreateBrief(signal.keyword ?? '', signal.pageUrl)}
+                >
+                  Refresh brief
+                </Button>
+              )}
             </div>
           );
         })}

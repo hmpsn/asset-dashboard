@@ -51,6 +51,7 @@ export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
 export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
+export { OutcomeReadbackChip, type OutcomeReadbackChipProps } from './OutcomeReadbackChip';
 export { ChartCard, type ChartCardProps } from './ChartCard';
 
 // ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───

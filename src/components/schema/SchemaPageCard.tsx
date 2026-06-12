@@ -317,12 +317,39 @@ export function SchemaPageCard({
               {!validationStatus && (
                 <Badge label="Not validated yet" tone="blue" variant="outline" shape="pill" size="sm" icon={Clock} />
               )}
-              {!page.pageId.startsWith('cms-') && (
-                published ? (
-                  <Badge label="Published to Webflow" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />
+              {/* Publish control — static pages always show; CMS pages show based on delivery readiness */}
+              {(() => {
+                const isCmsPage = page.pageId.startsWith('cms-');
+                const cmsStatus = page.cmsDeliveryStatus?.status;
+                // CMS page with no mapped field or blocked delivery → honest "not ready" notice
+                if (isCmsPage && cmsStatus !== 'ready') {
+                  const reason = cmsStatus === 'blocked' || cmsStatus === 'failed'
+                    ? (page.cmsDeliveryStatus?.message || 'CMS field delivery blocked')
+                    : 'CMS fields not mapped — configure a schema field in the CMS Mapping panel to enable publishing';
+                  return (
+                    <span className="badge-span-ok t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1" title={reason}>
+                      <Icon as={AlertTriangle} size="sm" className="text-amber-400/70 flex-shrink-0" />
+                      {isCmsPage && !cmsStatus ? 'CMS fields not mapped' : 'CMS publish unavailable'}
+                    </span>
+                  );
+                }
+                // Static page or CMS page with ready delivery — show publish UI
+                const publishLabel = isCmsPage ? 'Publish to CMS field' : 'Publish to Webflow';
+                const confirmLabel = isCmsPage
+                  ? `Write schema to CMS field${editedSchemaJson ? ' (edited)' : ''}?`
+                  : `Publish ${editedSchemaJson ? 'edited ' : ''}schema to this page's <head>?`;
+                return published ? (
+                  <Badge
+                    label={isCmsPage ? 'Published to CMS field' : 'Published to Webflow'}
+                    tone="emerald"
+                    variant="outline"
+                    shape="sm"
+                    size="md"
+                    icon={CheckCircle}
+                  />
                 ) : confirmPublish ? (
                   <div className="flex items-center gap-2">
-                    <span className="t-caption text-amber-400/80">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
+                    <span className="t-caption text-amber-400/80">{confirmLabel}</span>
                     <Button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
@@ -354,14 +381,10 @@ export function SchemaPageCard({
                     size="sm"
                     className="rounded-[var(--radius-md)] bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                   >
-                    {publishing ? (
-                      'Publishing...'
-                    ) : (
-                      'Publish to Webflow'
-                    )}
+                    {publishing ? 'Publishing...' : publishLabel}
                   </Button>
-                )
-              )}
+                );
+              })()}
               {isHomepage && (
                 templateSaved ? (
                   <Badge label="Template Saved" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />
@@ -392,7 +415,7 @@ export function SchemaPageCard({
                   </>
                 )
               )}
-              {published && !retracted && (
+              {published && !retracted && !page.pageId.startsWith('cms-') && (
                 <Button
                   onClick={() => onRetract(page.pageId)}
                   disabled={retracting}
@@ -404,6 +427,15 @@ export function SchemaPageCard({
                 >
                   Retract
                 </Button>
+              )}
+              {published && !retracted && page.pageId.startsWith('cms-') && (
+                <span
+                  className="badge-span-ok t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"
+                  title="To remove schema from a CMS item, clear the mapped field directly in Webflow CMS"
+                >
+                  <Icon as={AlertTriangle} size="sm" className="text-amber-400/70 flex-shrink-0" />
+                  Clear via Webflow CMS to retract
+                </span>
               )}
               {retracted && (
                 <Badge label="Retracted" tone="zinc" variant="outline" shape="sm" size="md" icon={Trash2} />

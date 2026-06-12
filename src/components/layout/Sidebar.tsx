@@ -3,14 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
 import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import {
+  NAV_REGISTRY, type NavEntry, type NavGroupKey,
+  resolveNavLabel, resolveNavDescription, isNavEntryHidden,
+} from '../../lib/navRegistry';
+import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
 import { Icon, cn, IconButton, ClickableRow } from '../ui';
 import {
-  Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
-  Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
-  Sun, Moon, LayoutDashboard, ChevronRight, Activity, Shield,
-  BookOpen, DollarSign, Trophy, Sparkles, Layers, FileSearch, Map, ListChecks,
+  Settings, Globe, LogOut,
+  Sun, Moon, ChevronRight, Activity, Shield,
+  BookOpen, DollarSign, Sparkles, Target,
 } from 'lucide-react';
 
 interface NavItem {
@@ -55,60 +59,62 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(keywordHubEnabled: boolean): NavGroup[] {
-  return [
-    { label: '', items: [
-      { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
-    ]},
-    { label: 'MONITORING', groupIcon: Activity, groupColor: 'text-blue-400',
-      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
-      items: [
-      { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
-      // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON.
-      { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, hidden: keywordHubEnabled, desc: 'Track keyword rankings over time' },
-      { id: 'outcomes', label: 'Action Results', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
-    ]},
-    { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
-      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
-      items: [
-      { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true, desc: 'Comprehensive SEO audit with AI recommendations' },
-      { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true, desc: 'PageSpeed scores, Core Web Vitals, and load times' },
-      { id: 'links', label: 'Links', icon: Link2, needsSite: true, desc: 'Internal links, broken links, and redirect management' },
-      { id: 'media', label: 'Assets', icon: Image, desc: 'Images, alt text, and media optimization' },
-    ]},
-    { label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
-      items: [
-      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
-      { id: 'seo-keywords', label: keywordHubEnabled ? 'Keyword Hub' : 'Keywords', icon: ListChecks, needsSite: true, desc: keywordHubEnabled ? 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' : 'Command center for keyword lifecycle, evidence, tracking, and handoffs' },
-      { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
-    ]},
-    { label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
-      items: [
-      { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
-      { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: true, desc: 'Brand voice, knowledge base, and audience personas' },
-      { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
-    ]},
-    { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
-      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
-      items: [
-      { id: 'content-pipeline', label: 'Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
-      { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
-      { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
-    ]},
-    { label: 'ADMIN', groupIcon: Settings, groupColor: 'text-[var(--brand-text)]',
-      activeBg: 'bg-zinc-500/10', activeText: 'text-[var(--brand-text-bright)]', activeIcon: 'text-[var(--brand-text)]', inactiveIcon: 'text-[var(--brand-text-dim)]', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-[var(--brand-text-bright)]', // raw-zinc-ok — admin group neutral tint
-      items: [
-      { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, desc: 'Cross-workspace outcomes overview' },
-      { id: 'prospect', label: 'Prospect', icon: FileSearch, desc: 'Sales prospect research' },
-      { id: 'ai-usage', label: 'AI Usage', icon: Activity, desc: 'AI token usage and costs' },
-      { id: 'roadmap', label: 'Roadmap', icon: Map, desc: 'Product roadmap and sprint tracking' },
-      { id: 'features', label: 'Features', icon: Layers, desc: 'Feature library and changelog' },
-      { id: 'diagnostics', label: 'Diagnostics', icon: FileSearch, desc: 'Deep diagnostic investigation reports' },
-    ]},
-  ];
+/**
+ * Sidebar-local PRESENTATION for each registry group: the uppercase label,
+ * group icon, colors, and render ORDER. Item identity (label / needsSite /
+ * description / hidden) comes from the nav registry — never hard-coded here.
+ * nav-registry-ok — group chrome is presentation, not item nav metadata.
+ */
+const GROUP_PRESENTATION: Array<{
+  key: NavGroupKey;
+  label: string;
+  groupIcon?: typeof Globe;
+  groupColor?: string;
+  activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string;
+  hoverBg?: string; hoverText?: string;
+}> = [
+  { key: 'home', label: '' },
+  { key: 'monitoring', label: 'MONITORING', groupIcon: Activity, groupColor: 'text-blue-400',
+    activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300' },
+  { key: 'site-health', label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
+    activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300' },
+  { key: 'seo-strategy', label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
+    activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },
+  { key: 'optimization', label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
+    activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },
+  { key: 'content', label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
+    activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300' },
+  { key: 'admin', label: 'ADMIN', groupIcon: Settings, groupColor: 'text-[var(--brand-text)]',
+    activeBg: 'bg-zinc-500/10', activeText: 'text-[var(--brand-text-bright)]', activeIcon: 'text-[var(--brand-text)]', inactiveIcon: 'text-[var(--brand-text-dim)]', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-[var(--brand-text-bright)]' }, // raw-zinc-ok — admin group neutral tint
+];
+
+/**
+ * Build the sidebar nav groups from the registry. Group chrome/order is local
+ * (GROUP_PRESENTATION); each item's label/needsSite/description/hidden is
+ * resolved from the registry, applying keyword-hub flag behavior in ONE place.
+ */
+function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): NavGroup[] {
+  const entryToNavItem = (entry: NavEntry): NavItem => ({
+    id: entry.id,
+    label: resolveNavLabel(entry, isFlagEnabled),
+    icon: entry.icon,
+    desc: resolveNavDescription(entry, isFlagEnabled),
+    needsSite: entry.needsSite,
+    hidden: isNavEntryHidden(entry, isFlagEnabled),
+  });
+
+  return GROUP_PRESENTATION.map((pres) => ({
+    label: pres.label,
+    groupIcon: pres.groupIcon,
+    groupColor: pres.groupColor,
+    activeBg: pres.activeBg,
+    activeText: pres.activeText,
+    activeIcon: pres.activeIcon,
+    inactiveIcon: pres.inactiveIcon,
+    hoverBg: pres.hoverBg,
+    hoverText: pres.hoverText,
+    items: NAV_REGISTRY.filter((e) => e.group === pres.key).map(entryToNavItem),
+  }));
 }
 
 export function Sidebar({
@@ -135,7 +141,8 @@ export function Sidebar({
   }, []);
 
   const keywordHubEnabled = useFeatureFlag('keyword-hub');
-  const navGroups = buildNavGroups(keywordHubEnabled);
+  // Only keyword-hub drives nav flagBehavior today; resolve other flags as false.
+  const navGroups = buildNavGroups((flag) => flag === 'keyword-hub' && keywordHubEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => { // effect-layout-ok — intentional post-render tab-group expansion

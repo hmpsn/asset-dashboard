@@ -122,7 +122,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                     </span>
                   )}
                 </Button>
-                {!isLatest && !isRestored && (
+                {!isLatest && !isRestored && !pageId.startsWith('cms-') && (
                   <Button
                     onClick={() => handleRollback(entry)}
                     disabled={rollingBack !== null}
@@ -135,6 +135,14 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                   >
                     Restore
                   </Button>
+                )}
+                {!isLatest && !isRestored && pageId.startsWith('cms-') && (
+                  <span
+                    className="badge-span-ok t-caption-sm text-[var(--brand-text-muted)]"
+                    title="CMS rollback not supported — update via Webflow CMS directly"
+                  >
+                    CMS only
+                  </span>
                 )}
                 {isRestored && (
                   <span className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">

@@ -206,7 +206,8 @@ export type InsightType =
   | 'competitor_alert'       // Tier 2: weekly competitor position change
   | 'freshness_alert'        // Tier 2: stale content detected via page_keywords age
   | 'milestone_attribution'  // Phase 2.5c: delivered brief crossed a traffic threshold
-  | 'lost_visibility';       // G1: queries that dropped off GSC after sustained presence
+  | 'lost_visibility'        // G1: queries that dropped off GSC after sustained presence
+  | 'local_visibility_shift'; // W5.3: local pack visible↔not_visible transition or new repeat competitor
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -491,6 +492,44 @@ export interface LostVisibilityData extends InsightDataBase {
   detectedAt: string;
 }
 
+/**
+ * W5.3 — Local visibility shift detection.
+ * Minted by bridge-local-visibility-shift after a local SEO refresh diffs the
+ * new latest-per-(market, keyword, device, language) snapshot state against the
+ * previous latest state. One insight per (market, keyword, device, language)
+ * identity that transitioned, plus one per market where a new repeat competitor
+ * surfaced. The `direction` discriminates the three transition kinds.
+ */
+export interface LocalVisibilityShiftData extends InsightDataBase {
+  /**
+   * - `risk`       — the business was visible (local-pack match) and is no longer.
+   * - `win`        — the business became visible after not being visible.
+   * - `competitor` — a new competitor appeared repeatedly across the market.
+   */
+  direction: 'risk' | 'win' | 'competitor';
+  /** Market the transition was observed in. */
+  marketId: string;
+  marketLabel: string;
+  /** The keyword whose visibility flipped. Omitted for `competitor` market-level shifts. */
+  keyword?: string;
+  /** Normalized keyword — used in the dedup key and for series cross-reference. */
+  normalizedKeyword?: string;
+  /** Device the snapshot was captured on (desktop/mobile). */
+  device?: string;
+  /** Language code the snapshot was captured in. */
+  languageCode?: string;
+  /** Best local-pack rank before the shift, when known (risk/win). units: integer position */
+  previousRank?: number | null;
+  /** Best local-pack rank after the shift, when known (win). units: integer position */
+  currentRank?: number | null;
+  /** Competitor business name for `competitor` shifts. */
+  competitorName?: string;
+  /** Number of distinct keywords this competitor now appears across (competitor shifts). units: raw count */
+  competitorAppearances?: number;
+  /** ISO timestamp of the refresh that detected this shift. */
+  detectedAt: string;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -514,6 +553,7 @@ export interface InsightDataMap {
   freshness_alert: FreshnessAlertData;
   milestone_attribution: MilestoneAttributionData;
   lost_visibility: LostVisibilityData;
+  local_visibility_shift: LocalVisibilityShiftData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

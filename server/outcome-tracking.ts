@@ -22,6 +22,7 @@ import type {
   DeltaSummary,
   EarlySignal,
   TopWin,
+  OutcomeReadback,
 } from '../shared/types/outcome-tracking.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
@@ -226,6 +227,43 @@ const stmts = createStmtCache(() => ({
   // NO JSON column reads — avoids the deserialization cost of getActionsByWorkspace.
   actionIdsByWorkspace: db.prepare(`
     SELECT id FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC
+  `),
+  // ── W5.1: read-back join for admin surfaces (Strategy / Keyword Hub / Posts) ──
+  // ONE indexed query per workspace returning the LATEST conclusive outcome per
+  // tracked action — the highest-checkpoint row whose score is a real verdict.
+  // The MAX(checkpoint_days) correlated subquery (the same dedup the overview/
+  // calibration queries use) guarantees one row per action, so a 30+60 action
+  // emits only the 60 verdict. Joins back to tracked_actions for the dimensions
+  // (source_type/source_id/page_url/target_keyword) and BOTH snapshots so the
+  // caller can render baseline→current without a second read. JSON columns are
+  // parsed at the read boundary in the mapper. Filtered to scored, conclusive
+  // outcomes only — inconclusive/insufficient_data/unscored never surface.
+  scoredReadbacksByWorkspace: db.prepare(`
+    SELECT
+      ta.id AS action_id,
+      ta.action_type AS action_type,
+      ta.source_type AS source_type,
+      ta.source_id AS source_id,
+      ta.page_url AS page_url,
+      ta.target_keyword AS target_keyword,
+      ta.baseline_snapshot AS baseline_snapshot,
+      ao.checkpoint_days AS checkpoint_days,
+      ao.score AS score,
+      ao.metrics_snapshot AS metrics_snapshot,
+      ao.delta_summary AS delta_summary,
+      ao.measured_at AS measured_at
+    FROM tracked_actions ta
+    JOIN action_outcomes ao ON ao.action_id = ta.id
+    WHERE ta.workspace_id = ?
+      AND ao.score IS NOT NULL
+      AND ao.score NOT IN ('insufficient_data', 'inconclusive')
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.score IS NOT NULL
+          AND ao2.score NOT IN ('insufficient_data', 'inconclusive')
+      )
   `),
 }));
 
@@ -842,6 +880,96 @@ export function getCalibrationOutcomes(workspaceId: string): CalibrationOutcome[
     .filter((r): r is { score: string; attributed_value: number; action_type: string; predicted_emv: number | null } =>
       r.score != null && typeof r.attributed_value === 'number' && Number.isFinite(r.attributed_value))
     .map(r => ({ score: r.score as OutcomeScore, attributedValue: r.attributed_value, actionType: r.action_type, predictedEmv: r.predicted_emv ?? null }));
+}
+
+/**
+ * W5.1: per-workspace indexes of the latest conclusive outcome per tracked action,
+ * pre-keyed for the three read-back surfaces:
+ *  - `bySource`  keyed by `${sourceType}::${sourceId}` — Strategy keyword rows and
+ *    the Keyword Hub drawer both record under STRATEGY_PAGE_KEYWORD_SOURCE_TYPE +
+ *    strategyPageKeywordSourceId(pagePath, keyword), so this is the exact-match key.
+ *  - `byKeyword` keyed by the lowercased trimmed targetKeyword — Posts/Briefs badge
+ *    fallback when no source id is known.
+ *  - `byPage`    keyed by the action's page_url — coarse page-level fallback.
+ * When multiple actions share a keyword/page, the most recently measured verdict wins
+ * (rows are applied measured_at DESC).
+ */
+export interface OutcomeReadbacks {
+  bySource: Map<string, OutcomeReadback>;
+  byKeyword: Map<string, OutcomeReadback>;
+  byPage: Map<string, OutcomeReadback>;
+}
+
+interface ScoredReadbackRow {
+  action_id: string;
+  action_type: string;
+  source_type: string;
+  source_id: string | null;
+  page_url: string | null;
+  target_keyword: string | null;
+  baseline_snapshot: string;
+  checkpoint_days: number;
+  score: string;
+  metrics_snapshot: string;
+  delta_summary: string;
+  measured_at: string;
+}
+
+function rowToOutcomeReadback(row: ScoredReadbackRow): OutcomeReadback {
+  const baseline = parseJsonFallback<{ position?: number; clicks?: number }>(row.baseline_snapshot, {});
+  const current = parseJsonFallback<{ position?: number; clicks?: number }>(row.metrics_snapshot, {});
+  const delta = parseJsonFallback<{
+    primary_metric?: string;
+    baseline_value?: number;
+    current_value?: number;
+    direction?: OutcomeReadback['direction'];
+  }>(row.delta_summary, {});
+  const primaryMetric = delta.primary_metric ?? 'position';
+  const isPositionMetric = primaryMetric === 'position';
+  return {
+    actionId: row.action_id,
+    actionType: row.action_type as OutcomeReadback['actionType'],
+    score: row.score as OutcomeReadback['score'],
+    checkpointDays: row.checkpoint_days as OutcomeReadback['checkpointDays'],
+    primaryMetric,
+    direction: delta.direction ?? 'stable',
+    baselineValue: typeof delta.baseline_value === 'number' ? delta.baseline_value : (baseline.position ?? baseline.clicks ?? 0),
+    currentValue: typeof delta.current_value === 'number' ? delta.current_value : (current.position ?? current.clicks ?? 0),
+    baselinePosition: isPositionMetric && typeof baseline.position === 'number' ? baseline.position : null,
+    currentPosition: isPositionMetric && typeof current.position === 'number' ? current.position : null,
+    baselineClicks: typeof baseline.clicks === 'number' ? baseline.clicks : null,
+    currentClicks: typeof current.clicks === 'number' ? current.clicks : null,
+    measuredAt: row.measured_at,
+  };
+}
+
+/**
+ * Build the read-back indexes for a workspace from ONE indexed query (no N+1).
+ * Read-only — never mutates outcome data. Safe to call on hot read paths; the
+ * single query reads only the latest conclusive outcome per action.
+ */
+export function getScoredOutcomeReadbacks(workspaceId: string): OutcomeReadbacks {
+  const rows = stmts().scoredReadbacksByWorkspace.all(workspaceId) as ScoredReadbackRow[];
+  const bySource = new Map<string, OutcomeReadback>();
+  const byKeyword = new Map<string, OutcomeReadback>();
+  const byPage = new Map<string, OutcomeReadback>();
+  // measured_at DESC so the most recent verdict wins for keyword/page collisions.
+  const sorted = [...rows].sort((a, b) => (b.measured_at ?? '').localeCompare(a.measured_at ?? ''));
+  for (const row of sorted) {
+    const readback = rowToOutcomeReadback(row);
+    if (row.source_id) {
+      const key = `${row.source_type}::${row.source_id}`;
+      if (!bySource.has(key)) bySource.set(key, readback);
+    }
+    if (row.target_keyword) {
+      const key = row.target_keyword.trim().toLowerCase();
+      if (key && !byKeyword.has(key)) byKeyword.set(key, readback);
+    }
+    if (row.page_url) {
+      if (!byPage.has(row.page_url)) byPage.set(row.page_url, readback);
+    }
+  }
+  return { bySource, byKeyword, byPage };
 }
 
 export function archiveOldActions(): { archived: number } {

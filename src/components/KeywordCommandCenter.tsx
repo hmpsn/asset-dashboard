@@ -619,6 +619,7 @@ export function KeywordCommandCenter({ workspaceId }: KeywordCommandCenterProps)
       <KeywordDetailDrawer
         open={!!selectedKey}
         row={selectedRow}
+        outcome={detail.data?.outcome}
         workspaceId={workspaceId}
         isLoading={detail.isFetching && !!selectedKey && !detail.data}
         loadingAction={localRefresh.isPending ? 'check_local_visibility' : actionMutation.isPending ? actionMutation.variables?.action : undefined}

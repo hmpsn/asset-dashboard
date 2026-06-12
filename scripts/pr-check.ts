@@ -8639,6 +8639,64 @@ export const CHECKS: Check[] = [
     },
   },
 
+  {
+    name: 'Hardcoded nav metadata outside the nav registry',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    message:
+      'Sidebar.tsx, CommandPalette.tsx, and Breadcrumbs.tsx must source nav ' +
+      'identity (label / needsSite / description) from src/lib/navRegistry.tsx, ' +
+      'not re-inline it. Found a hardcoded nav-metadata object literal or a ' +
+      'literal needsSite: true|false. Add the entry to NAV_REGISTRY and read it ' +
+      'via resolveNavLabel()/entry.needsSite instead. If this line is genuinely ' +
+      'not nav metadata (e.g. an unrelated object that happens to use these ' +
+      'keys), add // nav-registry-ok on the line or the line immediately above.',
+    severity: 'error',
+    rationale:
+      'Nav metadata triplicated across the three consumer surfaces silently ' +
+      'drifts (a tab missing from one surface, disagreeing needsSite gating). ' +
+      'The registry is the single source of truth.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    excludeLines: ['// nav-registry-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Only the three nav consumer surfaces are in scope. The registry itself
+      // is the authority and is never flagged.
+      const CONSUMER_SUFFIXES = [
+        'src/components/layout/Sidebar.tsx',
+        'src/components/CommandPalette.tsx',
+        'src/components/layout/Breadcrumbs.tsx',
+      ];
+      const HATCH = '// nav-registry-ok';
+      // (a) A hardcoded site-gating literal — `needsSite: true` / `needsSite: false`.
+      //     `needsSite: entry.needsSite` (reading FROM the registry) is allowed.
+      const NEEDS_SITE_LITERAL_RE = /\bneedsSite:\s*(?:true|false)\b/;
+      // (b) A nav-metadata object literal — `id: '<page-slug>'` on the same line
+      //     as a string `label:`. This is the NAV_ITEMS / buildNavGroups inline
+      //     signature. Reading `entry.id` / `entry.label` does NOT match (no
+      //     quoted slug + quoted label pair).
+      const NAV_OBJECT_RE = /\bid:\s*'[a-z][a-z0-9-]*'\s*,\s*label:\s*['"`]/;
+
+      for (const file of files) {
+        const normalised = file.replace(/\\/g, '/');
+        if (!CONSUMER_SUFFIXES.some((suffix) => normalised.endsWith(suffix))) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!NEEDS_SITE_LITERAL_RE.test(line) && !NAV_OBJECT_RE.test(line)) continue;
+          // Inline hatch on the same line or the line immediately above.
+          if (line.includes(HATCH)) continue;
+          if (i > 0 && lines[i - 1].includes(HATCH)) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

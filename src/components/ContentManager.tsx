@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
+import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput, OutcomeReadbackChip } from './ui';
+import type { OutcomeReadback } from '../../shared/types/outcome-tracking';
 import { formatDate } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
 import {
@@ -29,6 +30,8 @@ interface PostSummary {
   sections: { heading: string; wordCount: number; status: string }[];
   voiceScore?: number;
   voiceFeedback?: string;
+  /** W5.1: read-back outcome verdict for published posts (90-day clicks/position delta). */
+  outcome?: OutcomeReadback;
 }
 
 type SortField = 'date' | 'title' | 'status' | 'words';
@@ -359,6 +362,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                             <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
                             <span className="t-caption-sm text-accent-info font-medium">Voice {post.voiceScore}</span>
                           </Button>
+                        </>
+                      )}
+                      {/* W5.1: closed-loop outcome badge — 90-day clicks/position delta +
+                          verdict for this published post. Only present on published posts
+                          with a scored action; honest about direction. */}
+                      {post.outcome && (
+                        <>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+                          <OutcomeReadbackChip outcome={post.outcome} />
                         </>
                       )}
                     </div>

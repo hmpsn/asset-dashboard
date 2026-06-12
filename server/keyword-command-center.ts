@@ -32,6 +32,7 @@ import {
 } from './rank-tracking.js';
 import { listTrackedKeywordRows } from './tracked-keywords-store.js';
 import { recordKeywordTrackingAction } from './outcome-measurement-keywords.js';
+import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from './outcome-tracking.js';
 import { InvalidTransitionError, TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -81,6 +82,7 @@ import {
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
 import type { KeywordStrategyExplanation } from '../shared/types/keyword-strategy-ux.js';
+import type { OutcomeReadback } from '../shared/types/outcome-tracking.js';
 
 const RAW_EVIDENCE_ROW_LIMIT = 75;
 const RANK_EVIDENCE_ROW_LIMIT = 50;
@@ -3113,6 +3115,32 @@ export async function buildKeywordCommandCenterDetail(
     })
     : null;
   if (!row) return null;
+  // ── W5.1: read-back outcome verdict for the drawer detail panel ───────────────
+  // recordKeywordTrackingAction records every track/promote/add under
+  // STRATEGY_PAGE_KEYWORD_SOURCE_TYPE + strategyPageKeywordSourceId(pagePath, keyword).
+  // Join the scored outcome back so the drawer can show baseline→current position +
+  // verdict. ONE indexed batch read per request (workspace-scoped); the source-id
+  // exact match is tried for every candidate page path (the keyword's pageMap pages
+  // and the tracked-row page path), then a keyword fallback. Read-only — never
+  // mutates outcome data. Failure degrades to no chip, never blocks the drawer.
+  let outcome: OutcomeReadback | undefined;
+  try {
+    const readbacks = getScoredOutcomeReadbacks(workspace.id);
+    if (readbacks.bySource.size > 0 || readbacks.byKeyword.size > 0) {
+      const candidatePaths = new Set<string>();
+      for (const page of pageMap) if (page.pagePath) candidatePaths.add(page.pagePath);
+      if (row.tracking.pagePath) candidatePaths.add(row.tracking.pagePath);
+      for (const path of candidatePaths) {
+        const key = `${STRATEGY_PAGE_KEYWORD_SOURCE_TYPE}::${strategyPageKeywordSourceId(path, row.keyword)}`;
+        const hit = readbacks.bySource.get(key);
+        if (hit) { outcome = hit; break; }
+      }
+      // Source recorded with no page path → keyword-keyed fallback.
+      if (!outcome) outcome = readbacks.byKeyword.get(row.keyword.trim().toLowerCase());
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId: workspace.id, keyword: normalized }, 'Outcome read-back unavailable for KCC detail');
+  }
   log.info({
     workspaceId,
     mode: 'detail-skinny',
@@ -3123,6 +3151,7 @@ export async function buildKeywordCommandCenterDetail(
   return {
     row,
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+    outcome,
   };
 }
 

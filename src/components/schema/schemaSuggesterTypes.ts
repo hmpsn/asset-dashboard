@@ -1,6 +1,6 @@
 import type { ValidationFinding } from '../../../shared/types/schema-validation';
 import type { SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
-import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../../shared/types/site-inventory';
+import type { CmsSchemaFieldMapping, SchemaFieldTarget, SchemaCmsDeliveryStatus } from '../../../shared/types/site-inventory';
 
 export interface SchemaSuggestion {
   type: string;
@@ -29,6 +29,12 @@ export interface SchemaPageSuggestion {
   validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
   generationDiagnostics?: SchemaGenerationDiagnostics;
+  /**
+   * Top-level CMS delivery status mirrored from the server snapshot.
+   * Present only for CMS-item pages (pageId starts with 'cms-').
+   * status === 'ready' means a mapped field exists and schema can be published via the CMS path.
+   */
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
   lastPublishedAt?: string | null;
 }
 

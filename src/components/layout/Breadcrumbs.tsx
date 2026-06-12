@@ -2,17 +2,24 @@ import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { NAV_REGISTRY_BY_ID } from '../../lib/navRegistry';
 import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
-const TAB_LABELS: Record<string, string> = {
-  home: 'Home', brief: 'Meeting Brief', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
-  links: 'Links', 'seo-strategy': 'Strategy', 'seo-keywords': 'Keywords', 'page-intelligence': 'Page Intelligence',
-  'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
-  'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Search & Traffic', performance: 'Performance', 'content-perf': 'Content Performance',
-  rewrite: 'Page Rewriter', 'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
-  'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings', revenue: 'Revenue',
-  outcomes: 'Action Results', 'outcomes-overview': 'Team Outcomes', features: 'Features',
+// nav-registry-ok — fallback labels for redirect-only / legacy-folded Page
+// values (brief, seo-briefs, content, calendar, subscriptions,
+// workspace-settings) that intentionally have no registry entry. A breadcrumb
+// can still land on one of these via a stale bookmark, so we keep a label here
+// to avoid rendering a raw slug. Identity/label/needsSite/description for all
+// real nav surfaces comes from the registry (NAV_REGISTRY_BY_ID).
+const LEGACY_TAB_LABELS: Record<string, string> = {
+  brief: 'Meeting Brief',
+  'seo-briefs': 'Content Briefs',
+  content: 'Content',
+  calendar: 'Calendar',
+  subscriptions: 'Subscriptions',
+  'content-pipeline': 'Content Pipeline',
+  'workspace-settings': 'Workspace Settings',
 };
 
 interface BreadcrumbsProps {
@@ -27,10 +34,17 @@ export function Breadcrumbs({
 }: BreadcrumbsProps) {
   const navigate = useNavigate();
   // Wave 4 P4: relabel the seo-keywords crumb to "Keyword Hub" when ON.
-  // Flag-OFF byte-identical: the static TAB_LABELS map is unchanged.
+  // The relabel logic lives once in the nav registry (flagBehavior); the crumb
+  // just consumes it. Flag-OFF labels are byte-identical.
   const keywordHubEnabled = useFeatureFlag('keyword-hub');
-  const tabLabel = (t: Page): string =>
-    keywordHubEnabled && t === 'seo-keywords' ? 'Keyword Hub' : (TAB_LABELS[t] || t);
+  const tabLabel = (t: Page): string => {
+    const entry = NAV_REGISTRY_BY_ID[t];
+    if (entry) {
+      const fb = entry.flagBehavior;
+      return fb?.labelWhenOn && fb.flag === 'keyword-hub' && keywordHubEnabled ? fb.labelWhenOn : entry.label;
+    }
+    return LEGACY_TAB_LABELS[t] || t;
+  };
 
   return (
     <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[var(--brand-border)] t-caption-sm min-h-[36px]">
@@ -134,5 +148,13 @@ export function Breadcrumbs({
     </div>
   );
 }
+
+// Backward-compat export: a flat slug → flag-OFF label map derived from the
+// registry plus the legacy fallback labels. Kept for existing consumers/tests;
+// the registry is the source of truth.
+const TAB_LABELS: Record<string, string> = {
+  ...LEGACY_TAB_LABELS,
+  ...Object.fromEntries(Object.values(NAV_REGISTRY_BY_ID).map((e) => [e.id, e.label])),
+};
 
 export { TAB_LABELS };

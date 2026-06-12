@@ -8,6 +8,7 @@ import { useRankTrackingAddKeyword } from '../../hooks/admin/useKeywordCommandCe
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn } from '../ui';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
+import { LocalSeoVisibilityTrend } from './LocalSeoVisibilityTrend';
 
 type LocalSeoVisibilityPanelMode = 'strategy' | 'keywords' | 'page';
 
@@ -411,6 +412,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
       <div className="space-y-4">
         <LocalSeoSetupCallout report={report} error={error} refreshError={refresh.error} />
         <LocalSeoStatGrid report={report} mode={mode} />
+        <LocalSeoVisibilityTrend series={data.visibilityTrend} />
 
         {mode === 'strategy' && (
           <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4">

@@ -534,6 +534,26 @@ export interface LocalSeoServiceGap {
   starterKeywords: string[];
 }
 
+/**
+ * W5.3 — per-market visible-count trend over the retained (D4-thinned) snapshot window.
+ * One series per active market; each point is the count of (keyword, device, language)
+ * identities where the business was a verified local-pack match on that capture day.
+ */
+export interface LocalSeoVisibilityTrendPoint {
+  /** Capture day (YYYY-MM-DD). */
+  date: string;
+  /** Distinct (keyword, device, language) identities visible (verified match) that day. */
+  visibleCount: number;
+  /** Distinct identities checked that day (denominator for the visible share). */
+  checkedCount: number;
+}
+
+export interface LocalSeoVisibilityTrendSeries {
+  marketId: string;
+  marketLabel: string;
+  points: LocalSeoVisibilityTrendPoint[];
+}
+
 export interface LocalSeoReadResponse {
   featureEnabled: boolean;
   settings: LocalSeoWorkspaceSettings;
@@ -544,6 +564,11 @@ export interface LocalSeoReadResponse {
   report: LocalSeoReportSummary;
   competitorBrands: LocalSeoRepeatCompetitor[];
   serviceGaps: LocalSeoServiceGap[];
+  /**
+   * W5.3 — per-market visible-count trend over the retained snapshot window. Empty
+   * when the feature is disabled, no markets are configured, or no snapshots exist.
+   */
+  visibilityTrend: LocalSeoVisibilityTrendSeries[];
   caps: {
     maxMarkets: number;
     /**

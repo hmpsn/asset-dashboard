@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
-import { Badge, Button, Icon } from '../ui';
+import { Badge, Button, Icon, OutcomeReadbackChip } from '../ui';
 import { positionColor, positionTone } from '../ui/constants';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
@@ -286,6 +286,12 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             />
                             {explanation?.nextAction && (
                               <Badge label={explanation.nextAction.label} tone="teal" variant="outline" />
+                            )}
+                            {/* W5.1: closed-loop outcome chip — baseline→current position
+                                + verdict for this keyword's tracked action. Honest about
+                                direction (trusts outcome.direction). Absent when unscored. */}
+                            {explanation?.outcome && (
+                              <OutcomeReadbackChip outcome={explanation.outcome} />
                             )}
                           </div>
                         </Button>

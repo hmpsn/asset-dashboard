@@ -292,6 +292,12 @@ function adminInvalidationKeys(
         queryKeys.client.outcomeWins(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        // W5.1: outcome read-back chips/badges live on these admin surfaces, so a
+        // newly scored outcome must refresh them — the Strategy tab keyword rows,
+        // the Keyword Hub (rows + detail drawer), and the Posts list badges.
+        queryKeys.admin.keywordStrategy(workspaceId),
+        queryKeys.admin.keywordCommandCenter(workspaceId),
+        queryKeys.admin.posts(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
       return [

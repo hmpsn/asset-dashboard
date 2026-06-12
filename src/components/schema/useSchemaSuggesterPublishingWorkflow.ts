@@ -240,7 +240,12 @@ export function useSchemaSuggesterPublishingWorkflow({
   const publishAllToWebflow = useCallback(async () => {
     if (bulkPublishBlocked) return;
     if (!data) return;
-    const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
+    // Include static pages unconditionally; include CMS pages only when cmsDeliveryStatus === 'ready'.
+    const publishable = data.filter(p => {
+      if (published.has(p.pageId) || !p.suggestedSchemas[0]?.template) return false;
+      if (p.pageId.startsWith('cms-')) return p.cmsDeliveryStatus?.status === 'ready';
+      return true;
+    });
     if (publishable.length === 0) return;
     setBulkPublishing(true);
     setBulkProgress({ done: 0, total: publishable.length });
@@ -336,7 +341,12 @@ export function useSchemaSuggesterPublishingWorkflow({
     setEditingSchema(prev => (prev.size === 0 ? prev : new Set()));
   }, []);
 
-  const unpublishedCount = data?.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length ?? 0;
+  // Mirrors the publishAllToWebflow filter: static pages count always; CMS pages count only when ready.
+  const unpublishedCount = data?.filter(p => {
+    if (published.has(p.pageId) || !p.suggestedSchemas[0]?.template) return false;
+    if (p.pageId.startsWith('cms-')) return p.cmsDeliveryStatus?.status === 'ready';
+    return true;
+  }).length ?? 0;
 
   return {
     copiedId,

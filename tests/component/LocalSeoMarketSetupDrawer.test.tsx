@@ -107,6 +107,7 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
     },
     competitorBrands: [],
     serviceGaps: [],
+    visibilityTrend: [],
   };
   return { ...base, ...overrides, settings: { ...base.settings, ...overrides.settings }, caps: { ...base.caps, ...overrides.caps }, report: { ...base.report, ...overrides.report } };
 }

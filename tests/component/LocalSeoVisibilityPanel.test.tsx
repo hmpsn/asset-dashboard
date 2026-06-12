@@ -116,6 +116,7 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
     },
     competitorBrands: [],
     serviceGaps: [],
+    visibilityTrend: [],
   };
 
   return {
@@ -291,6 +292,60 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
     expect(screen.getByText('Possible')).toBeInTheDocument();
     expect(screen.getByText('Not Found')).toBeInTheDocument();
+  });
+
+  it('renders the per-market visibility trend when the read model includes a series with >= 2 points', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        visibleCount: 4,
+      },
+      visibilityTrend: [
+        {
+          marketId: 'm1',
+          marketLabel: 'Austin, TX',
+          points: [
+            { date: '2026-06-01', visibleCount: 1, checkedCount: 4 },
+            { date: '2026-06-02', visibleCount: 3, checkedCount: 4 },
+          ],
+        },
+      ],
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Visibility trend')).toBeInTheDocument();
+    expect(screen.getByText('Verified local-pack matches over time')).toBeInTheDocument();
+    // Market label appears in the trend row (getAllByText — also used in the market summary).
+    expect(screen.getAllByText('Austin, TX').length).toBeGreaterThan(0);
+    // Trend delta (+2) renders via TrendBadge.
+    expect(screen.getByText(/\+2/)).toBeInTheDocument();
+  });
+
+  it('does not render the visibility trend when no market has >= 2 points', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        visibleCount: 4,
+      },
+      visibilityTrend: [
+        { marketId: 'm1', marketLabel: 'Austin, TX', points: [{ date: '2026-06-01', visibleCount: 1, checkedCount: 4 }] },
+      ],
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.queryByText('Visibility trend')).not.toBeInTheDocument();
   });
 
   it('renders Page mode as annotation-only without workspace stats or refresh controls', () => {
