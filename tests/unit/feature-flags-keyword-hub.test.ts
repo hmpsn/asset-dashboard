@@ -19,15 +19,15 @@ describe('keyword-hub feature flag (Wave 4 P0)', () => {
     expect(hubBucket?.keys).toContain('keyword-value-scoring');
   });
 
-  it('exists and is OFF by default (dark launch)', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(false);
+  it('exists and is ON by default (Phase B cutover flip, 2026-06-11)', () => {
+    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
   });
 
-  it('has a catalog entry grouped under "Keyword Hub" with staging-validation rollout', () => {
+  it('has a catalog entry grouped under "Keyword Hub" with all-clients rollout', () => {
     const entry = FEATURE_FLAG_CATALOG['keyword-hub'];
     expect(entry).toBeDefined();
     expect(entry.group).toBe('Keyword Hub');
-    expect(entry.lifecycle.rolloutTarget).toBe('staging-validation');
+    expect(entry.lifecycle.rolloutTarget).toBe('all-clients');
     expect(entry.lifecycle.linkedRoadmapItemId).toBe('keyword-hub-wave4');
   });
 

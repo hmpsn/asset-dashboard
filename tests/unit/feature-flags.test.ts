@@ -31,9 +31,12 @@ vi.mock('../../server/errors.js', () => ({
 }));
 
 describe('feature-flags shared types', () => {
-  it('all feature flags default to false', () => {
-    for (const value of Object.values(FEATURE_FLAGS)) {
-      expect(value).toBe(false);
+  it('all feature flags default to false (except shipped cutover flags)', () => {
+    // keyword-hub flipped to true at the Phase B cutover (2026-06-11) — the Hub is
+    // the only keyword surface; the flag is now in its removal window (Phase C).
+    const SHIPPED_DEFAULT_TRUE = new Set(['keyword-hub']);
+    for (const [key, value] of Object.entries(FEATURE_FLAGS)) {
+      expect(value, key).toBe(SHIPPED_DEFAULT_TRUE.has(key));
     }
   });
 
@@ -61,8 +64,8 @@ describe('feature-flags shared types', () => {
     }
   });
 
-  it('known flag keyword-hub defaults to false', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(false);
+  it('known flag keyword-hub defaults to true (Phase B cutover flip, 2026-06-11)', () => {
+    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
   });
 
   it('known flag white-label defaults to false', () => {
@@ -90,7 +93,7 @@ describe('isFeatureEnabled', () => {
     });
 
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub')).toBe(false);
+    expect(isFeatureEnabled('keyword-hub')).toBe(true);
   });
 
   it('returns true when DB override enables a flag', async () => {
@@ -149,10 +152,10 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
 
   it('ignores per-workspace overrides when no workspaceId is passed (backward-compatible)', async () => {
     delete process.env['FEATURE_KEYWORD_HUB'];
-    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-hub', enabled: 1 }] });
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-universe-full', enabled: 1 }] });
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
     // No workspaceId → per-workspace layer is skipped → global default false.
-    expect(isFeatureEnabled('keyword-hub')).toBe(false);
+    expect(isFeatureEnabled('keyword-universe-full')).toBe(false);
   });
 
   it('per-workspace override (enabled) wins over the global default', async () => {
@@ -201,8 +204,8 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
 });
 
 describe('keyword-hub catalog entry', () => {
-  it('is registered, defaults false, and is in the Keyword Hub group', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(false);
+  it('is registered, defaults true (Phase B cutover), and is in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
     expect(FEATURE_FLAG_CATALOG['keyword-hub'].group).toBe('Keyword Hub');
     expect(FEATURE_FLAG_CATALOG['keyword-hub'].lifecycle.linkedRoadmapItemId)
       .toBe('keyword-hub-wave4');
@@ -248,9 +251,9 @@ describe('getWorkspaceFlagsWithMeta', () => {
 
   it('marks source=workspace and resolves the workspace value when a per-workspace override exists', async () => {
     delete process.env['FEATURE_KEYWORD_HUB'];
-    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-hub', enabled: 1 }] });
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-universe-full', enabled: 1 }] });
     const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
-    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-hub');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-universe-full');
     expect(entry?.source).toBe('workspace');
     expect(entry?.enabled).toBe(true);
     // inherited (clear target) is the global chain → default OFF
@@ -351,7 +354,7 @@ describe('getAllFlagsWithMeta', () => {
 
     const { getAllFlagsWithMeta } = await import('../../server/feature-flags.js');
     const meta = getAllFlagsWithMeta();
-    const keywordHubEntry = meta.find(m => m.key === 'keyword-hub');
+    const keywordHubEntry = meta.find(m => m.key === 'keyword-universe-full');
     expect(keywordHubEntry?.source).toBe('default');
     expect(keywordHubEntry?.enabled).toBe(false);
   });
