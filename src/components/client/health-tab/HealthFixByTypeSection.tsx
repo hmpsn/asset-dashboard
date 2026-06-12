@@ -26,6 +26,8 @@ interface HealthFixByTypeSectionProps {
   liveDomain?: string;
   shell: Pick<HealthTabShell, 'severityFilter' | 'showInfoItems' | 'expandedPages' | 'togglePage'>;
   tier: Tier;
+  /** External-billing workspaces: render request-fix framing, never prices/cart. */
+  hidePrices?: boolean;
   /**
    * Impact bands keyed by audit check type (e.g. "title", "structured-data").
    * Passed down from the parent — computed from the client intelligence projection.
@@ -40,6 +42,7 @@ export function HealthFixByTypeSection({
   liveDomain,
   shell,
   tier,
+  hidePrices,
   impactBandsByCheck,
   onRequestFix,
 }: HealthFixByTypeSectionProps) {
@@ -108,6 +111,7 @@ export function HealthFixByTypeSection({
                     displayName={group.label}
                     pageIds={group.pages.map((p) => p.pageId)}
                     tier={tier}
+                    hidePrices={hidePrices}
                     onRequestFix={() => onRequestFix?.(group.check, group.label)}
                   />
                 </div>

@@ -22,6 +22,7 @@
 // checkout-builder mapping so display can never drift from what Stripe charges.
 
 import type { ProductType } from './payments.js';
+import type { RecType } from './recommendations.js';
 
 /** Client-facing fixable-issue families surfaced with a purchase path. */
 export type FixType = 'metadata' | 'schema' | 'redirect' | 'alt-text';
@@ -114,7 +115,7 @@ export const FIX_PRODUCT_WIRING: Record<FixType, FixProductWiring> = {
 // product are mapped; everything else (content, performance, technical, …) has
 // no entry → no price-tagged CTA (those route to "talk to us"/work-order flows).
 
-export const REC_TYPE_TO_FIX_TYPE: Partial<Record<string, FixType>> = {
+export const REC_TYPE_TO_FIX_TYPE: Partial<Record<RecType, FixType>> = {
   metadata: 'metadata',
   schema: 'schema',
   accessibility: 'alt-text', // alt-text fixes surface as accessibility recs
@@ -154,7 +155,9 @@ export function fixTypeForAuditCheck(check: string): FixType | undefined {
 }
 
 export function fixTypeForRecType(recType: string): FixType | undefined {
-  return REC_TYPE_TO_FIX_TYPE[recType];
+  // Indexed via a narrowed cast: the map only has keys in the RecType union, so a
+  // non-RecType string simply returns undefined.
+  return REC_TYPE_TO_FIX_TYPE[recType as RecType];
 }
 
 // ── Impact band (D-IMPACT) ──────────────────────────────────────

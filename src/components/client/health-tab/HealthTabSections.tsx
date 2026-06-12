@@ -324,6 +324,8 @@ interface TopFixesProps {
   >;
   /** Current client tier — controls Fix CTA vs hours framing */
   tier?: Tier;
+  /** External-billing workspaces: render request-fix framing, never prices/cart. */
+  hidePrices?: boolean;
   /** Impact bands keyed by audit check type */
   impactBandsByCheck?: Record<string, ImpactBand>;
   onRequestFix?: (check: string, label: string) => void;
@@ -335,6 +337,7 @@ export function HealthTopFixesSection({
   workspaceId,
   shell,
   tier = 'growth',
+  hidePrices,
   impactBandsByCheck,
   onRequestFix,
 }: TopFixesProps) {
@@ -431,6 +434,7 @@ export function HealthTopFixesSection({
                           displayName={`${item.page} — ${item.issue.check}`}
                           pageIds={[item.pageId]}
                           tier={tier}
+                          hidePrices={hidePrices}
                           onRequestFix={() => onRequestFix?.(item.issue.check, item.issue.check)}
                         />
                       </div>
@@ -656,6 +660,8 @@ interface AllPagesProps {
   workspaceId?: string;
   /** Current client tier — controls Fix CTA vs hours framing in by-fix-type view */
   tier?: Tier;
+  /** External-billing workspaces: render request-fix framing, never prices/cart. */
+  hidePrices?: boolean;
   /** Impact bands keyed by audit check type for the by-fix-type view */
   impactBandsByCheck?: Record<string, ImpactBand>;
   onRequestFix?: (check: string, label: string) => void;
@@ -667,6 +673,7 @@ export function HealthAllPagesSection({
   shell,
   workspaceId,
   tier = 'growth',
+  hidePrices,
   impactBandsByCheck,
   onRequestFix,
 }: AllPagesProps) {
@@ -810,6 +817,7 @@ export function HealthAllPagesSection({
             liveDomain={liveDomain}
             shell={shell}
             tier={tier}
+            hidePrices={hidePrices}
             impactBandsByCheck={impactBandsByCheck}
             onRequestFix={onRequestFix}
           />

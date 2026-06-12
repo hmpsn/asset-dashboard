@@ -32,7 +32,9 @@ const stmts = createStmtCache(() => ({
          VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @note, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM approval_batches WHERE workspace_id = ?`,
+    // ORDER BY parity with selectByWorkspacePaged — unpaged and paged reads must
+    // return rows in the same order (newest first) so callers see a stable order.
+    `SELECT * FROM approval_batches WHERE workspace_id = ? ORDER BY created_at DESC`,
   ),
   selectByWorkspacePaged: db.prepare(
     `SELECT * FROM approval_batches WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,

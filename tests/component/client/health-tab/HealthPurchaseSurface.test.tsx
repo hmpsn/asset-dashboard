@@ -29,6 +29,8 @@ let mockCartItems: Array<{
   displayName: string;
   priceUsd: number;
   quantity: number;
+  pageIds?: string[];
+  issueChecks?: string[];
   isFlat?: boolean;
 }> = [];
 let mockTotalItems = 0;
@@ -209,22 +211,97 @@ describe('FixableIssueRow', () => {
     expect(call.priceUsd).toBe(39);
   });
 
-  it('Growth tier: shows "In cart" state when item is in cart', () => {
+  it('Growth tier: shows "In cart" state when THIS row\'s page is in cart', () => {
     mockCartItems = [{
       productType: 'fix_meta',
       displayName: 'Metadata',
       priceUsd: 20,
       quantity: 1,
+      pageIds: ['pg-1'],
     }];
     renderWith(
       <FixableIssueRow
         check="title"
         displayName="Page Titles"
+        pageIds={['pg-1']}
         tier="growth"
       />,
     );
     expect(screen.getByTestId('fix-row-incart-title')).toBeTruthy();
     expect(screen.queryByTestId('fix-row-cta-title')).toBeNull();
+  });
+
+  it('Growth tier: same-family OTHER page is NOT "in cart" (per-page identity)', () => {
+    // Regression: adding page A used to mark page B as "in cart" by productType
+    // match alone, dropping page B from the eventual work order.
+    mockCartItems = [{
+      productType: 'fix_meta',
+      displayName: 'Metadata',
+      priceUsd: 20,
+      quantity: 1,
+      pageIds: ['pg-1'],
+    }];
+    renderWith(
+      <FixableIssueRow
+        check="title"
+        displayName="Page Titles"
+        pageIds={['pg-2']}
+        tier="growth"
+      />,
+    );
+    // pg-2 still purchasable, not falsely "in cart"
+    expect(screen.getByTestId('fix-row-cta-title')).toBeTruthy();
+    expect(screen.queryByTestId('fix-row-incart-title')).toBeNull();
+  });
+
+  it('Growth tier: passes issueChecks=[check] to addItem', () => {
+    renderWith(
+      <FixableIssueRow
+        check="title"
+        displayName="Page Titles"
+        pageIds={['pg-1']}
+        tier="growth"
+      />,
+    );
+    fireEvent.click(screen.getByTestId('fix-row-cta-title'));
+    const call = mockAddItem.mock.calls[0][0];
+    expect(call.issueChecks).toEqual(['title']);
+  });
+
+  it('External billing: renders no-price request-fix framing, no cart affordance', () => {
+    const onRequestFix = vi.fn();
+    renderWith(
+      <FixableIssueRow
+        check="title"
+        displayName="Page Titles"
+        pageIds={['pg-1']}
+        tier="growth"
+        hidePrices
+        onRequestFix={onRequestFix}
+      />,
+    );
+    const row = screen.getByTestId('fix-row-external-title');
+    expect(row.textContent).not.toMatch(/\$\d+/);
+    expect(row.textContent?.toLowerCase()).toContain('request fix');
+    // No purchase CTA mounted
+    expect(screen.queryByTestId('fix-row-cta-title')).toBeNull();
+    // Clicking routes to request-fix flow, never addItem
+    fireEvent.click(row.querySelector('button')!);
+    expect(onRequestFix).toHaveBeenCalledTimes(1);
+    expect(mockAddItem).not.toHaveBeenCalled();
+  });
+
+  it('External billing takes precedence even for img-alt (flat) checks', () => {
+    renderWith(
+      <FixableIssueRow
+        check="img-alt"
+        displayName="Alt Text"
+        tier="growth"
+        hidePrices
+      />,
+    );
+    expect(screen.getByTestId('fix-row-external-img-alt')).toBeTruthy();
+    expect(screen.queryByTestId('fix-row-cta-img-alt')).toBeNull();
   });
 
   it('Premium tier: renders hours framing — no price visible', () => {
@@ -404,6 +481,55 @@ describe('HealthCartSummary', () => {
     const bar = screen.getByTestId('health-cart-summary');
     expect(bar.textContent).toContain('$80');
     expect(bar.textContent).toContain('$160');
+  });
+
+  it('derives combined impact from cart items\' issueChecks + impactBandsByCheck', () => {
+    // Item 6 wiring: when bands are supplied keyed by check, the summary looks up
+    // each cart item's issueChecks and sums the per-check bands.
+    mockTotalItems = 2;
+    mockTotalPrice = 59;
+    mockCartItems = [
+      { productType: 'fix_meta', displayName: 'Metadata', priceUsd: 20, quantity: 1, issueChecks: ['title'] },
+      { productType: 'schema_page', displayName: 'Schema', priceUsd: 39, quantity: 1, issueChecks: ['structured-data'] },
+    ];
+    const impactBandsByCheck: Record<string, ImpactBand> = {
+      title: { band: 'medium', monthlyRangeUsd: [80, 160] },
+      'structured-data': { band: 'high', monthlyRangeUsd: [120, 240] },
+    };
+    renderWith(<HealthCartSummary impactBandsByCheck={impactBandsByCheck} />);
+    const bar = screen.getByTestId('health-cart-summary');
+    // 80+120 = 200 low, 160+240 = 400 high
+    expect(bar.textContent).toContain('$200');
+    expect(bar.textContent).toContain('$400');
+  });
+
+  it('dedupes a check shared by multiple cart items when summing bands', () => {
+    mockTotalItems = 2;
+    mockTotalPrice = 40;
+    mockCartItems = [
+      { productType: 'fix_meta', displayName: 'Metadata A', priceUsd: 20, quantity: 1, issueChecks: ['title'] },
+      { productType: 'fix_meta', displayName: 'Metadata B', priceUsd: 20, quantity: 1, issueChecks: ['title'] },
+    ];
+    const impactBandsByCheck: Record<string, ImpactBand> = {
+      title: { band: 'medium', monthlyRangeUsd: [80, 160] },
+    };
+    renderWith(<HealthCartSummary impactBandsByCheck={impactBandsByCheck} />);
+    const bar = screen.getByTestId('health-cart-summary');
+    // counted once: $80–$160, not doubled
+    expect(bar.textContent).toContain('$80');
+    expect(bar.textContent).toContain('$160');
+    expect(bar.textContent).not.toContain('$320');
+  });
+
+  it('no combined estimate when items have no matching impact bands', () => {
+    mockTotalItems = 1;
+    mockTotalPrice = 19;
+    mockCartItems = [
+      { productType: 'fix_redirect', displayName: 'Redirect', priceUsd: 19, quantity: 1, issueChecks: ['redirect-chains'] },
+    ];
+    renderWith(<HealthCartSummary impactBandsByCheck={{ title: { band: 'low', monthlyRangeUsd: [10, 20] } }} />);
+    const bar = screen.getByTestId('health-cart-summary');
+    expect(bar.textContent).not.toContain('est. +$');
   });
 
   it('shows singular "1 fix" for a single item', () => {

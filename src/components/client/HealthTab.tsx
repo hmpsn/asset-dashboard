@@ -73,6 +73,7 @@ export function HealthTab({
           workspaceId={workspaceId}
           shell={shell}
           tier={tier}
+          hidePrices={hidePrices}
           impactBandsByCheck={impactBandsByCheck}
           onRequestFix={onRequestFix}
         />
@@ -84,11 +85,12 @@ export function HealthTab({
           workspaceId={workspaceId}
           shell={shell}
           tier={tier}
+          hidePrices={hidePrices}
           impactBandsByCheck={impactBandsByCheck}
           onRequestFix={onRequestFix}
         />
         <HealthHistorySection auditDetail={auditDetail} shell={shell} />
-        {!hidePrices && <HealthCartSummary hidePrices={hidePrices} />}
+        {!hidePrices && <HealthCartSummary hidePrices={hidePrices} impactBandsByCheck={impactBandsByCheck} />}
       </div>
     );
   }

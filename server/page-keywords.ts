@@ -244,7 +244,9 @@ function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisF
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
-    'SELECT * FROM page_keywords WHERE workspace_id = ?',
+    // ORDER BY parity with listByWsPaged — unpaged and paged reads must return
+    // rows in the same order (page_path ASC) so callers see a stable order.
+    'SELECT * FROM page_keywords WHERE workspace_id = ? ORDER BY page_path ASC',
   ),
   listByWsPaged: db.prepare<[workspaceId: string, limit: number, offset: number]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ? ORDER BY page_path ASC LIMIT ? OFFSET ?',

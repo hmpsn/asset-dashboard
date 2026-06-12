@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **500 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **501 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 501. Health Tab Revenue Surface — "Fix this ($X)" Cart, Impact Estimates, Bundle Pricing
+
+**What it does:** Turns the client Health tab into a purchase surface. Fixable issue rows carry a price-tagged teal CTA ("Fix this — $20") wired to the cart, with conservative banded impact estimates ("Est. ~$80–$160/mo at stake", floor $25/mo, cap $2k/mo, ROI-style methodology popover) projected server-side from emvPerWeek without ever exposing the raw figure. A sticky in-tab cart summary shows totals, pack suggestions at the 10-page threshold, and the combined impact estimate. Bundle math is server-authoritative (packs + remainder; client-constructed cart splits are re-normalized so a cheaper-than-correct cart is impossible); carts persist out-of-band of Stripe metadata (migration 137) so large multi-page purchases don't hit Stripe's limits. Premium clients see "Covered by your implementation hours — request fix" with zero prices; externally-billed clients see neutral request framing. A live-Stripe price-drift check (`npm run verify:stripe-prices`) guards the catalog↔Stripe trust boundary. Six unbounded client list endpoints also gained additive pagination.
+
+**Agency value:** Every client health report is now a transaction surface using prices that already existed in MONETIZATION.md — the audit's highest revenue-per-effort unlock.
+
+**Client value:** Clear inline prices (never a surprise at checkout), honest impact ranges, pack savings surfaced automatically.
+
+**Mutual:** The monetization ladder made tangible: free data → priced fixes → Premium hours.
+
+**Files:** `shared/types/fix-catalog.ts`, `server/payments/fix-bundle-pricing.ts`, `server/stripe.ts`, `src/components/client/health-tab/*`, `src/components/client/useCart.tsx`, `server/pagination.ts`, migration 137.
 
 ---
 

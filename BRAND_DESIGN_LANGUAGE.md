@@ -781,3 +781,9 @@ When shipping UI changes that affect color or design patterns:
 - `kind: 'published'` items: existing solid post treatment
 - `kind: 'created'` items: muted fallback
 - "Planned" badge: `<Badge tone="teal">`; schedule-a-draft + suggest-dates controls: soft teal CTA (`bg-teal-500/10 text-accent-brand hover:bg-teal-500/20`)
+
+### Health Tab purchase surface (Client Revenue R1)
+- "Fix this — $X" CTA: teal Button (Law 1); "In cart" state chip: soft teal outline span (hatched one-off)
+- Impact lines: blue data text (Law 2) with conservative ranges + (i) methodology popover (ROI pattern)
+- Sticky cart summary: `--z-sticky`, teal accents for actions, fmtMoneyFull for all currency
+- Premium / external-billing variants render zero prices — hours-covered / included-in-service framing

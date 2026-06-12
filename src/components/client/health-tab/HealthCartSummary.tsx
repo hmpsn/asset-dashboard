@@ -27,8 +27,36 @@ interface HealthCartSummaryProps {
    * Combined impact bands for items currently in the cart.
    * When provided, the bar shows "est. +$X–$Y/mo combined".
    * Absent or empty → no combined estimate shown.
+   *
+   * Prefer passing `impactBandsByCheck` (the same map HealthTab already holds) —
+   * the summary then derives per-cart-item bands from each item's issueChecks.
+   * This direct prop remains for callers that pre-compute the band list.
    */
   cartImpactBands?: ImpactBand[];
+  /**
+   * Impact bands keyed by audit check type (the projection map from HealthTab).
+   * When provided, the summary maps the cart's `issueChecks` → bands and sums
+   * them into the combined "est. +$X–$Y/mo" estimate. Each check is counted once.
+   */
+  impactBandsByCheck?: Record<string, ImpactBand>;
+}
+
+/** Derive the deduped band list for the cart from each item's issueChecks. */
+function bandsFromCartChecks(
+  cartItems: ReturnType<typeof useCart>['items'],
+  impactBandsByCheck: Record<string, ImpactBand>,
+): ImpactBand[] {
+  const seen = new Set<string>();
+  const bands: ImpactBand[] = [];
+  for (const item of cartItems) {
+    for (const check of item.issueChecks ?? []) {
+      if (seen.has(check)) continue;
+      seen.add(check);
+      const band = impactBandsByCheck[check];
+      if (band) bands.push(band);
+    }
+  }
+  return bands;
 }
 
 /** Aggregate monthly range across multiple impact bands — sums lower and upper bounds */
@@ -79,13 +107,17 @@ function buildPackSuggestion(
   return null;
 }
 
-export function HealthCartSummary({ hidePrices, cartImpactBands }: HealthCartSummaryProps) {
+export function HealthCartSummary({ hidePrices, cartImpactBands, impactBandsByCheck }: HealthCartSummaryProps) {
   const cart = useCart();
   const { items, totalItems, totalPrice, openCart } = cart;
 
   if (totalItems === 0) return null;
 
-  const combinedRange = cartImpactBands ? sumImpactBands(cartImpactBands) : null;
+  // Prefer an explicit band list; otherwise derive from the cart's issueChecks
+  // against the projection map (item 6 — the data exists, wire it).
+  const effectiveBands = cartImpactBands
+    ?? (impactBandsByCheck ? bandsFromCartChecks(items, impactBandsByCheck) : null);
+  const combinedRange = effectiveBands ? sumImpactBands(effectiveBands) : null;
   const packSuggestion = buildPackSuggestion(items);
 
   const familyLabel: Record<BundleFamily, string> = {

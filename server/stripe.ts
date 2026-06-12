@@ -5,6 +5,7 @@ import {
   getPaymentBySession,
   listPaymentsBySession,
   getPaymentByPaymentIntent,
+  getCartItemsBySession,
   type PaymentRecord,
   type ProductType,
 } from './payments.js';
@@ -335,12 +336,16 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
     productTypes.push(item.productType);
   }
 
+  // Stripe checkout-session metadata values cap at 500 chars. The full normalized
+  // cart (with all merged pageIds) can blow past that for large carts, so we keep
+  // metadata to a COMPACT reference and persist the authoritative cart out-of-band
+  // on the payment records (cart_items column). The webhook reads the persisted
+  // cart for work-order fulfillment instead of metadata.
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
-    // Persist the NORMALIZED cart so post-checkout work-order fulfillment matches
-    // what was actually charged (not the client's pre-bundle split).
-    cartItems: JSON.stringify(normalizedItems),
-    productTypes: productTypes.join(','),
+    cartItemCount: String(normalizedItems.length),
+    // productTypes is a short comma list (capped) — keep it for at-a-glance debugging.
+    productTypes: productTypes.join(',').slice(0, 480),
   };
 
   const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
@@ -356,6 +361,8 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
 
   // Create a pending payment record per normalized line item. PRODUCT_MAP already
   // carries pack prices ($179/$299), so priceUsd × quantity is the authoritative amount.
+  // The full normalized cart is persisted on every record (cart_items) so fulfillment
+  // can read it regardless of which record the webhook reaches first.
   for (const item of normalizedItems) {
     const config = getProductConfig(item.productType)!;
     createPayment(params.workspaceId, {
@@ -366,6 +373,7 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
       currency: 'usd',
       status: 'pending',
       metadata: { ...metadata, productType: item.productType, quantity: String(item.quantity) },
+      cartItems: normalizedItems,
     });
   }
 
@@ -571,9 +579,16 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.info(`Work order created: workspace=${workspaceId} product=${productType} pages=${pageIds.length}`);
       }
 
-      // Handle cart checkouts (multiple line items)
-      if (session.metadata?.cartItems) {
-        const cartItems = parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' });
+      // Handle cart checkouts (multiple line items). The authoritative cart is
+      // persisted out-of-band (cart_items column) because Stripe metadata caps at
+      // 500 chars; read it from the payment record. Fall back to legacy in-metadata
+      // carts for any session created before §3 (kept for in-flight replays).
+      const persistedCart = getCartItemsBySession(workspaceId, session.id);
+      const legacyCart = session.metadata?.cartItems
+        ? parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' })
+        : null;
+      const cartItems = persistedCart ?? legacyCart;
+      if (cartItems) {
         const paymentQueues = paymentQueuesByProduct(paidPayments);
         for (const item of cartItems) {
           try {

@@ -1,6 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
+import { cartItemSchema } from './schemas/payment-schemas.js';
+import type { NormalizedCartItem } from './payments/fix-bundle-pricing.js';
 
 // --- Types ---
 
@@ -20,6 +22,9 @@ interface PaymentRow {
   status: string;
   content_request_id: string | null;
   metadata: string | null;
+  /** JSON: the SERVER-AUTHORITATIVE normalized cart for cart-checkout sessions.
+   *  Persisted out-of-band because Stripe metadata values cap at 500 chars. */
+  cart_items: string | null;
   created_at: string;
   paid_at: string | null;
 }
@@ -47,9 +52,9 @@ function rowToRecord(row: PaymentRow): PaymentRecord {
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
         INSERT INTO payments (id, workspace_id, stripe_session_id, stripe_payment_intent_id,
-          product_type, amount, currency, status, content_request_id, metadata, created_at, paid_at)
+          product_type, amount, currency, status, content_request_id, metadata, cart_items, created_at, paid_at)
         VALUES (@id, @workspace_id, @stripe_session_id, @stripe_payment_intent_id,
-          @product_type, @amount, @currency, @status, @content_request_id, @metadata, @created_at, @paid_at)
+          @product_type, @amount, @currency, @status, @content_request_id, @metadata, @cart_items, @created_at, @paid_at)
       `),
   selectById: db.prepare(
     'SELECT * FROM payments WHERE id = ? AND workspace_id = ?',
@@ -65,6 +70,11 @@ const stmts = createStmtCache(() => ({
   ),
   selectByPaymentIntent: db.prepare(
     'SELECT * FROM payments WHERE workspace_id = ? AND stripe_payment_intent_id = ?',
+  ),
+  // First non-null persisted cart for a session (all records of a cart-checkout
+  // session share the same normalized cart blob).
+  selectCartBySession: db.prepare(
+    'SELECT cart_items FROM payments WHERE workspace_id = ? AND stripe_session_id = ? AND cart_items IS NOT NULL ORDER BY created_at ASC LIMIT 1',
   ),
   selectByWorkspace: db.prepare(
     'SELECT * FROM payments WHERE workspace_id = ? ORDER BY created_at DESC',
@@ -97,10 +107,15 @@ const stmts = createStmtCache(() => ({
 
 export function createPayment(
   _workspaceId: string,
-  data: Omit<PaymentRecord, 'id' | 'createdAt'>
+  data: Omit<PaymentRecord, 'id' | 'createdAt'> & {
+    /** SERVER-AUTHORITATIVE normalized cart, persisted out-of-band (cart_items column).
+     *  Stripe metadata caps at 500 chars, so large carts cannot ride in metadata. */
+    cartItems?: NormalizedCartItem[];
+  }
 ): PaymentRecord {
+  const { cartItems, ...recordData } = data;
   const record: PaymentRecord = {
-    ...data,
+    ...recordData,
     id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     createdAt: new Date().toISOString(),
   };
@@ -116,11 +131,31 @@ export function createPayment(
     status: record.status,
     content_request_id: record.contentRequestId ?? null,
     metadata: record.metadata ? JSON.stringify(record.metadata) : null,
+    cart_items: cartItems?.length ? JSON.stringify(cartItems) : null,
     created_at: record.createdAt,
     paid_at: record.paidAt ?? null,
   });
 
   return record;
+}
+
+/**
+ * Read the persisted normalized cart for a cart-checkout session. Returns null
+ * when no cart was persisted (single-product checkouts, or pre-§3 records).
+ * Parsed item-by-item so one malformed entry can't drop the whole cart.
+ */
+export function getCartItemsBySession(
+  workspaceId: string,
+  stripeSessionId: string
+): NormalizedCartItem[] | null {
+  const row = stmts().selectCartBySession.get(workspaceId, stripeSessionId) as { cart_items: string | null } | undefined;
+  if (!row?.cart_items) return null;
+  const items = parseJsonSafeArray(row.cart_items, cartItemSchema, {
+    workspaceId,
+    field: 'cart_items',
+    table: 'payments',
+  });
+  return items as NormalizedCartItem[];
 }
 
 export function updatePayment(

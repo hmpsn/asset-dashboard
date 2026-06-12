@@ -30,7 +30,10 @@ interface FixableIssueRowProps {
   pageIds?: string[];
   /** Current client tier — Premium shows hours framing, others show price */
   tier: Tier;
-  /** Called when Premium user clicks "request fix" (routes to work-order flow) */
+  /** External-billing workspaces: never render prices or cart affordances —
+   *  show neutral "Included in your service — request fix" framing instead. */
+  hidePrices?: boolean;
+  /** Called when Premium / external-billing user clicks "request fix" (routes to work-order flow) */
   onRequestFix?: () => void;
   className?: string;
 }
@@ -40,6 +43,7 @@ export function FixableIssueRow({
   displayName,
   pageIds,
   tier,
+  hidePrices,
   onRequestFix,
   className = '',
 }: FixableIssueRowProps) {
@@ -52,6 +56,29 @@ export function FixableIssueRow({
   // alt-text is always a flat full-site charge; everything else is per-page
   const isFlat = catalogEntry.bundleFamily === 'alt-text';
   const isPremium = tier === 'premium';
+
+  // External billing has no Stripe path — the cart/checkout summary is hidden,
+  // so showing a price + "add to cart" here would strand the client with a cart
+  // they can never check out. Render a neutral request-fix CTA instead. This is
+  // checked BEFORE tier so a Growth/external client never sees a price.
+  if (hidePrices) {
+    return (
+      <div
+        data-testid={`fix-row-external-${check}`}
+        className={`flex items-center gap-2 ${className}`}
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={Wrench}
+          onClick={onRequestFix}
+          aria-label={`Request fix for ${displayName}`}
+        >
+          Included in your service — request fix
+        </Button>
+      </div>
+    );
+  }
 
   if (isPremium) {
     return (
@@ -107,7 +134,16 @@ function FixCTAButton({
 }: FixCTAButtonProps) {
   const { items, addItem } = useCart();
 
-  const isInCart = items.some((i) => i.productType === productType);
+  const existing = items.find((i) => i.productType === productType);
+  // For per-page rows, "in cart" means THIS row's specific pages are already
+  // staged — productType match alone would wrongly mark every page of a family
+  // as in-cart after the first add (and block adding the rest). Flat items have
+  // no per-page identity, so productType presence is the correct signal.
+  const isInCart = isFlat
+    ? !!existing
+    : !!existing &&
+      (pageIds?.length ?? 0) > 0 &&
+      pageIds!.every((id) => existing.pageIds?.includes(id));
 
   if (isInCart) {
     return (
@@ -135,6 +171,8 @@ function FixCTAButton({
           priceUsd,
           isFlat,
           pageIds,
+          // Carry the audit check so the eventual work order knows what to fix.
+          issueChecks: [check],
           quantity: 1,
         })
       }

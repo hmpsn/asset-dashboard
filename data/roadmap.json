@@ -131,9 +131,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
           "est": "3-5d",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Wire existing Stripe fix products + useCart into HealthTab issue rows with inline prices. The audit's highest-confidence revenue unlock: products, cart, and checkout already exist — only the surface is missing."
+          "notes": "Done in feat/client-revenue-r1. FIX_CATALOG (MONETIZATION prices) + useCart wiring with per-page pageId merge semantics (review-critical fix: same-productType rows no longer block/drop pages); issueChecks end-to-end; cart persisted out-of-band of Stripe metadata (migration 137); external-billing + Premium render zero prices."
         },
         {
           "id": "cda-sc3-impact-estimates",
@@ -141,9 +141,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
           "est": "2-3d",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Recommendation engine already computes opportunity.emvPerWeek internally. Surface as estimated impact on fix cards (Growth+), giving clients a why-prioritize signal and the cart CTA a justification."
+          "notes": "Done. impactBand projection at the public boundary (floor $25/mo, cap $2k/mo, conservative 0.7x nice-step ranges, band labels); emvPerWeek leak test green + banding contract test; HealthImpactLine + combined cart estimate; buildImpactBandsByCheck adapter (highest-band merge)."
         },
         {
           "id": "cda-sc3-bundle-pricing",
@@ -151,9 +151,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
           "est": "1-2d",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Designed in MONETIZATION.md, never built. Suggest pack savings when cart crosses thresholds."
+          "notes": "Done. Server-authoritative packs+remainder math (re-normalizes client splits), pack suggestions in rows/cart at threshold, SeoCart upsell fixed to only show positive savings (pre-existing negative-savings bug fixed per review); verify:stripe-prices drift guard added."
         },
         {
           "id": "cda-sc3-pagination-enabler",
