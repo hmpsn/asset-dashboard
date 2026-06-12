@@ -389,8 +389,8 @@
           "source": "Core-features remediation F1 review (2026-06-10) — migration 129 created the workspace-scoped generation_quality table; getLatestGenerationQuality is not yet surfaced in server/intelligence/, so AdminChat/AI context are blind to generation health",
           "est": "small",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Deliberate deferral recorded at migration 129 header. Wire when touching the seoContext or operational slice, or when building the generation-health admin panel."
+          "status": "done",
+          "notes": "Completed 2026-06-12: added a read-only `generationQuality` intelligence slice backed by `getLatestGenerationQuality(workspaceId)`. The slice exposes typed latest-row data and degrades to `{ latest: null }`; no UI, route, job, write path, or prompt-formatting surface was added."
         }
       ]
     },
