@@ -68,26 +68,28 @@ afterAll(async () => {
   await ctx.stopServer();
 });
 
-describe('GET /api/content-briefs/:workspaceId/suggested — store seeding', () => {
+describe('GET /api/content-briefs/:workspaceId/suggested — backward-compat shape', () => {
   it('returns signals array response (backward-compat shape)', async () => {
+    // W6.2: seeding moved to GET /api/suggested-briefs/:workspaceId. This legacy
+    // endpoint still returns signals but no longer seeds the store.
     const res = await api(`/api/content-briefs/${testWsId}/suggested`);
     expect(res.status).toBe(200);
     const body = await res.json() as { signals: unknown[] };
     expect(body).toHaveProperty('signals');
     expect(Array.isArray(body.signals)).toBe(true);
   });
+});
 
-  it('calling /suggested with a ranking_opportunity insight seeds the store', async () => {
+describe('GET /api/suggested-briefs/:workspaceId — store seeding', () => {
+  it('calling /api/suggested-briefs with a ranking_opportunity insight seeds the store', async () => {
     const insightId = seedInsight({ insight_type: 'ranking_opportunity', impact_score: 80 });
     try {
-      // Trigger seeding
-      const seedRes = await api(`/api/content-briefs/${testWsId}/suggested`);
+      // Trigger seeding via the canonical seeding route (moved from /content-briefs/:id/suggested in W6.2)
+      const seedRes = await api(`/api/suggested-briefs/${testWsId}`);
       expect(seedRes.status).toBe(200);
 
       // Store should now have a pending brief for this workspace
-      const listRes = await api(`/api/suggested-briefs/${testWsId}`);
-      expect(listRes.status).toBe(200);
-      const briefs = await listRes.json() as Array<{ keyword: string; source: string; status: string }>;
+      const briefs = await seedRes.json() as Array<{ keyword: string; source: string; status: string }>;
       const seeded = briefs.find(b => b.source === 'ranking_opportunity');
       expect(seeded).toBeDefined();
       expect(seeded?.status).toBe('pending');
@@ -97,20 +99,24 @@ describe('GET /api/content-briefs/:workspaceId/suggested — store seeding', () 
     }
   });
 
-  it('repeated /suggested calls do not create duplicate store entries (SHA dedup)', async () => {
-    const insightId = seedInsight({ insight_type: 'ranking_opportunity', impact_score: 80 });
+  it('repeated /api/suggested-briefs calls do not create duplicate store entries (SHA dedup + TTL guard)', async () => {
+    // Use a fresh workspace so the in-process TTL cache has no prior entry for it.
+    const dedupWs = createWorkspace('Dedup Test Workspace');
+    const dedupWsId = dedupWs.id;
+    const insightId = seedInsight({ insight_type: 'ranking_opportunity', impact_score: 80, workspace_id: dedupWsId });
     try {
-      await api(`/api/content-briefs/${testWsId}/suggested`);
-      await api(`/api/content-briefs/${testWsId}/suggested`);
-
-      const listRes = await api(`/api/suggested-briefs/${testWsId}`);
+      // First call: TTL not primed — seeds the store (1 entry).
+      await api(`/api/suggested-briefs/${dedupWsId}`);
+      // Second call: TTL blocks re-seeding — store remains at 1 entry.
+      const listRes = await api(`/api/suggested-briefs/${dedupWsId}`);
       const briefs = await listRes.json() as Array<{ source: string }>;
       const rankingBriefs = briefs.filter(b => b.source === 'ranking_opportunity');
-      // Only one entry despite two seeding calls (dedup by keyword hash)
+      // At most one entry despite two calls (TTL-guard + DB-level SHA dedup)
       expect(rankingBriefs.length).toBe(1);
     } finally {
       db.prepare('DELETE FROM analytics_insights WHERE id = ?').run(insightId);
-      db.prepare('DELETE FROM suggested_briefs WHERE workspace_id = ? AND source = ?').run(testWsId, 'ranking_opportunity');
+      db.prepare('DELETE FROM suggested_briefs WHERE workspace_id = ?').run(dedupWsId);
+      deleteWorkspace(dedupWsId);
     }
   });
 });
