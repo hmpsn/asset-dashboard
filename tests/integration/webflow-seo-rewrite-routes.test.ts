@@ -4,14 +4,13 @@
  * Tests focus on input validation — missing/invalid input → 400 or 500.
  * External API calls (OpenAI, Webflow) are never triggered by these paths.
  *
- * Port: 13545 (range 13545–13559 exclusively assigned to wave-23-a1).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13545, { env: { OPENAI_API_KEY: '' } }); // port-ok: assigned range 13545-13559
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { postJson } = ctx;
 
 let workspaceId = '';

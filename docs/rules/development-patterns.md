@@ -457,15 +457,18 @@ router.patch('/api/approvals/:workspaceId/:batchId/status',
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers';
+import { createEphemeralTestContext } from './helpers';
 
-// IMPORTANT: Use a unique port — check with: grep -r 'createTestContext(' tests/
-// Current range: 13201–13353. Next available: 13354.
-const ctx = createTestContext(13354);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 describe('my-feature', () => {
-  beforeAll(() => ctx.startServer());
-  afterAll(() => ctx.stopServer());
+  beforeAll(async () => {
+    await ctx.startServer();
+  });
+
+  afterAll(async () => {
+    await ctx.stopServer();
+  });
 
   it('should create a feature', async () => {
     const res = await ctx.authPostJson('/api/my-feature/ws_test', { name: 'Test' });

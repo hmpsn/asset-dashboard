@@ -1,6 +1,5 @@
 /**
  * Integration tests for content decay detection and refresh lifecycle.
- * port-ok: unique in integration suite (13867)
  *
  * Architecture: in-process server (vi.mock works for broadcast capture).
  *

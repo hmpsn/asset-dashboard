@@ -7,14 +7,14 @@
  * - Success: job + report created, response has jobId + reportId
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAnomalyDigestInsight, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
 import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
 import { signToken } from '../../server/auth.js';
 
-const ctx = createTestContext(13261);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, setAuthToken, authApi } = ctx;
 
 const TEST_EMAIL = 'diag_owner@test.local';

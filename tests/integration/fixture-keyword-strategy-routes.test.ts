@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedStrategyData, type SeededStrategy } from '../fixtures/strategy-seed.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 
-const ctx = createTestContext(13710); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let seededStrategy: SeededStrategy | null = null;
 let emptyControl: SeededFullWorkspace | null = null;

@@ -7,10 +7,10 @@
  *   - GET /api/schema-impact/:workspaceId — 404, no GSC → 400
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13403);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsId = '';

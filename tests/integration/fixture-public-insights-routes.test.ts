@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import db from '../../server/db/index.js';
 import { seedIntelligenceTestData, type SeededWorkspace } from '../fixtures/intelligence-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13716, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let openSeed: SeededWorkspace | null = null;

@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedTwoWorkspaces } from '../fixtures/workspace-seed.js';
 import { cleanSeedData } from '../global-setup.js';
 import db from '../../server/db/index.js';
@@ -32,7 +32,7 @@ import { createMatrix } from '../../server/content-matrices.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeywordsBatch } from '../../server/page-keywords.js';
 
-const ctx = createTestContext(13305);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 // ─── Test workspace state ────────────────────────────────────────────────────

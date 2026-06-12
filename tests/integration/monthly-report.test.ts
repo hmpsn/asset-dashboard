@@ -15,7 +15,7 @@
  * environment, so isEmailConfigured() returns false and sendEmail is never called.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import {
@@ -25,7 +25,7 @@ import {
 import { renderMonthlyReport } from '../../server/email-templates.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13260, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Fixture workspaces ──

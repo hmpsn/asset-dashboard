@@ -34,8 +34,7 @@
  * red; the correct table read keeps the metrics.
  *
  * Port: none. This is a unit-style integration test — the generation pipeline is
- * mocked and no HTTP server is booted, so no `createTestContext()` / 13xxx port is
- * allocated (same shape as the P2 generation test). 13893 is reserved for this file
+ * mocked and no HTTP server is booted, so no `createEphemeralTestContext()` / 13xxx port is
  * should an HTTP read path ever be added.
  */
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

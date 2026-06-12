@@ -20,18 +20,16 @@
  * - workspace isolation: ws_a values don't bleed into ws_b
  * - pending_count counts each action once regardless of outcome fan-out
  *
- * Port: 13906 (range 13906–13909)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { recordAction, recordOutcome } from '../../server/outcome-tracking.js';
 
 process.env.FEATURE_OUTCOME_TRACKING = 'true';
 
-// port-ok: 13906 next free after 13905 (see tests/meta-port-uniqueness.test.ts)
-const ctx = createTestContext(13906);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsA = '';

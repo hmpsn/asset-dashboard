@@ -6,14 +6,13 @@
  * - Second audit with different issue data UPDATES the insight (not skips)
  * - A resolved insight keeps its resolution status after re-audit
  *
- * Port: 13314
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights, resolveInsight } from '../../server/analytics-insights-store.js';
 
-const ctx = createTestContext(13314);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let wsId = '';
 

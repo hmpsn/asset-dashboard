@@ -775,3 +775,9 @@ When shipping UI changes that affect color or design patterns:
 - **Blue** remains the data/observability hue for the module icon and quota-detail chips (`bg-blue-500/10 text-blue-400`).
 - Integration state badges follow semantic status mapping: **emerald** (`configured/healthy`), **amber** (`degraded`), **red** (`missing/error`).
 - No purple usage; the surface is admin operational telemetry, not admin AI interaction.
+
+### ContentCalendar (W6.6 planning semantics)
+- `kind: 'planned'` items: `bg-teal-500/15 text-accent-brand border border-teal-500/30 border-dashed` — teal = scheduling intent (actionable), dashed = intent-not-outcome
+- `kind: 'published'` items: existing solid post treatment
+- `kind: 'created'` items: muted fallback
+- "Planned" badge: `<Badge tone="teal">`; schedule-a-draft + suggest-dates controls: soft teal CTA (`bg-teal-500/10 text-accent-brand hover:bg-teal-500/20`)

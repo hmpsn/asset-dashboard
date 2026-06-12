@@ -15,7 +15,6 @@
  * (seo-apply-resolves-recommendations.test.ts): the spawned-server helper cannot apply `vi.mock`
  * for the Webflow boundary, and this test must (a) mock Webflow, (b) drive the mirror, and
  * (c) read `getDeliverable` directly. Uses an ephemeral port (listen(0)),
- * so no fixed-port allocation is needed (the 13201–13899 range is for the spawned-server helper).
  */
 import http from 'http';
 import { AddressInfo } from 'net';

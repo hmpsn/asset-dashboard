@@ -3,13 +3,12 @@
  * Covers GET list endpoint, GET single endpoint, and validation.
  * Avoids AI generation routes.
  *
- * Port: 13690 (assigned range 13688–13695 for wave-24-a12)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13690); // port-ok: assigned range 13688-13695
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsId = '';

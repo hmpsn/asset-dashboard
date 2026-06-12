@@ -104,9 +104,9 @@ W1 ∥ W2 is allowed EXCEPT lanes touching the same files (1.1/2.1 both touch st
 
 ## Owner decisions needed (blocking only the lanes named)
 
-- **D1 — Fold `seo-briefs` into `content-pipeline?tab=briefs`?** (audit recommends yes; route-removal checklist applies). Blocks nothing until Wave 4-adjacent.
-- **D2 — Suggested-briefs subsystem:** build the missing UI or delete the subsystem? Blocks 6.4.
-- **D3 — Calendar intelligence:** wire it or delete dead code? Blocks 6.4.
+- **D1 — DECIDED 2026-06-12: yes, fold + fix the Briefs IA inversion.** Legacy seo-briefs/content routes redirect to content-pipeline tabs; Briefs header/generator restored above the fold.
+- **D2 — DECIDED 2026-06-12: wire it.** AiSuggested panel swaps to the suggested-briefs store as its data source, gaining dismiss/snooze + SHA dedup; the ephemeral source retires.
+- **D3 — DECIDED 2026-06-12: wire it (owner chose build over delete).** Forward-planning calendar v1: planned publish dates, future view, clickable items, suggest-dates via suggestPublishDates.
 - **D4 — DECIDED 2026-06-11:** `local_visibility_snapshots`: keep 180 days raw + always retain the latest row per (market, keyword) regardless of age + thin older history to weekly granularity up to 18 months (preserves W5.3 trend charts). `schema_snapshots`: keep rows referenced by version history; prune unreferenced generation-progress rows after 30 days.
 
 ## Deferred ideas (NOT migrated to roadmap — promote deliberately)

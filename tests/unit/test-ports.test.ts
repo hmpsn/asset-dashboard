@@ -33,11 +33,11 @@ describe('reserveIntegrationTestPort', () => {
     const testFileUrl = 'file:///tmp/example-e.test.ts';
     const ctx = createEphemeralTestContext(testFileUrl);
 
-    expect(isIntegrationTestPortReserved(testFileUrl)).toBe(true);
+    expect(isIntegrationTestPortReserved('/tmp/example-e.test.ts#default')).toBe(true);
 
     await ctx.stopServer();
 
-    expect(isIntegrationTestPortReserved(testFileUrl)).toBe(false);
+    expect(isIntegrationTestPortReserved('/tmp/example-e.test.ts#default')).toBe(false);
   });
 
   it('requires import.meta.url style file URLs for ephemeral contexts', () => {
@@ -46,14 +46,30 @@ describe('reserveIntegrationTestPort', () => {
     );
   });
 
-  it('allows only one ephemeral context per test file id', async () => {
+  it('allows only one ephemeral context per test file id and context name', async () => {
     const testFileUrl = 'file:///tmp/example-g.test.ts';
     const ctx = createEphemeralTestContext(testFileUrl);
 
     expect(() => createEphemeralTestContext(testFileUrl)).toThrow(
-      'Only one createEphemeralTestContext(import.meta.url) is allowed per test file',
+      'Only one createEphemeralTestContext(import.meta.url) context named "default" is allowed per test file',
     );
 
     await ctx.stopServer();
+  });
+
+  it('allows multiple named ephemeral contexts for the same test file id', async () => {
+    const testFileUrl = 'file:///tmp/example-h.test.ts';
+    const main = createEphemeralTestContext(testFileUrl, { contextName: 'main' });
+    const authGated = createEphemeralTestContext(testFileUrl, { contextName: 'auth-gated' });
+
+    expect(main.PORT).not.toBe(authGated.PORT);
+    expect(isIntegrationTestPortReserved('/tmp/example-h.test.ts#main')).toBe(true);
+    expect(isIntegrationTestPortReserved('/tmp/example-h.test.ts#auth-gated')).toBe(true);
+
+    await main.stopServer();
+    await authGated.stopServer();
+
+    expect(isIntegrationTestPortReserved('/tmp/example-h.test.ts#main')).toBe(false);
+    expect(isIntegrationTestPortReserved('/tmp/example-h.test.ts#auth-gated')).toBe(false);
   });
 });

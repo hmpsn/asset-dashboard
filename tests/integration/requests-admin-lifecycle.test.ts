@@ -5,7 +5,6 @@
  * delete, and bulk update — verifying response shape, DB state,
  * activity log entries, and broadcast stubs at each step.
  *
- * The existing requests-routes.test.ts (port 13346) focuses on
  * validation failures. This file focuses on the happy-path lifecycle.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,12 +31,12 @@ vi.mock('../../server/email.js', async importOriginal => {
   };
 });
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 
-const ctx = createTestContext(13852); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson, patchJson, del, api } = ctx;
 
 let workspaceId = '';

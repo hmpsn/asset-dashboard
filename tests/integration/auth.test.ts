@@ -12,9 +12,9 @@
  * - /api/auth/logout (legacy)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13201);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, clearCookies, setAuthToken } = ctx;
 
 beforeAll(async () => {

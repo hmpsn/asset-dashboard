@@ -4,16 +4,14 @@
  * Tests all GET routes from server/routes/outcomes.ts using a fresh workspace
  * (no recorded actions) to verify shape, defaults, and 404 guard behavior.
  *
- * Complements outcome-pipeline.test.ts (port 13250) which tests POST/mutation
  * flows and interactions with recorded data.
  *
- * Port: 13632 (range: 13632–13639)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13632);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsId = '';

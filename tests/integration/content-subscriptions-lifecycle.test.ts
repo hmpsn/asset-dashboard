@@ -5,7 +5,7 @@
  * delivered endpoint, public endpoint, and broadcast payload verification
  * after each mutation.
  *
- * Port: 13857
+ * Uses an ephemeral in-process server port.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -42,8 +42,9 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>(resolve => server!.listen(13857, '127.0.0.1', resolve));
-  baseUrl = 'http://127.0.0.1:13857';
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${port}`;
 }
 
 async function stopTestServer(): Promise<void> {

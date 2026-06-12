@@ -21,8 +21,6 @@ import {
   getBrief,
   updateBrief,
   deleteBrief,
-  regenerateBrief,
-  regenerateOutline,
 } from '../content-brief.js';
 import { createContentRequest, getOpenRequestForBrief, updateContentRequest } from '../content-requests.js';
 import db from '../db/index.js';
@@ -42,6 +40,7 @@ import { BRIEF_PAGE_TYPES, CONTENT_GENERATION_STYLES } from '../../shared/types/
 import { normalizeBriefKeyword, resolveBriefTemplateCrossref } from '../content-brief-template-crossref.js';
 import { hasActiveJob } from '../jobs.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const router = Router();
@@ -100,9 +99,15 @@ router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspace
 });
 
 // AI Suggested Briefs — must be registered BEFORE /:briefId to avoid param shadowing
+//
+// Read-only: returns the raw pipeline signals derived from current insights.
+// Seeding ranking_opportunity signals into the store was moved to
+// GET /api/suggested-briefs/:workspaceId (the route the AiSuggested panel actually polls)
+// so seeding fires on the real read path rather than an orphaned endpoint.
 router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const insights = getInsights(req.params.workspaceId);
+    const { workspaceId } = req.params;
+    const insights = getInsights(workspaceId);
     const signals = buildPipelineSignals(insights);
     res.json({ signals });
   } catch (err) {
@@ -181,52 +186,43 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
   }
 });
 
-// Regenerate a brief with user feedback
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const { feedback } = req.body;
-    if (!feedback) return res.status(400).json({ error: 'feedback required' });
-    const existing = getBrief(req.params.workspaceId, req.params.briefId);
-    if (!existing) return res.status(404).json({ error: 'Brief not found' });
-    const newBrief = await regenerateBrief(req.params.workspaceId, existing, feedback);
-    addActivity(
-      req.params.workspaceId,
-      'brief_generated',
-      `Regenerated content brief for "${existing.targetKeyword}"`,
-      `New brief: ${newBrief.suggestedTitle}`,
-      { briefId: newBrief.id, previousBriefId: existing.id, action: 'brief_regenerated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, {
-      briefId: newBrief.id,
-      previousBriefId: existing.id,
-      action: 'brief_regenerated',
-    });
-    log.info(`REGENERATED brief ${req.params.briefId} -> ${newBrief.id} for "${existing.targetKeyword}"`);
-    res.json(newBrief);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate brief' });
-  }
+// Regenerate a brief with user feedback (async — returns 202 { jobId })
+//
+// W6.2: heavyweight AI regeneration (gpt-5.4, 7000 tokens, research mode) moved onto
+// the background job platform. The job persists the new brief to the content_briefs
+// store and broadcasts BRIEF_UPDATED on completion (declared cross-lane contract:
+// ContentBriefs.tsx is re-wired by a sibling lane). Failures surface via the job
+// error state, not the HTTP response.
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { feedback } = req.body;
+  if (!feedback) return res.status(400).json({ error: 'feedback required' });
+  const existing = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!existing) return res.status(404).json({ error: 'Brief not found' });
+  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
+  const started = startContentBriefRegenerateJob({
+    mode: 'regenerate',
+    workspaceId: req.params.workspaceId,
+    briefId: req.params.briefId,
+    feedback,
+  });
+  res.status(202).json(started);
 });
 
-// Regenerate outline only (preserves all other brief fields)
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const { feedback } = req.body || {};
-    const result = await regenerateOutline(req.params.workspaceId, req.params.briefId, feedback);
-    if (!result) return res.status(404).json({ error: 'Brief not found' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Regenerated outline for "${result.suggestedTitle || result.targetKeyword}"`,
-      undefined,
-      { briefId: result.id, action: 'brief_outline_regenerated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, { briefId: result.id, action: 'brief_outline_regenerated' });
-    log.info(`REGENERATED OUTLINE for brief ${req.params.briefId} in workspace ${req.params.workspaceId}`);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate outline' });
-  }
+// Regenerate outline only (preserves all other brief fields) — async, returns 202 { jobId }
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { feedback } = req.body || {};
+  const existing = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!existing) return res.status(404).json({ error: 'Brief not found' });
+  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
+  const started = startContentBriefRegenerateJob({
+    mode: 'outline',
+    workspaceId: req.params.workspaceId,
+    briefId: req.params.briefId,
+    feedback: typeof feedback === 'string' ? feedback : undefined,
+  });
+  res.status(202).json(started);
 });
 
 // Export a brief as branded HTML

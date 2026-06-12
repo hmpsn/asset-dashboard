@@ -17,6 +17,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getWorkspace } from './workspaces.js';
+import { validateTransition, SCHEMA_PLAN_TRANSITIONS } from './state-machines.js';
 
 const log = createLogger('schema-store');
 
@@ -42,6 +43,14 @@ const snapshotStmts = createStmtCache(() => ({
   ),
   deleteBySite: db.prepare<[siteId: string]>(
     'DELETE FROM schema_snapshots WHERE site_id = ?',
+  ),
+  // Prune extra rows for a site, keeping only the newest one (by created_at).
+  // Two positional params: both are siteId (outer WHERE + inner subquery WHERE).
+  pruneExtraForSite: db.prepare<[siteId: string, siteId2: string]>(
+    `DELETE FROM schema_snapshots
+     WHERE site_id = ? AND id NOT IN (
+       SELECT id FROM schema_snapshots WHERE site_id = ? ORDER BY created_at DESC LIMIT 1
+     )`,
   ),
 }));
 
@@ -69,24 +78,41 @@ function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
 }
 
 export function saveSchemaSnapshot(siteId: string, workspaceId: string, results: SchemaPageSuggestion[]): SchemaSnapshot {
-  const snapshot: SchemaSnapshot = {
-    id: `schema-${siteId}-${Date.now()}`,
-    siteId,
-    workspaceId,
-    createdAt: new Date().toISOString(),
-    results,
-    pageCount: results.length,
-  };
+  // Reuse the existing row's id + created_at so every full-job save updates the same
+  // row (INSERT OR REPLACE with the same primary key). Without this, each save minted
+  // a new timestamp-suffixed id and created an orphaned row that was never cleaned up.
+  const existing = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
+  const id = existing?.id ?? `schema-${siteId}-${Date.now()}`;
+  const createdAt = existing?.created_at ?? new Date().toISOString();
+
   snapshotStmts().upsert.run({
-    id: snapshot.id,
+    id,
     site_id: siteId,
     workspace_id: workspaceId,
-    created_at: snapshot.createdAt,
+    created_at: createdAt,
     results: JSON.stringify(results),
     page_count: results.length,
   });
   log.info(`Saved ${results.length} page schemas for site ${siteId}`);
-  return snapshot;
+  return { id, siteId, workspaceId, createdAt, results, pageCount: results.length };
+}
+
+/**
+ * Prune extra schema_snapshots rows for a site.
+ *
+ * Each site should have at most ONE snapshot row (the current working set).
+ * Before the saveSchemaSnapshot single-row fix (W6.3), the generation job minted
+ * a new id each call, leaving orphaned rows behind. This function removes all but
+ * the newest row for a given site. Idempotent and safe to call at any time.
+ *
+ * Called at the end of each bulk schema generation job to clean up any legacy rows.
+ */
+export function pruneSchemaSnapshotOrphans(siteId: string): number {
+  const result = snapshotStmts().pruneExtraForSite.run(siteId, siteId);
+  if (result.changes > 0) {
+    log.info(`Pruned ${result.changes} orphaned schema_snapshots row(s) for site ${siteId}`);
+  }
+  return result.changes;
 }
 
 export function getSchemaSnapshot(siteId: string): SchemaSnapshot | null {
@@ -104,31 +130,33 @@ export function updatePageSchemaInSnapshot(
   pageId: string,
   updatedSchema: Record<string, unknown>,
 ): boolean {
-  const snapshot = getSchemaSnapshot(siteId);
-  if (!snapshot) return false;
+  return db.transaction(() => {
+    const snapshot = getSchemaSnapshot(siteId);
+    if (!snapshot) return false;
 
-  const pageIdx = snapshot.results.findIndex(r => r.pageId === pageId);
-  if (pageIdx < 0) return false;
+    const pageIdx = snapshot.results.findIndex(r => r.pageId === pageId);
+    if (pageIdx < 0) return false;
 
-  // Update the first suggested schema's template
-  if (snapshot.results[pageIdx].suggestedSchemas?.[0]) {
-    snapshot.results[pageIdx].suggestedSchemas[0].template = updatedSchema;
-  }
+    // Update the first suggested schema's template
+    if (snapshot.results[pageIdx].suggestedSchemas?.[0]) {
+      snapshot.results[pageIdx].suggestedSchemas[0].template = updatedSchema;
+    }
 
-  // Re-save the full snapshot with updated results
-  const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
-  if (!row) return false;
+    // Re-save the full snapshot with updated results
+    const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
+    if (!row) return false;
 
-  snapshotStmts().upsert.run({
-    id: row.id,
-    site_id: siteId,
-    workspace_id: row.workspace_id,
-    created_at: row.created_at,
-    results: JSON.stringify(snapshot.results),
-    page_count: snapshot.results.length,
-  });
-  log.info(`Updated schema for page ${pageId} in snapshot for site ${siteId}`);
-  return true;
+    snapshotStmts().upsert.run({
+      id: row.id,
+      site_id: siteId,
+      workspace_id: row.workspace_id,
+      created_at: row.created_at,
+      results: JSON.stringify(snapshot.results),
+      page_count: snapshot.results.length,
+    });
+    log.info(`Updated schema for page ${pageId} in snapshot for site ${siteId}`);
+    return true;
+  })();
 }
 
 /**
@@ -433,6 +461,7 @@ export function updateSchemaPlanStatus(
 ): SchemaSitePlan | null {
   const plan = getSchemaPlan(siteId);
   if (!plan) return null;
+  validateTransition('schema_plan', SCHEMA_PLAN_TRANSITIONS, plan.status, status);
   plan.status = status;
   if (clientPreviewBatchId) plan.clientPreviewBatchId = clientPreviewBatchId;
   plan.updatedAt = new Date().toISOString();
@@ -452,25 +481,27 @@ export function deleteSchemaSnapshot(siteId: string): boolean {
 }
 
 export function removePageFromSnapshot(siteId: string, pageId: string): boolean {
-  const snapshot = getSchemaSnapshot(siteId);
-  if (!snapshot) return false;
+  return db.transaction(() => {
+    const snapshot = getSchemaSnapshot(siteId);
+    if (!snapshot) return false;
 
-  const filtered = snapshot.results.filter(r => r.pageId !== pageId);
-  if (filtered.length === snapshot.results.length) return false;
+    const filtered = snapshot.results.filter(r => r.pageId !== pageId);
+    if (filtered.length === snapshot.results.length) return false;
 
-  const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
-  if (!row) return false;
+    const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
+    if (!row) return false;
 
-  snapshotStmts().upsert.run({
-    id: row.id,
-    site_id: siteId,
-    workspace_id: row.workspace_id,
-    created_at: row.created_at,
-    results: JSON.stringify(filtered),
-    page_count: filtered.length,
-  });
-  log.info(`Removed page ${pageId} from schema snapshot for site ${siteId}`);
-  return true;
+    snapshotStmts().upsert.run({
+      id: row.id,
+      site_id: siteId,
+      workspace_id: row.workspace_id,
+      created_at: row.created_at,
+      results: JSON.stringify(filtered),
+      page_count: filtered.length,
+    });
+    log.info(`Removed page ${pageId} from schema snapshot for site ${siteId}`);
+    return true;
+  })();
 }
 
 export function updateSchemaPlanRoles(

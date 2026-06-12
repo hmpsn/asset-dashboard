@@ -103,6 +103,21 @@ vi.mock('../../../src/api/intelligence', () => ({
 import { intelligenceApi } from '../../../src/api/intelligence';
 const mockGetIntelligence = vi.mocked(intelligenceApi.getIntelligence);
 
+// ── Mock: src/api/suggested-briefs ─────────────────────────────────────────
+
+vi.mock('../../../src/api/suggested-briefs', () => ({
+  suggestedBriefsApi: {
+    list: vi.fn(),
+    get: vi.fn(),
+    update: vi.fn(),
+    snooze: vi.fn(),
+    dismiss: vi.fn(),
+  },
+}));
+
+import { suggestedBriefsApi as suggestedBriefsApiMock } from '../../../src/api/suggested-briefs';
+const mockSuggestedBriefsList = vi.mocked(suggestedBriefsApiMock.list);
+
 // ── Mock: src/api/brand-engine ──────────────────────────────────────────────
 
 vi.mock('../../../src/api/brand-engine', () => ({
@@ -360,24 +375,24 @@ describe('useWorkspaceIntelligence', () => {
 // ── useAiSuggestedBriefs ────────────────────────────────────────────────────
 
 describe('useAiSuggestedBriefs', () => {
-  beforeEach(() => { mockGetSafe.mockReset(); });
+  beforeEach(() => { mockSuggestedBriefsList.mockReset(); });
 
   it('is disabled when workspaceId is empty string', () => {
     const { result } = renderHook(() => useAiSuggestedBriefs(''), { wrapper: makeWrapper() });
     expect(result.current.data).toBeUndefined();
     expect(result.current.isLoading).toBe(false);
-    expect(mockGetSafe).not.toHaveBeenCalled();
+    expect(mockSuggestedBriefsList).not.toHaveBeenCalled();
   });
 
   it('enters loading state when enabled with a valid workspaceId', () => {
-    mockGetSafe.mockReturnValue(new Promise(() => {}));
+    mockSuggestedBriefsList.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useAiSuggestedBriefs('ws-1'), { wrapper: makeWrapper() });
     expect(result.current.isLoading).toBe(true);
   });
 
-  it('returns signals data when API resolves', async () => {
-    const payload = { signals: [{ id: 's1', type: 'suggested_brief' }] };
-    mockGetSafe.mockResolvedValue(payload);
+  it('returns store data when API resolves', async () => {
+    const payload = [{ id: 'b1', workspaceId: 'ws-1', keyword: 'dentist near me', pageUrl: null, source: 'insight', reason: 'High volume gap', priority: 'high', status: 'pending', createdAt: '2026-01-01T00:00:00.000Z', resolvedAt: null, snoozedUntil: null, dismissedKeywordHash: null }];
+    mockSuggestedBriefsList.mockResolvedValue(payload as never);
     const { result } = renderHook(() => useAiSuggestedBriefs('ws-1'), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.data).toEqual(payload));
   });

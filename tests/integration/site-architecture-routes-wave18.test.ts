@@ -4,7 +4,6 @@
  * Verifies the 404 / 200 contract for both endpoints on unknown and fresh
  * workspaces, and checks the shape of the response payload.
  *
- * Ports: 13426 (exclusive to wave-18 batch A2)
  *
  * Routes covered:
  *   GET /api/site-architecture/:workspaceId
@@ -12,11 +11,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13426;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 const UNKNOWN_ID = 'ws_wave18_arch_does_not_exist_z8x';
@@ -27,7 +25,7 @@ beforeAll(async () => {
   await ctx.startServer();
   // Workspace intentionally created without webflowSiteId so Webflow API
   // calls are skipped, keeping the test self-contained.
-  wsId = createWorkspace(`Wave18 Arch Test ${PORT}`).id;
+  wsId = createWorkspace(`Wave18 Arch Test ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {
@@ -192,7 +190,7 @@ describe('Workspace isolation — two fresh workspaces are independent', () => {
   let wsBId = '';
 
   beforeAll(() => {
-    wsBId = createWorkspace(`Wave18 Arch Isolation ${PORT}`).id;
+    wsBId = createWorkspace(`Wave18 Arch Isolation ${ctx.PORT}`).id;
   });
 
   afterAll(() => {

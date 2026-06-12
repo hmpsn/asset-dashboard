@@ -3,14 +3,14 @@
 // briefing endpoint (excluding auth/tier gates).
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertBriefingDraft, markPublished } from '../../server/briefing-store.js';
 import { upsertContentGapsBatch } from '../../server/content-gaps.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13770, { autoPublicAuth: true }); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let ws: SeededFullWorkspace | null = null;
 

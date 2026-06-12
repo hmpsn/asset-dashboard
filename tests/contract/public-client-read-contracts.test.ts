@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from '../integration/helpers.js';
+import { createEphemeralTestContext } from '../integration/helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createContentRequest } from '../../server/content-requests.js';
@@ -10,7 +10,7 @@ import { deleteSchemaPlan, saveSchemaPlan } from '../../server/schema-store.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13227);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, clearCookies } = ctx;
 
 let workspaceAId = '';

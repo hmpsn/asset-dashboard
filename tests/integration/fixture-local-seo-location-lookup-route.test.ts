@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { updateWorkspace } from '../../server/workspaces.js';
@@ -8,7 +8,7 @@ import {
   type LocalSeoLocationLookupResponse,
 } from '../../shared/types/local-seo.js';
 
-const ctx = createTestContext(13726);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace | null = null;

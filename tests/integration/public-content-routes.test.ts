@@ -10,15 +10,13 @@
  *   GET  /api/public/content-performance/:workspaceId — fresh → 200
  *   GET  /api/public/tracked-keywords/:workspaceId   — fresh → 200 { keywords: [] }
  *
- * Port: 13515 (exclusive to this file)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13515;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const UNKNOWN_ID = 'ws_pubcontent_unknown_zzz9999';
@@ -27,7 +25,7 @@ let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`PubContent Test ${PORT}`).id;
+  wsId = createWorkspace(`PubContent Test ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {
@@ -194,7 +192,7 @@ describe('GET /api/public/content-requests/:workspaceId', () => {
   });
 
   it('returns 200 with an array for a fresh workspace (may include previously created requests)', async () => {
-    const wsB = createWorkspace(`PubContent Requests Empty ${PORT}`);
+    const wsB = createWorkspace(`PubContent Requests Empty ${ctx.PORT}`);
     try {
       const res = await api(`/api/public/content-requests/${wsB.id}`);
       expect(res.status).toBe(200);
@@ -320,7 +318,7 @@ describe('GET /api/public/tracked-keywords/:workspaceId', () => {
   });
 
   it('returns 200 with empty keywords array for fresh workspace', async () => {
-    const wsC = createWorkspace(`PubContent Tracked ${PORT}`);
+    const wsC = createWorkspace(`PubContent Tracked ${ctx.PORT}`);
     try {
       const res = await api(`/api/public/tracked-keywords/${wsC.id}`);
       expect(res.status).toBe(200);

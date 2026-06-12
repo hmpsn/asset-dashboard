@@ -1,11 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { cancelJob, createJob } from '../../server/jobs.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-jobs';
-const ctx = createTestContext(13705, {
+const ctx = createEphemeralTestContext(import.meta.url, {
   env: { MCP_API_KEY: MCP_TEST_KEY },
 });
 

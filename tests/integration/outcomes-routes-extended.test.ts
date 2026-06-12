@@ -1,9 +1,6 @@
 /**
- * Wave 9 — Outcomes routes extended coverage (port 13371)
  *
  * Covers paths NOT exercised by the two existing outcome test files:
- *   outcome-pipeline.test.ts      (port 13250)
- *   outcomes-client-routes.test.ts (port 13363)
  *
  * Routes / code paths targeted here:
  *   - POST /api/outcomes/:wsId/actions  — Zod validation failures
@@ -24,12 +21,12 @@
  *   - All valid actionType enum values accepted by POST
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13371, { autoPublicAuth: true }); // port-ok: unique, confirmed free
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);

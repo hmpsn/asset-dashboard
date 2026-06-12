@@ -15,9 +15,9 @@ import db from '../../server/db/index.js';
 import { createPayment } from '../../server/payments.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13220, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let wsAId = '';
 let wsBId = '';

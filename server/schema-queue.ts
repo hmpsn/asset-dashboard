@@ -40,12 +40,7 @@ const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
     `SELECT * FROM pending_schemas WHERE workspace_id = ? AND status = 'pending' ORDER BY created_at DESC`,
   ),
-  selectByCellId: db.prepare(
-    `SELECT * FROM pending_schemas WHERE cell_id = ? AND workspace_id = ? AND status = 'pending' LIMIT 1`,
-  ),
-  updateStatus: db.prepare(
-    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: simple pending→applied/stale lifecycle, validateTransition planned in Batch 2
-  ),
+  // selectByCellId + updateStatus removed in W6.3 along with markSchemaApplied
   markStaleByCellId: db.prepare(
     `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND workspace_id = @workspace_id AND status = 'pending'`,
   ),
@@ -256,21 +251,16 @@ export function listPendingSchemas(workspaceId: string): {
   });
 }
 
-/**
- * Mark a pending schema as applied (called when schema is published to a page).
- */
-export function markSchemaApplied(workspaceId: string, cellId: string): void {
-  const row = stmts().selectByCellId.get(cellId, workspaceId) as PendingSchemaRow | undefined;
-  if (row) {
-    stmts().updateStatus.run({
-      id: row.id,
-      workspace_id: workspaceId,
-      status: 'applied',
-      updated_at: new Date().toISOString(),
-    });
-    log.info({ id: row.id, cellId, workspaceId }, 'Marked pending schema as applied');
-  }
-}
+// markSchemaApplied was removed in W6.3 (fix #3: pending-schemas half-pipeline).
+// The function had zero callers — the schema publish route does not carry a cellId
+// and cannot map pageId → cellId without a cross-table JOIN that was never built.
+// The pending_schemas table remains in use for the read-only intelligence slice
+// (content-pipeline-slice.ts calls listPendingSchemas) and for pre-generation by
+// queueSchemaPreGeneration. The GET /api/pending-schemas endpoint (which surfaced
+// listPendingSchemas over HTTP) was also removed — it had no UI consumer.
+// If a full wire is ever wanted, the correct approach is to add a page_id column to
+// pending_schemas and populate it at queueSchemaPreGeneration time, then call
+// markSchemaApplied from the publish route using that column.
 
 /**
  * Mark pending schemas for a cell as stale (called when keyword/URL changes).

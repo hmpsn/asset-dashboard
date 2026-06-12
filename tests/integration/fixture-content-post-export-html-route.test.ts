@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { seedContentData, type SeededContent } from '../fixtures/content-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13722);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let seededContent: SeededContent | null = null;
 let seededAuth: SeededAuth | null = null;

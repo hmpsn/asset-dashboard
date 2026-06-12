@@ -11,11 +11,11 @@
  * - POST /api/stripe/create-payment-intent (retired legacy endpoint)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
 import { signToken } from '../../server/auth.js';
 
-const ctx = createTestContext(13206);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, setAuthToken, authApi } = ctx;
 
 const TEST_EMAIL = 'stripe_api_owner@test.local';

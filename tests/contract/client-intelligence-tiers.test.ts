@@ -17,12 +17,12 @@
  * enforcement middleware passes through without requiring a login.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from '../integration/helpers.js';
+import { createEphemeralTestContext } from '../integration/helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 
-const ctx = createTestContext(13303);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 // Three workspaces, one per tier. clientPassword left empty so the

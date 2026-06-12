@@ -25,115 +25,29 @@ import {
   revertToVersion,
   getMostRecentPostVersion,
 } from '../content-posts.js';
-import { callCreativeAI, scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
+import { countHtmlWords } from '../content-posts-ai.js';
+import {
+  aiFixPromptAndTarget,
+  aiFixRequestSchema,
+  startAiReviewJob,
+  startAiFixJob,
+  startVoiceScoreJob,
+} from '../content-posts-ai-jobs.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { createLogger } from '../logger.js';
-import { parseAIJson } from '../openai-helpers.js';
-import { callAI } from '../ai.js';
 import { hasActiveJob, createJob } from '../jobs.js';
 import { runContentPublishJob } from '../content-publish-job.js';
-import { buildIntelPrompt } from '../workspace-intelligence.js';
+import { getInsights } from '../analytics-insights-store.js';
+import { suggestPublishDates, suggestDraftSchedule } from '../content-calendar-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
-import { buildSystemPrompt } from '../prompt-assembly.js';
-import {
-  buildClaimEvidenceLedger,
-} from '../content-review-evidence-ledger.js';
-import type { AIReviewMap, AiFixRequest, AiFixResult, ContentReviewEvidence, IssueKey, PostSection, StoredAIReview } from '../../shared/types/content.js';
-import { AI_FEEDBACK_TARGETS, CONTENT_GENERATION_STYLES, ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
+import type { AiFixRequest, PostSection } from '../../shared/types/content.js';
+import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
-import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
-import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
+import { sanitizePlainText } from '../html-sanitize.js';
 
 const router = Router();
-const log = createLogger('content-posts');
-
-const aiReviewResultSchema = z.object({
-  pass: z.boolean(),
-  reason: z.string(),
-  claimsToVerify: z.array(z.string()).optional(),
-}).strip();
-
-const aiReviewResponseSchema = z.object({
-  factual_accuracy: aiReviewResultSchema,
-  brand_voice: aiReviewResultSchema,
-  internal_links: aiReviewResultSchema,
-  no_hallucinations: aiReviewResultSchema,
-  meta_optimized: aiReviewResultSchema,
-  word_count_target: aiReviewResultSchema,
-}).strip();
-
-const aiMetaFixResponseSchema = z.object({
-  seoTitle: z.string().trim().min(1),
-  seoMetaDescription: z.string().trim().min(1),
-}).strip();
-
-const aiPostFeedbackResponseSchema = z.object({
-  introduction: z.string().trim().min(1),
-  sections: z.array(z.object({
-    index: z.number().int().nonnegative(),
-    content: z.string().trim().min(1),
-  })).min(1),
-  conclusion: z.string().trim().min(1),
-}).strip();
-
-function markProvenanceItemsForHumanReview(
-  review: AIReviewMap,
-  claimsToVerify: string[] = [],
-  evidence?: ContentReviewEvidence,
-): AIReviewMap {
-  const next = { ...review };
-  for (const key of PROVENANCE_SENSITIVE_REVIEW_KEYS) {
-    const existing = next[key];
-    const normalizedClaims = existing?.claimsToVerify?.length ? existing.claimsToVerify : claimsToVerify;
-    next[key] = {
-      pass: false,
-      reason: existing?.reason
-        ? `${existing.reason} Human verification is required before this checklist item can be checked.`
-        : 'Human verification is required before this checklist item can be checked.',
-      humanReviewRequired: true,
-      claimsToVerify: normalizedClaims,
-      claimEvidence: buildClaimEvidenceLedger(normalizedClaims, evidence),
-    };
-  }
-  return next;
-}
-
-function extractNumericClaims(text: string): string[] {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) return [];
-  const claimPattern = /(?:[$€£]\s?\d|\b\d+(?:[.,]\d+)?\s?%|\b\d+(?:[.,]\d+)?\s?(?:percent|x|times|k|m|million|billion|hours?|days?|weeks?|months?|years?)\b|\b(?:19|20)\d{2}\b)/i;
-  const sentences = normalized.match(/[^.!?]+[.!?]?/g) ?? [];
-  const claims: string[] = [];
-  const seen = new Set<string>();
-  for (const rawSentence of sentences) {
-    const sentence = rawSentence.trim();
-    if (sentence.length < 8 || sentence.length > 260) continue;
-    if (!claimPattern.test(sentence)) continue;
-    const key = sentence.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    claims.push(sentence);
-    if (claims.length >= 8) break;
-  }
-  return claims;
-}
-
-function buildReviewEvidence(workspaceId: string, briefId: string): ContentReviewEvidence | undefined {
-  const brief = getBrief(workspaceId, briefId);
-  const referenceUrls = brief?.referenceUrls?.filter(Boolean).slice(0, 8) ?? [];
-  const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
-  const topResults = brief?.realTopResults?.filter(r => r.title && r.url).slice(0, 8) ?? [];
-  if (!referenceUrls.length && !peopleAlsoAsk.length && !topResults.length) return undefined;
-  return {
-    referenceUrls,
-    peopleAlsoAsk,
-    topResults,
-    note: 'SERP evidence used for grounding support. Reviewers should verify important claims against the original sources before approving factual checklist items.',
-  };
-}
 
 const generatePostSchema = z.object({
   briefId: z.string({ required_error: 'briefId required' }).trim().min(1, 'briefId required'),
@@ -220,6 +134,53 @@ router.get('/api/content-posts/:workspaceId', requireWorkspaceAccess('workspaceI
   // clicks/position delta). Read-side decoration; listPosts stays pure for the
   // many non-list consumers.
   res.json(enrichPostsWithOutcomes(req.params.workspaceId, listPosts(req.params.workspaceId)));
+});
+
+// W6.6 (Forward-planning calendar): propose publish dates for unscheduled drafts.
+// Finally wires the previously-dead suggestPublishDates() — it derives page-level
+// priorities from decay + ranking-opportunity insights, then spreads the workspace's
+// unscheduled drafts (no plannedPublishAt, not published) across upcoming weekdays.
+// Returns proposals only; the admin confirms each via the planned-date PATCH below.
+//
+// MUST be registered BEFORE the `/:postId` GET route — otherwise Express matches
+// `suggest-dates` as a postId and returns 404 (literal-before-param ordering rule).
+router.get('/api/content-posts/:workspaceId/suggest-dates', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  const drafts = listPosts(workspaceId).filter(p => !p.plannedPublishAt && !p.publishedAt && p.status !== 'generating');
+  if (drafts.length === 0) {
+    return res.json({ suggestions: [], unscheduledCount: 0 });
+  }
+
+  // Derive page priorities from analytics insights (the original consumer-less heuristic).
+  const decayInsights = getInsights(workspaceId, 'content_decay').map(i => ({
+    pageId: i.pageId ?? '',
+    deltaPercent: (i.data as { deltaPercent: number }).deltaPercent,
+    currentClicks: (i.data as { currentClicks: number }).currentClicks,
+  })).filter(d => d.pageId);
+  const quickWins = getInsights(workspaceId, 'ranking_opportunity').map(i => {
+    const d = i.data as { pageUrl: string; query: string; estimatedTrafficGain: number };
+    return { pageUrl: d.pageUrl, query: d.query, estimatedTrafficGain: d.estimatedTrafficGain };
+  }).filter(q => q.pageUrl);
+
+  const priorityPages = suggestPublishDates({ decayInsights, quickWins })
+    .map(s => ({ pageUrl: s.pageUrl, priority: s.priority }));
+
+  // Start from tomorrow so suggestions are unambiguously in the future.
+  const startDate = new Date();
+  startDate.setUTCDate(startDate.getUTCDate() + 1);
+
+  const schedule = suggestDraftSchedule({
+    drafts: drafts.map(d => ({ id: d.id, targetKeyword: d.targetKeyword, pageHint: d.publishedSlug })),
+    startDate,
+    priorityPages,
+  });
+
+  const titleById = new Map(drafts.map(d => [d.id, d.title]));
+  res.json({
+    suggestions: schedule.map(s => ({ ...s, title: titleById.get(s.draftId) ?? '' })),
+    unscheduledCount: drafts.length,
+  });
 });
 
 // Get a single post
@@ -423,6 +384,42 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   res.json(updated);
 });
 
+// W6.6 (Forward-planning calendar): set or clear a post's planned/scheduled
+// publish date. Admin-only — a separate, surgically-scoped route from the main
+// PATCH handler above so the calendar's schedule-a-draft / suggest-dates flows have
+// a single-purpose endpoint. `plannedPublishAt: null` clears the schedule.
+// `.nullable()` lets the frontend clear by sending null; an absent key is rejected
+// (strict) so the intent is always explicit.
+const plannedPublishDateSchema = z.object({
+  plannedPublishAt: z.string().datetime({ message: 'plannedPublishAt must be an ISO datetime' }).nullable(),
+}).strict();
+
+router.patch('/api/content-posts/:workspaceId/:postId/planned-date',
+  requireWorkspaceAccess('workspaceId'),
+  validate(plannedPublishDateSchema),
+  (req, res) => {
+    const post = getPost(req.params.workspaceId, req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const plannedPublishAt: string | undefined = req.body.plannedPublishAt ?? undefined;
+    const updated = updatePostField(req.params.workspaceId, req.params.postId, { plannedPublishAt });
+    if (!updated) return res.status(404).json({ error: 'Post not found' });
+
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      plannedPublishAt
+        ? `Scheduled "${updated.title}" for ${plannedPublishAt.slice(0, 10)}`
+        : `Cleared planned date for "${updated.title}"`,
+      undefined,
+      { postId: updated.id, action: 'post_planned_date_updated', plannedPublishAt: plannedPublishAt ?? null },
+    );
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
+    res.json(updated);
+  },
+);
+
 // Export post as markdown
 router.get('/api/content-posts/:workspaceId/:postId/export/markdown', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
@@ -451,458 +448,45 @@ router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspac
   res.send(html);
 });
 
-// Model used for AI review — also recorded on the persisted StoredAIReview blob.
-const AI_REVIEW_MODEL = 'gpt-5.4-mini';
-
 // AI auto-review checklist — runs AI against post content to pre-check objective items.
-// Provenance-sensitive items are surfaced for human review only; the model does not
-// have verified source evidence for factual accuracy or hallucination clearance.
-router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+// W6.2: moved onto the background job platform (held HTTP open 30s+, no jobId, no dedupe).
+// The CONTENT_POST_REVIEW job persists the verdicts to the post (aiReview) and returns
+// { review, evidence } in job.result for the editor to read back. Provenance-sensitive
+// items are surfaced for human review only inside the worker.
+router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
-
-  const ws = getWorkspace(req.params.workspaceId);
-
-  // Build full business context for brand voice checking
-  const fullContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext', 'learnings'], { verbosity: 'detailed' });
-
-  // Build a text summary of the post content for AI analysis
-  const allContent = [
-    post.introduction || '',
-    ...post.sections.map(s => s.content || ''),
-    post.conclusion || '',
-  ].join('\n').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-
-  // Truncate to ~8000 chars to stay within token limits
-  const contentSnippet = allContent.slice(0, 8000);
-  const claimsToVerify = extractNumericClaims(allContent);
-
-  const prompt = `You are a content quality reviewer. Analyze this blog post and evaluate each checklist item.
-${fullContext}
-Return a JSON object with these keys, each with a boolean "pass" and a brief "reason" string.
-For "factual_accuracy" and "no_hallucinations", do NOT mark pass=true. You may identify claims
-that need verification, but those items require human review against source material.
-
-1. "factual_accuracy" — Identify suspicious claims, statistics, or unverifiable statements for human source checking. Always return pass=false.
-2. "brand_voice" — Does the content match a professional ${ws?.name ? `brand voice for "${ws.name}"` : 'business brand voice'}? Is the tone consistent?
-3. "internal_links" — Does the content include internal links (href attributes pointing to site pages)?
-4. "no_hallucinations" — Identify possible made-up studies, fake quotes, invented statistics, or fabricated expert names for human source checking. Always return pass=false.
-5. "meta_optimized" — Is the meta title "${post.seoTitle || post.title}" (${(post.seoTitle || post.title).length} chars) and meta description "${post.seoMetaDescription || post.metaDescription}" (${(post.seoMetaDescription || post.metaDescription).length} chars) well-optimized? Title should be 50-60 chars, description 150-160 chars, both should include the target keyword "${post.targetKeyword}".
-6. "word_count_target" — The post is ${post.totalWordCount} words. The target was ${post.targetWordCount} words. Is it within 15% of the target?
-
-Post content:
-${contentSnippet}
-
-Return ONLY valid JSON like:
-{
-  "factual_accuracy": { "pass": false, "reason": "Human source review required: ..." },
-  "brand_voice": { "pass": true, "reason": "..." },
-  "internal_links": { "pass": false, "reason": "..." },
-  "no_hallucinations": { "pass": false, "reason": "Human source review required: ..." },
-  "meta_optimized": { "pass": false, "reason": "..." },
-  "word_count_target": { "pass": true, "reason": "..." }
-}`;
-
-    try {
-      const systemPrompt = buildSystemPrompt(
-        req.params.workspaceId,
-        'You are a strict content QA reviewer. Return only valid JSON matching the requested checklist schema.',
-      );
-      const result = await callAI({
-        model: AI_REVIEW_MODEL,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: 1000,
-        temperature: 0.3,
-        researchMode: true,
-        responseFormat: { type: 'json_object' },
-        feature: 'content-review',
-        workspaceId: req.params.workspaceId,
-      });
-
-    const parsed = parseAIJson<unknown>(result.text);
-    const reviewResult = aiReviewResponseSchema.safeParse(parsed);
-    if (!reviewResult.success) {
-      log.warn({ issues: reviewResult.error.issues }, 'AI review response failed schema validation');
-      return res.status(500).json({ error: 'Failed to parse AI review response' });
-    }
-
-    const evidence = buildReviewEvidence(req.params.workspaceId, post.briefId);
-    const review = markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify, evidence);
-
-    // C4 (audit #16): persist verdicts so they survive editor close. Only the
-    // post-provenance-marking map is stored — provenance-sensitive keys are
-    // always pass=false + humanReviewRequired (content-quality-grounding).
-    const aiReview: StoredAIReview = {
-      review,
-      evidence,
-      reviewedAt: new Date().toISOString(),
-      model: AI_REVIEW_MODEL,
-    };
-    updatePostField(req.params.workspaceId, post.id, { aiReview });
-    addActivity(
-      req.params.workspaceId,
-      'post_ai_review',
-      `AI review completed for "${post.targetKeyword}"`,
-      post.title,
-      { postId: post.id, action: 'ai_review_completed' },
-    );
-    notifyContentUpdated(req.params.workspaceId, { postId: post.id, action: 'ai_review_completed' });
-
-    log.info(`AI review completed for post ${post.id}`);
-    res.json({ review, evidence });
-  } catch (err) {
-    log.error({ err }, 'AI review failed');
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: `AI review failed: ${msg}` });
-  }
+  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'An AI review is already running for this workspace', jobId: activeJob.id });
+  const started = startAiReviewJob({ workspaceId: req.params.workspaceId, postId: req.params.postId });
+  res.status(202).json(started);
 });
 
-const aiFixChecklistSchema = z.object({
-  mode: z.literal('checklist').optional(),
-  issueKey: z.enum([...ISSUE_KEYS] as [IssueKey, ...IssueKey[]]),
-  reason: z.string().min(1).max(500),
-}).strict();
-
-const aiFixFeedbackSchema = z.object({
-  mode: z.literal('feedback'),
-  target: z.enum(AI_FEEDBACK_TARGETS),
-  feedback: z.string().trim().min(1).max(2000),
-  sectionIndex: z.number().int().min(0).optional(),
-}).strict().superRefine((value, ctx) => {
-  if (value.target === 'section' && value.sectionIndex === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'sectionIndex required when target=section',
-      path: ['sectionIndex'],
-    });
-  }
-});
-
-const aiFixRequestSchema = z.union([aiFixChecklistSchema, aiFixFeedbackSchema]);
-
-function aiFixPromptAndTarget(
-  workspaceId: string,
-  post: NonNullable<ReturnType<typeof getPost>>,
-  body: AiFixRequest,
-): { field: AiFixResult['field']; sectionIndex?: number; originalText: string; userPrompt: string; researchMode: boolean } | { error: string } {
-  if (body.mode === 'feedback') {
-    const feedback = body.feedback;
-    const voiceProfile = getVoiceProfile(workspaceId);
-    const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
-    const voiceBlock = voiceCtx
-      ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
-      : '';
-
-    if (body.target === 'section') {
-      const targetSection = post.sections.find(s => s.index === body.sectionIndex);
-      if (!targetSection) return { error: 'Section not found' };
-      return {
-        field: 'section',
-        sectionIndex: targetSection.index,
-        originalText: targetSection.content,
-        userPrompt: `Revise this HTML section based on admin feedback.
-Return the FULL SECTION HTML only.
-
-Target keyword: "${post.targetKeyword}"
-Section heading: "${targetSection.heading}"
-Admin feedback:
-${feedback}
-${voiceBlock ? `\nVoice guidelines:\n${voiceBlock}` : ''}
-
-Section HTML:
-${targetSection.content}`,
-        researchMode: false,
-      };
-    }
-
-    if (body.target === 'meta') {
-      const originalMeta = {
-        seoTitle: post.seoTitle || post.title,
-        seoMetaDescription: post.seoMetaDescription || post.metaDescription,
-      };
-      return {
-        field: 'meta',
-        originalText: JSON.stringify(originalMeta),
-        userPrompt: `Rewrite the SEO title and meta description for this post based on admin feedback.
-Target keyword: "${post.targetKeyword}"
-Current title: "${originalMeta.seoTitle}"
-Current description: "${originalMeta.seoMetaDescription}"
-
-Admin feedback:
-${feedback}
-
-Hard constraints:
-- Title should be 50-60 characters
-- Description should be 150-160 characters
-- Include target keyword naturally
-
-Return ONLY valid JSON:
-{ "seoTitle": "...", "seoMetaDescription": "..." }`,
-        researchMode: false,
-      };
-    }
-
-    return {
-      field: 'post',
-      originalText: JSON.stringify({
-        introduction: post.introduction,
-        sections: post.sections.map(section => ({ index: section.index, content: section.content })),
-        conclusion: post.conclusion,
-      }),
-      userPrompt: `Revise this entire draft post based on admin feedback.
-Keep the same overall structure and section order. Improve clarity, flow, tone, and specificity.
-Return ONLY valid JSON in this exact shape:
-{
-  "introduction": "<p>...</p>",
-  "sections": [{"index": 0, "content": "<p>...</p>"}],
-  "conclusion": "<p>...</p>"
-}
-
-Target keyword: "${post.targetKeyword}"
-Current total words: ${post.totalWordCount}
-Target words: ${post.targetWordCount}
-Admin feedback:
-${feedback}
-${voiceBlock ? `\nVoice guidelines:\n${voiceBlock}` : ''}
-
-Current introduction HTML:
-${post.introduction}
-
-Current sections:
-${post.sections.map(section => `Index ${section.index} (${section.heading}):\n${section.content}`).join('\n\n')}
-
-Current conclusion HTML:
-${post.conclusion}`,
-      researchMode: false,
-    };
-  }
-
-  const { issueKey, reason } = body;
-  switch (issueKey) {
-    case 'internal_links': {
-      const targetSection = post.sections.find(s => !s.content.includes('<a href'))
-        ?? post.sections[0];
-      if (!targetSection) return { error: 'No sections available' };
-      const brief = getBrief(workspaceId, post.briefId);
-      const suggestions = brief?.internalLinkSuggestions ?? [];
-      return {
-        field: 'section',
-        sectionIndex: targetSection.index,
-        originalText: targetSection.content,
-        userPrompt: `Rewrite ONE sentence in this HTML section to include a relevant internal link using <a href="URL">anchor text</a>.
-Available internal link suggestions: ${suggestions.length > 0 ? suggestions.join(', ') : 'Use a plausible internal link like /blog or /services'}.
-Return the FULL SECTION HTML with exactly one new <a href="..."> tag added. Do not change any other content.
-
-Issue reason: ${reason}
-
-Section HTML:
-${targetSection.content}`,
-        researchMode: false,
-      };
-    }
-    case 'meta_optimized': {
-      return {
-        field: 'meta',
-        originalText: JSON.stringify({
-          seoTitle: post.seoTitle || post.title,
-          seoMetaDescription: post.seoMetaDescription || post.metaDescription,
-        }),
-        userPrompt: `Rewrite the SEO meta title and meta description for this blog post.
-Target keyword: "${post.targetKeyword}"
-Current title: "${post.seoTitle || post.title}"
-Current description: "${post.seoMetaDescription || post.metaDescription}"
-Requirements: Title 50-60 characters, description 150-160 characters, both include the target keyword.
-
-Issue reason: ${reason}
-
-Return ONLY valid JSON with no surrounding text:
-{ "seoTitle": "...", "seoMetaDescription": "..." }`,
-        researchMode: false,
-      };
-    }
-    case 'word_count_target': {
-      const doneSections = post.sections.filter(s => s.status === 'done');
-      const candidates = doneSections.length > 0 ? doneSections : post.sections;
-      if (candidates.length === 0) return { error: 'No sections available' };
-      const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
-      return {
-        field: 'section',
-        sectionIndex: targetSection.index,
-        originalText: targetSection.content,
-        userPrompt: `Expand this HTML section by approximately 20% to increase the post's overall word count.
-Add meaningful, relevant content — not filler. Maintain the same HTML structure and tone.
-Return the FULL EXPANDED SECTION HTML only.
-
-Post word count: ${post.totalWordCount} (target: ${post.targetWordCount})
-Issue reason: ${reason}
-
-Section HTML:
-${targetSection.content}`,
-        researchMode: false,
-      };
-    }
-    case 'brand_voice': {
-      const voiceProfile = getVoiceProfile(workspaceId);
-      const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
-      const voiceBlock = voiceCtx
-        ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
-        : '';
-      return {
-        field: 'introduction',
-        originalText: post.introduction,
-        userPrompt: `Rewrite this blog post introduction to better match the workspace's brand voice.
-Keep the same topic, key points, and approximate length. Return the FULL INTRODUCTION HTML only.
-
-Issue reason: ${reason}${voiceBlock ? `\n\nVoice guidelines:\n${voiceBlock}` : ''}
-
-Introduction HTML:
-${post.introduction}`,
-        researchMode: false,
-      };
-    }
-    case 'factual_accuracy':
-    case 'no_hallucinations': {
-      const targetSection = post.sections[0];
-      if (!targetSection) return { error: 'No sections available' };
-      return {
-        field: 'section',
-        sectionIndex: targetSection.index,
-        originalText: targetSection.content,
-        userPrompt: `Review this HTML section and rewrite any potentially inaccurate or unverifiable claims conservatively.
-Replace suspicious statistics or quotes with general, verifiable statements. Do NOT add new statistics.
-Return the FULL SECTION HTML with conservative rewrites applied.
-
-Issue reason: ${reason}
-
-Section HTML:
-${targetSection.content}`,
-        researchMode: true,
-      };
-    }
-    default:
-      return { error: 'Unknown issue key' };
-  }
-}
-
-// AI fix — generates a targeted fix for a specific failed review item
+// AI fix — generates a targeted fix for a specific failed review item.
+// W6.2: moved onto the background job platform. The full-post rewrite path is
+// 8000 tokens / ~90s — far too long to hold an HTTP connection. Upfront prompt-target
+// validation (Section not found / Unknown issue key) runs synchronously so the route
+// can still return the correct 4xx; the AI call runs in the CONTENT_POST_FIX job and
+// the AiFixResult draft lands in job.result for review-before-apply.
 router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
   requireWorkspaceAccess('workspaceId'),
   validate(aiFixRequestSchema),
-  async (req, res) => {
+  (req, res) => {
     const body = req.body as AiFixRequest;
     const post = getPost(req.params.workspaceId, req.params.postId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
+    // Validate the prompt target up front so target/issue-key errors return the
+    // right HTTP status instead of failing silently inside the async job.
     const promptTarget = aiFixPromptAndTarget(req.params.workspaceId, post, body);
     if ('error' in promptTarget) {
       return res.status(promptTarget.error === 'Unknown issue key' ? 400 : 422).json({ error: promptTarget.error });
     }
 
-    const { field, sectionIndex, originalText, userPrompt, researchMode } = promptTarget;
-    const requestReason = body.mode === 'feedback' ? body.feedback : body.reason;
-
-    try {
-      const systemPrompt = buildSystemPrompt(
-        req.params.workspaceId,
-        'You are an SEO content editor. Follow the requested field constraints exactly and return only the requested output format.',
-      );
-      const rawSuggested = field === 'meta'
-        ? (await callAI({
-          operation: 'content-post-feedback-fix-structured',
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-          workspaceId: req.params.workspaceId,
-          maxTokens: 2000,
-          temperature: 0.3,
-          researchMode,
-        })).text.trim()
-        : (await callCreativeAI({
-          operation: field === 'post'
-            ? 'content-post-feedback-fix-structured'
-            : 'content-post-feedback-fix',
-          systemPrompt,
-          userPrompt,
-          workspaceId: req.params.workspaceId,
-          maxTokens: field === 'post' ? 8000 : 2000,
-          temperature: 0.3,
-          researchMode,
-          ...(field === 'post' ? { json: true } : {}),
-        })).trim();
-      let suggestedText: string;
-
-      if (field === 'meta') {
-        let parsed: unknown;
-        try {
-          parsed = parseAIJson<unknown>(rawSuggested);
-        } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
-          return res.status(500).json({ error: 'Failed to parse AI meta response' });
-        }
-        const parsedResult = aiMetaFixResponseSchema.safeParse(parsed);
-        if (!parsedResult.success) {
-          log.warn({ issues: parsedResult.error.issues }, 'AI meta fix response failed schema validation');
-          return res.status(500).json({ error: 'Failed to parse AI meta response' });
-        }
-        const sanitizedMeta = {
-          seoTitle: sanitizePlainText(parsedResult.data.seoTitle),
-          seoMetaDescription: sanitizePlainText(parsedResult.data.seoMetaDescription),
-        };
-        const sanitizedResult = aiMetaFixResponseSchema.safeParse(sanitizedMeta);
-        if (!sanitizedResult.success) {
-          log.warn({ issues: sanitizedResult.error.issues }, 'AI meta fix response sanitized to invalid fields');
-          return res.status(500).json({ error: 'Failed to parse AI meta response' });
-        }
-        suggestedText = JSON.stringify(sanitizedResult.data);
-      } else if (field === 'post') {
-        let parsed: unknown;
-        try {
-          parsed = parseAIJson<unknown>(rawSuggested);
-        } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
-          return res.status(500).json({ error: 'Failed to parse AI post response' });
-        }
-        const parsedResult = aiPostFeedbackResponseSchema.safeParse(parsed);
-        if (!parsedResult.success) {
-          log.warn({ issues: parsedResult.error.issues }, 'AI post feedback response failed schema validation');
-          return res.status(500).json({ error: 'Failed to parse AI post response' });
-        }
-        const receivedIndices = parsedResult.data.sections.map(section => section.index);
-        const uniqueReceivedIndices = new Set(receivedIndices);
-        const sameShape = parsedResult.data.sections.length === post.sections.length
-          && uniqueReceivedIndices.size === post.sections.length
-          && post.sections.every(section => uniqueReceivedIndices.has(section.index));
-        if (!sameShape) {
-          return res.status(500).json({ error: 'Failed to parse AI post response' });
-        }
-        const sanitizedPost = {
-          introduction: sanitizeRichText(parsedResult.data.introduction),
-          sections: parsedResult.data.sections
-            .map(section => ({ index: section.index, content: sanitizeRichText(section.content) }))
-            .sort((a, b) => a.index - b.index),
-          conclusion: sanitizeRichText(parsedResult.data.conclusion),
-        };
-        const reparsed = aiPostFeedbackResponseSchema.safeParse(sanitizedPost);
-        if (!reparsed.success) {
-          log.warn({ issues: reparsed.error.issues }, 'AI post feedback response sanitized to invalid fields');
-          return res.status(500).json({ error: 'Failed to parse AI post response' });
-        }
-        suggestedText = JSON.stringify(reparsed.data);
-      } else {
-        suggestedText = sanitizeRichText(rawSuggested);
-      }
-
-      const targetSection = field === 'section' && sectionIndex !== undefined
-        ? post.sections.find(s => s.index === sectionIndex)
-        : undefined;
-      const sectionLabel = targetSection ? `section "${targetSection.heading}"` : field;
-      const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(requestReason).slice(0, 120)}`;
-
-      const result: AiFixResult = { field, sectionIndex, originalText, suggestedText, explanation };
-      res.json(result);
-    } catch (err) {
-      log.error({ err }, 'AI fix failed');
-      const msg = err instanceof Error ? err.message : String(err);
-      res.status(500).json({ error: `AI fix failed: ${msg}` });
-    }
+    const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, req.params.workspaceId);
+    if (activeJob) return res.status(409).json({ error: 'An AI fix is already running for this workspace', jobId: activeJob.id });
+    const started = startAiFixJob({ workspaceId: req.params.workspaceId, postId: req.params.postId, body });
+    res.status(202).json(started);
   },
 );
 
@@ -949,28 +533,19 @@ router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert'
   res.json(reverted);
 });
 
-// Score brand voice match
-router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const post = getPost(req.params.workspaceId, req.params.postId);
-    if (!post) return res.status(404).json({ error: 'Post not found' });
-    const brief = getBrief(req.params.workspaceId, post.briefId);
-    if (!brief) return res.status(404).json({ error: 'Brief not found' });
-
-    const { voiceScore, voiceFeedback } = await scoreVoiceMatch(post, brief, req.params.workspaceId);
-    if (voiceScore == null) {
-      return res.status(500).json({ error: voiceFeedback || 'Voice scoring failed' });
-    }
-    const updated = updatePostField(req.params.workspaceId, req.params.postId, { voiceScore, voiceFeedback });
-
-    invalidateContentPipelineIntelligence(req.params.workspaceId);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
-    res.json(updated);
-  } catch (err) {
-    log.error({ err }, `Voice scoring failed for post ${req.params.postId}`);
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg || 'Voice scoring failed' });
-  }
+// Score brand voice match (async — returns 202 { jobId })
+// W6.2: moved onto the background job platform. The CONTENT_POST_VOICE_SCORE job
+// persists voiceScore/voiceFeedback to the post and returns the updated post in
+// job.result. Failures surface via the job error state.
+router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const post = getPost(req.params.workspaceId, req.params.postId);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  const brief = getBrief(req.params.workspaceId, post.briefId);
+  if (!brief) return res.status(404).json({ error: 'Brief not found' });
+  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'Voice scoring is already running for this workspace', jobId: activeJob.id });
+  const started = startVoiceScoreJob({ workspaceId: req.params.workspaceId, postId: req.params.postId });
+  res.status(202).json(started);
 });
 
 // Delete a post

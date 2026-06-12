@@ -1,6 +1,5 @@
 /**
  * Integration tests for server/routes/webflow-seo-audit.ts
- * Port: 13456
  *
  * Covers:
  * - GET /api/webflow/seo-audit/:siteId — route reachability and response shape
@@ -15,11 +14,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13456;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 const FAKE_SITE_ID = 'fake-site-seo-audit-test-13456';
 

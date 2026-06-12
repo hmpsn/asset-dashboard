@@ -8,8 +8,6 @@ import type {
   ContentMatrix,
   KeywordRecommendationOptions,
   KeywordRecommendationResult,
-  AiFixResult,
-  AIReviewResponse,
   AiFixRequest,
   BriefTemplateCrossrefMatch,
 } from '../../shared/types/content';
@@ -94,6 +92,17 @@ export const contentPosts = {
   update: (wsId: string, postId: string, body: Record<string, unknown>) =>
     patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`, body),
 
+  // W6.6 (Forward-planning calendar): set or clear a post's planned publish date.
+  // Pass an ISO string to schedule, or null to clear.
+  setPlannedDate: (wsId: string, postId: string, plannedPublishAt: string | null) =>
+    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/planned-date`, { plannedPublishAt }),
+
+  // W6.6: propose publish dates for the workspace's unscheduled drafts.
+  suggestDates: (wsId: string) =>
+    get<{ suggestions: Array<{ draftId: string; suggestedDate: string; reason: string; title: string }>; unscheduledCount: number }>(
+      `/api/content-posts/${wsId}/suggest-dates`,
+    ),
+
   remove: (wsId: string, postId: string) =>
     del(`/api/content-posts/${wsId}/${postId}`),
 
@@ -114,16 +123,21 @@ export const contentPosts = {
       `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
     ),
 
+  // W6.2: ai-review / ai-fix / score-voice now return 202 { jobId } and run on
+  // the background job platform. Consumers track the job via useBackgroundTasks
+  // and read the result off the terminal job (CONTENT_POST_REVIEW returns
+  // { review, evidence }; CONTENT_POST_FIX returns the AiFixResult; voice score
+  // returns { post }).
   aiReview: (wsId: string, postId: string) =>
-    post<AIReviewResponse>(
+    post<{ jobId: string }>(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
     ),
 
   scoreVoice: (wsId: string, postId: string) =>
-    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
 
   aifix: (wsId: string, postId: string, body: AiFixRequest) =>
-    post<AiFixResult>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
 
   // Send a generated post to the client for review (POST-C1). Distinct from the internal
   // "Review" status bump — this creates a client-facing content_request (post_review) that

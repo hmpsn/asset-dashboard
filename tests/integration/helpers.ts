@@ -2,8 +2,8 @@
  * Shared test helpers for integration tests.
  *
  * Provides two factories:
- * - `createEphemeralTestContext(import.meta.url)` as the default for single-context files
- * - `createTestContext(port)` for explicit literal port ownership
+ * - `createEphemeralTestContext(import.meta.url)` as the default for test files
+ * - `createTestContext(port)` as the low-level fixed-port primitive used by this helper
  */
 import { spawn, type ChildProcess } from 'child_process';
 import crypto from 'crypto';
@@ -48,7 +48,17 @@ export interface TestContext {
  * `{ headers: { 'x-no-auto-public-auth': 'true' } }` to suppress injection for
  * those individual calls.
  */
-export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number; autoPublicAuth?: boolean }): TestContext {
+interface TestContextOptions {
+  env?: Record<string, string>;
+  startupTimeoutMs?: number;
+  autoPublicAuth?: boolean;
+}
+
+interface EphemeralTestContextOptions extends TestContextOptions {
+  contextName?: string;
+}
+
+export function createTestContext(port: number, options?: TestContextOptions): TestContext {
   const BASE = `http://localhost:${port}`;
   const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
   const sessionSecret = options?.env?.SESSION_SECRET ?? process.env.SESSION_SECRET ?? 'asset-dashboard-test-session-secret';
@@ -279,18 +289,22 @@ export function createTestContext(port: number, options?: { env?: Record<string,
  */
 export function createEphemeralTestContext(
   testFileUrl: string,
-  options?: { env?: Record<string, string>; startupTimeoutMs?: number; autoPublicAuth?: boolean },
+  options?: EphemeralTestContextOptions,
 ): TestContext {
   if (!testFileUrl.startsWith('file://')) {
     throw new Error('createEphemeralTestContext() requires import.meta.url as its first argument');
   }
-  if (isIntegrationTestPortReserved(testFileUrl)) {
-    throw new Error('Only one createEphemeralTestContext(import.meta.url) is allowed per test file');
+  const { contextName = 'default', ...contextOptions } = options ?? {};
+  const reservationId = `${fileURLToPath(testFileUrl)}#${contextName}`;
+  if (isIntegrationTestPortReserved(reservationId)) {
+    throw new Error(
+      `Only one createEphemeralTestContext(import.meta.url) context named "${contextName}" is allowed per test file`,
+    );
   }
 
-  const port = reserveIntegrationTestPort(testFileUrl);
+  const port = reserveIntegrationTestPort(reservationId);
   // Default autoPublicAuth to true (E3: portals are closed until configured).
-  const ctx = createTestContext(port, { ...options, autoPublicAuth: options?.autoPublicAuth ?? true });
+  const ctx = createTestContext(port, { ...contextOptions, autoPublicAuth: contextOptions.autoPublicAuth ?? true });
   const baseStopServer = ctx.stopServer;
 
   return {
@@ -299,7 +313,7 @@ export function createEphemeralTestContext(
       try {
         await baseStopServer();
       } finally {
-        releaseIntegrationTestPort(testFileUrl);
+        releaseIntegrationTestPort(reservationId);
       }
     },
   };

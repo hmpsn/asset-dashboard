@@ -13,7 +13,6 @@
  *   (6) archive round-trip    — predicted_emv survives archiveOld (the positional SELECT *).
  *
  * No HTTP server is booted (the rec engine + stores are exercised directly), so no 13xxx
- * port is allocated. Where a port is needed for documentation, the next free slot is 13880.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

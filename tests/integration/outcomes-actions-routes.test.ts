@@ -6,15 +6,13 @@
  * - POST /api/outcomes/:workspaceId/actions with missing required fields → 400
  * - POST /api/outcomes/:workspaceId/actions with valid body → 200 with action object
  *
- * Complements outcome-pipeline.test.ts (port 13250) which tests full pipeline flows.
  *
- * Port: 13633 (range: 13632–13639)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13633);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let wsId = '';

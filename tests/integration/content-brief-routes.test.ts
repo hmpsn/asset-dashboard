@@ -2,7 +2,7 @@
  * Integration tests for content brief HTTP routes.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { getBrief, upsertBrief } from '../../server/content-brief.js';
@@ -11,7 +11,7 @@ import { createTemplate } from '../../server/content-templates.js';
 import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import type { ContentBrief } from '../../shared/types/content.js';
 
-const ctx = createTestContext(13347); // port-ok: 13201-13346 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
 
 let testWsId = '';

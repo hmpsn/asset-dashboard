@@ -41,6 +41,7 @@ vi.mock('../../server/broadcast.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { getPost, savePost } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
+import { listJobs, cancelJob } from '../../server/jobs.js';
 
 // ── Test server helpers ────────────────────────────────────────────────────────
 
@@ -67,6 +68,36 @@ async function postJson(path: string, body: unknown): Promise<Response> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+// W6.2: ai-fix and ai-review now run on the background job platform — the route
+// returns 202 { jobId } and the result/error lands on the terminal job. This helper
+// POSTs, then (when accepted) polls /api/jobs/:id until terminal and returns the job.
+interface JobRunResult {
+  httpStatus: number;
+  jobStatus?: 'done' | 'error' | 'cancelled';
+  result?: Record<string, unknown>;
+  jobError?: string;
+}
+
+async function runJob(path: string, body: unknown, timeoutMs = 10_000): Promise<JobRunResult> {
+  const res = await postJson(path, body);
+  if (res.status !== 202) {
+    return { httpStatus: res.status };
+  }
+  const { jobId } = (await res.json()) as { jobId: string };
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const jobRes = await fetch(`${baseUrl}/api/jobs/${jobId}`);
+    if (jobRes.status === 200) {
+      const job = (await jobRes.json()) as { status: string; result?: Record<string, unknown>; error?: string };
+      if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+        return { httpStatus: res.status, jobStatus: job.status as JobRunResult['jobStatus'], result: job.result, jobError: job.error };
+      }
+    }
+    await new Promise(r => setTimeout(r, 30));
+  }
+  throw new Error(`Timed out waiting for job ${jobId}`);
 }
 
 // ── Setup / teardown ──────────────────────────────────────────────────────────
@@ -156,6 +187,11 @@ afterAll(() => {
 beforeEach(() => {
   resetOpenAIMocks();
   broadcastState.calls = [];
+  // Defensive: clear any still-active job for the test workspace so the
+  // workspace-scoped review/fix dedupe guard does not 409 the next op (W6.2).
+  for (const job of listJobs(wsId)) {
+    if (job.status === 'pending' || job.status === 'running') cancelJob(job.id);
+  }
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -188,12 +224,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   it('brand_voice — returns AiFixResult targeting introduction', async () => {
     const before = getPost(wsId, postId);
     mockOpenAIResponse('content-post-feedback-fix', '<p>Improved introduction.</p>');
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'Brand voice too informal',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('introduction');
     expect(body.suggestedText).toContain('Improved introduction');
     expect(body.originalText).toBe('<p>This is the introduction.</p>');
@@ -207,12 +244,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('word_count_target — returns AiFixResult targeting a section', async () => {
     mockOpenAIResponse('content-post-feedback-fix', '<p>Expanded section content here with more words.</p>');
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'word_count_target',
       reason: 'Word count too low',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('section');
     expect(body.sectionIndex).toBe(0);
     expect(body.suggestedText).toContain('Expanded');
@@ -225,12 +263,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
       reasoning: 'Extra model commentary should not break the response.',
     });
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'meta_optimized',
       reason: 'Meta description too short',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('meta');
     const parsed = JSON.parse(body.suggestedText);
     expect(parsed).toHaveProperty('seoTitle');
@@ -251,13 +290,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       seoMetaDescription: 42,
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'meta_optimized',
       reason: 'Meta description too short',
     });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
+    expect(run.jobError).toBe('Failed to parse AI meta response');
 
     expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
@@ -270,13 +309,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'meta_optimized',
       reason: 'Meta title is missing',
     });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
+    expect(run.jobError).toBe('Failed to parse AI meta response');
 
     expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
@@ -289,13 +328,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'meta_optimized',
       reason: 'Meta title is missing',
     });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
+    expect(run.jobError).toBe('Failed to parse AI meta response');
 
     expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
@@ -305,15 +344,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   it('returns 500 with error shape when AI call fails', async () => {
     const before = getPost(wsId, postId);
     mockOpenAIError('content-post-feedback-fix', 'OpenAI rate limit exceeded');
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'test',
     });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toHaveProperty('error');
-    expect(typeof body.error).toBe('string');
-    expect(body.error).toMatch(/AI fix failed/);
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
+    expect(typeof run.jobError).toBe('string');
 
     expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
@@ -336,12 +373,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
   // XSS hardening: AI-returned <script> tags must be stripped server-side
   it('sanitizes <script> tags out of AI suggestedText', async () => {
     mockOpenAIResponse('content-post-feedback-fix', '<p>Improved.</p><script>alert(1)</script><a href="javascript:void(0)">x</a>');
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'sanitize probe',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.suggestedText).not.toContain('<script');
     expect(body.suggestedText).not.toContain('javascript:');
     expect(body.suggestedText).toContain('<p>Improved.</p>');
@@ -349,14 +387,15 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 
   it('feedback mode section target — returns AiFixResult targeting the requested section', async () => {
     mockOpenAIResponse('content-post-feedback-fix', '<p>Updated section with sharper messaging.</p>');
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       mode: 'feedback',
       target: 'section',
       sectionIndex: 0,
       feedback: 'Make this section more concise and executive.',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('section');
     expect(body.sectionIndex).toBe(0);
     expect(body.suggestedText).toContain('Updated section');
@@ -377,13 +416,14 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       sections: [{ index: 0, content: '<p>Rewritten section body.</p>' }],
       conclusion: '<p>New conclusion</p>',
     });
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       mode: 'feedback',
       target: 'post',
       feedback: 'Improve flow and tighten repetition across the full post.',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('post');
     const parsed = JSON.parse(body.suggestedText);
     expect(parsed.introduction).toContain('New intro');
@@ -398,12 +438,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       sections: [{ index: 0, content: '<p>First rewrite.</p>' }, { index: 0, content: '<p>Duplicate index rewrite.</p>' }],
       conclusion: '<p>New conclusion</p>',
     });
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       mode: 'feedback',
       target: 'post',
       feedback: 'Improve flow and tighten repetition across the full post.',
     });
-    expect(res.status).toBe(500);
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
     expect(broadcastState.calls).toHaveLength(0);
     const after = getPost(wsId, postId);
     expect(after).toEqual(before);
@@ -423,13 +464,14 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
       seoTitle: 'Better SEO Title for Test Post',
       seoMetaDescription: 'A stronger meta description aligned with the admin feedback while keeping the keyword naturally included.',
     });
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       mode: 'feedback',
       target: 'meta',
       feedback: 'Make the title more benefit-led and clarify the value proposition.',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result!;
     expect(body.field).toBe('meta');
     const parsed = JSON.parse(body.suggestedText);
     expect(parsed).toHaveProperty('seoTitle');
@@ -449,10 +491,10 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
       word_count_target: { pass: true, reason: 'Word count is in range.' },
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to parse AI review response' });
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('error');
+    expect(run.jobError).toBe('Failed to parse AI review response');
 
     expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
@@ -470,9 +512,10 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
       summary: 'Extra model commentary should not fail the review.',
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
-    const body = await res.json() as {
+    const run = await runJob(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result as {
       review: Record<string, {
         pass: boolean;
         reason: string;
@@ -573,9 +616,10 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
       word_count_target: { pass: true, reason: 'Word count is in range.' },
     });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${reviewPostId}/ai-review`, {});
-    expect(res.status).toBe(200);
-    const body = await res.json() as {
+    const run = await runJob(`/api/content-posts/${wsId}/${reviewPostId}/ai-review`, {});
+    expect(run.httpStatus).toBe(202);
+    expect(run.jobStatus).toBe('done');
+    const body = run.result as {
       review: Record<string, {
         claimEvidence?: Array<{
           sourceCandidates: Array<{ kind: string; matchReason?: string }>;

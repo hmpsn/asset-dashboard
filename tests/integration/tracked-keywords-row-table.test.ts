@@ -16,15 +16,13 @@
  *      writes BOTH blob and table without throwing.
  *  (d) PRAGMA column assertion + CASCADE on workspace delete.
  *
- * The existing tracked-keywords-concurrency.test.ts (port 13886) covers the
  * IMMEDIATE/nesting safety net and MUST still pass unchanged (reads still blob;
  * the dual-write is inside the same IMMEDIATE txn).
  *
- * Port: 13891 (next free per the audit's port budget).
  */
 import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 vi.mock('../../server/broadcast.js', () => ({
@@ -44,8 +42,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
   };
 });
 
-const PORT = 13891;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 /** DELETE with a JSON body (the public remove route validates req.body.keyword). */

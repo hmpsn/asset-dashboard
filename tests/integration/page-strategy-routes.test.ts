@@ -19,11 +19,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext, assertWorkspaceIsolation } from './helpers.js';
+import { createEphemeralTestContext, assertWorkspaceIsolation } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SiteBlueprint, BlueprintEntry, BlueprintVersion, SectionPlanItem } from '../../shared/types/page-strategy.js';
 
-const ctx = createTestContext(13318);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, del } = ctx;
 
 let wsId = '';

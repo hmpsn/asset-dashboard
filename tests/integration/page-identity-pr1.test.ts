@@ -5,7 +5,6 @@
  * 1. After migration 075, no analytics_insights rows with page_id LIKE 'http%' remain.
  * 2. toAuditFindingPageId round-trips correctly in the write→read path.
  *
- * Port: 13330
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';

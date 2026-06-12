@@ -14,7 +14,7 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   createClientAction,
@@ -24,8 +24,7 @@ import { createBatch, updateItem } from '../../server/approvals.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import db from '../../server/db/index.js';
 
-const PORT = 13850;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsId = '';

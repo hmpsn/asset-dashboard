@@ -1,0 +1,21 @@
+-- 136-content-post-planned-publish.sql
+-- W6.6 (Forward-planning calendar v1) — admin-set scheduled/planned publish date.
+--
+-- Before this, the Content Calendar could only plot items retrospectively on
+-- created_at/published_at/requested_at — there was no way to say "this draft is
+-- planned for next Tuesday." This column records an admin's intended publish date
+-- so the calendar can render unpublished drafts on FUTURE days and offer a
+-- schedule-a-draft / suggest-dates workflow.
+--
+-- Nullable: a draft with no plan stays unscheduled (NULL). Distinct from
+-- published_at (the actual publish timestamp) — planned_publish_at is the intent,
+-- published_at is the outcome. A post can have a planned date and later be
+-- published (both set); the calendar prefers published_at for published posts.
+--
+-- DB column + mapper lockstep (CLAUDE.md): ships in the same commit as
+-- PostRow.planned_publish_at + rowToPost mapper + postToParams + the INSERT/UPDATE
+-- column lists in content-posts-db.ts, the GeneratedPost.plannedPublishAt field in
+-- shared/types/content.ts, and the PATCH route that sets/clears it.
+-- Admin-only v1 — NOT serialized on any public-portal route.
+
+ALTER TABLE content_posts ADD COLUMN planned_publish_at TEXT;

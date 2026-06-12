@@ -7,18 +7,17 @@
  * 3. Anomaly dismissed via HTTP POST
  * 4. Boost reversed — insight score returns to original value
  *
- * Port: 13253
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'crypto';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
 import { applyScoreAdjustment } from '../../server/insight-score-adjustments.js';
 import type { CtrOpportunityData, ContentDecayData } from '../../shared/types/analytics.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13253);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 let testWsId = '';

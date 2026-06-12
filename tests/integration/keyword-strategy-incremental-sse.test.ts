@@ -8,7 +8,6 @@
  *
  * Fix: emit `data: { done: true, strategy: ..., upToDate: true }` before res.end().
  *
- * Setup mirrors keyword-strategy-incremental.test.ts (port 13315):
  *   - Fake OPENAI_API_KEY before spawn so the key-presence check passes
  *   - Workspace with webflowSiteId (passes the "no site" check) + premium tier
  *   - Three fresh page_keywords rows (< 7d) so getPagesNeedingAnalysis → toAnalyze = []
@@ -17,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -26,11 +25,9 @@ import {
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
-// Verify port is free: grep -r 'createTestContext(' tests/ | grep -o '1[0-9]\{4\}' | sort -n | tail -5
-// Note: 13320 is taken by stripe-admin-auth.test.ts, 13321 by keyword-strategy-concurrent-guard.test.ts
-const PORT = 13322;
+// Verify port is free: grep -r 'createEphemeralTestContext(' tests/ | grep -o '1[0-9]\{4\}' | sort -n | tail -5
 
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 let workspaceId = '';
 
 beforeAll(async () => {
@@ -87,7 +84,7 @@ describe('keyword strategy — incremental early exit SSE', () => {
   it('sends { done: true, upToDate: true } data event on SSE incremental no-op', async () => {
     // SSE request — the Accept: text/event-stream header activates the streaming path.
     const res = await fetch(
-      `http://localhost:${PORT}/api/webflow/keyword-strategy/${workspaceId}`,
+      `${ctx.BASE}/api/webflow/keyword-strategy/${workspaceId}`,
       {
         method: 'POST',
         headers: {

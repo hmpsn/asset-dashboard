@@ -7,10 +7,9 @@
  * - PATCH /api/roadmap/item/:id (update single item status)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const PORT = 13700;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
 
 beforeAll(async () => {

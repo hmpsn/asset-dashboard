@@ -432,3 +432,91 @@ describe('direct DB write → read-back contract', () => {
     expect(apiIds.has(post.id)).toBe(true);
   });
 });
+
+// ── W6.6: planned publish date (forward-planning calendar) ──────────────────────
+
+describe('PATCH /api/content-posts/:workspaceId/:postId/planned-date', () => {
+  it('sets a planned date and broadcasts POST_UPDATED', async () => {
+    const post = seedPost(wsId, { title: 'Planned Date Post' });
+    const planned = '2026-09-01T00:00:00.000Z';
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}/planned-date`, { plannedPublishAt: planned });
+    expect(res.status).toBe(200);
+    const body = await res.json() as GeneratedPost;
+    expect(body.plannedPublishAt).toBe(planned);
+    // Persisted
+    expect(getPost(wsId, post.id)?.plannedPublishAt).toBe(planned);
+    // Broadcast fired
+    const evt = broadcastState.calls.find(c => c.event === WS_EVENTS.POST_UPDATED && (c.payload as { postId: string }).postId === post.id);
+    expect(evt).toBeDefined();
+  });
+
+  it('clears a planned date when null is sent', async () => {
+    const post = seedPost(wsId, { title: 'Clear Date Post', plannedPublishAt: '2026-09-01T00:00:00.000Z' });
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}/planned-date`, { plannedPublishAt: null });
+    expect(res.status).toBe(200);
+    const body = await res.json() as GeneratedPost;
+    expect(body.plannedPublishAt).toBeUndefined();
+    expect(getPost(wsId, post.id)?.plannedPublishAt).toBeUndefined();
+  });
+
+  it('rejects a non-ISO planned date with 400', async () => {
+    const post = seedPost(wsId, { title: 'Bad Date Post' });
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}/planned-date`, { plannedPublishAt: 'not-a-date' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a missing plannedPublishAt key (strict schema) with 400', async () => {
+    const post = seedPost(wsId, { title: 'Missing Key Post' });
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}/planned-date`, {});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 for an unknown post', async () => {
+    const res = await patchJson(`/api/content-posts/${wsId}/nonexistent-post/planned-date`, { plannedPublishAt: '2026-09-01T00:00:00.000Z' });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/content-posts/:workspaceId/suggest-dates', () => {
+  it('returns empty suggestions when there are no unscheduled drafts', async () => {
+    const freshWs = createWorkspace('Suggest Dates Empty Workspace');
+    try {
+      const res = await getJson(`/api/content-posts/${freshWs.id}/suggest-dates`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { suggestions: unknown[]; unscheduledCount: number };
+      expect(body.suggestions).toHaveLength(0);
+      expect(body.unscheduledCount).toBe(0);
+    } finally {
+      deleteWorkspace(freshWs.id);
+    }
+  });
+
+  it('proposes one date per unscheduled draft and skips already-scheduled/published posts', async () => {
+    const freshWs = createWorkspace('Suggest Dates Workspace');
+    try {
+      const draftA = makePost(freshWs.id, { title: 'Unscheduled A', status: 'draft' });
+      const draftB = makePost(freshWs.id, { title: 'Unscheduled B', status: 'draft' });
+      const scheduled = makePost(freshWs.id, { title: 'Already Scheduled', status: 'draft', plannedPublishAt: '2026-09-01T00:00:00.000Z' });
+      savePost(freshWs.id, draftA);
+      savePost(freshWs.id, draftB);
+      savePost(freshWs.id, scheduled);
+
+      const res = await getJson(`/api/content-posts/${freshWs.id}/suggest-dates`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { suggestions: Array<{ draftId: string; suggestedDate: string }>; unscheduledCount: number };
+      expect(body.unscheduledCount).toBe(2);
+      const ids = body.suggestions.map(s => s.draftId);
+      expect(ids).toContain(draftA.id);
+      expect(ids).toContain(draftB.id);
+      expect(ids).not.toContain(scheduled.id);
+      // Each suggested date is a valid ISO string in the future.
+      for (const s of body.suggestions) {
+        expect(Number.isNaN(new Date(s.suggestedDate).getTime())).toBe(false);
+        expect(new Date(s.suggestedDate).getTime()).toBeGreaterThan(Date.now());
+      }
+    } finally {
+      db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(freshWs.id);
+      deleteWorkspace(freshWs.id);
+    }
+  });
+});

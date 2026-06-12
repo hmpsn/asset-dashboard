@@ -16,7 +16,7 @@
  * it; the read itself is inert until cutover). It is exercised here with seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
@@ -24,8 +24,7 @@ import { createWorkOrder } from '../../server/work-orders.js';
 import { addWorkOrderComment } from '../../server/work-order-comments.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
-// port-ok: 13878 (verified free; 13877 is taken by projected-review-respond-routes.test.ts).
-const ctx = createTestContext(13878, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let pwless: SeededFullWorkspace;
 let pw: SeededFullWorkspace;

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
@@ -16,8 +16,10 @@ import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
+import { useBackgroundTasks, isTerminalJobStatus, type BackgroundJob } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { adminRichTextClass } from './post-editor/richTextStyles';
-import type { AiFeedbackTarget, AiFixRequest, AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey, StoredAIReview } from '../../shared/types/content';
+import type { AiFeedbackTarget, AiFixRequest, AiFixResult, AIReviewResponse, ContentBrief, ContentReviewEvidence, IssueKey, StoredAIReview } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 import { formatDate } from '../utils/formatDates';
@@ -132,6 +134,33 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
 export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // W6.2: ai-review / ai-fix / score-voice now run on the background job platform.
+  // The route returns { jobId } and the result lands on the terminal job. These
+  // helpers preserve the existing synchronous-feeling UI affordances (ReviewChecklist's
+  // onRunAIReview promise, FixDiffModal) by awaiting the tracked job's terminal state.
+  const tasks = useBackgroundTasks();
+  const tasksJobsRef = useRef<BackgroundJob[]>(tasks.jobs);
+  useEffect(() => { tasksJobsRef.current = tasks.jobs; }, [tasks.jobs]);
+
+  // Resolve when the given job reaches a terminal state. Returns the job.result on
+  // 'done', throws on error/cancelled. Polls tasksJobsRef (kept fresh by the effect
+  // above) — useBackgroundTasks already hydrates active jobs every 2s + via WS.
+  const awaitJobResult = <T,>(jobId: string, timeoutMs = 150_000): Promise<T> => {
+    return new Promise<T>((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const tick = () => {
+        const job = tasksJobsRef.current.find(j => j.id === jobId);
+        if (job && isTerminalJobStatus(job.status)) {
+          if (job.status === 'done') return resolve(job.result as T);
+          return reject(new Error(job.error || 'Operation failed'));
+        }
+        if (Date.now() > deadline) return reject(new Error('Timed out waiting for the operation to finish'));
+        window.setTimeout(tick, 400);
+      };
+      tick();
+    });
+  };
   const postQ = useAdminPost(workspaceId, postId);
   const post = (postQ.data ?? null) as GeneratedPost | null;
   const briefQ = useQuery({
@@ -342,10 +371,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setFixLoading(true);
     setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
     try {
-      const result = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
+      const { jobId } = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
+      tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, jobId, { workspaceId });
+      const result = await awaitJobResult<AiFixResult>(jobId);
       if (gen === fixGenRef.current) setFixResult(result);
     } catch (err) {
       console.error('PostEditor operation failed:', err);
+      if (gen === fixGenRef.current) toast(err instanceof Error ? err.message : 'AI fix failed', 'error');
     } finally {
       if (gen === fixGenRef.current) setFixLoading(false);
     }
@@ -382,10 +414,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           target: feedbackFixModal.target,
           feedback: trimmedFeedback,
         };
-      const result = await contentPosts.aifix(workspaceId, postId, body);
+      const { jobId } = await contentPosts.aifix(workspaceId, postId, body);
+      tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, jobId, { workspaceId });
+      const result = await awaitJobResult<AiFixResult>(jobId);
       if (gen === fixGenRef.current) setFixResult(result);
     } catch (err) {
       console.error('PostEditor operation failed:', err);
+      if (gen === fixGenRef.current) toast(err instanceof Error ? err.message : 'AI fix failed', 'error');
     } finally {
       if (gen === fixGenRef.current) setFixLoading(false);
     }
@@ -661,8 +696,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             });
           }}
           onRunAIReview={async () => {
-            const res = await contentPosts.aiReview(workspaceId, postId);
-            return res ?? null;
+            const { jobId } = await contentPosts.aiReview(workspaceId, postId);
+            tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, jobId, { workspaceId });
+            const result = await awaitJobResult<AIReviewResponse>(jobId);
+            // The review verdicts are persisted on the post by the job; refresh so the
+            // persisted-review read-back (W5.2) stays in sync after the editor reopens.
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
+            return result ?? null;
           }}
           onRequestFix={handleRequestFix}
           evidence={reviewEvidence}

@@ -18,11 +18,11 @@
  *  - Name max-length validation
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { deleteClientUser } from '../../server/client-users.js';
 
-const ctx = createTestContext(13370);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsId = '';       // primary workspace used across suites

@@ -13,15 +13,13 @@
  *     — no workspaceId/siteId → passes auth (no JWT), token lookup returns undefined → proceeds
  *
  * Strategy: validate error paths only — no actual Webflow API calls are made.
- * Port: 13517 (exclusive to this file)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13517;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, authPostJson, authApi } = ctx;
 
 const UNKNOWN_WORKSPACE_ID = 'ws_pubvalid_unknown_zzz9999';
@@ -33,7 +31,7 @@ let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`ContentPublish Validation ${PORT}`).id;
+  wsId = createWorkspace(`ContentPublish Validation ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {

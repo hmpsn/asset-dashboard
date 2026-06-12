@@ -9,13 +9,11 @@
  * 5. Bad payload on /calibration-feedback (missing feedback) → 400
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-// Port 13321 is taken by keyword-strategy-concurrent-guard.test.ts (const PORT, not createTestContext).
-// 13323 is taken by brandscript-hardening.test.ts; 13324 is the next free port.
-const ctx = createTestContext(13324); // port-ok: 13201-13323 fully allocated; extending range
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let testWsId = '';

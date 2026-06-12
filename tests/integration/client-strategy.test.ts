@@ -22,7 +22,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { expectNoLocalSeoClientBoundaryFields } from '../helpers/local-seo-client-boundary.js';
 import {
   createWorkspace,
@@ -43,7 +43,7 @@ import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluste
 
 // ── Port — unique across all integration tests ─────────────────────────────
 
-const ctx = createTestContext(13222, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Workspace IDs ───────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ async function captureWorkspaceEvent<T>(
   event: string,
   action: () => Promise<void>,
 ): Promise<T> {
-  const socket = new WebSocket(`ws://localhost:${ctx.PORT}/ws`);
+  const socket = new WebSocket(`${ctx.BASE.replace(/^http/, 'ws')}/ws`);
   try {
     await new Promise<void>((resolve, reject) => {
       socket.once('open', resolve);

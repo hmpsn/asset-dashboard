@@ -15,13 +15,10 @@
  *  - Reconcile baseline: volume/difficulty still attach to STRATEGY_SITE_KEYWORD
  *    targets via the reconcile join after the strip.
  *
- * Port: 13892 (exclusive; 13890 is the table-as-truth public-read gate, 13886
- * reserved for tracked-keywords-concurrency). NOTE: 13891 was vacated — it now
  * collides with tracked-keywords-row-table.test.ts (merged to staging via
- * 3c-i/#1062 after this branch was cut). 13892 is verified free on staging.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { createWorkspace, getWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -33,8 +30,7 @@ import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import type { KeywordStrategySiteKeywordMetric } from '../../server/keyword-strategy-enrichment.js';
 
-const PORT = 13892;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const cleanupIds: string[] = [];
@@ -85,7 +81,7 @@ afterAll(async () => {
 
 describe('Wave 3b-ii — siteKeywordMetrics blob strip survival', () => {
   it('strips the blob, serves metrics from the table, and survives the closed generation loop', async () => {
-    const wsId = createWorkspace(`SKM Strip Loop ${PORT}`).id;
+    const wsId = createWorkspace(`SKM Strip Loop ${ctx.PORT}`).id;
     cleanupIds.push(wsId);
 
     const metrics: KeywordStrategySiteKeywordMetric[] = [
@@ -139,7 +135,7 @@ describe('Wave 3b-ii — siteKeywordMetrics blob strip survival', () => {
   });
 
   it('reconcile baseline: volume/difficulty attach to STRATEGY_SITE_KEYWORD via the table join after the strip', () => {
-    const wsId = createWorkspace(`SKM Strip Reconcile ${PORT}`).id;
+    const wsId = createWorkspace(`SKM Strip Reconcile ${ctx.PORT}`).id;
     cleanupIds.push(wsId);
 
     // Persist so the table (sole store) carries the metric; blob is stripped.
@@ -172,7 +168,7 @@ describe('Wave 3b-ii — siteKeywordMetrics blob strip survival', () => {
   });
 
   it('an empty table yields no metrics on the public read — the blob is never a fallback', async () => {
-    const wsId = createWorkspace(`SKM Strip NoFallback ${PORT}`).id;
+    const wsId = createWorkspace(`SKM Strip NoFallback ${ctx.PORT}`).id;
     cleanupIds.push(wsId);
 
     // Persist with EMPTY metrics. The blob is stripped, the table is cleared.

@@ -26,18 +26,16 @@
  *   POST /api/public/content-request/:id/request-post-changes — wrong-status guard
  *   Auth boundary — 401 for password-protected workspace without credentials
  *
- * Port: 13372 (port-ok: verified free)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { seedContentData } from '../fixtures/content-seed.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import db from '../../server/db/index.js';
 import { randomUUID } from 'crypto';
 
-const PORT = 13372;
-const ctx = createTestContext(PORT, { autoPublicAuth: true }); // port-ok: Wave 9 — verified free
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, del } = ctx;
 
 // ── Fixtures created once for the whole suite ─────────────────────────────────

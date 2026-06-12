@@ -11,9 +11,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13471); // port-ok: assigned range 13470-13484
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson } = ctx;
 
 let workspaceId = '';

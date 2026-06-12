@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput, OutcomeReadbackChip } from './ui';
 import type { OutcomeReadback } from '../../shared/types/outcome-tracking';
@@ -14,6 +15,8 @@ import { contentPosts } from '../api/content';
 import { useAdminPostsList, usePublishTarget, useSendPostToClient } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { useToast } from './Toast';
+import { useBackgroundTasks, isTerminalJobStatus, type BackgroundJob } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 interface PostSummary {
   id: string;
@@ -47,13 +50,46 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
+  // W6.2: score-voice now runs on the background job platform (returns { jobId }).
+  const tasks = useBackgroundTasks();
+  const tasksJobsRef = useRef<BackgroundJob[]>(tasks.jobs);
+  useEffect(() => { tasksJobsRef.current = tasks.jobs; }, [tasks.jobs]);
+  const awaitVoiceJob = (jobId: string, timeoutMs = 150_000): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const tick = () => {
+        const job = tasksJobsRef.current.find(j => j.id === jobId);
+        if (job && isTerminalJobStatus(job.status)) {
+          if (job.status === 'done') return resolve();
+          return reject(new Error(job.error || 'Voice scoring failed'));
+        }
+        if (Date.now() > deadline) return reject(new Error('Timed out waiting for voice scoring'));
+        window.setTimeout(tick, 400);
+      };
+      tick();
+    });
+  };
   const postsQ = useAdminPostsList(workspaceId);
   const posts = (postsQ.data ?? []) as PostSummary[];
   const loading = postsQ.isLoading;
   const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
   const { toast } = useToast();
 
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  // W6.6: deep-link receiver — `?post=<id>` (e.g. from the Content Calendar) opens
+  // that post in the editor on mount. The param is consumed once into local state;
+  // the close handler clears it so a manual close doesn't reopen on re-render.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activePostId, setActivePostId] = useState<string | null>(() => searchParams.get('post'));
+
+  const closePostEditor = () => {
+    setActivePostId(null);
+    invalidatePosts();
+    if (searchParams.get('post')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('post');
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortAsc, setSortAsc] = useState(false);
@@ -122,12 +158,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const scoreVoice = async (postId: string) => {
     setScoringVoice(postId);
     try {
-      const result = await contentPosts.scoreVoice(workspaceId, postId);
-      if (result) {
-        invalidatePosts();
-      } else {
-        toast('Voice scoring failed', 'error');
-      }
+      const { jobId } = await contentPosts.scoreVoice(workspaceId, postId);
+      tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, jobId, { workspaceId });
+      await awaitVoiceJob(jobId);
+      invalidatePosts();
     } catch (err) {
       console.error('ContentManager voice score failed:', err);
       toast(err instanceof Error ? err.message : 'Voice scoring failed', 'error');
@@ -172,7 +206,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     return (
       <div className="space-y-8">
         <Button
-          onClick={() => { setActivePostId(null); invalidatePosts(); }}
+          onClick={closePostEditor}
           variant="link"
           size="sm"
           className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
@@ -184,8 +218,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             key={activePostId}
             workspaceId={workspaceId}
             postId={activePostId}
-            onClose={() => { setActivePostId(null); invalidatePosts(); }}
-            onDelete={() => { setActivePostId(null); invalidatePosts(); }}
+            onClose={closePostEditor}
+            onDelete={closePostEditor}
           />
         </div>
       </div>

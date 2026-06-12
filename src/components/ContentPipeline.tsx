@@ -73,6 +73,19 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
       setSearchParams(next, { replace: true });
     }
   };
+
+  // Sync activeTab when the URL ?tab= param changes externally (e.g. ContentCalendar's
+  // openItem navigates to ?tab=posts&post=<id> while the pipeline is already mounted).
+  // Only update when the incoming param is a valid tab that differs from current state;
+  // guard avoids feedback-loops from the handleTabChange call above that clears the param.
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (!param) return;
+    const valid = TABS.some(t => t.id === param);
+    if (valid && param !== activeTab) {
+      setActiveTab(param as PipelineTab);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- activeTab intentionally excluded: including it would loop with handleTabChange
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
@@ -131,7 +144,9 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   // Increments prefillNonce so the ContentBriefs key changes on every call,
   // forcing a remount even if the Briefs tab is already active (the fixConsumed
   // ref in ContentBriefs is per-mount, so a remount re-consumes the new context).
-  const handleCreateBrief = (keyword: string, pageUrl?: string) => {
+  // suggestedBriefId is accepted for interface compatibility (AiSuggested marks it
+  // accepted in the store before calling this); no additional action needed here.
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
     setPipelinePrefill(buildSignalPrefill(keyword, pageUrl));
     setPrefillNonce(n => n + 1);
     setActiveTab('briefs');

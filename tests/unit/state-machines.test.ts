@@ -13,6 +13,7 @@ import {
   CLIENT_ACTION_TRANSITIONS,
   BACKGROUND_JOB_TRANSITIONS,
   BRIEFING_DRAFT_TRANSITIONS,
+  SCHEMA_PLAN_TRANSITIONS,
 } from '../../server/state-machines.js';
 
 // ── validateTransition() core behavior ──
@@ -1027,5 +1028,90 @@ describe('validateTransition return value contract', () => {
     for (const [map, from, to] of pairs) {
       expect(validateTransition('entity', map, from, to)).toBe(to);
     }
+  });
+});
+
+// ── Schema Site Plan transitions (W6.3) ──
+
+describe('Schema Plan transitions', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('schema_plan', SCHEMA_PLAN_TRANSITIONS, from, to);
+
+  describe('valid transitions', () => {
+    it('draft → sent_to_client', () => {
+      expect(validate('draft', 'sent_to_client')).toBe('sent_to_client');
+    });
+
+    it('draft → active (admin self-serve activation, no client review)', () => {
+      // SchemaPlanPanel renders "Activate Plan" alongside "Send to client" on drafts,
+      // so an admin can activate a draft plan directly without sending it for review.
+      expect(validate('draft', 'active')).toBe('active');
+    });
+
+    it('sent_to_client → client_approved', () => {
+      expect(validate('sent_to_client', 'client_approved')).toBe('client_approved');
+    });
+
+    it('sent_to_client → client_changes_requested', () => {
+      expect(validate('sent_to_client', 'client_changes_requested')).toBe('client_changes_requested');
+    });
+
+    it('sent_to_client → active (admin fast-track)', () => {
+      expect(validate('sent_to_client', 'active')).toBe('active');
+    });
+
+    it('client_changes_requested → draft (admin revises)', () => {
+      expect(validate('client_changes_requested', 'draft')).toBe('draft');
+    });
+
+    it('client_changes_requested → sent_to_client (resend after changes)', () => {
+      expect(validate('client_changes_requested', 'sent_to_client')).toBe('sent_to_client');
+    });
+
+    it('client_approved → active', () => {
+      expect(validate('client_approved', 'active')).toBe('active');
+    });
+
+    it('active → draft (admin resets to rework)', () => {
+      expect(validate('active', 'draft')).toBe('draft');
+    });
+  });
+
+  describe('invalid transitions', () => {
+    it('draft → client_approved (cannot skip send step)', () => {
+      expect(() => validate('draft', 'client_approved')).toThrow(InvalidTransitionError);
+    });
+
+    it('draft → client_changes_requested (never sent)', () => {
+      expect(() => validate('draft', 'client_changes_requested')).toThrow(InvalidTransitionError);
+    });
+
+    it('client_approved → draft (must activate first, then reset)', () => {
+      expect(() => validate('client_approved', 'draft')).toThrow(InvalidTransitionError);
+    });
+
+    it('client_approved → sent_to_client (already approved, cannot re-send)', () => {
+      expect(() => validate('client_approved', 'sent_to_client')).toThrow(InvalidTransitionError);
+    });
+
+    it('active → sent_to_client (terminal reopen must go through draft)', () => {
+      expect(() => validate('active', 'sent_to_client')).toThrow(InvalidTransitionError);
+    });
+
+    it('active → client_approved (nonsensical backward jump)', () => {
+      expect(() => validate('active', 'client_approved')).toThrow(InvalidTransitionError);
+    });
+
+    it('sent_to_client → draft (cannot retract without going through changes_requested)', () => {
+      expect(() => validate('sent_to_client', 'draft')).toThrow(InvalidTransitionError);
+    });
+  });
+
+  it('active has an outbound draft edge only (no other escapes)', () => {
+    expect(SCHEMA_PLAN_TRANSITIONS['active']).toEqual(['draft']);
+  });
+
+  it('draft has two outbound edges (send to client or activate directly)', () => {
+    expect(SCHEMA_PLAN_TRANSITIONS['draft']).toEqual(['sent_to_client', 'active']);
   });
 });

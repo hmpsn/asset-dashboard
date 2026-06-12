@@ -1,21 +1,18 @@
 /**
- * keyword-hub-actions.test.ts — P3 integration test (port 13901).
  *
  * Exercises the REAL action engine through the HTTP route:
  *   POST   /api/webflow/keyword-command-center/:workspaceId/actions       (3b lifecycle guard → 409)
  *   DELETE /api/webflow/keyword-command-center/:workspaceId/keywords/:kw   (3c hard delete → 200 / 403)
  *
- * (P1 already owns port 13900 for keyword-hub-list; the plan's "13900" drifted, so this
- * file uses the next free port, 13901.)
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { KeywordCommandCenterActionResult, KeywordCommandCenterBulkActionResult } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13901); // port-ok: next free after keyword-hub-list (13900)
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson, del } = ctx;
 
 let workspaceId = '';

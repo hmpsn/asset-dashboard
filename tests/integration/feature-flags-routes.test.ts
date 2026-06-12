@@ -9,9 +9,9 @@
  *   - PUT /api/admin/feature-flags/:key with valid key and enabled=true → 200
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13400);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, authApi } = ctx;
 
 const RETIRED_PRODUCT_UI_FLAGS = [

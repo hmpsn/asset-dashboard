@@ -1,6 +1,5 @@
 /**
  * Integration tests for server/routes/webflow-schema.ts
- * Port: 13455
  *
  * Covers:
  * - GET /api/webflow/schema-snapshot/:siteId — pure DB read; unknown siteId → null
@@ -16,11 +15,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13455;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 const FAKE_SITE_ID = 'fake-site-schema-test-13455';
 

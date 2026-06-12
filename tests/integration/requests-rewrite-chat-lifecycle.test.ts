@@ -27,11 +27,10 @@
  *     - POST /api/rewrite-chat/:workspaceId — null/undefined question, unknown ws
  *     - POST /api/rewrite-chat/:workspaceId/load-page — SSRF: private IP guarded
  *
- * Port: 13860 — port-ok: unique in integration suite
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
@@ -41,7 +40,7 @@ import { createRequest, getRequest, listRequests } from '../../server/requests.j
 // attempt a real, slow AI call and the 5s test times out — a pre-existing ordering/env flake.
 // No other test in this file needs the key (all chat POSTs assert validation 400/404; the 200s
 // are /pages + requests CRUD).
-const ctx = createTestContext(13860, { env: { OPENAI_API_KEY: '' } }); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { api, postJson, patchJson, del } = ctx;
 
 let workspaceId = '';
@@ -648,7 +647,7 @@ describe('POST /api/rewrite-chat/:workspaceId — chat validation', () => {
   });
 
   it('returns 400 when OPENAI_API_KEY is not configured', async () => {
-    // Deterministic: the test server is spawned with OPENAI_API_KEY='' (see createTestContext
+    // Deterministic: the test server is spawned with OPENAI_API_KEY='' (see createEphemeralTestContext
     // call at the top of this file), so the route takes the fast no-key 400 branch
     // (rewrite-chat.ts:226-227) rather than attempting a real, slow AI call.
     const res = await postJson(`/api/rewrite-chat/${workspaceId}`, {

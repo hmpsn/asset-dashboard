@@ -8,13 +8,12 @@
  * an empty set; an unknown workspace returns an honest 404 (previously a 500
  * thrown from the inline generateRecommendations() fallback).
  *
- * Port: 13689 (assigned range 13688–13695 for wave-24-a12)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13689, { autoPublicAuth: true }); // port-ok: assigned range 13688-13695
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';

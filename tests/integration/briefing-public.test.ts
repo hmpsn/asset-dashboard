@@ -10,10 +10,9 @@
  *   - 200 with admin-only fields stripped (no sourceMetadata, no adminNote)
  *   - 200 with trial-active free workspace (computeEffectiveTier promotes to growth)
  *
- * Port: 13330 (verified free as of 2026-04-29; extends range to 13330)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import {
   upsertBriefingDraft,
@@ -25,7 +24,7 @@ import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/conten
 import { randomUUID } from 'crypto';
 import type { BriefingStory, BriefingSourceMetadata } from '../../shared/types/briefing.js';
 
-const ctx = createTestContext(13330, { autoPublicAuth: true }); // port-ok: verified free; extends range to 13330
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 // Workspace IDs — assigned in beforeAll

@@ -4,14 +4,12 @@
  * Fires two simultaneous POST requests for the same workspace and asserts
  * exactly one of them returns 409 with an "already being generated" message.
  *
- * Port: 13321
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
-const PORT = 13321;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let workspaceId: string;
 let cleanup: () => void;
@@ -44,12 +42,12 @@ describe('keyword strategy — concurrent generation guard', () => {
     const body = JSON.stringify({});
 
     const [res1, res2] = await Promise.all([
-      fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${workspaceId}`, {
+      fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
       }),
-      fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${workspaceId}`, {
+      fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,

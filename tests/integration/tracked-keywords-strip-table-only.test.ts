@@ -19,10 +19,9 @@
  *  (3) ORDER PRESERVED TABLE-ONLY — the table's sort_order drives read order with no
  *      blob involvement.
  *
- * Port: 13896 (next free after 13895; exclusive to this file).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 vi.mock('../../server/broadcast.js', () => ({
@@ -42,8 +41,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
   };
 });
 
-const PORT = 13896;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const cleanupWorkspaceIds: string[] = [];

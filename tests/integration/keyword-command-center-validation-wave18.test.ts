@@ -5,7 +5,6 @@
  * These complement keyword-command-center-routes.test.ts which covers the
  * happy-path behaviour.
  *
- * Port: 13427 (exclusive to wave-18 batch A2)
  *
  * Routes covered:
  *   GET  /api/webflow/keyword-command-center/:workspaceId/summary
@@ -16,11 +15,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13427;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 const UNKNOWN_ID = 'ws_wave18_kcc_does_not_exist_q7m';
@@ -29,7 +27,7 @@ let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`Wave18 KCC Validation ${PORT}`).id;
+  wsId = createWorkspace(`Wave18 KCC Validation ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {

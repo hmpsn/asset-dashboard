@@ -173,6 +173,45 @@ describe('schema-plan-admin-mutations', () => {
     expect(mockInvalidateIntelligenceCache).toHaveBeenCalledWith('ws_1');
   });
 
+  it('rejects sendSchemaPlanToClientForReview when plan is already sent_to_client (state precondition)', async () => {
+    mockGetSchemaPlan.mockReturnValue(makePlan({ status: 'sent_to_client' }));
+
+    const { sendSchemaPlanToClientForReview } = await loadModule();
+    const result = sendSchemaPlanToClientForReview('site_1');
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 422,
+      error: expect.stringContaining("sent_to_client"),
+    });
+    expect(mockUpdateSchemaPlanStatus).not.toHaveBeenCalled();
+    expect(mockMirrorSchemaPlanToDeliverable).not.toHaveBeenCalled();
+  });
+
+  it('rejects sendSchemaPlanToClientForReview when plan is already active (state precondition)', async () => {
+    mockGetSchemaPlan.mockReturnValue(makePlan({ status: 'active' }));
+
+    const { sendSchemaPlanToClientForReview } = await loadModule();
+    const result = sendSchemaPlanToClientForReview('site_1');
+
+    expect(result).toMatchObject({ ok: false, status: 422 });
+    expect(mockUpdateSchemaPlanStatus).not.toHaveBeenCalled();
+  });
+
+  it('allows sendSchemaPlanToClientForReview from client_changes_requested (resend after revision)', async () => {
+    const plan = makePlan({ status: 'client_changes_requested' });
+    const sent = makePlan({ status: 'sent_to_client' });
+    mockGetSchemaPlan.mockReturnValue(plan);
+    mockUpdateSchemaPlanStatus.mockReturnValue(sent);
+    mockMirrorSchemaPlanToDeliverable.mockReturnValue({ id: 'deliverable_2', type: 'schema_plan' });
+
+    const { sendSchemaPlanToClientForReview } = await loadModule();
+    const result = sendSchemaPlanToClientForReview('site_1');
+
+    expect(result).toEqual({ ok: true, value: { plan: sent } });
+    expect(mockUpdateSchemaPlanStatus).toHaveBeenCalledWith('site_1', 'sent_to_client');
+  });
+
   it('returns a conflict when admin schema-plan activation races an active generation job', async () => {
     mockGetSchemaPlan.mockReturnValue(makePlan({ status: 'sent_to_client' }));
     mockGetActiveSchemaPlanGenerationJobId.mockReturnValue('job_123');

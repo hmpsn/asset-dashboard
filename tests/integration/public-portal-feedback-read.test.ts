@@ -1,7 +1,6 @@
 /**
  * Integration tests for public-portal READ paths — keyword feedback, content gap votes, copy entries.
  *
- * Port: 13602
  *
  * Covers:
  * - GET /api/public/keyword-feedback/:workspaceId — 404 unknown, 200 with array
@@ -9,11 +8,11 @@
  * - GET /api/public/copy/:workspaceId/entries — 404 unknown, 200 with { entries: [] }
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createTestContext(13602, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-feedback-99999';

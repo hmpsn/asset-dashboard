@@ -1,5 +1,4 @@
 /**
- * keyword-universe-sort.test.ts — Task 1 integration test (port 13902).
  *
  * Exercises the REAL Keyword Command Center rows read path end-to-end for the
  * new clicks/difficulty sorts + direction:
@@ -16,13 +15,13 @@
  * unrelated rows can't mask a regression, and asserts length > 0.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import type { KeywordCommandCenterRowsResponse } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13902); // port-ok: next free after 13901
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

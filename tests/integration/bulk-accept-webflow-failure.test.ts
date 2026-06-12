@@ -21,11 +21,10 @@ vi.mock('../../server/webflow.js', async (importOriginal) => {
   };
 });
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-// ── Unique port ──────────────────────────────────────────────────────────────
-const ctx = createTestContext(13224);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 const SITE_ID = 'site_bulkfail_test';

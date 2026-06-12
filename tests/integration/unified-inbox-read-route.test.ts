@@ -12,14 +12,14 @@
  * fetches it; the read itself is inert until cutover). It is exercised here with seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
-const ctx = createTestContext(13875, { autoPublicAuth: true }); // port-ok: next free after 13874
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let pwless: SeededFullWorkspace;
 let pw: SeededFullWorkspace;

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 describe('GET /api/rewrite-chat/:workspaceId/pages', () => {
-  const ctx = createTestContext(13316);
+  const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'pages' });
   let workspaceId: string;
   let cleanup: () => void;
 
@@ -42,7 +42,7 @@ describe('GET /api/rewrite-chat/:workspaceId/pages', () => {
 
   it('returns 500 from load-page when URL targets an unsafe local host', async () => {
     const res = await ctx.authPostJson(`/api/rewrite-chat/${workspaceId}/load-page`, {
-      url: 'http://127.0.0.1:13316/does-not-exist',
+      url: `${ctx.BASE}/does-not-exist`,
     });
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: 'Failed to fetch page' });
@@ -55,8 +55,7 @@ describe('GET /api/rewrite-chat/:workspaceId/pages', () => {
 });
 
 describe('POST /api/rewrite-chat/:workspaceId — intelligence slice smoke test', () => {
-  // Uses port 13313 — unused slot in the 13201–13319 range
-  const ctx = createTestContext(13313);
+  const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'chat' });
   let workspaceId: string;
   let cleanup: () => void;
 
