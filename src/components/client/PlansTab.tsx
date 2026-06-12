@@ -23,13 +23,17 @@ interface PlansTabProps {
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   onOpenChat: () => void;
   pricingData?: PricingData | null;
+  hidePrices?: boolean;
 }
 
-export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData }: PlansTabProps) {
+export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData, hidePrices: hidePricesProp }: PlansTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
+  const hidePrices = hidePricesProp ?? ws.billingMode === 'external';
+  const growthMonthlyPrice = pricingData?.products?.plan_growth?.price ?? 249;
+  const premiumMonthlyPrice = pricingData?.products?.plan_premium?.price ?? 999;
   const [billingLoading, setBillingLoading] = useState(false);
 
   // Content subscription state
@@ -59,9 +63,9 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     } finally { setBillingLoading(false); }
   };
   type FeatureGroup = { category: string; features: { label: string; included: boolean }[] };
-  const plans: { id: Tier; name: string; price: string; tagline: string; color: string; borderColor: string; bgColor: string; featureGroups: FeatureGroup[] }[] = [
+  const plans: { id: Tier; name: string; monthlyPrice: number | null; price: string; tagline: string; color: string; borderColor: string; bgColor: string; featureGroups: FeatureGroup[] }[] = [
     {
-      id: 'free', name: 'Starter', price: 'Free', tagline: 'Your site at a glance',
+      id: 'free', name: 'Starter', monthlyPrice: null, price: 'Free', tagline: 'Your site at a glance',
       color: 'text-[var(--brand-text)]', borderColor: 'border-[var(--brand-border-strong)]', bgColor: 'bg-[var(--surface-2)]',
       featureGroups: [
         { category: 'Insights & Data', features: [
@@ -84,7 +88,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       ],
     },
     {
-      id: 'growth', name: 'Growth', price: pricingData?.products?.plan_growth ? `$${pricingData.products.plan_growth.price}` : '$249', tagline: 'AI-powered SEO engine',
+      id: 'growth', name: 'Growth', monthlyPrice: growthMonthlyPrice, price: hidePrices ? 'Contact us' : fmtPrice(growthMonthlyPrice), tagline: 'AI-powered SEO engine',
       color: 'text-accent-brand', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Starter, plus:', features: [] },
@@ -107,7 +111,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       ],
     },
     {
-      id: 'premium', name: 'Premium', price: pricingData?.products?.plan_premium ? `$${pricingData.products.plan_premium.price}` : '$999', tagline: 'Managed SEO partnership',
+      id: 'premium', name: 'Premium', monthlyPrice: premiumMonthlyPrice, price: hidePrices ? 'Contact us' : fmtPrice(premiumMonthlyPrice), tagline: 'Managed SEO partnership',
       color: 'text-accent-brand', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Growth, plus:', features: [] },
@@ -160,7 +164,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <h3 className={`t-ui font-semibold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
                   <span className={`t-h1 ${plan.color}`}>{plan.price}</span>
-                  {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
+                  {plan.monthlyPrice != null && !hidePrices && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5 mb-4">{plan.tagline}</p>
                 <div className="space-y-3">
@@ -187,30 +191,42 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                         {isTrial ? 'Trialing Now' : 'Your Plan'}
                       </div>
                       {plan.id !== 'free' && !isTrial && (
-                        <Button
-                          variant="secondary"
-                          onClick={openBillingPortal}
-                          disabled={billingLoading}
-                          loading={billingLoading}
-                          icon={billingLoading ? undefined : CreditCard}
-                          className="w-full"
-                        >
-                          Manage Billing
-                        </Button>
+                        hidePrices ? (
+                          <Button variant="secondary" onClick={onOpenChat} aria-label={`Contact us about ${plan.name} billing`} className="w-full">
+                            Contact us
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            onClick={openBillingPortal}
+                            disabled={billingLoading}
+                            loading={billingLoading}
+                            icon={billingLoading ? undefined : CreditCard}
+                            className="w-full"
+                          >
+                            Manage Billing
+                          </Button>
+                        )
                       )}
                     </div>
                   ) : isUpgrade ? (
-                    <Button onClick={async () => {
-                      try {
-                        const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: plan.id });
-                        if (data.url) window.location.href = data.url;
-                      } catch (err) {
-                        setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
-                      }
-                    }}
-                      className="w-full">
-                      Upgrade to {plan.name}
-                    </Button>
+                    hidePrices ? (
+                      <Button onClick={onOpenChat} aria-label={`Contact us about ${plan.name}`} className="w-full">
+                        Contact us
+                      </Button>
+                    ) : (
+                      <Button onClick={async () => {
+                        try {
+                          const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: plan.id });
+                          if (data.url) window.location.href = data.url;
+                        } catch (err) {
+                          setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
+                        }
+                      }}
+                        className="w-full">
+                        Upgrade to {plan.name}{plan.monthlyPrice != null ? ` - ${fmtPrice(plan.monthlyPrice)}/mo` : ''}
+                      </Button>
+                    )
                   ) : (
                     <div className="w-full py-2 rounded-[var(--radius-lg)] t-caption font-medium text-center bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-faint)]">
                       Included
@@ -224,7 +240,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       </div>
 
       {/* Content pricing section */}
-      {(briefPrice != null || fullPostPrice != null) && (
+      {!hidePrices && (briefPrice != null || fullPostPrice != null) && (
         <SectionCard title="Content Services" titleIcon={<Icon as={FileText} size="lg" className="text-accent-brand" />}>
           <p className="t-body text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
@@ -293,7 +309,10 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="t-page font-semibold text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-page font-semibold text-accent-brand">
+                    {hidePrices ? 'Contact us' : fmtPrice(subData.subscription.priceUsd)}
+                    {!hidePrices && <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>}
+                  </div>
                 </div>
               </div>
               {/* Progress */}
@@ -316,18 +335,24 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   <h4 className="t-page font-semibold text-[var(--brand-text-bright)]">{plan.displayName}</h4>
                   <p className="t-body text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
-                    <span className="t-h2 text-accent-brand">${plan.priceUsd}</span>
-                    <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
+                    <span className="t-h2 text-accent-brand">{hidePrices ? 'Contact us' : fmtPrice(plan.priceUsd)}</span>
+                    {!hidePrices && <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>}
                   </div>
-                  <Button
-                    onClick={() => handleSubscribe(plan.plan)}
-                    disabled={subLoading}
-                    loading={subLoading}
-                    className="mt-3 w-full"
-                  >
-                    {!subLoading && <Icon as={RefreshCw} size="sm" />}
-                    Subscribe
-                  </Button>
+                  {hidePrices ? (
+                    <Button onClick={onOpenChat} aria-label={`Contact us about ${plan.displayName}`} className="mt-3 w-full">
+                      Contact us
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleSubscribe(plan.plan)}
+                      disabled={subLoading}
+                      loading={subLoading}
+                      className="mt-3 w-full"
+                    >
+                      {!subLoading && <Icon as={RefreshCw} size="sm" />}
+                      Subscribe - {fmtPrice(plan.priceUsd)}/mo
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

@@ -71,6 +71,8 @@ export function ContentTab({
   // ISSUE 2a — solo mode: show ONLY the opened request, hide all pipeline chrome. Default false in
   // legacy mounts (no prop) → full pipeline renders unchanged.
   const isSolo = soloRequestId != null;
+  const briefPriceLabel = !hidePrices && briefPrice != null ? fmtPrice(briefPrice) : null;
+  const fullPostPriceLabel = !hidePrices && fullPostPrice != null ? fmtPrice(fullPostPrice) : null;
   // Topic form state
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
@@ -268,11 +270,15 @@ export function ContentTab({
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">What would you like?</div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}>
-              <Icon as={FileText} size="md" /> Content Brief
+            <Button type="button" variant="ghost" aria-label={briefPriceLabel ? `Content Brief ${briefPriceLabel}` : 'Content Brief'} onClick={() => setNewTopicServiceType('brief_only')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${newTopicServiceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}>
+              <Icon as={FileText} size="md" />
+              <span>Content Brief</span>
+              {briefPriceLabel && <span className="opacity-70">{briefPriceLabel}</span>}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}>
-              <Icon as={Sparkles} size="md" /> Full Blog Post
+            <Button type="button" variant="ghost" aria-label={fullPostPriceLabel ? `Full Blog Post ${fullPostPriceLabel}` : 'Full Blog Post'} onClick={() => setNewTopicServiceType('full_post')} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${newTopicServiceType === 'full_post' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}>
+              <Icon as={Sparkles} size="md" />
+              <span>Full Blog Post</span>
+              {fullPostPriceLabel && <span className="opacity-70">{fullPostPriceLabel}</span>}
             </Button>
           </div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{newTopicServiceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>

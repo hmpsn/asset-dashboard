@@ -722,7 +722,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             plans: (
               <LazyClientTabPanel>
-                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
+                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} hidePrices={isExternalBilling} />
               </LazyClientTabPanel>
             ),
             roi: (

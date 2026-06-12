@@ -801,6 +801,10 @@ export function UnifiedInbox({
           onDismiss={() => setChooserOpen(false)}
           setPricingModal={contentTabProps.setPricingModal}
           pricingConfirming={contentTabProps.pricingConfirming}
+          briefPrice={contentTabProps.briefPrice}
+          fullPostPrice={contentTabProps.fullPostPrice}
+          fmtPrice={contentTabProps.fmtPrice}
+          hidePrices={contentTabProps.hidePrices}
         />
       )}
     </div>

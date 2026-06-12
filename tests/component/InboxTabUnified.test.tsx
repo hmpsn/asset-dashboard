@@ -406,6 +406,37 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByRole('dialog', { name: 'Ask for content' })).not.toBeInTheDocument();
   });
 
+  it('flag ON → chooser shows content service prices before the pricing modal opens', () => {
+    mockUseFeatureFlag.mockReturnValue(false);
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} briefPrice={125} fullPostPrice={500} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ask for content/ }));
+
+    expect(screen.getByRole('button', { name: /Content Brief \$125/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Full Blog Post \$500/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continue - \$125/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Full Blog Post \$500/i }));
+    expect(screen.getByRole('button', { name: /Continue - \$500/i })).toBeInTheDocument();
+  });
+
+  it('flag ON → chooser hides content service prices for external billing', () => {
+    mockUseFeatureFlag.mockReturnValue(false);
+    mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
+
+    render(<InboxTab {...baseProps} briefPrice={125} fullPostPrice={500} hidePrices />);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit a request' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ask for content/ }));
+
+    expect(screen.getByRole('button', { name: /^Content Brief$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Full Blog Post$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    expect(screen.queryByText('$125')).not.toBeInTheDocument();
+    expect(screen.queryByText('$500')).not.toBeInTheDocument();
+  });
+
   // ── Item 5 — section headings + vocab reconcile ──
 
   it('flag ON → the actionable section has a visible "Decisions" heading + subtitle (was aria-only)', () => {

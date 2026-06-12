@@ -18,6 +18,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import { getWorkspace } from '../workspaces.js';
 
 const log = createLogger('routes:content-subscriptions');
 const router = Router();
@@ -194,16 +195,23 @@ router.get('/api/public/content-subscription/:workspaceId', requireClientPortalA
 // Client checkout for a content subscription
 router.post('/api/public/content-subscribe/:workspaceId', requireClientPortalAuth(), async (req, res) => {
   try {
+    const workspaceId = req.params.workspaceId;
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    if (ws.billingMode === 'external') {
+      return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+    }
+
     const { plan } = req.body as { plan: ContentSubPlan };
     const planConfig = CONTENT_SUB_PLANS.find(p => p.plan === plan);
     if (!planConfig) return res.status(400).json({ error: `Invalid plan: ${plan}` });
 
     const origin = `${req.protocol}://${req.get('host')}`;
     const { sessionId, url } = await createCheckoutSession({
-      workspaceId: req.params.workspaceId,
+      workspaceId,
       productType: plan,
-      successUrl: `${origin}/client/${req.params.workspaceId}/plans?subscribed=true`,
-      cancelUrl: `${origin}/client/${req.params.workspaceId}/plans`,
+      successUrl: `${origin}/client/${workspaceId}/plans?subscribed=true`,
+      cancelUrl: `${origin}/client/${workspaceId}/plans`,
     });
 
     res.json({ sessionId, url });
