@@ -22,6 +22,7 @@ import { type Page, adminPath, clientPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
+import { timeAgo } from '../lib/timeAgo';
 
 const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 
@@ -221,7 +222,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   // Data freshness
   const ageMs = lastFetched ? now.getTime() - lastFetched.getTime() : 0;
   const isStale = ageMs > 60 * 60 * 1000; // >1 hour
-  const freshnessLabel = !lastFetched ? '' : ageMs < 60_000 ? 'Just now' : ageMs < 3_600_000 ? `${Math.floor(ageMs / 60_000)}m ago` : `${Math.floor(ageMs / 3_600_000)}h ago`;
+  const freshnessLabel = lastFetched ? timeAgo(lastFetched.toISOString(), { capitalizeJustNow: true }) : '';
 
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
 

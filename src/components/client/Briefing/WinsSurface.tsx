@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { SectionCard, Skeleton, Icon, EmptyState } from '../../ui';
 import { TierGate } from '../../ui/TierGate';
 import { useClientOutcomeWins } from '../../../hooks/client/useClientOutcomes';
+import { timeAgo } from '../../../lib/timeAgo';
 import type { Tier } from '../../ui/TierGate';
 import type { ActionType, OutcomeWinEntry, OutcomeScore } from '../../../../shared/types/outcome-tracking';
 
@@ -28,18 +29,6 @@ const ACTION_LABELS: Record<ActionType, string> = {
 
 function actionLabel(type: ActionType): string {
   return ACTION_LABELS[type] ?? type.replace(/_/g, ' ');
-}
-
-// ── Relative time ──────────────────────────────────────────────────────────
-
-function relativeTime(isoDate: string): string {
-  const diff = Math.max(0, Date.now() - new Date(isoDate).getTime());
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30.44); // 30.44 ≈ avg days/month
-  return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
 // ── Win quality badge ──────────────────────────────────────────────────────
@@ -102,7 +91,7 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
           )}
         </p>
       </div>
-      <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 pt-0.5">{relativeTime(entry.detectedAt)}</span>
+      <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 pt-0.5">{timeAgo(entry.detectedAt, { style: 'calendar' })}</span>
     </div>
   );
 }
