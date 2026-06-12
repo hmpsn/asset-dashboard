@@ -7,7 +7,6 @@
  *  - Broadcast shape after status change vs. non-status-only update
  *  - Workspace isolation (cross-workspace PATCH returns 404, list returns own data only)
  *
- * Port: 13854
  * Avoid duplication with content-request-mutation-safety.test.ts (full lifecycle,
  * post_review auto-populate, page-state write, delete, public endpoints).
  */

@@ -15,13 +15,13 @@
  * FETCHES it; the read itself is inert until cutover). It is exercised here with seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
 import type { AdminDeliverableView } from '../../shared/types/admin-deliverable-view.js';
 
-const ctx = createTestContext(13876); // port-ok: next free after 13875
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let ws: SeededFullWorkspace;
 

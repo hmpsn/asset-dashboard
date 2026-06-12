@@ -5,14 +5,13 @@
  * mismatch workspaceId → 403, valid workspace but site with no Webflow token
  * still reaches the handler and returns data (empty scan).
  *
- * Port: 13546 (range 13545–13559 exclusively assigned to wave-23-a1).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13546); // port-ok: assigned range 13545-13559
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

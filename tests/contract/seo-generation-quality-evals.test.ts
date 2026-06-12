@@ -16,7 +16,7 @@
  * bar qualifies as an evidence-grounding contract now that P3 enforces it deterministically.
  *
  * No server port is allocated: this is a deterministic contract test (no
- * createTestContext / HTTP boot), so it leaves no orphan 13xxx port.
+ * createEphemeralTestContext / HTTP boot), so it leaves no orphan 13xxx port.
  */
 import { describe, expect, it } from 'vitest';
 

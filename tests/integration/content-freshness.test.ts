@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
-
-const PORT = 13341;
 const STALE_DATE = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
 
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 describe('content freshness detection', () => {
   let seed: ReturnType<typeof seedWorkspace>;

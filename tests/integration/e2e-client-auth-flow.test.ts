@@ -16,7 +16,7 @@
  * can make per test run. Tests are ordered to minimize auth attempts.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createWorkspace,
   updateWorkspace,
@@ -28,7 +28,7 @@ import {
 } from '../../server/client-users.js';
 import bcrypt from 'bcryptjs';
 
-const ctx = createTestContext(13233, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let testWsId = '';

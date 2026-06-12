@@ -2,13 +2,12 @@
  * Integration tests for content-briefs read paths and basic validation.
  * Covers GET endpoints and POST validation-only routes (no AI calls).
  *
- * Port: 13648 (assigned range 13648–13655 for wave-24-a7)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13648); // port-ok: assigned range 13648-13655
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let wsId = '';

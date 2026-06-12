@@ -1,6 +1,5 @@
 /**
  * Integration tests for voice calibration mutation lifecycle.
- * port-ok: unique in integration suite
  *
  * Covers mutation paths NOT already tested in:
  *   - voice-calibration-mutations.test.ts  (PATCH profile, sample CRUD, workspace isolation)
@@ -22,7 +21,7 @@
  * 10.  Payload validation — missing/bad fields → 400 on calibrate + refine + feedback
  * 11.  Broadcast emissions for each mutation route
  *
- * Port: 13863
+ * Uses an ephemeral in-process server port.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -103,8 +102,9 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>(resolve => server!.listen(13863, '127.0.0.1', resolve)); // port-ok: unique in integration suite
-  baseUrl = 'http://127.0.0.1:13863';
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${port}`;
 }
 
 async function stopTestServer(): Promise<void> {

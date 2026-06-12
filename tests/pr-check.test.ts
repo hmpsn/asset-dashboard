@@ -3607,100 +3607,118 @@ describe('Rule: Duplicate globally-applied rate limiter in route file', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: Port collision in integration tests
+// Rule: Fixed test ports are forbidden
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Rule: Port collision in integration tests', () => {
-  const RULE = 'Port collision in integration tests';
+describe('Rule: Fixed test ports are forbidden', () => {
+  const RULE = 'Fixed test ports are forbidden';
   // Helper to build createTestContext() calls in fixture strings without
-  // tripping the meta-port-uniqueness test, which scans every .test.ts
-  // file for the literal regex /createTestContext\s*\(\s*(\d+)/.
+  // tripping the meta-port-uniqueness test, which scans test files
+  // file for direct createTestContext() usage.
   const ctc = (port: number) => `createTestContext(${port})`;
 
-  it('flags duplicate port numbers across test files', () => {
-    const file1 = write(
+  it('flags direct createTestContext usage in test files', () => {
+    const file = write(
       uniqPath('rule-port', 'tests/integration/feature-a.test.ts'),
       lines(
         "import { createTestContext } from '../helpers';",
         `const ctx = ${ctc(19999)};`,
       )
     );
-    const file2 = write(
-      uniqPath('rule-port', 'tests/integration/feature-b.test.ts'),
-      lines(
-        "import { createTestContext } from '../helpers';",
-        `const ctx = ${ctc(19999)};`,
-      )
-    );
-    const hits = runRule(RULE, [file1, file2]);
-    expect(hits).toHaveLength(2); // both files flagged
-    expect(hits[0].file).toBe(file1);
-    expect(hits[1].file).toBe(file2);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].file).toBe(file);
   });
 
-  it('respects inline // port-ok hatch', () => {
-    const file1 = write(
+  it('flags direct createTestContext usage even with the legacy // port-ok hatch', () => {
+    const file = write(
       uniqPath('rule-port', 'tests/integration/shared-a.test.ts'),
       lines(
-        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-b`,
+        `const ctx = ${ctc(19998)}; // port-ok — old fixed-port hatch`,
       )
     );
-    const file2 = write(
-      uniqPath('rule-port', 'tests/integration/shared-b.test.ts'),
-      lines(
-        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-a`,
-      )
-    );
-    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(1);
   });
 
-  it('respects // port-ok hatch on line above', () => {
-    const file1 = write(
-      uniqPath('rule-port', 'tests/integration/above-a.test.ts'),
-      lines(
-        "// port-ok — intentionally shared",
-        `const ctx = ${ctc(19997)};`,
-      )
-    );
-    const file2 = write(
-      uniqPath('rule-port', 'tests/integration/above-b.test.ts'),
-      lines(
-        "// port-ok",
-        `const ctx = ${ctc(19997)};`,
-      )
-    );
-    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
-  });
-
-  it('does not flag unique in-range port numbers', () => {
-    const file1 = write(
-      uniqPath('rule-port', 'tests/integration/unique-a.test.ts'),
-      lines(
-        `const ctx = ${ctc(13201)};`,
-      )
-    );
-    const file2 = write(
-      uniqPath('rule-port', 'tests/integration/unique-b.test.ts'),
-      lines(
-        `const ctx = ${ctc(13202)};`,
-      )
-    );
-    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
-  });
-
-  it('flags a single port outside the documented 13201–13319 range', () => {
+  it('flags fixed numeric server.listen ports', () => {
     const file = write(
-      uniqPath('rule-port', 'tests/integration/out-of-range.test.ts'),
+      uniqPath('rule-port', 'tests/integration/raw-server.test.ts'),
       lines(
-        `const ctx = ${ctc(50000)};`,
+        "const server = http.createServer(app);",
+        "server.listen(13857, '127.0.0.1');",
       )
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
+    expect(hits[0].line).toBe(2);
   });
 
-  it('does not flag files without createTestContext', () => {
+  it('flags fixed ports in test TSX files', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/component/server-backed.test.tsx'),
+      lines(
+        "const server = http.createServer(app);",
+        "server.listen(13858, '127.0.0.1');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags fixed ports in server test files', () => {
+    const file = write(
+      uniqPath('rule-port', 'server/__tests__/server-backed.test.ts'),
+      lines(
+        "const server = http.createServer(app);",
+        "server.listen(13859, '127.0.0.1');",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags fixed numeric PORT constants used for server binds', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/integration/port-const.test.ts'),
+      lines(
+        "const TEST_PORT = 13860;",
+        "const server = http.createServer(app);",
+        "server.listen(TEST_PORT, '127.0.0.1');",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag ephemeral context usage or listen(0)', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/ephemeral-a.test.ts'),
+      lines(
+        "import { createEphemeralTestContext } from '../helpers';",
+        "const ctx = createEphemeralTestContext(import.meta.url);",
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/raw-ephemeral.test.ts'),
+      lines(
+        "const server = http.createServer(app);",
+        "server.listen(0, '127.0.0.1');",
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('does not flag comments mentioning createTestContext', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/integration/comments.test.ts'),
+      lines(
+        "// createTestContext(19999) is legacy and should not be used",
+        "const ctx = createEphemeralTestContext(import.meta.url);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files without test server ports', () => {
     const file = write(
       uniqPath('rule-port', 'tests/unit/utils.test.ts'),
       lines(
@@ -5752,7 +5770,7 @@ describe('Meta: customCheck rule name registry', () => {
     'requireAuth usage outside allowed route files',
     'Duplicate globally-applied rate limiter in route file',
     // P1 expansion rules
-    'Port collision in integration tests',
+    'Fixed test ports are forbidden',
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
     // Keyword Command Center crash-hardening follow-up

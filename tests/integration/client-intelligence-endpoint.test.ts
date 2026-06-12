@@ -17,17 +17,16 @@
  *   - keywordFeedbackSummary projects client-safe approve/reject signals
  *   - Workspace isolation: one workspace's insights don't bleed into another
  *
- * Port: 13366 (port-ok: next free after 13365)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import { LEARNINGS_LOGIC_VERSION } from '../../server/workspace-learnings.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13366, { autoPublicAuth: true }); // port-ok: next free after 13365
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 // Seeded workspaces — created after server starts so DB is guaranteed up.

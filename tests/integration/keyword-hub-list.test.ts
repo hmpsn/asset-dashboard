@@ -1,5 +1,4 @@
 /**
- * keyword-hub-list.test.ts — P1-T5 integration test (port 13900).
  *
  * Exercises the REAL Keyword Hub read path: the KCC rows + summary endpoints
  * that the Hub list (P1-T3/T4) consumes:
@@ -14,7 +13,7 @@
  * vacuously-true empty result can never mask a filter regression.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { storeRankSnapshot } from '../../server/rank-tracking.js';
 import type {
@@ -22,7 +21,7 @@ import type {
   KeywordCommandCenterSummaryResponse,
 } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13900); // port-ok: next free after 13899
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let workspaceId = '';

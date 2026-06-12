@@ -16,7 +16,6 @@
  *
  * Architecture note: POST /api/public/signal/:id hits BOTH publicWriteLimiter (10/min)
  * AND publicApiLimiter (60/min) AND globalPublicLimiter (200/min) — the write limiter is
- * the binding constraint. The existing client-signals-rate-limit.test.ts (port 13300)
  * covers write-limiter exhaustion on the /signal path; this file covers the remaining
  * tiers on separate paths, using a dedicated port so buckets start clean.
  *
@@ -27,11 +26,11 @@
  *  - Retry-After           : seconds until reset, only on 429 responses
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 // Dedicated port — no other test file uses 13302
-const ctx = createTestContext(13302, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // publicApiWsId is shared across the header-presence describe block (describe block 1 + 2).

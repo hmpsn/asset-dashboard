@@ -11,18 +11,15 @@
  *   - applies === true when posture is 'local' + a snapshot exists
  *   - applies === false for a default (non-local) workspace
  *
- * Port: 13905 (next free after 13904 — confirmed by grepping createTestContext)
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import db from '../../server/db/index.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
-
-const PORT = 13905;
-const ctx = createTestContext(PORT); // port-ok: next free after 13904
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let localWsId = ''; // workspace with local posture + snapshot + strategy blob

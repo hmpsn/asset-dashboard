@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13753, { env: { OPENAI_API_KEY: '' } });
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { api, postJson } = ctx;
 
 let wsId = '';

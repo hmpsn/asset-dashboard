@@ -1,22 +1,20 @@
 /**
  * Wave 18 — Integration tests for public-chat usage routes
- * Port: 13440
  *
  * Routes tested (server/routes/public-chat.ts):
  *   GET /api/public/chat-usage/:workspaceId — rate limit check for a workspace
  *   GET /api/public/usage/:workspaceId      — unified usage summary
  *
  * These routes are not covered in the existing public-chat-routes.test.ts
- * (port 13350), which focuses on session CRUD.
  *
  * Also covers supplemental cases for:
  *   GET /api/public/chat-sessions/:workspaceId — invalid channel filter → 400
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13440, { autoPublicAuth: true }); // port-ok: wave-18-a3 range 13440-13454
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let workspaceId = '';

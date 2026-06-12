@@ -15,9 +15,9 @@ import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import type { ClientSignalsSlice } from '../../shared/types/intelligence.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13349, { autoPublicAuth: true }); // port-ok: 13201-13348 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';

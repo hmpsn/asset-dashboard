@@ -8,10 +8,9 @@
  * analysis from the SEO Editor, Page Intelligence would show empty state
  * despite having real stored data.
  *
- * Port: 13320
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { listPageKeywords, upsertPageKeyword } from '../../server/page-keywords.js';
@@ -22,9 +21,7 @@ import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../.
 import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import type { ContentGap, PageKeywordMap } from '../../shared/types/workspace.js';
-
-const PORT = 13320;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let partialWsId = '';   // has page_keywords, no ws.keywordStrategy
 let emptyWsId = '';     // no page_keywords, no ws.keywordStrategy
@@ -67,7 +64,7 @@ afterAll(async () => {
 
 describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', () => {
   it('returns pageMap when page_keywords has rows but ws.keywordStrategy is absent', async () => {
-    const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`);
+    const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${partialWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
 
@@ -84,14 +81,14 @@ describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', (
   });
 
   it('returns null when neither ws.keywordStrategy nor page_keywords has data', async () => {
-    const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${emptyWsId}`);
+    const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${emptyWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toBeNull();
   });
 
   it('synthesized shell has generatedAt: null so client can distinguish from real strategy', async () => {
-    const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`);
+    const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${partialWsId}`);
     const body = await res.json();
     expect(body.generatedAt).toBeNull();
     expect(body.siteKeywords).toEqual([]);
@@ -120,7 +117,7 @@ describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', (
         },
       });
 
-      const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`);
+      const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`);
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.contentGaps).toEqual([
@@ -160,7 +157,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('pure-pageMap PATCH on shell-state workspace does NOT create a strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH pure-pageMap shell');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -185,7 +182,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('pure quickWins PATCH updates table-backed rows without creating a strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH quickWins shell');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,7 +205,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('pure keywordGaps PATCH updates table-backed rows without creating a strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH keywordGaps shell');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -237,7 +234,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('pure topicClusters PATCH updates table-backed rows without creating a strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH topicClusters shell');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -273,7 +270,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('pure cannibalization PATCH updates table-backed rows without creating a strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH cannibalization shell');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -318,7 +315,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
       { pagePath: '/services/seo', action: 'Keep me', estimatedImpact: 'medium', rationale: 'baseline' },
     ]);
 
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -344,7 +341,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
       },
     ]);
 
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -371,7 +368,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
       },
     ]);
 
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -396,7 +393,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
       },
     ]);
 
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -412,7 +409,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
     const wsId = freshShellWorkspace('PATCH siteKeywords promote');
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -435,7 +432,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
   it('pure-pageMap PATCH on workspace with existing blob PRESERVES original generatedAt', async () => {
     // Seed the workspace with a real blob via a non-pageMap PATCH first.
     const wsId = freshShellWorkspace('PATCH timestamp preservation');
-    const seedRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const seedRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ siteKeywords: ['original'] }),
@@ -448,7 +445,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     await new Promise(r => setTimeout(r, 10));
 
     // Pure-pageMap patch — must preserve the original timestamp.
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const patchRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -462,7 +459,7 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
     // Non-pageMap patch — SHOULD bump the timestamp.
     await new Promise(r => setTimeout(r, 10));
-    const bumpRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+    const bumpRes = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ siteKeywords: ['updated'] }),

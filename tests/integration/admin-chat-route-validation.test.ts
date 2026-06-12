@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13357); // port-ok: 13201-13356 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 let workspaceId = '';

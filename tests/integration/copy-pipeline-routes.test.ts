@@ -1,6 +1,5 @@
 /**
  * Integration tests for admin copy-pipeline routes.
- * port-ok: next free after 13364
  *
  * Covers:
  * - GET  /api/copy/:workspaceId/entry/:entryId/sections
@@ -25,13 +24,13 @@
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import { cancelJob, listJobs } from '../../server/jobs.js';
 
-const ctx = createTestContext(13365); // port-ok: next free after 13364
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsA: SeededFullWorkspace;

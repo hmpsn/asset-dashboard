@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createMatrix, getMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13351, { autoPublicAuth: true }); // port-ok: 13201-13350 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 let workspaceId = '';

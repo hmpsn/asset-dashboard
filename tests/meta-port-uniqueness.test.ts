@@ -1,20 +1,8 @@
 /**
- * Meta-test: every integration server port strategy across the test tree must be valid.
- *
- * Round 2 Task P3.1 of the 2026-04-10 pr-check audit. CLAUDE.md requires
- * each integration test file using `createTestContext()` to allocate a
- * unique port in the 13201+ range. `createEphemeralTestContext(import.meta.url)`
- * is the behavior-preserving migration path for new or opportunistically
- * simplified tests. Today the literal-path rule is enforced by a
- * `grep -r 'createTestContext('` convention before every PR. When two
- * authors collide on a port number, the second test to run binds to an
- * already-listening socket and either fails with EADDRINUSE (loud) or,
- * worse, succeeds and produces cross-contaminated state (silent). This
- * meta-test converts the convention into a mechanical gate.
- *
- * The literal-port regex deliberately only matches integer ports. Files using
- * `createEphemeralTestContext(import.meta.url)` are treated as a separate
- * valid ownership strategy. Any other call shape is a test bug.
+ * Meta-test: integration server ports must use the lock-backed ephemeral
+ * allocator. Fixed literal ports are forbidden in normal test files because
+ * parallel local agents and CI workers can collide on the same process-global
+ * port even when each file chose a unique integer.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, lstatSync } from 'fs';
@@ -33,6 +21,7 @@ function repoRoot(): string {
 }
 
 function walkTestFiles(dir: string): string[] {
+  if (!lstatSync(dir).isDirectory()) return [];
   const results: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
@@ -53,108 +42,146 @@ function walkTestFiles(dir: string): string[] {
   return results;
 }
 
-describe('Meta: integration server port uniqueness', () => {
-  it('every literal integration server port is unique across the test tree', () => {
+function collectCallExpressions(src: string, callee: string): string[] {
+  const calls: string[] = [];
+  let searchFrom = 0;
+  const needle = `${callee}(`;
+
+  while (searchFrom < src.length) {
+    const start = src.indexOf(needle, searchFrom);
+    if (start === -1) break;
+
+    let depth = 0;
+    let quote: '"' | "'" | '`' | undefined;
+    let escaped = false;
+
+    for (let i = start + callee.length; i < src.length; i += 1) {
+      const ch = src[i];
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === quote) {
+          quote = undefined;
+        }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      } else if (ch === '(') {
+        depth += 1;
+      } else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          calls.push(src.slice(start, i + 1));
+          searchFrom = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (searchFrom <= start) searchFrom = start + needle.length;
+  }
+
+  return calls;
+}
+
+function stripLineComment(line: string): string {
+  const idx = line.indexOf('//');
+  return idx === -1 ? line : line.slice(0, idx);
+}
+
+describe('Meta: integration server port strategy', () => {
+  it('normal test files use ephemeral test ports', () => {
     const root = repoRoot();
-    const testDir = path.join(root, 'tests');
-    const files = walkTestFiles(testDir);
+    const files = [
+      ...walkTestFiles(path.join(root, 'tests')),
+      ...walkTestFiles(path.join(root, 'server/__tests__')),
+    ];
 
-    // Map port → list of files that claim it. Duplicates produce a
-    // list longer than one. Claims include createTestContext(...) ports and
-    // raw server/index.ts spawn helpers that bind their own PORT constants.
-    const portClaims = new Map<number, string[]>();
-    // Track files that call createTestContext with a first argument we
-    // cannot resolve to a number. Local numeric consts like `const PORT = 13322`
-    // are resolved so those files stay covered by the uniqueness gate.
-    const nonLiteralCallers: string[] = [];
-
-    const numericConstRe = /const\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g;
-    const callRe = /createTestContext\s*\(\s*([A-Za-z_$][\w$]*|\d+)/g;
-    // Any match — if present but callRe yielded no resolved port, the caller
-    // is using an indirection we don't parse.
-    const anyRe = /createTestContext\s*\(/g;
-    const ephemeralRe = /createEphemeralTestContext\s*\(/g;
-    const validEphemeralRe = /createEphemeralTestContext\s*\(\s*import\.meta\.url\b/g;
+    const directFixedContextCallers: string[] = [];
+    const fixedListenCallers: string[] = [];
     const invalidEphemeralCallers: string[] = [];
-    const duplicateEphemeralCallers: string[] = [];
+    const duplicateEphemeralContextNames: string[] = [];
 
     for (const file of files) {
       const src = readFileSync(file, 'utf-8');
       const rel = path.relative(root, file);
       const isHarness =
         rel === 'tests/meta-port-uniqueness.test.ts'
-        || rel === 'tests/unit/test-ports.test.ts';
-      const numericConsts = new Map<string, number>();
-      let resolvedCount = 0;
-      let m: RegExpExecArray | null;
+        || rel === 'tests/unit/test-ports.test.ts'
+        || rel === 'tests/pr-check.test.ts'
+        || rel === 'tests/integration/helpers.ts';
+      if (isHarness) continue;
 
-      numericConstRe.lastIndex = 0;
-      while ((m = numericConstRe.exec(src)) !== null) {
-        numericConsts.set(m[1], Number.parseInt(m[2], 10));
-      }
-
-      callRe.lastIndex = 0;
-      while ((m = callRe.exec(src)) !== null) {
-        const arg = m[1];
-        const port = /^\d+$/.test(arg)
-          ? Number.parseInt(arg, 10)
-          : numericConsts.get(arg);
-        if (port === undefined) continue;
-        resolvedCount += 1;
-        if (!Number.isFinite(port)) continue;
-        if (!portClaims.has(port)) portClaims.set(port, []);
-        portClaims.get(port)!.push(`${rel}:createTestContext`);
-      }
-
-      if (src.includes('server/index.ts')) {
-        for (const [name, port] of numericConsts) {
-          if (!/PORT/i.test(name)) continue;
-          if (!Number.isFinite(port)) continue;
-          if (!portClaims.has(port)) portClaims.set(port, []);
-          portClaims.get(port)!.push(`${rel}:${name}`);
+      src.split('\n').forEach((line, idx) => {
+        const code = stripLineComment(line);
+        if (/\bcreateTestContext\s*\(/.test(code)) {
+          directFixedContextCallers.push(`${rel}:${idx + 1}`);
         }
-      }
-      // If the file calls createTestContext at all but no literal was
-      // parsed, note it. This is informational, not a hard failure.
-      anyRe.lastIndex = 0;
-      const totalCalls = (src.match(anyRe) ?? []).length;
-      const ephemeralCalls = (src.match(ephemeralRe) ?? []).length;
-      const validEphemeralCalls = (src.match(validEphemeralRe) ?? []).length;
-      if (totalCalls > resolvedCount) {
-        const unresolvedLiteralCalls = totalCalls - resolvedCount - ephemeralCalls;
-        if (unresolvedLiteralCalls > 0) {
-          nonLiteralCallers.push(rel);
+        if (/\blisten\s*\(\s*(?:[1-9][0-9]{3,}|13[0-9]{3})\b/.test(code)) {
+          fixedListenCallers.push(`${rel}:${idx + 1}`);
         }
+      });
+
+      const fixedPortConstNames = src
+        .split('\n')
+        .map(line => stripLineComment(line))
+        .map(line => /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:13[0-9]{3}|[1-9][0-9]{3,})\b/.exec(line)?.[1])
+        .filter((name): name is string => !!name && /PORT/i.test(name));
+      if (fixedPortConstNames.length > 0) {
+        src.split('\n').forEach((line, idx) => {
+          const code = stripLineComment(line);
+          for (const name of fixedPortConstNames) {
+            if (new RegExp(`\\blisten\\s*\\(\\s*${name}\\b`).test(code)) {
+              fixedListenCallers.push(`${rel}:${idx + 1}`);
+              break;
+            }
+          }
+        });
       }
-      if (!isHarness && ephemeralCalls > validEphemeralCalls) {
-        invalidEphemeralCallers.push(rel);
+
+      const sourceForCalls = src
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .filter(line => !line.trim().startsWith('//'))
+        .join('\n');
+      const seenContextNames = new Map<string, number>();
+      for (const call of collectCallExpressions(sourceForCalls, 'createEphemeralTestContext')) {
+        if (!/createEphemeralTestContext\s*\(\s*import\.meta\.url\b/.test(call)) {
+          const line = src.slice(0, src.indexOf(call)).split('\n').length;
+          invalidEphemeralCallers.push(`${rel}:${line}`);
+          continue;
+        }
+        const contextName = /contextName\s*:\s*['"]([^'"]+)['"]/.exec(call)?.[1] ?? 'default';
+        const count = seenContextNames.get(contextName) ?? 0;
+        seenContextNames.set(contextName, count + 1);
       }
-      if (!isHarness && validEphemeralCalls > 1) {
-        duplicateEphemeralCallers.push(rel);
+
+      for (const [contextName, count] of seenContextNames) {
+        if (count > 1) {
+          duplicateEphemeralContextNames.push(`${rel}:${contextName}`);
+        }
       }
     }
 
-    // Fail loudly on any port claimed by more than one file.
-    const collisions = [...portClaims.entries()].filter(([, claimants]) => claimants.length > 1);
-    if (collisions.length > 0) {
-      const report = collisions
-        .map(([port, claimants]) => {
-          const unique = [...new Set(claimants)].sort();
-          return `  port ${port}:\n` + unique.map((f) => `    - ${f}`).join('\n');
-        })
-        .join('\n\n');
+    if (directFixedContextCallers.length > 0) {
       throw new Error(
-        `Integration server port collisions detected:\n\n${report}\n\n` +
-        `Each integration test file must bind to a unique port. Check both ` +
-        `createTestContext(...) calls and raw server/index.ts PORT constants ` +
-        `before picking the next free integer.`,
+        `Normal test files must use createEphemeralTestContext(import.meta.url), not createTestContext(port):\n  - ${
+          directFixedContextCallers.join('\n  - ')
+        }`,
       );
     }
 
-    // Sanity: at least one port must have been parsed, otherwise the
-    // regex probably drifted from the actual call sites (e.g. someone
-    // introduced a factory indirection without updating this test).
-    expect(portClaims.size).toBeGreaterThan(0);
+    if (fixedListenCallers.length > 0) {
+      throw new Error(
+        `Test servers must bind with listen(0, '127.0.0.1') and derive baseUrl from server.address().port:\n  - ${
+          fixedListenCallers.join('\n  - ')
+        }`,
+      );
+    }
 
     if (invalidEphemeralCallers.length > 0) {
       throw new Error(
@@ -163,27 +190,18 @@ describe('Meta: integration server port uniqueness', () => {
         }`,
       );
     }
-    if (duplicateEphemeralCallers.length > 0) {
+    if (duplicateEphemeralContextNames.length > 0) {
       throw new Error(
-        `Each test file may call createEphemeralTestContext(import.meta.url) at most once:\n  - ${
-          duplicateEphemeralCallers.join('\n  - ')
+        `Multiple createEphemeralTestContext() calls in one file must use unique contextName values:\n  - ${
+          duplicateEphemeralContextNames.join('\n  - ')
         }`,
       );
     }
 
-    // Optional informational output on non-literal callers. Do not fail —
-    // they might be legitimately using a shared constant.
-    if (nonLiteralCallers.length > 0 && process.env.DEBUG_PORT_META) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[meta-port-uniqueness] ${nonLiteralCallers.length} file(s) call ` +
-        `createTestContext() with a non-literal argument:\n  - ` +
-        nonLiteralCallers.join('\n  - '),
-      );
-    }
+    expect(files.length).toBeGreaterThan(0);
   });
 
-  it('createTestContext() server cleanup is awaited', () => {
+  it('test context server cleanup is awaited', () => {
     const root = repoRoot();
     const files = walkTestFiles(path.join(root, 'tests'));
     const unawaited: string[] = [];
@@ -191,10 +209,10 @@ describe('Meta: integration server port uniqueness', () => {
     for (const file of files) {
       const src = readFileSync(file, 'utf-8');
       const rel = path.relative(root, file);
-      if (rel === 'tests/meta-port-uniqueness.test.ts' || !src.includes('ctx.stopServer();')) continue;
+      if (rel === 'tests/meta-port-uniqueness.test.ts' || !src.includes('.stopServer();')) continue;
       src.split('\n').forEach((line, idx) => {
         const code = line.replace(/\/\/.*$/, '');
-        if (code.includes('ctx.stopServer();') && !code.includes('await ctx.stopServer();')) {
+        if (code.includes('.stopServer();') && !code.includes('await ')) {
           unawaited.push(`${rel}:${idx + 1}`);
         }
       });
@@ -202,7 +220,7 @@ describe('Meta: integration server port uniqueness', () => {
 
     if (unawaited.length > 0) {
       throw new Error(
-        `createTestContext().stopServer() must be awaited so test server ports ` +
+        `Test context stopServer() must be awaited so ephemeral ports ` +
         `are released before the next file starts:\n  - ${unawaited.join('\n  - ')}`,
       );
     }

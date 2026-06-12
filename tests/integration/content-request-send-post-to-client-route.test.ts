@@ -11,7 +11,7 @@
  *  - the sent post reaches the unified inbox (listClientFacingDeliverables → awaiting_client)
  *
  * Uses an ephemeral listen(0) port (matches the sibling content-request route tests) so it never
- * collides with the 13xxx createTestContext allocations.
+ * collides with the 13xxx createEphemeralTestContext allocations.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';

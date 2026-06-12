@@ -1,6 +1,5 @@
 /**
  * Integration tests for copy pipeline state machine transitions.
- * port-ok: unique in integration suite (13864)
  *
  * Covers state machine transitions NOT already tested in copy-pipeline-lifecycle.test.ts,
  * copy-pipeline-routes.test.ts, and copy-pipeline-validation.test.ts. Specifically:

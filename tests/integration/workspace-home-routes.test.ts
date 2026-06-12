@@ -9,10 +9,10 @@
  *   - Fresh workspace with no external data → 200 with expected shape
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13404);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsId = '';

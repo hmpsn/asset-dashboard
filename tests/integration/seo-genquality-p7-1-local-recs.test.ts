@@ -22,7 +22,6 @@
  *   (6) ActionType mapping + label maps — recommendationOutcomeActionType returns the new
  *       ActionTypes (NOT audit_fix_applied); the admin label map covers them.
  *
- * Port for the HTTP leak test: 13882 (next free slot in the 13201–13899 range).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -474,12 +473,11 @@ describe('P7.1 dedupe safe-direction — panel-dedupe protects the whole categor
 // ── (7) public-leak — local recs strip money fields + no dollarized gain ──────────
 
 describe('P7.1 public-leak — local recs strip money fields + no dollarized gain', () => {
-  const PORT = 13882; // port-ok: next free slot in the 13201–13899 range
 
   it('the public recommendations route never emits emv/predictedEmv or a $ gain for local recs', async () => {
-    const { createTestContext } = await import('./helpers.js');
+    const { createEphemeralTestContext } = await import('./helpers.js');
     const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
-    const ctx = createTestContext(PORT, { autoPublicAuth: true });
+    const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
     await ctx.startServer();
     const ws = createWorkspace('P7.1 Public Leak Test Workspace');
     const workspaceId = ws.id;

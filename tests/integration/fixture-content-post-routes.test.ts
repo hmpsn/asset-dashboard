@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedContentData, type SeededContent } from '../fixtures/content-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13715); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let seededContent: SeededContent | null = null;
 let foreignAuth: SeededAuth | null = null;

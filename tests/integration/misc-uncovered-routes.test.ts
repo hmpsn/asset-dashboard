@@ -18,7 +18,7 @@
 
 import crypto from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedTwoWorkspaces } from '../fixtures/workspace-seed.js';
 import { createPayment, deleteAllPayments } from '../../server/payments.js';
 import { createSuggestedBrief } from '../../server/suggested-briefs-store.js';
@@ -26,12 +26,12 @@ import db from '../../server/db/index.js';
 
 // ── Pin SESSION_SECRET so the HMAC admin token is deterministic ───────────────
 // The server derives: HMAC(sha256, SESSION_SECRET || APP_PASSWORD || random).update('admin')
-// By pinning SESSION_SECRET here (before createTestContext reads process.env),
+// By pinning SESSION_SECRET here (before createEphemeralTestContext reads process.env),
 // it is spread into the spawned server's env, making the token predictable.
 const TEST_SESSION_SECRET = 'test-ai-stats-session-secret-misc-wave14';
 process.env.SESSION_SECRET = TEST_SESSION_SECRET;
 
-const ctx = createTestContext(13384);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, del, startServer, stopServer } = ctx;
 
 // ── Admin HMAC token (mirrors server/middleware.ts: signAdminToken) ──────────

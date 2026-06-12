@@ -18,8 +18,6 @@
  *   (7) public-leak               — the public recommendations route strips emv/predictedEmv and
  *       never emits a dollarized gain for the new recs.
  *
- * Port allocated for the HTTP leak test: 13881 (next free slot in the 13201–13899 range;
- * 13880 is reserved as a documentation slot by the P4 suite).
  */
 import { afterEach, beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -422,12 +420,11 @@ describe('P5 C1 — active insight on a still-present cannibalization issue does
 // ── (7) public-leak — new recs strip emv/predictedEmv + no dollarized gain ─────────
 
 describe('P5 public-leak — new recs strip money fields + no dollarized gain', () => {
-  const PORT = 13881; // port-ok: next free slot in the 13201–13899 range (13880 is a P4 doc slot)
 
   it('the public recommendations route never emits emv/predictedEmv or a $ gain for new recs', async () => {
-    const { createTestContext } = await import('./helpers.js');
+    const { createEphemeralTestContext } = await import('./helpers.js');
     const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
-    const ctx = createTestContext(PORT, { autoPublicAuth: true });
+    const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
     await ctx.startServer();
     // createWorkspace (no client_password) so the public GET is not session-gated by the
     // client-dashboard enforcement middleware (which 401s a public read on a passworded ws).

@@ -1,16 +1,15 @@
 /**
  * Public background-job read routes.
  *
- * Port: 13897 (next free in the sanctioned 13201–13899 range).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createJob, updateJob } from '../../server/jobs.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
-const ctx = createTestContext(13897, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, clearCookies } = ctx;
 
 let passwordlessWorkspaceId = '';

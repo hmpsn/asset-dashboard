@@ -1,7 +1,6 @@
 /**
  * Integration tests for tier downgrade and trial expiry behavior.
  *
- * The existing tier-gate-enforcement.test.ts (port 13312) tests that
  * tier-gated endpoints return the correct limits when workspaces ARE on
  * Growth/Premium. These tests cover the complementary failure modes:
  *
@@ -12,15 +11,14 @@
  *      value test — a workspace that WAS on trial must NOT retain Growth access)
  *   4. Effective tier endpoint reflects all of the above consistently
  *
- * Port 13364 — verify uniqueness with: grep -r '13364' tests/
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13364, { autoPublicAuth: true }); // port-ok: next free after 13363
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let growthWs: SeededFullWorkspace | undefined;

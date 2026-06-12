@@ -19,13 +19,13 @@
  *   premium: { ai_chats: Infinity, strategy_generations: Infinity, alt_text_generations: Infinity, workspace_context_generations: Infinity }
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import { incrementUsage } from '../../server/usage-tracking.js';
 
-const ctx = createTestContext(13312, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let freeWs: SeededFullWorkspace;

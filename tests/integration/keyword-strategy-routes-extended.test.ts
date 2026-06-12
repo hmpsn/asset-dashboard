@@ -12,10 +12,9 @@
  *   - GET  /api/webflow/keyword-strategy/:wsId/signals (workspace-not-found, empty insights)
  *   - Auth / workspace isolation (wrong workspace JWT is blocked)
  *
- * Port: 13382
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
@@ -25,9 +24,7 @@ import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
-
-const PORT = 13382;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 // ── Workspace IDs ────────────────────────────────────────────────────────────
 

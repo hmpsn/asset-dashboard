@@ -1,12 +1,12 @@
 process.env.FEATURE_CLIENT_BRIEFING_V2 = 'true';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertBriefingDraft } from '../../server/briefing-store.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13757);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

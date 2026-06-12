@@ -22,12 +22,10 @@
  *      same added/retained/deprecated/replaced changeset whether the table is
  *      populated or empty (its txn-start read MUST stay on the blob).
  *
- * Port: 13894 (next free per re-grep of tests/ — 13888 from the audit was already
- * taken by keyword-strategy-assembler-public-read.test.ts; 13886/13890-13893 are
  * the rest of the keyword-consolidation cluster).
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 vi.mock('../../server/broadcast.js', () => ({
@@ -46,9 +44,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
     globalPublicLimiter: noopMiddleware,
   };
 });
-
-const PORT = 13894;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const cleanupWorkspaceIds: string[] = [];

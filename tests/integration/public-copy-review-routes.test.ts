@@ -15,9 +15,9 @@ import { createClientUser, deleteClientUser, signClientToken } from '../../serve
 import { addEntry, createBlueprint } from '../../server/page-strategy.js';
 import { updateWorkspace } from '../../server/workspaces.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13348, { autoPublicAuth: true }); // port-ok: 13201-13347 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';

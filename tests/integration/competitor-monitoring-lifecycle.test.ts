@@ -1,6 +1,5 @@
 /**
  * Integration tests: competitor monitoring lifecycle
- * port-ok: unique in integration suite
  *
  * Covers the full lifecycle of competitor domain management and competitive
  * intelligence via:

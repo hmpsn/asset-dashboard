@@ -27,7 +27,7 @@
 //   - Cross-workspace isolation for schema-publish and schema-plan
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   setupWebflowMocks,
   mockWebflowSuccess,
@@ -56,7 +56,7 @@ import type { SchemaPageSuggestion } from '../../server/schema-suggester.js';
 // Must call at module level — vi.mock is hoisted.
 setupWebflowMocks();
 
-const ctx = createTestContext(13373, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,5 @@
 /**
  * Integration tests for background job lifecycle.
- * port-ok: unique in integration suite (13865)
  *
  * Covers job shape, empty lists, cancel/non-cancel/missing-job scenarios,
  * cross-workspace isolation, per-job status endpoint, completed-job cleanup,
@@ -19,7 +18,7 @@
  * for a brand-new workspace.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js'; // port-ok: unique in integration suite
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   createJob,
@@ -36,7 +35,7 @@ import { BACKGROUND_JOB_LIFECYCLE_MATRIX } from '../helpers/background-job-test-
 
 // startupTimeoutMs raised to 40s so this test survives pre-commit runs where
 // multiple subprocess servers start concurrently under load.
-const ctx = createTestContext(13865, { startupTimeoutMs: 40_000 }); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { startupTimeoutMs: 40_000 });
 const { api, del } = ctx;
 
 let wsAId = '';

@@ -8,15 +8,14 @@
  * - POST /api/suggested-briefs/:workspaceId/:briefId/snooze
  * - POST /api/suggested-briefs/:workspaceId/:briefId/dismiss
  *
- * Port: 13564
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'crypto';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13564);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson, postJson } = ctx;
 
 let testWsId = '';

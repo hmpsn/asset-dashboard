@@ -1,7 +1,6 @@
 /**
  * Integration tests — AEO review lifecycle.
  *
- * port-ok: unique in integration suite (13868)
  *
  * Covers areas NOT already tested by aeo-review-routes.test.ts:
  *  - GET returns null when no review has been saved
@@ -25,7 +24,7 @@
  *  - POST site falls back to snapshot pages when page discovery throws
  *
  * Uses the inline server pattern (vi.mock + dynamic import of createApp) rather
- * than createTestContext(), because createTestContext() spawns a subprocess that
+ * than createEphemeralTestContext(), because createEphemeralTestContext() spawns a subprocess that
  * cannot share vi.mock state with the test process.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';

@@ -7,10 +7,9 @@
  * route) must keep this payload byte-identical. The `backfilled` honesty flag
  * and all whitelisted contentGap fields MUST survive.
  *
- * Port: 13888 (exclusive; 13886 reserved for tracked-keywords-concurrency).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins } from '../../server/quick-wins.js';
@@ -21,8 +20,7 @@ import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.
 import { upsertAndCleanPageKeywords } from '../../server/page-keywords.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem, PageKeywordMap } from '../../shared/types/workspace.js';
 
-const PORT = 13888;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';
@@ -55,7 +53,7 @@ const pageMap: PageKeywordMap[] = [{
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`Assembler Public Read ${PORT}`).id;
+  wsId = createWorkspace(`Assembler Public Read ${ctx.PORT}`).id;
   updateWorkspace(wsId, { keywordStrategy: {
     siteKeywords: ['site keyword one', 'site keyword two'],
     siteKeywordMetrics: [{ keyword: 'site keyword one', volume: 2000, difficulty: 40 }],

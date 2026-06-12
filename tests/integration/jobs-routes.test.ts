@@ -8,14 +8,14 @@
  * - DELETE /api/jobs/:id (cancel)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createJob, updateJob, clearCompletedJobs } from '../../server/jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
-const ctx = createTestContext(13210);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, del } = ctx;
 
 let testWsId = '';

@@ -1,6 +1,5 @@
 /**
  * Wave 18 — Integration tests for webflow-analysis routes (validation paths)
- * Port: 13442
  *
  * Routes tested (server/routes/webflow-analysis.ts):
  *   POST /api/competitor-compare               — requires myUrl + competitorUrl
@@ -20,13 +19,12 @@
  * passes through; the underlying implementations then run/fail on their own.
  *
  * NOTE: The full happy-path and 403 tests live in webflow-analysis.test.ts
- * (port 13383) using vi.mock. This file covers the input-validation layer.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13442); // port-ok: wave-18-a3 range 13440-13454
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let workspaceId = '';

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedContentData, type SeededContent } from '../fixtures/content-seed.js';
 
-const ctx = createTestContext(13714); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, del, patchJson, postJson } = ctx;
 
 let seeded: SeededContent | null = null;

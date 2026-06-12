@@ -21,7 +21,7 @@
  *   - Auth passthrough — APP_PASSWORD='' means all routes are open in test env
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 import type { VoiceProfile, VoiceSample } from '../../shared/types/brand-engine.js';
@@ -29,7 +29,7 @@ import type { DiscoverySource, DiscoveryExtraction } from '../../server/discover
 import type { Brandscript } from '../../shared/types/brand-engine.js';
 import type { BrandDeliverable } from '../../shared/types/brand-engine.js';
 
-const ctx = createTestContext(13317);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsId = '';

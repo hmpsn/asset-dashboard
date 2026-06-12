@@ -45,7 +45,7 @@ const PUBLISH_TARGET = JSON.stringify({
 });
 
 // ── In-process server helper ──────────────────────────────────────────────
-// Uses createApp() so vi.mock interceptors work (unlike createTestContext
+// Uses createApp() so vi.mock interceptors work (unlike createEphemeralTestContext
 // which spawns a child process where mocks don't apply).
 
 async function startTestServer(): Promise<{ server: http.Server; baseUrl: string; stop: () => void }> {
@@ -245,7 +245,7 @@ describe('Content Publish Writes — FM-2 Phantom Success', () => {
   // ── Route-level: CMS create failure aborts before local state write ───────
   //
   // Route-level tests use createApp() (in-process) so vi.mock interceptors
-  // work correctly. The createTestContext helper spawns a child process where
+  // work correctly. The createEphemeralTestContext helper spawns a child process where
   // mocks don't apply.
 
   describe('POST /api/content-posts/:workspaceId/:postId/publish-to-webflow', () => {

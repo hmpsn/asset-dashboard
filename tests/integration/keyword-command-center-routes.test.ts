@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   getLostVisibilityCount,
   upsertDiscoveredQueries,
@@ -10,7 +10,7 @@ import { updateTrackedKeywords } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
 import type { KeywordCommandCenterRow } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13360); // port-ok: next free after 13359
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let workspaceId = '';

@@ -7,7 +7,6 @@
  * the route through assembleStoredKeywordStrategy and deletes the redundant
  * re-strip in serializeKeywordStrategy.
  *
- * Port: 13889 (exclusive; 13886 reserved; 13888 used by the public-read gate).
  *
  * F1 (#7c) — DIVERGENT siteKeywordMetrics fixtures. The blob carries a STALE/wrong
  * value while the site_keyword_metrics table carries the REAL value. This pins the
@@ -17,7 +16,7 @@
  * public-route assertion confirms both read paths agree on the table value.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins } from '../../server/quick-wins.js';
@@ -28,8 +27,7 @@ import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.
 import { upsertAndCleanPageKeywords } from '../../server/page-keywords.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem, PageKeywordMap } from '../../shared/types/workspace.js';
 
-const PORT = 13889;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let fullWs = '';
@@ -44,7 +42,7 @@ const page: PageKeywordMap = { pagePath: '/p', pageTitle: 'P', primaryKeyword: '
 
 beforeAll(async () => {
   await ctx.startServer();
-  fullWs = createWorkspace(`Admin Assembler Full ${PORT}`).id;
+  fullWs = createWorkspace(`Admin Assembler Full ${ctx.PORT}`).id;
   // DIVERGENT (#7c): the blob carries a STALE siteKeywordMetrics value (volume 1,
   // difficulty 1) — what an un-stripped legacy blob would hold. The table is the
   // SOLE store post-strip and carries the REAL value (volume 1000, difficulty 30).
@@ -65,7 +63,7 @@ beforeAll(async () => {
   replaceAllSiteKeywordMetrics(fullWs, [{ keyword: 'admin site kw', volume: 1000, difficulty: 30 }]);
 
   // Shell case: no strategy blob, but table rows exist → synthesized shell (generatedAt null).
-  shellWs = createWorkspace(`Admin Assembler Shell ${PORT}`).id;
+  shellWs = createWorkspace(`Admin Assembler Shell ${ctx.PORT}`).id;
   upsertAndCleanPageKeywords(shellWs, [page]);
   replaceAllContentGaps(shellWs, [gap]);
 }, 25_000);
@@ -139,7 +137,7 @@ describe('GET /api/webflow/keyword-strategy/:id — admin assembler byte-identit
   });
 
   it('returns null for a fresh workspace with no blob and empty tables', async () => {
-    const empty = createWorkspace(`Admin Assembler Empty ${PORT}`).id;
+    const empty = createWorkspace(`Admin Assembler Empty ${ctx.PORT}`).id;
     try {
       const res = await api(`/api/webflow/keyword-strategy/${empty}`);
       expect(res.status).toBe(200);

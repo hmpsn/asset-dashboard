@@ -15,12 +15,10 @@
  * or are aware that the 6th+ call may return 429.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createClientUser, createResetToken, deleteClientUser } from '../../server/client-users.js';
-
-const PORT = 13500;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Each describe block that calls rate-limited endpoints gets its own workspace

@@ -14,7 +14,7 @@
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
@@ -26,7 +26,7 @@ import { saveSchemaPlan, getSchemaPlan, deleteSchemaPlan } from '../../server/sc
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
-const ctx = createTestContext(13874, { autoPublicAuth: true }); // port-ok: next free after 13873
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let pwless: SeededFullWorkspace;
 let clientUserId = '';

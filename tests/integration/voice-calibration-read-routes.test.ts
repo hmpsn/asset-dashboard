@@ -7,13 +7,12 @@
  * - GET /api/voice/:workspaceId → 200 with profile shape after creation
  * - GET /api/voice/:workspaceId/sessions → 200 with array (empty for fresh profile)
  *
- * Port: 13640 (unique — no other file uses this port).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13640); // port-ok: extending range to 13640
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let wsId = '';

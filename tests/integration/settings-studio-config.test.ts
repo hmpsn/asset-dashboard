@@ -11,9 +11,9 @@
  *   - GET /api/studio-config → 200 {bookingUrl}
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13399);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, authApi, authPatchJson } = ctx;
 
 beforeAll(async () => {

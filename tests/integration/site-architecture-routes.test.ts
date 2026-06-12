@@ -16,7 +16,7 @@
  * directly through their respective DB modules.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createMatrix, deleteMatrix } from '../../server/content-matrices.js';
 import {
@@ -37,7 +37,7 @@ import {
 // Test server context — port must be unique across all test files
 // ---------------------------------------------------------------------------
 
-const ctx = createTestContext(13243);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 // ---------------------------------------------------------------------------

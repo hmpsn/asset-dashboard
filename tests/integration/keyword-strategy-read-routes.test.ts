@@ -2,13 +2,12 @@
  * Integration tests for keyword-strategy read paths and basic validation.
  * Covers GET endpoints and PATCH validation-only routes (no AI generation calls).
  *
- * Port: 13688 (assigned range 13688–13695 for wave-24-a12)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13688); // port-ok: assigned range 13688-13695
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
 
 let wsId = '';

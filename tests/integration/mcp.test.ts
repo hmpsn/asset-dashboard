@@ -1,13 +1,12 @@
 /**
  * Integration tests for the MCP server.
- * Port: 13229
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-abc123';
-const ctx = createTestContext(13229);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let ws: ReturnType<typeof seedWorkspace>;
 

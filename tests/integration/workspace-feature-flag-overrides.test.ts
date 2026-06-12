@@ -20,7 +20,7 @@
  * isFeatureEnabled(flag, workspaceId), so this exercises the real resolution path.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
@@ -40,9 +40,7 @@ const RETIRED_SEO_RUNTIME_FLAGS = [
 ] as const;
 
 // ── Main flow (auth disabled — APP_PASSWORD='' default → requireAdminAuth passes through) ──
-// Ports 13884/13885: next free slots in the 13201–13899 range (13880 is a P4 doc
-// slot, 13881 is owned by seo-genquality-p5).
-const ctx = createTestContext(13884);
+const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'main' });
 const { api, authApi } = ctx;
 
 let wsA: SeededFullWorkspace;
@@ -244,7 +242,10 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
 });
 
 // ── Auth rejection (APP_PASSWORD set → admin gate active) ──
-const authCtx = createTestContext(13885, { env: { APP_PASSWORD: 'secret-test-pw' } });
+const authCtx = createEphemeralTestContext(import.meta.url, {
+  contextName: 'auth-gated',
+  env: { APP_PASSWORD: 'secret-test-pw' },
+});
 
 describe('per-workspace feature-flag routes reject unauthenticated calls', () => {
   beforeAll(async () => {

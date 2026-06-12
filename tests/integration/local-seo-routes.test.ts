@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { cancelJob, createJob } from '../../server/jobs.js';
@@ -8,7 +8,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13361); // port-ok: next free after 13360
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, del } = ctx;
 
 let workspaceId = '';

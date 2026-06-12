@@ -16,7 +16,7 @@
  * - GET /api/public/report/:id (public report JSON)
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
@@ -25,7 +25,7 @@ import { saveSnapshot } from '../../server/reports.js';
 import { listActivity } from '../../server/activity-log.js';
 import type { SeoAuditResult } from '../../server/seo-audit.js';
 
-const ctx = createTestContext(13211, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

@@ -19,15 +19,14 @@
  * fetches with no token for demo/passwordless portals, so a hard gate would break
  * legitimate access).
  *
- * Port: 13887 (next free integration port).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { loadRecommendations, saveRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13887, { autoPublicAuth: true }); // port-ok: next free integration port
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 let emptyWsId = '';        // known workspace, NO cached recommendations

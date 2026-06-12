@@ -14,9 +14,9 @@ vi.mock('../../server/broadcast.js', () => ({
 }));
 
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from '../integration/helpers.js';
+import { createEphemeralTestContext } from '../integration/helpers.js';
 
-const ctx = createTestContext(13307);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

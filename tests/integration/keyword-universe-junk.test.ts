@@ -1,5 +1,4 @@
 /**
- * keyword-universe-junk.test.ts — Task 2 integration test (port 13903).
  *
  * Exercises the REAL Keyword Command Center rows read path
  *   GET /api/webflow/keyword-command-center/:workspaceId/rows?filter=all
@@ -20,7 +19,7 @@
  * paths (the same paths production uses).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -33,7 +32,7 @@ import type {
 } from '../../shared/types/keyword-command-center.js';
 import type { KeywordGapItem, ContentGap } from '../../shared/types/workspace.js';
 
-const ctx = createTestContext(13903); // port-ok: next free after 13902
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

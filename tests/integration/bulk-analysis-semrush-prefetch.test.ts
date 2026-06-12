@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 
-const ctx = createTestContext(13327); // port-ok: 13201-13326 fully allocated; extending range
+const ctx = createEphemeralTestContext(import.meta.url);
 
 vi.doMock('../../server/seo-data-provider.js', async (orig) => {
   const actual = await orig<typeof import('../../server/seo-data-provider.js')>();

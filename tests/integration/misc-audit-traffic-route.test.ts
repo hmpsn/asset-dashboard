@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 const TEST_SESSION_SECRET = 'test-misc-audit-traffic-secret';
 process.env.SESSION_SECRET = TEST_SESSION_SECRET;
 
-const ctx = createTestContext(13870);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 const ADMIN_HMAC_TOKEN = crypto

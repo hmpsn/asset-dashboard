@@ -5,14 +5,11 @@
  * - 200 response with updated keywords list immediately (non-blocking)
  * - Graceful handling when no SEO provider is configured
  *
- * Port: 13334
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-
-const PORT = 13334;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let workspaceId: string;
 let cleanup: () => void;

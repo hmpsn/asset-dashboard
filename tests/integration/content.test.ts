@@ -19,10 +19,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13203);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 const testWsId = 'ws_integ_content_' + Date.now();

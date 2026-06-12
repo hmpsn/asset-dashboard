@@ -1,10 +1,9 @@
 /**
  * Integration tests — Stripe admin route security boundaries.
  *
- * Port: 13862 — port-ok: unique in integration suite
  *
  * Uses an in-process http.createServer(app) so vi.mock hoisting applies to the
- * modules loaded by the Express app.  createTestContext spawns a child process
+ * modules loaded by the Express app.  createEphemeralTestContext spawns a child process
  * whose module graph cannot share the test-process vi.mock state.
  *
  * Covers:

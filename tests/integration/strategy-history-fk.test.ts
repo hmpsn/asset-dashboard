@@ -23,11 +23,9 @@
  *  - seo-context-slice: the strategyHistory summary still counts rows + reports
  *    lastRevisedAt after the rebuild.
  *
- * Port: 13893 (exclusive; reserved for this file by the Wave-3e port allocation;
- * 13886 reserved for tracked-keywords-concurrency).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { setBroadcast } from '../../server/broadcast.js';
@@ -37,9 +35,7 @@ import { assembleSeoContext } from '../../server/intelligence/seo-context-slice.
 import { listContentGaps } from '../../server/content-gaps.js';
 import { listPageKeywords } from '../../server/page-keywords.js';
 import type { PersistKeywordStrategyOptions } from '../../server/keyword-strategy-persistence.js';
-
-const PORT = 13893;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 const baseSearchData: PersistKeywordStrategyOptions['searchData'] = {
   deviceBreakdown: [],
@@ -250,7 +246,7 @@ describe('strategy_history — typed reads round-trip', () => {
     const wsId = createWorkspace('strategy-history typed diff').id;
     try {
       seedHistory(wsId);
-      const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}/diff`);
+      const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}/diff`);
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).not.toBeNull();
@@ -290,7 +286,7 @@ describe('strategy_history — typed reads round-trip', () => {
       })).not.toThrow();
 
       // /diff route must still respond 200 (degraded), not 500.
-      const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}/diff`);
+      const res = await fetch(`${ctx.BASE}/api/webflow/keyword-strategy/${wsId}/diff`);
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).not.toBeNull();

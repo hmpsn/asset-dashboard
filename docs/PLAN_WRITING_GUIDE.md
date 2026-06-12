@@ -234,8 +234,8 @@ See `docs/workflows/deploy.md` for the full branch model and deploy steps.
 ## Step 5: Testing Patterns
 
 - **Write tests alongside code** — new routes get integration tests, new state transitions get guard tests
-- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helpers in `tests/integration/helpers.ts`. Default to `createEphemeralTestContext(import.meta.url)` for standard single-context integration files; use `createTestContext(port)` when a test genuinely needs fixed or multiple ports.
-- **Port uniqueness** — standard single-context integration tests should use `createEphemeralTestContext(import.meta.url)`. When a file needs literal ports, keep each `createTestContext(port)` unique and verify with `rg 'createTestContext\\(' tests/`.
+- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helpers in `tests/integration/helpers.ts`. Use `createEphemeralTestContext(import.meta.url)` for spawned-server integration tests; pass unique `contextName` values when a file needs multiple contexts.
+- **Port allocation** — tests must not bind fixed server ports. Use `createEphemeralTestContext(import.meta.url)` for child-process tests, or `server.listen(0, '127.0.0.1')` and derive `baseUrl` from `server.address().port` for in-process `createApp()` tests.
 - **External API error tests** — mock the API to return an error, assert the operation records `failed`/`error` status (FM-2 pattern)
 - **Cleanup** — every `beforeAll` resource creation must have a matching `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 - **Collection assertions** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously.

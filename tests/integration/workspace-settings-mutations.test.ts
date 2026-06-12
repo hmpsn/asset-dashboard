@@ -6,7 +6,6 @@
  * - PATCH/GET/DELETE /api/workspaces/:id/page-states/:pageId
  * - POST /api/workspaces/:id/page-states/clear
  *
- * Port: 13858
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -33,10 +32,10 @@ vi.mock('../../server/email.js', async importOriginal => {
   };
 });
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13858); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsId = '';
