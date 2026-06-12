@@ -40,104 +40,6 @@
       ]
     },
     {
-      "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",
-      "name": "🔗 Admin Surfaces W3 — Unlocks & Broken Handoffs",
-      "hours": "~22-32h",
-      "rationale": "Wave 3: finished pipelines gated off and cross-surface handoffs that drop their payload. The integration intent exists everywhere; the receiving half keeps failing.",
-      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 3. 3.2 depends on aw2-schema-persistence. 3.4 is sequential (shared nav files) and adds a pr-check rule. Every repaired link gets a ?tab= two-halves contract test.",
-      "items": [
-        {
-          "id": "aw3-ai-suggested-keyword",
-          "title": "Pipeline: AI Suggested 'Create Brief' carries the suggestion's keyword via fixContext prefill + refresh_suggestion button",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "ContentPipeline.tsx:110-112 discards both args — the flagship insight→action flow is a dead end; refresh_suggestion signals get no button at all. Report §5."
-        },
-        {
-          "id": "aw3-cms-publish-unlock",
-          "title": "Schema: unlock CMS-field publishing — add cmsDeliveryStatus to frontend type, show Publish for 'ready', route retract/rollback through CMS mode",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Complete server pipeline unreachable behind blanket cms- gate at SchemaPageCard.tsx:308. Unlocks hundreds of one-click CMS publishes. Depends on aw2-schema-persistence. Report §4."
-        },
-        {
-          "id": "aw3-deeplink-repair-batch",
-          "title": "Deep-link repair: PI→Schema pageSlug→pageId; WorkspaceHome's 3 broken senders; Strategy KeywordGaps→Hub; RepeatCompetitorList one-click Track; Decay→pipeline/PI handoffs",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead of schedule with W2). WorkspaceHome senders fixed (?tab=requests two-halves + content→content-pipeline), KeywordGaps→Hub links, RepeatCompetitorList one-click Track, Decay→briefs (pageSlug contract) + Decay→PI handoffs, pipeline decay banner clickable. PI→Schema receiver accepts pageSlug (handled in schema lane)."
-        },
-        {
-          "id": "aw3-nav-registry",
-          "title": "Single nav metadata registry for Sidebar + CommandPalette + Breadcrumbs + drop needsSite from requests + pr-check rule",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Nav metadata triplicated and already drifted (diagnostics missing from 2 of 3, stale palette entries, disagreeing needsSite gating); requests gating cuts off client communication exactly during onboarding. Sequential after aw3-deeplink-repair-batch. Report §6/§8."
-        },
-        {
-          "id": "aw3-journey-visibility",
-          "title": "Journey: resolve TaskPanel-vs-NotificationBell (delete dead TaskPanel, fix CLAUDE.md ref, verify cross-tab job visibility) + live audit progress/cancel + real Webflow-link path from onboarding",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch. TaskPanel retired (stub + doc sweep incl. CLAUDE.md and golden-paths); NotificationBell cross-tab visibility verified (no gap — provider rehydrates from GET /api/jobs); SEO audit shows live job progress (non-cancellable job type, progress-only); ConnectionsTab gets a real link-site flow via useLinkSiteFlow with per-row pending + error surfacing."
-        }
-      ]
-    },
-    {
-      "id": "sprint-admin-surfaces-w5-close-the-loop-2026-06-11",
-      "name": "♻️ Admin Surfaces W5 — Close the Loop (read-side)",
-      "hours": "~16-24h",
-      "rationale": "Wave 5: the platform already writes outcome baselines, AI review verdicts, and a visibility time series — nothing reads them back. Read-side work only; the write halves are done.",
-      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 5. Wave 4 (Keyword Hub cutover) is tracked on the existing simp-feature-keyword-hub-kcc-rank-consolidation item — see its updated notes for the audit's precondition + blocker list.",
-      "items": [
-        {
-          "id": "aw5-outcome-chips",
-          "title": "Outcome read-back: tracked_actions/outcome_actions chips on Strategy pageMap/Quick Wins, Hub drawer (baseline→current + verdict), and Briefs/Posts lists (90-day delta)",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "recordKeywordTrackingAction writes baselines on every track/promote/add and the measurement cron scores them; no surface reads back. OUTCOME_SCORED invalidation already mapped. Report §1/§2/§5 integration ideas."
-        },
-        {
-          "id": "aw5-ai-review-readback",
-          "title": "Posts: seed ReviewChecklist from persisted post.aiReview",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead with W2). ReviewChecklist seeds from persisted post.aiReview with from-last-review provenance note; fresh runs overwrite; key={postId} guards remount seeding."
-        },
-        {
-          "id": "aw5-local-visibility-insights",
-          "title": "Local SEO: insights bridge on refresh-job snapshot diffs (visible↔not_visible transitions, repeat competitors) + visibility trend from the existing time series",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Append-only local_visibility_snapshots is read latest-only everywhere; diff data already exists and the hook point already broadcasts. Follow docs/rules/bridge-authoring.md. Report §3."
-        }
-      ]
-    },
-    {
       "id": "sprint-admin-surfaces-w6-quality-debias-2026-06-11",
       "name": "⚖️ Admin Surfaces W6 — Quality & De-bias",
       "hours": "~20-30h",
@@ -1434,6 +1336,106 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",
+      "name": "✅ SHIPPED — 🔗 Admin Surfaces W3 — Unlocks & Broken Handoffs",
+      "hours": "~22-32h",
+      "rationale": "Wave 3: finished pipelines gated off and cross-surface handoffs that drop their payload. The integration intent exists everywhere; the receiving half keeps failing.",
+      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 3. 3.2 depends on aw2-schema-persistence. 3.4 is sequential (shared nav files) and adds a pr-check rule. Every repaired link gets a ?tab= two-halves contract test.",
+      "items": [
+        {
+          "id": "aw3-ai-suggested-keyword",
+          "title": "Pipeline: AI Suggested 'Create Brief' carries the suggestion's keyword via fixContext prefill + refresh_suggestion button",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w3-w5-batch. handleCreateBrief carries keyword+pageUrl via internal fixContext prefill (pageSlug targeting per W2.5 contract); refresh_suggestion gets a Refresh brief action; repeat-click prefill remount via nonce key."
+        },
+        {
+          "id": "aw3-cms-publish-unlock",
+          "title": "Schema: unlock CMS-field publishing — add cmsDeliveryStatus to frontend type, show Publish for 'ready', route retract/rollback through CMS mode",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. cmsDeliveryStatus typed frontend-side (serialization already existed); status-aware Publish for ready CMS pages through the existing dispatch endpoint; honest reasons for blocked; Publish-All respects readiness; retract/restore honestly gated — server-side CMS retract does not exist (gap documented for a future lane)."
+        },
+        {
+          "id": "aw3-deeplink-repair-batch",
+          "title": "Deep-link repair: PI→Schema pageSlug→pageId; WorkspaceHome's 3 broken senders; Strategy KeywordGaps→Hub; RepeatCompetitorList one-click Track; Decay→pipeline/PI handoffs",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead of schedule with W2). WorkspaceHome senders fixed (?tab=requests two-halves + content→content-pipeline), KeywordGaps→Hub links, RepeatCompetitorList one-click Track, Decay→briefs (pageSlug contract) + Decay→PI handoffs, pipeline decay banner clickable. PI→Schema receiver accepts pageSlug (handled in schema lane)."
+        },
+        {
+          "id": "aw3-nav-registry",
+          "title": "Single nav metadata registry for Sidebar + CommandPalette + Breadcrumbs + drop needsSite from requests + pr-check rule",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. src/lib/navRegistry.tsx single source consumed by Sidebar/CommandPalette/Breadcrumbs; drift fixed (diagnostics everywhere, requests un-site-gated, stale palette entries removed, keyword-hub flag relabel deduplicated); Page-union contract test; pr-check rule hardcoded-nav-metadata-outside-registry with fixtures."
+        },
+        {
+          "id": "aw3-journey-visibility",
+          "title": "Journey: resolve TaskPanel-vs-NotificationBell (delete dead TaskPanel, fix CLAUDE.md ref, verify cross-tab job visibility) + live audit progress/cancel + real Webflow-link path from onboarding",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-7h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w2-batch. TaskPanel retired (stub + doc sweep incl. CLAUDE.md and golden-paths); NotificationBell cross-tab visibility verified (no gap — provider rehydrates from GET /api/jobs); SEO audit shows live job progress (non-cancellable job type, progress-only); ConnectionsTab gets a real link-site flow via useLinkSiteFlow with per-row pending + error surfacing."
+        }
+      ],
+      "shippedAt": "2026-06-12"
+    },
+    {
+      "id": "sprint-admin-surfaces-w5-close-the-loop-2026-06-11",
+      "name": "✅ SHIPPED — ♻️ Admin Surfaces W5 — Close the Loop (read-side)",
+      "hours": "~16-24h",
+      "rationale": "Wave 5: the platform already writes outcome baselines, AI review verdicts, and a visibility time series — nothing reads them back. Read-side work only; the write halves are done.",
+      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 5. Wave 4 (Keyword Hub cutover) is tracked on the existing simp-feature-keyword-hub-kcc-rank-consolidation item — see its updated notes for the audit's precondition + blocker list.",
+      "items": [
+        {
+          "id": "aw5-outcome-chips",
+          "title": "Outcome read-back: tracked_actions/outcome_actions chips on Strategy pageMap/Quick Wins, Hub drawer (baseline→current + verdict), and Briefs/Posts lists (90-day delta)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. Shared OutcomeReadback reader + OutcomeReadbackChip on Strategy pageMap, Hub drawer, published Posts; OUTCOME_SCORED central invalidation was MISSING (audit/plan claimed mapped) — added. One indexed query per payload, no N+1."
+        },
+        {
+          "id": "aw5-ai-review-readback",
+          "title": "Posts: seed ReviewChecklist from persisted post.aiReview",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "2-3h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead with W2). ReviewChecklist seeds from persisted post.aiReview with from-last-review provenance note; fresh runs overwrite; key={postId} guards remount seeding."
+        },
+        {
+          "id": "aw5-local-visibility-insights",
+          "title": "Local SEO: insights bridge on refresh-job snapshot diffs (visible↔not_visible transitions, repeat competitors) + visibility trend from the existing time series",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. local_visibility_shift insight (4-part lockstep) minted edge-triggered from refresh diffs (risk/win/competitor, degraded excluded, win retires stale risk); per-market visibility sparkline on the 180d daily window."
+        }
+      ],
+      "shippedAt": "2026-06-12"
     },
     {
       "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",

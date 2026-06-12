@@ -1,8 +1,50 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **490 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **493 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 493. Outcome Read-Back Chips — Strategy, Keyword Hub, Posts (W5.1)
+
+**What it does:** Closes the outcome loop on three admin surfaces. A shared reader (`getScoredOutcomeReadbacks`, one indexed query per workspace, latest-conclusive-verdict-per-action) joins scored outcome measurements back to the surfaces that initiated the work: Strategy pageMap rows, the Keyword Hub drawer detail, and published posts in the content list each render an `OutcomeReadbackChip` ("#14 → #6 · Win · 30d") with server-computed direction. Newly scored outcomes refresh live via the OUTCOME_SCORED broadcast (central mapping added).
+
+**Agency value:** The platform was already recording baselines and scoring outcomes — now the admin sees proof of impact exactly where the work happens, without opening the Outcomes tab.
+
+**Client value:** Indirect — better-informed prioritization; the same readbacks feed the learnings the generators consume.
+
+**Mutual:** Measurement that nobody reads is cost; measurement read at the point of action is leverage.
+
+**Files:** `server/outcome-tracking.ts`, `server/keyword-strategy-ux.ts`, `server/keyword-command-center.ts`, `server/content-posts-db.ts`, `src/components/ui/OutcomeReadbackChip.tsx`, consumers in Strategy/keyword-hub/ContentManager. Tests: `server/__tests__/outcome-readback*.test.ts`, `tests/component/OutcomeReadbackChip.test.tsx`.
+
+---
+
+### 492. Local Visibility Trend + Shift Insights (W5.3)
+
+**What it does:** Reads the (previously write-only) local visibility snapshot time series two ways: a per-market visibility sparkline on the Local SEO panel (day-bucketed over the 180-day raw retention window, blue data styling), and an insight bridge that diffs each refresh against the previous latest state to mint `local_visibility_shift` insights — lost local-pack visibility (risk), regained visibility (win), and new repeat competitors — with edge-triggered dedup, degraded-snapshot exclusion, and client-safe narrative framing.
+
+**Agency value:** Local pack movements surface proactively in the insights digest instead of requiring a manual panel check after every refresh.
+
+**Client value:** Local visibility wins and risks flow into the client inbox/digest with plain-language stories.
+
+**Mutual:** The D4 retention policy preserved this history specifically so it could be read — this is the read half.
+
+**Files:** `server/bridge-local-visibility-shift.ts`, `server/local-seo.ts` (trend aggregate), `shared/types/analytics.ts`, `server/schemas/insight-schemas.ts`, `src/components/local-seo/LocalSeoVisibilityTrend.tsx`, renderer cases in `useInsightFeed`/`InsightsDigest`. Tests: `tests/integration/local-visibility-shift-bridge.test.ts`, `tests/unit/local-seo-visibility-trend.test.ts`.
+
+---
+
+### 491. CMS-Field Schema Publishing UI + AI-Suggested Brief Prefill (W3.2 + W3.1)
+
+**What it does:** Unlocks the previously unreachable CMS-field schema delivery pipeline: CMS pages with a ready field mapping get a working Publish action (status-aware UI with honest reasons when blocked; Publish-All counts respect readiness; retract/restore honestly gated where no CMS server path exists). Separately, the AI Suggested "Create Brief" action now actually carries the suggestion's keyword and page into the brief generator via the fixContext prefill (it previously discarded both), and refresh_suggestion signals gain a "Refresh brief" action.
+
+**Agency value:** Hundreds of CMS-item pages become one-click schema-publishable; the flagship insight→action flow in the content pipeline stops being a dead end.
+
+**Client value:** Faster structured-data coverage on collection pages; suggested content turns into targeted briefs without manual re-entry.
+
+**Mutual:** Both are pure unlocks of already-built server capability.
+
+**Files:** `src/components/schema/*` (status-aware publish UI), `src/components/ContentPipeline.tsx`, `src/components/pipeline/AiSuggested.tsx`. Tests: `tests/unit/schema-cms-delivery-ui.test.tsx`, `tests/integration/webflow-schema-cms-delivery-serialization.test.ts`, `tests/component/AiSuggested-brief-handoff.test.tsx`.
 
 ---
 

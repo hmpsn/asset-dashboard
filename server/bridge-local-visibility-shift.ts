@@ -63,9 +63,16 @@ function isVisible(snapshot: Pick<LocalVisibilitySnapshot, 'businessFound' | 'st
   return snapshot.businessFound && snapshot.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
 }
 
-/** A snapshot is a usable signal when it is not a hard provider failure. */
+/**
+ * A snapshot is a usable signal when it is not a hard provider failure and not degraded.
+ * Degraded snapshots carry businessFound=false regardless of actual visibility, so treating
+ * them as usable mints spurious risk/win flaps. This matches the postureFromSummaryRow
+ * convention in server/local-seo.ts which buckets DEGRADED with PROVIDER_FAILED as
+ * untrustworthy.
+ */
 function isUsable(snapshot: Pick<LocalVisibilitySnapshot, 'status'>): boolean {
-  return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
+  return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED
+    && snapshot.status !== LOCAL_VISIBILITY_STATUS.DEGRADED;
 }
 
 /** Stable identity key for the latest-per-(market, keyword, device, language) granularity. */

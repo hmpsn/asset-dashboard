@@ -138,4 +138,35 @@ describe('getLocalSeoVisibilityTrend', () => {
     // Same keyword, two devices → 2 checked, 1 visible.
     expect(series[0].points[0]).toEqual({ date: '2026-06-01', visibleCount: 1, checkedCount: 2 });
   });
+
+  it('excludes degraded snapshots from the trend (does not inflate checked_count)', () => {
+    const id = ws('Trend No Degraded');
+    // One success + one degraded row on the same day. Degraded must be excluded from
+    // checked_count (it carries businessFound=false regardless of actual visibility).
+    const today = new Date().toISOString().slice(0, 10);
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'kw1', capturedAt: `${today}T08:00:00.000Z`, visible: true });
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'kw2', capturedAt: `${today}T09:00:00.000Z`, visible: false, status: LOCAL_VISIBILITY_STATUS.DEGRADED });
+
+    const series = getLocalSeoVisibilityTrend(id);
+    // Only the success row should count — checkedCount: 1, not 2.
+    expect(series[0].points[0]).toEqual({ date: today, visibleCount: 1, checkedCount: 1 });
+  });
+
+  it('excludes snapshots older than RETENTION_RAW_DAYS (180d) from the trend', () => {
+    const id = ws('Trend Window Bound');
+    const recent = new Date();
+    recent.setDate(recent.getDate() - 10); // 10 days ago → within window
+    const old = new Date();
+    old.setDate(old.getDate() - 190); // 190 days ago → outside 180d window
+    const recentDay = recent.toISOString().slice(0, 10);
+
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'kw1', capturedAt: recent.toISOString(), visible: true });
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'kw2', capturedAt: old.toISOString(), visible: true });
+
+    const series = getLocalSeoVisibilityTrend(id);
+    // Only the recent row should appear.
+    expect(series).toHaveLength(1);
+    expect(series[0].points).toHaveLength(1);
+    expect(series[0].points[0].date).toBe(recentDay);
+  });
 });

@@ -621,8 +621,11 @@ const stmts = createStmtCache(() => ({
   // W5.3: per-market visible-count trend. One row per (market, capture-day) with the
   // count of verified-match identities and the total checked identities that day.
   // Bucketed on date(captured_at) so multiple intra-day refreshes collapse to one point.
-  // Excludes provider_failed rows (unusable). Scoped + bounded to active series only via
-  // the captured_at window the caller passes (the D4-retained window).
+  // Bounded to RETENTION_RAW_DAYS (180d) so the series is uniformly daily — older rows
+  // have been weekly-thinned and would introduce uneven spacing in the sparkline.
+  // Excludes both provider_failed and degraded rows so neither inflates checked_count
+  // (degraded snapshots carry businessFound=false regardless of actual visibility, matching
+  // the postureFromSummaryRow convention that treats both status values as untrustworthy).
   visibilityTrend: db.prepare(`
     SELECT
       s.market_id AS market_id,
@@ -635,7 +638,8 @@ const stmts = createStmtCache(() => ({
       COUNT(DISTINCT s.normalized_keyword || '::' || s.device || '::' || s.language_code) AS checked_count
     FROM local_visibility_snapshots s
     WHERE s.workspace_id = ?
-      AND s.status != ?
+      AND s.status NOT IN (?, ?)
+      AND s.captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
     GROUP BY s.market_id, s.market_label, day
     ORDER BY s.market_id ASC, day ASC
   `),
@@ -1178,6 +1182,7 @@ export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibil
     LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
     workspaceId,
     LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+    LOCAL_VISIBILITY_STATUS.DEGRADED,
   ) as VisibilityTrendRow[];
 
   const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();

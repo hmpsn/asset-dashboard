@@ -56,7 +56,7 @@ export interface OutcomeReadbackChipProps {
 export function OutcomeReadbackChip({ outcome, showTimeframe = true, className }: OutcomeReadbackChipProps) {
   const verdict = VERDICT_LABEL[outcome.score];
   const movement = movementText(outcome);
-  const timeframe = showTimeframe ? ` · ${CHECKPOINT_LABEL[outcome.checkpointDays]}` : '';
+  const timeframe = showTimeframe ? ` · ${CHECKPOINT_LABEL[outcome.checkpointDays] ?? `${outcome.checkpointDays}d`}` : '';
   const label = `${movement} · ${verdict}${timeframe}`;
   return (
     <Badge

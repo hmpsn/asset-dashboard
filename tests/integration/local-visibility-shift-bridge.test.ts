@@ -165,4 +165,27 @@ describe('bridge-local-visibility-shift', () => {
       fresh.cleanup();
     }
   });
+
+  it('ignores degraded snapshots when diffing transitions — success→degraded→success mints nothing', async () => {
+    // Degraded snapshots carry businessFound=false regardless of actual visibility.
+    // success→degraded must NOT mint a risk, and degraded→success must NOT mint a win.
+    const fresh = seedWorkspace();
+    try {
+      // success→degraded: should mint nothing (degraded is not a usable "next" signal)
+      const prevSuccess = [snap({ keyword: 'k1', visible: true, workspaceId: fresh.workspaceId })];
+      const nextDegraded = [snap({ keyword: 'k1', visible: false, workspaceId: fresh.workspaceId, status: LOCAL_VISIBILITY_STATUS.DEGRADED })];
+
+      const r1 = await runLocalVisibilityShiftBridge(fresh.workspaceId, prevSuccess, nextDegraded);
+      expect(r1.modified).toBe(0);
+      expect(getInsights(fresh.workspaceId, 'local_visibility_shift')).toHaveLength(0);
+
+      // degraded→success: degraded is also not a usable "prev" signal, so no win
+      const nextSuccess = [snap({ keyword: 'k1', visible: true, workspaceId: fresh.workspaceId })];
+      const r2 = await runLocalVisibilityShiftBridge(fresh.workspaceId, nextDegraded, nextSuccess);
+      expect(r2.modified).toBe(0);
+      expect(getInsights(fresh.workspaceId, 'local_visibility_shift')).toHaveLength(0);
+    } finally {
+      fresh.cleanup();
+    }
+  });
 });

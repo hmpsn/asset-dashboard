@@ -61,7 +61,7 @@ export interface LocalSeoVisibilityTrendProps {
  * Renders nothing when no market has at least two data points (no trend to show).
  */
 export function LocalSeoVisibilityTrend({ series }: LocalSeoVisibilityTrendProps): ReactElement | null {
-  const renderable = series.filter(s => s.points.length >= 2);
+  const renderable = (series ?? []).filter(s => s.points.length >= 2);
   if (renderable.length === 0) return null;
 
   return (

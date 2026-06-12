@@ -321,8 +321,14 @@ export function SchemaPageCard({
               {(() => {
                 const isCmsPage = page.pageId.startsWith('cms-');
                 const cmsStatus = page.cmsDeliveryStatus?.status;
-                // CMS page with no mapped field or blocked delivery → honest "not ready" notice
-                if (isCmsPage && cmsStatus !== 'ready') {
+                // CMS page with no mapped field or blocked delivery → honest "not ready" notice.
+                // 'written' and 'unchanged' are already-delivered states — fall through to the
+                // publish UI so they render the "Published to CMS field" badge or re-publish button.
+                const cmsUnavailable = isCmsPage
+                  && cmsStatus !== 'ready'
+                  && cmsStatus !== 'written'
+                  && cmsStatus !== 'unchanged';
+                if (cmsUnavailable) {
                   const reason = cmsStatus === 'blocked' || cmsStatus === 'failed'
                     ? (page.cmsDeliveryStatus?.message || 'CMS field delivery blocked')
                     : 'CMS fields not mapped — configure a schema field in the CMS Mapping panel to enable publishing';
