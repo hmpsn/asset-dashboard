@@ -928,8 +928,8 @@
           "source": "Post-merge notification gap review 2026-05-26",
           "est": "2-4h",
           "priority": "P1",
-          "notes": "Create a definitive matrix of client emails: trigger route/job, audience, throttle category, template/event type, required payload fields, and expected user-visible outcome. Verify gaps against real workflows (brief/post review lifecycle, request replies, approvals, billing, audit/recommendation sends), then document missing triggers and duplicates with fix recommendations.",
-          "status": "pending"
+          "notes": "Completed 2026-06-12 in `docs/audits/2026-06-12-client-email-surface-audit.md`. Matrix covers live client-facing triggers, adjacent team-only/dormant paths, throttling/dedupe, payload contracts, and follow-up PRs. Main follow-ups: pass dashboard CTAs into work-order client emails, normalize unified deliverable reminders against legacy approval reminders, decide Stripe/client receipt authority, retire or intentionally wire the dormant `audit_improved` template, and establish notification recipient authority for workspace vs client-user emails.",
+          "status": "done"
         }
       ]
     },
