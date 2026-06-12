@@ -73,6 +73,19 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
       setSearchParams(next, { replace: true });
     }
   };
+
+  // Sync activeTab when the URL ?tab= param changes externally (e.g. ContentCalendar's
+  // openItem navigates to ?tab=posts&post=<id> while the pipeline is already mounted).
+  // Only update when the incoming param is a valid tab that differs from current state;
+  // guard avoids feedback-loops from the handleTabChange call above that clears the param.
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (!param) return;
+    const valid = TABS.some(t => t.id === param);
+    if (valid && param !== activeTab) {
+      setActiveTab(param as PipelineTab);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- activeTab intentionally excluded: including it would loop with handleTabChange
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);

@@ -852,10 +852,19 @@ function buildWorkspaceServiceTermRegex(workspace: Workspace): RegExp {
   // Layer 2: strategy site keywords — the keywords the admin has already identified
   // as the core services. Extract individual word tokens (4+ chars) so that
   // multi-word phrases like "cosmetic dentist" contribute both "cosmetic" and "dentist".
+  // Generic stopwords that appear in almost every keyword phrase are excluded: they
+  // carry no discriminating signal and produce false-positive service-keyword matches
+  // against unrelated page titles. Keep the list small and limited to words that are
+  // truly universal noise across all industries.
+  const KEYWORD_TOKEN_STOPWORDS = new Set([
+    'best', 'near', 'your', 'with', 'guide', 'this', 'that', 'from', 'into',
+    'over', 'than', 'then', 'when', 'more', 'also', 'have', 'will', 'what',
+    'where', 'which', 'they', 'them', 'their', 'been', 'were', 'very',
+  ]);
   for (const kw of workspace.keywordStrategy?.siteKeywords ?? []) {
     const tokens = kw.toLowerCase().trim().split(/\s+/);
     for (const token of tokens) {
-      if (token.length >= 4) terms.push(token);
+      if (token.length >= 4 && !KEYWORD_TOKEN_STOPWORDS.has(token)) terms.push(token);
     }
   }
 

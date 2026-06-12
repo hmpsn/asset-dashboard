@@ -251,27 +251,17 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     }
   }, [templateCrossref?.pageType, pageType]);
 
-  // W6.2 sibling contract: POST .../regenerate-outline returns 202 { jobId } when
-  // the endpoint has been converted to the background-job platform. The handler also
-  // accepts the old sync ContentBrief response for backward compatibility while the
-  // sibling branch is in flight.
+  // W6.2: POST .../regenerate-outline always returns 202 { jobId } — sync fallback removed.
   const handleRegenerateOutline = async (briefId: string, feedback?: string) => {
     setRegeneratingOutline(briefId);
     try {
-      const res = await post<{ jobId?: string } & Partial<ContentBrief>>(
+      const res = await post<{ jobId: string }>(
         `/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback }
       );
-      if (res.jobId) {
-        // Async path: job was enqueued; watcher effect will clear state on completion.
-        trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
-        setRegenOutlineJobId({ jobId: res.jobId, briefId });
-        // Do NOT clear regeneratingOutline here — the watcher clears it.
-      } else {
-        // Sync path (legacy endpoint not yet converted): apply update immediately.
-        const updated = res as ContentBrief;
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
-        setRegeneratingOutline(null);
-      }
+      // Job was enqueued; watcher effect will clear state on completion.
+      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
+      setRegenOutlineJobId({ jobId: res.jobId, briefId });
+      // Do NOT clear regeneratingOutline here — the watcher clears it.
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
       toast(err instanceof Error ? err.message : 'Failed to regenerate outline', 'error');
@@ -279,29 +269,17 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     }
   };
 
-  // W6.2 sibling contract: POST .../regenerate returns 202 { jobId } when converted.
-  // Same backward-compat handling as handleRegenerateOutline above.
+  // W6.2: POST .../regenerate always returns 202 { jobId } — sync fallback removed.
   const handleRegenerateBrief = async (briefId: string, feedback: string, requestId?: string) => {
     setRegeneratingBrief(briefId);
     try {
-      const res = await post<{ jobId?: string } & Partial<ContentBrief>>(
+      const res = await post<{ jobId: string }>(
         `/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback }
       );
-      if (res.jobId) {
-        // Async path: job was enqueued; watcher effect handles result + state clear.
-        trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
-        setRegenBriefJobId({ jobId: res.jobId, briefId, requestId });
-        // Do NOT clear regeneratingBrief here — the watcher clears it.
-      } else {
-        // Sync path (legacy endpoint not yet converted): apply update immediately.
-        const newBrief = res as ContentBrief;
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [newBrief, ...(old ?? [])]);
-        setExpanded(newBrief.id);
-        if (requestId) {
-          await handleUpdateRequestStatus(requestId, undefined, { briefId: newBrief.id });
-        }
-        setRegeneratingBrief(null);
-      }
+      // Job was enqueued; watcher effect handles result + state clear.
+      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
+      setRegenBriefJobId({ jobId: res.jobId, briefId, requestId });
+      // Do NOT clear regeneratingBrief here — the watcher clears it.
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
       toast(err instanceof Error ? err.message : 'Failed to regenerate brief', 'error');

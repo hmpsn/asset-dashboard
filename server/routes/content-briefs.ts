@@ -33,7 +33,6 @@ import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
-import { createSuggestedBrief } from '../suggested-briefs-store.js';
 import { validate, z } from '../middleware/validate.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
@@ -101,30 +100,15 @@ router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspace
 
 // AI Suggested Briefs — must be registered BEFORE /:briefId to avoid param shadowing
 //
-// This route seeds the store with any new ranking_opportunity signals before returning.
-// SHA dedup in createSuggestedBrief ensures idempotency across repeated calls.
-// The frontend reads exclusively from /api/suggested-briefs/:workspaceId (the store);
-// this endpoint is retained as the seeding trigger called on panel open.
+// Read-only: returns the raw pipeline signals derived from current insights.
+// Seeding ranking_opportunity signals into the store was moved to
+// GET /api/suggested-briefs/:workspaceId (the route the AiSuggested panel actually polls)
+// so seeding fires on the real read path rather than an orphaned endpoint.
 router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { workspaceId } = req.params;
     const insights = getInsights(workspaceId);
     const signals = buildPipelineSignals(insights);
-    // Seed ranking_opportunity signals into the store (SHA dedup prevents duplicates).
-    // content_decay signals are already written by the decay analysis pipeline; skip them here.
-    for (const signal of signals) {
-      if (signal.type === 'suggested_brief' && signal.keyword) {
-        createSuggestedBrief({
-          workspaceId,
-          keyword: signal.keyword,
-          pageUrl: signal.pageUrl,
-          source: 'ranking_opportunity',
-          reason: signal.detail,
-          priority: signal.impactScore >= 75 ? 'high' : signal.impactScore >= 50 ? 'medium' : 'low',
-        });
-      }
-    }
-    // Return the store list so the response is consistent with the primary store read path.
     res.json({ signals });
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');

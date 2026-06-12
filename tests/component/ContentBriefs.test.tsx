@@ -680,8 +680,9 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
     const { join } = await import('path');
     const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
 
-    // Handler must check for jobId before falling to sync path
-    expect(src).toContain('if (res.jobId)');
+    // Handler consumes the unconditional 202 { jobId } contract (sync fallback removed post-review)
+    expect(src).toContain('res.jobId');
+    expect(src).toContain('trackJob(');
     // Must NOT clear regeneratingBrief immediately in async path
     // (watcher clears it on job completion)
     expect(src).toContain('Do NOT clear regeneratingBrief here');
@@ -700,25 +701,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
     expect(src).toContain('setRegeneratingOutline(null)');
   });
 
-  it('handleRegenerateBrief falls back to sync path when endpoint returns ContentBrief directly', async () => {
-    const { readFileSync } = await import('fs');
-    const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
 
-    // Sync path: cast res as ContentBrief and apply immediately
-    expect(src).toContain('const newBrief = res as ContentBrief');
-    expect(src).toContain('Sync path (legacy endpoint not yet converted)');
-  });
-
-  it('handleRegenerateOutline falls back to sync path when endpoint returns ContentBrief directly', async () => {
-    const { readFileSync } = await import('fs');
-    const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
-
-    expect(src).toContain('const updated = res as ContentBrief');
-    // Outline sync path must apply to the correct brief ID
-    expect(src).toContain('b.id === briefId ? updated : b');
-  });
 
   it('handleRegenerateBrief error path shows toast and clears spinner on throw', async () => {
     const { readFileSync } = await import('fs');

@@ -150,6 +150,22 @@ describe('suggestDraftSchedule', () => {
     }
   });
 
+  it('anchors suggested dates at noon UTC (12:00:00Z) to avoid west-of-UTC off-by-one', () => {
+    // A midnight-UTC date (00:00Z) is the previous calendar day in UTC-1..UTC-12.
+    // Noon UTC (12:00Z) is the same civil day in every UTC-12..UTC+12 timezone.
+    const result = suggestDraftSchedule({
+      drafts: [{ id: 'a' }, { id: 'b' }],
+      startDate: new Date('2026-06-15T00:00:00Z'), // Monday
+    });
+    expect(result.length).toBe(2);
+    for (const r of result) {
+      const d = new Date(r.suggestedDate);
+      expect(d.getUTCHours()).toBe(12);
+      expect(d.getUTCMinutes()).toBe(0);
+      expect(d.getUTCSeconds()).toBe(0);
+    }
+  });
+
   it('orders high-priority drafts (matching priorityPages) before unprioritized ones', () => {
     const result = suggestDraftSchedule({
       drafts: [

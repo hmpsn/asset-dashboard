@@ -633,6 +633,13 @@ export async function runVoiceScore(params: VoiceScoreJobParams) {
   const updated = updatePostField(workspaceId, postId, { voiceScore, voiceFeedback });
   invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, { postId });
+  addActivity(
+    workspaceId,
+    'post_voice_scored',
+    `Voice score recorded for "${post.targetKeyword}"`,
+    `Score: ${voiceScore}`,
+    { postId: post.id, voiceScore, action: 'voice_score_completed' },
+  );
   return updated;
 }
 

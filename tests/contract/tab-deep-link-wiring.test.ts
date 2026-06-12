@@ -394,3 +394,45 @@ describe('?tab= deep-link wiring contract', () => {
     expect(readsTabParam(missingFile)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ?post= deep-link wiring: ContentCalendar → ContentManager
+// ---------------------------------------------------------------------------
+
+describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
+  // readFile-ok — intentional static analysis of sender and receiver
+  const calendarFile = join(SRC_DIR, 'components/ContentCalendar.tsx');
+  const managerFile = join(SRC_DIR, 'components/ContentManager.tsx');
+
+  it('ContentCalendar sender file exists', () => {
+    expect(existsSync(calendarFile)).toBe(true);
+  });
+
+  it('ContentManager receiver file exists', () => {
+    expect(existsSync(managerFile)).toBe(true);
+  });
+
+  it('ContentCalendar sends ?post=<id> via navigate()', () => {
+    const calendarSrc = readFileSync(calendarFile, 'utf8'); // readFile-ok — intentional static analysis
+    // Must contain the ?tab=posts&post= URL construction (sender half of the contract)
+    expect(calendarSrc).toContain('?tab=posts&post=');
+  });
+
+  it('ContentManager reads the "post" search param (receiver half)', () => {
+    const managerSrc = readFileSync(managerFile, 'utf8'); // readFile-ok — intentional static analysis
+    // Receiver must call searchParams.get('post') to consume the deep-link
+    expect(
+      managerSrc.includes("searchParams.get('post')") ||
+      managerSrc.includes('searchParams.get("post")')
+    ).toBe(true);
+  });
+
+  it('ContentPipeline syncs activeTab from searchParams so calendar-to-posts navigation works when pipeline is already mounted', () => {
+    const pipelineSrc = readFileSync(join(SRC_DIR, 'components/ContentPipeline.tsx'), 'utf8'); // readFile-ok — intentional static analysis
+    // The effect must read searchParams.get('tab') to sync the active tab
+    expect(
+      pipelineSrc.includes("searchParams.get('tab')") ||
+      pipelineSrc.includes('searchParams.get("tab")')
+    ).toBe(true);
+  });
+});

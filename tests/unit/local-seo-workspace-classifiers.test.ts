@@ -374,3 +374,36 @@ describe('Texas dental workspace — regression: still works after per-workspace
     expect(keywords.some(kw => kw.includes('dental'))).toBe(true);
   });
 });
+
+// ─── Stopword filter — generic tokens must not become service-term classifiers ─
+
+describe('siteKeywords token extraction — stopword filter', () => {
+  it('generic stopword "best" is not extracted as a service-term classifier', () => {
+    // A workspace whose siteKeywords contain "best" (e.g. "best hvac repair") must
+    // NOT produce a serviceTermRegex that matches purely on the word "best" — that
+    // would classify any page title containing "best" as a service keyword.
+    const ws = createWorkspace('Stopword Test Workspace');
+    cleanupWorkspaceIds.add(ws.id);
+    updateWorkspace(ws.id, {
+      keywordStrategy: {
+        siteKeywords: ['best hvac repair', 'near me service guide'],
+        opportunities: [],
+        businessContext: 'HVAC services',
+        generatedAt: '2026-06-01T00:00:00.000Z',
+      },
+      intelligenceProfile: { industry: 'hvac' },
+    });
+
+    const ctx = loadCandidateIterationContext(ws.id, []);
+    expect(ctx).not.toBeNull();
+    const { serviceTermRegex } = ctx!.classifiers;
+
+    // "best" alone should NOT trigger the service-term classifier
+    expect(serviceTermRegex.test('best practices guide')).toBe(false);
+    expect(serviceTermRegex.test('best team in the world')).toBe(false);
+
+    // But the substantive tokens extracted from the keywords should still match
+    expect(serviceTermRegex.test('hvac repair chicago')).toBe(true);
+    expect(serviceTermRegex.test('service near me')).toBe(true);
+  });
+});

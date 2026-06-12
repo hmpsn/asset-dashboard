@@ -53,6 +53,14 @@ export function respondToSchemaPlanFeedback(
     return null;
   }
 
+  // Defense-in-depth: feedback is only valid on plans that have been sent to the client.
+  // Plans in 'draft', 'active', or already-terminal states cannot receive new feedback.
+  const feedbackAllowedStatuses: SchemaSitePlan['status'][] = ['sent_to_client'];
+  if (!feedbackAllowedStatuses.includes(existing.status)) {
+    log.warn({ workspaceId, siteId, status: existing.status }, 'respondToSchemaPlanFeedback: plan is not in a state that accepts feedback — ignoring');
+    return null;
+  }
+
   const newStatus: RespondToSchemaPlanResult['status'] =
     action === 'approve' ? 'client_approved' : 'client_changes_requested';
   const plan = updateSchemaPlanStatus(siteId, newStatus);

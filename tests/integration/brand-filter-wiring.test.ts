@@ -45,7 +45,7 @@ const contentBriefRouteSrc = fs.readFileSync(
 // W6.2: brief generation/regeneration moved off the route and onto the background
 // job platform. The route dispatches startContentBriefGenerationJob; the job module
 // is where generateBrief (the brand-filter-aware path) is actually imported & called.
-const contentBriefGenerationJobSrc = fs.readFileSync(
+const contentBriefGenerationJobSrc = fs.readFileSync( // readFile-ok — intentional static analysis of brand-filter call-sites
   path.join(serverDir, 'content-brief-generation-job.ts'),
   'utf-8',
 );
@@ -55,6 +55,10 @@ const contentDecaySrc = fs.readFileSync(
 );
 const insightFeedbackSrc = fs.readFileSync(
   path.join(serverDir, 'insight-feedback.ts'),
+  'utf-8',
+);
+const suggestedBriefsRouteSrc = fs.readFileSync( // readFile-ok — intentional static analysis of seeding call-site
+  path.join(routesDir, 'suggested-briefs.ts'),
   'utf-8',
 );
 
@@ -251,6 +255,16 @@ describe('suggested briefs pipeline — static source check', () => {
   it('buildPipelineSignals in insight-feedback produces suggested_brief signals from ranking_opportunity insights', () => {
     expect(insightFeedbackSrc).toContain("type: 'suggested_brief'");
     expect(insightFeedbackSrc).toContain("insightType === 'ranking_opportunity'");
+  });
+
+  it('ranking_opportunity seeding fires on the real read path (suggested-briefs LIST route)', () => {
+    // The AiSuggested panel polls GET /api/suggested-briefs/:workspaceId — seeding must live
+    // there so the panel always reflects current signals without a separate trigger call.
+    expect(suggestedBriefsRouteSrc).toContain('buildPipelineSignals');
+    expect(suggestedBriefsRouteSrc).toContain('createSuggestedBrief');
+    expect(suggestedBriefsRouteSrc).toContain("source: 'ranking_opportunity'");
+    // Confirm the seeding is guarded by a freshness TTL to avoid expensive rebuilds on every poll
+    expect(suggestedBriefsRouteSrc).toContain('SEEDING_TTL_MS');
   });
 });
 

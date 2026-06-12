@@ -99,9 +99,15 @@ function isWeekend(d: Date): boolean {
   return dow === 0 || dow === 6;
 }
 
-/** Advance to the next weekday (Mon–Fri) on/after the given date. */
+/**
+ * Advance to the next weekday (Mon–Fri) on/after the given date.
+ * The returned Date is anchored at 12:00:00 UTC to avoid off-by-one calendar
+ * bucketing in local timezones: midnight UTC (00:00Z) is the previous day in any
+ * timezone west of UTC, so west-of-UTC admins would see suggestions a day early.
+ * Noon UTC (12:00Z) is safely within the same civil day in all UTC-12..UTC+12 zones.
+ */
 function nextWeekday(d: Date): Date {
-  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
   while (isWeekend(next)) {
     next.setUTCDate(next.getUTCDate() + 1);
   }

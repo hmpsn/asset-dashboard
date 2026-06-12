@@ -40,55 +40,6 @@
       ]
     },
     {
-      "id": "sprint-admin-surfaces-w6-quality-debias-2026-06-11",
-      "name": "⚖️ Admin Surfaces W6 — Quality & De-bias",
-      "hours": "~20-30h",
-      "rationale": "Wave 6: systematic-quality fixes — first-client bias in classifiers, sync AI in route handlers, unbounded tables, state-machine bypasses. Some lanes gated on owner decisions D2/D3.",
-      "notes": "PR map + decisions D1-D4: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 6. Schema value-prioritization is NOT here — merged into existing kwv-titles-metas-schema-priority (notes updated).",
-      "items": [
-        {
-          "id": "aw6-local-seo-debias",
-          "title": "Local SEO: derive city/service classifiers from configured markets + business profile (kill hardcoded Texas cities + dental/legal regexes)",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-8h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "server/local-seo.ts:556/:1526/:1543/:1839 bias candidate generation for every non-Texas, non-dental workspace — biggest data-quality lift per new client. Report §3."
-        },
-        {
-          "id": "aw6-sync-ai-to-jobs",
-          "title": "Move the 5 synchronous heavyweight AI route handlers onto the job platform + paginate unbounded post/brief list endpoints + prune schema_snapshots",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Sync AI in HTTP handlers violates docs/rules/background-generation.md; list endpoints return full bodies fetched redundantly by three hooks; schema_snapshots writes a full blob every 10s during generation, never pruned. Report §4/§5. D4 (schema_snapshots): keep version-history-referenced rows; prune unreferenced after 30d."
-        },
-        {
-          "id": "aw6-wire-or-delete",
-          "title": "Wire suggested-briefs store into AiSuggested (D2) + forward-planning calendar v1 (D3) + pending-schemas wire-or-delete",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "D2 DECIDED: wire — AiSuggested swaps to the store (dismiss/snooze/dedup). D3 DECIDED: WIRE (owner overrode delete rec) — calendar planning v1: plannedPublishAt, future view, clickable items, suggestPublishDates wiring. Pending-schemas half-pipeline: lane judges wire-or-delete. Report §4/§5."
-        },
-        {
-          "id": "aw6-state-machine-validation",
-          "title": "Schema plan transitions through validateTransition + content-templates routes onto validate() Zod middleware",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Schema plan status mutations bypass server/state-machines.ts entirely; content-templates routes skip the mandatory validation middleware. Report §4/§5."
-        }
-      ]
-    },
-    {
       "id": "sprint-admin-surfaces-polish-2026-06-11",
       "name": "✨ Admin Surfaces — Polish Sweeps (minors, batched per surface)",
       "hours": "~24-36h",
@@ -1227,6 +1178,56 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-admin-surfaces-w6-quality-debias-2026-06-11",
+      "name": "✅ SHIPPED — ⚖️ Admin Surfaces W6 — Quality & De-bias",
+      "hours": "~20-30h",
+      "rationale": "Wave 6: systematic-quality fixes — first-client bias in classifiers, sync AI in route handlers, unbounded tables, state-machine bypasses. Some lanes gated on owner decisions D2/D3.",
+      "notes": "PR map + decisions D1-D4: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 6. Schema value-prioritization is NOT here — merged into existing kwv-titles-metas-schema-priority (notes updated).",
+      "items": [
+        {
+          "id": "aw6-local-seo-debias",
+          "title": "Local SEO: derive city/service classifiers from configured markets + business profile (kill hardcoded Texas cities + dental/legal regexes)",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done in fix/admin-surfaces-w6-final. Geo/service classifiers derived per-workspace (markets + business profile + industry taxonomy + strategy siteKeywords with stopword filter; documented generic fallback); precomputed per candidate cycle; Chicago-HVAC + leak-guard + stopword tests."
+        },
+        {
+          "id": "aw6-sync-ai-to-jobs",
+          "title": "Move the 5 synchronous heavyweight AI route handlers onto the job platform + paginate unbounded post/brief list endpoints + prune schema_snapshots",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "6-9h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done (AI half). 4 new job types (CONTENT_BRIEF_REGENERATE, CONTENT_POST_REVIEW, CONTENT_POST_FIX ephemeral, CONTENT_POST_VOICE_SCORE); 202 jobId + 409 dedupe; PostEditor/ContentManager via useBackgroundTasks; coverage-contract anchored. NOTE: unbounded post/brief list pagination was descoped from this item (no db-layer owner this round) — remains open as a follow-up; schema_snapshots pruning shipped under aw6-state-machine-validation scope."
+        },
+        {
+          "id": "aw6-wire-or-delete",
+          "title": "Wire suggested-briefs store into AiSuggested (D2) + forward-planning calendar v1 (D3) + pending-schemas wire-or-delete",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. D2: AiSuggested reads the persistent store (dismiss/snooze/accept + addActivity, SHA dedup, TTL-guarded ranking-signal seeding on the real read path). D3: calendar planning v1 (migration 136, future view, clickable rows + ContentPipeline tab-sync fix, schedule-a-draft, noon-UTC suggest-dates). Pending-schemas half-pipeline deleted (zero callers, documented)."
+        },
+        {
+          "id": "aw6-state-machine-validation",
+          "title": "Schema plan transitions through validateTransition + content-templates routes onto validate() Zod middleware",
+          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
+          "est": "3-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Done. SCHEMA_PLAN transitions (incl. draft→active per the live Activate button) via validateTransition + 422 send precondition + feedback guard; schema_snapshots id-reuse fix + orphan pruning + transactional RMW; content-templates on validate() Zod (middleware now prefixes field paths in errors)."
+        }
+      ],
+      "shippedAt": "2026-06-12"
     },
     {
       "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
