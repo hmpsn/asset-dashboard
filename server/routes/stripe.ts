@@ -31,6 +31,7 @@ import {
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
 import { getContentRequest } from '../content-requests.js';
+import { contentProductType } from '../../shared/types/payments.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
@@ -106,6 +107,22 @@ const stripeProductsConfigSchema = z.object({
 const CART_MAX_ITEMS = 50;
 const CART_MAX_PAGE_IDS = 500;
 const CART_MAX_ISSUE_CHECKS = 100;
+// Content cart context (briefs/posts). Mirrors the single-purchase content
+// payload — server re-derives price + product from this, never trusts a
+// client-supplied amount.
+const cartContentContextSchema = z.object({
+  topic: z.string().min(1).max(200),
+  targetKeyword: z.string().min(1).max(200),
+  serviceType: z.enum(['brief_only', 'full_post']),
+  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']),
+  source: z.enum(['strategy', 'client']),
+  intent: z.string().max(50).optional(),
+  priority: z.string().max(20).optional(),
+  rationale: z.string().max(1000).optional(),
+  notes: z.string().max(1000).optional(),
+  targetPageId: z.string().max(100).optional(),
+  targetPageSlug: z.string().max(200).optional(),
+});
 const cartCheckoutSchema = z.object({
   workspaceId: z.string().min(1).max(100),
   items: z
@@ -115,6 +132,7 @@ const cartCheckoutSchema = z.object({
         quantity: z.number().int().min(1).max(1000).optional(),
         pageIds: z.array(z.string().max(400)).max(CART_MAX_PAGE_IDS).optional(),
         issueChecks: z.array(z.string().max(120)).max(CART_MAX_ISSUE_CHECKS).optional(),
+        content: cartContentContextSchema.optional(),
       }),
     )
     .min(1)
@@ -208,12 +226,32 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, validate(cartCheckoutS
   try {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
-      items: items.map((i: { productType: string; quantity: number; pageIds?: string[]; issueChecks?: string[] }) => ({
-        productType: sanitizeString(i.productType, 50) as import('../payments.js').ProductType,
-        quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
-        pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
-        issueChecks: Array.isArray(i.issueChecks) ? i.issueChecks.map((c: string) => sanitizeString(c, 100)) : undefined,
-      })),
+      items: items.map((i: { productType: string; quantity: number; pageIds?: string[]; issueChecks?: string[]; content?: import('../../shared/types/payments.js').ContentCartContext }) => {
+        // Content items: the server re-derives the productType from serviceType
+        // (contentProductType) so a client can't pick a cheaper content product.
+        const content = i.content
+          ? {
+              topic: sanitizeString(i.content.topic, 200),
+              targetKeyword: sanitizeString(i.content.targetKeyword, 200),
+              serviceType: i.content.serviceType,
+              pageType: i.content.pageType,
+              source: i.content.source,
+              intent: i.content.intent ? sanitizeString(i.content.intent, 50) : undefined,
+              priority: i.content.priority ? sanitizeString(i.content.priority, 20) : undefined,
+              rationale: i.content.rationale ? sanitizeString(i.content.rationale, 1000) : undefined,
+              notes: i.content.notes ? sanitizeString(i.content.notes, 1000) : undefined,
+              targetPageId: i.content.targetPageId ? sanitizeString(i.content.targetPageId, 100) : undefined,
+              targetPageSlug: i.content.targetPageSlug ? sanitizeString(i.content.targetPageSlug, 200) : undefined,
+            }
+          : undefined;
+        return {
+          productType: (content ? contentProductType(content.serviceType) : sanitizeString(i.productType, 50)) as import('../payments.js').ProductType,
+          quantity: content ? 1 : Math.max(1, Math.min(100, Number(i.quantity) || 1)),
+          pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
+          issueChecks: Array.isArray(i.issueChecks) ? i.issueChecks.map((c: string) => sanitizeString(c, 100)) : undefined,
+          content,
+        };
+      }),
       successUrl: context.successUrl,
       cancelUrl: context.cancelUrl,
     });

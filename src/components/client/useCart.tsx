@@ -1,13 +1,20 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { ProductType } from '../../../server/payments';
+import type { ContentCartContext } from '../../../shared/types/payments';
 
 // --- Cart item types ---
 
 export interface CartItem {
+  /** Stable per-row identity. Fix items reuse their productType (so R1 merge
+   *  semantics hold); content items get a generated id because many distinct
+   *  briefs/posts share one productType (e.g. brief_blog) and must NOT merge. */
+  cartItemId: string;
   productType: ProductType;
   displayName: string;
   priceUsd: number;
   quantity: number;
+  /** 'fix' (default) merges by productType; 'content' is always a distinct row. */
+  kind?: 'fix' | 'content';
   /** Optional: pages selected for per-page products */
   pageIds?: string[];
   /** Optional: audit check types backing this fix (e.g. "title", "img-alt").
@@ -15,6 +22,8 @@ export interface CartItem {
   issueChecks?: string[];
   /** Whether this is a flat-rate (full-site) product */
   isFlat?: boolean;
+  /** Content context (briefs/posts) — mirrors the single-purchase payload. */
+  content?: ContentCartContext;
 }
 
 /** Union two id lists preserving first-seen order, dropping duplicates. */
@@ -30,15 +39,26 @@ function mergeDedup(a: string[] | undefined, b: string[] | undefined): string[] 
   return out;
 }
 
+let _contentItemSeq = 0;
+function nextContentItemId(): string {
+  _contentItemSeq += 1;
+  return `content_${Date.now()}_${_contentItemSeq}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export interface CartState {
   items: CartItem[];
   isOpen: boolean;
 }
 
 export interface CartActions {
-  addItem: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void;
-  removeItem: (productType: ProductType) => void;
-  updateQuantity: (productType: ProductType, quantity: number) => void;
+  /** Add an item. Fix items merge by productType (R1 semantics); content items
+   *  are always added as a new distinct row. Callers may omit cartItemId for fix
+   *  items (it defaults to the productType). */
+  addItem: (item: Omit<CartItem, 'quantity' | 'cartItemId'> & { quantity?: number; cartItemId?: string }) => void;
+  /** Remove by row identity (cartItemId). */
+  removeItem: (cartItemId: string) => void;
+  /** Update quantity by row identity (cartItemId). */
+  updateQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
   openCart: () => void;
   closeCart: () => void;
@@ -55,12 +75,22 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = 'seo-fix-cart';
 
+/** Backfill cartItemId for any persisted item written before content-in-cart
+ *  (those rows are fix items keyed by productType). */
+function normalizePersisted(items: unknown): CartItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((raw) => {
+    const item = raw as CartItem;
+    if (item.cartItemId) return item;
+    return { ...item, cartItemId: item.productType, kind: item.kind || 'fix' };
+  });
+}
+
 function loadCart(): CartItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return normalizePersisted(JSON.parse(raw));
   } catch (err) {
       console.error('useCart operation failed:', err);
     return [];
@@ -82,9 +112,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Persist on change
   useEffect(() => { saveCart(items); }, [items]);
 
-  const addItem = useCallback((item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
+  const addItem = useCallback((item: Omit<CartItem, 'quantity' | 'cartItemId'> & { quantity?: number; cartItemId?: string }) => {
     setItems(prev => {
-      const existing = prev.find(i => i.productType === item.productType);
+      // Content items NEVER merge — each brief/post is a distinct topic. Always a
+      // new row with a generated identity.
+      if (item.kind === 'content') {
+        const quantity = item.quantity || 1;
+        return [...prev, { ...item, cartItemId: nextContentItemId(), kind: 'content', quantity }];
+      }
+
+      // Fix items: merge by productType (R1 semantics). cartItemId === productType.
+      const existing = prev.find(i => i.kind !== 'content' && i.productType === item.productType);
       if (existing) {
         // For flat-rate items, don't stack
         if (item.isFlat) return prev;
@@ -93,7 +131,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // A then page B) must accumulate both pages or the work order silently
         // drops one. issueChecks merge the same way for end-to-end check context.
         return prev.map(i => {
-          if (i.productType !== item.productType) return i;
+          if (i.kind === 'content' || i.productType !== item.productType) return i;
           const hasPages = (item.pageIds?.length ?? 0) > 0 || (i.pageIds?.length ?? 0) > 0;
           if (hasPages) {
             const pageIds = mergeDedup(i.pageIds, item.pageIds);
@@ -112,21 +150,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       const pageIds = item.pageIds;
       const quantity = pageIds?.length ? pageIds.length : (item.quantity || 1);
-      return [...prev, { ...item, quantity }];
+      return [...prev, { ...item, cartItemId: item.cartItemId ?? item.productType, kind: 'fix', quantity }];
     });
     setIsOpen(true);
   }, []);
 
-  const removeItem = useCallback((productType: ProductType) => {
-    setItems(prev => prev.filter(i => i.productType !== productType));
+  const removeItem = useCallback((cartItemId: string) => {
+    setItems(prev => prev.filter(i => i.cartItemId !== cartItemId));
   }, []);
 
-  const updateQuantity = useCallback((productType: ProductType, quantity: number) => {
+  const updateQuantity = useCallback((cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
-      setItems(prev => prev.filter(i => i.productType !== productType));
+      setItems(prev => prev.filter(i => i.cartItemId !== cartItemId));
     } else {
       setItems(prev => prev.map(i =>
-        i.productType === productType ? { ...i, quantity } : i
+        i.cartItemId === cartItemId ? { ...i, quantity } : i
       ));
     }
   }, []);

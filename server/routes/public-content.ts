@@ -39,6 +39,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import { computeOpportunityScore } from './keyword-strategy.js';
 import { buildKeywordStrategyUxPayload, buildLatestKeywordStrategyRefreshSummary } from '../keyword-strategy-ux.js';
+import { buildPageRankStories } from '../page-rank-stories.js';
 import {
   createContentRequestSchema,
   submitContentRequestSchema,
@@ -255,6 +256,10 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
       strategyUx,
       businessContext: strategy?.businessContext || '',
       generatedAt: strategy?.generatedAt ?? null,
+      // R2-D: per-page keyword story cards — ranked keywords a page holds +
+      // nearby gap keywords worth adding. Value is banded/labeled (never raw
+      // integers or EMV). Empty array when no page has both ranked + gap signals.
+      pageRankStories: buildPageRankStories(fullPageMap, keywordGaps),
     });
   } catch (err) {
     next(err);

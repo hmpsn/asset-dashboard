@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccessFromBody, requireWorkspaceAccessFromQuery } from '../auth.js';
+import { parsePaginationParams, MAX_PAGE_LIMIT } from '../pagination.js';
 
 const router = Router();
 
@@ -17,8 +18,14 @@ function parseLimit(rawLimit: unknown): number | null {
 }
 
 // --- Activity Log ---
-// Public: client views activity for their workspace
+// Public: client views activity for their workspace (supports ?limit=N&offset=N pagination)
 router.get('/api/public/activity/:workspaceId', requireClientPortalAuth(), (req, res) => {
+  const pagination = parsePaginationParams(req.query as Record<string, unknown>);
+  if (pagination) {
+    const { limit, offset } = pagination;
+    return res.json(listClientActivity(req.params.workspaceId, Math.min(limit, MAX_PAGE_LIMIT), offset));
+  }
+  // Unpaginated back-compat: respect legacy ?limit= only.
   const limit = parseLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   res.json(listClientActivity(req.params.workspaceId, limit));

@@ -16,6 +16,7 @@ export {
 } from './platform';
 export { meetingBriefApi } from './meetingBrief';
 export { briefingApi } from './briefing';
+export { competitorGapsApi } from './competitorGaps';
 export { diagnostics } from './diagnostics.js';
 export { clientActions } from './clientActions';
 export { publicDeliverables } from './deliverables';

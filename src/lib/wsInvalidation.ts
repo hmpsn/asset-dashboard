@@ -639,6 +639,9 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.schemaPlan(workspaceId),
         queryKeys.client.schemaSnapshot(workspaceId),
       ] as const;
+    case WS_EVENTS.JOB_CREATED:
+    case WS_EVENTS.JOB_UPDATED:
+      return [queryKeys.client.jobs(workspaceId)] as const;
     default:
       return NO_KEYS;
   }

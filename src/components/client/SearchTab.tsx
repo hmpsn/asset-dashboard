@@ -5,8 +5,9 @@ import {
 } from 'lucide-react';
 import { KeywordTable, RankTrackingSection } from '../shared/RankTable';
 import type { KeywordTableRow } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button, FreshnessStamp } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button, FreshnessStamp, type Tier } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
+import { CompetitorGapsSection } from './CompetitorGapsSection';
 import { Explainer } from './SeoGlossary';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
@@ -31,6 +32,9 @@ interface SearchTabProps {
   latestRanks: { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[];
   insights: SearchInsights | null;
   dataUpdatedAt?: number | null;
+  /** For the Premium competitor-gap section (self-fetching, tier-gated). */
+  workspaceId?: string;
+  tier?: Tier;
 }
 
 function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | null, insights: SearchInsights | null): string {
@@ -53,6 +57,7 @@ function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | 
 export function SearchTab({
   overview, searchComparison, trend, annotations,
   rankHistory, latestRanks, insights, dataUpdatedAt,
+  workspaceId, tier,
 }: SearchTabProps) {
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -152,6 +157,12 @@ export function SearchTab({
 
     {/* Rank Tracking */}
     <RankTrackingSection rankHistory={rankHistory} latestRanks={latestRanks} />
+
+    {/* Competitor keyword gaps — Premium-exclusive benchmarking (R2-A).
+        Self-fetching + tier-gated; Growth/free see a soft-gate upsell. */}
+    {workspaceId && tier && (
+      <CompetitorGapsSection workspaceId={workspaceId} tier={tier} />
+    )}
 
     {/* Timeline notes (read-only, managed by your team) */}
     {annotations.length > 0 && (

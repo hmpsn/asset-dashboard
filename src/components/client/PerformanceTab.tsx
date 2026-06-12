@@ -136,6 +136,8 @@ export function PerformanceTab(props: PerformanceTabProps) {
           latestRanks={props.latestRanks}
           insights={props.insights}
           dataUpdatedAt={props.searchDataUpdatedAt}
+          workspaceId={props.ws.id}
+          tier={props.tier}
         />
       )}
 

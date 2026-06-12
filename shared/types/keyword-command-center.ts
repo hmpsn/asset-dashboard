@@ -38,6 +38,12 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
   DECLINED: 'declined',
   RETIRED: 'retired',
   LOST_VISIBILITY: 'lost_visibility',
+  /**
+   * Striking Distance: keywords at positions 11–20 (page 2 of search results).
+   * These are the classic agency "easy wins" — one nudge away from page 1.
+   * Derived from currentPosition; no new provider calls required.
+   */
+  STRIKING_DISTANCE: 'striking_distance',
 } as const;
 
 export type KeywordCommandCenterFilter =
@@ -258,6 +264,11 @@ export interface KeywordCommandCenterCounts {
   localCandidates: number;
   retired: number;
   declined: number;
+  /**
+   * Count of keywords at positions 11–20 (page 2). The classic "striking distance"
+   * easy-wins list — one nudge away from page 1, value-ranked in the segment view.
+   */
+  strikingDistance?: number;
   /**
    * Count of keywords across the universe that have no provider volume data
    * attached. Surfaced as a diagnostic in the panel header so admins can tell

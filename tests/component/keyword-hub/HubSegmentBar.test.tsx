@@ -1,11 +1,12 @@
 /**
- * Tests for HubSegmentBar — the six primary segment pills for the Keyword Hub.
+ * Tests for HubSegmentBar — the seven primary segment pills for the Keyword Hub.
  *
  * Plan P1-T2 assertions:
- * - renders all 6 segment labels
+ * - renders all 7 segment labels (including Striking Distance)
  * - active segment has teal/active styling (aria-pressed=true)
  * - clicking a segment calls onChange with the correct segment id
  * - Local segment shows MapPin icon when active
+ * - Striking Distance segment shows TrendingUp icon when active
  * - count Skeleton rendered when isLoading=true
  * - numeric badge when count loaded
  * - "—" when count is undefined
@@ -16,7 +17,7 @@ import userEvent from '@testing-library/user-event';
 import { HubSegmentBar, HUB_SEGMENT_METAS } from '../../../src/components/keyword-hub/HubSegmentBar';
 import type { HubSegmentMeta } from '../../../src/components/keyword-hub/HubSegmentBar';
 import type { HubSegment } from '../../../src/hooks/admin/useKeywordHubState';
-import { MapPin } from 'lucide-react';
+import { MapPin, TrendingUp } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Helper: build segments with counts
@@ -25,6 +26,7 @@ import { MapPin } from 'lucide-react';
 function makeSegments(overrides: Partial<Record<HubSegment, number | undefined>> = {}): HubSegmentMeta[] {
   const defaults: Record<HubSegment, number | undefined> = {
     all: 120,
+    striking_distance: 14,
     in_strategy: 45,
     tracked: 30,
     needs_review: 12,
@@ -42,7 +44,7 @@ function makeSegments(overrides: Partial<Record<HubSegment, number | undefined>>
 // ---------------------------------------------------------------------------
 
 describe('HubSegmentBar', () => {
-  it('renders all 6 segment labels', () => {
+  it('renders all 7 segment labels', () => {
     const onChange = vi.fn();
     render(
       <HubSegmentBar
@@ -53,6 +55,7 @@ describe('HubSegmentBar', () => {
     );
 
     expect(screen.getByRole('button', { name: /all segment/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /striking distance segment/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /in strategy segment/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tracked segment/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /needs review segment/i })).toBeInTheDocument();
@@ -159,6 +162,59 @@ describe('HubSegmentBar', () => {
     expect(iconEl).toBeNull();
   });
 
+  it('shows TrendingUp icon on Striking Distance segment when it is active', () => {
+    render(
+      <HubSegmentBar
+        segments={makeSegments()}
+        active="striking_distance"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const sdBtn = screen.getByRole('button', { name: /striking distance segment/i });
+    expect(sdBtn).toHaveAttribute('aria-pressed', 'true');
+    // TrendingUp renders as an SVG inside the button when active
+    const iconEl = sdBtn.querySelector('svg');
+    expect(iconEl).toBeInTheDocument();
+  });
+
+  it('does NOT show TrendingUp icon on Striking Distance when it is NOT active', () => {
+    render(
+      <HubSegmentBar
+        segments={makeSegments()}
+        active="all"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const sdBtn = screen.getByRole('button', { name: /striking distance segment/i });
+    expect(sdBtn).toHaveAttribute('aria-pressed', 'false');
+    const iconEl = sdBtn.querySelector('svg');
+    expect(iconEl).toBeNull();
+  });
+
+  it('calls onChange with "striking_distance" when Striking Distance is clicked', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <HubSegmentBar
+        segments={makeSegments()}
+        active="all"
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /striking distance segment/i }));
+    expect(onChange).toHaveBeenCalledWith('striking_distance');
+  });
+
+  it('HUB_SEGMENT_METAS includes striking_distance as second entry', () => {
+    expect(HUB_SEGMENT_METAS[1].id).toBe('striking_distance');
+    expect(HUB_SEGMENT_METAS[1].label).toBe('Striking Distance');
+    expect(HUB_SEGMENT_METAS[1].icon).toBe(TrendingUp);
+  });
+
   it('renders Skeleton placeholders for counts when isLoading=true', () => {
     const { container } = render(
       <HubSegmentBar
@@ -171,8 +227,8 @@ describe('HubSegmentBar', () => {
 
     // animate-pulse class is the Skeleton indicator
     const skeletons = container.querySelectorAll('.animate-pulse');
-    // One skeleton per segment (6)
-    expect(skeletons.length).toBe(6);
+    // One skeleton per segment (7)
+    expect(skeletons.length).toBe(7);
   });
 
   it('renders numeric count badge when count is provided and not loading', () => {
@@ -207,7 +263,7 @@ describe('HubSegmentBar', () => {
 
     // "—" characters should appear for all segments
     const dashes = screen.getAllByText('—');
-    expect(dashes.length).toBe(6);
+    expect(dashes.length).toBe(7);
   });
 
   it('does not render Skeleton when count is undefined and isLoading=false', () => {

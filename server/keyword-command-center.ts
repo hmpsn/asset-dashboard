@@ -934,8 +934,19 @@ export function sortRowsForQuery(
   return keywordSortComparator(sort, direction, accessors);
 }
 
+/**
+ * True when a row is in the "striking distance" position window (11–20 inclusive).
+ * Positions are 1-based (lower = better); pos 11 is the first result on page 2.
+ * A position of exactly 10 is NOT included (that is still page 1).
+ */
+function isStrikingDistanceRow(row: KeywordCommandCenterRow): boolean {
+  const pos = row.metrics.currentPosition;
+  return pos != null && pos >= 11 && pos <= 20;
+}
+
 export function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE) return isStrikingDistanceRow(row);
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return Boolean(row.localSeoState);
@@ -1005,6 +1016,7 @@ export function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordComm
 
 export function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCenterFilter): number {
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return rows.length;
+  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE) return rows.filter(isStrikingDistanceRow).length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return rows.filter(row => row.assignment?.role === 'content_gap').length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return rows.filter(row => row.assignment?.role === 'page_keyword').length;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return rows.filter(row => row.localSeoState).length;
@@ -1052,6 +1064,7 @@ export function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCent
     localCandidates: rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length,
     retired: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RETIRED).length,
     declined: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.DECLINED).length,
+    strikingDistance: rows.filter(isStrikingDistanceRow).length,
     lostVisibility: rows.filter(row => row.isLostVisibility === true).length,
     // Sentinel-masked volumes have already been dropped to undefined by mergeMetrics,
     // so any null/undefined here is genuinely missing (not a planner-bucket masquerade).
@@ -1102,11 +1115,13 @@ interface SkinnyFilterCounts {
   declined: number;
   retired: number;
   lostVisibility: number;
+  strikingDistance: number;
 }
 
 export function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
   return [
     { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All', count: counts.all },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE, label: 'Striking Distance', count: counts.strikingDistance },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy', count: counts.inStrategy },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED, label: 'Tracked', count: counts.tracked },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review', count: counts.needsReview },
@@ -1782,6 +1797,20 @@ export async function buildKeywordCommandCenterSummary(
   }
   const rankEvidenceTotal = rankEvidence.total;
 
+  // Striking-distance count: distinct keyword keys from latest ranks with
+  // position 11–20 inclusive (page 2). Uses a Set to deduplicate variants.
+  // Position comes from the rank snapshot (the authoritative GSC rank signal);
+  // trackedKeyword.baselinePosition is intentionally excluded here because the
+  // summary uses a key-set approach without full row assembly.
+  const strikingDistanceKeys = new Set<string>();
+  for (const rank of latestRanks) {
+    if (rank.position >= 11 && rank.position <= 20) {
+      const key = keywordComparisonKey(rank.query);
+      if (key) strikingDistanceKeys.add(key);
+    }
+  }
+  const strikingDistanceCount = strikingDistanceKeys.size;
+
   const activeTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
   const inactiveTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE);
   const requested = [...feedback.values()].filter(row => row.status === 'requested');
@@ -1829,6 +1858,7 @@ export async function buildKeywordCommandCenterSummary(
     localCandidates: localCandidatesCount,
     retired: inactiveTracked.length,
     declined: declined.length,
+    strikingDistance: strikingDistanceCount,
     missingVolume,
     lostVisibility: lostVisibilityCount,
   };
@@ -1842,6 +1872,7 @@ export async function buildKeywordCommandCenterSummary(
     rawEvidence: counts.evidence,
     local: counts.local,
     localCandidates: localCandidatesCount,
+    strikingDistance: strikingDistanceCount,
     visibleLocally: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length,
     possibleMatch: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length,
     notVisible: localVisibilityValues.filter(item =>
@@ -2776,6 +2807,20 @@ function sourceKeysForRows(input: {
       for (const key of input.localVisibility.keys()) keys.add(key);
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED:
+      return keys;
+    case KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE:
+      for (const rank of input.latestRanks) {
+        if (rank.position >= 11 && rank.position <= 20) {
+          const key = keywordComparisonKey(rank.query);
+          if (key) keys.add(key);
+        }
+      }
+      for (const keyword of input.trackedKeywords) {
+        const pos = keyword.baselinePosition;
+        if (pos != null && pos >= 11 && pos <= 20) {
+          add(keyword.query);
+        }
+      }
       return keys;
     case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES:
       return null;

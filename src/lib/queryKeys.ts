@@ -252,6 +252,7 @@ export const queryKeys = {
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
     briefing: (wsId: string) => ['client-briefing', wsId] as const,
+    competitorGaps: (wsId: string) => ['client-competitor-gaps', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
     chatUsage: (wsId: string) => ['client-chat-usage', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
@@ -271,6 +272,8 @@ export const queryKeys = {
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
     postPreviewAll: (wsId: string) => ['client', 'post-preview', wsId] as const,
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
+    /** Active background jobs visible to this workspace's client portal. */
+    jobs: (wsId: string) => ['client-jobs', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

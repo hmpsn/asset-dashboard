@@ -69,6 +69,7 @@ const rowsQuerySchema = z.object({
     KEYWORD_COMMAND_CENTER_FILTERS.DECLINED,
     KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
     KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY,
+    KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE,
   ]).optional(),
   search: z.string().optional(),
   sort: z.enum(['priority', 'keyword', 'demand', 'rank', 'clicks', 'difficulty', 'opportunity']).optional(),

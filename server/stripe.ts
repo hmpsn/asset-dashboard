@@ -12,7 +12,10 @@ import {
 import { getContentRequest, updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
-import { getWorkspace, updateWorkspace } from './workspaces.js';
+import { getWorkspace, updateWorkspace, computeEffectiveTier } from './workspaces.js';
+import { createContentRequest } from './content-requests.js';
+import { type ContentCartContext } from '../shared/types/payments.js';
+import { PREMIUM_CONTENT_DISCOUNT } from '../shared/pricing.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
@@ -93,6 +96,26 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   content_scale:    { displayName: 'Scale Content (8 posts/mo)',   category: 'content', priceUsd: 1600, envKey: 'STRIPE_PRICE_CONTENT_SCALE' },
 };
 
+/** Discount-eligible content categories (briefs + full posts). */
+function isDiscountableContent(category: ProductConfig['category']): boolean {
+  return category === 'brief' || category === 'content';
+}
+
+/**
+ * The discounted whole-cent unit price for a content product at a given tier.
+ * Returns the full price for non-Premium tiers or non-content products. Rounded
+ * to whole cents (Stripe charges integer cents) so display and charge agree.
+ * The discount rate is the shared PREMIUM_CONTENT_DISCOUNT config constant — the
+ * tier-model rediscussion (roadmap: tier-model-rediscussion) may re-map it.
+ */
+export function contentUnitAmountCents(config: ProductConfig, tier: string): number {
+  const full = Math.round(config.priceUsd * 100);
+  if (tier === 'premium' && isDiscountableContent(config.category)) {
+    return Math.round(full * (1 - PREMIUM_CONTENT_DISCOUNT));
+  }
+  return full;
+}
+
 export const PRODUCT_TYPES = Object.freeze(Object.keys(PRODUCT_MAP)) as readonly ProductType[];
 
 export function isProductType(value: string): value is ProductType {
@@ -119,6 +142,28 @@ function validatePostPolishedUpgrade(workspaceId: string, contentRequestId: stri
   if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
     throw new Error('Only approved brief requests can be upgraded to a full post');
   }
+}
+
+/**
+ * Fulfill a CART content item (a fresh brief OR full-post purchase). Unlike the
+ * single-purchase upgrade path (`applyContentRequestPayment` with post_polished),
+ * a cart content request is brand-new in `pending_payment` regardless of service
+ * type — it just needs to advance to `requested`. Throws on an unexpected DB
+ * error so the webhook's per-family FM-2 handler records the failure; an
+ * already-advanced request (replay) is a no-op.
+ */
+function applyCartContentPayment(workspaceId: string, contentRequestId: string): void {
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) {
+    log.warn({ workspaceId, contentRequestId }, 'Cart content payment references a missing content request');
+    return;
+  }
+  if (request.status !== 'pending_payment') {
+    // Already advanced (webhook replay) — nothing to do.
+    log.info({ workspaceId, contentRequestId, status: request.status }, 'Cart content request already past pending_payment — skipping');
+    return;
+  }
+  updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
 }
 
 function applyContentRequestPayment(workspaceId: string, productType: string, contentRequestId: string | undefined): void {
@@ -307,7 +352,14 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
 
 export interface CartCheckoutParams {
   workspaceId: string;
-  items: Array<{ productType: ProductType; quantity: number; pageIds?: string[]; issueChecks?: string[] }>;
+  items: Array<{
+    productType: ProductType;
+    quantity: number;
+    pageIds?: string[];
+    issueChecks?: string[];
+    /** Per-item content context (briefs/posts). */
+    content?: ContentCartContext;
+  }>;
   successUrl: string;
   cancelUrl: string;
 }
@@ -319,20 +371,70 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
 
   // SERVER-AUTHORITATIVE bundle pricing: collapse any client pack/per-page split of
   // a fix family and re-derive the correct line items (pack(s) + per-page remainder;
-  // alt-text flat). Non-fix products pass through unchanged. The client cannot
-  // construct a cheaper-than-correct split — the server is the only authority on
-  // totals (MONETIZATION.md §233).
+  // alt-text flat). Content items (briefs/posts) are non-fix and pass through
+  // normalization untouched — each content item stays its own distinct line. The
+  // client cannot construct a cheaper-than-correct split — the server is the only
+  // authority on totals (MONETIZATION.md §233).
   const normalizedItems = normalizeFixCart(params.items);
   if (!normalizedItems.length) throw new Error('Cart is empty');
 
-  const lineItems: Array<{ price: string; quantity: number }> = [];
+  // Premium content discount is keyed off the SERVER's view of the tier, never a
+  // client claim. Premium is a paid tier (trial promotes free→growth only), so the
+  // effective tier is authoritative here.
+  const ws = getWorkspace(params.workspaceId);
+  const tier = ws ? computeEffectiveTier(ws) : 'free';
+
+  // For each content item, create the backing content request NOW (pending_payment),
+  // mirroring the single-purchase flow, and stamp its id back onto the normalized
+  // item so the persisted cart can fulfill it in the webhook. dedupe:false — each
+  // cart line is a distinct topic the client explicitly added.
+  for (const item of normalizedItems) {
+    if (!item.content) continue;
+    const c = item.content;
+    const request = createContentRequest(params.workspaceId, {
+      topic: c.topic,
+      targetKeyword: c.targetKeyword,
+      intent: c.intent || 'informational',
+      priority: c.priority || 'medium',
+      rationale: c.rationale || c.notes || `Cart content request: ${c.topic}`,
+      clientNote: c.notes,
+      source: c.source,
+      serviceType: c.serviceType,
+      pageType: c.pageType,
+      initialStatus: 'pending_payment',
+      targetPageId: c.targetPageId,
+      targetPageSlug: c.targetPageSlug,
+      dedupe: false,
+    });
+    item.contentRequestId = request.id;
+  }
+
+  // Stripe line items. Fix/full-price products use their fixed Stripe Price ID.
+  // Premium content lines carry an inline `price_data` override so the 10% discount
+  // is applied exactly per-line (the configured Price ID is a fixed amount and
+  // cannot express the discount). Non-Premium content keeps the fixed Price ID.
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   const productTypes: string[] = [];
 
   for (const item of normalizedItems) {
     const config = getProductConfig(item.productType);
     if (!config) throw new Error(`Unknown product type: ${item.productType}`);
     if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${item.productType}. Configure it in Command Center → Payments.`);
-    lineItems.push({ price: config.stripePriceId, quantity: item.quantity });
+
+    const isContent = !!item.content;
+    const discounted = isContent && tier === 'premium' && isDiscountableContent(config.category);
+    if (discounted) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          unit_amount: contentUnitAmountCents(config, tier),
+          product_data: { name: `${config.displayName} (Premium −${Math.round(PREMIUM_CONTENT_DISCOUNT * 100)}%)` },
+        },
+        quantity: item.quantity,
+      });
+    } else {
+      lineItems.push({ price: config.stripePriceId, quantity: item.quantity });
+    }
     productTypes.push(item.productType);
   }
 
@@ -361,17 +463,23 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
 
   // Create a pending payment record per normalized line item. PRODUCT_MAP already
   // carries pack prices ($179/$299), so priceUsd × quantity is the authoritative amount.
-  // The full normalized cart is persisted on every record (cart_items) so fulfillment
-  // can read it regardless of which record the webhook reaches first.
+  // Content lines store the (possibly Premium-discounted) unit amount so the record
+  // matches the Stripe charge. The full normalized cart is persisted on every record
+  // (cart_items) so fulfillment can read it regardless of which record the webhook
+  // reaches first. Content records carry their contentRequestId for fulfillment.
   for (const item of normalizedItems) {
     const config = getProductConfig(item.productType)!;
+    const unitCents = item.content
+      ? contentUnitAmountCents(config, tier)
+      : config.priceUsd * 100;
     createPayment(params.workspaceId, {
       workspaceId: params.workspaceId,
       stripeSessionId: session.id,
       productType: item.productType,
-      amount: config.priceUsd * item.quantity * 100,
+      amount: unitCents * item.quantity,
       currency: 'usd',
       status: 'pending',
+      contentRequestId: item.contentRequestId,
       metadata: { ...metadata, productType: item.productType, quantity: String(item.quantity) },
       cartItems: normalizedItems,
     });
@@ -590,6 +698,16 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const cartItems = persistedCart ?? legacyCart;
       if (cartItems) {
         const paymentQueues = paymentQueuesByProduct(paidPayments);
+        // FM-2 per family: a session can mix fixes (work orders) and content
+        // (content requests). Each item is fulfilled via its own existing path,
+        // wrapped in its OWN try/catch so one family's failure can never swallow
+        // the other's — a content-request error must not abort the fix work orders,
+        // and vice versa. The payments are already marked paid (the charge cleared),
+        // so we do NOT throw to force a retry (that would re-fulfill the already-
+        // succeeded family and duplicate work orders). Instead each failure is
+        // RECORDED on the activity log as a failure, not silently swallowed, so an
+        // operator can reconcile the stuck item.
+        const fulfillmentFailures: string[] = [];
         for (const item of cartItems) {
           try {
             if (isFulfillmentProduct(item.productType)) {
@@ -602,10 +720,26 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
                 issueChecks: item.issueChecks,
                 quantity: item.quantity || 1,
               });
+            } else if (item.contentRequestId) {
+              // Content item (fresh brief/post) — advance the pending_payment
+              // request to requested. Cart content is always a NEW request, so it
+              // uses the cart-specific fulfillment (NOT the single-purchase
+              // post_polished upgrade path, which expects an approved brief).
+              applyCartContentPayment(workspaceId, item.contentRequestId);
             }
           } catch (err) {
-            log.error({ err, workspaceId, productType: item.productType }, 'Failed to create work order for cart item — skipping');
+            log.error({ err, workspaceId, productType: item.productType, contentRequestId: item.contentRequestId }, 'Failed to fulfill cart item');
+            fulfillmentFailures.push(item.contentRequestId ?? item.productType);
           }
+        }
+        if (fulfillmentFailures.length > 0) {
+          addActivity(
+            workspaceId,
+            'payment_failed',
+            `Fulfillment failed for ${fulfillmentFailures.length} paid cart item(s) — needs reconciliation`,
+            `Session ${session.id} · items: ${fulfillmentFailures.join(', ')}`,
+            { stripeSessionId: session.id, failedItems: fulfillmentFailures.join(',') },
+          );
         }
       }
 

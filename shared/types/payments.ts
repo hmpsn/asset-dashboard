@@ -10,6 +10,44 @@ export type ProductType =
   | 'plan_growth' | 'plan_premium'
   | 'content_starter' | 'content_growth' | 'content_scale';
 
+// ── Content cart context ────────────────────────────────────────
+// A content cart item (brief or full post) carries the same payload the
+// single-purchase content flow sends today (see src/hooks/usePayments.ts), so
+// the cart checkout can mirror Buy-now fulfillment exactly. Unlike per-page fix
+// items — which MERGE by productType — each content item is a DISTINCT topic and
+// never merges; identity is the generated `cartItemId`, not productType.
+export type ContentServiceType = 'brief_only' | 'full_post';
+/** The page types the cart/checkout supports (the brief-priced subset). A subset
+ *  of the broader content.ts ContentPageType — kept narrow so it maps 1:1 onto a
+ *  brief product. */
+export type ContentCartPageType =
+  | 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
+
+export interface ContentCartContext {
+  topic: string;
+  targetKeyword: string;
+  serviceType: ContentServiceType;
+  pageType: ContentCartPageType;
+  /** Where this content request originated (mirrors PricingModalData.source). */
+  source: 'strategy' | 'client';
+  intent?: string;
+  priority?: string;
+  rationale?: string;
+  notes?: string;
+  targetPageId?: string;
+  targetPageSlug?: string;
+}
+
+/**
+ * Resolve the Stripe ProductType for a content cart item. Mirrors the
+ * single-purchase mapping in usePayments.ts EXACTLY so cart and Buy-now charge
+ * the same product (full post → post_polished, otherwise brief_blog). Keeping
+ * one resolver prevents the two paths from drifting.
+ */
+export function contentProductType(serviceType: ContentServiceType): ProductType {
+  return serviceType === 'full_post' ? 'post_polished' : 'brief_blog';
+}
+
 export interface PaymentRecord {
   id: string;
   workspaceId: string;

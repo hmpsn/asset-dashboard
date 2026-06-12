@@ -21,6 +21,7 @@ import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
+import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
@@ -114,6 +115,7 @@ export function OverviewTab({
   // flag can be flipped per-workspace without touching anything below this
   // block. When OFF (default), the original overview body renders unchanged.
   const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  const workFeedEnabled = useFeatureFlag('client-work-feed');
   if (briefingV2Enabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
@@ -576,8 +578,15 @@ export function OverviewTab({
           );
         })()}
 
-        {/* Activity timeline — only real team work, no system/anomaly entries */}
-        {(() => {
+        {/* Agency work feed (R2-B) — live jobs + narrative activity history */}
+        {workFeedEnabled && (
+          <ErrorBoundary label="Agency Work Feed">
+            <AgencyWorkFeed workspaceId={workspaceId} />
+          </ErrorBoundary>
+        )}
+
+        {/* Legacy activity timeline — shown only when client-work-feed flag is off */}
+        {!workFeedEnabled && (() => {
           const WORK_TYPES = new Set(['audit_completed', 'request_resolved', 'approval_applied', 'seo_updated', 'images_optimized', 'links_fixed', 'content_updated']);
           const workEntries = activityLog.filter(e => WORK_TYPES.has(e.type)).slice(0, 5);
           if (workEntries.length === 0) return null;

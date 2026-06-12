@@ -29,6 +29,25 @@ import {
 import { getProductConfig } from '../server/stripe.js';
 import type { ProductType } from '../shared/types/payments.js';
 
+/**
+ * Content products actually BILLED from env-configured Stripe Price IDs. These
+ * are the cart-/Buy-now-priced families (R2-E made them cart-addable). The cart
+ * + single-purchase flows resolve content to exactly these two products
+ * (contentProductType: brief_only → brief_blog, full_post → post_polished), so
+ * these are the only content Prices that can be charged and the only ones whose
+ * `priceUsd` is guaranteed to match the configured Stripe Price.
+ *
+ * NOTE: other brief/post entries in PRODUCT_MAP share one env Price
+ * (STRIPE_PRICE_BRIEF etc.) but carry display-only priceUsd variants — they are
+ * never charged directly, so verifying them here would produce false drift
+ * against a single shared Stripe Price. The Premium 10% discount is applied at
+ * checkout-BUILD time via an inline price_data override, so the configured Price
+ * stays the FULL price and is validated exactly like the fix prices.
+ */
+const CONTENT_PRICE_PRODUCTS: ProductType[] = [
+  'brief_blog', 'post_polished',
+];
+
 interface PriceCheck {
   productType: ProductType;
   label: string;
@@ -70,6 +89,21 @@ function buildPriceChecks(): { checks: PriceCheck[]; unconfigured: string[] } {
         });
       }
     }
+  }
+
+  // Content prices (briefs/posts) — full-price guard (discount is build-time).
+  for (const productType of CONTENT_PRICE_PRODUCTS) {
+    const config = getProductConfig(productType);
+    if (!config?.stripePriceId) {
+      unconfigured.push(`content (${productType})`);
+      continue;
+    }
+    checks.push({
+      productType,
+      label: `content ${productType}`,
+      expectedUsd: config.priceUsd,
+      stripePriceId: config.stripePriceId,
+    });
   }
 
   return { checks, unconfigured };
@@ -128,7 +162,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`\nverify:stripe-prices — OK. ${checks.length} fix price(s) match the catalog.`);
+  console.log(`\nverify:stripe-prices — OK. ${checks.length} price(s) match the catalog.`);
   process.exit(0);
 }
 
