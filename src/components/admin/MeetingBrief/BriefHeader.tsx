@@ -1,21 +1,11 @@
 import { RefreshCw } from 'lucide-react';
 import { Button } from '../../ui';
+import { timeAgo } from '../../../lib/timeAgo';
 
 interface Props {
   generatedAt: string;
   onRegenerate: () => void;
   isGenerating: boolean;
-}
-
-function formatRelativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
 export function BriefHeader({ generatedAt, onRegenerate, isGenerating }: Props) {
@@ -24,7 +14,7 @@ export function BriefHeader({ generatedAt, onRegenerate, isGenerating }: Props) 
       <div>
         <h1 className="t-h1 text-[var(--brand-text-bright)]">Meeting Brief</h1>
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-          Generated {formatRelativeTime(generatedAt)}
+          Generated {timeAgo(generatedAt, { style: 'long' })}
         </p>
       </div>
       <Button

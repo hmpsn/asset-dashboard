@@ -4,6 +4,7 @@ import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, 
 import { SectionCard, StatCard, EmptyState, PageHeader, Button, Icon, cn } from './ui';
 import { llmsTxt } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
+import { timeAgo } from '../lib/timeAgo';
 import { formatDateTime } from '../utils/formatDates';
 import { STALE_TIMES } from '../lib/queryClient';
 import { useJobProgress } from '../hooks/useJobProgress';
@@ -17,10 +18,10 @@ function formatFreshness(ts: string | null | undefined): { label: string; color:
   if (!ts) return { label: 'Never generated', color: 'text-[var(--brand-text-muted)]' };
   const ageMs = Date.now() - new Date(ts).getTime();
   const hours = ageMs / (1000 * 60 * 60);
-  if (hours < 1) return { label: 'Generated just now', color: 'text-accent-success' };
-  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-accent-success' };
-  if (hours < 72) return { label: `Generated ${Math.round(hours / 24)}d ago`, color: 'text-accent-warning' };
-  return { label: `Generated ${Math.round(hours / 24)}d ago — consider regenerating`, color: 'text-accent-warning' };
+  const label = `Generated ${timeAgo(ts, { dateAfterDays: Number.POSITIVE_INFINITY, roundUnits: true })}`;
+  if (hours < 24) return { label, color: 'text-accent-success' };
+  if (hours < 72) return { label, color: 'text-accent-warning' };
+  return { label: `${label} — consider regenerating`, color: 'text-accent-warning' };
 }
 
 export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
