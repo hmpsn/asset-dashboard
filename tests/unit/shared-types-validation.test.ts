@@ -332,16 +332,16 @@ import {
 } from '../../shared/types/feature-flags.js';
 
 describe('FEATURE_FLAGS constants', () => {
-  it('all flags default to false (except shipped cutover flags)', () => {
-    // keyword-hub flipped to true at the Phase B cutover (2026-06-11).
-    const SHIPPED_DEFAULT_TRUE = new Set(['keyword-hub']);
+  it('all flags default to false', () => {
+    // keyword-hub was retired at the Phase C cutover (2026-06-11); every remaining
+    // flag is dark by default.
     for (const [key, value] of Object.entries(FEATURE_FLAGS)) {
-      expect(value, `flag "${key}" default`).toBe(SHIPPED_DEFAULT_TRUE.has(key));
+      expect(value, `flag "${key}" default`).toBe(false);
     }
   });
 
   it('contains expected flag keys', () => {
-    expect('keyword-hub' in FEATURE_FLAGS).toBe(true);
+    expect('keyword-universe-full' in FEATURE_FLAGS).toBe(true);
     expect('white-label' in FEATURE_FLAGS).toBe(true);
     expect('client-briefing-v2' in FEATURE_FLAGS).toBe(true);
   });

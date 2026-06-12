@@ -1339,6 +1339,110 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'Retired Keyword Hub feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/135-retire-keyword-hub-feature-flag.sql'],
+    message:
+      'The keyword-hub umbrella flag was retired at the Phase C cutover (2026-06-11). The Hub is the only keyword surface — make the Hub path unconditional instead of using the retired key.',
+    severity: 'error',
+    rationale:
+      'After the Keyword Hub cutover deleted KCC/Rank Tracker, the keyword-hub flag must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a legacy path that no longer exists.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const filesToScan = SCAN_ALL
+        ? Array.from(new Set([
+          ...files,
+          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
+          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
+        ]))
+        : files;
+      const retired = ['keyword-hub'];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of filesToScan) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.endsWith('tests/pr-check.test.ts')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired seo-ranks route literal in src',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message: "The standalone Rank Tracker (seo-ranks) route was folded into the Keyword Hub (seo-keywords) at the Keyword Hub cutover. Do not reference the 'seo-ranks' Page literal in src/ — route to 'seo-keywords' instead. If a transitional redirect genuinely needs it, add a // seo-ranks-fold-ok hatch.",
+    severity: 'error',
+    rationale:
+      "After the Keyword Hub cutover removed RankTracker.tsx and folded seo-ranks into the Hub, any new 'seo-ranks' literal in src/ resurrects a dead route or silently bypasses the Hub. Promoted from the route-fold-in-seo-ranks drift test into a mechanized pr-check rule.",
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      const literalRe = /['"]seo-ranks['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/src/') && !file.startsWith('src/')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (literalRe.test(line) && !hasHatch(lines, i, 'seo-ranks-fold-ok')) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',

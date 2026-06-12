@@ -5,43 +5,48 @@ import {
   FEATURE_FLAG_GROUPS,
 } from '../../shared/types/feature-flags.js';
 
-// Wave 4 — Keyword Hub P0-T1. The `keyword-hub` flag dark-launches the whole Hub
-// (KCC + Rank Tracker consolidation). It MUST be OFF by default (dark), grouped,
-// and pass the import-time grouping-consistency assertion + verify:feature-flags.
-describe('keyword-hub feature flag (Wave 4 P0)', () => {
-  it('keyword-value-scoring flag exists, defaults OFF, and is in the Keyword Hub group', () => {
-    expect(FEATURE_FLAGS['keyword-value-scoring']).toBe(false);
-    const entry = FEATURE_FLAG_CATALOG['keyword-value-scoring'];
+// Wave 4 — Keyword Hub Phase C cutover (2026-06-11). The `keyword-hub` umbrella flag
+// was RETIRED once the Hub became the only keyword surface (KCC + Rank Tracker deleted).
+// The "Keyword Hub" group survives with its two coverage/scoring sub-flags, which keep
+// their own independent removal conditions.
+describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
+  it('keyword-hub flag is fully retired (removed from defaults, catalog, and groups)', () => {
+    expect('keyword-hub' in FEATURE_FLAGS).toBe(false);
+    expect('keyword-hub' in FEATURE_FLAG_CATALOG).toBe(false);
+    const groupsWithKey = FEATURE_FLAG_GROUPS.filter(g =>
+      (g.keys as readonly string[]).includes('keyword-hub'),
+    );
+    expect(groupsWithKey).toHaveLength(0);
+  });
+
+  it('keyword-universe-full survives, defaults OFF, and stays in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-universe-full']).toBe(false);
+    const entry = FEATURE_FLAG_CATALOG['keyword-universe-full'];
     expect(entry.group).toBe('Keyword Hub');
     expect(entry.lifecycle.owner).toBe('analytics-intelligence');
     expect(entry.lifecycle.linkedRoadmapItemId).toBeTruthy();
     const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
+    expect(hubBucket?.keys).toContain('keyword-universe-full');
+  });
+
+  it('keyword-value-scoring survives, defaults OFF, and stays in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-value-scoring']).toBe(false);
+    const entry = FEATURE_FLAG_CATALOG['keyword-value-scoring'];
+    expect(entry.group).toBe('Keyword Hub');
+    const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
     expect(hubBucket?.keys).toContain('keyword-value-scoring');
   });
 
-  it('exists and is ON by default (Phase B cutover flip, 2026-06-11)', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
-  });
-
-  it('has a catalog entry grouped under "Keyword Hub" with all-clients rollout', () => {
-    const entry = FEATURE_FLAG_CATALOG['keyword-hub'];
-    expect(entry).toBeDefined();
-    expect(entry.group).toBe('Keyword Hub');
-    expect(entry.lifecycle.rolloutTarget).toBe('all-clients');
-    expect(entry.lifecycle.linkedRoadmapItemId).toBe('keyword-hub-wave4');
-  });
-
-  it('is registered in exactly one group (the "Keyword Hub" group)', () => {
-    const groupsWithKey = FEATURE_FLAG_GROUPS.filter(g => g.keys.includes('keyword-hub'));
-    expect(groupsWithKey).toHaveLength(1);
-    expect(groupsWithKey[0].label).toBe('Keyword Hub');
+  it('the Keyword Hub group retains exactly the two surviving keys', () => {
+    const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
+    expect(hubBucket?.keys).toEqual(['keyword-universe-full', 'keyword-value-scoring']);
   });
 
   it('importing the module runs assertFeatureFlagGroupingConsistency() without throwing', () => {
     // The module evaluates assertFeatureFlagGroupingConsistency() at import time
     // (it throws if a key is missing from a group, mis-grouped, duplicated, or
     // references an unknown key). Reaching this assertion at all proves the import
-    // — and therefore the consistency check — succeeded for `keyword-hub`.
-    expect(Object.keys(FEATURE_FLAG_CATALOG)).toContain('keyword-hub');
+    // — and therefore the consistency check — succeeded post-retirement.
+    expect(Object.keys(FEATURE_FLAG_CATALOG)).not.toContain('keyword-hub');
   });
 });

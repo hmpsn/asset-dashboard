@@ -1,12 +1,15 @@
-// tests/component/KeywordCommandCenter-ws-invalidation.test.tsx
+// tests/component/keyword-hub-ws-invalidation.test.tsx
 //
-// CONTRACT: broadcast events that KCC depends on are covered centrally.
+// CONTRACT: broadcast events that the Keyword Hub depends on are covered
+// centrally. (The legacy Keyword Command Center was retired in the W4 cutover;
+// the Hub is now the only keyword surface, and it reuses the same
+// `queryKeys.admin.keywordCommandCenter*` cache keys.)
 //
-// KeywordCommandCenter has no inline useWorkspaceEvents wiring (correct — adding
-// it would duplicate the central map and trigger the pr-check
+// KeywordHub has no inline useWorkspaceEvents wiring (correct — adding it would
+// duplicate the central map and trigger the pr-check
 // "useWorkspaceEvents handler for centralized event" rule).
 //
-// Instead, three broadcasts that change KCC data are handled by
+// Instead, three broadcasts that change Hub data are handled by
 // useWsInvalidation (mounted in the App ancestor whenever an admin workspace
 // is open): RANK_TRACKING_UPDATED, STRATEGY_UPDATED, and
 // INTELLIGENCE_SIGNALS_UPDATED. Each must invalidate `queryKeys.admin.keywordCommandCenter(wsId)`
@@ -14,7 +17,7 @@
 // detail sub-keys via React Query prefix matching.
 //
 // These tests pin that contract so a future wsInvalidation refactor cannot
-// silently drop KCC coverage.
+// silently drop Keyword Hub coverage.
 
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -25,29 +28,29 @@ import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
 import { WS_EVENTS } from '../../src/lib/wsEvents';
 import { queryKeys } from '../../src/lib/queryKeys';
 
-const WS_ID = 'ws-kcc-test';
+const WS_ID = 'ws-keyword-hub-test';
 
 // ---------------------------------------------------------------------------
 // Static registry tests (no mocking needed — test the pure mapping functions)
 // ---------------------------------------------------------------------------
 
-describe('KeywordCommandCenter — WS invalidation contract (static registry)', () => {
-  it('RANK_TRACKING_UPDATED (admin scope) invalidates the KCC prefix key', () => {
+describe('Keyword Hub — WS invalidation contract (static registry)', () => {
+  it('RANK_TRACKING_UPDATED (admin scope) invalidates the Hub prefix key', () => {
     const keys = getWorkspaceInvalidationKeys(WS_EVENTS.RANK_TRACKING_UPDATED, WS_ID, undefined, 'admin');
     expect(keys).toContainEqual(queryKeys.admin.keywordCommandCenter(WS_ID));
   });
 
-  it('STRATEGY_UPDATED (admin scope) invalidates the KCC prefix key', () => {
+  it('STRATEGY_UPDATED (admin scope) invalidates the Hub prefix key', () => {
     const keys = getWorkspaceInvalidationKeys(WS_EVENTS.STRATEGY_UPDATED, WS_ID, undefined, 'admin');
     expect(keys).toContainEqual(queryKeys.admin.keywordCommandCenter(WS_ID));
   });
 
-  it('INTELLIGENCE_SIGNALS_UPDATED (admin scope) invalidates the KCC prefix key', () => {
+  it('INTELLIGENCE_SIGNALS_UPDATED (admin scope) invalidates the Hub prefix key', () => {
     const keys = getWorkspaceInvalidationKeys(WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, WS_ID, undefined, 'admin');
     expect(keys).toContainEqual(queryKeys.admin.keywordCommandCenter(WS_ID));
   });
 
-  it('KCC prefix key is a proper prefix of the summary, rows, and detail sub-keys', () => {
+  it('Hub prefix key is a proper prefix of the summary, rows, and detail sub-keys', () => {
     // React Query matches all keys whose start equals the invalidation prefix.
     // If the prefix is ['admin-keyword-command-center', wsId], then summary
     // ['admin-keyword-command-center', wsId, 'summary'] is invalidated too.
@@ -64,7 +67,7 @@ describe('KeywordCommandCenter — WS invalidation contract (static registry)', 
 });
 
 // ---------------------------------------------------------------------------
-// Runtime tests — verify useWsInvalidation dispatches the KCC invalidation
+// Runtime tests — verify useWsInvalidation dispatches the Hub invalidation
 // calls when the three relevant events fire
 // ---------------------------------------------------------------------------
 
@@ -82,12 +85,12 @@ function createWrapper(client: QueryClient) {
   );
 }
 
-describe('KeywordCommandCenter — WS invalidation contract (runtime hook)', () => {
+describe('Keyword Hub — WS invalidation contract (runtime hook)', () => {
   beforeEach(() => {
     capturedHandlers = {};
   });
 
-  it('useWsInvalidation registers RANK_TRACKING_UPDATED and it invalidates the KCC prefix', () => {
+  it('useWsInvalidation registers RANK_TRACKING_UPDATED and it invalidates the Hub prefix', () => {
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
 
@@ -106,7 +109,7 @@ describe('KeywordCommandCenter — WS invalidation contract (runtime hook)', () 
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.keywordCommandCenter(WS_ID));
   });
 
-  it('useWsInvalidation registers STRATEGY_UPDATED and it invalidates the KCC prefix', () => {
+  it('useWsInvalidation registers STRATEGY_UPDATED and it invalidates the Hub prefix', () => {
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
 
@@ -125,7 +128,7 @@ describe('KeywordCommandCenter — WS invalidation contract (runtime hook)', () 
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.keywordCommandCenter(WS_ID));
   });
 
-  it('useWsInvalidation registers INTELLIGENCE_SIGNALS_UPDATED and it invalidates the KCC prefix', () => {
+  it('useWsInvalidation registers INTELLIGENCE_SIGNALS_UPDATED and it invalidates the Hub prefix', () => {
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
 

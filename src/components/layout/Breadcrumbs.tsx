@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
-import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { NAV_REGISTRY_BY_ID } from '../../lib/navRegistry';
 import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
@@ -33,16 +32,9 @@ export function Breadcrumbs({
   workspaces, selected, tab, pendingContentRequests,
 }: BreadcrumbsProps) {
   const navigate = useNavigate();
-  // Wave 4 P4: relabel the seo-keywords crumb to "Keyword Hub" when ON.
-  // The relabel logic lives once in the nav registry (flagBehavior); the crumb
-  // just consumes it. Flag-OFF labels are byte-identical.
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
   const tabLabel = (t: Page): string => {
     const entry = NAV_REGISTRY_BY_ID[t];
-    if (entry) {
-      const fb = entry.flagBehavior;
-      return fb?.labelWhenOn && fb.flag === 'keyword-hub' && keywordHubEnabled ? fb.labelWhenOn : entry.label;
-    }
+    if (entry) return entry.label;
     return LEGACY_TAB_LABELS[t] || t;
   };
 
@@ -149,9 +141,9 @@ export function Breadcrumbs({
   );
 }
 
-// Backward-compat export: a flat slug → flag-OFF label map derived from the
-// registry plus the legacy fallback labels. Kept for existing consumers/tests;
-// the registry is the source of truth.
+// Backward-compat export: a flat slug → label map derived from the registry
+// plus the legacy fallback labels. Kept for existing consumers/tests; the
+// registry is the source of truth.
 const TAB_LABELS: Record<string, string> = {
   ...LEGACY_TAB_LABELS,
   ...Object.fromEntries(Object.values(NAV_REGISTRY_BY_ID).map((e) => [e.id, e.label])),

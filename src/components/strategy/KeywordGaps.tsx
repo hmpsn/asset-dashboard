@@ -14,16 +14,15 @@ interface KeywordGapItem {
 export interface KeywordGapsProps {
   keywordGaps: KeywordGapItem[];
   difficultyColor: (kd?: number) => string;
-  /** When provided with keywordHubEnabled=true, each row gets a "View in Hub" link. */
+  /** When workspaceId + navigate are provided, each row gets a "View in Hub" link. */
   workspaceId?: string;
   navigate?: (path: string) => void;
-  keywordHubEnabled?: boolean;
 }
 
-export function KeywordGaps({ keywordGaps, difficultyColor, workspaceId, navigate, keywordHubEnabled }: KeywordGapsProps) {
+export function KeywordGaps({ keywordGaps, difficultyColor, workspaceId, navigate }: KeywordGapsProps) {
   if (keywordGaps.length === 0) return null;
 
-  const showHubLink = !!(keywordHubEnabled && workspaceId && navigate);
+  const showHubLink = !!(workspaceId && navigate);
 
   return (
     <div className="bg-[var(--surface-2)] border border-orange-500/20 p-5 rounded-[var(--radius-signature)]">

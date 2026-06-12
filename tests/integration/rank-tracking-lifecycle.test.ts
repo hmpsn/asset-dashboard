@@ -11,12 +11,11 @@
  * - tracked-keywords-broadcasts.test.ts — broadcast semantics for public routes
  *
  * Coverage in this file:
- * - Full lifecycle: add → verify presence → pin → unpin → delete
+ * - Full lifecycle: add → verify presence → pin → unpin
+ * - KCC hard-delete route (the surviving keyword-removal path)
  * - Admin POST broadcasts RANK_TRACKING_UPDATED with correct payload
- * - Admin DELETE broadcasts RANK_TRACKING_UPDATED with correct payload
  * - Admin PATCH pin broadcasts RANK_TRACKING_UPDATED with correct payload
  * - No broadcast on duplicate add
- * - No broadcast on delete of non-existent keyword
  * - Workspace isolation for admin keyword routes
  * - History with ?queries= filter
  * - History with custom ?limit= values
@@ -27,7 +26,6 @@
  * - Whitespace-only query → 400
  * - Pinned flag respected on add
  * - Multiple keyword coexistence
- * - Delete-leaves-others-intact pattern
  * - Public history and latest return arrays (basic guard)
  */
 
@@ -80,7 +78,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 // ─── Imports (after vi.mock calls) ────────────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
+import { storeRankSnapshot } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
@@ -239,25 +237,6 @@ describe('Admin keyword CRUD — full lifecycle', () => {
     expect(kw!.pinned).toBe(false);
   });
 
-  it('DELETE removes the keyword and subsequent GET confirms absence', async () => {
-    await postJson(kwUrl(wsId), { query: 'keyword to delete' });
-
-    const delRes = await del(kwUrl(wsId, 'keyword to delete'));
-    expect(delRes.status).toBe(200);
-
-    const verifyRes = await api(kwUrl(wsId));
-    expect(verifyRes.status).toBe(200);
-    const body = await verifyRes.json() as { query: string }[];
-    expect(body.map(k => k.query)).not.toContain('keyword to delete');
-  });
-
-  it('DELETE on a non-existent keyword returns 200 without error', async () => {
-    const res = await del(kwUrl(wsId, 'does-not-exist-keyword'));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-  });
-
   it('KCC hard-delete route handles keywords containing a percent sign', async () => {
     await postJson(kwUrl(wsId), { query: '100% growth' });
 
@@ -373,28 +352,6 @@ describe('Admin keyword mutations — broadcasts', () => {
     expect(rankTrackingBroadcasts(wsId)).toHaveLength(0);
   });
 
-  it('DELETE broadcasts RANK_TRACKING_UPDATED with removed action', async () => {
-    await postJson(kwUrl(wsId), { query: 'broadcast del keyword' });
-    broadcastState.calls = [];
-
-    const delRes = await del(kwUrl(wsId, 'broadcast del keyword'));
-    expect(delRes.status).toBe(200);
-
-    const broadcasts = rankTrackingBroadcasts(wsId);
-    expect(broadcasts).toHaveLength(1);
-    expect(broadcasts[0]).toMatchObject({
-      workspaceId: wsId,
-      event: WS_EVENTS.RANK_TRACKING_UPDATED,
-      payload: expect.objectContaining({ action: 'removed' }),
-    });
-  });
-
-  it('DELETE on non-existent keyword does NOT broadcast', async () => {
-    const res = await del(kwUrl(wsId, 'ghost keyword nobody added'));
-    expect(res.status).toBe(200);
-    expect(rankTrackingBroadcasts(wsId)).toHaveLength(0);
-  });
-
   it('PATCH pin broadcasts RANK_TRACKING_UPDATED with pin_toggled action', async () => {
     await postJson(kwUrl(wsId), { query: 'pin broadcast keyword' });
     broadcastState.calls = [];
@@ -439,18 +396,6 @@ describe('Admin keyword mutations — workspace isolation', () => {
     expect(bodyA.map(k => k.query)).not.toContain('workspace b only keyword');
   });
 
-  it('deleting a keyword from workspace A does not affect workspace B', async () => {
-    await postJson(kwUrl(wsId), { query: 'shared keyword label' });
-    await postJson(kwUrl(wsIdB), { query: 'shared keyword label' });
-
-    await del(kwUrl(wsId, 'shared keyword label'));
-
-    const resB = await api(kwUrl(wsIdB));
-    expect(resB.status).toBe(200);
-    const bodyB = await resB.json() as { query: string }[];
-    expect(bodyB.map(k => k.query)).toContain('shared keyword label');
-  });
-
   it('broadcasts from workspace A are scoped only to workspace A', async () => {
     await postJson(kwUrl(wsId), { query: 'isolation broadcast keyword' });
 
@@ -477,18 +422,6 @@ describe('Admin keyword mutations — multiple keyword scenarios', () => {
     expect(queries).toContain('kw gamma');
   });
 
-  it('deleting one keyword leaves other keywords intact', async () => {
-    await postJson(kwUrl(wsId), { query: 'keep one' });
-    await postJson(kwUrl(wsId), { query: 'remove one' });
-    await postJson(kwUrl(wsId), { query: 'keep two' });
-
-    await del(kwUrl(wsId, 'remove one'));
-
-    const remaining = getTrackedKeywords(wsId).map(k => k.query);
-    expect(remaining).toContain('keep one');
-    expect(remaining).toContain('keep two');
-    expect(remaining).not.toContain('remove one');
-  });
 });
 
 // ─── Rank history endpoint ────────────────────────────────────────────────────

@@ -84,12 +84,10 @@ function renderPanel() {
   );
 }
 
-describe('KeywordStrategy — View in Hub deep-link sender (flag-ON)', () => {
+describe('KeywordStrategy — View in Hub deep-link sender', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
-    featureFlagMock.mockReset();
-    featureFlagMock.mockReturnValue(true); // keyword-hub ON
   });
 
   it('renders BOTH a Track control AND a View in Hub control on the chip', () => {
@@ -121,25 +119,5 @@ describe('KeywordStrategy — View in Hub deep-link sender (flag-ON)', () => {
   it('the Track control no longer renders the literal "Rank Tracker" copy', () => {
     renderPanel();
     expect(screen.queryByRole('button', { name: /track in rank tracker/i })).toBeNull();
-  });
-});
-
-describe('KeywordStrategy — View in Hub is flag-gated (flag-OFF byte-identity)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    navigateMock.mockReset();
-    featureFlagMock.mockReset();
-    featureFlagMock.mockReturnValue(false); // keyword-hub OFF
-  });
-
-  it('does NOT render the View in Hub control when the flag is off', () => {
-    renderPanel();
-    expect(screen.queryByRole('button', { name: /view in hub/i })).toBeNull();
-  });
-
-  it('keeps the byte-identical "Track in Rank Tracker" copy when the flag is off', () => {
-    renderPanel();
-    // Flag-OFF byte-identity: the legacy Track copy is preserved.
-    expect(screen.getAllByRole('button', { name: /track in rank tracker/i }).length).toBeGreaterThan(0);
   });
 });

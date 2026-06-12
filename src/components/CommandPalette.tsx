@@ -13,7 +13,6 @@ import {
   resolveNavLabel, isNavEntryHidden,
 } from '../lib/navRegistry';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useToast } from './Toast';
 import { ClickableRow, FormInput, Icon } from './ui';
@@ -85,9 +84,6 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // Keyword Hub (Wave 4 P4): when ON, fold the standalone Rank Tracker nav entry
-  // into the Hub and relabel "Keywords" -> "Keyword Hub". Flag-OFF byte-identical.
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
   // ⌘K / Ctrl+K to toggle
   // keydown-ok: this handler intentionally fires from input fields. The
@@ -129,12 +125,11 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const items: PaletteItem[] = useMemo(() => {
     const result: PaletteItem[] = [];
 
-    // Navigation items — driven by the nav registry. The keyword-hub relabel /
-    // hide logic lives once in the registry (flagBehavior); we resolve it here.
-    // Only keyword-hub drives nav flagBehavior today; other flags resolve false.
-    const flagResolver = (flag: FeatureFlagKey) => flag === 'keyword-hub' && keywordHubEnabled;
+    // Navigation items — driven by the nav registry. No nav entry currently uses
+    // flagBehavior, so the resolver always reports flags as OFF; the relabel/hide
+    // mechanism is retained in the registry for future flag-gated nav changes.
+    const flagResolver = (_flag: FeatureFlagKey) => false;
     for (const entry of NAV_REGISTRY) {
-      // Wave 4 P4: the standalone Rank Tracker entry folds into the Hub when ON.
       if (isNavEntryHidden(entry, flagResolver)) continue;
       const label = resolveNavLabel(entry, flagResolver);
       const groupLabel = PALETTE_GROUP_LABELS[entry.group];
@@ -250,7 +245,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, keywordHubEnabled, startJob, toast]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, startJob, toast]);
 
   // Filter items by query
   const filtered = useMemo(() => {

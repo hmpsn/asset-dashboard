@@ -1,6 +1,5 @@
 import { FileText } from 'lucide-react';
 import { useAdminMeetingBrief } from '../../../hooks/admin/useAdminMeetingBrief';
-import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { adminPath, type Page } from '../../../routes';
 import { SectionCard } from '../../ui/SectionCard';
 import { Skeleton } from '../../ui/Skeleton';
@@ -40,9 +39,6 @@ function BriefSkeleton() {
 
 export function MeetingBriefPage({ workspaceId, onNavigate }: Props) {
   const { brief, isLoading, isError, refetch, generate, isGenerating, generateError } = useAdminMeetingBrief(workspaceId);
-  // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON;
-  // rank/keyword text routes to seo-keywords. Flag-OFF byte-identical.
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
   const openTab = (tab: Page) => {
     const target = adminPath(workspaceId, tab);
@@ -56,7 +52,7 @@ export function MeetingBriefPage({ workspaceId, onNavigate }: Props) {
   const resolveTextRoute = (text: string): Page => {
     const t = text.toLowerCase();
     if (t.includes('blueprint')) return 'brief';
-    if (t.includes('rank') || t.includes('keyword') || t.includes('position')) return keywordHubEnabled ? 'seo-keywords' : 'seo-ranks';
+    if (t.includes('rank') || t.includes('keyword') || t.includes('position')) return 'seo-keywords';
     if (t.includes('pipeline') || t.includes('brief') || t.includes('content')) return 'content-pipeline';
     if (t.includes('win rate') || t.includes('outcome') || t.includes('conversion')) return 'outcomes';
     if (t.includes('traffic') || t.includes('session') || t.includes('click') || t.includes('impression')) return 'analytics-hub';

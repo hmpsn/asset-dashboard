@@ -114,10 +114,6 @@ vi.mock('../../src/components/LinksPanel', () => ({
   LinksPanel: () => <div data-testid="links-panel" />,
 }));
 
-vi.mock('../../src/components/RankTracker', () => ({
-  RankTracker: () => <div data-testid="rank-tracker" />,
-}));
-
 vi.mock('../../src/components/ContentManager', () => ({
   ContentManager: () => <div data-testid="content-manager" />,
 }));

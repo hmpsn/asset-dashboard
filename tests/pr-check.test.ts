@@ -175,7 +175,7 @@ describe('Rule: Retired outcome feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-outcome-flags', 'negative.tsx'),
       lines(
-        "const active = isFeatureEnabled('keyword-hub');",
+        "const active = isFeatureEnabled('keyword-universe-full');",
         `const historicalNote = '${retiredKey} was retired';`,
       ),
     );
@@ -346,7 +346,7 @@ describe('Rule: Retired unified inbox feature flag key used in flag API', () => 
     const file = write(
       uniqPath('rule-retired-unified-inbox-flags', 'negative.tsx'),
       lines(
-        "const active = useFeatureFlag('keyword-hub');",
+        "const active = useFeatureFlag('keyword-universe-full');",
         `const note = '${retiredKey} was retired after cutover';`,
       ),
     );
@@ -423,7 +423,7 @@ describe('Rule: Retired product/UI feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-product-ui-flags', 'negative.tsx'),
       lines(
-        "const active = useFeatureFlag('keyword-hub');",
+        "const active = useFeatureFlag('keyword-universe-full');",
         `const note = '${retiredKey} was retired after rollout';`,
       ),
     );
@@ -513,8 +513,136 @@ describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-seo-runtime-flags', 'negative.ts'),
       lines(
-        "const active = isFeatureEnabled('keyword-hub');",
+        "const active = isFeatureEnabled('keyword-universe-full');",
         `const historicalNote = '${retiredKey} was retired';`,
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Retired Keyword Hub feature flag key used in flag API', () => {
+  const RULE = 'Retired Keyword Hub feature flag key used in flag API';
+
+  it('flags keyword-hub passed to feature flag helpers', () => {
+    const retiredKey = ['keyword', 'hub'].join('-');
+    const file = write(
+      uniqPath('rule-retired-keyword-hub-flag', 'helper.ts'),
+      lines(
+        'import { isFeatureEnabled } from "./feature-flags";',
+        `const enabled = isFeatureEnabled('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags keyword-hub passed to a FeatureFlag component', () => {
+    const retiredKey = ['keyword', 'hub'].join('-');
+    const file = write(
+      uniqPath('rule-retired-keyword-hub-flag', 'component.tsx'),
+      lines(
+        'import { FeatureFlag } from "./FeatureFlag";',
+        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags the FEATURE_KEYWORD_HUB env var', () => {
+    const retiredEnv = ['FEATURE', 'KEYWORD', 'HUB'].join('_');
+    const file = write(
+      uniqPath('rule-retired-keyword-hub-flag', 'env.ts'),
+      lines(
+        `process.env.${retiredEnv} = 'true';`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags keyword-hub re-added to the shared feature flag registry', () => {
+    const retiredKey = ['keyword', 'hub'].join('-');
+    const file = write(
+      'shared/types/feature-flags.ts',
+      lines(
+        'export const FEATURE_FLAGS = {',
+        `  '${retiredKey}': true,`,
+        '};',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('allows the surviving Keyword Hub sub-flags', () => {
+    const file = write(
+      uniqPath('rule-retired-keyword-hub-flag', 'negative.ts'),
+      lines(
+        "const a = isFeatureEnabled('keyword-universe-full');",
+        "const b = isFeatureEnabled('keyword-value-scoring');",
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Retired seo-ranks route literal in src', () => {
+  const RULE = 'Retired seo-ranks route literal in src';
+
+  it('flags a seo-ranks Page literal in a src file', () => {
+    const file = write(
+      uniqPath('rule-retired-seo-ranks-literal', 'src/Demo.tsx'),
+      lines(
+        "import { adminPath } from './routes';",
+        "const dest = adminPath(id, 'seo-ranks');",
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects an inline // seo-ranks-fold-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-retired-seo-ranks-literal', 'src/Redirect.tsx'),
+      lines(
+        "// transitional redirect target",
+        "const legacy = 'seo-ranks'; // seo-ranks-fold-ok",
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag seo-ranks outside src/', () => {
+    const file = write(
+      uniqPath('rule-retired-seo-ranks-literal', 'server/legacy.ts'),
+      lines(
+        "const targetTab = 'seo-ranks';",
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag the seo-keywords replacement literal', () => {
+    const file = write(
+      uniqPath('rule-retired-seo-ranks-literal', 'src/Ok.tsx'),
+      lines(
+        "const dest = adminPath(id, 'seo-keywords');",
       ),
     );
 
@@ -5790,6 +5918,12 @@ describe('Meta: customCheck rule name registry', () => {
     // Sidebar/CommandPalette/Breadcrumbs and drifted; the nav registry is now
     // the single source of truth. Bans re-inlining label/needsSite in consumers.
     'Hardcoded nav metadata outside the nav registry',
+    // Keyword Hub cutover Phase C (2026-06-11) — the keyword-hub umbrella flag was
+    // retired once the Hub became the only keyword surface; it must not re-enter flag APIs.
+    'Retired Keyword Hub feature flag key used in flag API',
+    // Keyword Hub cutover Phase C (2026-06-11) — the standalone Rank Tracker (seo-ranks)
+    // was folded into the Hub; the 'seo-ranks' Page literal must not return to src/.
+    'Retired seo-ranks route literal in src',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

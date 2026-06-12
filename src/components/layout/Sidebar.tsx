@@ -2,7 +2,6 @@ import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
 import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
-import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import {
   NAV_REGISTRY, type NavEntry, type NavGroupKey,
   resolveNavLabel, resolveNavDescription, isNavEntryHidden,
@@ -91,7 +90,7 @@ const GROUP_PRESENTATION: Array<{
 /**
  * Build the sidebar nav groups from the registry. Group chrome/order is local
  * (GROUP_PRESENTATION); each item's label/needsSite/description/hidden is
- * resolved from the registry, applying keyword-hub flag behavior in ONE place.
+ * resolved from the registry, applying any flag behavior in ONE place.
  */
 function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): NavGroup[] {
   const entryToNavItem = (entry: NavEntry): NavItem => ({
@@ -140,9 +139,8 @@ export function Sidebar({
     });
   }, []);
 
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
-  // Only keyword-hub drives nav flagBehavior today; resolve other flags as false.
-  const navGroups = buildNavGroups((flag) => flag === 'keyword-hub' && keywordHubEnabled);
+  // No nav entry currently uses flagBehavior, so all flags resolve as OFF.
+  const navGroups = buildNavGroups(() => false);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => { // effect-layout-ok — intentional post-render tab-group expansion

@@ -5,9 +5,9 @@
  *   Server: FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *   Frontend: VITE_FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *
- * Example: to enable 'keyword-hub' in production, set:
- *   FEATURE_KEYWORD_HUB=true  (server)
- *   VITE_FEATURE_KEYWORD_HUB=true  (Vite build)
+ * Example: to enable 'keyword-universe-full' in production, set:
+ *   FEATURE_KEYWORD_UNIVERSE_FULL=true  (server)
+ *   VITE_FEATURE_KEYWORD_UNIVERSE_FULL=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
   // Self-service onboarding
@@ -28,13 +28,10 @@ export const FEATURE_FLAGS = {
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,
 
-  // Keyword Hub (Wave 4). Umbrella kill-switch for the multi-phase consolidation of the
-  // admin Keyword Command Center (seo-keywords) and the standalone Rank Tracker (seo-ranks)
-  // into one keyword-first Hub. Dark by default; the whole Hub surface mounts behind this
-  // flag and is flipped only at the P5 cutover (owner-gated). P0 ships behavior-preserving
-  // foundation (table-renderer migration + additive strategyOwned exposure) with the flag
-  // OFF. See docs/superpowers/plans/2026-06-04-keyword-hub.md.
-  'keyword-hub': true,
+  // Keyword Hub (Wave 4). The `keyword-hub` umbrella flag was RETIRED at the Phase C
+  // cutover (2026-06-11): the Hub is now the only keyword surface (KCC + Rank Tracker
+  // deleted, seo-ranks redirected), so no kill-switch remains. The two sub-flags below
+  // gate independent coverage/scoring overhauls and keep their own removal conditions.
   // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
   // include every GSC-clicked/impressed query (full ranking coverage), keep all
   // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
@@ -216,22 +213,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-  'keyword-hub': {
-    label: 'Keyword Hub — unified keyword surface (KCC + Rank Tracker consolidation)',
-    group: 'Keyword Hub',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      // Dated to the lifecycle-audit horizon (REVIEWED_AT cohort / 2026-06-02), not the
-      // literal commit day, so the pinned-`asOf` lifecycle audit never reads these as
-      // future. The Wave 4 plan + spec carry the 2026-06-04 authoring date.
-      createdAt: '2026-06-02',
-      rolloutTarget: 'all-clients',
-      removalCondition: 'Remove after the Keyword Hub is validated on staging, flipped at the P5 cutover, and becomes the only keyword surface (seo-ranks folded in, no flag-off legacy KCC/Rank Tracker path). Default flipped to true 2026-06-11 (Phase B) — matches the production DB override in place since ~2026-06-10; the override is now redundant.',
-      linkedRoadmapItemId: 'keyword-hub-wave4',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
-    },
-  },
   'keyword-universe-full': {
     label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
     group: 'Keyword Hub',
@@ -283,7 +264,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-hub', 'keyword-universe-full', 'keyword-value-scoring'],
+    keys: ['keyword-universe-full', 'keyword-value-scoring'],
   },
 ];
 

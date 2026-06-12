@@ -1,11 +1,11 @@
 /**
- * route-fold-in-seo-ranks.test.ts — Phase P4-T4 drift safety net.
+ * route-fold-in-seo-ranks.test.ts — route-retired guard (W4 Phase C1 + D).
  *
- * After the Rank Tracker fold-in, the ONLY place that resolves `seo-ranks` to
- * a destination is the App.tsx redirect (flag-ON -> seo-keywords) / the
- * standalone RankTracker (flag-OFF). No other src/ component may navigate TO
- * `seo-ranks` via the literal `navigate(adminPath(_, 'seo-ranks'))` form —
- * such a navigator would bypass the Hub when the flag is on.
+ * The standalone Rank Tracker and its `seo-ranks` route were fully removed in
+ * the Keyword Hub cutover: the Page-union value, the App.tsx redirect, the nav
+ * registry entry, and every navigator are gone. This test is the drift safety
+ * net — NOTHING under src/ may reference `seo-ranks` (as a route literal or a
+ * navigate target) anymore. The allow-list is intentionally empty.
  *
  * readFile-ok — this test intentionally reads source files for static analysis.
  */
@@ -16,12 +16,8 @@ import { describe, it, expect } from 'vitest';
 const ROOT = join(__dirname, '../..');
 const SRC_DIR = join(ROOT, 'src');
 
-/** Files allowed to reference seo-ranks routing: the redirect + the retained label. */
-const ALLOWED = new Set([
-  'src/App.tsx',                          // the flag-gated <Navigate> redirect + the flag-OFF RankTracker render
-  'src/routes.ts',                        // the Page union value (retained for P5)
-  'src/components/layout/Breadcrumbs.tsx', // the retained "Rank Tracker" crumb label
-]);
+/** Files allowed to reference seo-ranks. Intentionally empty: the route is retired. */
+const ALLOWED = new Set<string>([]);
 
 function collectFiles(dir: string): string[] {
   const out: string[] = [];
@@ -33,24 +29,18 @@ function collectFiles(dir: string): string[] {
   return out;
 }
 
-// Matches a direct navigate-to-seo-ranks call: navigate(adminPath(<anything>, 'seo-ranks'))
-const NAVIGATE_SEO_RANKS = /navigate\(\s*adminPath\([^,]+,\s*['"]seo-ranks['"]\s*\)/;
+// Matches any reference to the retired seo-ranks route literal.
+const SEO_RANKS_LITERAL = /['"]seo-ranks['"]/;
 
-describe('route-fold-in: no src/ component navigates directly to seo-ranks', () => {
-  it('no file outside the allow-list contains navigate(adminPath(_, "seo-ranks"))', () => {
+describe('route-retired: src/ no longer references the seo-ranks route', () => {
+  it('no file outside the (empty) allow-list contains a seo-ranks route literal', () => {
     const offenders: string[] = [];
     for (const file of collectFiles(SRC_DIR)) {
       const rel = relative(ROOT, file).split('\\').join('/');
       if (ALLOWED.has(rel)) continue;
       const content = readFileSync(file, 'utf8'); // readFile-ok — static analysis
-      if (NAVIGATE_SEO_RANKS.test(content)) offenders.push(rel);
+      if (SEO_RANKS_LITERAL.test(content)) offenders.push(rel);
     }
-    expect(offenders, `These files navigate directly to seo-ranks (should route to seo-keywords / be flag-gated):\n${offenders.join('\n')}`).toEqual([]);
-  });
-
-  it('the allow-list files exist (sanity)', () => {
-    for (const rel of ALLOWED) {
-      expect(() => statSync(join(ROOT, rel)), `${rel} should exist`).not.toThrow();
-    }
+    expect(offenders, `These files still reference the retired seo-ranks route:\n${offenders.join('\n')}`).toEqual([]);
   });
 });

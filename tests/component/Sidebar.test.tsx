@@ -141,18 +141,13 @@ describe('Sidebar', () => {
     expect(screen.getByText('Search & Traffic')).toBeInTheDocument();
   });
 
-  // ── Wave 4 P4: Keyword Hub nav fold-in (flag-gated) ──────────────────────────
-  describe('keyword-hub nav fold-in', () => {
-    it('flag OFF (byte-identical): shows "Keywords" + "Rank Tracker", no "Keyword Hub"', () => {
-      featureFlagMock.mockImplementation((flag: string) => flag !== 'keyword-hub');
-      renderSidebar();
-      expect(screen.getByText('Keywords')).toBeInTheDocument();
-      expect(screen.getByText('Rank Tracker')).toBeInTheDocument();
-      expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
-    });
-
-    it('flag ON: shows "Keyword Hub", removes "Rank Tracker" and "Keywords"', () => {
-      featureFlagMock.mockReturnValue(true); // all flags ON, incl keyword-hub
+  // ── Keyword Hub nav (post-W4-cutover: unconditional) ─────────────────────────
+  // The Hub is the only keyword surface. The nav shows "Keyword Hub"
+  // unconditionally; the standalone "Rank Tracker" entry and the old "Keywords"
+  // label are gone regardless of any flag state.
+  describe('keyword nav', () => {
+    it('shows "Keyword Hub" and never the retired "Rank Tracker" / "Keywords" entries', () => {
+      featureFlagMock.mockReturnValue(true);
       renderSidebar();
       expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
       expect(screen.queryByText('Rank Tracker')).not.toBeInTheDocument();

@@ -25,7 +25,7 @@
 
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
-  Pencil, Target, Code2, TrendingUp, Link2, MessageSquare,
+  Pencil, Target, Code2, Link2, MessageSquare,
   LayoutDashboard, Activity, Sparkles, Layers, FileSearch, Map, ListChecks,
   DollarSign, Trophy,
 } from 'lucide-react';
@@ -53,11 +53,11 @@ export type NavGroupKey =
   | 'utility';
 
 /**
- * Flag-driven behavior for a nav entry. Currently only the `keyword-hub` flag
- * uses this: when ON it relabels `seo-keywords` ("Keywords" → "Keyword Hub")
- * and hides the standalone `seo-ranks` Rank Tracker (folded into the Hub).
- * Centralized here so the relabel/hide logic lives in ONE place instead of
- * being re-implemented per surface.
+ * Flag-driven behavior for a nav entry: relabel, re-describe, or hide a surface
+ * while a feature flag is ON. No entry currently uses this (the keyword-hub
+ * relabel/hide retired when the Hub became the only keyword surface), but the
+ * mechanism is retained so future flag-gated nav changes live in ONE place
+ * instead of being re-implemented per surface.
  */
 export interface NavFlagBehavior {
   /** The feature flag this behavior keys off of. */
@@ -115,10 +115,6 @@ export const NAV_REGISTRY: NavEntry[] = [
   // ── Monitoring ──
   { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, group: 'monitoring', needsSite: true,
     description: 'Unified analytics: search performance, traffic, insights, and annotations' },
-  { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'monitoring', needsSite: true,
-    description: 'Track keyword rankings over time',
-    // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON.
-    flagBehavior: { flag: 'keyword-hub', hideWhenOn: true } },
   { id: 'outcomes', label: 'Action Results', icon: Trophy, group: 'monitoring',
     description: "Track what's working across all your SEO actions" },
 
@@ -135,14 +131,8 @@ export const NAV_REGISTRY: NavEntry[] = [
   // ── SEO Strategy ──
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'seo-strategy', needsSite: true,
     description: 'Keyword strategy with page-keyword mapping' },
-  { id: 'seo-keywords', label: 'Keywords', icon: ListChecks, group: 'seo-strategy', needsSite: true,
-    description: 'Command center for keyword lifecycle, evidence, tracking, and handoffs',
-    // Wave 4 P4: relabel to "Keyword Hub" when ON.
-    flagBehavior: {
-      flag: 'keyword-hub',
-      labelWhenOn: 'Keyword Hub',
-      descriptionWhenOn: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs',
-    } },
+  { id: 'seo-keywords', label: 'Keyword Hub', icon: ListChecks, group: 'seo-strategy', needsSite: true,
+    description: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' },
   { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'seo-strategy', needsSite: true,
     description: 'Per-page keyword analysis, metrics, and optimization' },
 

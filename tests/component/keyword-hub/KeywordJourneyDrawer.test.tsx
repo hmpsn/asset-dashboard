@@ -1,9 +1,10 @@
 /**
- * KeywordJourneyDrawer.test.tsx — Phase P2: the Keyword Journey Drawer.
+ * KeywordJourneyDrawer.test.tsx — the Keyword Journey Drawer.
  *
- * The KeywordDetailDrawer is shared by the KCC (flag-OFF) AND the Hub (flag-ON).
- * P2 adds five journey sections + a Tracking-Decision enrichment, ALL gated behind
- * the `keyword-hub` feature flag so flag-OFF renders byte-identical to today.
+ * The KeywordDetailDrawer is the Keyword Hub's detail surface. It renders five
+ * journey sections + a Tracking-Decision enrichment unconditionally (the
+ * `keyword-hub` flag gate was removed in the W4 cutover when the Hub became the
+ * only keyword surface).
  *
  * Sections:
  *   T0 — KeywordSparkline (extracted from RankTracker's PositionSparkline)
@@ -30,15 +31,10 @@ import type {
 } from '../../../shared/types/local-seo';
 
 // ---------------------------------------------------------------------------
-// Flag + history-fetch mocks
+// History-fetch mock
 // ---------------------------------------------------------------------------
 
-const featureFlagMock = vi.fn();
 const getMock = vi.fn();
-
-vi.mock('../../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: (...args: unknown[]) => featureFlagMock(...args),
-}));
 
 vi.mock('../../../src/api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/api/client')>();
@@ -101,8 +97,7 @@ function makeRow(overrides: Partial<KeywordCommandCenterRow> = {}): KeywordComma
   };
 }
 
-function renderDrawer(row: KeywordCommandCenterRow | null, flagOn = true) {
-  featureFlagMock.mockReturnValue(flagOn);
+function renderDrawer(row: KeywordCommandCenterRow | null) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -122,7 +117,6 @@ function renderDrawer(row: KeywordCommandCenterRow | null, flagOn = true) {
 }
 
 beforeEach(() => {
-  featureFlagMock.mockReset();
   getMock.mockReset();
   getMock.mockResolvedValue([]);
 });
@@ -186,36 +180,17 @@ describe('KeywordSparkline', () => {
 });
 
 // ===========================================================================
-// CRITICAL CONSTRAINT 1 — flag-OFF byte-identity
+// Drawer chrome baseline
 // ===========================================================================
+//
+// The journey sections used to be gated behind the `keyword-hub` flag. After
+// the W4 cutover the Hub is the only keyword surface, so the journey renders
+// unconditionally. This baseline asserts the core drawer chrome still mounts;
+// the journey-section behaviour is exercised by the T1–T5 describes below.
 
-describe('flag-OFF byte identity (KCC drawer unchanged)', () => {
-  it('renders no journey sections when the flag is OFF', () => {
-    renderDrawer(
-      makeRow({
-        tracking: {
-          status: 'active',
-          source: 'content_gap',
-          sourceGapKey: 'gap:abc123',
-          strategyOwned: true,
-          pinned: true,
-          addedAt: '2025-11-15T00:00:00.000Z',
-        },
-        localSeo: makeLocalSeo([makeMarket()]),
-      }),
-      false,
-    );
-    // None of the new journey-section affordances appear.
-    expect(screen.queryByTestId('view-in-strategy-link')).toBeNull();
-    expect(screen.queryByText(/Auto-managed/i)).toBeNull();
-    expect(screen.queryByText(/Tracked since/i)).toBeNull();
-    expect(screen.queryByText('National rank')).toBeNull();
-    expect(screen.queryByText('Local visibility')).toBeNull();
-    expect(screen.queryByTestId('view-replaced-by-link')).toBeNull();
-  });
-
-  it('still renders the existing KCC drawer chrome when the flag is OFF', () => {
-    renderDrawer(makeRow(), false);
+describe('drawer chrome baseline', () => {
+  it('renders the keyword and core drawer chrome', () => {
+    renderDrawer(makeRow());
     expect(screen.getByText('cosmetic dentistry')).not.toBeNull();
     expect(screen.getByText('Tracking State')).not.toBeNull();
   });
@@ -225,7 +200,7 @@ describe('flag-OFF byte identity (KCC drawer unchanged)', () => {
 // T1 — Origin
 // ===========================================================================
 
-describe('Origin section (flag ON)', () => {
+describe('Origin section', () => {
   it('shows "From content gap" + the unwired View-in-Strategy button for a gap-sourced keyword', () => {
     renderDrawer(
       makeRow({
@@ -266,7 +241,7 @@ describe('Origin section (flag ON)', () => {
 // T2 — Tracking-Decision enrichment
 // ===========================================================================
 
-describe('Tracking-Decision enrichment (flag ON)', () => {
+describe('Tracking-Decision enrichment', () => {
   it('shows the Auto-managed note ONLY when strategyOwned === true', () => {
     renderDrawer(makeRow({ tracking: { status: 'active', source: 'manual', strategyOwned: true } }));
     expect(screen.getByText(/Auto-managed/i)).not.toBeNull();
@@ -304,7 +279,7 @@ describe('Tracking-Decision enrichment (flag ON)', () => {
 // T3 — National Rank + sparkline
 // ===========================================================================
 
-describe('National Rank section (flag ON)', () => {
+describe('National Rank section', () => {
   it('shows "#6.3" with the positionColor class for a ranked keyword', () => {
     renderDrawer(
       makeRow({ metrics: { currentPosition: 6.3, clicks: 50, impressions: 1000 } }),
@@ -359,7 +334,7 @@ describe('National Rank section (flag ON)', () => {
 // T4 — Local Visibility per-market
 // ===========================================================================
 
-describe('Local Visibility per-market (flag ON)', () => {
+describe('Local Visibility per-market', () => {
   it('renders one row per market with rank labels', () => {
     renderDrawer(
       makeRow({
@@ -436,7 +411,7 @@ describe('Local Visibility per-market (flag ON)', () => {
 // T5 — Lifecycle / Why Retired
 // ===========================================================================
 
-describe('Lifecycle / Why Retired (flag ON)', () => {
+describe('Lifecycle / Why Retired', () => {
   it('shows "Retired on Mar 1, 2026" + "Replaced by" + the unwired View-in-Hub button', () => {
     const { container } = renderDrawer(
       makeRow({

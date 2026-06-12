@@ -31,12 +31,11 @@ vi.mock('../../server/errors.js', () => ({
 }));
 
 describe('feature-flags shared types', () => {
-  it('all feature flags default to false (except shipped cutover flags)', () => {
-    // keyword-hub flipped to true at the Phase B cutover (2026-06-11) — the Hub is
-    // the only keyword surface; the flag is now in its removal window (Phase C).
-    const SHIPPED_DEFAULT_TRUE = new Set(['keyword-hub']);
+  it('all feature flags default to false', () => {
+    // keyword-hub was retired at the Phase C cutover (2026-06-11): the Hub is the only
+    // keyword surface, the flag is gone, and every remaining flag is dark by default.
     for (const [key, value] of Object.entries(FEATURE_FLAGS)) {
-      expect(value, key).toBe(SHIPPED_DEFAULT_TRUE.has(key));
+      expect(value, key).toBe(false);
     }
   });
 
@@ -64,10 +63,6 @@ describe('feature-flags shared types', () => {
     }
   });
 
-  it('known flag keyword-hub defaults to true (Phase B cutover flip, 2026-06-11)', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
-  });
-
   it('known flag white-label defaults to false', () => {
     expect(FEATURE_FLAGS['white-label']).toBe(false);
   });
@@ -80,7 +75,7 @@ describe('isFeatureEnabled', () => {
 
   it('returns false for a flag with no DB override and no env var (default)', async () => {
     // Ensure env var is not set
-    delete process.env['FEATURE_KEYWORD_HUB'];
+    delete process.env['FEATURE_KEYWORD_UNIVERSE_FULL'];
 
     const dbModule = await import('../../server/db/index.js');
     const mockDb = dbModule.default as unknown as {
@@ -93,7 +88,7 @@ describe('isFeatureEnabled', () => {
     });
 
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub')).toBe(true);
+    expect(isFeatureEnabled('keyword-universe-full')).toBe(false);
   });
 
   it('returns true when DB override enables a flag', async () => {
@@ -102,13 +97,13 @@ describe('isFeatureEnabled', () => {
       prepare: ReturnType<typeof vi.fn>;
     };
     mockDb.prepare.mockReturnValue({
-      all: vi.fn(() => [{ key: 'keyword-hub', enabled: 1 }]),
+      all: vi.fn(() => [{ key: 'keyword-universe-full', enabled: 1 }]),
       get: vi.fn(() => undefined),
       run: vi.fn(),
     });
 
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub')).toBe(true);
+    expect(isFeatureEnabled('keyword-universe-full')).toBe(true);
   });
 
   it('returns false when DB override disables a flag', async () => {
@@ -117,13 +112,13 @@ describe('isFeatureEnabled', () => {
       prepare: ReturnType<typeof vi.fn>;
     };
     mockDb.prepare.mockReturnValue({
-      all: vi.fn(() => [{ key: 'keyword-hub', enabled: 0 }]),
+      all: vi.fn(() => [{ key: 'keyword-universe-full', enabled: 0 }]),
       get: vi.fn(() => undefined),
       run: vi.fn(),
     });
 
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub')).toBe(false);
+    expect(isFeatureEnabled('keyword-universe-full')).toBe(false);
   });
 });
 
@@ -151,7 +146,7 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
   }
 
   it('ignores per-workspace overrides when no workspaceId is passed (backward-compatible)', async () => {
-    delete process.env['FEATURE_KEYWORD_HUB'];
+    delete process.env['FEATURE_KEYWORD_UNIVERSE_FULL'];
     await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-universe-full', enabled: 1 }] });
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
     // No workspaceId → per-workspace layer is skipped → global default false.
@@ -159,31 +154,31 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
   });
 
   it('per-workspace override (enabled) wins over the global default', async () => {
-    delete process.env['FEATURE_KEYWORD_HUB'];
-    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-hub', enabled: 1 }] });
+    delete process.env['FEATURE_KEYWORD_UNIVERSE_FULL'];
+    await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-universe-full', enabled: 1 }] });
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub', 'ws-1')).toBe(true);
+    expect(isFeatureEnabled('keyword-universe-full', 'ws-1')).toBe(true);
   });
 
   it('per-workspace override (disabled) wins over a global DB override that enables it', async () => {
     await mockDbBySql({
-      globalRows: [{ key: 'keyword-hub', enabled: 1 }],
-      workspaceRows: [{ key: 'keyword-hub', enabled: 0 }],
+      globalRows: [{ key: 'keyword-universe-full', enabled: 1 }],
+      workspaceRows: [{ key: 'keyword-universe-full', enabled: 0 }],
     });
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
     // Global says ON, per-workspace says OFF → per-workspace wins for this workspace.
-    expect(isFeatureEnabled('keyword-hub', 'ws-1')).toBe(false);
+    expect(isFeatureEnabled('keyword-universe-full', 'ws-1')).toBe(false);
     // The global resolution (no workspaceId) still reflects the global override.
-    expect(isFeatureEnabled('keyword-hub')).toBe(true);
+    expect(isFeatureEnabled('keyword-universe-full')).toBe(true);
   });
 
   it('falls back to the global chain when the workspace has no override for the flag', async () => {
     await mockDbBySql({
-      globalRows: [{ key: 'keyword-hub', enabled: 1 }],
+      globalRows: [{ key: 'keyword-universe-full', enabled: 1 }],
       workspaceRows: [], // workspace has no per-flag override
     });
     const { isFeatureEnabled } = await import('../../server/feature-flags.js');
-    expect(isFeatureEnabled('keyword-hub', 'ws-1')).toBe(true);
+    expect(isFeatureEnabled('keyword-universe-full', 'ws-1')).toBe(true);
   });
 
   it('setWorkspaceFlagOverride is exported and invokes a DB write', async () => {
@@ -196,19 +191,19 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
       run: vi.fn((...args: unknown[]) => { lastRun = args; }),
     }));
     const { setWorkspaceFlagOverride } = await import('../../server/feature-flags.js');
-    setWorkspaceFlagOverride('keyword-hub', 'ws-9', true);
-    expect(lastRun).toEqual(['keyword-hub', 'ws-9', 1]);
-    setWorkspaceFlagOverride('keyword-hub', 'ws-9', null); // delete path
-    expect(lastRun).toEqual(['keyword-hub', 'ws-9']);
+    setWorkspaceFlagOverride('keyword-universe-full', 'ws-9', true);
+    expect(lastRun).toEqual(['keyword-universe-full', 'ws-9', 1]);
+    setWorkspaceFlagOverride('keyword-universe-full', 'ws-9', null); // delete path
+    expect(lastRun).toEqual(['keyword-universe-full', 'ws-9']);
   });
 });
 
-describe('keyword-hub catalog entry', () => {
-  it('is registered, defaults true (Phase B cutover), and is in the Keyword Hub group', () => {
-    expect(FEATURE_FLAGS['keyword-hub']).toBe(true);
-    expect(FEATURE_FLAG_CATALOG['keyword-hub'].group).toBe('Keyword Hub');
-    expect(FEATURE_FLAG_CATALOG['keyword-hub'].lifecycle.linkedRoadmapItemId)
-      .toBe('keyword-hub-wave4');
+describe('keyword-universe-full catalog entry', () => {
+  it('is registered, defaults false, and is in the Keyword Hub group', () => {
+    expect(FEATURE_FLAGS['keyword-universe-full']).toBe(false);
+    expect(FEATURE_FLAG_CATALOG['keyword-universe-full'].group).toBe('Keyword Hub');
+    expect(FEATURE_FLAG_CATALOG['keyword-universe-full'].lifecycle.linkedRoadmapItemId)
+      .toBe('keyword-universe-overhaul');
   });
 });
 
@@ -250,7 +245,7 @@ describe('getWorkspaceFlagsWithMeta', () => {
   });
 
   it('marks source=workspace and resolves the workspace value when a per-workspace override exists', async () => {
-    delete process.env['FEATURE_KEYWORD_HUB'];
+    delete process.env['FEATURE_KEYWORD_UNIVERSE_FULL'];
     await mockDbBySql({ globalRows: [], workspaceRows: [{ key: 'keyword-universe-full', enabled: 1 }] });
     const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
     const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-universe-full');
@@ -263,11 +258,11 @@ describe('getWorkspaceFlagsWithMeta', () => {
 
   it('per-workspace OFF override surfaces inheritedEnabled=true when global override is ON', async () => {
     await mockDbBySql({
-      globalRows: [{ key: 'keyword-hub', enabled: 1 }],
-      workspaceRows: [{ key: 'keyword-hub', enabled: 0 }],
+      globalRows: [{ key: 'keyword-universe-full', enabled: 1 }],
+      workspaceRows: [{ key: 'keyword-universe-full', enabled: 0 }],
     });
     const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
-    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-hub');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-universe-full');
     // Workspace forces OFF, but clearing reverts to the global override (ON).
     expect(entry?.source).toBe('workspace');
     expect(entry?.enabled).toBe(false);
@@ -277,11 +272,11 @@ describe('getWorkspaceFlagsWithMeta', () => {
 
   it('falls back to the global chain (source=db) when the workspace has no override', async () => {
     await mockDbBySql({
-      globalRows: [{ key: 'keyword-hub', enabled: 1 }],
+      globalRows: [{ key: 'keyword-universe-full', enabled: 1 }],
       workspaceRows: [],
     });
     const { getWorkspaceFlagsWithMeta } = await import('../../server/feature-flags.js');
-    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-hub');
+    const entry = getWorkspaceFlagsWithMeta('ws-1').find(m => m.key === 'keyword-universe-full');
     expect(entry?.source).toBe('db');
     expect(entry?.enabled).toBe(true);
     expect(entry?.inheritedEnabled).toBe(true);
@@ -341,7 +336,7 @@ describe('getAllFlagsWithMeta', () => {
   });
 
   it('reports source=default when no DB override or env var present', async () => {
-    delete process.env['FEATURE_KEYWORD_HUB'];
+    delete process.env['FEATURE_KEYWORD_UNIVERSE_FULL'];
     const dbModule = await import('../../server/db/index.js');
     const mockDb = dbModule.default as unknown as {
       prepare: ReturnType<typeof vi.fn>;
@@ -365,14 +360,14 @@ describe('getAllFlagsWithMeta', () => {
       prepare: ReturnType<typeof vi.fn>;
     };
     mockDb.prepare.mockReturnValue({
-      all: vi.fn(() => [{ key: 'keyword-hub', enabled: 1 }]),
+      all: vi.fn(() => [{ key: 'keyword-universe-full', enabled: 1 }]),
       get: vi.fn(() => undefined),
       run: vi.fn(),
     });
 
     const { getAllFlagsWithMeta } = await import('../../server/feature-flags.js');
     const meta = getAllFlagsWithMeta();
-    const entry = meta.find(m => m.key === 'keyword-hub');
+    const entry = meta.find(m => m.key === 'keyword-universe-full');
     expect(entry?.source).toBe('db');
     expect(entry?.enabled).toBe(true);
   });
