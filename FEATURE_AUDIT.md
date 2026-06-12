@@ -1,12 +1,12 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **493 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **494 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 493. Outcome Read-Back Chips — Strategy, Keyword Hub, Posts (W5.1)
+### 494. Outcome Read-Back Chips — Strategy, Keyword Hub, Posts (W5.1)
 
 **What it does:** Closes the outcome loop on three admin surfaces. A shared reader (`getScoredOutcomeReadbacks`, one indexed query per workspace, latest-conclusive-verdict-per-action) joins scored outcome measurements back to the surfaces that initiated the work: Strategy pageMap rows, the Keyword Hub drawer detail, and published posts in the content list each render an `OutcomeReadbackChip` ("#14 → #6 · Win · 30d") with server-computed direction. Newly scored outcomes refresh live via the OUTCOME_SCORED broadcast (central mapping added).
 
@@ -20,7 +20,7 @@ A comprehensive value assessment of every feature in the platform — **493 feat
 
 ---
 
-### 492. Local Visibility Trend + Shift Insights (W5.3)
+### 493. Local Visibility Trend + Shift Insights (W5.3)
 
 **What it does:** Reads the (previously write-only) local visibility snapshot time series two ways: a per-market visibility sparkline on the Local SEO panel (day-bucketed over the 180-day raw retention window, blue data styling), and an insight bridge that diffs each refresh against the previous latest state to mint `local_visibility_shift` insights — lost local-pack visibility (risk), regained visibility (win), and new repeat competitors — with edge-triggered dedup, degraded-snapshot exclusion, and client-safe narrative framing.
 
@@ -34,7 +34,7 @@ A comprehensive value assessment of every feature in the platform — **493 feat
 
 ---
 
-### 491. CMS-Field Schema Publishing UI + AI-Suggested Brief Prefill (W3.2 + W3.1)
+### 492. CMS-Field Schema Publishing UI + AI-Suggested Brief Prefill (W3.2 + W3.1)
 
 **What it does:** Unlocks the previously unreachable CMS-field schema delivery pipeline: CMS pages with a ready field mapping get a working Publish action (status-aware UI with honest reasons when blocked; Publish-All counts respect readiness; retract/restore honestly gated where no CMS server path exists). Separately, the AI Suggested "Create Brief" action now actually carries the suggestion's keyword and page into the brief generator via the fixContext prefill (it previously discarded both), and refresh_suggestion signals gain a "Refresh brief" action.
 
@@ -45,6 +45,17 @@ A comprehensive value assessment of every feature in the platform — **493 feat
 **Mutual:** Both are pure unlocks of already-built server capability.
 
 **Files:** `src/components/schema/*` (status-aware publish UI), `src/components/ContentPipeline.tsx`, `src/components/pipeline/AiSuggested.tsx`. Tests: `tests/unit/schema-cms-delivery-ui.test.tsx`, `tests/integration/webflow-schema-cms-delivery-serialization.test.ts`, `tests/component/AiSuggested-brief-handoff.test.tsx`.
+### 491. Client Dashboard QW2 PR4 — ROI Methodology Explainer
+
+**What it does:** Adds an expandable "How we calculate this" explanation to the client ROI Dashboard. The disclosure explains organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and the conservative assumption that the model does not multiply by lead value, close rate, or lifetime value.
+
+**Agency value:** Gives account teams a ready-made answer to skeptical ROI questions inside the dashboard itself, without changing the formula or adding review work.
+
+**Client value:** Clients can see what inputs drive the dollar figures and why the numbers should be treated as directional traffic value rather than guaranteed booked revenue.
+
+**Mutual:** Makes the ROI tab more transparent and easier to trust while staying copy-only: no new endpoints, no duplicate dollar engine, and no new feature flags.
+
+**Files:** `src/components/client/ROIDashboard.tsx`. Tests: `tests/component/client/ROIDashboard.test.tsx`.
 
 ---
 
@@ -190,7 +201,7 @@ A comprehensive value assessment of every feature in the platform — **493 feat
 
 **Agency value:** One reasons formula and one dollar formula across every surface — the Hub, the client strategy drawer, and the ROI dashboard can never show a contradictory "why" or a contradictory "$" for the same keyword. The realized-$ equivalence (`currentMonthly == roi.ts trafficValue`) is locked by test, so there is no second dollar engine to drift. Real CPC on content gaps makes the value score honest before it propagates.
 
-**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across their below-page-1 keywords — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
+**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across tracked keywords with position upside — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
 
 **Mutual:** Pure reuse — no new endpoint, no new client keyword tab, no second dollar engine. Rides the existing `/api/public/roi` query + the keyword-strategy / KCC serialization. The dollar helper floors to 0 when CPC is unknown (drawers hide the block), so CPC sparsity degrades gracefully.
 

@@ -200,9 +200,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.3",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "ROIDashboard.tsx info popover describing inputs and conservative assumptions. Copy-only; first slice of roadmap #74, does not replace it."
+          "notes": "Shipped in PR 4. ROIDashboard now includes an expandable 'How we calculate this' explainer that describes organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and conservative assumptions without changing ROI formulas or adding route reads."
         },
         {
           "id": "cda-qw2-health-ring-breakdown",

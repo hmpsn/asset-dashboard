@@ -553,7 +553,7 @@
     {
       "id": 56,
       "title": "ROI Dashboard",
-      "oneLiner": "Shows organic traffic value (clicks × CPC), keyword revenue at stake, content ROI attribution, and growth vs previous period — puts a dollar figure on SEO results",
+      "oneLiner": "Shows organic traffic value (clicks × CPC), keyword revenue at stake, content ROI attribution, growth vs previous period, and a plain-English methodology explainer — puts a transparent dollar figure on SEO results",
       "category": "analytics",
       "painPoints": ["reporting", "client-transparency"],
       "tier": "growth",
