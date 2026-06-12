@@ -303,7 +303,7 @@
     {
       "id": 31,
       "title": "Stripe Payments + Subscriptions",
-      "oneLiner": "Full Stripe Checkout for content purchases and tier subscriptions — encrypted key storage, webhook lifecycle, and self-service billing portal",
+      "oneLiner": "Full Stripe Checkout for content purchases and tier subscriptions — price-forward portal CTAs, encrypted key storage, webhook lifecycle, and self-service billing portal",
       "category": "monetization",
       "painPoints": ["payments"],
       "tier": "free",
@@ -323,7 +323,7 @@
     {
       "id": 33,
       "title": "In-Portal Plans & Pricing Page",
-      "oneLiner": "Dedicated Plans tab inside the client portal comparing tiers, showing content pricing, and driving upgrades with ROI-backed CTAs",
+      "oneLiner": "Dedicated Plans tab inside the client portal comparing tiers, showing content pricing, and driving upgrades with monthly prices directly on upgrade and subscription CTAs",
       "category": "monetization",
       "painPoints": ["payments", "onboarding"],
       "tier": "free",

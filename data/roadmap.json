@@ -168,115 +168,6 @@
       ]
     },
     {
-      "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
-      "name": "📖 Client Dashboard Quick Wins 2 — Tell the Story",
-      "hours": "~22-32h",
-      "rationale": "Second quick-win wave from the 2026-06 client dashboard audit: narrative, freshness, and feedback-loop polish. The audit's core theme is that clients see raw results without interpretation or confirmation — these items add the missing 'what this means / we heard you' layer without restructuring any tab.",
-      "notes": "Source: docs/audits/client-dashboard-2026-06/01-quick-wins.md. Several items touch the same components — sequence within the sprint to avoid merge churn. assembledAt (server half) ships with freshness stamps (client half) in one PR per the typed-contract data-flow rule.",
-      "items": [
-        {
-          "id": "cda-qw2-assembledat-freshness-stamps",
-          "title": "assembledAt on intelligence payload + 'Data as of …' freshness stamps on metric surfaces",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.4 + §2.1",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 1. Server half already existed via ClientIntelligence.assembledAt; this PR adds a shared FreshnessStamp primitive, real React Query dataUpdatedAt plumbing for client GA4/GSC hooks, visible stamps on Search/Analytics/Overview metric surfaces, and removes the synthetic client-intelligence fallback timestamp so failed intelligence reads cannot render as fresh."
-        },
-        {
-          "id": "cda-qw2-analytics-takeaway",
-          "title": "Analytics sub-tab: deterministic takeaway summary + conversion-rate color coding",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.2",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 2. AnalyticsTab now renders a deterministic, template-based takeaway from GA4 traffic, top source/page, and top tracked action with no AI call. Conversion rates remain display percentages and use judgment colors only: emerald for 5%+, amber for 2-4.9%, red below 2%, while raw conversion counts remain neutral metric text."
-        },
-        {
-          "id": "cda-qw2-roi-methodology-explainer",
-          "title": "ROI methodology explainer ('How we calculate this')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 4. ROIDashboard now includes an expandable 'How we calculate this' explainer that describes organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and conservative assumptions without changing ROI formulas or adding route reads."
-        },
-        {
-          "id": "cda-qw2-health-ring-breakdown",
-          "title": "Composite health ring breakdown (churn 40 / ROI 30 / engagement 30)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.4",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 5. Client intelligence now projects a sanitized composite health breakdown for Growth+ workspaces, and the existing HealthScoreCard renders an expandable component view for retention signals, ROI momentum, and portal engagement without exposing raw churnRisk or adding route reads."
-        },
-        {
-          "id": "cda-qw2-post-approval-toast",
-          "title": "Post-approval 'next step' toast in Inbox",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.1",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 3. Successful unified-inbox approve responses now show a next-step toast: \"Approved. We're publishing this. Track it in your inbox.\" This covers both standard DecisionCard approval and inline approval-family cards while preserving held-item, declined, feedback, and apply-to-website flows."
-        },
-        {
-          "id": "cda-qw2-flag-confirmation",
-          "title": "Flag-submission confirmation + optimistic flagged-state on Content Plan cells",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.2",
-          "est": "1-2h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 3. Content Plan cell flagging now updates the visible cell to flagged immediately with the submitted note, reconciles from the server after success, rolls back on API failure, and shows success/error toasts so the tab confirms the client was heard."
-        },
-        {
-          "id": "cda-qw2-comment-count-badges",
-          "title": "Comment-count badges on work-order conversation threads",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 6. Work-order deliverables now serialize a list-side commentCount from a single batched work_order_comments aggregate, including 0 for empty threads, and the client Work in progress cards render a blue comment-count Badge for 0/1/plural conversation counts without using per-thread reads for the badge."
-        },
-        {
-          "id": "cda-qw2-keyword-feedback-card",
-          "title": "Keyword feedback summary card on Strategy ('You approved 91% of suggestions')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.4",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 7. Growth+ client intelligence now projects a sanitized keywordFeedbackSummary from ClientSignalsSlice, and Strategy renders a blue data SectionCard with approve/reject counts, approval rate, display samples, and top rejection reasons."
-        },
-        {
-          "id": "cda-qw2-we-called-it-expansion",
-          "title": "'We Called It' prediction card narrative expansion",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.5",
-          "est": "3h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 7. PredictionShowcaseCard now renders each stored outcome as a Before/After story with the recorded score badge, page, and confirmation date, using existing WeCalledItEntry fields only."
-        },
-        {
-          "id": "cda-qw2-inline-prices",
-          "title": "Inline prices on every purchase CTA before Stripe redirect",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.5",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-06-11",
-          "notes": "Audit each CTA (PricingConfirmationModal, SeoCart/useCart, PlansTab, deliverable cards); prices already in config/payload. Price surprise kills conversion."
-        }
-      ]
-    },
-    {
       "id": "sprint-client-dashboard-significant-followups-2026-06-11",
       "name": "Client Dashboard Followups — Revenue, Premium, Transparency & Inbox",
       "hours": "phased",
@@ -1336,6 +1227,116 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
+      "name": "✅ SHIPPED — 📖 Client Dashboard Quick Wins 2 — Tell the Story",
+      "hours": "~22-32h",
+      "rationale": "Second quick-win wave from the 2026-06 client dashboard audit: narrative, freshness, and feedback-loop polish. The audit's core theme is that clients see raw results without interpretation or confirmation — these items add the missing 'what this means / we heard you' layer without restructuring any tab.",
+      "notes": "Source: docs/audits/client-dashboard-2026-06/01-quick-wins.md. Several items touch the same components — sequence within the sprint to avoid merge churn. assembledAt (server half) ships with freshness stamps (client half) in one PR per the typed-contract data-flow rule.",
+      "items": [
+        {
+          "id": "cda-qw2-assembledat-freshness-stamps",
+          "title": "assembledAt on intelligence payload + 'Data as of …' freshness stamps on metric surfaces",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.4 + §2.1",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 1. Server half already existed via ClientIntelligence.assembledAt; this PR adds a shared FreshnessStamp primitive, real React Query dataUpdatedAt plumbing for client GA4/GSC hooks, visible stamps on Search/Analytics/Overview metric surfaces, and removes the synthetic client-intelligence fallback timestamp so failed intelligence reads cannot render as fresh."
+        },
+        {
+          "id": "cda-qw2-analytics-takeaway",
+          "title": "Analytics sub-tab: deterministic takeaway summary + conversion-rate color coding",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.2",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 2. AnalyticsTab now renders a deterministic, template-based takeaway from GA4 traffic, top source/page, and top tracked action with no AI call. Conversion rates remain display percentages and use judgment colors only: emerald for 5%+, amber for 2-4.9%, red below 2%, while raw conversion counts remain neutral metric text."
+        },
+        {
+          "id": "cda-qw2-roi-methodology-explainer",
+          "title": "ROI methodology explainer ('How we calculate this')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 4. ROIDashboard now includes an expandable 'How we calculate this' explainer that describes organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and conservative assumptions without changing ROI formulas or adding route reads."
+        },
+        {
+          "id": "cda-qw2-health-ring-breakdown",
+          "title": "Composite health ring breakdown (churn 40 / ROI 30 / engagement 30)",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.4",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 5. Client intelligence now projects a sanitized composite health breakdown for Growth+ workspaces, and the existing HealthScoreCard renders an expandable component view for retention signals, ROI momentum, and portal engagement without exposing raw churnRisk or adding route reads."
+        },
+        {
+          "id": "cda-qw2-post-approval-toast",
+          "title": "Post-approval 'next step' toast in Inbox",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.1",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 3. Successful unified-inbox approve responses now show a next-step toast: \"Approved. We're publishing this. Track it in your inbox.\" This covers both standard DecisionCard approval and inline approval-family cards while preserving held-item, declined, feedback, and apply-to-website flows."
+        },
+        {
+          "id": "cda-qw2-flag-confirmation",
+          "title": "Flag-submission confirmation + optimistic flagged-state on Content Plan cells",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.2",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 3. Content Plan cell flagging now updates the visible cell to flagged immediately with the submitted note, reconciles from the server after success, rolls back on API failure, and shows success/error toasts so the tab confirms the client was heard."
+        },
+        {
+          "id": "cda-qw2-comment-count-badges",
+          "title": "Comment-count badges on work-order conversation threads",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.3",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 6. Work-order deliverables now serialize a list-side commentCount from a single batched work_order_comments aggregate, including 0 for empty threads, and the client Work in progress cards render a blue comment-count Badge for 0/1/plural conversation counts without using per-thread reads for the badge."
+        },
+        {
+          "id": "cda-qw2-keyword-feedback-card",
+          "title": "Keyword feedback summary card on Strategy ('You approved 91% of suggestions')",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.4",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 7. Growth+ client intelligence now projects a sanitized keywordFeedbackSummary from ClientSignalsSlice, and Strategy renders a blue data SectionCard with approve/reject counts, approval rate, display samples, and top rejection reasons."
+        },
+        {
+          "id": "cda-qw2-we-called-it-expansion",
+          "title": "'We Called It' prediction card narrative expansion",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.5",
+          "est": "3h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 7. PredictionShowcaseCard now renders each stored outcome as a Before/After story with the recorded score badge, page, and confirmation date, using existing WeCalledItEntry fields only."
+        },
+        {
+          "id": "cda-qw2-inline-prices",
+          "title": "Inline prices on every purchase CTA before Stripe redirect",
+          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.5",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-11",
+          "notes": "Shipped in PR 8. Content and Inbox submit-request service choosers now show brief/full-post prices and selected CTA price before checkout, PlansTab upgrade/subscription CTAs include monthly prices, and external billing workspaces hide platform prices while billing actions route to contact/chat instead of Stripe; content subscription checkout also has a server-side external-billing guard."
+        }
+      ],
+      "shippedAt": "2026-06-12"
     },
     {
       "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",

@@ -492,6 +492,26 @@ describe('5. Checkout session creation', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it('POST /api/public/content-subscribe/:wsId for external-billing workspace returns 403 without checkout', async () => {
+    currentWs = seedWorkspace();
+    updateWorkspace(currentWs.workspaceId, { billingMode: 'external' });
+    stripeConfigStore.secretKey = 'sk_test_external_content_sub';
+
+    const res = await api(`/api/public/content-subscribe/${currentWs.workspaceId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': ADMIN_HMAC_TOKEN,
+      },
+      body: JSON.stringify({ plan: 'content_starter' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('billed externally');
+    expect(stripeMockStubs.checkoutCreate).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
