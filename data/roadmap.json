@@ -68,13 +68,13 @@
         },
         {
           "id": "aw6-wire-or-delete",
-          "title": "Wire-or-delete: suggested-briefs subsystem (D2), calendar intelligence dead code (D3), half-built pending-schemas pipeline",
+          "title": "Wire suggested-briefs store into AiSuggested (D2) + forward-planning calendar v1 (D3) + pending-schemas wire-or-delete",
           "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Entire suggested-briefs subsystem has zero UI; calendar intelligence is dead code. Blocked on owner decisions D2/D3 in the remediation plan. Report §5/§4."
+          "notes": "D2 DECIDED: wire — AiSuggested swaps to the store (dismiss/snooze/dedup). D3 DECIDED: WIRE (owner overrode delete rec) — calendar planning v1: plannedPublishAt, future view, clickable items, suggestPublishDates wiring. Pending-schemas half-pipeline: lane judges wire-or-delete. Report §4/§5."
         },
         {
           "id": "aw6-state-machine-validation",
