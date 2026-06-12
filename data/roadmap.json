@@ -240,9 +240,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.3",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Blue <Badge> (data, not action) on Conversations list rows. Verify count is available list-side without N+1; if it needs a field, that's a one-column serialization addition in public-portal.ts (DB column + mapper lockstep rule)."
+          "notes": "Shipped in PR 6. Work-order deliverables now serialize a list-side commentCount from a single batched work_order_comments aggregate, including 0 for empty threads, and the client Work in progress cards render a blue comment-count Badge for 0/1/plural conversation counts without using per-thread reads for the badge."
         },
         {
           "id": "cda-qw2-keyword-feedback-card",

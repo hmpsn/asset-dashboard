@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **495 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **496 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 496. Client Dashboard QW2 PR6 — Work-Order Comment Count Badges
+
+**What it does:** Adds list-side conversation counts to client work-order deliverables. The unified inbox read now batches `work_order_comments` counts for all visible work-order rows and serializes `commentCount` on the shared `ClientDeliverable` contract, including `0` for empty threads. The "Work in progress" client cards render a blue comment-count badge for zero, singular, and plural counts without deriving badge state from per-thread fetches.
+
+**Agency value:** Makes paid work-order conversations easier to scan and reduces missed replies in the client portal without adding another admin workflow.
+
+**Client value:** Clients can immediately see whether a work-order thread has activity before reading the conversation, making the "Work in progress" lane feel more responsive and transparent.
+
+**Mutual:** Turns work-order conversation activity into a lightweight, tested data signal while preserving the existing verb-free order lane and client/team comment flow.
+
+**Files:** `shared/types/client-deliverable.ts`, `server/work-order-comments.ts`, `server/domains/inbox/unified-inbox-read.ts`, `server/routes/deliverables.ts`, `src/components/client/inbox/UnifiedInbox.tsx`. Tests: `tests/unit/work-order-comments.test.ts`, `tests/integration/work-order-track-lane-read.test.ts`, `tests/component/InboxTabUnified.test.tsx`.
 
 ---
 
