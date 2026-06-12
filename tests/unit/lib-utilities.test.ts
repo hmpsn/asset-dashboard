@@ -20,6 +20,7 @@
  *  - src/lib/internal-link-client-action.ts (normalizeInternalLinkSuggestion edge cases)
  */
 import { describe, it, expect } from 'vitest';
+import { rankTrackingHistoryPath } from '../../src/lib/keywordTracking';
 
 // ════════════════════════════════════════════════════════════════════════════
 // src/lib/decision-adapters.ts
@@ -438,6 +439,18 @@ describe('queryKeys — admin rank tracking keys', () => {
   });
 });
 
+describe('keywordTracking — rankTrackingHistoryPath', () => {
+  it('uses repeated query params and preserves comma-bearing keywords', () => {
+    const path = rankTrackingHistoryPath(WS, [
+      'dentist, chicago',
+      '100% growth',
+      'a&b keyword',
+      '  ',
+    ]);
+    expect(path).toBe('/api/rank-tracking/ws-test/history?query=dentist%2C+chicago&query=100%25+growth&query=a%26b+keyword');
+  });
+});
+
 describe('queryKeys — admin page join keys', () => {
   it('pageJoinPagesAll has no params', () => {
     expect(queryKeys.admin.pageJoinPagesAll()).toEqual(['admin-page-join-pages']);
@@ -493,6 +506,10 @@ describe('queryKeys — client outcome + plan keys', () => {
 
   it('pageKeywords key shape', () => {
     expect(queryKeys.client.pageKeywords(WS)).toEqual(['client-page-keywords', WS]);
+  });
+
+  it('strategyGuidance key shape', () => {
+    expect(queryKeys.client.strategyGuidance(WS)).toEqual(['client-strategy-guidance', WS]);
   });
 
   it('rankHistory key shape', () => {

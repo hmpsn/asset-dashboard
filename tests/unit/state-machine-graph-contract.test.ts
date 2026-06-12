@@ -7,6 +7,7 @@ import {
   CONTENT_REQUEST_TRANSITIONS,
   CONTENT_SUB_TRANSITIONS,
   POST_STATUS_TRANSITIONS,
+  TRACKED_KEYWORD_TRANSITIONS,
   WORK_ORDER_TRANSITIONS,
   validateTransition,
 } from '../../server/state-machines.js';
@@ -27,6 +28,7 @@ const TRANSITION_GRAPHS: TransitionGraphSpec[] = [
   { name: 'client_action', map: CLIENT_ACTION_TRANSITIONS },
   { name: 'briefing_draft', map: BRIEFING_DRAFT_TRANSITIONS },
   { name: 'background_job', map: BACKGROUND_JOB_TRANSITIONS },
+  { name: 'tracked_keyword', map: TRACKED_KEYWORD_TRANSITIONS },
 ];
 
 function assertGraphShape(name: string, graph: TransitionMap): void {

@@ -53,7 +53,7 @@
     {
       "id": 6,
       "title": "Keyword Strategy Engine",
-      "oneLiner": "AI-driven keyword mapping with SEMRush/DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, and a command-center surface for keyword evidence/actions",
+      "oneLiner": "AI-driven keyword mapping with DataForSEO data, content gaps, quick wins, lifecycle tracking, local visibility reporting, plain-language value reasons, per-keyword revenue potential, and a command-center surface for keyword evidence/actions",
       "category": "content",
       "painPoints": ["keyword-strategy", "competitive-intel", "workflow-clarity", "local-seo"],
       "tier": "growth",
@@ -83,7 +83,7 @@
     {
       "id": 9,
       "title": "Client Portal",
-      "oneLiner": "White-labeled dashboard with search data, health scores, strategy, content hub, approvals, and AI chatbot",
+      "oneLiner": "White-labeled dashboard with search data, freshness stamps, analytics takeaways, conversion cues, explainable health scores, strategy, content hub, approvals, fail-loud inbox states, live refreshes, trial prompts, and AI chatbot",
       "category": "client",
       "painPoints": ["client-transparency", "reporting"],
       "tier": "free",
@@ -93,7 +93,7 @@
     {
       "id": 10,
       "title": "AI Insights Engine (Client Chatbot)",
-      "oneLiner": "GPT-4o advisor using full dashboard data — GSC, GA4, audit, strategy, ranks — with conversation memory and revenue hooks",
+      "oneLiner": "Client advisor using dashboard data — GSC, GA4, audit, strategy, ranks — with conversation memory, tier-aware usage counters, and Growth/Premium limits",
       "category": "ai",
       "painPoints": ["client-transparency", "reporting"],
       "tier": "growth",
@@ -303,7 +303,7 @@
     {
       "id": 31,
       "title": "Stripe Payments + Subscriptions",
-      "oneLiner": "Full Stripe Checkout for content purchases and tier subscriptions — encrypted key storage, webhook lifecycle, and self-service billing portal",
+      "oneLiner": "Full Stripe Checkout for content purchases and tier subscriptions — price-forward portal CTAs, encrypted key storage, webhook lifecycle, and self-service billing portal",
       "category": "monetization",
       "painPoints": ["payments"],
       "tier": "free",
@@ -323,7 +323,7 @@
     {
       "id": 33,
       "title": "In-Portal Plans & Pricing Page",
-      "oneLiner": "Dedicated Plans tab inside the client portal comparing tiers, showing content pricing, and driving upgrades with ROI-backed CTAs",
+      "oneLiner": "Dedicated Plans tab inside the client portal comparing tiers, showing content pricing, and driving upgrades with monthly prices directly on upgrade and subscription CTAs",
       "category": "monetization",
       "painPoints": ["payments", "onboarding"],
       "tier": "free",
@@ -553,7 +553,7 @@
     {
       "id": 56,
       "title": "ROI Dashboard",
-      "oneLiner": "Shows organic traffic value (clicks × CPC), content ROI attribution, and growth vs previous period — puts a dollar figure on SEO results",
+      "oneLiner": "Shows organic traffic value (clicks × CPC), keyword revenue at stake, content ROI attribution, growth vs previous period, and a plain-English methodology explainer — puts a transparent dollar figure on SEO results",
       "category": "analytics",
       "painPoints": ["reporting", "client-transparency"],
       "tier": "growth",
@@ -563,7 +563,7 @@
     {
       "id": 57,
       "title": "14-Day Growth Trial",
-      "oneLiner": "New workspaces auto-provisioned with Growth tier access — trial badges, countdown timers, and upgrade prompts drive conversion passively",
+      "oneLiner": "New workspaces auto-provisioned with Growth tier access — trial badges, five-day countdown banner, Day-10 email warning, and upgrade prompts drive conversion passively",
       "category": "monetization",
       "painPoints": ["onboarding", "payments"],
       "tier": "free",
@@ -679,6 +679,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
+    },
+    {
+      "id": 69,
+      "title": "Client Outcome Scorecard & Wins Ledger",
+      "oneLiner": "Tiered 'Your results' win-rate scorecard plus a wins ledger with real recommendation titles and estimated dollar value, right on the client overview",
+      "category": "reporting",
+      "painPoints": ["proof-of-value", "reporting", "retention"],
+      "tier": "free",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

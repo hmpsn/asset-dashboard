@@ -66,4 +66,139 @@ describe('webflow-client', () => {
     expect(headers.get('content-type')).toBe('application/vnd.custom+json');
     expect(headers.get('authorization')).toBe('Bearer wf_env_token');
   });
+
+  it('webflowJson returns typed success data for ok responses', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pages: [{ id: 'page-1' }] }),
+    } as Response));
+    const { webflowJson } = await import('../../server/webflow-client.js');
+
+    const result = await webflowJson<{ pages: Array<{ id: string }> }>('/sites/site_1/pages');
+
+    expect(result).toEqual({
+      ok: true,
+      data: { pages: [{ id: 'page-1' }] },
+    });
+  });
+
+  it('webflowJson returns status and response text for non-ok responses', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => 'Rate limited',
+    } as Response));
+    const { webflowJson } = await import('../../server/webflow-client.js');
+
+    const result = await webflowJson('/sites/site_1/pages');
+
+    expect(result).toEqual({
+      ok: false,
+      status: 429,
+      errorText: 'Rate limited',
+    });
+  });
+
+  it('paginateWebflow advances by item count when total-based pagination needs partial pages', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          nodes: [{ id: 'node-1' }, { id: 'node-2' }],
+          pagination: { total: 3 },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          nodes: [{ id: 'node-3' }],
+          pagination: { total: 3 },
+        }),
+      } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    const { paginateWebflow } = await import('../../server/webflow-client.js');
+
+    const result = await paginateWebflow<
+      { nodes?: Array<{ id: string }>; pagination?: { total?: number } },
+      { id: string }
+    >({
+      buildEndpoint: (offset, limit) => `/pages/page_1/dom?limit=${limit}&offset=${offset}`,
+      extractItems: page => page.nodes,
+      getTotal: page => page.pagination?.total,
+      advanceBy: 'items-length',
+    });
+
+    expect(result.map(node => node.id)).toEqual(['node-1', 'node-2', 'node-3']);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.webflow.com/v2/pages/page_1/dom?limit=100&offset=2');
+  });
+
+  it('paginateWebflow stops after a short page when total is unavailable', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          assets: Array.from({ length: 100 }, (_, index) => ({ id: `asset-${index}` })),
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          assets: [{ id: 'asset-100' }],
+        }),
+      } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    const { paginateWebflow } = await import('../../server/webflow-client.js');
+
+    const result = await paginateWebflow<{ assets?: Array<{ id: string }> }, { id: string }>({
+      buildEndpoint: (offset, limit) => `/sites/site_1/assets?limit=${limit}&offset=${offset}`,
+      extractItems: page => page.assets,
+    });
+
+    expect(result).toHaveLength(101);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.webflow.com/v2/sites/site_1/assets?limit=100&offset=100');
+  });
+
+  it('webflowMutation returns parsed JSON data when requested', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'asset-1' }),
+    } as Response));
+    const { webflowMutation } = await import('../../server/webflow-client.js');
+
+    const result = await webflowMutation<{ id: string }>(
+      '/assets',
+      { method: 'POST', body: '{"name":"hero.jpg"}' },
+      undefined,
+      'json',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      data: { id: 'asset-1' },
+    });
+  });
+
+  it('webflowMutation returns status and error text for failed writes', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: async () => 'Validation failed',
+    } as Response));
+    const { webflowMutation } = await import('../../server/webflow-client.js');
+
+    const result = await webflowMutation('/assets', { method: 'POST' });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 422,
+      errorText: 'Validation failed',
+    });
+  });
 });

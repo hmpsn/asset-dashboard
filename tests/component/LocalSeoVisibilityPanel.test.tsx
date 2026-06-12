@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
 import { LocalSeoVisibilityPanel } from '../../src/components/local-seo/LocalSeoVisibilityPanel';
@@ -9,14 +9,19 @@ const updateMutateAsync = vi.fn();
 const refreshMutate = vi.fn();
 const refreshMutateAsync = vi.fn();
 const locationLookupMutateAsync = vi.fn();
+const localSeoRefetch = vi.fn();
 
-let localSeoData: LocalSeoReadResponse;
+let localSeoData: LocalSeoReadResponse | undefined;
+let localSeoIsError = false;
+let localSeoError: Error | null = null;
 
 vi.mock('../../src/hooks/admin', () => ({
   useLocalSeo: () => ({
     data: localSeoData,
     isLoading: false,
-    error: null,
+    isError: localSeoIsError,
+    error: localSeoError,
+    refetch: localSeoRefetch,
   }),
   useLocalSeoRefresh: () => ({
     mutate: refreshMutate,
@@ -44,6 +49,21 @@ vi.mock('../../src/hooks/admin', () => ({
     isLoading: false,
     isError: false,
   }),
+}));
+
+vi.mock('../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({ findActiveJob: () => null }),
+}));
+
+// Wave 1 added useRankTrackingAddKeyword to LocalSeoVisibilityPanel; mock it here so
+// the test renderer doesn't need a QueryClientProvider wrapper.
+vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useRankTrackingAddKeyword: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+    error: null,
+  }),
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalSeoReadResponse {
@@ -97,6 +117,7 @@ function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalS
     },
     competitorBrands: [],
     serviceGaps: [],
+    visibilityTrend: [],
   };
 
   return {
@@ -119,6 +140,8 @@ function renderPanel(props: ComponentProps<typeof LocalSeoVisibilityPanel> = { w
 describe('LocalSeoVisibilityPanel setup drawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localSeoIsError = false;
+    localSeoError = null;
     localSeoData = makeReadResponse();
     updateMutateAsync.mockResolvedValue({
       ...localSeoData,
@@ -272,6 +295,60 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     expect(screen.getByText('Not Found')).toBeInTheDocument();
   });
 
+  it('renders the per-market visibility trend when the read model includes a series with >= 2 points', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        visibleCount: 4,
+      },
+      visibilityTrend: [
+        {
+          marketId: 'm1',
+          marketLabel: 'Austin, TX',
+          points: [
+            { date: '2026-06-01', visibleCount: 1, checkedCount: 4 },
+            { date: '2026-06-02', visibleCount: 3, checkedCount: 4 },
+          ],
+        },
+      ],
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Visibility trend')).toBeInTheDocument();
+    expect(screen.getByText('Verified local-pack matches over time')).toBeInTheDocument();
+    // Market label appears in the trend row (getAllByText — also used in the market summary).
+    expect(screen.getAllByText('Austin, TX').length).toBeGreaterThan(0);
+    // Trend delta (+2) renders via TrendBadge.
+    expect(screen.getByText(/\+2/)).toBeInTheDocument();
+  });
+
+  it('does not render the visibility trend when no market has >= 2 points', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        visibleCount: 4,
+      },
+      visibilityTrend: [
+        { marketId: 'm1', marketLabel: 'Austin, TX', points: [{ date: '2026-06-01', visibleCount: 1, checkedCount: 4 }] },
+      ],
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.queryByText('Visibility trend')).not.toBeInTheDocument();
+  });
+
   it('renders Page mode as annotation-only without workspace stats or refresh controls', () => {
     localSeoData = makeReadResponse({
       report: {
@@ -413,7 +490,7 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
-    fireEvent.click(screen.getByRole('button', { name: /remove round rock/i }));
+    fireEvent.click(screen.getByRole('button', { name: /deactivate round rock/i }));
     fireEvent.click(screen.getByRole('button', { name: /^save market$/i }));
 
     await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledWith({
@@ -467,5 +544,218 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
       })],
       keywordsPerRefresh: null,
     }));
+  });
+});
+
+// ── Bug fix tests ─────────────────────────────────────────────────────────────
+// Three silent-failure bugs verified via TDD before implementation.
+
+describe('LocalSeoVisibilityPanel — Bug fix: panel error state (Bug 1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localSeoIsError = false;
+    localSeoError = null;
+    localSeoData = makeReadResponse();
+    updateMutateAsync.mockResolvedValue({ markets: [] });
+    refreshMutateAsync.mockResolvedValue({ jobId: 'job-1', selectedKeywordCount: 0, selectedMarketCount: 0 });
+  });
+
+  it('renders ErrorState with retry button when the first fetch fails (data is undefined)', () => {
+    // Simulate a first-load fetch failure: data is undefined and isError is true
+    localSeoData = undefined as unknown as LocalSeoReadResponse;
+    localSeoIsError = true;
+    localSeoError = new Error('Network error');
+
+    renderPanel();
+
+    // Must render an error state — NOT return null silently
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    // Retry / Try Again button must be present
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it('calls refetch when the retry button is clicked after a fetch error', () => {
+    localSeoData = undefined as unknown as LocalSeoReadResponse;
+    localSeoIsError = true;
+    localSeoError = new Error('Network error');
+
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(localSeoRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null (not an error state) when featureEnabled is false and no error', () => {
+    localSeoIsError = false;
+    localSeoData = makeReadResponse({ featureEnabled: false });
+
+    const { container } = renderPanel();
+
+    // featureEnabled: false → nothing rendered (existing behaviour preserved)
+    expect(container.firstChild).toBeNull();
+    // No error UI shown
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('renders error state in page mode too', () => {
+    localSeoData = undefined as unknown as LocalSeoReadResponse;
+    localSeoIsError = true;
+    localSeoError = new Error('Network error');
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'page' });
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
+describe('LocalSeoMarketSetupDrawer — Bug fix: dirty-state resync (Bug 2)', () => {
+  const marketA = {
+    id: 'market-austin',
+    workspaceId: 'ws-1',
+    label: 'Austin, TX',
+    city: 'Austin',
+    stateOrRegion: 'TX',
+    country: 'US',
+    providerLocationName: 'Austin,Texas,United States',
+    providerLocationCode: 1026201,
+    source: 'admin_override' as const,
+    status: 'active' as const,
+    createdAt: '2026-05-20T12:00:00.000Z',
+    updatedAt: '2026-05-20T12:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localSeoIsError = false;
+    localSeoError = null;
+    localSeoData = makeReadResponse({
+      settings: { posture: 'local' },
+      markets: [marketA],
+      report: { setupState: 'ready_no_data', activeMarketCount: 1, configuredMarketCount: 1 },
+    });
+    updateMutateAsync.mockResolvedValue({ markets: [marketA] });
+    refreshMutateAsync.mockResolvedValue({ jobId: 'job-1', selectedKeywordCount: 5, selectedMarketCount: 1 });
+  });
+
+  it('preserves in-progress label edits when data identity changes while drawer is open', async () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <LocalSeoVisibilityPanel workspaceId="ws-1" />
+      </MemoryRouter>,
+    );
+
+    // Open the drawer
+    fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
+
+    // Edit the market label — make it dirty
+    const labelInput = screen.getByLabelText(/market label/i);
+    fireEvent.change(labelInput, { target: { value: 'Austin Metro' } });
+    expect(labelInput).toHaveValue('Austin Metro');
+
+    // Simulate a data refetch by providing a new object identity for data.markets
+    // (same logical content, new array reference — the scenario that "Set as primary" triggers)
+    localSeoData = makeReadResponse({
+      settings: { posture: 'local' },
+      markets: [{ ...marketA }], // new array/object identity
+      report: { setupState: 'ready_no_data', activeMarketCount: 1, configuredMarketCount: 1 },
+    });
+
+    await act(async () => {
+      rerender(
+        <MemoryRouter>
+          <LocalSeoVisibilityPanel workspaceId="ws-1" />
+        </MemoryRouter>,
+      );
+    });
+
+    // Draft must NOT be wiped — label edit should be preserved
+    expect(screen.getByLabelText(/market label/i)).toHaveValue('Austin Metro');
+  });
+
+  it('resyncs cleanly from fresh data when the drawer is pristine', async () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <LocalSeoVisibilityPanel workspaceId="ws-1" />
+      </MemoryRouter>,
+    );
+
+    // Open the drawer without making any changes
+    fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
+    expect(screen.getByLabelText(/market label/i)).toHaveValue('Austin, TX');
+
+    // Simulate a data update that brings a renamed market
+    localSeoData = makeReadResponse({
+      settings: { posture: 'local' },
+      markets: [{ ...marketA, label: 'Austin Metro Area' }],
+      report: { setupState: 'ready_no_data', activeMarketCount: 1, configuredMarketCount: 1 },
+    });
+
+    await act(async () => {
+      rerender(
+        <MemoryRouter>
+          <LocalSeoVisibilityPanel workspaceId="ws-1" />
+        </MemoryRouter>,
+      );
+    });
+
+    // Pristine drawer SHOULD resync with the new server data
+    expect(screen.getByLabelText(/market label/i)).toHaveValue('Austin Metro Area');
+  });
+});
+
+describe('LocalSeoMarketSetupDrawer — Bug fix: save error visibility (Bug 3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localSeoIsError = false;
+    localSeoError = null;
+    localSeoData = makeReadResponse({
+      settings: { posture: 'local' },
+      markets: [{
+        id: 'market-austin',
+        workspaceId: 'ws-1',
+        label: 'Austin, TX',
+        city: 'Austin',
+        stateOrRegion: 'TX',
+        country: 'US',
+        providerLocationName: 'Austin,Texas,United States',
+        providerLocationCode: 1026201,
+        source: 'admin_override',
+        status: 'active',
+        createdAt: '2026-05-20T12:00:00.000Z',
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      }],
+      report: { setupState: 'ready_no_data', activeMarketCount: 1, configuredMarketCount: 1 },
+    });
+    updateMutateAsync.mockRejectedValue(new Error('Save failed: network timeout'));
+    refreshMutateAsync.mockResolvedValue({ jobId: 'job-1', selectedKeywordCount: 5, selectedMarketCount: 1 });
+  });
+
+  it('shows a role=alert error message in the footer area after a failed save', async () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /edit markets/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save market$/i }));
+
+    // Error must be announced via role="alert"
+    const alert = await screen.findByRole('alert');
+    expect(alert).toBeInTheDocument();
+    expect(alert).toHaveTextContent(/save failed/i);
+  });
+
+  it('shows a role=alert for validation errors too', async () => {
+    // Use a setup where validation will fail: non-local posture but active market with no provider identity
+    localSeoData = makeReadResponse({ suggestedMarkets: [] });
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /configure market/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add market/i }));
+    fireEvent.change(screen.getByLabelText(/market label/i), { target: { value: 'Austin, TX' } });
+    fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: 'Austin' } });
+    // Missing country and provider identity — validation should fail
+    fireEvent.change(screen.getByLabelText(/^country/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save market$/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toBeInTheDocument();
   });
 });

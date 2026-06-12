@@ -11,20 +11,11 @@ import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import { fmtNum } from '../../utils/formatNumbers';
-import { capitalize } from '../../utils/strings';
+import { capitalizeWord } from '../../utils/strings';
 import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
-const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
-
-function titleCaseWord(word: string): string {
-  return ACRONYMS.has(word.toLowerCase())
-    ? word.toUpperCase()
-    : capitalize(word);
-}
 
 /** GA4/GSC placeholder values that should be treated as missing (no real title). */
 const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
@@ -47,7 +38,7 @@ export function cleanSlugToTitle(url: string | null): string {
     return slug
       .replace(/[-_]/g, ' ')
       .split(' ')
-      .map(titleCaseWord)
+      .map(word => capitalizeWord(word))
       .join(' ')
       .trim() || 'Home';
   } catch {
@@ -58,7 +49,7 @@ export function cleanSlugToTitle(url: string | null): string {
     return slug
       .replace(/[-_]/g, ' ')
       .split(' ')
-      .map(titleCaseWord)
+      .map(word => capitalizeWord(word))
       .join(' ')
       .trim() || 'Home';
   }
@@ -179,8 +170,10 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
 
     case 'serp_opportunity': {
       headline = 'eligible for rich results';
-      const schemaType = data.schemaType as string | undefined;
-      if (schemaType) contextParts.push(schemaType);
+      // The producer (analytics-intelligence.ts) writes schemaStatus, not schemaType —
+      // reading schemaType meant this context line silently never rendered (guessed-field bug).
+      const schemaStatus = data.schemaStatus as 'missing' | 'partial' | 'complete' | undefined;
+      if (schemaStatus) contextParts.push(`Schema ${schemaStatus}`);
       break;
     }
 
@@ -210,8 +203,184 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'lost_visibility': {
+      const lostCount = data.lostCount as number | undefined;
+      if (lostCount !== undefined && lostCount > 0) {
+        headline = `${lostCount} quer${lostCount === 1 ? 'y' : 'ies'} lost visibility`;
+      } else {
+        headline = 'queries lost visibility';
+      }
+      contextParts.push('GSC drop-off detected');
+      break;
+    }
+
+    case 'keyword_cluster': {
+      const label = data.label as string | undefined;
+      const queries = data.queries as unknown[] | undefined;
+      const queryCount = Array.isArray(queries) ? queries.length : undefined;
+      if (label) {
+        headline = queryCount !== undefined
+          ? `${queryCount} quer${queryCount === 1 ? 'y' : 'ies'} clustered under "${label}"`
+          : `keyword cluster: "${label}"`;
+      } else {
+        headline = 'keyword cluster identified';
+      }
+      const avgPosition = data.avgPosition as number | undefined;
+      if (avgPosition !== undefined) contextParts.push(`Avg position ${avgPosition.toFixed(1)}`);
+      break;
+    }
+
+    case 'competitor_gap': {
+      const keyword = data.keyword as string | undefined;
+      const competitorPos = data.competitorPosition as number | undefined;
+      if (keyword && competitorPos !== undefined) {
+        headline = `"${keyword}" — competitor at #${competitorPos}`;
+      } else if (keyword) {
+        headline = `competitor gap: "${keyword}"`;
+      } else {
+        headline = 'competitor keyword gap';
+      }
+      const ourPosition = data.ourPosition as number | null | undefined;
+      contextParts.push(`Our position: ${ourPosition != null ? `#${ourPosition}` : 'not ranking'}`);
+      break;
+    }
+
+    case 'strategy_alignment': {
+      const alignedCount = data.alignedCount as number | undefined;
+      const misalignedCount = data.misalignedCount as number | undefined;
+      const untrackedCount = data.untrackedCount as number | undefined;
+      if (alignedCount !== undefined && misalignedCount !== undefined) {
+        headline = `${alignedCount} aligned, ${misalignedCount} misaligned pages`;
+      } else {
+        headline = 'strategy alignment review';
+      }
+      if (untrackedCount !== undefined && untrackedCount > 0) {
+        contextParts.push(`${untrackedCount} untracked`);
+      }
+      break;
+    }
+
+    case 'anomaly_digest': {
+      const anomalyType = data.anomalyType as string | undefined;
+      const deviationPercent = data.deviationPercent as number | undefined;
+      if (anomalyType && deviationPercent !== undefined) {
+        headline = `${anomalyType.replace(/_/g, ' ')} — ${Math.abs(Math.round(deviationPercent))}% deviation`;
+      } else if (anomalyType) {
+        headline = `anomaly: ${anomalyType.replace(/_/g, ' ')}`;
+      } else {
+        headline = 'anomaly detected';
+      }
+      const durationDays = data.durationDays as number | undefined;
+      if (durationDays !== undefined) {
+        contextParts.push(`${durationDays} day${durationDays !== 1 ? 's' : ''} ongoing`);
+      }
+      break;
+    }
+
+    case 'site_health': {
+      const siteScore = data.siteScore as number | undefined;
+      if (siteScore !== undefined) {
+        headline = `Site health: ${siteScore}/100`;
+      } else {
+        headline = 'site health summary';
+      }
+      const scoreDelta = data.scoreDelta as number | null | undefined;
+      if (scoreDelta != null && scoreDelta !== 0) {
+        const sign = scoreDelta > 0 ? '+' : '';
+        contextParts.push(`${sign}${scoreDelta} from last audit`);
+      }
+      break;
+    }
+
+    case 'emerging_keyword': {
+      const keyword = data.keyword as string | undefined;
+      if (keyword) {
+        headline = `"${keyword}" — rising trend`;
+      } else {
+        headline = 'emerging keyword opportunity';
+      }
+      const volume = data.volume as number | undefined;
+      if (volume !== undefined) contextParts.push(`Vol. ${fmtNum(volume)}`);
+      const difficulty = data.difficulty as number | undefined;
+      if (difficulty !== undefined) contextParts.push(`Difficulty: ${difficulty}`);
+      break;
+    }
+
+    case 'competitor_alert': {
+      const competitorDomain = data.competitorDomain as string | undefined;
+      const alertType = data.alertType as string | undefined;
+      if (competitorDomain && alertType) {
+        headline = `${competitorDomain} ${alertType.replace(/_/g, ' ')}`;
+      } else if (competitorDomain) {
+        headline = `competitor alert: ${competitorDomain}`;
+      } else {
+        headline = 'competitor movement detected';
+      }
+      const keyword = data.keyword as string | undefined;
+      if (keyword) contextParts.push(`"${keyword}"`);
+      const positionChange = data.positionChange as number | undefined;
+      if (positionChange !== undefined && positionChange !== 0) {
+        const sign = positionChange > 0 ? '+' : '';
+        contextParts.push(`${sign}${positionChange} positions`);
+      }
+      break;
+    }
+
+    case 'freshness_alert': {
+      const daysSince = data.daysSinceLastAnalysis as number | undefined;
+      if (daysSince !== undefined) {
+        headline = `Content last analyzed ${daysSince}d ago`;
+      } else {
+        headline = 'content freshness alert';
+      }
+      const impressions = data.impressions as number | undefined;
+      if (impressions !== undefined) contextParts.push(`${fmtNum(impressions)} impressions at risk`);
+      break;
+    }
+
+    case 'local_visibility_shift': {
+      const direction = data.direction as string | undefined;
+      const keyword = data.keyword as string | undefined;
+      const marketLabel = data.marketLabel as string | undefined;
+      const competitorName = data.competitorName as string | undefined;
+      if (direction === 'win') {
+        headline = keyword
+          ? `Now visible in local pack for "${keyword}"`
+          : 'Gained local pack visibility';
+      } else if (direction === 'competitor') {
+        headline = competitorName
+          ? `New local competitor: ${competitorName}`
+          : 'New repeat local competitor detected';
+      } else {
+        headline = keyword
+          ? `Lost local pack visibility for "${keyword}"`
+          : 'Lost local pack visibility';
+      }
+      if (marketLabel) contextParts.push(marketLabel);
+      const appearances = data.competitorAppearances as number | undefined;
+      if (direction === 'competitor' && appearances !== undefined) {
+        contextParts.push(`${appearances} keyword${appearances === 1 ? '' : 's'}`);
+      }
+      break;
+    }
+
+    case 'milestone_attribution': {
+      const daysSinceDelivery = data.daysSinceDelivery as number | undefined;
+      const thresholdCrossed = data.thresholdCrossed as string | undefined;
+      if (daysSinceDelivery !== undefined && typeof thresholdCrossed === 'string') {
+        headline = `Brief delivered ${daysSinceDelivery}d ago crossed ${thresholdCrossed.replace(/_/g, ' ')}`;
+      } else {
+        headline = 'content milestone reached';
+      }
+      const currentClicks = data.currentClicks as number | undefined;
+      if (currentClicks !== undefined) contextParts.push(`${fmtNum(currentClicks)} clicks tracked`);
+      break;
+    }
+
     default: {
-      headline = insight.insightType.replace(/_/g, ' ');
+      // Exhaustive switch — all InsightType cases are handled above.
+      // This branch exists as a runtime safety net for unexpected values.
+      headline = (insight.insightType as string).replace(/_/g, ' ');
       break;
     }
   }
@@ -253,6 +422,14 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       details = queries.slice(0, 10);
       if (queries.length > 10) details.push(`+ ${queries.length - 10} more queries`);
     }
+  } else if (insight.insightType === 'lost_visibility') {
+    const topQueries = data.topQueries as Array<{ query: string; lastPosition: number | null; lastSeen: string }> | undefined;
+    if (Array.isArray(topQueries) && topQueries.length > 0) {
+      details = topQueries.map(q => {
+        const pos = q.lastPosition != null ? ` — last position ${q.lastPosition}` : '';
+        return `"${q.query}"${pos}`;
+      });
+    }
   }
 
   return {
@@ -265,6 +442,10 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     pageUrl: insight.pageId ?? undefined,
     domain,
     impactScore: insight.impactScore ?? 0,
+    // When the insight was computed — SearchDetail pins chart callouts to this date
+    // (falls back to the last chart date when absent). Was never set → callouts always
+    // landed on the final chart date, misrepresenting timing.
+    detectedAt: insight.computedAt,
     details,
   };
 }

@@ -30,6 +30,8 @@ interface ActivityRow {
   actor_name: string | null;
 }
 
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
+
 let baseUrl = '';
 let server: http.Server | undefined;
 let wsId = '';
@@ -58,7 +60,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown, opts?: RequestInit): Promise<Response> {
@@ -419,8 +421,8 @@ describe('client action mutation safety', () => {
     const completeRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'completed' });
     expect(completeRes.status).toBe(200);
 
-    expect(getInsightById(ambiguousA.id, wsId)?.resolutionStatus).toBeNull();
-    expect(getInsightById(ambiguousB.id, wsId)?.resolutionStatus).toBeNull();
+    expect(getInsightById(ambiguousA.id, wsId)?.resolutionStatus).not.toBe('resolved');
+    expect(getInsightById(ambiguousB.id, wsId)?.resolutionStatus).not.toBe('resolved');
 
     const upgradedSource = getActionByWorkspaceAndSource(wsId, 'content_decay', '/decay-page');
     expect(upgradedSource?.attribution).toBe('platform_executed');

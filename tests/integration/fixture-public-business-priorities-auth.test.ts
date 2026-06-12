@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13717);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let primary: SeededAuth | null = null;
 let secondary: SeededAuth | null = null;
@@ -19,6 +19,12 @@ async function postPriorities(
 
   if (token) {
     headers.Cookie = `client_user_token_${workspaceId}=${token}`;
+    // Suppress admin-token injection when testing client JWT auth paths:
+    // we want the server to evaluate the actual cookie, not fall back to admin bypass.
+    headers['x-no-auto-public-auth'] = 'true';
+  } else {
+    // No auth at all — suppress injection so 401 is returned as expected.
+    headers['x-no-auto-public-auth'] = 'true';
   }
 
   return ctx.api(`/api/public/business-priorities/${workspaceId}`, {
@@ -68,7 +74,14 @@ describe('Public business priorities auth boundaries (fixture-backed)', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ saved: 2 });
+    expect(await res.json()).toEqual(expect.objectContaining({
+      saved: 2,
+      priorities: [
+        { text: 'Increase qualified leads', category: 'growth' },
+        { text: 'Improve brand visibility', category: 'brand' },
+      ],
+      updatedAt: expect.any(String),
+    }));
 
     const followUp = await ctx.api(`/api/public/business-priorities/${primary!.workspaceId}`);
     expect(followUp.status).toBe(200);

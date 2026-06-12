@@ -18,6 +18,26 @@ Every plan goes through this sequence. The skills are:
 
 ---
 
+## Plans Are Contract + Test-Centric (read first)
+
+Plans specify **what** a task must achieve and **how it's verified** — not pre-written implementation. This **overrides** the generic `writing-plans` default of "complete implementation code in every step."
+
+**Lock in the plan:**
+- Contracts — function signatures, types, interfaces (the shape the task must produce or preserve)
+- Test cases as concrete assertions — the behavioral spec, written first
+- Constraints / gotchas — concurrency, transaction discipline, CI-coupled deletes, flag boundaries
+- File structure + ownership, the dependency graph, and the exact verification commands
+
+**Do NOT pre-bake in the plan:**
+- The implementation **body** — it is written at *execution* time by an agent that has READ the real current code and runs a real red→green loop.
+- (Exception: trivial one-line edits — dead-code deletes, key renames — may show the exact line.)
+
+**Why.** Implementation written at planning time has no execution feedback, so the TDD loop gets faked (test + impl authored together, "red" never genuinely observed) and the code ships unverified. It is also the project's #1 bug pattern — guessed field names that compile via `as any` but cause silent data loss (CLAUDE.md "read-before-write"). A plan full of concrete code *looks* authoritative, so the executor transcribes it with false confidence.
+
+**Execution discipline (state this in every plan).** For each task: (1) READ the real code; (2) write the failing test from the plan's assertions and RUN it, confirming it fails for the right reason; (3) implement minimally against the real signatures; (4) RUN the test (green) + typecheck; (5) commit. Never transcribe; never skip the red. If the real code contradicts a contract in the plan, STOP and report.
+
+---
+
 ## Step 1: Pre-Plan Audit (when required)
 
 Run the `pre-plan-audit` skill **before writing-plans** for:
@@ -214,8 +234,8 @@ See `docs/workflows/deploy.md` for the full branch model and deploy steps.
 ## Step 5: Testing Patterns
 
 - **Write tests alongside code** — new routes get integration tests, new state transitions get guard tests
-- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helper `createTestContext(port)` in `tests/integration/helpers.ts`
-- **Port uniqueness** — each integration test file needs a unique port. Check existing range: `grep -r 'createTestContext(' tests/`. Current range: 13201–13316.
+- **Infrastructure:** mock factories in `tests/mocks/`, seed fixtures in `tests/fixtures/`, HTTP helpers in `tests/integration/helpers.ts`. Use `createEphemeralTestContext(import.meta.url)` for spawned-server integration tests; pass unique `contextName` values when a file needs multiple contexts.
+- **Port allocation** — tests must not bind fixed server ports. Use `createEphemeralTestContext(import.meta.url)` for child-process tests, or `server.listen(0, '127.0.0.1')` and derive `baseUrl` from `server.address().port` for in-process `createApp()` tests.
 - **External API error tests** — mock the API to return an error, assert the operation records `failed`/`error` status (FM-2 pattern)
 - **Cleanup** — every `beforeAll` resource creation must have a matching `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 - **Collection assertions** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously.

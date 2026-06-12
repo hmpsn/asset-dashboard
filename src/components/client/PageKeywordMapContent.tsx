@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
-import { Badge, Button, Icon } from '../ui';
+import { Badge, Button, Icon, OutcomeReadbackChip } from '../ui';
+import { positionColor, positionTone } from '../ui/constants';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
 import { post } from '../../api';
 import { normalizeKeyword } from './strategy/strategyKeywordDisplay';
 import { capitalize } from '../../utils/strings';
+import { KeywordMetricCell } from '../shared/KeywordMetricCell';
 
 interface GscKeyword {
   query: string;
@@ -66,19 +68,6 @@ function getPageFolder(path: string): string {
          capitalize(parts[0]);
 }
 
-function positionColor(pos: number): string {
-  if (pos <= 3) return 'text-accent-success font-semibold';
-  if (pos <= 10) return 'text-accent-success';
-  if (pos <= 20) return 'text-accent-warning font-semibold';
-  if (pos <= 50) return 'text-accent-warning';
-  return 'text-[var(--brand-text-muted)]';
-}
-
-function positionTone(pos: number): 'emerald' | 'amber' | 'zinc' {
-  if (pos <= 10) return 'emerald';
-  if (pos <= 50) return 'amber';
-  return 'zinc';
-}
 
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback, explanations = [] }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
@@ -288,24 +277,21 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 {kwCount} keywords
                               </span>
                             )}
-                            {page.volume != null && page.volume > 0 && (
-                              <span className="t-caption-sm text-[var(--brand-text-muted)] inline-flex items-center gap-0.5">
-                                {page.volume.toLocaleString()}/mo
-                                {page.metricsSource === 'partial_match' && (
-                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
-                                )}
-                              </span>
-                            )}
-                            {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`t-caption-sm inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-accent-success' : page.difficulty <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>
-                                Difficulty {page.difficulty}
-                                {page.metricsSource === 'partial_match' && (
-                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
-                                )}
-                              </span>
-                            )}
+                            <KeywordMetricCell
+                              volume={page.volume}
+                              difficulty={page.difficulty}
+                              mode="badge"
+                              kdForm="difficulty"
+                              partialMatch={page.metricsSource === 'partial_match'}
+                            />
                             {explanation?.nextAction && (
                               <Badge label={explanation.nextAction.label} tone="teal" variant="outline" />
+                            )}
+                            {/* W5.1: closed-loop outcome chip — baseline→current position
+                                + verdict for this keyword's tracked action. Honest about
+                                direction (trusts outcome.direction). Absent when unscored. */}
+                            {explanation?.outcome && (
+                              <OutcomeReadbackChip outcome={explanation.outcome} />
                             )}
                           </div>
                         </Button>

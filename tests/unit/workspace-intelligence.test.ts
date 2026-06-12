@@ -1,7 +1,21 @@
 // tests/unit/workspace-intelligence.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const hoisted = vi.hoisted(() => ({
+  logDebug: vi.fn(),
+  logInfo: vi.fn(),
+  logWarn: vi.fn(),
+  assembleSiteHealth: vi.fn(),
+}));
+
 // Mock all subsystem dependencies
+vi.mock('../../server/logger.js', () => ({
+  createLogger: vi.fn(() => ({
+    debug: hoisted.logDebug,
+    info: hoisted.logInfo,
+    warn: hoisted.logWarn,
+  })),
+}));
 vi.mock('../../server/intelligence/seo-context-source.js', () => ({
   buildEffectiveBrandVoiceBlock: vi.fn(() => 'Test brand voice'),
   getRawBrandVoice: vi.fn(() => ''),
@@ -51,6 +65,9 @@ vi.mock('../../server/webflow-cms.js', () => ({
 vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn().mockReturnValue(true),
 }));
+vi.mock('../../server/intelligence/site-health-slice.js', () => ({
+  assembleSiteHealth: hoisted.assembleSiteHealth,
+}));
 vi.mock('../../server/intelligence-cache.js', () => {
   class MockLRUCache {
     get = vi.fn().mockReturnValue(null);
@@ -72,6 +89,9 @@ import {
   formatForPrompt,
 } from '../../server/workspace-intelligence.js';
 import {
+  INTELLIGENCE_SLICE_METADATA_REGISTRY,
+} from '../../server/intelligence/slice-metadata-registry.js';
+import {
   INTELLIGENCE_SLICES,
   OPTION_SCOPED_INTELLIGENCE_SLICES,
   PROMPT_FORMATTABLE_INTELLIGENCE_SLICES,
@@ -87,6 +107,8 @@ const mockGetInsights = vi.mocked(getInsights);
 const mockGetLearnings = vi.mocked(getWorkspaceLearnings);
 const mockGetWorkspace = vi.mocked(getWorkspace);
 const mockSingleFlight = vi.mocked(singleFlight);
+const mockLogWarn = hoisted.logWarn;
+const mockAssembleSiteHealth = hoisted.assembleSiteHealth;
 
 describe('buildWorkspaceIntelligence', () => {
   beforeEach(() => {
@@ -94,6 +116,7 @@ describe('buildWorkspaceIntelligence', () => {
     mockBuildEffectiveBrandVoiceBlock.mockReturnValue('Test brand voice');
     mockGetInsights.mockReturnValue([]);
     mockGetLearnings.mockReturnValue(null);
+    mockAssembleSiteHealth.mockResolvedValue(undefined);
   });
 
   it('returns a valid WorkspaceIntelligence object with version and timestamp', async () => {
@@ -127,6 +150,19 @@ describe('buildWorkspaceIntelligence', () => {
     expect(OPTION_SCOPED_INTELLIGENCE_SLICES).toEqual(['pageProfile', 'pageElements', 'siteInventory']);
   });
 
+  it('keeps server slice metadata registry in lockstep with shared slice constants', () => {
+    expect(Object.keys(INTELLIGENCE_SLICE_METADATA_REGISTRY).sort()).toEqual(
+      [...INTELLIGENCE_SLICES].sort(),
+    );
+
+    expect(INTELLIGENCE_SLICE_METADATA_REGISTRY.pageProfile.requiredOptions).toEqual({ pagePath: true });
+    expect(INTELLIGENCE_SLICE_METADATA_REGISTRY.pageElements.requiredOptions).toEqual({ pagePath: true });
+    expect(INTELLIGENCE_SLICE_METADATA_REGISTRY.siteInventory.requiredOptions).toEqual({
+      siteId: true,
+      siteBaseUrl: true,
+    });
+  });
+
   it('skips pageProfile and pageElements when pagePath is not provided', async () => {
     const result = await buildWorkspaceIntelligence('ws-1', {
       slices: ['pageProfile', 'pageElements'],
@@ -148,6 +184,28 @@ describe('buildWorkspaceIntelligence', () => {
 
     expect(missingSiteId.siteInventory).toBeUndefined();
     expect(missingBaseUrl.siteInventory).toBeUndefined();
+  });
+
+  it('degrades siteHealth timeout once without duplicate warnings from late rejection', async () => {
+    vi.useFakeTimers();
+    mockAssembleSiteHealth.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('late siteHealth failure')), 6000);
+        }),
+    );
+
+    const pending = buildWorkspaceIntelligence('ws-timeout-1', { slices: ['siteHealth'] });
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await pending;
+
+    expect(result.siteHealth).toBeUndefined();
+    expect(mockLogWarn).toHaveBeenCalledTimes(1);
+    expect(mockLogWarn.mock.calls[0]?.[1]).toBe('siteHealth slice assembly failed — skipping');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mockLogWarn).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('gracefully handles subsystem failure — returns partial data', async () => {

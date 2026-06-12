@@ -54,7 +54,7 @@ describe('assembleInsights', () => {
     expect(result.bySeverity.warning).toBe(1);
   });
 
-  it('reconstructs full insight coverage from uncapped byType rollups', async () => {
+  it('listAllInsightsFromSlice returns the prompt-facing all list (top 100 by impact)', async () => {
     const highImpact = Array.from({ length: 100 }, (_, index) => ({
       id: `high-${index}`,
       workspaceId: 'ws-insights',
@@ -80,10 +80,76 @@ describe('assembleInsights', () => {
     const result = await assembleInsights('ws-insights');
     const full = listAllInsightsFromSlice(result);
 
+    // G3: the helper reads `all` (the slice's intended prompt-facing bound) instead of
+    // reconstructing the full set from byType, which is now capped at 25 per type.
     expect(result.all).toHaveLength(100);
-    expect(result.all.some(insight => insight.id === beyondCap.id)).toBe(false);
-    expect(full.map(insight => insight.id)).toContain(beyondCap.id);
-    expect(full.at(-1)?.id).toBe(beyondCap.id);
+    expect(full.map(insight => insight.id)).toEqual(result.all.map(insight => insight.id));
+    // Pre-cap totals stay honest via countsByType even though the 101st insight is
+    // outside the prompt-facing list.
+    expect(result.countsByType.ranking_opportunity).toBe(100);
+    expect(result.countsByType.cannibalization).toBe(1);
+  });
+
+  it('caps byType at 25 per type ordered by impactScore with full pre-cap countsByType', async () => {
+    // Divergent fixture: highest-impact insight is NOT first by insertion order, so the
+    // cap must select by impactScore, not by insertion.
+    const lowFirst = Array.from({ length: 30 }, (_, index) => ({
+      id: `low-${index}`,
+      workspaceId: 'ws-insights',
+      insightType: 'ranking_opportunity',
+      severity: 'opportunity',
+      impactScore: index + 1, // 1..30, ascending — insertion order inverse of impact order
+      pageId: `/page-${index}`,
+      data: {},
+      createdAt: '2026-05-26T00:00:00.000Z',
+    }));
+    const apex = {
+      id: 'apex-inserted-last',
+      workspaceId: 'ws-insights',
+      insightType: 'ranking_opportunity',
+      severity: 'opportunity',
+      impactScore: 999,
+      pageId: '/apex',
+      data: {},
+      createdAt: '2026-05-26T00:00:00.000Z',
+    };
+    const otherType = Array.from({ length: 3 }, (_, index) => ({
+      id: `decay-${index}`,
+      workspaceId: 'ws-insights',
+      insightType: 'content_decay',
+      severity: 'warning',
+      impactScore: 50 - index,
+      pageId: `/decay-${index}`,
+      data: {},
+      createdAt: '2026-05-26T00:00:00.000Z',
+    }));
+    mocks.getInsights.mockReturnValue([...lowFirst, apex, ...otherType]);
+
+    const result = await assembleInsights('ws-insights');
+
+    const ranking = result.byType.ranking_opportunity ?? [];
+    expect(ranking).toHaveLength(25);
+    expect(ranking[0]?.id).toBe('apex-inserted-last');
+    const scores = ranking.map(insight => insight.impactScore ?? 0);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    // The lowest-impact insights fall out of the capped list...
+    expect(ranking.some(insight => insight.id === 'low-0')).toBe(false);
+    // ...but the pre-cap totals are preserved.
+    expect(result.countsByType.ranking_opportunity).toBe(31);
+    expect(result.countsByType.content_decay).toBe(3);
+    // The type×severity matrix is also pre-cap (joint-filtering consumers).
+    expect(result.countsByTypeBySeverity.ranking_opportunity).toEqual({
+      critical: 0, warning: 0, opportunity: 31, positive: 0,
+    });
+    expect(result.countsByTypeBySeverity.content_decay).toEqual({
+      critical: 0, warning: 3, opportunity: 0, positive: 0,
+    });
+    // Types under the cap are unaffected.
+    expect(result.byType.content_decay).toHaveLength(3);
+    // `all` is unaffected by the per-type cap (34 insights, under its own 100 cap).
+    expect(result.all).toHaveLength(34);
+    expect(result.bySeverity.opportunity).toBe(31);
+    expect(result.bySeverity.warning).toBe(3);
   });
 
   it('matches page-scoped anomaly insights by affectedPage', async () => {

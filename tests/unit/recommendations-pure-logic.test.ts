@@ -1,17 +1,20 @@
 /**
  * Pure-logic unit tests for server/recommendations.ts
  *
- * Covers: getRecoveryRate, computeImpactScore, determinePriority,
- * migrateSourceKey, buildMergeKey, pageImportanceMultiplier,
+ * Covers: getRecoveryRate, migrateSourceKey, buildMergeKey, pageImportanceMultiplier,
  * checkToRecType, mapToProduct, auditInsight, getTrafficScore (base formula)
  *
- * All functions under test are pure / non-async / non-DB.
+ * The functions under test are pure / non-async / non-DB. The product-catalog
+ * helpers imported from server/stripe.js (isProductType, getProductConfig) are
+ * likewise static lookups over PRODUCT_MAP — the Stripe client is constructed
+ * lazily, so importing them here does not touch the DB or open a connection.
  */
 import { describe, it, expect } from 'vitest';
+import { isProductType, getProductConfig } from '../../server/stripe.js';
+import type { RecType } from '../../shared/types/recommendations.js';
+import type { ContentGap } from '../../shared/types/workspace.js';
 import {
   getRecoveryRate,
-  computeImpactScore,
-  determinePriority,
   migrateSourceKey,
   buildMergeKey,
   pageImportanceMultiplier,
@@ -94,117 +97,6 @@ describe('getRecoveryRate', () => {
     const r = getRecoveryRate('redirect-chains');
     expect(r.perRec).toBe('5-15%');
     expect(r.summary).toBe(0.10);
-  });
-});
-
-// ─── computeImpactScore ───────────────────────────────────────────────────────
-
-describe('computeImpactScore', () => {
-  it('error severity with no traffic and not critical → base 60', () => {
-    expect(computeImpactScore('error', false, 0, 100)).toBe(60);
-  });
-
-  it('warning severity with no traffic and not critical → base 35', () => {
-    expect(computeImpactScore('warning', false, 0, 100)).toBe(35);
-  });
-
-  it('info severity with no traffic and not critical → base 15', () => {
-    expect(computeImpactScore('info', false, 0, 100)).toBe(15);
-  });
-
-  it('isCritical adds +20 bonus on top of severity base', () => {
-    expect(computeImpactScore('error', true, 0, 100)).toBe(80);  // 60+20
-    expect(computeImpactScore('warning', true, 0, 100)).toBe(55); // 35+20
-    expect(computeImpactScore('info', true, 0, 100)).toBe(35);   // 15+20
-  });
-
-  it('traffic multiplier is 0 when maxTrafficScore=0 (no division by zero)', () => {
-    expect(computeImpactScore('error', false, 1000, 0)).toBe(60);
-    expect(computeImpactScore('warning', true, 9999, 0)).toBe(55);
-  });
-
-  it('traffic multiplier is 20 when trafficScore equals maxTrafficScore', () => {
-    // 35 (warning) + 0 (not critical) + 20 (full traffic) = 55
-    expect(computeImpactScore('warning', false, 100, 100)).toBe(55);
-  });
-
-  it('traffic multiplier is proportional between 0 and 20', () => {
-    // 35 + 0 + 10 = 45 (traffic is half of max)
-    expect(computeImpactScore('warning', false, 50, 100)).toBe(45);
-  });
-
-  it('result is capped at 100', () => {
-    // error(60) + critical(20) + max-traffic(20) = 100
-    expect(computeImpactScore('error', true, 100, 100)).toBe(100);
-    // Even beyond: error(60) + critical(20) + over-max traffic would still be 100
-    expect(computeImpactScore('error', true, 200, 100)).toBe(100);
-  });
-
-  it('rounds the result to the nearest integer', () => {
-    // 35 + 0 + (33/100)*20 = 35 + 6.6 → round to 42
-    const score = computeImpactScore('warning', false, 33, 100);
-    expect(Number.isInteger(score)).toBe(true);
-    expect(score).toBe(42); // Math.round(35 + 6.6) = 42
-  });
-
-  it('trafficScore=0 with non-zero maxTrafficScore → multiplier is 0', () => {
-    expect(computeImpactScore('error', false, 0, 500)).toBe(60);
-  });
-});
-
-// ─── determinePriority ────────────────────────────────────────────────────────
-
-describe('determinePriority', () => {
-  it('returns "fix_now" when impactScore >= 70', () => {
-    expect(determinePriority(70, 'warning', 0)).toBe('fix_now');
-    expect(determinePriority(71, 'info', 0)).toBe('fix_now');
-    expect(determinePriority(100, 'info', 0)).toBe('fix_now');
-  });
-
-  it('returns "fix_now" when severity is error AND trafficScore > 0 (even low score)', () => {
-    expect(determinePriority(20, 'error', 1)).toBe('fix_now');
-    expect(determinePriority(0, 'error', 100)).toBe('fix_now');
-    expect(determinePriority(44, 'error', 50)).toBe('fix_now');
-  });
-
-  it('does NOT return "fix_now" for error severity with trafficScore = 0 and low impactScore', () => {
-    // impactScore < 70 AND error severity AND trafficScore = 0 → fix_soon (because of severity=error)
-    expect(determinePriority(60, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" when impactScore >= 45 (non-error severity)', () => {
-    expect(determinePriority(45, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(69, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(55, 'info', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_soon" for error severity with zero traffic and impactScore < 70', () => {
-    // error severity alone (no traffic) → fix_soon
-    expect(determinePriority(30, 'error', 0)).toBe('fix_soon');
-    expect(determinePriority(0, 'error', 0)).toBe('fix_soon');
-  });
-
-  it('returns "fix_later" when impactScore >= 20 (non-error, low traffic)', () => {
-    expect(determinePriority(20, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(44, 'info', 0)).toBe('fix_later');
-    expect(determinePriority(30, 'info', 0)).toBe('fix_later');
-  });
-
-  it('returns "fix_later" for low impactScore regardless of severity', () => {
-    // impactScore < 20 and not error → fix_later
-    expect(determinePriority(19, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(0, 'info', 0)).toBe('fix_later');
-    expect(determinePriority(10, 'warning', 0)).toBe('fix_later');
-  });
-
-  it('fix_now threshold is exactly 70 (not 69)', () => {
-    expect(determinePriority(69, 'warning', 0)).toBe('fix_soon');
-    expect(determinePriority(70, 'warning', 0)).toBe('fix_now');
-  });
-
-  it('fix_soon threshold is exactly 45 (not 44)', () => {
-    expect(determinePriority(44, 'warning', 0)).toBe('fix_later');
-    expect(determinePriority(45, 'warning', 0)).toBe('fix_soon');
   });
 });
 
@@ -479,6 +371,41 @@ describe('checkToRecType', () => {
 // ─── mapToProduct ─────────────────────────────────────────────────────────────
 
 describe('mapToProduct', () => {
+  // ── Checkout-guard contract ────────────────────────────────────────────────
+  // Every productType mapToProduct can EVER return must pass isProductType and
+  // carry the catalog price — otherwise the rec card renders a purchase CTA
+  // that fails at cart checkout (the exact pre-existing bug this pins shut).
+  // The Record<RecType, true> forces a typecheck failure when a new RecType is
+  // added, so this sweep can never silently go stale.
+  it('every returned productType passes isProductType at the catalog price (exhaustive over RecType)', () => {
+    const ALL_REC_TYPES: Record<RecType, true> = {
+      technical: true, content: true, content_refresh: true, schema: true,
+      metadata: true, performance: true, accessibility: true, strategy: true,
+      aeo: true, keyword_gap: true, topic_cluster: true, cannibalization: true,
+      local_visibility: true, local_service_gap: true,
+    };
+    const PAGE_COUNTS = [1, 4, 5, 9, 10, 100];
+    const PAGE_TYPES: Array<ContentGap['suggestedPageType']> = [
+      undefined, 'blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource',
+    ];
+    let purchasable = 0;
+    for (const recType of Object.keys(ALL_REC_TYPES) as RecType[]) {
+      for (const pageCount of PAGE_COUNTS) {
+        for (const pageType of PAGE_TYPES) {
+          const { productType, productPrice } = mapToProduct(recType, pageCount, pageType);
+          if (productType === undefined) {
+            expect(productPrice).toBeUndefined();
+            continue;
+          }
+          purchasable++;
+          expect(isProductType(productType), `${recType}/${pageCount}/${pageType} → ${productType} must be a real ProductType`).toBe(true);
+          expect(productPrice, `${recType}/${pageCount}/${pageType} → ${productType} price must match the catalog`).toBe(getProductConfig(productType as Parameters<typeof getProductConfig>[0])!.priceUsd);
+        }
+      }
+    }
+    expect(purchasable).toBeGreaterThan(0); // the sweep must exercise real products, not vacuously skip
+  });
+
   it('metadata with pageCount < 10 → fix_meta at $20', () => {
     const r = mapToProduct('metadata', 9);
     expect(r.productType).toBe('fix_meta');
@@ -520,28 +447,17 @@ describe('mapToProduct', () => {
     expect(mapToProduct('accessibility', 100)).toEqual({ productType: 'fix_alt', productPrice: 50 });
   });
 
-  it('aeo with pageCount < 5 → aeo_page_review at $99', () => {
-    const r = mapToProduct('aeo', 4);
-    expect(r.productType).toBe('aeo_page_review');
-    expect(r.productPrice).toBe(99);
+  // aeo/content_refresh deliberately have NO product: the values they used to
+  // return are not in the ProductType union / PRODUCT_MAP, so their CTAs failed
+  // isProductType at cart checkout. Re-add cases only with real PRODUCT_MAP entries.
+  it('aeo → empty object (no purchasable product in the catalog)', () => {
+    expect(mapToProduct('aeo', 4)).toEqual({});
+    expect(mapToProduct('aeo', 5)).toEqual({});
   });
 
-  it('aeo with pageCount >= 5 → aeo_site_review at $499', () => {
-    const r = mapToProduct('aeo', 5);
-    expect(r.productType).toBe('aeo_site_review');
-    expect(r.productPrice).toBe(499);
-  });
-
-  it('content_refresh with pageCount < 5 → content_refresh at $199', () => {
-    const r = mapToProduct('content_refresh', 3);
-    expect(r.productType).toBe('content_refresh');
-    expect(r.productPrice).toBe(199);
-  });
-
-  it('content_refresh with pageCount >= 5 → content_refresh_5 at $799', () => {
-    const r = mapToProduct('content_refresh', 5);
-    expect(r.productType).toBe('content_refresh_5');
-    expect(r.productPrice).toBe(799);
+  it('content_refresh → empty object (no purchasable product in the catalog)', () => {
+    expect(mapToProduct('content_refresh', 3)).toEqual({});
+    expect(mapToProduct('content_refresh', 5)).toEqual({});
   });
 
   it('technical → empty object (no product)', () => {
@@ -549,8 +465,20 @@ describe('mapToProduct', () => {
     expect(mapToProduct('technical', 50)).toEqual({});
   });
 
-  it('content → empty object (no product)', () => {
-    expect(mapToProduct('content', 10)).toEqual({});
+  // D2 (audit #11): content recs map to the existing brief-purchase products so the
+  // client CTA routes into the brief-purchase flow instead of dead-ending with no product.
+  it('content → brief product keyed by suggested page type (prices mirror PRODUCT_MAP)', () => {
+    expect(mapToProduct('content', 1, 'blog')).toEqual({ productType: 'brief_blog', productPrice: 125 });
+    expect(mapToProduct('content', 1, 'landing')).toEqual({ productType: 'brief_landing', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'service')).toEqual({ productType: 'brief_service', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'location')).toEqual({ productType: 'brief_location', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'product')).toEqual({ productType: 'brief_product', productPrice: 150 });
+    expect(mapToProduct('content', 1, 'pillar')).toEqual({ productType: 'brief_pillar', productPrice: 200 });
+    expect(mapToProduct('content', 1, 'resource')).toEqual({ productType: 'brief_resource', productPrice: 150 });
+  });
+
+  it('content without a page type → brief_blog default', () => {
+    expect(mapToProduct('content', 10)).toEqual({ productType: 'brief_blog', productPrice: 125 });
   });
 
   it('performance → empty object (no product)', () => {
@@ -562,10 +490,6 @@ describe('mapToProduct', () => {
     expect(mapToProduct('metadata', 10).productType).toBe('fix_meta_10');
   });
 
-  it('aeo threshold is exactly 5 (not 4)', () => {
-    expect(mapToProduct('aeo', 4).productType).toBe('aeo_page_review');
-    expect(mapToProduct('aeo', 5).productType).toBe('aeo_site_review');
-  });
 });
 
 // ─── auditInsight ─────────────────────────────────────────────────────────────

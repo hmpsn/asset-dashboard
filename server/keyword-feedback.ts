@@ -67,6 +67,12 @@ const stmts = createStmtCache(() => ({
   listAll: db.prepare<[workspaceId: string]>(
     'SELECT keyword, status, reason, source, declined_by, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC',
   ),
+  listAllPaged: db.prepare<[workspaceId: string, limit: number, offset: number]>(
+    'SELECT keyword, status, reason, source, declined_by, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?',
+  ),
+  countAll: db.prepare<[workspaceId: string]>(
+    'SELECT COALESCE(COUNT(*), 0) AS cnt FROM keyword_feedback WHERE workspace_id = ?',
+  ),
   upsert: db.prepare<[
     workspaceId: string,
     keyword: string,
@@ -97,6 +103,24 @@ const stmts = createStmtCache(() => ({
 function toStatus(value: string): KeywordFeedbackStatus {
   if (value === 'approved' || value === 'declined' || value === 'requested') return value;
   return 'requested';
+}
+
+/**
+ * Wave 3d-i ADDITIVE provenance: when a keyword is approved from a content_gap /
+ * keyword_gap surface, the approved keyword IS the gap's target_keyword
+ * (content_gaps PK = (workspace_id, target_keyword)). Record the content-addressed
+ * pointer keywordComparisonKey(displayKeyword) so the tracked keyword carries a
+ * stable back-reference to the gap it came from. Returns undefined for any other
+ * (or absent) feedback source — provenance is only meaningful for gap surfaces.
+ */
+function sourceGapKeyForFeedback(
+  source: KeywordFeedbackSource | null | undefined,
+  displayKeyword: string,
+): string | undefined {
+  if (source === 'content_gap' || source === 'keyword_gap') {
+    return keywordComparisonKey(displayKeyword) || undefined;
+  }
+  return undefined;
 }
 
 function toSource(value: string | null): KeywordFeedbackSource | null {
@@ -153,6 +177,31 @@ export function listPublicKeywordFeedback(workspaceId: string): KeywordFeedbackL
   return rows.map(toKeywordFeedbackListRow);
 }
 
+export interface ListPublicKeywordFeedbackPagedResult {
+  items: KeywordFeedbackListRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export function listPublicKeywordFeedbackPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListPublicKeywordFeedbackPagedResult {
+  const countRow = stmts().countAll.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().listAllPaged.all(workspaceId, limit, offset) as KeywordFeedbackDbRow[];
+  return {
+    items: rows.map(toKeywordFeedbackListRow),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
+}
+
 export function saveKeywordFeedback(input: SaveKeywordFeedbackInput): {
   response: KeywordFeedbackMutationResponse;
   trackedKeyword: string | null;
@@ -168,6 +217,7 @@ export function saveKeywordFeedback(input: SaveKeywordFeedbackInput): {
   if (input.status === 'approved') {
     addTrackedKeyword(input.workspaceId, displayKeyword, {
       source: trackedKeywordSourceForFeedback(source ?? undefined),
+      sourceGapKey: sourceGapKeyForFeedback(source, displayKeyword),
     });
   }
 
@@ -202,9 +252,13 @@ export function saveBulkKeywordFeedback(input: SaveBulkKeywordFeedbackInput): {
       stmts().upsert.run(input.workspaceId, keyword, item.status, reason, source, declinedBy);
 
       if (item.status === 'approved') {
+        const displayKeyword = item.keyword.trim();
         trackedEntries.push({
-          query: item.keyword.trim(),
-          options: { source: trackedKeywordSourceForFeedback(source ?? undefined) },
+          query: displayKeyword,
+          options: {
+            source: trackedKeywordSourceForFeedback(source ?? undefined),
+            sourceGapKey: sourceGapKeyForFeedback(source, displayKeyword),
+          },
         });
       }
     }
@@ -214,7 +268,7 @@ export function saveBulkKeywordFeedback(input: SaveBulkKeywordFeedbackInput): {
     }
   });
 
-  insert(input.keywords);
+  insert.immediate(input.keywords);
 
   return {
     response: { updated: input.keywords.length },

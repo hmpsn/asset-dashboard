@@ -24,22 +24,13 @@ import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
 import { toInsightPageId } from './helpers.js';
+import { capitalizeWord } from './utils/strings.js';
 const log = createLogger('insight-enrichment');
 
 // ── Pure utility functions ────────────────────────────────────────────────────
 
-/** Known acronyms that should be fully uppercased in title-cased text. */
-const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
-
 /** GA4/GSC placeholder values that should be treated as empty (no real title). */
 const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
-
-/** Title-case a single word, uppercasing known acronyms. */
-function titleCaseWord(word: string): string {
-  return ACRONYMS.has(word.toLowerCase())
-    ? word.toUpperCase()
-    : word.charAt(0).toUpperCase() + word.slice(1);
-}
 
 /**
  * Converts a URL path or full URL into a human-readable title.
@@ -73,7 +64,7 @@ export function cleanSlugToTitle(urlOrPath: string): string {
   return slug
     .replace(/[-_]/g, ' ')
     .split(' ')
-    .map(titleCaseWord)
+    .map(word => capitalizeWord(word))
     .join(' ');
 }
 
@@ -94,6 +85,7 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'emerging_keyword',
     'competitor_alert',
     'freshness_alert',
+    'local_visibility_shift',
   ];
 
   const trafficTypes: InsightType[] = [
@@ -181,7 +173,7 @@ export function resolvePageTitle(
     }
     // For non-URL prefixes (cannibalization::, cluster::), use the right part as a readable label
     if (right) {
-      return right.split(/\s+/).map(titleCaseWord).join(' ');
+      return right.split(/\s+/).map(word => capitalizeWord(word)).join(' ');
     }
   }
 

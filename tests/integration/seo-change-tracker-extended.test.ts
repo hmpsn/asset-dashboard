@@ -9,13 +9,12 @@
  *   - Response shape contracts (changes array items have expected fields)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { recordSeoChange } from '../../server/seo-change-tracker.js';
 import db from '../../server/db/index.js';
 
-const PORT = 13560;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let wsA = '';

@@ -207,10 +207,11 @@ async function handleOptimizedFile(
   // Clean up queue ID cache
   queueIdCache.delete(key);
 
-  // Upload to Webflow if workspace has a site configured (case-insensitive match)
+  // Upload to Webflow if workspace has a site configured (case-insensitive folder
+  // match — no index helper for a lowercased folder comparison).
   const workspaces = listWorkspaces();
   const wsLower = workspaceFolder.toLowerCase();
-  const ws = workspaces.find(w => w.folder.toLowerCase() === wsLower);
+  const ws = workspaces.find(w => w.folder.toLowerCase() === wsLower); // list-workspaces-find-ok: case-insensitive folder match has no index helper
 
   if (ws?.webflowSiteId) {
     try {

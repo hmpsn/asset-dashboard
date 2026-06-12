@@ -1,6 +1,5 @@
 // src/components/client/BrandTab.tsx
 // Client portal Brand tab — editable business profile + read-only brand positioning.
-// Feature-flagged: 'client-brand-section'
 // Design rules: no purple, teal for CTAs, SectionCard for all panels.
 
 import { useState, useEffect } from 'react';

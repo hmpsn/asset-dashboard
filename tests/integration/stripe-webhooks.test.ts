@@ -137,6 +137,7 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
         productType: 'plan_growth',
       },
       amount_total: 24900,
+      subscription: 'sub_test_upgrade_growth',
     });
 
     await handleWebhookEvent(event as never);
@@ -164,6 +165,7 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
         productType: 'plan_premium',
       },
       amount_total: 99900,
+      subscription: 'sub_test_upgrade_premium',
     });
 
     await handleWebhookEvent(event as never);

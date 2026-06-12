@@ -13,6 +13,7 @@ import type {
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
   WorkspaceInfo,
 } from './types';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 interface SearchInsights {
   lowHanging: { query: string; position: number; impressions: number; clicks: number; ctr: number }[];
@@ -32,6 +33,7 @@ interface PerformanceTabProps {
   rankHistory: { date: string; positions: Record<string, number> }[];
   latestRanks: { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[];
   insights: SearchInsights | null;
+  searchDataUpdatedAt?: number | null;
   // Analytics props
   ga4Overview: GA4Overview | null;
   ga4Comparison: GA4Comparison | null;
@@ -44,9 +46,11 @@ interface PerformanceTabProps {
   ga4NewVsReturning: GA4NewVsReturning[] | null;
   ga4Conversions: GA4ConversionSummary[];
   ga4Events: GA4Event[];
+  ga4DataUpdatedAt?: number | null;
   ws: WorkspaceInfo;
   tier: 'free' | 'growth' | 'premium';
   days: number;
+  dateRange?: AnalyticsDateRange;
   // Which sub-tab to start on
   initialSubTab?: 'search' | 'analytics';
 }
@@ -131,6 +135,9 @@ export function PerformanceTab(props: PerformanceTabProps) {
           rankHistory={props.rankHistory}
           latestRanks={props.latestRanks}
           insights={props.insights}
+          dataUpdatedAt={props.searchDataUpdatedAt}
+          workspaceId={props.ws.id}
+          tier={props.tier}
         />
       )}
 
@@ -147,8 +154,10 @@ export function PerformanceTab(props: PerformanceTabProps) {
           ga4NewVsReturning={props.ga4NewVsReturning}
           ga4Conversions={props.ga4Conversions}
           ga4Events={props.ga4Events}
+          dataUpdatedAt={props.ga4DataUpdatedAt}
           ws={props.ws}
           days={props.days}
+          dateRange={props.dateRange}
         />
       )}
     </>

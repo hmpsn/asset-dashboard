@@ -1,6 +1,5 @@
 import {
   getLatestSnapshotRanks,
-  getTrackedKeywords,
   updateTrackedKeywords,
   type RankEntry,
 } from './rank-tracking.js';
@@ -10,6 +9,8 @@ import {
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
+import { listTrackedKeywordRows } from './tracked-keywords-store.js';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.js';
 
 export interface StrategyRankTrackingTarget {
@@ -38,7 +39,9 @@ export interface StrategyRankTrackingChangeSet {
 
 export interface ReconcileStrategyRankTrackingOptions {
   workspaceId: string;
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'siteKeywordMetrics' | 'generatedAt'>;
+  // siteKeywordMetrics is no longer read off the blob (Wave 3b-ii strip) — the
+  // reconcile join resolves volume/difficulty from the site_keyword_metrics table.
+  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'generatedAt'>;
   pageMap: PageKeywordMap[];
   generatedAt?: string;
 }
@@ -47,21 +50,49 @@ function normalizeQuery(query: string | undefined): string {
   return keywordComparisonKey(query);
 }
 
+/**
+ * Wave 3d-ii: ownership is read from the decoupled `strategyOwned` flag, NOT the
+ * `source` enum. Only reconcile sets strategyOwned===true, and only a strategy
+ * target establishes it — so a client-approved page_map/topic_cluster keyword (now
+ * kept as CLIENT_REQUESTED, strategyOwned undefined) is no longer mistaken for a
+ * strategy-owned keyword and force-deprecated. `false`/`undefined` are NOT owned.
+ */
 function isStrategyOwned(keyword: TrackedKeyword): boolean {
-  return keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
-    || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
+  return keyword.strategyOwned === true;
+}
+
+/**
+ * Belt-and-suspenders protection guard for the auto-deprecation branch. Even when
+ * strategyOwned===true, NEVER deprecate a pinned / client-requested / manual /
+ * gap-provenanced keyword. The strategyOwned gate should already exclude these
+ * (reconcile never sets strategyOwned on a client/gap approval), but this is the
+ * second lock: client-requested data must survive every reconcile.
+ */
+function isProtected(keyword: TrackedKeyword): boolean {
+  return Boolean(keyword.pinned)
+    || keyword.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED
+    || keyword.source === TRACKED_KEYWORD_SOURCE.MANUAL
+    || Boolean(keyword.sourceGapKey);
 }
 
 export function hasStrategyOwnedTrackedKeywords(workspaceId: string): boolean {
-  return getTrackedKeywords(workspaceId, { includeInactive: true }).some(isStrategyOwned);
+  // listTrackedKeywordRows (admin/table shape) carries strategyOwned — getTrackedKeywords
+  // STRIPS it, so reading it there would always see undefined → always false.
+  return listTrackedKeywordRows(workspaceId).some(isStrategyOwned);
 }
 
 function buildTargets(
+  workspaceId: string,
   keywordStrategy: ReconcileStrategyRankTrackingOptions['keywordStrategy'],
   pageMap: PageKeywordMap[],
 ): { targets: Map<string, StrategyRankTrackingTarget>; skipped: StrategyRankTrackingChangeSet['skipped'] } {
   const targets = new Map<string, StrategyRankTrackingTarget>();
   const skipped: StrategyRankTrackingChangeSet['skipped'] = [];
+
+  // #19b table-as-truth (Wave 3b-ii strip): join from the site_keyword_metrics
+  // table, the sole store. The volume/difficulty baseline keeps attaching to
+  // STRATEGY_SITE_KEYWORD targets through the table.
+  const siteKeywordMetrics = resolveSiteKeywordMetrics(workspaceId);
 
   for (const keyword of keywordStrategy.siteKeywords ?? []) {
     const query = normalizeQuery(keyword);
@@ -69,7 +100,7 @@ function buildTargets(
       skipped.push({ query: keyword, reason: 'blank_site_keyword' });
       continue;
     }
-    const metrics = keywordStrategy.siteKeywordMetrics?.find(metric => normalizeQuery(metric.keyword) === query);
+    const metrics = siteKeywordMetrics.find(metric => normalizeQuery(metric.keyword) === query);
     targets.set(query, {
       query: keyword.trim(),
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
@@ -109,13 +140,20 @@ function mergeTarget(
   latestRank?: RankEntry,
 ): TrackedKeyword {
   const existingSource = existing.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
-  const shouldAdoptStrategySource = isStrategyOwned(existing);
   const isSiteKeyword = target.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
   return {
     ...existing,
     query: existing.query,
     pinned: existing.pinned,
-    source: shouldAdoptStrategySource ? target.source : existingSource,
+    // Wave 3d-ii STOP LAUNDERING: ownership is now carried by strategyOwned, NOT by
+    // overwriting the source enum. Only adopt the strategy source when the existing
+    // source is UNKNOWN (genuinely unprovenance'd) — a client-requested / gap / manual
+    // keyword that is ALSO a current target KEEPS its real source (and stays protected)
+    // while still being marked strategyOwned below.
+    source: existingSource === TRACKED_KEYWORD_SOURCE.UNKNOWN ? target.source : existingSource,
+    // This keyword matches a current strategy target → reconcile OWNS its lifecycle.
+    // Reconcile is the sole writer of strategyOwned=true.
+    strategyOwned: true,
     status: TRACKED_KEYWORD_STATUS.ACTIVE,
     // Site-level strategy keywords intentionally clear page ownership. Page
     // targets preserve existing context if the incoming target is sparse.
@@ -139,7 +177,7 @@ export function reconcileStrategyRankTracking(
   options: ReconcileStrategyRankTrackingOptions,
 ): StrategyRankTrackingChangeSet {
   const generatedAt = options.generatedAt ?? options.keywordStrategy.generatedAt ?? new Date().toISOString();
-  const { targets, skipped } = buildTargets(options.keywordStrategy, options.pageMap);
+  const { targets, skipped } = buildTargets(options.workspaceId, options.keywordStrategy, options.pageMap);
   const targetsByPage = new Map<string, StrategyRankTrackingTarget>();
   for (const target of targets.values()) {
     if (target.pagePath && !targetsByPage.has(target.pagePath)) targetsByPage.set(target.pagePath, target);
@@ -182,7 +220,11 @@ export function reconcileStrategyRankTracking(
         continue;
       }
 
-      if (isStrategyOwned(existing) && !existing.pinned) {
+      // Wave 3d-ii: deprecate ONLY strategy-owned keywords (strategyOwned===true)
+      // that are not protected. `!existing.pinned` is now subsumed by isProtected,
+      // but kept explicit as the primary lock; isProtected adds the client/manual/gap
+      // belt-and-suspenders so client-requested data can never be auto-deprecated.
+      if (isStrategyOwned(existing) && !existing.pinned && !isProtected(existing)) {
         const replacement = existing.pagePath ? targetsByPage.get(existing.pagePath) : undefined;
         const removed: TrackedKeyword = {
           ...existing,
@@ -208,6 +250,9 @@ export function reconcileStrategyRankTracking(
         pinned: false,
         addedAt: generatedAt,
         source: target.source,
+        // Wave 3d-ii: a keyword newly added FROM a current strategy target is owned by
+        // reconcile. Reconcile is the sole writer of strategyOwned=true.
+        strategyOwned: true,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
         pagePath: target.pagePath,
         pageTitle: target.pageTitle,

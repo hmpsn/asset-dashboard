@@ -1,27 +1,21 @@
 import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
+import { cancelJob, createJob } from '../../server/jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import db from '../../server/db/index.js';
 
-process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
-
-const ctx = createTestContext(13361); // port-ok: next free after 13360
-const { api, postJson } = ctx;
+const ctx = createEphemeralTestContext(import.meta.url);
+const { api, postJson, del } = ctx;
 
 let workspaceId = '';
 let otherWorkspaceId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
   const ws = createWorkspace('Local SEO Route Test Dental');
   workspaceId = ws.id;
   otherWorkspaceId = createWorkspace('Other Local SEO Route Test Dental').id;
@@ -44,11 +38,6 @@ beforeAll(async () => {
 afterAll(async () => {
   deleteWorkspace(workspaceId);
   deleteWorkspace(otherWorkspaceId);
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
   await ctx.stopServer();
 });
 
@@ -138,41 +127,18 @@ describe('Local SEO routes', () => {
     expect(['matched', 'ambiguous', 'not_found', 'provider_unavailable', 'provider_failed']).toContain(body.status);
   });
 
-  it('redacts local SEO state and rejects writes while the feature flag is disabled', async () => {
-    await api('/api/admin/feature-flags/local-seo-visibility', {
+  it('keeps local SEO reads and writes available without a feature-flag precondition', async () => {
+    const read = await api(`/api/local-seo/${workspaceId}`);
+    expect(read.status).toBe(200);
+    const readBody = await read.json();
+    expect(readBody.featureEnabled).toBe(true);
+
+    const write = await api(`/api/local-seo/${workspaceId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: false }),
+      body: JSON.stringify({ posture: 'local' }),
     });
-    try {
-      const read = await api(`/api/local-seo/${workspaceId}`);
-      expect(read.status).toBe(200);
-      const readBody = await read.json();
-      expect(readBody).toEqual(expect.objectContaining({
-        featureEnabled: false,
-        markets: [],
-        suggestedMarkets: [],
-        latestSnapshots: [],
-      }));
-      expect(readBody.report).toEqual(expect.objectContaining({
-        setupState: 'feature_disabled',
-        activeMarketCount: 0,
-        checkedKeywordCount: 0,
-      }));
-
-      const write = await api(`/api/local-seo/${workspaceId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posture: 'local' }),
-      });
-      expect(write.status).toBe(403);
-    } finally {
-      await api('/api/admin/feature-flags/local-seo-visibility', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: true }),
-      });
-    }
+    expect(write.status).toBe(200);
   });
 
   it('PUT preserves existing market provider identity and status when fields are omitted', async () => {
@@ -273,6 +239,14 @@ describe('Local SEO routes', () => {
   it('POST refresh starts a capped background job from local-intent keywords', async () => {
     const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
       marketIds: ['missing-market'],
+      thenRegenerateStrategy: true,
+      strategyGeneration: {
+        businessContext: 'Route-level local strategy chain coverage',
+        seoDataMode: 'full',
+        seoDataProvider: 'dataforseo',
+        competitorDomains: ['competitor.example'],
+        maxPages: 12,
+      },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -281,6 +255,44 @@ describe('Local SEO routes', () => {
     expect(body.selectedMarketCount).toBe(0);
     expect(body.selectedKeywordCount).toBeGreaterThan(0);
     expect(body.selectedKeywordCount).toBeLessThanOrEqual(50);
+    await del(`/api/jobs/${body.jobId}`);
+  });
+
+  it('POST refresh rejects invalid request bodies before creating a job', async () => {
+    const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
+      device: 'tablet',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST refresh returns 404 for an unknown workspace', async () => {
+    const res = await postJson('/api/local-seo/does-not-exist-workspace/refresh', {
+      keywords: ['Austin Dentist'],
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Workspace not found');
+  });
+
+  it('POST refresh returns the active job id when a workspace refresh is already running', async () => {
+    const activeJob = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      workspaceId,
+      message: 'already refreshing',
+    });
+    try {
+      const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
+        keywords: ['Austin Dentist'],
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body).toEqual(expect.objectContaining({
+        error: 'Local SEO refresh is already running for this workspace',
+        jobId: activeJob.id,
+      }));
+    } finally {
+      cancelJob(activeJob.id);
+      await del(`/api/jobs/${activeJob.id}`);
+    }
   });
 
   it('allows replacing a market while already at the active market cap', async () => {

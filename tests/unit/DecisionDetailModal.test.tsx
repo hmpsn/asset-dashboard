@@ -100,8 +100,15 @@ function renderInternalLinkModal() {
 describe('DecisionDetailModal', () => {
   it('renders dialog with title', () => {
     renderModal();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'SEO Editor — 3 pages' })).toBeInTheDocument();
     expect(screen.getByText('SEO Editor — 3 pages')).toBeInTheDocument();
+  });
+
+  it('exposes dialog semantics for assistive tech', () => {
+    renderModal();
+    const dialog = screen.getByRole('dialog', { name: 'SEO Editor — 3 pages' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'decision-modal-title');
   });
 
   it('renders all batch items', () => {

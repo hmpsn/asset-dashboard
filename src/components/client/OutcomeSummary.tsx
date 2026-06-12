@@ -4,7 +4,6 @@
 import { ArrowUp, ArrowDown, Minus, BarChart3, CheckCircle2, Clock, Trophy } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, StatCard } from '../ui';
 import { Icon } from '../ui/Icon';
-import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeSummary } from '../../hooks/client/useClientOutcomes';
 // scoreColor helpers used locally via winRateColor()
@@ -200,19 +199,21 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
 // --- Main component -----------------------------------------------------
 
 export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProps) {
-  const { data: scorecard, isLoading } = useClientOutcomeSummary(workspaceId);
+  const { data, isLoading } = useClientOutcomeSummary(workspaceId);
+  // A scorecard with nothing scored yet renders as a wall of 0% — that reads as
+  // failure, not "too early". Treat it the same as no data: show the empty state.
+  const scorecard = data && data.totalScored > 0 ? data : null;
 
   return (
-    <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard
-        title="Your results"
-        titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
-        action={
-          <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
-            <Icon as={Clock} size="sm" /> Measured over 90 days
-          </span>
-        }
-      >
+    <SectionCard
+      title="Your results"
+      titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
+      action={
+        <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
+          <Icon as={Clock} size="sm" /> Measured over 90 days
+        </span>
+      }
+    >
 
         {isLoading && (
           <div className="space-y-3">
@@ -226,7 +227,11 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
           <EmptyState
             icon={BarChart3}
             title="Results are on the way"
-            description="Once your first recommendations are measured, you'll see your outcomes here. Check back in 7–14 days."
+            description={
+              data && data.pendingMeasurement > 0
+                ? `${data.pendingMeasurement} ${data.pendingMeasurement === 1 ? 'action is' : 'actions are'} being measured right now. Results typically land within 7–14 days.`
+                : "Once your first recommendations are measured, you'll see your outcomes here. Check back in 7–14 days."
+            }
           />
         )}
 
@@ -274,7 +279,6 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
             )}
           </>
         )}
-      </SectionCard>
-    </FeatureFlag>
+    </SectionCard>
   );
 }

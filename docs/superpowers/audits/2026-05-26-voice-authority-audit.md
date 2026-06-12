@@ -9,7 +9,7 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 21
+- `correct`: 20
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 17
@@ -77,7 +77,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/routes/content-posts.ts` | correct | Uses `buildSystemPrompt()` for AI fix/rewrite paths. |
 | `server/routes/content-publish.ts` | documented-exception | Field mapping helper, not client prose. |
 | `server/routes/google.ts` | documented-exception | Google data chat/diagnostic helper, not client prose authority. |
-| `server/routes/jobs.ts` | correct | Bulk SEO fix path uses `buildSystemPrompt()`. |
+| `server/webflow-bulk-seo-fix-background-job.ts` | correct | Bulk SEO fix background job uses `buildSystemPrompt()`. |
 | `server/routes/public-analytics.ts` | documented-exception | Client advisor persona is agency-support voice, not the client's website brand voice. |
 | `server/routes/rewrite-chat.ts` | builder-backed | Uses page-assist builder and `buildSystemPrompt()`. |
 | `server/routes/webflow-keywords.ts` | builder-backed | Uses page-assist context for keyword analysis; no voice imitation needed. |

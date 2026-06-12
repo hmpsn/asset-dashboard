@@ -17,7 +17,7 @@ router.get('/api/backlinks/:workspaceId', requireWorkspaceAccess('workspaceId'),
 
   const provider = getBacklinksProvider(ws.seoDataProvider);
   if (!provider) {
-    return res.status(503).json({ error: 'No SEO data provider configured. Set SEMRUSH_API_KEY or DATAFORSEO_LOGIN to enable backlink data.' });
+    return res.status(503).json({ error: 'No SEO data provider configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD to enable backlink data.' });
   }
 
   // Derive domain from liveDomain or webflowSiteName

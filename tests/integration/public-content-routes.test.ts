@@ -10,15 +10,13 @@
  *   GET  /api/public/content-performance/:workspaceId — fresh → 200
  *   GET  /api/public/tracked-keywords/:workspaceId   — fresh → 200 { keywords: [] }
  *
- * Port: 13515 (exclusive to this file)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13515;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const UNKNOWN_ID = 'ws_pubcontent_unknown_zzz9999';
@@ -27,7 +25,7 @@ let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`PubContent Test ${PORT}`).id;
+  wsId = createWorkspace(`PubContent Test ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {
@@ -137,6 +135,23 @@ describe('POST /api/public/content-request/:workspaceId', () => {
     expect(typeof body.status).toBe('string');
   });
 
+  it('strips HTML from public plain-text content request fields before persisting', async () => {
+    const res = await postJson(`/api/public/content-request/${wsId}`, {
+      topic: '<strong>HTML Topic</strong>',
+      targetKeyword: '<em>html keyword</em>',
+      rationale: '<p>Needs cleanup</p>',
+      clientNote: '<a href="https://example.com">Client note</a>',
+      priority: 'medium',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    expect(body.topic).toBe('HTML Topic');
+    expect(body.targetKeyword).toBe('html keyword');
+    expect(body.rationale).toBe('Needs cleanup');
+    expect(body.clientNote).toBe('Client note');
+  });
+
   it('accepts optional fields without error', async () => {
     const res = await postJson(`/api/public/content-request/${wsId}`, {
       topic: 'Optional Fields Topic',
@@ -177,7 +192,7 @@ describe('GET /api/public/content-requests/:workspaceId', () => {
   });
 
   it('returns 200 with an array for a fresh workspace (may include previously created requests)', async () => {
-    const wsB = createWorkspace(`PubContent Requests Empty ${PORT}`);
+    const wsB = createWorkspace(`PubContent Requests Empty ${ctx.PORT}`);
     try {
       const res = await api(`/api/public/content-requests/${wsB.id}`);
       expect(res.status).toBe(200);
@@ -251,6 +266,21 @@ describe('POST /api/public/content-request/:workspaceId/submit', () => {
     expect(body.topic).toBe('Client Submitted Topic');
     expect(body.source).toBe('client');
   });
+
+  it('strips HTML from client-submitted request notes before persisting', async () => {
+    const res = await postJson(`/api/public/content-request/${wsId}/submit`, {
+      topic: '<strong>Client HTML Topic</strong>',
+      targetKeyword: '<em>client html keyword</em>',
+      notes: '<p>Plain client note</p>',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    expect(body.topic).toBe('Client HTML Topic');
+    expect(body.targetKeyword).toBe('client html keyword');
+    expect(body.rationale).toBe('Plain client note');
+    expect(body.clientNote).toBe('Plain client note');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,7 +318,7 @@ describe('GET /api/public/tracked-keywords/:workspaceId', () => {
   });
 
   it('returns 200 with empty keywords array for fresh workspace', async () => {
-    const wsC = createWorkspace(`PubContent Tracked ${PORT}`);
+    const wsC = createWorkspace(`PubContent Tracked ${ctx.PORT}`);
     try {
       const res = await api(`/api/public/tracked-keywords/${wsC.id}`);
       expect(res.status).toBe(200);

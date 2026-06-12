@@ -8,13 +8,12 @@
  * - POST /api/brandscript-templates with missing name → 400
  * - POST /api/brandscripts/:workspaceId with valid body → 201 with object
  *
- * Port: 13641 (unique — no other file uses this port).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13641); // port-ok: extending range to 13641
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let wsId = '';

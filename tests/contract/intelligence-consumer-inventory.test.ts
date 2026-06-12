@@ -26,6 +26,7 @@ const INVENTORY: Array<{
   { file: 'server/brandscript.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/content-brief.ts', classification: 'native', targetPath: 'content-builder' },
   { file: 'server/content-decay.ts', classification: 'native', targetPath: 'recommendation-builder' },
+  { file: 'server/content-posts-ai-jobs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/content-posts-ai.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/copy-generation.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/diagnostic-orchestrator.ts', classification: 'native', targetPath: 'chat-builder' },
@@ -36,9 +37,7 @@ const INVENTORY: Array<{
   { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/monthly-digest.ts', classification: 'native', targetPath: 'future-briefing-builder' },
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/routes/content-posts.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/routes/jobs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/public-analytics.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/rewrite-chat.ts', classification: 'native', targetPath: 'page-assist-builder' },
   { file: 'server/routes/webflow-keywords.ts', classification: 'native', targetPath: 'page-assist-builder' },
@@ -49,6 +48,8 @@ const INVENTORY: Array<{
   { file: 'server/routes/workspaces.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/seo-audit-ai-recs.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/voice-calibration.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/webflow-bulk-alt-background-job.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/webflow-bulk-seo-fix-background-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'page-assist-builder' },
 ];
@@ -70,7 +71,7 @@ function listTypeScriptFiles(dir: string): string[] {
 }
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
-  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
+  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildSeoPromptContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
   const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|generateAltText\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }
@@ -131,7 +132,17 @@ describe('intelligence consumer inventory', () => {
   it('keeps PR5 consumers on canonical intelligence builders instead of one-off prompt assembly', () => {
     const monthlyDigest = readFileSync(resolve(ROOT_DIR, 'server/monthly-digest.ts'), 'utf-8'); // readFile-ok — PR5 guard: monthly digest must stay on recommendation builder context.
     expect(monthlyDigest).toContain('buildRecommendationGenerationContext');
-    expect(monthlyDigest).not.toMatch(/getWorkspaceLearnings|formatLearningsForPrompt|getInsights\(/);
+    // G3 documented exception: the digest's DETERMINISTIC wins/resolved rollups need the
+    // full insight set, which the slice no longer carries post-cap (byType capped at 25,
+    // `all` at 100) — so a direct getInsights() read is allowed for the rollups ONLY.
+    // The AI prompt path must still go through the builder (asserted above), and the
+    // direct read must carry its inline intel-builder-ok rationale (asserted here).
+    expect(monthlyDigest).not.toMatch(/getWorkspaceLearnings|formatLearningsForPrompt/);
+    const getInsightsCalls = monthlyDigest.split('\n').filter(line => line.includes('getInsights('));
+    expect(getInsightsCalls.length).toBeGreaterThan(0); // the documented exception exists...
+    for (const line of getInsightsCalls) {
+      expect(line).toContain('// intel-builder-ok'); // ...and EVERY direct read carries its inline rationale.
+    }
 
     const aeoReview = readFileSync(resolve(ROOT_DIR, 'server/aeo-page-review.ts'), 'utf-8'); // readFile-ok — PR5 guard: AEO review uses one canonical formatted SEO context block.
     expect(aeoReview).toContain('buildIntelPrompt');
@@ -146,6 +157,18 @@ describe('intelligence consumer inventory', () => {
     const contentBrief = readFileSync(resolve(ROOT_DIR, 'server/content-brief.ts'), 'utf-8'); // readFile-ok — PR5 guard: content briefs use builder promptContext for SEO/voice/knowledge data.
     expect(contentBrief).toContain('buildContentGenerationContext');
     expect(contentBrief).not.toMatch(/formatKeywordsForPrompt|formatKnowledgeBaseForPrompt|formatPersonasForPrompt/);
+
+    for (const file of [
+      'server/content-posts-ai.ts',
+      'server/page-analysis-job.ts',
+      'server/routes/google.ts',
+      'server/routes/public-analytics.ts',
+      'server/webflow-seo-bulk-analyze-job.ts',
+    ]) {
+      const source = readFileSync(resolve(ROOT_DIR, file), 'utf-8'); // readFile-ok — SEO prompt builder guard: these consumers should stay on the shared seoContext/learnings/page-map builder.
+      expect(source).toContain('buildSeoPromptContext');
+      expect(source).not.toMatch(/formatForPrompt\(intel|formatPageMapForPrompt\(intel\.seoContext|buildWorkspaceIntelligence\(.*slices:\s*\['seoContext', 'learnings'/s);
+    }
   });
 
   it('keeps chat and page-assist consumers on dedicated context builders', () => {

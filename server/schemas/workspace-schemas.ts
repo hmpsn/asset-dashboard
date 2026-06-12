@@ -162,32 +162,6 @@ export const keywordStrategySchema = z.object({
     volume: z.number(),
     difficulty: z.number(),
   })).optional(),
-  topicClusters: z.array(z.object({
-    topic: z.string(),
-    keywords: z.array(z.string()),
-    ownedCount: z.number(),
-    totalCount: z.number(),
-    coveragePercent: z.number(),
-    avgPosition: z.number().optional(),
-    topCompetitor: z.string().optional(),
-    topCompetitorCoverage: z.number().optional(),
-    gap: z.array(z.string()),
-  }).passthrough()).optional(),
-  cannibalization: z.array(z.object({
-    keyword: z.string(),
-    pages: z.array(z.object({
-      path: z.string(),
-      position: z.number().optional(),
-      impressions: z.number().optional(),
-      clicks: z.number().optional(),
-      source: z.enum(['keyword_map', 'gsc']),
-    }).passthrough()),
-    severity: z.enum(['high', 'medium', 'low']),
-    recommendation: z.string(),
-    canonicalPath: z.string().optional(),
-    canonicalUrl: z.string().optional(),
-    action: z.enum(['canonical_tag', 'redirect_301', 'differentiate', 'noindex']).optional(),
-  }).passthrough()).optional(),
   generatedAt: z.string().optional(),
   seoDataStatus: z.object({
     mode: z.enum(['quick', 'full', 'none']),
@@ -196,6 +170,43 @@ export const keywordStrategySchema = z.object({
     reasons: z.array(z.string()).optional(),
     fallbackProviderAvailable: z.boolean().optional(),
   }).passthrough().optional(),
+}).passthrough();
+
+// strategy_history.strategy_json (migration 030, FK-rebuilt in 119) stores the
+// FULL prior KeywordStrategy blob spread with the five table-backed arrays that
+// the live blob strips (contentGaps/quickWins/keywordGaps/topicClusters/
+// cannibalization — see keyword-strategy-persistence.ts history INSERT). The
+// stored shape can be a SPARSE patch-built blob, so — like keywordStrategySchema
+// — EVERY field is .optional() and the object is .passthrough(); a too-strict
+// schema would silently return the fallback and break /diff + the refresh
+// summary (Schema-vs-stored-shape rule). Consumers only read siteKeywords +
+// contentGaps[].targetKeyword, but we keep the arrays passthrough so unrelated
+// item fields survive validation.
+export const strategyHistoryStrategySchema = keywordStrategySchema.extend({
+  contentGaps: z.array(z.object({
+    targetKeyword: z.string().optional(),
+  }).passthrough()).optional(),
+  quickWins: z.array(z.object({}).passthrough()).optional(),
+  keywordGaps: z.array(z.object({}).passthrough()).optional(),
+  topicClusters: z.array(z.object({}).passthrough()).optional(),
+  cannibalization: z.array(z.object({}).passthrough()).optional(),
+}).passthrough();
+
+export type StrategyHistoryStrategy = z.infer<typeof strategyHistoryStrategySchema>;
+
+// strategy_history.page_map_json stores the prior page_keywords snapshot. In
+// practice this is full PageKeywordMap rows (from listPageKeywords), but legacy /
+// manually-seeded history rows can be MINIMAL ({ pagePath, primaryKeyword } only)
+// — and both consumers (/diff + refresh summary) read only those two fields. Per
+// the Schema-vs-stored-shape rule the schema must reflect what is stored, not the
+// richest in-memory shape: a too-strict reuse of pageKeywordMapSchema (which
+// requires pageTitle + secondaryKeywords) would drop minimal rows and silently
+// break the page-map diff. So only the two consumed fields are required; the rest
+// passes through. parseJsonSafeArray validates each item individually so one
+// malformed row does not drop the whole snapshot.
+export const strategyHistoryPageMapSchema = z.object({
+  pagePath: z.string(),
+  primaryKeyword: z.string(),
 }).passthrough();
 
 // ── Personas ──
@@ -364,6 +375,9 @@ export const recommendationSchema = z.object({
   actionType: z.enum(['automated', 'manual', 'content_creation', 'purchase']),
   productType: z.string().optional(),
   productPrice: z.number().optional(),
+  // D2 (audit #11): content-gap recs carry their target keyword for publish-time
+  // resolution matching. Optional — absent on legacy rows and non-content recs.
+  targetKeyword: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed', 'dismissed']),
   assignedTo: z.enum(['team', 'client']).optional(),
   createdAt: z.string(),
@@ -384,8 +398,12 @@ export const recommendationSummarySchema = z.object({
   ongoing: z.number(),
   totalImpactScore: z.number(),
   trafficAtRisk: z.number(),
-  estimatedRecoverableClicks: z.number(),
-  estimatedRecoverableImpressions: z.number(),
+  totalOpportunityValue: z.number().optional(),
+  actionableOpportunityValue: z.number().optional(),
+  topOpportunityValue: z.number().optional(),
+  // Legacy persisted rows may still carry the pre-OV aggregate recovery fields.
+  estimatedRecoverableClicks: z.number().optional(),
+  estimatedRecoverableImpressions: z.number().optional(),
   topRecommendationId: z.string().nullable().optional(),
   // One-line rendered rationale for the #1 (from its opportunity.components, PR6).
   topOpportunityRationale: z.string().optional(),

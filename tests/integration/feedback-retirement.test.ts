@@ -9,11 +9,11 @@
  * whether a real item exists, because no route handler matches the path.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { setBroadcast } from '../../server/broadcast.js';
 
-const ctx = createTestContext(13352); // port-ok: verified free as of 2026-05-10; retirement test extends range to 13352
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

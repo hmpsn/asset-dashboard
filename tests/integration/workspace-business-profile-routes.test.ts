@@ -18,10 +18,10 @@
  *   numberOfEmployees?: string (max 50)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13618);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 let wsId = '';
 

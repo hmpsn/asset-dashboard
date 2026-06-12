@@ -5,6 +5,7 @@
  */
 
 import db from './db/index.js';
+import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('google-auth');
@@ -83,7 +84,7 @@ export function getGoogleCredentials(): { clientId: string; clientSecret: string
   return { clientId, clientSecret, redirectUri };
 }
 
-const GLOBAL_KEY = '_global';
+export const GLOBAL_KEY = '_global';
 
 export function getAuthUrl(siteId: string): string | null {
   const creds = getGoogleCredentials();
@@ -118,7 +119,14 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
   if (!creds) return { success: false, error: 'Google credentials not configured' };
 
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
+    const data = await googleJson<{
+      access_token: string;
+      refresh_token?: string;
+      expires_in: number;
+      scope: string;
+    }>({
+      endpoint: 'https://oauth2.googleapis.com/token',
+      source: 'google-oauth',
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -130,19 +138,6 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
       }),
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      log.error({ err: err }, 'Google token exchange failed');
-      return { success: false, error: `Token exchange failed: ${res.status}` };
-    }
-
-    const data = await res.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope: string;
-    };
-
     saveTokenForSite(siteId, {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
@@ -153,6 +148,12 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
     return { success: true };
   } catch (err) {
     log.error({ err: err }, 'Google token exchange error');
+    if (isGoogleProviderError(err) && typeof err.status === 'number') {
+      return { success: false, error: `Token exchange failed: ${err.status}` };
+    }
+    if (isGoogleProviderError(err) && err.cause instanceof Error) {
+      return { success: false, error: String(err.cause) };
+    }
     return { success: false, error: String(err) };
   }
 }
@@ -178,7 +179,12 @@ export async function getValidToken(siteId: string): Promise<string | null> {
   if (!creds) return null;
 
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
+    const data = await googleJson<{
+      access_token: string;
+      expires_in: number;
+    }>({
+      endpoint: 'https://oauth2.googleapis.com/token',
+      source: 'google-oauth',
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -188,13 +194,6 @@ export async function getValidToken(siteId: string): Promise<string | null> {
         grant_type: 'refresh_token',
       }),
     });
-
-    if (!res.ok) return null;
-
-    const data = await res.json() as {
-      access_token: string;
-      expires_in: number;
-    };
 
     saveTokenForSite(tokenOwnerSiteId, {
       ...tokens,
@@ -259,5 +258,3 @@ export function disconnectGlobal(): void {
 export async function getGlobalToken(): Promise<string | null> {
   return getValidToken(GLOBAL_KEY);
 }
-
-export { GLOBAL_KEY };

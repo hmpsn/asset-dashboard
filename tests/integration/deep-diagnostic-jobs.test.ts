@@ -3,22 +3,18 @@
  *
  * Tests:
  * - Validation: missing params → 400
- * - Feature flag gate: not enabled → 403
  * - Insight not found → 404
  * - Success: job + report created, response has jobId + reportId
- *
- * NOTE: Feature flags are toggled via the HTTP admin API (not direct module import)
- * so the server's module-level cache is properly invalidated.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAnomalyDigestInsight, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
 import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
 import { signToken } from '../../server/auth.js';
 
-const ctx = createTestContext(13261);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, setAuthToken, authApi } = ctx;
 
 const TEST_EMAIL = 'diag_owner@test.local';
@@ -26,14 +22,6 @@ let testUserId = '';
 let testWsId = '';
 let anomalyInsightId = '';
 let nonAnomalyInsightId = '';
-
-async function setFlag(enabled: boolean | null) {
-  await authApi('/api/admin/feature-flags/deep-diagnostics', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled }),
-  });
-}
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -81,7 +69,6 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
-  await setFlag(null); // restore default
   deleteWorkspace(testWsId);
   setAuthToken('');
   if (testUserId) deleteUser(testUserId);
@@ -89,13 +76,6 @@ afterAll(async () => {
 });
 
 describe('deep-diagnostic job — validation', () => {
-  it('GET /api/feature-flags shows deep-diagnostics key', async () => {
-    const res = await api('/api/feature-flags');
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect('deep-diagnostics' in body).toBe(true);
-  });
-
   it('POST /api/jobs with deep-diagnostic but missing params returns 400', async () => {
     const res = await postJson('/api/jobs', { type: 'deep-diagnostic', params: {} });
     expect(res.status).toBe(400);
@@ -103,19 +83,7 @@ describe('deep-diagnostic job — validation', () => {
     expect(body.error).toBe('workspaceId and insightId required');
   });
 
-  it('POST /api/jobs with deep-diagnostic when feature disabled returns 403', async () => {
-    await setFlag(false);
-    const res = await postJson('/api/jobs', {
-      type: 'deep-diagnostic',
-      params: { workspaceId: testWsId, insightId: anomalyInsightId },
-    });
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toBe('Deep diagnostics feature not enabled');
-  });
-
   it('POST /api/jobs with deep-diagnostic and unknown insightId returns 404', async () => {
-    await setFlag(true);
     const res = await postJson('/api/jobs', {
       type: 'deep-diagnostic',
       params: { workspaceId: testWsId, insightId: 'ins_nonexistent' },
@@ -126,7 +94,6 @@ describe('deep-diagnostic job — validation', () => {
   });
 
   it('POST /api/jobs with deep-diagnostic and non-anomaly insightId returns 400', async () => {
-    await setFlag(true);
     const res = await postJson('/api/jobs', {
       type: 'deep-diagnostic',
       params: { workspaceId: testWsId, insightId: nonAnomalyInsightId },
@@ -139,8 +106,6 @@ describe('deep-diagnostic job — validation', () => {
 
 describe('deep-diagnostic job — success', () => {
   it('POST /api/jobs with valid deep-diagnostic params creates job and report row', async () => {
-    await setFlag(true);
-
     const res = await postJson('/api/jobs', {
       type: 'deep-diagnostic',
       params: { workspaceId: testWsId, insightId: anomalyInsightId },
@@ -173,7 +138,6 @@ describe('deep-diagnostic job — success', () => {
 
 describe('deep-diagnostic job — cross-workspace isolation', () => {
   it('POST /api/jobs with insightId from workspace A using workspace B ID returns 404', async () => {
-    await setFlag(true);
     // anomalyInsightId belongs to testWsId — sending it with a different workspaceId must 404
     const secondWs = createWorkspace('Cross-Workspace Isolation Test');
     try {

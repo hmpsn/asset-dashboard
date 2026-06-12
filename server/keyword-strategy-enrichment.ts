@@ -1,13 +1,14 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './helpers.js';
-import { resolveWorkspaceLocationCode } from './local-seo.js';
+import { z } from 'zod';
+import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import {
-  callKeywordStrategyAI,
+  callNamedStrategyAI,
   type KeywordStrategyKeywordPool,
   type StrategyPageMapEntry,
   type StrategyContentGap,
@@ -15,7 +16,10 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
+import { computeKeywordValueScore, deriveValueIntent } from './scoring/keyword-value-score.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspace } from './workspaces.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
@@ -23,6 +27,28 @@ const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
 const URL_LEVEL_KEYWORD_PER_PAGE_LIMIT = 10;
 const URL_LEVEL_KEYWORD_CONCURRENCY = 3;
+const topicClusterItemSchema = z.object({
+  topic: z.string().trim().min(1),
+  keywords: z.array(z.string().trim().min(1)).min(3),
+});
+const topicClusterCandidateSchema = z.object({}).passthrough();
+const topicClusterAiOutputSchema = z.object({
+  clusters: z.array(topicClusterCandidateSchema).default([]),
+});
+
+export type TopicClusterAiOutput = z.infer<typeof topicClusterItemSchema>[];
+
+export function parseTopicClusterOutput(raw: string): TopicClusterAiOutput {
+  const parsed = parseJsonFallback<unknown>(raw, null);
+  const envelope = topicClusterAiOutputSchema.safeParse(parsed);
+  if (!envelope.success) throw new Error('AI topic clustering returned invalid JSON');
+  const clusters: TopicClusterAiOutput = [];
+  for (const cluster of envelope.data.clusters) {
+    const result = topicClusterItemSchema.safeParse(cluster);
+    if (result.success) clusters.push(result.data);
+  }
+  return clusters;
+}
 
 export interface KeywordStrategyTopicCluster {
   topic: string;
@@ -438,6 +464,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (domainHit) {
         cg.volume = domainHit.volume;
         cg.difficulty = domainHit.difficulty;
+        cg.cpc = domainHit.cpc;
         continue;
       }
       missingCgKws.push(cg.targetKeyword);
@@ -454,6 +481,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
             if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               cg.volume = m.volume;
               cg.difficulty = m.difficulty;
+              cg.cpc = m.cpc;
             }
           }
         }
@@ -567,20 +595,45 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // emvPerWeek), so it: (a) shares the OV/EMV basis (owner decision), (b) stays in the column's
   // existing 0..100 range, and (c) keeps the rec content_gap branch's grounded spine valid (it
   // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
-  // break the `opportunityScore/100` math). Flag-OFF keeps the legacy computeOpportunityScore
-  // (byte-identical).
+  // break the `opportunityScore/100` math).
+  //
+  // Phase 2 (keyword-value-scoring flag): build the base score ONCE at the top of the per-gap
+  // loop so all three computeOpportunityScore sites (spine input, OV fallback, P4-OFF write) use
+  // the same value. Flag-OFF keeps the legacy computeOpportunityScore (byte-identical regardless
+  // of the P4 / relaxConservatism state). ctx is built once per enrichment run, never per gap.
   if (strategy.contentGaps?.length) {
+    // Build ctx once per enrichment run — only when the flag is ON (avoids extra DB reads on the
+    // flag-OFF path, preserving byte-identity and perf).
+    const valueScoringOn = isFeatureEnabled('keyword-value-scoring', workspaceId);
+    const scoringCtx = valueScoringOn ? (() => {
+      const ws = getWorkspace(workspaceId);
+      return {
+        posture: getLocalSeoPosture(workspaceId),
+        markets: listLocalSeoMarkets(workspaceId),
+        city: ws?.businessProfile?.address?.city?.toLowerCase(),
+        state: ws?.businessProfile?.address?.state?.toLowerCase(),
+      };
+    })() : null;
+
     for (const cg of strategy.contentGaps) {
+      // base = value-first score when the flag is ON; legacy score when OFF.
+      // computeKeywordValueScore may return undefined (signal gate) — fall back to
+      // computeOpportunityScore in that case so a gap is never silently dropped.
+      const base: number | undefined = valueScoringOn && scoringCtx != null
+        ? (computeKeywordValueScore(
+            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
+            scoringCtx,
+          ) ?? computeOpportunityScore(cg))
+        : computeOpportunityScore(cg);
+
       if (relaxConservatism) {
         const ov = computeOpportunityValue({
           branch: 'content_gap',
-          opportunityScore: computeOpportunityScore(cg) ?? null, // grounded composite spine
+          opportunityScore: base ?? null, // grounded composite spine (was: computeOpportunityScore(cg))
           volume: cg.volume ?? null,
           difficulty: cg.difficulty ?? null,
           trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
-          intent: cg.intent === 'transactional' || cg.intent === 'commercial' || cg.intent === 'informational' || cg.intent === 'navigational'
-            ? cg.intent
-            : null,
+          intent: deriveValueIntent(cg.targetKeyword, cg.intent),
           llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,
         });
         // OV value is 0..100 and EMV-derived; undefined when the gap had no signal at all.
@@ -590,9 +643,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         // re-compression vs the flag-OFF magnitude basis. This is deliberate and safe: the value
         // stays in 0..100, ordering is preserved, and nothing breaks (the served tier/gain/badge
         // all share the one OV basis — Contract 3). Flag-OFF keeps the single-pass legacy score.
-        cg.opportunityScore = ov.value > 0 ? ov.value : computeOpportunityScore(cg);
+        cg.opportunityScore = ov.value > 0 ? ov.value : base; // was: computeOpportunityScore(cg)
       } else {
-        cg.opportunityScore = computeOpportunityScore(cg);
+        cg.opportunityScore = base; // was: computeOpportunityScore(cg)
       }
     }
     // Sort descending so highest-value gaps surface first in the UI
@@ -612,8 +665,13 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
     }
 
+    // GSC enrichment is optional: gscByQuery stays empty without a Search Console
+    // connection, so the detection loop below still runs on keyword-map duplicates
+    // alone (two pages assigned the same primaryKeyword). Previously the loop was
+    // nested inside this guard, making cannibalization dead code for non-GSC
+    // workspaces (2026-06-09 audit, strategy-keywords finding).
+    const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
     if (gscData.length > 0) {
-      const gscByQuery = new Map<string, Array<{ page: string; position: number; impressions: number; clicks: number }>>();
       for (const r of gscData) {
         const q = keywordComparisonKey(r.query);
         if (!gscByQuery.has(q)) gscByQuery.set(q, []);
@@ -633,7 +691,9 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
           }
         }
       }
+    }
 
+    {
       for (const [kw, pages] of kwPages) {
         if (pages.length < 2) continue;
         const gscQueryData = gscByQuery.get(kw);
@@ -681,7 +741,10 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         } else if (secondaryHasTraffic) {
           action = 'canonical_tag';
           recommendation = `Add <link rel="canonical" href="${canonicalUrl || canonicalPath}"> to ${otherPages.map(p => p.path).join(', ')}. This tells Google that ${canonicalPath} is the primary page for "${kw}" while preserving the secondary pages for users.`;
-        } else if (otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) {
+        } else if (gscData.length > 0 && otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) {
+          // The "no meaningful traffic" claim requires GSC evidence — without a GSC
+          // connection the absence of clicks is absence of DATA, not of traffic, so
+          // the no-GSC case falls through to the generic canonical recommendation.
           action = 'redirect_301';
           recommendation = `301 redirect ${otherPages.map(p => p.path).join(', ')} → ${canonicalPath}. The secondary page(s) have no meaningful traffic and are diluting ranking authority for "${kw}".`;
         } else {
@@ -726,13 +789,15 @@ ${businessSection}
 KEYWORD POOL (${poolForClustering.length} keywords with search volume):
 ${poolForClustering.join(', ')}
 
-Return JSON array:
-[
-  {
-    "topic": "Short descriptive topic name (2-4 words, specific to THIS business)",
-    "keywords": ["keyword1", "keyword2"]
-  }
-]
+Return a JSON object:
+{
+  "clusters": [
+    {
+      "topic": "Short descriptive topic name (2-4 words, specific to THIS business)",
+      "keywords": ["keyword1", "keyword2", "keyword3"]
+    }
+  ]
+}
 
 Rules:
 - Each cluster must represent a distinct business capability, service area, product category, or content pillar that THIS business actually serves
@@ -741,64 +806,59 @@ Rules:
 - Every keyword should appear in exactly ONE cluster. Skip keywords that don't fit any meaningful business topic
 - Clusters should have 3-15 keywords each
 - Order clusters by strategic importance to the business
-- Return ONLY valid JSON array, no markdown`;
+- Return ONLY a valid JSON object with a "clusters" array, no markdown`;
 
-      const clusterRaw = await callKeywordStrategyAI(workspaceId, [
+      const clusterRaw = await callNamedStrategyAI(workspaceId, 'keyword-topic-clusters', [
         { role: 'system', content: 'You are a topical authority analyst. Return valid JSON only.' },
         { role: 'user', content: clusterPrompt },
-      ], 2000, 'topic-clusters');
+      ], 2000);
 
-      const aiClusters = parseJsonFallback<Array<{ topic?: string; keywords?: string[] }> | null>(clusterRaw, null);
-      if (!Array.isArray(aiClusters)) throw new Error('AI topic clustering returned invalid JSON');
-      if (Array.isArray(aiClusters)) {
-        for (const cluster of aiClusters) {
-          if (!cluster.topic || !Array.isArray(cluster.keywords) || cluster.keywords.length < 3) continue;
+      const aiClusters = parseTopicClusterOutput(clusterRaw);
+      for (const cluster of aiClusters) {
+        const normalizedKws = cluster.keywords
+          .map((k: string) => keywordComparisonKey(k))
+          .filter((k: string) => keywordPool.has(k));
+        if (normalizedKws.length < 3) continue;
 
-          const normalizedKws = cluster.keywords
-            .map((k: string) => keywordComparisonKey(k))
-            .filter((k: string) => keywordPool.has(k));
-          if (normalizedKws.length < 3) continue;
+        const owned = normalizedKws.filter((k: string) =>
+          ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
+        );
+        const gap = normalizedKws.filter((k: string) => !owned.includes(k));
+        const coverage = Math.round((owned.length / normalizedKws.length) * 100);
 
-          const owned = normalizedKws.filter((k: string) =>
-            ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
-          );
-          const gap = normalizedKws.filter((k: string) => !owned.includes(k));
-          const coverage = Math.round((owned.length / normalizedKws.length) * 100);
-
-          let avgPos: number | undefined;
-          if (owned.length > 0) {
-            const positions = owned.map((k: string) => domainKeywords.find(d => keywordComparisonKey(d.keyword) === k)?.position).filter(Boolean) as number[];
-            if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
-          }
-
-          let topComp: string | undefined;
-          let topCompCov: number | undefined;
-          if (competitorKeywords.length > 0) {
-            const compCoverage = new Map<string, number>();
-            for (const ck of competitorKeywords) {
-              if (normalizedKws.includes(keywordComparisonKey(ck.keyword))) {
-                compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
-              }
-            }
-            const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
-            if (best && best[1] > owned.length) {
-              topComp = best[0];
-              topCompCov = Math.round((best[1] / normalizedKws.length) * 100);
-            }
-          }
-
-          topicClusters.push({
-            topic: cluster.topic,
-            keywords: normalizedKws,
-            ownedCount: owned.length,
-            totalCount: normalizedKws.length,
-            coveragePercent: coverage,
-            avgPosition: avgPos,
-            topCompetitor: topComp,
-            topCompetitorCoverage: topCompCov,
-            gap,
-          });
+        let avgPos: number | undefined;
+        if (owned.length > 0) {
+          const positions = owned.map((k: string) => domainKeywords.find(d => keywordComparisonKey(d.keyword) === k)?.position).filter(Boolean) as number[];
+          if (positions.length > 0) avgPos = Math.round(positions.reduce((s, p) => s + p, 0) / positions.length);
         }
+
+        let topComp: string | undefined;
+        let topCompCov: number | undefined;
+        if (competitorKeywords.length > 0) {
+          const compCoverage = new Map<string, number>();
+          for (const ck of competitorKeywords) {
+            if (normalizedKws.includes(keywordComparisonKey(ck.keyword))) {
+              compCoverage.set(ck.domain, (compCoverage.get(ck.domain) || 0) + 1);
+            }
+          }
+          const best = [...compCoverage.entries()].sort((a, b) => b[1] - a[1])[0];
+          if (best && best[1] > owned.length) {
+            topComp = best[0];
+            topCompCov = Math.round((best[1] / normalizedKws.length) * 100);
+          }
+        }
+
+        topicClusters.push({
+          topic: cluster.topic,
+          keywords: normalizedKws,
+          ownedCount: owned.length,
+          totalCount: normalizedKws.length,
+          coveragePercent: coverage,
+          avgPosition: avgPos,
+          topCompetitor: topComp,
+          topCompetitorCoverage: topCompCov,
+          gap,
+        });
       }
       if (topicClusters.length > 0) {
         topicClusters.sort((a, b) => a.coveragePercent - b.coveragePercent);

@@ -21,8 +21,10 @@ describe('SchemaSuggester generation workflow extraction', () => {
     expect(hook).toContain('useSchemaSnapshot(siteId, workspaceId)');
     expect(hook).toContain('/api/webflow/all-pages/');
     expect(hook).toContain('fetchAllPageOptions');
-    expect(hook).toContain("fixContext.targetRoute === 'seo-schema'");
-    expect(hook).toContain('generateSinglePage(fixContext.pageId!)');
+    expect(hook).toContain("fixContext?.targetRoute !== 'seo-schema'");
+    // The PI handoff sends pageSlug — the receiver resolves slug → pageId before triggering.
+    expect(hook).toContain('fixContext.pageSlug');
+    expect(hook).toContain('generateSinglePage(pageId)');
     expect(hook).toContain('lastPublishedAt: page.lastPublishedAt');
   });
 

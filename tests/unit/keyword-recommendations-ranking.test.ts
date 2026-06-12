@@ -126,7 +126,7 @@ const baseContext = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetWorkspace.mockReturnValue({ id: 'ws_test', seoDataProvider: 'semrush' });
+  mockGetWorkspace.mockReturnValue({ id: 'ws_test', seoDataProvider: 'dataforseo' });
   mockGetKeywordMetrics.mockResolvedValue([
     { keyword: 'emergency plumber austin', volume: 300, difficulty: 42, cpc: 18 },
   ]);
@@ -136,7 +136,7 @@ beforeEach(() => {
   mockGetRequestedKeywords.mockReturnValue([]);
   mockCheckKeywordCannibalization.mockReturnValue([]);
   mockGetQueryPageData.mockResolvedValue([]);
-  mockCallAI.mockResolvedValue({ text: '["emergency plumber austin"]' });
+  mockCallAI.mockResolvedValue({ text: '{"keywords":["emergency plumber austin"]}' });
 });
 
 describe('getKeywordRecommendations ranking behavior', () => {
@@ -145,7 +145,7 @@ describe('getKeywordRecommendations ranking behavior', () => {
       { keyword: '24 hour plumber austin', volume: 180, difficulty: 30, cpc: 16 },
       { keyword: 'plumber', volume: 8000, difficulty: 72, cpc: 12 },
     ]);
-    mockCallAI.mockResolvedValue({ text: '["24 hour plumber austin", "emergency plumber austin", "plumber"]' });
+    mockCallAI.mockResolvedValue({ text: '{"keywords":["24 hour plumber austin","emergency plumber austin","plumber"]}' });
 
     const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
     const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: true, includeReasoning: true });
@@ -154,6 +154,9 @@ describe('getKeywordRecommendations ranking behavior', () => {
       slices: ['seoContext', 'learnings', 'clientSignals'],
       learningsDomain: 'strategy',
       enrichWithBacklinks: true,
+    }));
+    expect(mockCallAI).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'keyword-recommendation-rank',
     }));
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(result.recommended).toBe('24 hour plumber austin');
@@ -191,9 +194,16 @@ describe('getKeywordRecommendations ranking behavior', () => {
 
   it('suppresses previously declined keyword recommendations', async () => {
     mockGetDeclinedKeywords.mockReturnValue(['cheap plumber austin']);
+    // The surviving candidate must win on RAW metrics (volume 2000 vs the
+    // seed's 300, matching cpc) so this test pins suppression ONLY. It
+    // previously relied on the outcome-learning difficulty multiplier
+    // (candidate's 35 → '21-40' bin → 0.65 boost AND seed's 42 → '41-60' bin
+    // → 0.35 penalty) to flip the order — A1 disabled that multiplier pending
+    // the position-bin vs KD-bin rebinning; the seam has its own dedicated
+    // tests in outcome-learning-pure.test.ts.
     mockGetRelatedKeywords.mockResolvedValue([
       { keyword: 'cheap plumber austin', volume: 600, difficulty: 20, cpc: 2 },
-      { keyword: 'best emergency plumber austin', volume: 140, difficulty: 35, cpc: 10 },
+      { keyword: 'best emergency plumber austin', volume: 2000, difficulty: 30, cpc: 18 },
     ]);
 
     const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
@@ -235,6 +245,36 @@ describe('getKeywordRecommendations ranking behavior', () => {
       { keyword: '24 hour plumber austin', volume: 220, difficulty: 28, cpc: 16 },
     ]);
     mockCallAI.mockRejectedValue(new Error('model unavailable'));
+
+    const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
+    const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: true });
+
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(result.recommended).toBe('24 hour plumber austin');
+  });
+
+  it('accepts fenced JSON object ranking output from the AI path', async () => {
+    mockGetRelatedKeywords.mockResolvedValue([
+      { keyword: '24 hour plumber austin', volume: 180, difficulty: 30, cpc: 16 },
+      { keyword: 'plumber', volume: 8000, difficulty: 72, cpc: 12 },
+    ]);
+    mockCallAI.mockResolvedValue({
+      text: '```json\n{"keywords":["24 hour plumber austin","emergency plumber austin","plumber"]}\n```',
+    });
+
+    const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
+    const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: true });
+
+    expect(result.recommended).toBe('24 hour plumber austin');
+  });
+
+  it('falls back to deterministic scoring when ranking JSON is parseable but invalid', async () => {
+    mockGetRequestedKeywords.mockReturnValue(['24 hour plumber austin']);
+    mockGetRelatedKeywords.mockResolvedValue([
+      { keyword: 'plumber', volume: 10000, difficulty: 70, cpc: 14 },
+      { keyword: '24 hour plumber austin', volume: 220, difficulty: 28, cpc: 16 },
+    ]);
+    mockCallAI.mockResolvedValue({ text: '{"items":["plumber"]}' });
 
     const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
     const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: true });

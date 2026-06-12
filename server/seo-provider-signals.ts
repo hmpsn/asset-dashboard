@@ -1,4 +1,4 @@
-// Provider-neutral keyword signal helpers used by SEMRush and DataForSEO flows.
+// Provider-neutral keyword signal helpers used by SEO provider flows.
 
 export type TrendDirection = 'rising' | 'declining' | 'stable';
 

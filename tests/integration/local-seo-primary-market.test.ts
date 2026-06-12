@@ -1,11 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { LocalSeoReadResponse } from '../../shared/types/local-seo.js';
 
-process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
-
-const ctx = createTestContext(13363); // port-ok: next free after 13362
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace;
@@ -22,11 +20,6 @@ async function readLocalSeo(): Promise<LocalSeoReadResponse> {
 describe('Local SEO primary market', () => {
   beforeAll(async () => {
     await ctx.startServer();
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
 
@@ -64,11 +57,6 @@ describe('Local SEO primary market', () => {
 
   afterAll(async () => {
     seeded.cleanup();
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
     await ctx.stopServer();
   });
 
@@ -155,26 +143,13 @@ describe('Local SEO primary market', () => {
     expect(localSeo.markets.find(market => market.id === market2Id)?.isPrimary).toBe(false);
   });
 
-  it('PUT /set-primary returns 403 while Local SEO visibility is disabled', async () => {
-    await api('/api/admin/feature-flags/local-seo-visibility', {
+  it('PUT /set-primary remains available without a feature-flag precondition', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: false }),
+      body: JSON.stringify({}),
     });
-    try {
-      const res = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      expect(res.status).toBe(403);
-    } finally {
-      await api('/api/admin/feature-flags/local-seo-visibility', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: true }),
-      });
-    }
+    expect(res.status).toBe(200);
   });
 
   it('PUT /set-primary with unknown marketId returns 404', async () => {
@@ -184,5 +159,82 @@ describe('Local SEO primary market', () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(404);
+  });
+
+  // ─── W2 review fix #7: orphaned-primary auto-promotion ───────────────────────
+  // Deactivating the PRIMARY market must not silently leave zero active primaries
+  // when another eligible active market exists — a successor is auto-promoted.
+
+  it('deactivating the primary auto-promotes another active market to primary', async () => {
+    // Reset to a known state: both markets active, market1 primary.
+    const reset = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'active' },
+          { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'active' },
+        ],
+      }),
+    });
+    expect(reset.status).toBe(200);
+    const setPrimary = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    expect(setPrimary.status).toBe(200);
+    expect((await readLocalSeo()).markets.find(m => m.id === market1Id)?.isPrimary).toBe(true);
+
+    // Deactivate the PRIMARY market (market1) — market2 stays active and eligible.
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'inactive' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    const after = await readLocalSeo();
+    const m1 = after.markets.find(m => m.id === market1Id);
+    const m2 = after.markets.find(m => m.id === market2Id);
+    // The deactivated primary is no longer primary; the surviving active market took over.
+    expect(m1?.isPrimary).toBe(false);
+    expect(m2?.isPrimary).toBe(true);
+    // Exactly one active primary remains.
+    expect(after.markets.filter(m => m.isPrimary).length).toBe(1);
+  });
+
+  it('deactivating ALL markets leaves zero primaries (no successor to promote)', async () => {
+    // Reactivate both first.
+    const reactivate = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'active' },
+          { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'active' },
+        ],
+      }),
+    });
+    expect(reactivate.status).toBe(200);
+
+    // Deactivate BOTH markets.
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'inactive' },
+          { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'inactive' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    const after = await readLocalSeo();
+    // No active market exists, so no promotion — zero primaries is the correct outcome.
+    expect(after.markets.filter(m => m.isPrimary).length).toBe(0);
   });
 });

@@ -16,7 +16,7 @@
  *   - GET /api/public/content-requests/:workspaceId
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { cleanSeedData } from '../global-setup.js';
 import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
@@ -27,7 +27,7 @@ import {
   getContentRequest,
 } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13273);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsAId = '';

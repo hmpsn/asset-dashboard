@@ -1,12 +1,10 @@
 /**
- * client_action dual-write mirror (PR-1b, DARK behind the flag).
+ * client_action dual-write mirror.
  *
  * At the client_action SEND seam (`createAdminClientAction` in client-actions-mutations.ts —
  * the single place all four producer routes funnel through: RedirectManager, InternalLinks,
- * AeoReview, ContentDecay), when the `unified-deliverables-broken-family` flag is ON we ALSO
- * mirror the freshly-created legacy `client_action` into the unified `client_deliverable`
- * model via the registered adapter + `upsertDeliverable`. Default off → this is a no-op (NO
- * production behavior change).
+ * AeoReview, ContentDecay), mirror the freshly-created legacy `client_action` into the unified
+ * `client_deliverable` model via the registered adapter + `upsertDeliverable`.
  *
  * Hooking ONE place (after the create) covers all four producer routes with one mirror call,
  * mirroring how PR-1a hooks the single `createBatch` seam.
@@ -17,21 +15,22 @@
  *
  * The mirror is best-effort and MUST NOT break the live legacy create: any failure is logged
  * and swallowed (the legacy action is already persisted + the client already notified by the
- * mutation helper). The flag being off makes this unreachable, so a dark bug can never reach
- * prod.
+ * mutation helper).
  *
  * sourceRef resolution: the redirect / internal_link sourceRefs key on the workspace's Webflow
  * siteId (a workspace maps to exactly one site), which the producers do NOT carry in the action
  * payload — so this seam resolves it from the workspace and passes it into the adapter input.
  * The adapter itself stays a leaf (types + store only); this non-leaf seam does the lookup.
  *
- * Leaf rule: imports the registry + the store + the flag reader + the workspace getter; not
- * imported back by them.
+ * Leaf rule: imports the registry + the store + the broadcast singleton + the workspace
+ * getter; not imported back by them. (No feature flag gates this mirror — it runs
+ * unconditionally on every send.)
  */
 import type { ClientAction } from '../../../shared/types/client-actions.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import { upsertDeliverable } from '../../client-deliverables.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 import { getWorkspace } from '../../workspaces.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import {
@@ -42,21 +41,15 @@ import { createLogger } from '../../logger.js';
 
 const log = createLogger('client-action-dual-write');
 
-/** The flag that gates the entire client_action dual-write. Default false (dark). */
-export const CLIENT_ACTION_FAMILY_FLAG = 'unified-deliverables-broken-family' as const;
-
 /**
- * Mirror a freshly-created client_action into `client_deliverable` IFF the flag is on.
- * Returns the mirrored deliverable, or null when the flag is off (no-op) or the mirror was
- * skipped/failed. Never throws — the live legacy create must not be affected.
+ * Mirror a freshly-created client_action into `client_deliverable`.
+ * Returns the mirrored deliverable, or null when the mirror was skipped/failed. Never throws —
+ * the live legacy create must not be affected.
  */
 export function mirrorClientActionToDeliverable(
   workspaceId: string,
   action: ClientAction,
 ): ClientDeliverable | null {
-  // Flag default false → dark no-op. The single gate for the whole machinery.
-  if (!isFeatureEnabled(CLIENT_ACTION_FAMILY_FLAG)) return null;
-
   try {
     const type = clientActionDeliverableType(action.sourceType);
     const adapter = getAdapter(type);
@@ -104,6 +97,18 @@ export function mirrorClientActionToDeliverable(
       { workspaceId, actionId: action.id, type, deliverableId: deliverable.id },
       'client action mirrored into client_deliverable (dual-write)',
     );
+    // The unified client Inbox renders from the deliverables query and subscribes to
+    // DELIVERABLE_SENT — required for new Decisions to appear live (Data Flow Rule #2).
+    // Own try/catch: a transport failure must not poison the mirror result.
+    try {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_SENT, {
+        deliverableId: deliverable.id,
+        type: deliverable.type,
+        status: deliverable.status,
+      });
+    } catch (broadcastErr) {
+      log.warn({ err: broadcastErr, workspaceId, deliverableId: deliverable.id }, 'DELIVERABLE_SENT broadcast failed (swallowed)');
+    }
     return deliverable;
   } catch (err) {
     // Best-effort: the legacy action is already persisted + the client notified. A mirror

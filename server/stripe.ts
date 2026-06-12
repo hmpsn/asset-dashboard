@@ -5,13 +5,17 @@ import {
   getPaymentBySession,
   listPaymentsBySession,
   getPaymentByPaymentIntent,
+  getCartItemsBySession,
   type PaymentRecord,
   type ProductType,
 } from './payments.js';
-import { getContentRequest, updateContentRequest } from './content-requests.js';
+import { getContentRequest, updateContentRequest, deleteContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
-import { getWorkspace, updateWorkspace } from './workspaces.js';
+import { getWorkspace, updateWorkspace, computeEffectiveTier } from './workspaces.js';
+import { createContentRequest } from './content-requests.js';
+import { type ContentCartContext } from '../shared/types/payments.js';
+import { PREMIUM_CONTENT_DISCOUNT } from '../shared/pricing.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
@@ -24,6 +28,7 @@ import {
 import { CONTENT_SUB_PLANS, type ContentSubscription } from '../shared/types/content.js';
 import { WS_EVENTS } from './ws-events.js';
 import { isProgrammingError } from './errors.js';
+import { normalizeFixCart } from './payments/fix-bundle-pricing.js';
 
 const log = createLogger('stripe');
 
@@ -91,6 +96,32 @@ const PRODUCT_MAP: Record<ProductType, { displayName: string; category: ProductC
   content_scale:    { displayName: 'Scale Content (8 posts/mo)',   category: 'content', priceUsd: 1600, envKey: 'STRIPE_PRICE_CONTENT_SCALE' },
 };
 
+/** Discount-eligible content categories (briefs + full posts). */
+function isDiscountableContent(category: ProductConfig['category']): boolean {
+  return category === 'brief' || category === 'content';
+}
+
+/**
+ * The discounted whole-cent unit price for a content product at a given tier.
+ * Returns the full price for non-Premium tiers or non-content products. Rounded
+ * to whole cents (Stripe charges integer cents) so display and charge agree.
+ * The discount rate is the shared PREMIUM_CONTENT_DISCOUNT config constant — the
+ * tier-model rediscussion (roadmap: tier-model-rediscussion) may re-map it.
+ */
+export function contentUnitAmountCents(config: ProductConfig, tier: string): number {
+  const full = Math.round(config.priceUsd * 100);
+  if (tier === 'premium' && isDiscountableContent(config.category)) {
+    return Math.round(full * (1 - PREMIUM_CONTENT_DISCOUNT));
+  }
+  return full;
+}
+
+export const PRODUCT_TYPES = Object.freeze(Object.keys(PRODUCT_MAP)) as readonly ProductType[];
+
+export function isProductType(value: string): value is ProductType {
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
 export function getProductConfig(type: ProductType): ProductConfig | null {
   const entry = PRODUCT_MAP[type];
   if (!entry) return null;
@@ -111,6 +142,43 @@ function validatePostPolishedUpgrade(workspaceId: string, contentRequestId: stri
   if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
     throw new Error('Only approved brief requests can be upgraded to a full post');
   }
+}
+
+/**
+ * Outcome of a cart content fulfillment attempt:
+ *   - 'advanced' — request moved pending_payment → requested (broadcast CONTENT_REQUEST_UPDATE)
+ *   - 'noop'     — already past pending_payment (webhook replay); nothing to do, no failure
+ *   - 'missing'  — the referenced request no longer exists; the caller MUST record a
+ *                  fulfillment failure so the paid-but-unfulfilled item is reconciled.
+ */
+type CartContentPaymentResult = 'advanced' | 'noop' | 'missing';
+
+/**
+ * Fulfill a CART content item (a fresh brief OR full-post purchase). Unlike the
+ * single-purchase upgrade path (`applyContentRequestPayment` with post_polished),
+ * a cart content request is brand-new in `pending_payment` regardless of service
+ * type — it just needs to advance to `requested`. Throws on an unexpected DB
+ * error so the webhook's per-family FM-2 handler records the failure; an
+ * already-advanced request (replay) is a no-op.
+ *
+ * Returns a discriminated result so the webhook loop can (a) broadcast
+ * CONTENT_REQUEST_UPDATE only when the request actually advanced, and (b) treat a
+ * MISSING request as a fulfillment failure (paid but unfulfillable) rather than a
+ * silent log.warn — the client paid, so the item must surface on reconciliation.
+ */
+function applyCartContentPayment(workspaceId: string, contentRequestId: string): CartContentPaymentResult {
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) {
+    log.warn({ workspaceId, contentRequestId }, 'Cart content payment references a missing content request');
+    return 'missing';
+  }
+  if (request.status !== 'pending_payment') {
+    // Already advanced (webhook replay) — nothing to do.
+    log.info({ workspaceId, contentRequestId, status: request.status }, 'Cart content request already past pending_payment — skipping');
+    return 'noop';
+  }
+  updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+  return 'advanced';
 }
 
 function applyContentRequestPayment(workspaceId: string, productType: string, contentRequestId: string | undefined): void {
@@ -148,8 +216,55 @@ function checkoutPaymentIntentId(session: Stripe.Checkout.Session): string | und
   return typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
 }
 
+function checkoutSubscriptionId(session: Stripe.Checkout.Session): string | undefined {
+  return typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+}
+
 function isFulfillmentProduct(productType: string): boolean {
   return productType.startsWith('fix_') || productType.startsWith('schema_');
+}
+
+type PlatformPlanTier = 'growth' | 'premium';
+
+function platformPlanTier(productType: string | undefined): PlatformPlanTier | null {
+  if (productType === 'plan_premium') return 'premium';
+  if (productType === 'plan_growth') return 'growth';
+  return null;
+}
+
+function isCurrentPlanSubscription(
+  workspaceId: string,
+  subscriptionId: string,
+  opts: { allowMissingCurrent: boolean; eventType: string; status?: string },
+): boolean {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) {
+    log.warn({ workspaceId, subscriptionId, eventType: opts.eventType }, 'Ignoring platform subscription event for missing workspace');
+    return false;
+  }
+  if (!ws.stripeSubscriptionId) {
+    if (opts.allowMissingCurrent) return true;
+    log.warn({ workspaceId, subscriptionId, eventType: opts.eventType, status: opts.status }, 'Ignoring platform subscription event with no current workspace subscription');
+    return false;
+  }
+  if (ws.stripeSubscriptionId !== subscriptionId) {
+    log.warn({
+      workspaceId,
+      eventSubscriptionId: subscriptionId,
+      currentSubscriptionId: ws.stripeSubscriptionId,
+      eventType: opts.eventType,
+      status: opts.status,
+    }, 'Ignoring stale platform subscription event');
+    return false;
+  }
+  return true;
+}
+
+function downgradePlatformPlan(workspaceId: string, subscriptionId: string, status: string, message: string): void {
+  updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
+  _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free', subscriptionStatus: status });
+  addActivity(workspaceId, 'subscription_cancelled', message, '', { subscriptionId, status });
+  log.info({ workspaceId, subscriptionId, status }, 'Platform subscription downgraded workspace to free');
 }
 
 function paymentQueuesByProduct(payments: PaymentRecord[]): Map<ProductType, PaymentRecord[]> {
@@ -252,7 +367,14 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
 
 export interface CartCheckoutParams {
   workspaceId: string;
-  items: Array<{ productType: ProductType; quantity: number; pageIds?: string[] }>;
+  items: Array<{
+    productType: ProductType;
+    quantity: number;
+    pageIds?: string[];
+    issueChecks?: string[];
+    /** Per-item content context (briefs/posts). */
+    content?: ContentCartContext;
+  }>;
   successUrl: string;
   cancelUrl: string;
 }
@@ -262,21 +384,94 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
   if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
   if (!params.items.length) throw new Error('Cart is empty');
 
-  const lineItems: Array<{ price: string; quantity: number }> = [];
+  // SERVER-AUTHORITATIVE bundle pricing: collapse any client pack/per-page split of
+  // a fix family and re-derive the correct line items (pack(s) + per-page remainder;
+  // alt-text flat). Content items (briefs/posts) are non-fix and pass through
+  // normalization untouched — each content item stays its own distinct line. The
+  // client cannot construct a cheaper-than-correct split — the server is the only
+  // authority on totals (MONETIZATION.md §233).
+  const normalizedItems = normalizeFixCart(params.items);
+  if (!normalizedItems.length) throw new Error('Cart is empty');
+
+  // Premium content discount is keyed off the SERVER's view of the tier, never a
+  // client claim. Premium is a paid tier (trial promotes free→growth only), so the
+  // effective tier is authoritative here.
+  const ws = getWorkspace(params.workspaceId);
+  const tier = ws ? computeEffectiveTier(ws) : 'free';
+
+  // For each content item, create the backing content request NOW (pending_payment),
+  // mirroring the single-purchase flow, and stamp its id back onto the normalized
+  // item so the persisted cart can fulfill it in the webhook. dedupe:false — each
+  // cart line is a distinct topic the client explicitly added.
+  //
+  // These requests are created BEFORE the Stripe session. If anything downstream
+  // (line-item assembly, customer creation, or sessions.create) throws, these
+  // pending_payment rows would be stranded as client-visible "Awaiting Payment"
+  // items for a checkout that never started. Track their ids and clean them up on
+  // any failure before re-throwing (item 5 — orphaned pending_payment guard).
+  const createdContentRequestIds: string[] = [];
+  for (const item of normalizedItems) {
+    if (!item.content) continue;
+    const c = item.content;
+    const request = createContentRequest(params.workspaceId, {
+      topic: c.topic,
+      targetKeyword: c.targetKeyword,
+      intent: c.intent || 'informational',
+      priority: c.priority || 'medium',
+      rationale: c.rationale || c.notes || `Cart content request: ${c.topic}`,
+      clientNote: c.notes,
+      source: c.source,
+      serviceType: c.serviceType,
+      pageType: c.pageType,
+      initialStatus: 'pending_payment',
+      targetPageId: c.targetPageId,
+      targetPageSlug: c.targetPageSlug,
+      dedupe: false,
+    });
+    item.contentRequestId = request.id;
+    createdContentRequestIds.push(request.id);
+  }
+
+  try {
+  // Stripe line items. Fix/full-price products use their fixed Stripe Price ID.
+  // Premium content lines carry an inline `price_data` override so the 10% discount
+  // is applied exactly per-line (the configured Price ID is a fixed amount and
+  // cannot express the discount). Non-Premium content keeps the fixed Price ID.
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   const productTypes: string[] = [];
 
-  for (const item of params.items) {
+  for (const item of normalizedItems) {
     const config = getProductConfig(item.productType);
     if (!config) throw new Error(`Unknown product type: ${item.productType}`);
     if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${item.productType}. Configure it in Command Center → Payments.`);
-    lineItems.push({ price: config.stripePriceId, quantity: item.quantity });
+
+    const isContent = !!item.content;
+    const discounted = isContent && tier === 'premium' && isDiscountableContent(config.category);
+    if (discounted) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          unit_amount: contentUnitAmountCents(config, tier),
+          product_data: { name: `${config.displayName} (Premium −${Math.round(PREMIUM_CONTENT_DISCOUNT * 100)}%)` },
+        },
+        quantity: item.quantity,
+      });
+    } else {
+      lineItems.push({ price: config.stripePriceId, quantity: item.quantity });
+    }
     productTypes.push(item.productType);
   }
 
+  // Stripe checkout-session metadata values cap at 500 chars. The full normalized
+  // cart (with all merged pageIds) can blow past that for large carts, so we keep
+  // metadata to a COMPACT reference and persist the authoritative cart out-of-band
+  // on the payment records (cart_items column). The webhook reads the persisted
+  // cart for work-order fulfillment instead of metadata.
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
-    cartItems: JSON.stringify(params.items),
-    productTypes: productTypes.join(','),
+    cartItemCount: String(normalizedItems.length),
+    // productTypes is a short comma list (capped) — keep it for at-a-glance debugging.
+    productTypes: productTypes.join(',').slice(0, 480),
   };
 
   const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
@@ -290,21 +485,46 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
     cancel_url: params.cancelUrl,
   });
 
-  // Create a pending payment record per product
-  for (const item of params.items) {
+  // Create a pending payment record per normalized line item. PRODUCT_MAP already
+  // carries pack prices ($179/$299), so priceUsd × quantity is the authoritative amount.
+  // Content lines store the (possibly Premium-discounted) unit amount so the record
+  // matches the Stripe charge. The full normalized cart is persisted on every record
+  // (cart_items) so fulfillment can read it regardless of which record the webhook
+  // reaches first. Content records carry their contentRequestId for fulfillment.
+  for (const item of normalizedItems) {
     const config = getProductConfig(item.productType)!;
+    const unitCents = item.content
+      ? contentUnitAmountCents(config, tier)
+      : config.priceUsd * 100;
     createPayment(params.workspaceId, {
       workspaceId: params.workspaceId,
       stripeSessionId: session.id,
       productType: item.productType,
-      amount: config.priceUsd * item.quantity * 100,
+      amount: unitCents * item.quantity,
       currency: 'usd',
       status: 'pending',
+      contentRequestId: item.contentRequestId,
       metadata: { ...metadata, productType: item.productType, quantity: String(item.quantity) },
+      cartItems: normalizedItems,
     });
   }
 
   return { sessionId: session.id, url: session.url! };
+  } catch (err) {
+    // Session creation (or any step after the content requests were created) failed.
+    // Roll back the just-created pending_payment requests so the client never sees a
+    // stranded "Awaiting Payment" row for a checkout that never started. These are
+    // brand-new requests this call created, so deletion (not status revert) is the
+    // honest cleanup — there is no prior state to revert to.
+    for (const id of createdContentRequestIds) {
+      try {
+        deleteContentRequest(params.workspaceId, id);
+      } catch (cleanupErr) {
+        log.error({ cleanupErr, workspaceId: params.workspaceId, contentRequestId: id }, 'Failed to clean up orphaned cart content request after checkout-session failure');
+      }
+    }
+    throw err;
+  }
 }
 
 async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise<string> {
@@ -428,9 +648,18 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
-        updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
-        log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        const stripeSubId = checkoutSubscriptionId(session);
+        if (!stripeSubId) {
+          log.error({ workspaceId, stripeSessionId: session.id, productType }, 'Platform plan checkout completed without a Stripe subscription id — skipping tier upgrade');
+        } else {
+          updateWorkspace(workspaceId, {
+            tier: newTier,
+            trialEndsAt: undefined,
+            stripeSubscriptionId: stripeSubId,
+          });
+          _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
+          log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
+        }
       }
 
       // Handle content subscription creation
@@ -497,10 +726,27 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.info(`Work order created: workspace=${workspaceId} product=${productType} pages=${pageIds.length}`);
       }
 
-      // Handle cart checkouts (multiple line items)
-      if (session.metadata?.cartItems) {
-        const cartItems = parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' });
+      // Handle cart checkouts (multiple line items). The authoritative cart is
+      // persisted out-of-band (cart_items column) because Stripe metadata caps at
+      // 500 chars; read it from the payment record. Fall back to legacy in-metadata
+      // carts for any session created before §3 (kept for in-flight replays).
+      const persistedCart = getCartItemsBySession(workspaceId, session.id);
+      const legacyCart = session.metadata?.cartItems
+        ? parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' })
+        : null;
+      const cartItems = persistedCart ?? legacyCart;
+      if (cartItems) {
         const paymentQueues = paymentQueuesByProduct(paidPayments);
+        // FM-2 per family: a session can mix fixes (work orders) and content
+        // (content requests). Each item is fulfilled via its own existing path,
+        // wrapped in its OWN try/catch so one family's failure can never swallow
+        // the other's — a content-request error must not abort the fix work orders,
+        // and vice versa. The payments are already marked paid (the charge cleared),
+        // so we do NOT throw to force a retry (that would re-fulfill the already-
+        // succeeded family and duplicate work orders). Instead each failure is
+        // RECORDED on the activity log as a failure, not silently swallowed, so an
+        // operator can reconcile the stuck item.
+        const fulfillmentFailures: string[] = [];
         for (const item of cartItems) {
           try {
             if (isFulfillmentProduct(item.productType)) {
@@ -513,10 +759,37 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
                 issueChecks: item.issueChecks,
                 quantity: item.quantity || 1,
               });
+            } else if (item.contentRequestId) {
+              // Content item (fresh brief/post) — advance the pending_payment
+              // request to requested. Cart content is always a NEW request, so it
+              // uses the cart-specific fulfillment (NOT the single-purchase
+              // post_polished upgrade path, which expects an approved brief).
+              const result = applyCartContentPayment(workspaceId, item.contentRequestId);
+              if (result === 'advanced') {
+                // Data Flow Rule 1: a status-changing mutation must broadcast so the
+                // client portal's content list / inbox refresh (mirrors the single-
+                // purchase path's CONTENT_REQUEST_UPDATE at applyContentRequestPayment).
+                _broadcastFn?.(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: item.contentRequestId, status: 'requested' });
+              } else if (result === 'missing') {
+                // Paid but the request vanished — record as a fulfillment failure so
+                // the paid-but-unfulfilled reconciliation activity fires (not a silent
+                // log.warn). The client's money cleared; this item must be reconciled.
+                fulfillmentFailures.push(item.contentRequestId);
+              }
             }
           } catch (err) {
-            log.error({ err, workspaceId, productType: item.productType }, 'Failed to create work order for cart item — skipping');
+            log.error({ err, workspaceId, productType: item.productType, contentRequestId: item.contentRequestId }, 'Failed to fulfill cart item');
+            fulfillmentFailures.push(item.contentRequestId ?? item.productType);
           }
+        }
+        if (fulfillmentFailures.length > 0) {
+          addActivity(
+            workspaceId,
+            'payment_failed',
+            `Fulfillment failed for ${fulfillmentFailures.length} paid cart item(s) — needs reconciliation`,
+            `Session ${session.id} · items: ${fulfillmentFailures.join(', ')}`,
+            { stripeSessionId: session.id, failedItems: fulfillmentFailures.join(',') },
+          );
         }
       }
 
@@ -654,22 +927,38 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!workspaceId) return;
 
       const productType = subscription.metadata?.productType;
-      const newTier = productType === 'plan_premium' ? 'premium' : productType === 'plan_growth' ? 'growth' : null;
+      const newTier = platformPlanTier(productType);
       if (!newTier) {
         log.info({ workspaceId, subscriptionId: subscription.id, status: subscription.status, productType }, 'Ignoring non-platform subscription event with no local content subscription');
         break;
       }
 
       if (subscription.status === 'active' || subscription.status === 'trialing') {
-        const updates: Record<string, unknown> = { stripeSubscriptionId: subscription.id };
-        updates.tier = newTier;
-        updates.trialEndsAt = undefined;
-        updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
+        const allowMissingCurrent = event.type === 'customer.subscription.created';
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent, eventType: event.type, status: subscription.status })) break;
+        updateWorkspace(workspaceId, {
+          stripeSubscriptionId: subscription.id,
+          tier: newTier,
+          trialEndsAt: undefined,
+        });
         _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier, subscriptionStatus: subscription.status });
         log.info(`Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
-      } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+      } else if (subscription.status === 'past_due') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
         log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
         addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { subscriptionStatus: subscription.status });
+      } else if (subscription.status === 'unpaid') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription unpaid — downgraded to Free tier');
+      } else if (subscription.status === 'incomplete_expired') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription checkout expired — downgraded to Free tier');
+      } else if (subscription.status === 'canceled') {
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+        downgradePlatformPlan(workspaceId, subscription.id, subscription.status, 'Subscription cancelled — downgraded to Free tier');
+      } else {
+        log.warn({ workspaceId, subscriptionId: subscription.id, status: subscription.status }, 'Unhandled platform subscription Stripe status');
       }
       break;
     }
@@ -688,11 +977,10 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const workspaceId = subscription.metadata?.workspaceId;
         if (!workspaceId) return;
 
+        if (!isCurrentPlanSubscription(workspaceId, subscription.id, { allowMissingCurrent: false, eventType: event.type, status: subscription.status })) break;
+
         // Downgrade to free tier (platform plan)
-        updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free' });
-        addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
-        log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
+        downgradePlatformPlan(workspaceId, subscription.id, 'canceled', 'Subscription cancelled — downgraded to Free tier');
       }
       break;
     }

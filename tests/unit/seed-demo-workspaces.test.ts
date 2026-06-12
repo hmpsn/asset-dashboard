@@ -56,6 +56,6 @@ describe('seed demo workspaces safety', () => {
     expect(broken?.webflowToken).toBeNull();
     expect(broken?.gscPropertyUrl).toBeNull();
     expect(broken?.ga4PropertyId).toBeNull();
-    expect(broken?.seoDataProvider).toBe('semrush');
+    expect(broken?.seoDataProvider).toBe('dataforseo');
   });
 });

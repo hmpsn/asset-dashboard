@@ -143,7 +143,6 @@ modules (gaps, clusters, quick wins, low-hanging fruit, competitive intel).
 - `src/components/strategy/KeywordGaps.tsx`
 - `src/components/strategy/KeywordStrategyGuide.tsx`
 - `src/components/strategy/LowHangingFruit.tsx`
-- `src/components/strategy/PageKeywordMap.tsx`
 - `src/components/strategy/QuickWins.tsx`
 - `src/components/strategy/SeoCopyPanel.tsx`
 - `src/components/strategy/StrategyDiff.tsx`

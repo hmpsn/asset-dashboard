@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from '../integration/helpers.js';
+import { createEphemeralTestContext } from '../integration/helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createContentRequest } from '../../server/content-requests.js';
@@ -10,7 +10,7 @@ import { deleteSchemaPlan, saveSchemaPlan } from '../../server/schema-store.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13227);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, clearCookies } = ctx;
 
 let workspaceAId = '';
@@ -152,11 +152,14 @@ afterAll(async () => {
 describe('public/client read auth boundary contracts', () => {
   it('requires auth for protected endpoints', async () => {
     clearCookies();
-    expect((await api(`/api/public/content-requests/${workspaceAId}`)).status).toBe(401);
-    expect((await api(`/api/public/content-plan/${workspaceAId}`)).status).toBe(401);
-    expect((await api(`/api/public/schema-plan/${workspaceAId}`)).status).toBe(401);
-    expect((await api(`/api/public/approvals/${workspaceAId}`)).status).toBe(401);
-    expect((await api(`/api/public/client-actions/${workspaceAId}`)).status).toBe(401);
+    // x-no-auto-public-auth: suppress admin token injection so these requests
+    // are truly unauthenticated and the server correctly returns 401.
+    const noAuth = { headers: { 'x-no-auto-public-auth': 'true' } };
+    expect((await api(`/api/public/content-requests/${workspaceAId}`, noAuth)).status).toBe(401);
+    expect((await api(`/api/public/content-plan/${workspaceAId}`, noAuth)).status).toBe(401);
+    expect((await api(`/api/public/schema-plan/${workspaceAId}`, noAuth)).status).toBe(401);
+    expect((await api(`/api/public/approvals/${workspaceAId}`, noAuth)).status).toBe(401);
+    expect((await api(`/api/public/client-actions/${workspaceAId}`, noAuth)).status).toBe(401);
   });
 
   it('rejects cross-workspace client token on representative protected endpoint', async () => {

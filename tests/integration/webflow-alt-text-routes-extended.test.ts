@@ -1,6 +1,6 @@
 /**
  * Extended integration tests for server/routes/webflow-alt-text.ts
- * Port: 13374 — confirmed free
+ * Uses an ephemeral in-process server port.
  *
  * Covers uncovered paths:
  * - workspace not found (generate-alt, bulk-generate-alt)
@@ -32,6 +32,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { ExternalFetchError } from '../../server/external-fetch.js';
 
 const nativeFetch = globalThis.fetch;
+const ALT_ROUTE_TEST_TIMEOUT_MS = 15_000;
 
 // --- Hoisted mock state ---
 
@@ -164,7 +165,6 @@ vi.mock('sharp', () => ({
   })),
 }));
 
-// --- Server setup (port 13374) ---
 
 let server: http.Server | undefined;
 let baseUrl = '';
@@ -177,7 +177,7 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>((resolve) => server!.listen(13374, resolve));
+  await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
   const { port } = server!.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${port}`;
 }
@@ -303,7 +303,7 @@ describe('POST /generate-alt — generate returns null', () => {
     expect(body.updated).toBe(false);
     // Should NOT have called updateAsset
     expect(webflowState.updateCalls).toHaveLength(0);
-  });
+  }, ALT_ROUTE_TEST_TIMEOUT_MS);
 });
 
 describe('POST /generate-alt — without siteId', () => {
@@ -349,7 +349,7 @@ describe('POST /generate-alt — siteId context from site displayName', () => {
     const body = await res.json() as { altText: string; updated: boolean };
     expect(body.updated).toBe(true);
     expect(body.altText).toBe('Generated with site name context');
-  });
+  }, ALT_ROUTE_TEST_TIMEOUT_MS);
 });
 
 describe('POST /generate-alt — siteId context from page DOM match', () => {

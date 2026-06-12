@@ -5,6 +5,7 @@ import type {
 } from './rank-tracking.ts';
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
 import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
+import type { OutcomeReadback } from './outcome-tracking.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -37,6 +38,12 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
   DECLINED: 'declined',
   RETIRED: 'retired',
   LOST_VISIBILITY: 'lost_visibility',
+  /**
+   * Striking Distance: keywords at positions 11–20 (page 2 of search results).
+   * These are the classic agency "easy wins" — one nudge away from page 1.
+   * Derived from currentPosition; no new provider calls required.
+   */
+  STRIKING_DISTANCE: 'striking_distance',
 } as const;
 
 export type KeywordCommandCenterFilter =
@@ -105,6 +112,13 @@ export interface KeywordCommandCenterMetrics {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  /**
+   * Raw keyword intent string from any source (trackedKeyword.intent, pageMap.searchIntent, contentGap.intent).
+   * Additive metrics metadata, like `cpc`: populated whenever a source carries intent, independent of the
+   * `keyword-value-scoring` flag. It feeds the value-first score when that flag is ON but is not read by any sort
+   * accessor when OFF, so rows/order/scores stay byte-identical with the flag OFF.
+   */
+  intent?: string;
   currentPosition?: number;
   clicks?: number;
   impressions?: number;
@@ -133,6 +147,24 @@ export interface KeywordCommandCenterTrackingState {
   pageTitle?: string;
   replacedBy?: string;
   deprecatedAt?: string;
+  /**
+   * Wave 3d-i ADDITIVE provenance pointer (admin-only). The content-addressed gap
+   * key the keyword was approved from (content_gap / keyword_gap surface). Sourced
+   * from the provenance-bearing read (listTrackedKeywordRows), NOT getTrackedKeywords
+   * (which strips provenance). Undefined when the keyword has no gap provenance.
+   */
+  sourceGapKey?: string;
+  /**
+   * Wave 4 P0 ADDITIVE ownership flag (admin-only). True when reconcile owns this
+   * keyword (`strategy_owned = 1`) — i.e. it is part of the active managed strategy
+   * set. Sourced from the provenance-bearing read (mergeTrackedKeywordProvenance →
+   * listTrackedKeywordRows), NOT getTrackedKeywords / the public endpoint (both STRIP
+   * it via `delete out.strategyOwned`). THREE-STATE: `true` = explicitly owned,
+   * `false` = explicitly not owned, `undefined` = ownership unknown (pre-reconcile).
+   * A truthiness / `?? false` guard is a bug — coercing `undefined`→`false` would
+   * mislabel every pre-reconcile row as "explicitly not owned".
+   */
+  strategyOwned?: boolean;
   /**
    * True when the row has any rank/clicks/impressions data, false when the keyword
    * is `active` (or paused) but no rank snapshot or GSC signal has materialized.
@@ -202,6 +234,24 @@ export interface KeywordCommandCenterRow {
   }>;
   /** True if this keyword has lost GSC visibility for 14+ days (quality-gated). */
   isLostVisibility?: boolean;
+  /**
+   * Plain-language reasons explaining the keyword's value score (admin-only, Task 2.2).
+   * Built in finalizeDraftRow from computeKeywordValueComponents + keywordValueReasons
+   * when the keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * keyword has no value signal (signal gate fails).
+   */
+  valueReasons?: string[];
+  /**
+   * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
+   * Built in finalizeDraftRow via the single keywordDollarValue helper (one $
+   * definition, identical to roi.ts trafficValue). Absent when metrics.cpc is unknown.
+   */
+  currentMonthly?: number;
+  /**
+   * Upside monthly dollar value if the keyword moved up (Task 3.3): impressions ×
+   * CTR uplift × cpc, from the same keywordDollarValue helper. Absent when no cpc.
+   */
+  upsideMonthly?: number;
 }
 
 export interface KeywordCommandCenterCounts {
@@ -214,6 +264,11 @@ export interface KeywordCommandCenterCounts {
   localCandidates: number;
   retired: number;
   declined: number;
+  /**
+   * Count of keywords at positions 11–20 (page 2). The classic "striking distance"
+   * easy-wins list — one nudge away from page 1, value-ranked in the segment view.
+   */
+  strikingDistance?: number;
   /**
    * Count of keywords across the universe that have no provider volume data
    * attached. Surfaced as a diagnostic in the panel header so admins can tell
@@ -243,7 +298,7 @@ export interface KeywordCommandCenterResponse {
   generatedAt?: string | null;
 }
 
-export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank';
+export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty' | 'opportunity';
 
 export interface KeywordCommandCenterSummaryResponse {
   counts: KeywordCommandCenterCounts;
@@ -259,6 +314,8 @@ export interface KeywordCommandCenterRowsQuery {
   filter?: KeywordCommandCenterFilter;
   search?: string;
   sort?: KeywordCommandCenterSort;
+  /** Sort direction. Absent → each sort's natural default (demand/clicks/difficulty desc, rank/keyword asc). */
+  direction?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
 }
@@ -281,6 +338,14 @@ export interface KeywordCommandCenterRowsResponse {
 export interface KeywordCommandCenterDetailResponse {
   row: KeywordCommandCenterRow;
   generatedAt?: string | null;
+  /**
+   * W5.1: read-back outcome verdict for this keyword's tracked action — the latest
+   * conclusive measurement (baseline→current position + verdict). Populated by
+   * joining the keyword's (pagePath, keyword) tracked action recorded by
+   * recordKeywordTrackingAction back to its scored outcome. Absent when no scored
+   * action exists yet. Positions are honest (lower=better); trust `direction`.
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface KeywordCommandCenterActionRequest {
@@ -328,7 +393,16 @@ export interface KeywordCommandCenterBulkActionRequest {
 
 export interface KeywordCommandCenterBulkActionItem {
   keyword: string;
-  status: 'applied' | 'skipped_protected' | 'skipped_not_tracked' | 'error';
+  /**
+   * - applied: the action mutated the keyword.
+   * - skipped_protected: a protected keyword that needs explicit confirmation.
+   * - skipped_not_tracked: the action requires a tracked row and there was none.
+   * - skipped_noop: the keyword is already in (or cannot leave) the target state —
+   *   an idempotent self-transition (e.g. retire an already-retired keyword in a
+   *   bulk selection). A benign no-op, NOT a failure; counts toward `skipped`.
+   * - error: an unexpected failure.
+   */
+  status: 'applied' | 'skipped_protected' | 'skipped_not_tracked' | 'skipped_noop' | 'error';
   error?: string;
 }
 

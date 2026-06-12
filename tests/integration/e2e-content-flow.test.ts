@@ -11,12 +11,12 @@
  * 7. Clean up
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest } from '../../server/content-requests.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13231);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

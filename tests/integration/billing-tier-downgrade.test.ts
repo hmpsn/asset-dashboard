@@ -1,7 +1,6 @@
 /**
  * Integration tests for tier downgrade and trial expiry behavior.
  *
- * The existing tier-gate-enforcement.test.ts (port 13312) tests that
  * tier-gated endpoints return the correct limits when workspaces ARE on
  * Growth/Premium. These tests cover the complementary failure modes:
  *
@@ -12,15 +11,14 @@
  *      value test — a workspace that WAS on trial must NOT retain Growth access)
  *   4. Effective tier endpoint reflects all of the above consistently
  *
- * Port 13364 — verify uniqueness with: grep -r '13364' tests/
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13364); // port-ok: next free after 13363
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let growthWs: SeededFullWorkspace | undefined;
@@ -146,15 +144,14 @@ describe('Trial active: Free workspace with future trial_ends_at', () => {
     expect(body.usage.strategy_generations.limit).toBe(3);
   });
 
-  it('chat-usage endpoint: trial workspace gets unlimited chat (Growth)', async () => {
+  it('chat-usage endpoint: trial workspace gets Growth chat limit', async () => {
     const res = await api(`/api/public/chat-usage/${trialActiveWs!.workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.tier).toBe('growth');
     expect(body.allowed).toBe(true);
-    // Growth/premium serializes Infinity to null in JSON
-    expect(body.limit).toBeNull();
-    expect(body.remaining).toBeNull();
+    expect(body.limit).toBe(50);
+    expect(body.remaining).toBe(50);
   });
 
   it('intelligence endpoint: trial workspace gets learningHighlights slice', async () => {

@@ -1,9 +1,8 @@
-// ── Client work-order conversation hooks (DARK behind unified-inbox) ─────────
+// ── Client work-order conversation hooks ──────────────────────────────────────
 // The client "Work in progress" track-lane card reads its own conversation
 // thread (public GET) and posts comments (public POST, author forced 'client'
 // server-side). Both keyed on the work order id (extracted from the deliverable's
-// sourceRef `work_order:<id>`). Reachable ONLY when the UnifiedInbox renders,
-// which is itself gated on the `unified-inbox` flag.
+// sourceRef `work_order:<id>`).
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { publicWorkOrders } from '../../api/work-orders';

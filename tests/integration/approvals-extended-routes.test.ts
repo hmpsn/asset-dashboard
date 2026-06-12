@@ -22,6 +22,7 @@ vi.mock('../../server/broadcast.js', () => ({
 import type { AddressInfo } from 'net';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -54,23 +55,23 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function get(path: string, headers?: Record<string, string>): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, { headers });
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, { headers }));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 beforeAll(async () => {

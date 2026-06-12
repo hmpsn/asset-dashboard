@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 
-const ctx = createTestContext(13748);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let openWs = '';
@@ -50,7 +50,9 @@ afterAll(async () => {
 
 describe('Fixture content-plan review edge routes', () => {
   it('requires auth for protected workspace list', async () => {
-    const res = await api(`/api/public/content-plan/${protectedWs}`);
+    const res = await api(`/api/public/content-plan/${protectedWs}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 

@@ -1,17 +1,30 @@
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
+import { compactStrings } from './utils/collections.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import {
+  computeKeywordValueComponents,
+  keywordValueReasons,
+  type ScoringContext,
+} from './scoring/keyword-value-score.js';
+import { keywordDollarValue } from './scoring/keyword-value-money.js';
+import { getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
+import { getWorkspace } from './workspaces.js';
+import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from './outcome-tracking.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
+import type { KeywordStrategySiteKeywordMetric } from './keyword-strategy-enrichment.js';
 import type {
   ContentGap,
   KeywordGapItem,
@@ -31,6 +44,10 @@ import type {
 const log = createLogger('keyword-strategy-ux');
 
 const RAW_EVIDENCE_NOTE = 'Raw provider evidence is useful context, but it is filtered separately before a keyword becomes a selected strategy action.';
+
+// Typed empty fallback for parseJsonSafe so a missing/malformed strategy_history
+// blob degrades to {} while keeping the schema's optional fields visible to TS.
+const EMPTY_STRATEGY_HISTORY: StrategyHistoryStrategy = {};
 
 const stmts = createStmtCache(() => ({
   feedback: db.prepare<[workspaceId: string]>(
@@ -56,6 +73,12 @@ interface BuildKeywordStrategyUxOptions {
   workspaceId: string;
   workspaceName?: string;
   strategy?: KeywordStrategy | null;
+  /** Table-backed site keyword metrics (from site_keyword_metrics — NOT from the
+   *  strategy blob, which has siteKeywordMetrics stripped). Callers must pass this
+   *  from assembleStoredKeywordStrategy().siteKeywordMetrics or equivalent so that
+   *  site-keyword explanations include real volume/difficulty evidence.
+   *  Without this, every site-keyword explanation ships metric=undefined. */
+  siteKeywordMetrics?: KeywordStrategySiteKeywordMetric[];
   pageMap: PageKeywordMap[];
   contentGaps: ContentGap[];
   keywordGaps: KeywordGapItem[];
@@ -78,10 +101,6 @@ interface BuildSummaryOptions {
   skipped?: number;
 }
 
-function compact(values: Array<string | undefined | null | false>): string[] {
-  return values.map(value => typeof value === 'string' ? value.trim() : '').filter(Boolean);
-}
-
 function uniq(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
@@ -101,11 +120,6 @@ function feedbackMap(workspaceId: string): Map<string, KeywordStrategyExplanatio
 
 function trackingMap(trackedKeywords: TrackedKeyword[]): Map<string, TrackedKeyword> {
   return new Map(trackedKeywords.map(keyword => [normalizeKeyword(keyword.query), keyword]));
-}
-
-function isStrategyOwned(keyword: TrackedKeyword): boolean {
-  return keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY
-    || keyword.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD;
 }
 
 function isPreserved(keyword: TrackedKeyword): boolean {
@@ -216,6 +230,7 @@ function buildExplanation(input: {
   businessReasons: string[];
   fitSignals: string[];
   rawEvidenceOnly?: boolean;
+  valueReasons?: string[];
 }): KeywordStrategyExplanation {
   const normalizedKeyword = normalizeKeyword(input.keyword);
   const opportunityScore = input.contentGap?.opportunityScore;
@@ -228,6 +243,27 @@ function buildExplanation(input: {
         : 'Included in the strategy set that guides tracking and recommendations.';
 
   const reasons = uniq([...input.businessReasons, fallbackReason]).slice(0, 4);
+
+  // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (the
+  // ONE $ definition — currentMonthly == roi.ts trafficValue). Only the page_keyword
+  // path carries realized clicks/cpc/position/impressions, so $ is computed there.
+  // cpc sparsity floors to 0 → omit the $ entirely so the drawer hides it (no cpc).
+  // ctrCurve is left null (industry fallback via ctrAt) to keep this latency-sensitive
+  // public read off a GSC-history rebuild.
+  let currentMonthly: number | undefined;
+  let upsideMonthly: number | undefined;
+  if (input.page && input.page.cpc != null && input.page.cpc > 0) {
+    const money = keywordDollarValue({
+      clicks: input.page.clicks,
+      cpc: input.page.cpc,
+      currentPosition: input.page.currentPosition,
+      impressions: input.page.impressions,
+      ctrCurve: null,
+    });
+    currentMonthly = money.currentMonthly;
+    upsideMonthly = money.upsideMonthly;
+  }
+
   return {
     keyword: input.keyword,
     normalizedKeyword,
@@ -254,6 +290,9 @@ function buildExplanation(input: {
     opportunityScore,
     rawEvidenceOnly: input.rawEvidenceOnly,
     nextAction: nextActionFor(input.role, input.keyword, input.page, input.tracked),
+    valueReasons: input.valueReasons,
+    currentMonthly,
+    upsideMonthly,
   };
 }
 
@@ -276,8 +315,11 @@ export function buildKeywordStrategyRefreshSummary(options: BuildSummaryOptions)
 
   const retainedSite = [...currentSite].filter(keyword => previousSite.has(keyword)).length;
   const tracked = options.trackedKeywords ?? [];
-  const retiredInWindow = (keyword: TrackedKeyword, status: string) => isStrategyOwned(keyword)
-    && keyword.status === status
+  // Wave 3d-ii: a tracked keyword reaches DEPRECATED/REPLACED status ONLY via
+  // reconcile's auto-deprecation (the sole writer of those statuses), so keying on
+  // status is equivalent to the old strategy-ownership gate — and works on the
+  // stripped getTrackedKeywords shape (strategyOwned is table-only, not present here).
+  const retiredInWindow = (keyword: TrackedKeyword, status: string) => keyword.status === status
     && wasRetiredInRefresh(keyword, options);
   return {
     previousGeneratedAt: options.previousGeneratedAt,
@@ -303,18 +345,24 @@ export function buildLatestKeywordStrategyRefreshSummary(options: {
 }): KeywordStrategyRefreshSummary | undefined {
   if (!options.strategy) return undefined;
   const prev = stmts().latestHistory.get(options.workspaceId) as StrategyHistoryRow | undefined;
-  type PrevStrategyShape = {
-    siteKeywords?: string[];
-    contentGaps?: { targetKeyword: string }[];
-  };
-  const prevStrategy = prev ? parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {}) : {};
-  const prevPageMap = prev ? parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []) : [];
+  // parseJsonSafe returns the fallback for null/empty raw, so passing
+  // prev?.strategy_json (possibly undefined) degrades to {} without a guard. The
+  // typed empty fallback keeps the result's optional fields visible to TS.
+  const prevStrategy = parseJsonSafe(
+    prev?.strategy_json,
+    strategyHistoryStrategySchema,
+    EMPTY_STRATEGY_HISTORY,
+    { workspaceId: options.workspaceId, field: 'strategy_json', table: 'strategy_history' },
+  );
+  const prevPageMap = parseJsonSafeArray(prev?.page_map_json, strategyHistoryPageMapSchema, {
+    workspaceId: options.workspaceId, field: 'page_map_json', table: 'strategy_history',
+  });
   return buildKeywordStrategyRefreshSummary({
     previousGeneratedAt: prev?.generated_at,
     currentGeneratedAt: options.strategy.generatedAt,
     previousSiteKeywords: prevStrategy.siteKeywords ?? [],
     currentSiteKeywords: options.strategy.siteKeywords ?? [],
-    previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+    previousContentGapKeywords: prevStrategy.contentGaps?.flatMap(gap => (gap.targetKeyword ? [gap.targetKeyword] : [])) ?? [],
     currentContentGapKeywords: options.contentGaps.map(gap => gap.targetKeyword),
     previousPageMap: prevPageMap,
     currentPageMap: options.pageMap,
@@ -371,7 +419,53 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     cpc: 0,
   }, evaluationContext);
 
-  const siteMetricByKeyword = new Map((options.strategy?.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
+  // Task 2.3: build value reasons server-side when the flag is ON.
+  // One ScoringContext per payload build (flag-gated), reused across all keywords.
+  const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
+  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, options.workspaceId);
+  let valueScoringCtx: ScoringContext | null = null;
+  if (valueScoringOn) {
+    try {
+      const posture = getLocalSeoPosture(options.workspaceId);
+      const markets = listLocalSeoMarkets(options.workspaceId);
+      // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
+      // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
+      // the admin Hub drawer and this client strategy path for the same keyword.
+      const ws = getWorkspace(options.workspaceId);
+      valueScoringCtx = {
+        posture: posture ?? 'unknown',
+        markets,
+        city: ws?.businessProfile?.address?.city?.toLowerCase(),
+        state: ws?.businessProfile?.address?.state?.toLowerCase(),
+      };
+    } catch (err) {
+      // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
+      log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
+    }
+  }
+
+  const computeValueReasons = (
+    keyword: string,
+    raw: { volume?: number; difficulty?: number; cpc?: number; intent?: string | null },
+    opts?: { exposeCpc?: boolean },
+  ): string[] | undefined => {
+    if (!valueScoringCtx) return undefined;
+    // cpc always feeds the SCORE (commercial value); `exposeCpc` controls only
+    // whether the raw "$X CPC" appears in the human-readable reason text. Content
+    // gaps keep cpc admin-only (#1103) — the score stays cpc-aware but the raw cpc
+    // must not reach the public payload via the reason string.
+    const exposeCpc = opts?.exposeCpc ?? true;
+    const { components } = computeKeywordValueComponents(
+      { keyword, volume: raw.volume, difficulty: raw.difficulty, cpc: raw.cpc, intent: raw.intent },
+      valueScoringCtx,
+    );
+    if (!components) return undefined;
+    return keywordValueReasons(components, { cpc: exposeCpc ? raw.cpc : undefined, volume: raw.volume, difficulty: raw.difficulty });
+  };
+
+  // siteKeywordMetrics is table-only post-strip — options.strategy?.siteKeywordMetrics is always
+  // undefined at read time. Callers must pass the table-backed value via options.siteKeywordMetrics.
+  const siteMetricByKeyword = new Map((options.siteKeywordMetrics ?? []).map(metric => [normalizeKeyword(metric.keyword), metric]));
   for (const keyword of options.strategy?.siteKeywords ?? []) {
     const normalized = normalizeKeyword(keyword);
     if (!normalized) continue;
@@ -382,7 +476,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       keyword,
       role: 'site_keyword',
       surface,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         'Selected strategy keyword',
         metric?.volume != null ? `${metric.volume.toLocaleString()} monthly searches` : null,
         metric?.difficulty != null ? `Difficulty ${metric.difficulty}` : null,
@@ -392,6 +486,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      valueReasons: computeValueReasons(keyword, { volume: metric?.volume, difficulty: metric?.difficulty }),
     }));
   }
 
@@ -406,7 +501,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       role: 'page_keyword',
       surface,
       page,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         `Mapped to ${page.pageTitle || page.pagePath}`,
         page.currentPosition != null ? `Current rank around #${Math.round(page.currentPosition)}` : null,
         page.impressions != null ? `${page.impressions.toLocaleString()} impressions` : null,
@@ -417,6 +512,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      valueReasons: computeValueReasons(keyword, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent }),
     }));
   }
 
@@ -431,7 +527,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       role: 'content_gap',
       surface,
       contentGap: gap,
-      sourceEvidence: compact([
+      sourceEvidence: compactStrings([
         `${gap.priority} priority content gap`,
         gap.competitorProof,
         gap.impressions != null ? `${gap.impressions.toLocaleString()} impressions` : null,
@@ -442,6 +538,14 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
+      // Content-gap cpc is admin/scoring-internal only (#1103): score stays
+      // cpc-aware, but only the admin surface may show the raw "$X CPC" in text —
+      // the client surface feeds the public payload, so suppress it there.
+      valueReasons: computeValueReasons(
+        keyword,
+        { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent },
+        { exposeCpc: surface === 'admin' },
+      ),
     }));
   }
 
@@ -455,7 +559,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         role: 'competitor_gap',
         surface,
         keywordGap: gap,
-        sourceEvidence: compact([
+        sourceEvidence: compactStrings([
           'Raw competitor/provider evidence',
           `${gap.competitorDomain} ranks #${gap.competitorPosition}`,
           gap.volume != null ? `${gap.volume.toLocaleString()} monthly searches` : null,
@@ -466,7 +570,35 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         businessReasons: result.reasons.map(reason => reason.message),
         fitSignals: result.fitSignals,
         rawEvidenceOnly: true,
+        valueReasons: computeValueReasons(gap.keyword, { volume: gap.volume, difficulty: gap.difficulty }),
       }));
+    }
+  }
+
+  // ── W5.1: enrich each explanation with its read-back outcome verdict ──────────
+  // The persist path records a strategy keyword's tracked action under
+  // STRATEGY_PAGE_KEYWORD_SOURCE_TYPE + strategyPageKeywordSourceId(pagePath, keyword)
+  // (both the strategy-regen writer and the Hub track/promote recorder). Join the
+  // scored outcome back so the Strategy tab can render a "#14→#6 · Win" chip on
+  // pageMap / Quick Win rows. One batch read; exact source-id match first, then a
+  // keyword fallback for actions recorded without a page path. Read-only.
+  let readbacks: ReturnType<typeof getScoredOutcomeReadbacks> | null = null;
+  try {
+    readbacks = getScoredOutcomeReadbacks(options.workspaceId);
+  } catch (err) {
+    // catch-ok: outcome read-back is informational; degrade gracefully if the
+    // outcome store is unavailable so strategy assembly never fails on it.
+    log.debug({ err, workspaceId: options.workspaceId }, 'Outcome read-back unavailable — skipping outcome chips');
+  }
+  if (readbacks && (readbacks.bySource.size > 0 || readbacks.byKeyword.size > 0)) {
+    for (const explanation of explanations.values()) {
+      const pagePath = explanation.pagePath ?? explanation.tracking?.pagePath;
+      const sourceKey = pagePath
+        ? `${STRATEGY_PAGE_KEYWORD_SOURCE_TYPE}::${strategyPageKeywordSourceId(pagePath, explanation.keyword)}`
+        : null;
+      const outcome = (sourceKey ? readbacks.bySource.get(sourceKey) : undefined)
+        ?? readbacks.byKeyword.get(explanation.keyword.trim().toLowerCase());
+      if (outcome) explanation.outcome = outcome;
     }
   }
 

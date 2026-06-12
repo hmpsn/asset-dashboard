@@ -1,17 +1,24 @@
 import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
+import { NAV_REGISTRY_BY_ID } from '../../lib/navRegistry';
 import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
-const TAB_LABELS: Record<string, string> = {
-  home: 'Home', brief: 'Meeting Brief', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
-  links: 'Links', 'seo-strategy': 'Strategy', 'seo-keywords': 'Keywords', 'page-intelligence': 'Page Intelligence',
-  'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
-  'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Search & Traffic', performance: 'Performance', 'content-perf': 'Content Performance',
-  rewrite: 'Page Rewriter', 'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
-  'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings', revenue: 'Revenue',
-  outcomes: 'Action Results', 'outcomes-overview': 'Team Outcomes', features: 'Features',
+// nav-registry-ok — fallback labels for redirect-only / legacy-folded Page
+// values (brief, seo-briefs, content, calendar, subscriptions,
+// workspace-settings) that intentionally have no registry entry. A breadcrumb
+// can still land on one of these via a stale bookmark, so we keep a label here
+// to avoid rendering a raw slug. Identity/label/needsSite/description for all
+// real nav surfaces comes from the registry (NAV_REGISTRY_BY_ID).
+const LEGACY_TAB_LABELS: Record<string, string> = {
+  brief: 'Meeting Brief',
+  'seo-briefs': 'Content Briefs',
+  content: 'Content',
+  calendar: 'Calendar',
+  subscriptions: 'Subscriptions',
+  'content-pipeline': 'Content Pipeline',
+  'workspace-settings': 'Workspace Settings',
 };
 
 interface BreadcrumbsProps {
@@ -25,6 +32,11 @@ export function Breadcrumbs({
   workspaces, selected, tab, pendingContentRequests,
 }: BreadcrumbsProps) {
   const navigate = useNavigate();
+  const tabLabel = (t: Page): string => {
+    const entry = NAV_REGISTRY_BY_ID[t];
+    if (entry) return entry.label;
+    return LEGACY_TAB_LABELS[t] || t;
+  };
 
   return (
     <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[var(--brand-border)] t-caption-sm min-h-[36px]">
@@ -73,7 +85,7 @@ export function Breadcrumbs({
             <>
               <span className="text-[var(--brand-text-dim)]">/</span>
               <span className="text-[var(--brand-text-muted)]">
-                {TAB_LABELS[tab] || tab}
+                {tabLabel(tab)}
               </span>
             </>
           )}
@@ -83,7 +95,7 @@ export function Breadcrumbs({
         <>
           <span className="text-[var(--brand-text-dim)]">/</span>
           <span className="text-[var(--brand-text-muted)]">
-            {TAB_LABELS[tab] || tab}
+            {tabLabel(tab)}
           </span>
         </>
       )}
@@ -128,5 +140,13 @@ export function Breadcrumbs({
     </div>
   );
 }
+
+// Backward-compat export: a flat slug → label map derived from the registry
+// plus the legacy fallback labels. Kept for existing consumers/tests; the
+// registry is the source of truth.
+const TAB_LABELS: Record<string, string> = {
+  ...LEGACY_TAB_LABELS,
+  ...Object.fromEntries(Object.values(NAV_REGISTRY_BY_ID).map((e) => [e.id, e.label])),
+};
 
 export { TAB_LABELS };

@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
 const MCP_TEST_KEY = 'test-mcp-key-keyword';
-const ctx = createTestContext(13703, {
+const ctx = createEphemeralTestContext(import.meta.url, {
   env: {
     MCP_API_KEY: MCP_TEST_KEY,
     DATAFORSEO_LOGIN: '',

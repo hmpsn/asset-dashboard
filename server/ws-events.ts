@@ -12,6 +12,10 @@
 // --- Workspace-scoped events (broadcastToWorkspace) ---
 
 export const WS_EVENTS = {
+  // Job lifecycle
+  JOB_CREATED: 'job:created',
+  JOB_UPDATED: 'job:update',
+
   // Workspace settings / tier changes
   WORKSPACE_UPDATED: 'workspace:updated',
   PAGE_STATE_UPDATED: 'page-state:updated',
@@ -61,6 +65,7 @@ export const WS_EVENTS = {
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
 
   // Schema
+  SCHEMA_PLAN_UPDATED: 'schema:plan_updated',
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
   SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
   SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated',

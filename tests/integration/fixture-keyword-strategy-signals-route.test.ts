@@ -2,9 +2,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13725); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, authApi, setAuthToken, clearCookies } = ctx;
 
 let seededWorkspace: SeededFullWorkspace | null = null;

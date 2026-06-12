@@ -99,6 +99,7 @@ export interface GA4TopPage {
   path: string;
   pageviews: number;
   users: number;
+  sessions: number;
   avgEngagementTime: number;
 }
 
@@ -204,7 +205,9 @@ export type InsightType =
   | 'emerging_keyword'       // Tier 2: SEMRush trend-rising keyword opportunity
   | 'competitor_alert'       // Tier 2: weekly competitor position change
   | 'freshness_alert'        // Tier 2: stale content detected via page_keywords age
-  | 'milestone_attribution'; // Phase 2.5c: delivered brief crossed a traffic threshold
+  | 'milestone_attribution'  // Phase 2.5c: delivered brief crossed a traffic threshold
+  | 'lost_visibility'        // G1: queries that dropped off GSC after sustained presence
+  | 'local_visibility_shift'; // W5.3: local pack visible↔not_visible transition or new repeat competitor
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -256,6 +259,8 @@ export interface PageHealthData extends InsightDataBase {
   pageviews: number;
   bounceRate: number;
   avgEngagementTime: number;
+  /** False when GA4 data was unavailable or the page was absent from the GA4 read. */
+  ga4Available?: boolean;
   /** Audit-derived enrichment — present only when populated by bridge-audit-page-health */
   auditSnapshotId?: string;
   errorCount?: number;
@@ -463,6 +468,68 @@ export interface MilestoneAttributionData extends InsightDataBase {
   trafficValue: number;
 }
 
+/**
+ * G1 — Lost-visibility detection (audit #9).
+ * Minted by bridge-lost-visibility after the daily rank-tracking run calls detectLostVisibility().
+ * Represents the aggregate set of queries that previously sent search traffic but
+ * have dropped out of GSC impressions entirely for 14+ days with >= 10 total impressions.
+ */
+export interface LostVisibilityData extends InsightDataBase {
+  /** Total queries in lost_visibility status for the workspace */
+  lostCount: number;
+  /** Top affected queries (up to 5) ordered by total_impressions DESC */
+  topQueries: Array<{
+    /** Raw query string from discovered_queries.query */
+    query: string;
+    /** Best GSC position observed before disappearing. null if never ranked in top positions */
+    lastPosition: number | null;
+    /** ISO date of the last impression observation (discovered_queries.last_seen) */
+    lastSeen: string;
+    /** Cumulative impressions across all observations (proxy for traffic at risk) */
+    totalImpressions: number;
+  }>;
+  /** ISO timestamp of the detection run that generated this insight */
+  detectedAt: string;
+}
+
+/**
+ * W5.3 — Local visibility shift detection.
+ * Minted by bridge-local-visibility-shift after a local SEO refresh diffs the
+ * new latest-per-(market, keyword, device, language) snapshot state against the
+ * previous latest state. One insight per (market, keyword, device, language)
+ * identity that transitioned, plus one per market where a new repeat competitor
+ * surfaced. The `direction` discriminates the three transition kinds.
+ */
+export interface LocalVisibilityShiftData extends InsightDataBase {
+  /**
+   * - `risk`       — the business was visible (local-pack match) and is no longer.
+   * - `win`        — the business became visible after not being visible.
+   * - `competitor` — a new competitor appeared repeatedly across the market.
+   */
+  direction: 'risk' | 'win' | 'competitor';
+  /** Market the transition was observed in. */
+  marketId: string;
+  marketLabel: string;
+  /** The keyword whose visibility flipped. Omitted for `competitor` market-level shifts. */
+  keyword?: string;
+  /** Normalized keyword — used in the dedup key and for series cross-reference. */
+  normalizedKeyword?: string;
+  /** Device the snapshot was captured on (desktop/mobile). */
+  device?: string;
+  /** Language code the snapshot was captured in. */
+  languageCode?: string;
+  /** Best local-pack rank before the shift, when known (risk/win). units: integer position */
+  previousRank?: number | null;
+  /** Best local-pack rank after the shift, when known (win). units: integer position */
+  currentRank?: number | null;
+  /** Competitor business name for `competitor` shifts. */
+  competitorName?: string;
+  /** Number of distinct keywords this competitor now appears across (competitor shifts). units: raw count */
+  competitorAppearances?: number;
+  /** ISO timestamp of the refresh that detected this shift. */
+  detectedAt: string;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -485,6 +552,8 @@ export interface InsightDataMap {
   competitor_alert: CompetitorAlertData;
   freshness_alert: FreshnessAlertData;
   milestone_attribution: MilestoneAttributionData;
+  lost_visibility: LostVisibilityData;
+  local_visibility_shift: LocalVisibilityShiftData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

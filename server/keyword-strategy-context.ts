@@ -1,5 +1,6 @@
 import type { ClientSignalsSlice, SeoContextSlice } from '../shared/types/intelligence.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
+import { compactStrings } from './utils/collections.js';
 
 /**
  * Evaluation context shape used by keyword intelligence rules.
@@ -41,16 +42,12 @@ export interface BuildStrategyKeywordEvaluationContextOptions {
   relaxConservatism?: boolean;
 }
 
-function compact(values: Array<string | undefined | null>): string[] {
-  return values.map(value => value?.trim()).filter((value): value is string => Boolean(value));
-}
-
 export function buildStrategyKeywordEvaluationContext(
   options: BuildStrategyKeywordEvaluationContextOptions,
 ): KeywordEvaluationContext {
   return {
     workspaceId: options.workspaceId,
-    businessTerms: compact([
+    businessTerms: compactStrings([
       options.workspaceName,
       options.businessContext,
       options.seoContext?.businessContext,

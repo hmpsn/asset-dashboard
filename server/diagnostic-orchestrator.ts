@@ -105,6 +105,7 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
     if (!anomalyInsight) {
       markDiagnosticFailed(reportId, 'Anomaly insight not found');
       updateJob(jobId, { status: 'error', message: 'Anomaly insight not found' });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.DIAGNOSTIC_FAILED, { reportId, insightId });
       return;
     }
 
@@ -460,7 +461,7 @@ Rules for remediation:
     maxTokens: 3000,
     temperature: 0.3,
     responseFormat: { type: 'json_object' },
-    feature: 'deep-diagnostics',
+    feature: 'diagnostics',
     workspaceId,
   });
 

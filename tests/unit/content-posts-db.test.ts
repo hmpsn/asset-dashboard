@@ -782,3 +782,50 @@ describe('revertToVersion', () => {
     }
   });
 });
+
+// ─── Part 3: planned_publish_at column lockstep (W6.6) ───────────────────────
+
+describe('plannedPublishAt — column + mapper round-trip', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace();
+  });
+  afterAll(() => {
+    ws?.cleanup();
+  });
+
+  it('defaults to undefined on a freshly inserted draft', () => {
+    const id = randomUUID();
+    savePost(ws.workspaceId, makePost(id, ws.workspaceId, null, 'draft'));
+    const fetched = getPost(ws.workspaceId, id);
+    expect(fetched?.plannedPublishAt).toBeUndefined();
+  });
+
+  it('persists a planned date through the UPDATE path and reads it back', () => {
+    const id = randomUUID();
+    savePost(ws.workspaceId, makePost(id, ws.workspaceId, null, 'draft'));
+    const planned = '2026-09-01T00:00:00.000Z';
+    const updated = updatePostField(ws.workspaceId, id, { plannedPublishAt: planned });
+    expect(updated?.plannedPublishAt).toBe(planned);
+    // Re-read from DB to confirm it survived serialization, not just in-memory.
+    expect(getPost(ws.workspaceId, id)?.plannedPublishAt).toBe(planned);
+  });
+
+  it('clears the planned date when set back to undefined', () => {
+    const id = randomUUID();
+    savePost(ws.workspaceId, makePost(id, ws.workspaceId, null, 'draft'));
+    updatePostField(ws.workspaceId, id, { plannedPublishAt: '2026-09-01T00:00:00.000Z' });
+    const cleared = updatePostField(ws.workspaceId, id, { plannedPublishAt: undefined });
+    expect(cleared?.plannedPublishAt).toBeUndefined();
+    expect(getPost(ws.workspaceId, id)?.plannedPublishAt).toBeUndefined();
+  });
+
+  it('persists a planned date through the INSERT path (savePost with plannedPublishAt set)', () => {
+    const id = randomUUID();
+    const planned = '2026-10-15T00:00:00.000Z';
+    const post = { ...makePost(id, ws.workspaceId, null, 'draft'), plannedPublishAt: planned };
+    savePost(ws.workspaceId, post);
+    expect(getPost(ws.workspaceId, id)?.plannedPublishAt).toBe(planned);
+  });
+});

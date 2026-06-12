@@ -6,11 +6,7 @@ import { backfillBriefingDeliverables } from '../../scripts/backfill-deliverable
 import { upsertBriefingDraft, markPublished } from '../../server/briefing-store.js';
 import { listDeliverables } from '../../server/client-deliverables.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
-import {
-  mirrorBriefingToDeliverable,
-  BRIEFING_FLAG,
-} from '../../server/domains/inbox/briefing-dual-write.js';
+import { mirrorBriefingToDeliverable } from '../../server/domains/inbox/briefing-dual-write.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 
 const wsA = createWorkspace('backfill-briefing-A', 'site-bbr-a');
@@ -44,7 +40,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setFlagOverride(BRIEFING_FLAG, null);
   db.prepare('DELETE FROM briefing_drafts WHERE workspace_id = ?').run(WS_A);
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS_A);
 });
@@ -101,7 +96,6 @@ describe('backfill-deliverables-briefing', () => {
   });
 
   it('CROSS-PATH: a dual-written deliverable + a backfill of the same briefing collapse to ONE', () => {
-    setFlagOverride(BRIEFING_FLAG, true);
     const draft = upsertBriefingDraft({ workspaceId: WS_A, weekOf: '2026-05-25', stories: stories(), sourceMetadata: null });
     const published = markPublished(WS_A, draft.id, { autoPublished: false })!;
     // Mirror via dual-write → one briefing:<id> deliverable.

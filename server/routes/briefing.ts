@@ -28,8 +28,8 @@ import { InvalidTransitionError } from '../state-machines.js';
 import { runBriefingForWorkspace } from '../briefing-cron.js';
 import { notifyClientBriefingReady } from '../email.js';
 import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { buildBriefingClientView } from '../briefing-client-projection.js';
 import { mirrorBriefingToDeliverable } from '../domains/inbox/briefing-dual-write.js';
@@ -143,8 +143,7 @@ router.post(
         return res.status(404).json({ error: 'Draft not found' });
       }
 
-      // DARK dual-write (PR-1fg): mirror the just-published briefing into client_deliverable as a
-      // one-way notification when the `unified-deliverables-rest` flag is on (default off → no-op).
+      // Mirror the just-published briefing into client_deliverable as a one-way notification.
       // Best-effort/never-throws so it can never break the live publish. Idempotent on briefing:<id>.
       mirrorBriefingToDeliverable(updated);
 

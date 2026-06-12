@@ -16,9 +16,8 @@ import {
   getClientLocations,
   updateClientLocation,
 } from '../client-locations.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import db from '../db/index.js';
-import { createJob, hasActiveJob, updateJob } from '../jobs.js';
+import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
 import { createLogger } from '../logger.js';
 import {
   countLocalVisibilitySnapshots,
@@ -34,6 +33,7 @@ import { validate, z } from '../middleware/validate.js';
 import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   LOCAL_SEO_DEVICE,
@@ -93,6 +93,17 @@ const refreshSchema = z.object({
   keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP).optional(),
   device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
   languageCode: z.string().min(2).max(8).optional(),
+  // When true, a successful refresh (crawl that produced data) chains a
+  // keyword-strategy regen server-side so it survives a closed tab. Threaded
+  // through to runLocalSeoRefreshJob, which gates on result.refreshed > 0.
+  thenRegenerateStrategy: z.boolean().optional(),
+  strategyGeneration: z.object({
+    businessContext: z.string().max(20_000).optional(),
+    seoDataMode: z.enum(['none', 'quick', 'full']).optional(),
+    seoDataProvider: z.string().min(1).max(80).optional(),
+    competitorDomains: z.array(z.string().min(1).max(255)).max(50).optional(),
+    maxPages: z.number().int().min(0).max(KEYWORD_STRATEGY_MAX_PAGE_CAP).optional(),
+  }).strict().optional(),
 }).strict();
 
 const locationLookupQuerySchema = z.object({
@@ -128,9 +139,6 @@ const updateLocationSchema = z.object({
 }).strict();
 
 function ensureLocalSeoLocationsAvailable(workspaceId: string): { ok: true } | { ok: false; status: number; error: string } {
-  if (!isFeatureEnabled('local-seo-visibility')) {
-    return { ok: false, status: 403, error: 'Local SEO visibility is not enabled for this environment' };
-  }
   if (!getWorkspace(workspaceId)) {
     return { ok: false, status: 404, error: 'Workspace not found' };
   }
@@ -159,7 +167,7 @@ function recordLocationMutation(
 }
 
 router.get('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const payload = getLocalSeoReadModel(req.params.workspaceId, isFeatureEnabled('local-seo-visibility'), {
+  const payload = getLocalSeoReadModel(req.params.workspaceId, true, {
     includeSnapshots: req.query.includeSnapshots !== 'false',
   });
   if (!payload) return res.status(404).json({ error: 'Workspace not found' });
@@ -168,9 +176,6 @@ router.get('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'),
 
 router.put('/api/local-seo/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateSchema), (req, res, next) => {
   try {
-    if (!isFeatureEnabled('local-seo-visibility')) {
-      return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
-    }
     const payload = updateLocalSeoConfiguration(req.params.workspaceId, req.body, true);
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
@@ -187,9 +192,6 @@ router.put(
   requireWorkspaceAccess('workspaceId'),
   (req, res, next) => {
     try {
-      if (!isFeatureEnabled('local-seo-visibility')) {
-        return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
-      }
       setPrimaryMarket(req.params.workspaceId, req.params.marketId);
       res.json({ ok: true });
     } catch (err) {
@@ -203,9 +205,6 @@ router.put(
 
 router.get('/api/local-seo/:workspaceId/location-lookup', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {
-    if (!isFeatureEnabled('local-seo-visibility')) {
-      return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
-    }
     const parsed = locationLookupQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid local SEO location lookup request' });
@@ -220,9 +219,6 @@ router.get('/api/local-seo/:workspaceId/location-lookup', requireWorkspaceAccess
 
 router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('workspaceId'), validate(refreshSchema), (req, res) => {
   const workspaceId = req.params.workspaceId;
-  if (!isFeatureEnabled('local-seo-visibility')) {
-    return res.status(403).json({ error: 'Local SEO visibility is not enabled for this environment' });
-  }
   const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, workspaceId);
   if (active) return res.status(409).json({ error: 'Local SEO refresh is already running for this workspace', jobId: active.id });
   // Global cross-workspace coalescing — each refresh holds DataForSEO SERP responses
@@ -247,6 +243,7 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
     total: Math.max(1, plan.markets.length * plan.keywords.length),
     message: 'Preparing local SEO visibility refresh...',
   });
+  registerAbort(job.id);
   res.json({ jobId: job.id, selectedKeywordCount: plan.keywords.length, selectedMarketCount: plan.markets.length });
   // Use .catch() instead of void so any unexpected throw (e.g. from addActivity/broadcastToWorkspace
   // after the main loop) becomes a logged error + failed job rather than an unhandled rejection

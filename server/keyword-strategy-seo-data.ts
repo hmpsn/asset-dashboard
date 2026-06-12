@@ -9,7 +9,6 @@ import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } 
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { isFeatureEnabled } from './feature-flags.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -172,15 +171,13 @@ export async function fetchAndCacheKeywordStrategySeoData({
   if (fetchCompetitors && competitorDomains.length > 0) {
     try {
       const compLimit = seoDataMode === 'full' ? 200 : 50;
-      const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
-      const fetchLimit = compLimit * fetchMultiplier;
+      const fetchLimit = compLimit;
 
       const cappedCompetitorDomains = competitorDomains.slice(0, MAX_COMPETITORS);
       sendProgress('seo-data', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
       for (const comp of cappedCompetitorDomains) {
         const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         try {
-          // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
           const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
           const compKws = [...rawKws]
             .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
@@ -251,7 +248,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
   // prompt's seoContext discovery block with en keywords while the pool carries
   // resolved-language ones. On flag-ON we skip it; the prompt still gets discovery
   // context through the universe-built KEYWORD POOL block. Flag-OFF is unchanged. (I2)
-  const universeOwnsDiscovery = isFeatureEnabled('seo-generation-quality', ws.id);
+  const universeOwnsDiscovery = true;
   if (seoDataMode === 'full' && !universeOwnsDiscovery) {
     try {
       sendProgress('seo-data', 'Expanding keyword discovery sources...', 0.63);

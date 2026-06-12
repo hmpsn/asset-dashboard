@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   addTrackedKeyword,
@@ -9,6 +8,7 @@ import {
   storeRankSnapshot,
 } from '../../server/rank-tracking.js';
 import { reconcileStrategyRankTracking } from '../../server/rank-tracking-reconciliation.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -59,12 +59,14 @@ describe('reconcileStrategyRankTracking', () => {
       { query: 'Dentist Austin', position: 4, clicks: 9, impressions: 300, ctr: 0.03 },
     ]);
 
+    // siteKeywordMetrics is table-only post-strip — the reconcile join reads it
+    // from the site_keyword_metrics table, not off the keywordStrategy Pick.
+    replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'dentist austin', volume: 900, difficulty: 34 }]);
     const changeSet = reconcileStrategyRankTracking({
       workspaceId,
       generatedAt,
       keywordStrategy: {
         siteKeywords: ['dentist austin'],
-        siteKeywordMetrics: [{ keyword: 'dentist austin', volume: 900, difficulty: 34 }],
         generatedAt,
       },
       pageMap: [
@@ -150,26 +152,33 @@ describe('reconcileStrategyRankTracking', () => {
   it('retains, reassigns, replaces, deprecates, and manually preserves tracked keywords', () => {
     const previousRun = '2026-05-01T10:00:00.000Z';
     const generatedAt = '2026-05-19T10:00:00.000Z';
+    // Wave 3d-ii: genuine strategy-owned rows seed strategyOwned:true explicitly
+    // (reconcile is the real-world writer of it; here we stand in for a prior
+    // reconcile so the deprecation/reassign/replace assertions stay meaningful).
     addTrackedKeyword(workspaceId, 'retained keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/old-retained',
       strategyGeneratedAt: previousRun,
       lastStrategySeenAt: previousRun,
     });
     addTrackedKeyword(workspaceId, 'reassigned keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/old-page',
       strategyGeneratedAt: previousRun,
       lastStrategySeenAt: previousRun,
     });
     addTrackedKeyword(workspaceId, 'old page keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/replace-me',
       strategyGeneratedAt: previousRun,
       lastStrategySeenAt: previousRun,
     });
     addTrackedKeyword(workspaceId, 'old site keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+      strategyOwned: true,
       strategyGeneratedAt: previousRun,
       lastStrategySeenAt: previousRun,
     });
@@ -179,6 +188,7 @@ describe('reconcileStrategyRankTracking', () => {
     addTrackedKeyword(workspaceId, 'pinned old strategy keyword', {
       pinned: true,
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/pinned-page',
     });
 
@@ -253,6 +263,7 @@ describe('reconcileStrategyRankTracking', () => {
     const secondRun = '2026-05-20T10:00:00.000Z';
     addTrackedKeyword(workspaceId, 'paper tiger', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/platform',
       strategyGeneratedAt: firstRun,
       lastStrategySeenAt: firstRun,
@@ -295,11 +306,12 @@ describe('reconcileStrategyRankTracking', () => {
   });
 
   it('normalizes legacy tracked keyword rows and preserves active rank output metadata', () => {
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: 'Legacy Keyword', addedAt: '2026-05-01T00:00:00.000Z' }]));
+    // Wave 3c-iii-b: the row table is the SOLE store — seed via the table writer
+    // (a legacy UNKNOWN-source keyword) instead of a raw blob INSERT (the blob is no
+    // longer read).
+    addTrackedKeyword(workspaceId, 'Legacy Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
 
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
@@ -341,33 +353,43 @@ describe('reconcileStrategyRankTracking', () => {
     ]));
   });
 
-  it('preserves legacy unknown tracked keywords instead of retiring them after strategy drift', () => {
+  it('preserves a legacy unknown keyword that is NOT a current strategy target (reconcile never owned it)', () => {
+    // Wave 3d-ii: ownership is established ONLY by reconcile, and ONLY for keywords
+    // that match a current target. A legacy UNKNOWN keyword that is NOT a target is
+    // never marked strategyOwned, so it is manually preserved across drift — the
+    // conservative default (strategy_owned NULL is never auto-deprecated).
     const firstRun = '2026-05-19T10:00:00.000Z';
     const secondRun = '2026-05-20T10:00:00.000Z';
-    db.prepare(`
-      INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
-      VALUES (?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = excluded.tracked_keywords
-    `).run(workspaceId, JSON.stringify([{ query: 'Legacy Manual Keyword', addedAt: '2026-05-01T00:00:00.000Z' }]));
+    // Wave 3c-iii-b: seed the legacy UNKNOWN keyword via the table writer (the blob
+    // is no longer a store). UNKNOWN source + no strategyOwned = the realistic
+    // "ownership unknown, not a strategy target" case this test exercises.
+    addTrackedKeyword(workspaceId, 'Legacy Manual Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
 
-    reconcileStrategyRankTracking({
+    // First reconcile: the legacy keyword is NOT among the targets, so reconcile
+    // leaves it untouched (manually preserved) and never establishes ownership.
+    const firstChange = reconcileStrategyRankTracking({
       workspaceId,
       generatedAt: firstRun,
       keywordStrategy: {
-        siteKeywords: ['legacy manual keyword'],
+        siteKeywords: ['some other site keyword'],
         generatedAt: firstRun,
       },
       pageMap: [],
     });
+    expect(firstChange.manuallyPreserved.map(k => k.query)).toContain('Legacy Manual Keyword');
 
-    expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual([
+    expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
       expect.objectContaining({
         query: 'Legacy Manual Keyword',
         source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
       }),
-    ]);
+    ]));
 
+    // Second reconcile with a different target set: still never a target, still
+    // manually preserved, never deprecated.
     const changeSet = reconcileStrategyRankTracking({
       workspaceId,
       generatedAt: secondRun,
@@ -380,11 +402,59 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(changeSet.manuallyPreserved.map(k => k.query)).toContain('Legacy Manual Keyword');
     expect(changeSet.deprecated.map(k => k.query)).not.toContain('Legacy Manual Keyword');
-    expect(getTrackedKeywords(workspaceId)).toEqual([
+    expect(getTrackedKeywords(workspaceId)).toEqual(expect.arrayContaining([
       expect.objectContaining({
         query: 'Legacy Manual Keyword',
         source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      }),
+    ]));
+  });
+
+  it('OWNS a legacy unknown keyword once it matches a current strategy target, then deprecates it on drift', () => {
+    // Wave 3d-ii reconcile-sets-it: a legacy UNKNOWN keyword that IS a declared
+    // current site-keyword target is a genuine strategy target — reconcile adopts
+    // the strategy source and establishes ownership (strategyOwned=true). When it
+    // later drifts off the targets, reconcile (the now-owner) deprecates it. This
+    // is the intended decoupled-ownership behavior, NOT the old source-conflation.
+    const firstRun = '2026-05-19T10:00:00.000Z';
+    const secondRun = '2026-05-20T10:00:00.000Z';
+    // Wave 3c-iii-b: seed the legacy UNKNOWN keyword via the table writer (the blob
+    // is no longer a store). The display form differs in case from the strategy
+    // target ('adopted keyword') to exercise the canonical-variant match below.
+    addTrackedKeyword(workspaceId, 'Adopted Keyword', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
+
+    reconcileStrategyRankTracking({
+      workspaceId,
+      generatedAt: firstRun,
+      keywordStrategy: { siteKeywords: ['adopted keyword'], generatedAt: firstRun },
+      pageMap: [],
+    });
+
+    // Adopted the strategy source (existing was UNKNOWN) and is now active.
+    expect(getTrackedKeywords(workspaceId)).toEqual([
+      expect.objectContaining({
+        query: 'Adopted Keyword',
+        source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+        status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      }),
+    ]);
+
+    const changeSet = reconcileStrategyRankTracking({
+      workspaceId,
+      generatedAt: secondRun,
+      keywordStrategy: { siteKeywords: [], generatedAt: secondRun },
+      pageMap: [],
+    });
+
+    expect(changeSet.deprecated.map(k => k.query)).toContain('Adopted Keyword');
+    expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual([
+      expect.objectContaining({
+        query: 'Adopted Keyword',
+        status: TRACKED_KEYWORD_STATUS.DEPRECATED,
+        deprecatedAt: secondRun,
       }),
     ]);
   });
@@ -393,6 +463,7 @@ describe('reconcileStrategyRankTracking', () => {
     const generatedAt = '2026-05-19T10:00:00.000Z';
     addTrackedKeyword(workspaceId, 'strategy duplicate keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/strategy-page',
       strategyGeneratedAt: generatedAt,
       lastStrategySeenAt: generatedAt,
@@ -432,11 +503,12 @@ describe('reconcileStrategyRankTracking', () => {
     ]);
   });
 
-  it('clears page ownership only when a strategy primary keyword becomes site-wide', () => {
+  it('clears page ownership when a strategy primary keyword becomes site-wide (source no longer laundered)', () => {
     const firstRun = '2026-05-19T10:00:00.000Z';
     const secondRun = '2026-05-20T10:00:00.000Z';
     addTrackedKeyword(workspaceId, 'demoted keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
       pagePath: '/old-page',
       pageTitle: 'Old Page',
       strategyGeneratedAt: firstRun,
@@ -453,10 +525,15 @@ describe('reconcileStrategyRankTracking', () => {
       pageMap: [],
     });
 
+    // Wave 3d-ii: page ownership (pagePath/pageTitle) is STILL cleared when the
+    // incoming target is a site keyword — that is driven by the TARGET source, not
+    // the keyword's own. But mergeTarget no longer OVERWRITES the keyword's existing
+    // source enum (de-laundering), so it stays STRATEGY_PRIMARY. Ownership is carried
+    // by strategyOwned, which the merge keeps true.
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
         query: 'demoted keyword',
-        source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+        source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
         lastStrategySeenAt: secondRun,
       }),
     ]);
@@ -471,6 +548,7 @@ describe('reconcileStrategyRankTracking', () => {
     const thirdRun = '2026-05-21T10:00:00.000Z';
     addTrackedKeyword(workspaceId, 'old strategy keyword', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+      strategyOwned: true,
       strategyGeneratedAt: firstRun,
       lastStrategySeenAt: firstRun,
     });

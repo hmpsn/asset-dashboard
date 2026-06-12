@@ -1,6 +1,5 @@
 /**
  * Wave 18 — Integration tests for rewrite-chat routes (validation paths)
- * Port: 13441
  *
  * Routes tested (server/routes/rewrite-chat.ts):
  *   GET  /api/rewrite-chat/:workspaceId/pages     — list pages from snapshot
@@ -12,9 +11,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13441, { env: { OPENAI_API_KEY: '' } }); // port-ok: wave-18-a3 range 13440-13454
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { api, postJson } = ctx;
 
 let workspaceId = '';

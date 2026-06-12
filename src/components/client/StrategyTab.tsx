@@ -8,15 +8,18 @@ import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
+import { useClientIntelligence } from '../../hooks/client';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
 import { StrategyDeclinedKeywordsSection } from './strategy/StrategyDeclinedKeywordsSection';
 import { StrategyDeclineKeywordModal } from './strategy/StrategyDeclineKeywordModal';
+import { StrategyKeywordFeedbackSummaryCard } from './strategy/StrategyKeywordFeedbackSummaryCard';
 import { StrategyKeywordDrawer } from './strategy/StrategyKeywordDrawer';
 import { StrategyKeywordsSection } from './strategy/StrategyKeywordsSection';
 import { StrategyNextStepsSection } from './strategy/StrategyNextStepsSection';
 import { StrategyPageKeywordMapSection } from './strategy/StrategyPageKeywordMapSection';
+import { StrategyRequestedKeywordTrendSection } from './strategy/StrategyRequestedKeywordTrendSection';
 import { StrategyPageImprovementsSection } from './strategy/StrategyPageImprovementsSection';
 import { StrategyRefreshSummarySection } from './strategy/StrategyRefreshSummarySection';
 import { StrategySnapshotSection } from './strategy/StrategySnapshotSection';
@@ -88,6 +91,11 @@ function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkT
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [searchParams] = useSearchParams();
+  const { data: clientIntelligence } = useClientIntelligence(workspaceId ?? '');
+  const keywordFeedbackSummary =
+    effectiveTier !== 'free' && clientIntelligence?.tier !== 'free'
+      ? clientIntelligence?.keywordFeedbackSummary
+      : null;
   const initialDeepLinkTab = searchParams.get('tab');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const initial = new Set(['new-content', 'optimize-existing']);
@@ -112,6 +120,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const {
     priorities,
     prioritiesLoaded,
+    prioritiesError,
+    reloadPriorities,
     newPriority,
     setNewPriority,
     newPriorityCategory,
@@ -616,12 +626,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       searchIntent: page?.searchIntent ?? contentGap?.intent,
       impressions,
       clicks: page?.clicks,
+      cpc: page?.cpc, // Task 3.2: realized-$ input joined from page_keywords
       metricsSource,
       contextSources,
       rationale: contentGap?.rationale,
       trendDirection: contentGap?.trendDirection,
       enrichmentStatus,
       explanation,
+      // Task 2.3: server-computed value reasons from the explanation (flag-gated, never re-derived).
+      valueReasons: explanation?.valueReasons,
+      // Task 3.3: server-computed realized $ (one keywordDollarValue definition). Never re-derived client-side.
+      currentMonthly: explanation?.currentMonthly,
+      upsideMonthly: explanation?.upsideMonthly,
     };
   };
 
@@ -697,6 +713,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         onManageKeywords={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
 
+      {keywordFeedbackSummary && (
+        <StrategyKeywordFeedbackSummaryCard summary={keywordFeedbackSummary} />
+      )}
+
       {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
       {(feedbackLoadError || trackedKeywordsError) && (
         <div className="space-y-1">
@@ -719,6 +739,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         businessPrioritiesRef={businessPrioritiesRef}
         workspaceId={workspaceId}
         prioritiesLoaded={prioritiesLoaded}
+        prioritiesError={prioritiesError}
+        reloadPriorities={() => { void reloadPriorities(); }}
         priorities={priorities}
         newPriority={newPriority}
         setNewPriority={setNewPriority}
@@ -792,6 +814,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       </div>
 
+      {/* ── REQUESTED KEYWORD RANK TREND (A4, audit #15) ── */}
+      <StrategyRequestedKeywordTrendSection
+        workspaceId={workspaceId}
+        trackedKeywords={trackedKeywords}
+        effectiveTier={effectiveTier}
+      />
+
       <StrategyPageKeywordMapSection
         effectiveTier={effectiveTier}
         pageMap={strategyData.pageMap}
@@ -829,6 +858,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             drawerRow={drawerRow}
             drawerClosing={drawerClosing}
             drawerRef={drawerRef}
+            effectiveTier={effectiveTier}
             drawerEvidenceOpen={drawerEvidenceOpen}
             setDrawerEvidenceOpen={setDrawerEvidenceOpen}
             removingKeyword={removingKeyword}

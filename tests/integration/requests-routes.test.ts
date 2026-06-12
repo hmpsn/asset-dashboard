@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13346); // port-ok: 13201-13345 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, clearCookies } = ctx;
 
 let workspaceId = '';
@@ -145,8 +145,10 @@ describe('requests routes', () => {
     });
 
     clearCookies();
-    const unauthenticatedRes = await postJson(`/api/public/requests/${protectedWorkspaceId}/${request.id}/notes`, {
-      content: 'This should not save.',
+    const unauthenticatedRes = await api(`/api/public/requests/${protectedWorkspaceId}/${request.id}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ content: 'This should not save.' }),
     });
     expect(unauthenticatedRes.status).toBe(401);
     expect(getRequest(request.id)?.notes).toHaveLength(0);

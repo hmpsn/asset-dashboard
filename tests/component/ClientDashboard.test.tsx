@@ -10,7 +10,7 @@
  *    without rendering.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -64,6 +64,11 @@ vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: vi.fn(() => false),
 }));
 
+vi.mock('../../src/hooks/useRecommendations', () => ({
+  useRecommendations: vi.fn(() => ({ recs: [], loaded: false })),
+  useRecommendationSet: vi.fn(() => ({ data: undefined })),
+}));
+
 vi.mock('../../src/hooks/usePayments', () => ({
   usePayments: vi.fn(() => ({
     pricingModal: null,
@@ -93,7 +98,6 @@ vi.mock('../../src/hooks/client/useClientQueries', () => ({
   useClientStrategy: () => ({ data: null, isLoading: false, error: null }),
   useClientPricing: () => ({ data: null, isLoading: false, error: null }),
   useClientContentPlan: () => ({ data: null, isLoading: false, error: null }),
-  useClientPageKeywords: () => ({ data: null, isLoading: false, error: null }),
   useClientCopyEntries: () => ({ data: 0, isLoading: false, error: null }),
 }));
 
@@ -191,7 +195,14 @@ vi.mock('../../src/components/client/PerformanceTab', () => ({
   PerformanceTab: () => <div data-testid="performance-tab">Performance</div>,
 }));
 vi.mock('../../src/components/client/HealthTab', () => ({
-  HealthTab: () => <div data-testid="health-tab">Health</div>,
+  HealthTab: ({ impactBandsByCheck }: { impactBandsByCheck?: Record<string, unknown> }) => (
+    <div
+      data-testid="health-tab"
+      data-impact-bands={impactBandsByCheck ? JSON.stringify(impactBandsByCheck) : undefined}
+    >
+      Health
+    </div>
+  ),
 }));
 vi.mock('../../src/components/client/StrategyTab', () => ({
   StrategyTab: () => <div data-testid="strategy-tab">Strategy</div>,
@@ -227,6 +238,7 @@ vi.mock('../../src/lib/lazyWithRetry', () => ({
 // ── Now import subject under test ─────────────────────────────────────────────
 import { get, getOptional } from '../../src/api/client';
 import { ClientDashboard } from '../../src/components/ClientDashboard';
+import { useRecommendations } from '../../src/hooks/useRecommendations';
 import {
   resolveClientTab,
   KNOWN_CLIENT_TABS,
@@ -283,58 +295,45 @@ function renderDashboard(
 
 describe('resolveClientTab', () => {
   it('returns overview for undefined input', () => {
-    expect(resolveClientTab(undefined, false)).toBe('overview');
+    expect(resolveClientTab(undefined)).toBe('overview');
   });
 
   it('returns overview for null input', () => {
-    expect(resolveClientTab(null, false)).toBe('overview');
+    expect(resolveClientTab(null)).toBe('overview');
   });
 
   it('returns overview for an empty string', () => {
-    expect(resolveClientTab('', false)).toBe('overview');
+    expect(resolveClientTab('')).toBe('overview');
   });
 
   it('returns overview for an unknown tab', () => {
-    expect(resolveClientTab('completely-unknown-tab', false)).toBe('overview');
+    expect(resolveClientTab('completely-unknown-tab')).toBe('overview');
   });
 
   it('maps legacy "search" alias to performance', () => {
-    expect(resolveClientTab('search', false)).toBe('performance');
+    expect(resolveClientTab('search')).toBe('performance');
   });
 
   it('maps legacy "analytics" alias to performance', () => {
-    expect(resolveClientTab('analytics', false)).toBe('performance');
+    expect(resolveClientTab('analytics')).toBe('performance');
   });
 
   it('maps retired "schema-review" to inbox', () => {
-    expect(resolveClientTab('schema-review', false)).toBe('inbox');
+    expect(resolveClientTab('schema-review')).toBe('inbox');
   });
 
-  it('resolves "brand" to overview when feature flag is off', () => {
-    expect(resolveClientTab('brand', false)).toBe('overview');
+  it('passes through "brand"', () => {
+    expect(resolveClientTab('brand')).toBe('brand');
   });
 
-  it('resolves "brand" to brand when feature flag is on', () => {
-    expect(resolveClientTab('brand', true)).toBe('brand');
-  });
-
-  it('passes through every known tab unchanged (flag=false)', () => {
-    const flaggedTabs = new Set(['brand']);
+  it('passes through every known tab unchanged', () => {
     for (const tab of KNOWN_CLIENT_TABS) {
-      if (!flaggedTabs.has(tab)) {
-        expect(resolveClientTab(tab, false)).toBe(tab);
-      }
+      expect(resolveClientTab(tab)).toBe(tab);
     }
   });
 
-  it('passes through every known tab unchanged (flag=true)', () => {
-    for (const tab of KNOWN_CLIENT_TABS) {
-      expect(resolveClientTab(tab, true)).toBe(tab);
-    }
-  });
-
-  it('KNOWN_CLIENT_TABS excludes brand (it is feature-flagged, not pass-through)', () => {
-    expect(KNOWN_CLIENT_TABS).not.toContain('brand');
+  it('KNOWN_CLIENT_TABS includes brand', () => {
+    expect(KNOWN_CLIENT_TABS).toContain('brand');
   });
 
   it('KNOWN_CLIENT_TABS excludes search and analytics (they are aliases)', () => {
@@ -557,35 +556,14 @@ describe('ClientDashboard — tab content', () => {
   });
 });
 
-// ── Component: feature-flag gating ───────────────────────────────────────────
-
-describe('ClientDashboard — feature flag gating', () => {
+describe('ClientDashboard — brand tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
     mockGetOptional.mockResolvedValue(null);
   });
 
-  it('does NOT render brand tab when client-brand-section flag is false', async () => {
-    const { useFeatureFlag } = await import('../../src/hooks/useFeatureFlag');
-    vi.mocked(useFeatureFlag).mockReturnValue(false);
-
-    const ws = makeWorkspace({ tier: 'growth' });
-    mockGet.mockResolvedValue(ws);
-
-    renderDashboard({ initialTab: 'brand' });
-
-    await waitFor(() => {
-      // brand resolves to overview when flag is off
-      expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('brand-tab')).not.toBeInTheDocument();
-  });
-
-  it('renders brand tab when client-brand-section flag is true', async () => {
-    const { useFeatureFlag } = await import('../../src/hooks/useFeatureFlag');
-    vi.mocked(useFeatureFlag).mockReturnValue(true);
-
+  it('renders brand tab when selected directly', async () => {
     const ws = makeWorkspace({ tier: 'premium' });
     mockGet.mockResolvedValue(ws);
 
@@ -603,11 +581,12 @@ describe('ClientDashboard — trial banners', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
     mockGetOptional.mockResolvedValue(null);
   });
 
-  it('shows a countdown banner when trial has ≤10 days remaining', async () => {
-    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, tier: 'growth' });
+  it('shows a countdown banner when trial has 5 days remaining', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
     mockGet.mockResolvedValue(ws);
 
     renderDashboard();
@@ -617,8 +596,20 @@ describe('ClientDashboard — trial banners', () => {
     });
   });
 
+  it('does NOT show a countdown banner when trial has 6 days remaining', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 6, tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/days left on your Growth trial/i)).not.toBeInTheDocument();
+  });
+
   it('shows singular "day" when exactly 1 day remains', async () => {
-    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 1, tier: 'growth' });
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 1, trialEndsAt: '2026-06-12T00:00:00.000Z', tier: 'growth' });
     mockGet.mockResolvedValue(ws);
 
     renderDashboard();
@@ -626,6 +617,46 @@ describe('ClientDashboard — trial banners', () => {
     await waitFor(() => {
       expect(screen.getByText(/1 day\b/i)).toBeInTheDocument();
     });
+  });
+
+  it('opens Plans from the trial countdown CTA', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 days/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /view plans/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith('/client/ws-test/plans');
+  });
+
+  it('dismisses the trial countdown banner per workspace and trial end date', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 5, trialEndsAt: '2026-06-16T00:00:00.000Z', tier: 'growth' });
+    mockGet.mockResolvedValue(ws);
+
+    const view = renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 days/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss trial reminder/i }));
+
+    expect(screen.queryByText(/5 days/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem('client-trial-banner-dismissed:ws-test:2026-06-16T00:00:00.000Z')).toBe('1');
+
+    view.unmount();
+    mockGet.mockResolvedValue(ws);
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/5 days/i)).not.toBeInTheDocument();
   });
 
   it('shows "trial has ended" banner when trialDaysRemaining is 0', async () => {
@@ -657,6 +688,18 @@ describe('ClientDashboard — trial banners', () => {
     mockGet.mockResolvedValue(ws);
 
     renderDashboard({ betaMode: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/days left/i)).not.toBeInTheDocument();
+  });
+
+  it('does NOT show trial banners for external billing workspaces', async () => {
+    const ws = makeWorkspace({ isTrial: true, trialDaysRemaining: 3, tier: 'growth', billingMode: 'external' });
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard();
 
     await waitFor(() => {
       expect(screen.getByTestId('client-header')).toBeInTheDocument();
@@ -734,5 +777,142 @@ describe('ClientDashboard — JWT auto-auth', () => {
       expect(screen.getByTestId('client-header')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('client-auth-gate')).not.toBeInTheDocument();
+  });
+});
+
+// ── R1-A → R1-B seam: impactBandsByCheck prop flow ───────────────────────────
+//
+// Asserts that ClientDashboard builds the per-check impact map from the
+// client recommendations and passes it through to HealthTab.
+
+describe('ClientDashboard — impactBandsByCheck wiring (R1 seam)', () => {
+  const mockUseRecommendations = vi.mocked(useRecommendations);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    mockGetOptional.mockResolvedValue(null);
+  });
+
+  it('passes impactBandsByCheck to HealthTab derived from audit-sourced recs', async () => {
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    // Stub two audit recs with impactBand — one with audit: prefix, one site-wide
+    mockUseRecommendations.mockReturnValue({
+      recs: [
+        {
+          id: 'rec-1',
+          workspaceId: 'ws-test',
+          priority: 'fix_now',
+          type: 'metadata',
+          title: 'Fix titles',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'high',
+          effort: 'low',
+          impactScore: 80,
+          source: 'audit:title',
+          affectedPages: ['/home'],
+          trafficAtRisk: 200,
+          impressionsAtRisk: 1000,
+          estimatedGain: 'Better rankings',
+          actionType: 'purchase',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'medium', monthlyRangeUsd: [100, 200] },
+        },
+        {
+          id: 'rec-2',
+          workspaceId: 'ws-test',
+          priority: 'fix_soon',
+          type: 'schema',
+          title: 'Add schema',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'medium',
+          effort: 'medium',
+          impactScore: 55,
+          source: 'audit:structured-data',
+          affectedPages: ['/about'],
+          trafficAtRisk: 50,
+          impressionsAtRisk: 200,
+          estimatedGain: 'Richer SERP',
+          actionType: 'purchase',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'low', monthlyRangeUsd: [30, 60] },
+        },
+      ],
+      loaded: true,
+      forPage: vi.fn(),
+      ofType: vi.fn(),
+      forPageAndType: vi.fn(),
+    });
+
+    renderDashboard({ initialTab: 'health' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('health-tab')).toBeInTheDocument();
+    });
+
+    const healthTab = screen.getByTestId('health-tab');
+    const rawBands = healthTab.getAttribute('data-impact-bands');
+    expect(rawBands).not.toBeNull();
+    const bands = JSON.parse(rawBands!);
+    expect(bands.title).toEqual({ band: 'medium', monthlyRangeUsd: [100, 200] });
+    expect(bands['structured-data']).toEqual({ band: 'low', monthlyRangeUsd: [30, 60] });
+  });
+
+  it('passes an empty impactBandsByCheck when recs have no audit source', async () => {
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    mockUseRecommendations.mockReturnValue({
+      recs: [
+        {
+          id: 'rec-1',
+          workspaceId: 'ws-test',
+          priority: 'fix_soon',
+          type: 'content',
+          title: 'Content gap',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'medium',
+          effort: 'medium',
+          impactScore: 40,
+          source: 'strategy:content-gap',
+          affectedPages: [],
+          trafficAtRisk: 0,
+          impressionsAtRisk: 0,
+          estimatedGain: 'More traffic',
+          actionType: 'content_creation',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'medium', monthlyRangeUsd: [80, 160] },
+        },
+      ],
+      loaded: true,
+      forPage: vi.fn(),
+      ofType: vi.fn(),
+      forPageAndType: vi.fn(),
+    });
+
+    renderDashboard({ initialTab: 'health' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('health-tab')).toBeInTheDocument();
+    });
+
+    const healthTab = screen.getByTestId('health-tab');
+    // data-impact-bands attr should be absent (empty object → adapter renders undefined)
+    // OR be an empty object — either is acceptable; both mean "no impact for any check"
+    const rawBands = healthTab.getAttribute('data-impact-bands');
+    if (rawBands !== null) {
+      expect(JSON.parse(rawBands)).toEqual({});
+    }
   });
 });

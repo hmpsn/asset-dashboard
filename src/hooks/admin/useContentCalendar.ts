@@ -22,6 +22,8 @@ interface CalendarPost {
   status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   totalWordCount: number;
   publishedAt?: string;
+  /** W6.6: admin-set planned/scheduled publish date for forward-planning. */
+  plannedPublishAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,7 +40,16 @@ interface CalendarRequest {
 
 type ItemType = 'brief' | 'post' | 'request' | 'matrix';
 
-interface CalendarItem {
+/**
+ * W6.6: distinguishes how a post item is plotted on the calendar:
+ *  - 'published' — plotted on publishedAt (historical record)
+ *  - 'planned'   — plotted on plannedPublishAt (forward-planning intent)
+ *  - 'created'   — plotted on createdAt (fallback for unscheduled drafts)
+ * Briefs/requests/matrices are always 'created'.
+ */
+export type CalendarItemKind = 'published' | 'planned' | 'created';
+
+export interface CalendarItem {
   id: string;
   type: ItemType;
   label: string;
@@ -46,6 +57,22 @@ interface CalendarItem {
   status: string;
   date: string; // ISO date string
   publishedAt?: string;
+  /** W6.6: how this item is plotted — drives visual treatment + future-month rendering. */
+  kind: CalendarItemKind;
+}
+
+/**
+ * W6.6: pure derivation of how a post item is plotted on the calendar and on which
+ * date. Exported for unit testing. Published wins (historical record), then planned
+ * (forward-looking intent), then created (unscheduled fallback).
+ */
+export function derivePostPlot(post: { publishedAt?: string; plannedPublishAt?: string; createdAt: string }): {
+  kind: CalendarItemKind;
+  date: string;
+} {
+  if (post.publishedAt) return { kind: 'published', date: post.publishedAt };
+  if (post.plannedPublishAt) return { kind: 'planned', date: post.plannedPublishAt };
+  return { kind: 'created', date: post.createdAt };
 }
 
 export function useContentCalendar(workspaceId: string) {
@@ -53,10 +80,10 @@ export function useContentCalendar(workspaceId: string) {
     queryKey: queryKeys.admin.contentCalendar(workspaceId),
     queryFn: async (): Promise<CalendarItem[]> => {
       const [briefsData, postsData, requestsData, matricesData] = await Promise.all([
-        contentBriefs.list(workspaceId).catch(() => []),
-        contentPosts.list(workspaceId).catch(() => []),
-        contentRequests.list(workspaceId).catch(() => []),
-        contentMatrices.list(workspaceId).catch(() => []),
+        contentBriefs.list(workspaceId),
+        contentPosts.list(workspaceId),
+        contentRequests.list(workspaceId),
+        contentMatrices.list(workspaceId),
       ]);
 
       const allItems: CalendarItem[] = [];
@@ -70,19 +97,25 @@ export function useContentCalendar(workspaceId: string) {
           sublabel: b.targetKeyword,
           status: 'created',
           date: b.createdAt,
+          kind: 'created',
         });
       }
 
-      // Process posts
+      // Process posts — W6.6: plot on the most meaningful date.
+      // Published posts plot on publishedAt ('published'). Unpublished posts with an
+      // admin-set plannedPublishAt plot there ('planned', forward-looking). Everything
+      // else falls back to createdAt ('created').
       for (const p of postsData as CalendarPost[]) {
+        const { kind, date } = derivePostPlot(p);
         allItems.push({
           id: p.id,
           type: 'post',
           label: p.title,
           sublabel: p.targetKeyword,
           status: p.status,
-          date: p.publishedAt || p.createdAt,
+          date,
           publishedAt: p.publishedAt,
+          kind,
         });
       }
 
@@ -95,6 +128,7 @@ export function useContentCalendar(workspaceId: string) {
           sublabel: r.targetKeyword,
           status: r.status,
           date: r.requestedAt,
+          kind: 'created',
         });
       }
 
@@ -107,6 +141,7 @@ export function useContentCalendar(workspaceId: string) {
           sublabel: `${m.cells?.length || 0} cells`,
           status: m.status || 'created',
           date: m.createdAt || m.updatedAt,
+          kind: 'created',
         });
       }
 

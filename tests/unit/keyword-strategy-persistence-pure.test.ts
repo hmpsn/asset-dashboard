@@ -641,8 +641,10 @@ describe('persistKeywordStrategy()', () => {
       expect(action.cnt).toBeGreaterThanOrEqual(1);
     });
 
-    it('does not duplicate the outcome action on second call', () => {
-      const ws = makeWorkspace('OutcomeNoDupe');
+    // A3 (audit #14): regeneration is a distinct trackable event — the old once-ever
+    // guard (`if (!getActionBySource(...))`) suppressed every regen after the first.
+    it('records a new strategy-level outcome action on each regeneration', () => {
+      const ws = makeWorkspace('OutcomeRegen');
 
       persistKeywordStrategy(makeMinimalOptions(ws));
       persistKeywordStrategy(makeMinimalOptions(ws));
@@ -650,7 +652,7 @@ describe('persistKeywordStrategy()', () => {
       const action = db.prepare(
         "SELECT COUNT(*) as cnt FROM tracked_actions WHERE workspace_id = ? AND source_type = 'strategy'",
       ).get(ws.id) as { cnt: number };
-      expect(action.cnt).toBe(1);
+      expect(action.cnt).toBe(2);
     });
   });
 

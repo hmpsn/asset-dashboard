@@ -147,6 +147,10 @@ export const workspaceLearningsDataSchema = z.object({
   strategy: strategyLearningsSchema.nullable(),
   technical: technicalLearningsSchema.nullable(),
   overall: overallLearningsSchema,
+  // A1: stamp of the computation-logic version that produced this cached blob.
+  // Optional because legacy/pre-A1 rows predate the stamp; a missing stamp is
+  // treated as a version mismatch (cache-invalid) on read. See LEARNINGS_LOGIC_VERSION.
+  logicVersion: z.number().optional(),
 });
 
 // --- Scoring Config ---

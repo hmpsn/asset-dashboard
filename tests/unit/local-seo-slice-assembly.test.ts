@@ -2,7 +2,7 @@
 //
 // Tests for server/intelligence/local-seo-slice.ts:
 //   - selectRelevantLocalCandidates (pure function, no DB needed)
-//   - assembleLocalSeo (DB-backed, feature-flag-controlled)
+//   - assembleLocalSeo (DB-backed, canonical local SEO read model)
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { LocalSeoSlice } from '../../shared/types/intelligence.js';
@@ -424,26 +424,6 @@ describe('assembleLocalSeo', () => {
     vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map());
     vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-  });
-
-  // ── Bug probe: feature flag disabled → returns baseline, never throws ────────
-
-  it('returns baseline with enabled=false and empty candidates when flag is off', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(false);
-
-    const result = await assembleLocalSeo('ws-flag-off');
-
-    expect(result.enabled).toBe(false);
-    expect(result.candidates).toHaveLength(0);
-    expect(result.markets).toHaveLength(0);
-    expect(result.locations).toHaveLength(0);
-    expect(result.effectiveLocalSeoBlock).toContain('disabled');
-  });
-
-  it('does not throw when flag is off', async () => {
-    vi.mocked(isFeatureEnabled).mockReturnValue(false);
-
-    await expect(assembleLocalSeo('ws-flag-off-nothrow')).resolves.toBeDefined();
   });
 
   // ── Bug probe: no markets → returns locations but empty candidates ────────────

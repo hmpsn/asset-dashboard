@@ -17,6 +17,7 @@ import type {
   CopyIntelligencePattern, EntryCopyStatus, BatchJob,
   ExportRequest, ExportResult,
 } from '../../shared/types/copy-pipeline';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 // ═══ BRANDSCRIPT ═══
 
@@ -118,8 +119,9 @@ export const blueprints = {
   remove: (wsId: string, blueprintId: string) =>
     del(`/api/page-strategy/${wsId}/${blueprintId}`),
 
+  /** Enqueue async blueprint generation. Returns { jobId }. */
   generate: (wsId: string, body: BlueprintGenerationInput) =>
-    post<SiteBlueprint>(`/api/page-strategy/${wsId}/generate`, body),
+    post<{ jobId: string }>(`/api/page-strategy/${wsId}/generate`, body),
 };
 
 type BlueprintEntryCreateBody = {
@@ -170,8 +172,9 @@ export const blueprintVersions = {
 // ═══ COPY PIPELINE ═══
 
 export const copyGeneration = {
+  /** Enqueue async copy generation. Returns { jobId }. */
   generate: (wsId: string, blueprintId: string, entryId: string, body?: { accumulatedSteering?: string[]; force?: boolean }) =>
-    post<{ sections: CopySection[]; metadata: CopyMetadata }>(
+    post<{ jobId: string }>(
       `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
       body ?? {}
     ),
@@ -213,10 +216,10 @@ export const copyReview = {
 
 export const copyBatch = {
   start: (wsId: string, blueprintId: string, body: { entryIds: string[]; mode?: string; batchSize?: number }) =>
-    post<{ batchId: string }>(
-      `/api/copy/${wsId}/${blueprintId}/batch`,
-      body
-    ),
+    post<{ batchId: string; jobId: string }>('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION,
+      params: { workspaceId: wsId, blueprintId, ...body },
+    }),
   getJob: (wsId: string, batchId: string) =>
     get<BatchJob | null>(`/api/copy/${wsId}/batch/${batchId}`),
 };

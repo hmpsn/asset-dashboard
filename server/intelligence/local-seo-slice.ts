@@ -3,7 +3,6 @@ import type { LocalSeoKeywordVisibility, LocalSeoVisibilityPosture } from '../..
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getClientLocations } from '../client-locations.js';
 import { createLogger } from '../logger.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 
 const log = createLogger('workspace-intelligence/local-seo');
 
@@ -26,11 +25,11 @@ const PROMPT_BLOCK_LOCATION_LIST_CAP = PROMPT_BLOCK_MARKET_LIST_CAP;
  *     PROMPT_BLOCK_TOTAL_CAP). AI consumers should inject this string
  *     directly per CLAUDE.md authority-layered fields rule.
  *
- * Workspaces with the feature flag off, no markets configured, or upstream
+ * Workspaces with no markets configured or upstream
  * failures still receive a typed empty-but-valid slice — never undefined.
  */
 export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSlice> {
-  const enabled = isFeatureEnabled('local-seo-visibility');
+  const enabled = true;
 
   const baseline: LocalSeoSlice = {
     locations: [],
@@ -40,13 +39,9 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     candidates: [],
     serviceGaps: [],
     competitorBrands: [],
-    effectiveLocalSeoBlock: enabled
-      ? 'Local SEO is enabled but no markets are configured for this workspace.'
-      : 'Local SEO is disabled for this workspace.',
+    effectiveLocalSeoBlock: 'Local SEO is enabled but no markets are configured for this workspace.',
     latestSnapshotAt: null,
   };
-
-  if (!enabled) return baseline;
 
   try {
     const locations: LocalSeoSlice['locations'] = getClientLocations(workspaceId)

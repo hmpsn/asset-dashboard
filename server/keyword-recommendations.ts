@@ -10,7 +10,7 @@ import { getWorkspace } from './workspaces.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { getQueryPageData } from './search-console.js';
 import { callAI } from './ai.js';
-import { parseAIJson } from './openai-helpers.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { checkKeywordCannibalization, type CannibalizationConflict } from './cannibalization-detection.js';
@@ -24,17 +24,21 @@ import type {
 } from '../shared/types/content.ts';
 import type { ClientSignalsSlice, LearningsSlice, SeoContextSlice } from '../shared/types/intelligence.ts';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
-import { sanitizeQueryForPrompt } from './helpers.js';
+import { sanitizeQueryForPrompt, stripCodeFences } from './helpers.js';
 import {
   evaluateKeywordCandidate,
   normalizeKeyword,
   opportunityScore,
   shouldIncludeKeywordCandidate,
 } from './keyword-intelligence/index.js';
+import { z } from 'zod';
 
 const log = createLogger('keyword-recommendations');
 
 const recommendationSlices = ['seoContext', 'learnings', 'clientSignals'] as const;
+const keywordRankingOutputSchema = z.object({
+  keywords: z.array(z.string().trim().min(1)).min(1),
+});
 
 type ConflictSeverity = CannibalizationConflict['severity'];
 
@@ -45,6 +49,13 @@ type ScoredCandidate = KeywordCandidate & {
   _fitSignals: string[];
   _conflictSeverity: ConflictSeverity | null;
 };
+
+export function parseKeywordRankingOutput(raw: string): string[] {
+  const parsed = parseJsonFallback<unknown>(stripCodeFences(raw).trim(), null);
+  const result = keywordRankingOutputSchema.safeParse(parsed);
+  if (!result.success) throw new Error('AI keyword ranking output failed schema validation');
+  return result.data.keywords;
+}
 
 interface CandidateScoringContext {
   seedKeyword: string;
@@ -365,6 +376,9 @@ export async function getKeywordRecommendations(
   const outcomeLearningStatusNote = buildOutcomeLearningStatusNote(
     recommendationContext?.learningsAvailability,
     'strategy',
+    // A6: on the no_data/degraded fallback tiers this appends the clearly-labeled
+    // cross-workspace benchmark; on ready/disabled it is a no-op inside the helper.
+    learnings?.platformPriors,
   );
 
   const seed = seedMetrics[0];
@@ -511,20 +525,18 @@ ${businessContext.slice(0, 2500)}
 KEYWORD CANDIDATES:
 ${kwList}
 
-Return a JSON array of the keywords in ranked order (best first). Only return the keyword strings:
-["best keyword", "second best", ...]`;
+Return ONLY a JSON object with this shape, ranking keywords best first:
+{ "keywords": ["best keyword", "second best"] }`;
 
   const result = await callAI({
-    model: 'gpt-5.4-mini',
+    operation: 'keyword-recommendation-rank',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.2,
-    feature: 'keyword-recommendations',
     workspaceId,
   });
 
-  const ranked = parseAIJson<string[]>(result.text);
-  if (!Array.isArray(ranked)) throw new Error('AI did not return an array');
+  const ranked = parseKeywordRankingOutput(result.text);
 
   const candidateMap = new Map(candidates.map(candidate => [normalizeKeyword(candidate.keyword), candidate])); // map-dup-ok — ranked input is already deduped before AI reordering
   const reordered: KeywordCandidate[] = [];

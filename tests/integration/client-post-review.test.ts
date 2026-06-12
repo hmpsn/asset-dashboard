@@ -10,14 +10,14 @@
  * Pattern follows tests/integration/content-requests-routes.test.ts.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { savePost, getPost, listPostVersions } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
-const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, clearCookies } = ctx;
 
 let testWsId = '';
@@ -161,7 +161,11 @@ describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
     updateContentRequest(privateWsId, req.id, { status: 'post_review', postId: req.postId });
 
     clearCookies();
-    const unauthenticatedRes = await postJson(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {});
+    const unauthenticatedRes = await api(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({}),
+    });
     expect(unauthenticatedRes.status).toBe(401);
     expect(getContentRequest(privateWsId, req.id)?.status).toBe('post_review');
     expect(countActivitiesForRequest(privateWsId, req.id, 'post_approved')).toBe(0);
@@ -376,6 +380,43 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     // conclusion: "Test conclusion" = 2 words
     // Total: 2 + 5 + 2 = 9 words
     expect(persisted?.totalWordCount).toBe(9);
+  });
+
+  it('sanitizes unsafe client rich text while preserving allowlisted formatting', async () => {
+    const briefId = `brief_sanitize_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Sanitize Test', targetKeyword: `sanitize-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '',
+      serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '<strong>Plain title</strong>',
+        sections: [
+          {
+            index: 0,
+            heading: '<em>Plain heading</em>',
+            content: '<p><strong>Allowed</strong> copy</p><script>alert("x")</script>',
+            wordCount: 2,
+          },
+        ],
+      }),
+    });
+
+    expect(editRes.status).toBe(200);
+    const updated = await editRes.json() as { title: string; sections: { heading: string; content: string }[] };
+    expect(updated.title).toBe('Plain title');
+    expect(updated.sections[0].heading).toBe('Plain heading');
+    expect(updated.sections[0].content).toBe('<p><strong>Allowed</strong> copy</p>');
   });
 
   it('coalesces rapid client edits into a single snapshot within 60 s', async () => {

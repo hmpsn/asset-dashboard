@@ -12,12 +12,12 @@
  * exercises the public GET endpoint — the actual client read path.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet, OpportunityScore } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13873); // port-ok: next free port above 13872
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, patchJson } = ctx;
 
 let testWsId = '';

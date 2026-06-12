@@ -52,6 +52,7 @@ import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkOrder } from '../../server/work-orders.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Server setup ──────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ async function patchJson(path: string, body: unknown): Promise<Response> {
 }
 
 async function getJson(path: string): Promise<Response> {
-  return fetch(`${baseUrl}${path}`);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
 }
 
 // ── Seed helper ───────────────────────────────────────────────────────────────

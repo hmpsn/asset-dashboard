@@ -16,6 +16,7 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
+  briefSourceEvidenceSchema,
 } from './schemas/content-schemas.js';
 import {
   parseContentBriefOutline,
@@ -150,6 +151,8 @@ interface BriefRow {
   title_variants: string | null;
   meta_desc_variants: string | null;
   generation_style: string | null;
+  source_evidence: string | null;
+  superseded_by: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -163,7 +166,8 @@ const stmts = createStmtCache(() => ({
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
             page_type, reference_urls, real_people_also_ask, real_top_results,
             keyword_locked, keyword_source, keyword_validation, template_id,
-            title_variants, meta_desc_variants, generation_style)
+            title_variants, meta_desc_variants, generation_style, source_evidence,
+            superseded_by)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -173,9 +177,13 @@ const stmts = createStmtCache(() => ({
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
             @keyword_locked, @keyword_source, @keyword_validation, @template_id,
-            @title_variants, @meta_desc_variants, @generation_style)`,
+            @title_variants, @meta_desc_variants, @generation_style, @source_evidence,
+            @superseded_by)`,
   ),
   selectByWorkspace: db.prepare(
+    `SELECT * FROM content_briefs WHERE workspace_id = ? AND superseded_by IS NULL ORDER BY created_at DESC`,
+  ),
+  selectByWorkspaceAll: db.prepare(
     `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
   ),
   selectById: db.prepare(
@@ -199,7 +207,8 @@ const stmts = createStmtCache(() => ({
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id,
            title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
-           generation_style = @generation_style
+           generation_style = @generation_style, source_evidence = @source_evidence,
+           superseded_by = @superseded_by
          WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
@@ -255,6 +264,10 @@ function rowToBrief(row: BriefRow): ContentBrief {
     titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
     metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
     generationStyle: resolveContentGenerationStyle(row.generation_style),
+    sourceEvidence: row.source_evidence
+      ? parseJsonSafe(row.source_evidence, briefSourceEvidenceSchema, null, { workspaceId: row.workspace_id, field: 'source_evidence', table: 'content_briefs' }) ?? undefined
+      : undefined,
+    supersededBy: row.superseded_by ?? undefined,
   };
 }
 
@@ -296,6 +309,8 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
     meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
     generation_style: resolveContentGenerationStyle(brief.generationStyle),
+    source_evidence: brief.sourceEvidence ? JSON.stringify(brief.sourceEvidence) : null,
+    superseded_by: brief.supersededBy ?? null,
   };
 }
 
@@ -312,8 +327,10 @@ export function upsertBrief(workspaceId: string, brief: ContentBrief): void {
   stmts().insert.run(briefToParams(brief));
 }
 
-export function listBriefs(workspaceId: string): ContentBrief[] {
-  const rows = stmts().selectByWorkspace.all(workspaceId) as BriefRow[];
+export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): ContentBrief[] {
+  const rows = (opts?.includeSuperseded
+    ? stmts().selectByWorkspaceAll.all(workspaceId)
+    : stmts().selectByWorkspace.all(workspaceId)) as BriefRow[];
   return rows.map(rowToBrief);
 }
 
@@ -917,6 +934,9 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     referenceUrls: existingBrief.referenceUrls,
     realPeopleAlsoAsk: existingBrief.realPeopleAlsoAsk,
     realTopResults: existingBrief.realTopResults,
+    // C4: preserve persisted source evidence across regenerate — the regenerate
+    // path does not re-scrape, and briefToParams would otherwise write NULL.
+    sourceEvidence: existingBrief.sourceEvidence,
     keywordLocked: existingBrief.keywordLocked,
     keywordSource: existingBrief.keywordSource,
     keywordValidation: existingBrief.keywordValidation,
@@ -924,7 +944,17 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     generationStyle,
   };
 
-  upsertBrief(workspaceId, newBrief);
+  // Bug 3 fix: insert the new brief and mark the old one superseded in a single
+  // transaction so the list never shows two live entries for the same keyword.
+  db.transaction(() => {
+    upsertBrief(workspaceId, newBrief);
+    // Guard: re-read the old brief inside the transaction so the UPDATE operates
+    // on the current row state, not the snapshot taken before the AI call.
+    const currentOld = getBrief(workspaceId, existingBrief.id);
+    if (currentOld && !currentOld.supersededBy) {
+      updateBrief(workspaceId, existingBrief.id, { supersededBy: newBrief.id });
+    }
+  })();
 
   return newBrief;
 }
@@ -1201,7 +1231,7 @@ export async function generateBrief(
   const eeatAssetBlock = buildEeatAssetBriefBlock(matchedPage?.eeatAssetRecommendations, fallbackEeatRecommendations);
 
   // Build providerLabel early — used in SERP features block and keyword metrics block below.
-  const providerLabel = context.providerLabel ?? 'SEMRush';
+  const providerLabel = context.providerLabel ?? 'DataForSEO';
 
   // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
   // Provider flags which SERP features are present for the primary keyword; we translate

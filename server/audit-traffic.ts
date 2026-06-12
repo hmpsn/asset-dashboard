@@ -52,9 +52,9 @@ export async function getAuditTrafficForWorkspace(
 
   const trafficMap: AuditTrafficMap = {};
 
-  if (ws.gscPropertyUrl) {
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
-      const gscPages = await getAllGscPages(ws.id, ws.gscPropertyUrl, 28);
+      const gscPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 28);
       for (const p of gscPages) {
         const pagePath = normalizeGscPagePath(p.page);
         if (!pagePath) continue;
@@ -75,7 +75,7 @@ export async function getAuditTrafficForWorkspace(
         const pagePath = normalizeTrafficPath(p.path);
         if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
         trafficMap[pagePath].pageviews += p.pageviews;
-        trafficMap[pagePath].sessions += p.users;
+        trafficMap[pagePath].sessions += p.sessions;
       }
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err, workspaceId: ws.id }, 'audit-traffic: GA4 programming error');

@@ -4,7 +4,6 @@
  * Tests the full HTTP request/response cycle for:
  * - GET /api/rank-tracking/:workspaceId/keywords (list tracked keywords)
  * - POST /api/rank-tracking/:workspaceId/keywords (add keyword)
- * - DELETE /api/rank-tracking/:workspaceId/keywords/:query (remove keyword)
  * - PATCH /api/rank-tracking/:workspaceId/keywords/:query/pin (toggle pin)
  * - GET /api/rank-tracking/:workspaceId/history (rank history)
  * - GET /api/rank-tracking/:workspaceId/latest (latest ranks)
@@ -13,12 +12,12 @@
  * - GET /api/public/rank-tracking/:workspaceId/latest (public)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
-const ctx = createTestContext(13213);
-const { api, postJson, patchJson, del } = ctx;
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
+const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';
 
@@ -81,13 +80,6 @@ describe('Rank Tracking — keywords CRUD', () => {
     const res = await patchJson(
       `/api/rank-tracking/${testWsId}/keywords/${encodeURIComponent('seo audit tool')}/pin`,
       {},
-    );
-    expect(res.status).toBe(200);
-  });
-
-  it('DELETE removes the keyword', async () => {
-    const res = await del(
-      `/api/rank-tracking/${testWsId}/keywords/${encodeURIComponent('seo audit tool')}`,
     );
     expect(res.status).toBe(200);
   });

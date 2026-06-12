@@ -1,7 +1,6 @@
 /**
  * Integration tests — Stripe admin route security boundaries.
  *
- * Port: 13862 — port-ok: unique in integration suite
  *
  * Uses an in-process http.createServer(app) so vi.mock hoisting applies to the
  * modules loaded by the Express app.  createTestContext spawns a child process
@@ -15,7 +14,7 @@
  *   5. Checkout session creation — valid tier vs. invalid tier
  *   6. Workspace tier upgrade lifecycle (broadcast fires on tier change)
  *   7. Subscription status sync via webhook handler
- *   8. Error paths — Stripe SDK throws → 500 with error message
+ *   8. Error paths — Stripe SDK throws → 500 with sanitized error message
  *   9. Config persistence across requests
  */
 
@@ -352,6 +351,38 @@ describe('3. Product/price configuration', () => {
     expect(res.status).toBe(400);
   });
 
+  it('POST /api/stripe/config/products rejects malformed product-price config', async () => {
+    const res = await adminPostJson('/api/stripe/config/products', {
+      products: [
+        { productType: 'brief_blog', stripePriceId: 'price_blog_001', displayName: 'Blog Brief', priceUsd: -1, enabled: true },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    expect(stripeConfigStore.products).toHaveLength(0);
+  });
+
+  it('POST /api/stripe/config/products allows blank price ids for unconfigured products', async () => {
+    const products = [
+      { productType: 'brief_blog', stripePriceId: '', displayName: 'Blog Brief', priceUsd: 125, enabled: true },
+    ];
+    const res = await adminPostJson('/api/stripe/config/products', { products });
+
+    expect(res.status).toBe(200);
+    expect(stripeConfigStore.products[0].stripePriceId).toBe('');
+  });
+
+  it('POST /api/stripe/config/products rejects unknown product types', async () => {
+    const res = await adminPostJson('/api/stripe/config/products', {
+      products: [
+        { productType: 'plan_enterprise_typo', stripePriceId: 'price_unknown_001', displayName: 'Unknown', priceUsd: 1, enabled: true },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    expect(stripeConfigStore.products).toHaveLength(0);
+  });
+
   it('GET /api/stripe/products lists all product types', async () => {
     const res = await adminApi('/api/stripe/products');
     expect(res.status).toBe(200);
@@ -460,6 +491,26 @@ describe('5. Checkout session creation', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it('POST /api/public/content-subscribe/:wsId for external-billing workspace returns 403 without checkout', async () => {
+    currentWs = seedWorkspace();
+    updateWorkspace(currentWs.workspaceId, { billingMode: 'external' });
+    stripeConfigStore.secretKey = 'sk_test_external_content_sub';
+
+    const res = await api(`/api/public/content-subscribe/${currentWs.workspaceId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': ADMIN_HMAC_TOKEN,
+      },
+      body: JSON.stringify({ plan: 'content_starter' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('billed externally');
+    expect(stripeMockStubs.checkoutCreate).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -489,13 +540,14 @@ describe('6. Workspace tier upgrade lifecycle via webhook', () => {
           metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
           amount_total: 24900,
           payment_intent: 'pi_upgrade_growth_001',
-          subscription: null,
+          subscription: 'sub_upgrade_growth_001',
         },
       },
     } as unknown as import('stripe').Stripe.Event);
 
     const ws = getWorkspace(currentWs.workspaceId);
     expect(ws?.tier).toBe('growth');
+    expect(ws?.stripeSubscriptionId).toBe('sub_upgrade_growth_001');
   });
 
   it('tier upgrade emits WORKSPACE_UPDATED broadcast', async () => {
@@ -521,7 +573,7 @@ describe('6. Workspace tier upgrade lifecycle via webhook', () => {
           metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
           amount_total: 24900,
           payment_intent: 'pi_broadcast_growth_001',
-          subscription: null,
+          subscription: 'sub_broadcast_growth_001',
         },
       },
     } as unknown as import('stripe').Stripe.Event);
@@ -555,13 +607,76 @@ describe('6. Workspace tier upgrade lifecycle via webhook', () => {
           metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_premium' },
           amount_total: 99900,
           payment_intent: 'pi_upgrade_premium_001',
-          subscription: null,
+          subscription: 'sub_upgrade_premium_001',
         },
       },
     } as unknown as import('stripe').Stripe.Event);
 
     const ws = getWorkspace(currentWs.workspaceId);
     expect(ws?.tier).toBe('premium');
+    expect(ws?.stripeSubscriptionId).toBe('sub_upgrade_premium_001');
+  });
+
+  it('checkout.session.completed for platform plan without subscription id does not grant tier', async () => {
+    currentWs = seedWorkspace({ tier: 'free' });
+    createPayment(currentWs.workspaceId, {
+      workspaceId: currentWs.workspaceId,
+      stripeSessionId: 'cs_plan_missing_sub_001',
+      productType: 'plan_growth',
+      amount: 24900,
+      currency: 'usd',
+      status: 'pending',
+      metadata: {},
+    });
+
+    await handleWebhookEvent({
+      id: 'evt_plan_missing_sub_001',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_plan_missing_sub_001',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          amount_total: 24900,
+          payment_intent: 'pi_plan_missing_sub_001',
+          subscription: null,
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe('free');
+    expect(ws?.stripeSubscriptionId).toBeUndefined();
+  });
+
+  it('checkout.session.completed for platform plan persists the Stripe subscription id', async () => {
+    currentWs = seedWorkspace({ tier: 'free' });
+    createPayment(currentWs.workspaceId, {
+      workspaceId: currentWs.workspaceId,
+      stripeSessionId: 'cs_plan_sub_persist_001',
+      productType: 'plan_growth',
+      amount: 24900,
+      currency: 'usd',
+      status: 'pending',
+      metadata: {},
+    });
+
+    await handleWebhookEvent({
+      id: 'evt_plan_sub_persist_001',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_plan_sub_persist_001',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          amount_total: 24900,
+          payment_intent: 'pi_plan_sub_persist_001',
+          subscription: 'sub_plan_current_001',
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe('growth');
+    expect(ws?.stripeSubscriptionId).toBe('sub_plan_current_001');
   });
 
   it('already-paid session is not re-processed (idempotency guard)', async () => {
@@ -624,6 +739,91 @@ describe('7. Subscription status sync via webhook events', () => {
 
     const ws = getWorkspace(currentWs.workspaceId);
     expect(ws?.tier).toBe('growth');
+    expect(ws?.stripeSubscriptionId).toBe('sub_sync_001');
+  });
+
+  it('customer.subscription.updated ignores stale platform subscription ids', async () => {
+    currentWs = seedWorkspace({ tier: 'premium' });
+    updateWorkspace(currentWs.workspaceId, { stripeSubscriptionId: 'sub_current_plan_001' });
+
+    await handleWebhookEvent({
+      id: 'evt_sub_stale_updated_001',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_old_plan_001',
+          status: 'active',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          items: { data: [] },
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe('premium');
+    expect(ws?.stripeSubscriptionId).toBe('sub_current_plan_001');
+  });
+
+  it('customer.subscription.updated active cannot rebind after terminal status cleared current subscription', async () => {
+    currentWs = seedWorkspace({ tier: 'growth' });
+    updateWorkspace(currentWs.workspaceId, { stripeSubscriptionId: 'sub_replay_case_001' });
+
+    await handleWebhookEvent({
+      id: 'evt_sub_replay_unpaid_001',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_replay_case_001',
+          status: 'unpaid',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          items: { data: [] },
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    await handleWebhookEvent({
+      id: 'evt_sub_replay_active_001',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_replay_case_001',
+          status: 'active',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          items: { data: [] },
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe('free');
+    expect(ws?.stripeSubscriptionId).toBeUndefined();
+  });
+
+  it.each([
+    { status: 'past_due', expectedTier: 'growth', expectedSubscriptionId: 'sub_status_case_001' },
+    { status: 'unpaid', expectedTier: 'free', expectedSubscriptionId: undefined },
+    { status: 'incomplete_expired', expectedTier: 'free', expectedSubscriptionId: undefined },
+    { status: 'canceled', expectedTier: 'free', expectedSubscriptionId: undefined },
+  ])('customer.subscription.updated $status has explicit platform plan behavior', async ({ status, expectedTier, expectedSubscriptionId }) => {
+    currentWs = seedWorkspace({ tier: 'growth' });
+    updateWorkspace(currentWs.workspaceId, { stripeSubscriptionId: 'sub_status_case_001' });
+
+    await handleWebhookEvent({
+      id: `evt_sub_status_${status}`,
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_status_case_001',
+          status,
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          items: { data: [] },
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe(expectedTier);
+    expect(ws?.stripeSubscriptionId).toBe(expectedSubscriptionId);
   });
 
   it('customer.subscription.deleted → workspace downgraded to free', async () => {
@@ -645,6 +845,29 @@ describe('7. Subscription status sync via webhook events', () => {
 
     const ws = getWorkspace(currentWs.workspaceId);
     expect(ws?.tier).toBe('free');
+    expect(ws?.stripeSubscriptionId).toBeUndefined();
+  });
+
+  it('customer.subscription.deleted ignores stale platform subscription ids', async () => {
+    currentWs = seedWorkspace({ tier: 'growth' });
+    updateWorkspace(currentWs.workspaceId, { stripeSubscriptionId: 'sub_current_delete_001' });
+
+    await handleWebhookEvent({
+      id: 'evt_sub_stale_deleted_001',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_old_delete_001',
+          status: 'canceled',
+          metadata: { workspaceId: currentWs.workspaceId, productType: 'plan_growth' },
+          items: { data: [] },
+        },
+      },
+    } as unknown as import('stripe').Stripe.Event);
+
+    const ws = getWorkspace(currentWs.workspaceId);
+    expect(ws?.tier).toBe('growth');
+    expect(ws?.stripeSubscriptionId).toBe('sub_current_delete_001');
   });
 
   it('customer.subscription.deleted emits WORKSPACE_UPDATED broadcast with tier=free', async () => {
@@ -712,6 +935,8 @@ describe('8. Error paths — Stripe SDK throws', () => {
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(typeof body.error).toBe('string');
+    expect(body.error).not.toContain('Stripe API unavailable');
+    expect(body.error).toContain('Unable to start checkout');
   });
 
   it('POST /api/public/upgrade-checkout/:wsId when Stripe SDK throws returns 500', async () => {
@@ -725,13 +950,19 @@ describe('8. Error paths — Stripe SDK throws', () => {
     stripeMockStubs.customersRetrieve.mockRejectedValue(new Error('No such customer'));
     stripeMockStubs.checkoutCreate.mockRejectedValue(new Error('Stripe rate limit exceeded'));
 
-    const res = await postJson(`/api/public/upgrade-checkout/${currentWs.workspaceId}`, {
-      planId: 'growth',
+    const res = await api(`/api/public/upgrade-checkout/${currentWs.workspaceId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': ADMIN_HMAC_TOKEN },
+      body: JSON.stringify({
+        planId: 'growth',
+      }),
     });
 
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(typeof body.error).toBe('string');
+    expect(body.error).not.toContain('Stripe rate limit exceeded');
+    expect(body.error).toContain('Unable to start plan checkout');
   });
 
   it('checkout.session.completed with missing payment record is handled without crash', async () => {

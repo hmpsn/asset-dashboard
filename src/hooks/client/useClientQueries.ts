@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, get, getSafe, getOptional } from '../../api/client';
+import { publicCopyReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type { ClientAction } from '../../../shared/types/client-actions';
@@ -7,7 +8,7 @@ import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   ActivityLogItem, RankHistoryEntry, LatestRank,
-  AnnotationItem, AnomalyItem, ContentPlanReviewCell, ApprovalPageKeyword,
+  AnnotationItem, AnomalyItem, ContentPlanReviewCell,
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
 import { keywordComparisonKey } from '../../../shared/keyword-normalization';
@@ -66,7 +67,7 @@ export function useClientAnomalies(wsId: string, enabled: boolean) {
 export function useClientApprovals(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.approvals(wsId),
-    queryFn: () => getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []),
+    queryFn: () => get<ApprovalBatch[]>(`/api/public/approvals/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -75,7 +76,7 @@ export function useClientApprovals(wsId: string, enabled: boolean) {
 export function useClientActions(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.clientActions(wsId),
-    queryFn: () => getSafe<ClientAction[]>(`/api/public/client-actions/${wsId}`, []),
+    queryFn: () => get<ClientAction[]>(`/api/public/client-actions/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -85,7 +86,7 @@ export function useClientActions(wsId: string, enabled: boolean) {
 export function useClientRequests(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.requests(wsId),
-    queryFn: () => getSafe<ClientRequest[]>(`/api/public/requests/${wsId}`, []),
+    queryFn: () => get<ClientRequest[]>(`/api/public/requests/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -95,7 +96,7 @@ export function useClientRequests(wsId: string, enabled: boolean) {
 export function useClientContentRequests(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.contentRequests(wsId),
-    queryFn: () => getSafe<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`, []),
+    queryFn: () => get<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });
@@ -143,14 +144,6 @@ export function useClientROI(wsId: string, enabled: boolean) {
     enabled,
     staleTime: 10 * 60 * 1000,
     retry: 2,
-  });
-}
-
-export function useClientPageKeywords(wsId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.client.pageKeywords(wsId),
-    queryFn: () => getOptional<ApprovalPageKeyword[]>(`/api/public/page-keywords/${wsId}`),
-    enabled,
   });
 }
 
@@ -265,5 +258,21 @@ export function useClientCopyEntries(wsId: string, enabled: boolean) {
     queryFn: () => getSafe<{ entries: unknown[] }>(`/api/public/copy/${wsId}/entries`, { entries: [] }),
     enabled,
     select: (d) => (Array.isArray(d?.entries) ? d.entries.length : 0),
+  });
+}
+
+export function useClientCopyEntryList(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copyEntries(wsId),
+    queryFn: () => publicCopyReview.entries(wsId),
+    enabled,
+  });
+}
+
+export function useClientCopySections(wsId: string, entryId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copySections(wsId, entryId),
+    queryFn: () => publicCopyReview.sections(wsId, entryId),
+    enabled,
   });
 }

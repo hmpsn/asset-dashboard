@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listActivity } from '../../server/activity-log.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { applyKeywordCommandCenterBulkAction } from '../../server/keyword-command-center.js';
-import { addTrackedKeyword, getTrackedKeywords } from '../../server/rank-tracking.js';
+import { addTrackedKeyword, getTrackedKeywords, updateTrackedKeywords } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center.js';
@@ -126,6 +126,34 @@ describe('applyKeywordCommandCenterBulkAction', () => {
     expect(result.skipped).toBe(1);
     expect(listActivity(ws.id).length - beforeCount).toBe(0);
     expect(wsBroadcast.mock.calls.filter(call => call[1] === WS_EVENTS.RANK_TRACKING_UPDATED)).toHaveLength(0);
+  });
+
+  it('routes a bulk item already in the target state to skipped_noop (a benign skip, not a failure)', () => {
+    // Regression guard: a bulk action over a mixed selection routinely includes a
+    // keyword already in the target state (deprecated → deprecated). That is an
+    // idempotent no-op, NOT a failure — pre-P3 it succeeded silently; the P3 state
+    // machine made it throw InvalidTransitionError. The bulk path must classify it
+    // as a skip so the user never sees a spurious "N failed".
+    const ws = createWorkspace('Bulk Idempotent State Test');
+    cleanupWorkspaceIds.add(ws.id);
+    addTrackedKeyword(ws.id, 'ok kw', { source: TRACKED_KEYWORD_SOURCE.RECOMMENDATION });
+    addTrackedKeyword(ws.id, 'already retired', { source: TRACKED_KEYWORD_SOURCE.RECOMMENDATION });
+    // Force the second keyword into a state from which RETIRE is a no-op (deprecated → deprecated).
+    updateTrackedKeywords(ws.id, keywords =>
+      keywords.map(k => (k.query === 'already retired' ? { ...k, status: TRACKED_KEYWORD_STATUS.DEPRECATED } : k)),
+    );
+
+    const result = applyKeywordCommandCenterBulkAction(ws.id, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+      keywords: ['ok kw', 'already retired'],
+    });
+
+    expect(result.applied).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(result.skipped).toBe(1);
+    const noop = result.items.find(item => item.keyword === 'already retired');
+    expect(noop?.status).toBe('skipped_noop');
+    expect(noop?.error).toContain('Invalid tracked_keyword transition');
   });
 
   it('throws Workspace not found when workspaceId is unknown', () => {

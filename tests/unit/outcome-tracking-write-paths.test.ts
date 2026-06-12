@@ -34,6 +34,7 @@ vi.mock('../../server/ws-events.js', () => ({
   WS_EVENTS: {
     ANNOTATION_BRIDGE_CREATED: 'annotation_bridge_created',
     OUTCOME_SCORED: 'outcome_scored',
+    OUTCOME_LEARNINGS_UPDATED: 'outcome_learnings_updated',
   },
 }));
 
@@ -72,6 +73,7 @@ import {
   getTopWinsFromActions,
   WIN_SCORES,
 } from '../../server/outcome-tracking.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,7 @@ describe('outcome-tracking write paths', () => {
   });
 
   afterEach(() => {
+    vi.mocked(broadcastToWorkspace).mockClear();
     // Clean up tracked_actions and action_outcomes for test isolation
     db.prepare(
       `DELETE FROM action_outcomes WHERE action_id IN (
@@ -466,6 +469,23 @@ describe('outcome-tracking write paths', () => {
       expect(updated!.context.detectionChecks).toBeUndefined();
     });
 
+    it('broadcasts learnings invalidation when context changes', () => {
+      const action = recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'voice_calibrated',
+        sourceType: 'system',
+        baselineSnapshot: BASELINE,
+      });
+
+      updateActionContext(action.id, ws.workspaceId, { notes: 'new note' });
+
+      expect(broadcastToWorkspace).toHaveBeenCalledWith(
+        ws.workspaceId,
+        'outcome_learnings_updated',
+        expect.objectContaining({ actionId: action.id, action: 'context_updated' }),
+      );
+    });
+
     it('does not affect actions from other workspaces', () => {
       const ws1Action = recordAction({
         workspaceId: ws.workspaceId,
@@ -567,6 +587,11 @@ describe('outcome-tracking write paths', () => {
       expect(outcome.score).toBe('win');
       expect(outcome.deltaSummary.delta_percent).toBe(50);
       expect(outcome.measuredAt).toBeTruthy();
+      expect(broadcastToWorkspace).toHaveBeenCalledWith(
+        ws.workspaceId,
+        'outcome_learnings_updated',
+        expect.objectContaining({ actionId: action.id, checkpointDays: 30, score: 'win' }),
+      );
     });
 
     it('90-day checkpoint marks the action complete', () => {

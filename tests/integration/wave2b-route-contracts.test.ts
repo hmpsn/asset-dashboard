@@ -15,9 +15,9 @@ import db from '../../server/db/index.js';
 import { createPayment } from '../../server/payments.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13220);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let wsAId = '';
 let wsBId = '';
@@ -284,10 +284,10 @@ describe('billing route auth and workspace contracts', () => {
         method: route.method,
         ...(route.body
           ? {
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
               body: JSON.stringify(route.body),
             }
-          : {}),
+          : { headers: { 'x-no-auto-public-auth': 'true' } }),
       });
 
       expect(res.status).toBe(401);
@@ -299,6 +299,7 @@ describe('billing route auth and workspace contracts', () => {
         method: route.method,
         headers: {
           ...(route.body ? { 'Content-Type': 'application/json' } : {}),
+          'x-no-auto-public-auth': 'true',
           Cookie: clientCookieHeader(wsAId, clientTokenB),
         },
         ...(route.body ? { body: JSON.stringify(route.body) } : {}),

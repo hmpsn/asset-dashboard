@@ -11,18 +11,34 @@
  * 7. Clean up
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
 } from '../../server/workspaces.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 
-const ctx = createTestContext(13232);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let clientUserId = '';
+let clientToken = '';
 const testSiteId = 'site_e2e_reports_' + Date.now();
+
+function clientCookieHeader(): string {
+  return `client_user_token_${testWsId}=${clientToken}`;
+}
+
+async function getWithClientToken(urlPath: string): Promise<Response> {
+  ctx.clearCookies();
+  return api(urlPath, {
+    headers: {
+      Cookie: clientCookieHeader(),
+    },
+  });
+}
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -30,9 +46,18 @@ beforeAll(async () => {
   testWsId = ws.id;
   // Link a fake site ID to the workspace for report association
   updateWorkspace(testWsId, { webflowSiteId: testSiteId });
+  const clientUser = await createClientUser(
+    'e2e-reports-client@test.local',
+    'ClientPass1!',
+    'E2E Reports Client',
+    testWsId,
+  );
+  clientUserId = clientUser.id;
+  clientToken = signClientToken(clientUser);
 }, 25_000);
 
 afterAll(async () => {
+  if (clientUserId) deleteClientUser(clientUserId, testWsId);
   deleteWorkspace(testWsId);
   await ctx.stopServer();
 });
@@ -144,7 +169,7 @@ describe('E2E: Workspace → Report → Action Items', () => {
   });
 
   it('Step 9: Public workspace reports list includes the snapshot', async () => {
-    const res = await api(`/api/public/reports/${testWsId}`);
+    const res = await getWithClientToken(`/api/public/reports/${testWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     const ours = body.find((r: { id: string }) => r.id === snapshotId);

@@ -1,6 +1,6 @@
 import { discoverSitemapUrls, resolveStaticPagePathsFromSitemap } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import { fetchPageMeta } from './seo-audit.js';
@@ -8,7 +8,6 @@ import { fetchPublishedHtml, resolvePagePath } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
 import { assembleSiteContext } from './schema/site-context.js';
 import type { SiteContext } from './schema/site-context.js';
@@ -32,11 +31,9 @@ import type { EeatAsset } from '../shared/types/eeat-assets.js';
 /**
  * AI budget allocation for the page-element AI extractors.
  * 100 image classifications + 20 HowTo disambiguations = 120 total per regenerate-all.
- * Returns a zero-cap budget when the feature flag is off so all consumers fall through to rule-based.
  */
 function allocateElementAiBudget(): AiBudget {
-  const enabled = isFeatureEnabled('schema-ai-element-classifier');
-  return createAiBudget(enabled ? 120 : 0);
+  return createAiBudget(120);
 }
 
 // Re-export from the standalone rich-results module so existing external callers
@@ -526,7 +523,7 @@ export async function generateSchemaForPage(
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return null;
 
-  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const wsId = ctx.workspaceId || getWorkspaceBySiteId(siteId)?.id;
   const rawPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
   const sitemapUrls = rawPages.length > 0 ? await discoverSitemapUrls(baseUrl) : [];
   const allPages = resolveStaticPagePathsFromSitemap(rawPages, sitemapUrls, baseUrl);
@@ -737,7 +734,7 @@ export async function generateSchemaSuggestions(
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return [];
 
-  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const wsId = ctx.workspaceId || getWorkspaceBySiteId(siteId)?.id;
   const rawPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
   const sitemapUrls = rawPages.length > 0 ? await discoverSitemapUrls(baseUrl) : [];
   const pages = resolveStaticPagePathsFromSitemap(rawPages, sitemapUrls, baseUrl);
@@ -758,8 +755,7 @@ export async function generateSchemaSuggestions(
     ? assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])
     : undefined;
 
-  // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
-  // Allocates 120 slots when schema-ai-element-classifier is enabled; 0 when off.
+  // ONE shared budget for the entire regenerate-all run (static + CMS loops).
   // This enforces the per-run cap (100 image classifications + 20 HowTo calls)
   // across all pages rather than resetting on each page.
   const aiBudget = allocateElementAiBudget();

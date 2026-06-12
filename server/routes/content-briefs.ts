@@ -21,37 +21,30 @@ import {
   getBrief,
   updateBrief,
   deleteBrief,
-  generateBrief,
-  regenerateBrief,
-  regenerateOutline,
 } from '../content-brief.js';
-import { createContentRequest, updateContentRequest } from '../content-requests.js';
+import { createContentRequest, getOpenRequestForBrief, updateContentRequest } from '../content-requests.js';
+import db from '../db/index.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { notifyClientBriefReady } from '../email.js';
-import { getSearchOverview } from '../search-console.js';
-import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
-import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
-import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
-import { recordAction } from '../outcome-tracking.js';
-import { isProgrammingError } from '../errors.js';
 import { validate, z } from '../middleware/validate.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
-import { listMatrices } from '../content-matrices.js';
-import { getTemplate } from '../content-templates.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { BRIEF_PAGE_TYPES, CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
-import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { normalizeBriefKeyword, resolveBriefTemplateCrossref } from '../content-brief-template-crossref.js';
+import { hasActiveJob } from '../jobs.js';
+import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const router = Router();
 const log = createLogger('content-briefs');
-const BRIEF_PAGE_TYPE_SET = new Set<string>(BRIEF_PAGE_TYPES);
 
 const contentBriefPatchSchema = z.object({
   targetKeyword: z.string().trim().min(1).max(200).optional(),
@@ -97,62 +90,6 @@ function notifyContentUpdated(workspaceId: string, payload: Record<string, unkno
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
 }
 
-function normalizeKeyword(value: string): string {
-  return keywordComparisonKey(value);
-}
-
-function toBriefPageType(value: string): BriefPageType | null {
-  return BRIEF_PAGE_TYPE_SET.has(value) ? value as BriefPageType : null;
-}
-
-function resolveBriefTemplateCrossref(workspaceId: string, keyword: string): BriefTemplateCrossrefMatch | null {
-  const normalizedKeyword = normalizeKeyword(keyword);
-  if (!normalizedKeyword) return null;
-
-  const matrices = listMatrices(workspaceId);
-  for (const matrix of matrices) {
-    for (const cell of matrix.cells) {
-      const customKeyword = typeof cell.customKeyword === 'string' ? cell.customKeyword.trim() : '';
-      const targetKeyword = cell.targetKeyword.trim();
-      const customMatch = customKeyword.length > 0 && normalizeKeyword(customKeyword) === normalizedKeyword;
-      const targetMatch = normalizeKeyword(targetKeyword) === normalizedKeyword;
-      if (!customMatch && !targetMatch) continue;
-
-      const template = getTemplate(workspaceId, matrix.templateId);
-      if (!template) continue;
-
-      const sections = [...template.sections]
-        .sort((a, b) => a.order - b.order)
-        .map(section => ({
-          id: section.id,
-          name: section.name,
-          headingTemplate: section.headingTemplate,
-          guidance: section.guidance,
-          wordCountTarget: section.wordCountTarget,
-          order: section.order,
-        }));
-
-      return {
-        keyword: keyword.trim(),
-        matrixId: matrix.id,
-        matrixName: matrix.name,
-        cellId: cell.id,
-        matchedKeyword: customMatch ? customKeyword : targetKeyword,
-        matchedSource: customMatch ? 'custom' : 'target',
-        templateId: template.id,
-        templateName: template.name,
-        pageType: toBriefPageType(template.pageType),
-        sections,
-        toneAndStyle: template.toneAndStyle,
-        titlePattern: template.titlePattern,
-        metaDescPattern: template.metaDescPattern,
-      };
-    }
-  }
-
-  return null;
-}
-
 // --- Content Briefs ---
 // List all briefs for a workspace
 router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -162,9 +99,15 @@ router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspace
 });
 
 // AI Suggested Briefs — must be registered BEFORE /:briefId to avoid param shadowing
+//
+// Read-only: returns the raw pipeline signals derived from current insights.
+// Seeding ranking_opportunity signals into the store was moved to
+// GET /api/suggested-briefs/:workspaceId (the route the AiSuggested panel actually polls)
+// so seeding fires on the real read path rather than an orphaned endpoint.
 router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const insights = getInsights(req.params.workspaceId);
+    const { workspaceId } = req.params;
+    const insights = getInsights(workspaceId);
     const signals = buildPipelineSignals(insights);
     res.json({ signals });
   } catch (err) {
@@ -210,199 +153,76 @@ router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess
 // Generate a new content brief
 router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
-    const { targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle } = req.body;
-    if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
-    if (
-      generationStyle !== undefined
-      && (typeof generationStyle !== 'string' || !CONTENT_GENERATION_STYLES.includes(generationStyle as typeof CONTENT_GENERATION_STYLES[number]))
-    ) {
-      return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
-    }
-
-    const ws = getWorkspace(req.params.workspaceId);
-    const templateCrossref = resolveBriefTemplateCrossref(req.params.workspaceId, targetKeyword);
-
-    // No usage limit — briefs are paid add-ons purchased via Stripe
-    let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
-
-    // Fetch GSC data if available
-    if (ws?.gscPropertyUrl && ws.webflowSiteId) {
-      try {
-        const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28);
-        relatedQueries = overview.topQueries
-          .filter(q => { const ql = q.query.toLowerCase(); return targetKeyword.toLowerCase().split(' ').some((w: string) => w.length > 2 && ql.includes(w)); })
-          .slice(0, 20);
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-briefs: POST /api/content-briefs/:workspaceId/generate: programming error'); /* GSC not available */ }
-    }
-
-    // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
-    const existingPages = ws ? await getAllSitePages(ws) : [];
-
-    // Gather SEO keyword data if a provider is configured
-    let keywordMetrics: KeywordMetrics | undefined;
-    let relatedKeywords: RelatedKeyword[] | undefined;
-    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
-    if (seoProvider) {
-      try {
-        const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
-        const [metrics, related] = await Promise.all([
-          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId, undefined, locationCode),
-          seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
-        ]);
-        if (metrics.length > 0) keywordMetrics = metrics[0];
-        if (related.length > 0) relatedKeywords = related;
-      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
-    }
-
-    // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---
-    const { scrapeUrls, scrapeSerpData } = await import('../web-scraper.js'); // dynamic-import-ok — lazy-loaded per-request; TypeScript resolves types via module inference, no as-any cast
-
-    // 1. Scrape reference URLs (user-provided competitor/inspiration pages)
-    const refUrlList: string[] = Array.isArray(referenceUrls)
-      ? referenceUrls.filter((u: unknown) => typeof u === 'string' && (u as string).startsWith('http')).slice(0, 5)
-      : [];
-
-    // 2. Scrape Google SERP for target keyword (best-effort, may be blocked)
-    // 3. If site has GA4 + liveDomain, scrape top-performing pages for style context
-    const topPageUrls: string[] = [];
-    let ga4Performance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] = [];
-    if (ws?.ga4PropertyId) {
-      try {
-        const { getGA4LandingPages } = await import('../google-analytics.js'); // dynamic-import-ok — lazy-loaded; TypeScript resolves types, no as-any cast
-        const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
-        ga4Performance = pages.slice(0, 10);
-        // Pick top 2 pages with lowest bounce rate + highest engagement for style examples
-        if (ws.liveDomain) {
-          const sortedByQuality = [...pages]
-            .filter(p => p.sessions > 10 && p.avgEngagementTime > 30)
-            .sort((a, b) => (b.avgEngagementTime * b.sessions) - (a.avgEngagementTime * a.sessions));
-          for (const p of sortedByQuality.slice(0, 2)) {
-            const domain = ws.liveDomain.replace(/\/+$/, '');
-            topPageUrls.push(`https://${domain}${p.landingPage}`);
-          }
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-briefs: programming error'); /* GA4 not available */ }
-    }
-
-    // Run all scraping in parallel
-    const [scrapedRefs, serpData, stylePages] = await Promise.all([
-      refUrlList.length > 0 ? scrapeUrls(refUrlList, 3) : Promise.resolve([]),
-      scrapeSerpData(targetKeyword).catch(() => null),
-      topPageUrls.length > 0 ? scrapeUrls(topPageUrls, 2) : Promise.resolve([]),
-    ]);
-
-    const bodyPageType = toBriefPageType(pageType);
-    const matchedTemplatePageType = templateCrossref?.pageType;
-    const resolvedPageType = bodyPageType ?? matchedTemplatePageType ?? undefined;
-
-    const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
-      relatedQueries,
-      businessContext: businessContext || ws?.keywordStrategy?.businessContext,
-      existingPages,
-      keywordMetrics,
-      relatedKeywords,
-      providerLabel,
-      pageType: resolvedPageType,
-      templateId: templateCrossref?.templateId,
-      templateSections: templateCrossref?.sections.map(section => ({
-        name: section.name,
-        headingTemplate: section.headingTemplate,
-        guidance: section.guidance,
-        wordCountTarget: section.wordCountTarget,
-      })),
-      templateToneOverride: templateCrossref?.toneAndStyle,
-      templateTitlePattern: templateCrossref?.titlePattern,
-      templateMetaDescPattern: templateCrossref?.metaDescPattern,
-      keywordLocked: templateCrossref ? true : undefined,
-      keywordSource: templateCrossref ? 'template' : undefined,
-      generationStyle,
-      referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
-      scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
-      serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
-      ga4PagePerformance: ga4Performance.length > 0 ? ga4Performance : undefined,
-      styleExamples: stylePages.length > 0 ? stylePages : undefined,
-      pageAnalysisContext: pageAnalysisContext || undefined,
-    });
-
-    // Record for outcome tracking
-    try {
-      recordAction({ // recordAction-ok — workspaceId is req.params.workspaceId, validated by requireWorkspaceAccess middleware
+    {
+      const { targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext, generationStyle } = req.body;
+      if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
+      if (
+        generationStyle !== undefined
+        && (typeof generationStyle !== 'string' || !CONTENT_GENERATION_STYLES.includes(generationStyle as typeof CONTENT_GENERATION_STYLES[number]))
+      ) {
+        return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
+      }
+      const ws = getWorkspace(req.params.workspaceId);
+      if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+      const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, req.params.workspaceId);
+      if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
+      const refUrlList: string[] = Array.isArray(referenceUrls)
+        ? referenceUrls.filter((u: unknown) => typeof u === 'string' && (u as string).startsWith('http')).slice(0, 5)
+        : [];
+      const started = startContentBriefGenerationJob({
+        source: 'standalone',
         workspaceId: req.params.workspaceId,
-        actionType: 'brief_created',
-        sourceType: 'brief',
-        sourceId: brief.id,
-        pageUrl: null,
-        targetKeyword: targetKeyword,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-        },
-        attribution: 'platform_executed',
+        targetKeyword,
+        businessContext,
+        pageType,
+        generationStyle,
+        referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
+        pageAnalysisContext: pageAnalysisContext || undefined,
       });
-    } catch (err) {
-      log.warn({ err, keyword: targetKeyword }, 'Failed to record outcome action for brief creation');
+      return res.json(started);
     }
-
-    addActivity(
-      req.params.workspaceId,
-      'brief_generated',
-      `Generated content brief for "${brief.targetKeyword}"`,
-      brief.suggestedTitle,
-      { briefId: brief.id, action: 'brief_generated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, action: 'brief_generated' });
-    res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
   }
 });
 
-// Regenerate a brief with user feedback
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const { feedback } = req.body;
-    if (!feedback) return res.status(400).json({ error: 'feedback required' });
-    const existing = getBrief(req.params.workspaceId, req.params.briefId);
-    if (!existing) return res.status(404).json({ error: 'Brief not found' });
-    const newBrief = await regenerateBrief(req.params.workspaceId, existing, feedback);
-    addActivity(
-      req.params.workspaceId,
-      'brief_generated',
-      `Regenerated content brief for "${existing.targetKeyword}"`,
-      `New brief: ${newBrief.suggestedTitle}`,
-      { briefId: newBrief.id, previousBriefId: existing.id, action: 'brief_regenerated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, {
-      briefId: newBrief.id,
-      previousBriefId: existing.id,
-      action: 'brief_regenerated',
-    });
-    log.info(`REGENERATED brief ${req.params.briefId} -> ${newBrief.id} for "${existing.targetKeyword}"`);
-    res.json(newBrief);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate brief' });
-  }
+// Regenerate a brief with user feedback (async — returns 202 { jobId })
+//
+// W6.2: heavyweight AI regeneration (gpt-5.4, 7000 tokens, research mode) moved onto
+// the background job platform. The job persists the new brief to the content_briefs
+// store and broadcasts BRIEF_UPDATED on completion (declared cross-lane contract:
+// ContentBriefs.tsx is re-wired by a sibling lane). Failures surface via the job
+// error state, not the HTTP response.
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { feedback } = req.body;
+  if (!feedback) return res.status(400).json({ error: 'feedback required' });
+  const existing = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!existing) return res.status(404).json({ error: 'Brief not found' });
+  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
+  const started = startContentBriefRegenerateJob({
+    mode: 'regenerate',
+    workspaceId: req.params.workspaceId,
+    briefId: req.params.briefId,
+    feedback,
+  });
+  res.status(202).json(started);
 });
 
-// Regenerate outline only (preserves all other brief fields)
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const { feedback } = req.body || {};
-    const result = await regenerateOutline(req.params.workspaceId, req.params.briefId, feedback);
-    if (!result) return res.status(404).json({ error: 'Brief not found' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Regenerated outline for "${result.suggestedTitle || result.targetKeyword}"`,
-      undefined,
-      { briefId: result.id, action: 'brief_outline_regenerated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, { briefId: result.id, action: 'brief_outline_regenerated' });
-    log.info(`REGENERATED OUTLINE for brief ${req.params.briefId} in workspace ${req.params.workspaceId}`);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate outline' });
-  }
+// Regenerate outline only (preserves all other brief fields) — async, returns 202 { jobId }
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { feedback } = req.body || {};
+  const existing = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!existing) return res.status(404).json({ error: 'Brief not found' });
+  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
+  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
+  const started = startContentBriefRegenerateJob({
+    mode: 'outline',
+    workspaceId: req.params.workspaceId,
+    briefId: req.params.briefId,
+    feedback: typeof feedback === 'string' ? feedback : undefined,
+  });
+  res.status(202).json(started);
 });
 
 // Export a brief as branded HTML
@@ -422,34 +242,53 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
 
   const ws = getWorkspace(req.params.workspaceId);
 
-  // Create a content request linked to this brief
-  const request = createContentRequest(req.params.workspaceId, {
-    topic: brief.suggestedTitle,
-    targetKeyword: brief.targetKeyword,
-    intent: brief.intent || 'informational',
-    priority: 'medium',
-    rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
-    source: 'strategy',
-    serviceType: 'brief_only',
-    pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
-    initialStatus: 'brief_generated',
-    dedupe: false,
-  });
+  // Bug 2 fix: wrap dedupe-check + create + link in a single transaction so the
+  // check-then-create sequence is atomic. Re-checking INSIDE the transaction (not
+  // before it) closes the TOCTOU window where two concurrent send-to-client calls
+  // both pass an outside-the-txn check and each create a request. The serialized
+  // transaction guarantees the second caller sees the first caller's row and
+  // early-returns its id instead of inserting a duplicate.
+  let request: ReturnType<typeof createContentRequest> | null = null;
+  let dedupedRequestId: string | null = null;
+  db.transaction(() => {
+    const existing = getOpenRequestForBrief(req.params.workspaceId, brief.id);
+    if (existing) {
+      dedupedRequestId = existing.id;
+      return;
+    }
+    request = createContentRequest(req.params.workspaceId, {
+      topic: brief.suggestedTitle,
+      targetKeyword: brief.targetKeyword,
+      intent: brief.intent || 'informational',
+      priority: 'medium',
+      rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
+      source: 'strategy',
+      serviceType: 'brief_only',
+      pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
+      initialStatus: 'brief_generated',
+      dedupe: false,
+    });
+    // Link the brief and set to client_review
+    updateContentRequest(req.params.workspaceId, request!.id, {
+      briefId: brief.id,
+      status: 'client_review',
+    });
+  })();
 
-  // Link the brief and set to client_review
-  updateContentRequest(req.params.workspaceId, request.id, {
-    briefId: brief.id,
-    status: 'client_review',
-  });
+  // Dedupe hit — an open request already covers this brief; return it without
+  // re-broadcasting, re-notifying, or re-logging (no new work was done).
+  if (dedupedRequestId) {
+    return res.json({ ok: true, requestId: dedupedRequestId });
+  }
 
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id });
-  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request!.id });
+  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' });
   addActivity(
     req.params.workspaceId,
     'brief_generated',
     `Sent brief "${brief.suggestedTitle}" to client`,
     `Keyword: ${brief.targetKeyword}`,
-    { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' },
+    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' },
   );
 
   // Send email notification
@@ -466,8 +305,8 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     });
   }
 
-  log.info(`Brief ${brief.id} sent to client via request ${request.id}`);
-  res.json({ ok: true, requestId: request.id });
+  log.info(`Brief ${brief.id} sent to client via request ${request!.id}`);
+  res.json({ ok: true, requestId: request!.id });
 });
 
 // Delete a brief
@@ -573,10 +412,10 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
   try {
     const locationCode = resolveWorkspaceLocationCode(req.params.workspaceId) ?? undefined;
     const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId, undefined, locationCode);
-    const metricsMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
+    const metricsMap = new Map(metrics.map(m => [normalizeBriefKeyword(m.keyword), m])); // map-dup-ok
 
     const results = keywords.slice(0, 50).map((kw: string) => {
-      const m = metricsMap.get(normalizeKeyword(kw));
+      const m = metricsMap.get(normalizeBriefKeyword(kw));
       if (!m) {
         return { keyword: kw, valid: true, source: bulkProvider.name, metrics: null };
       }

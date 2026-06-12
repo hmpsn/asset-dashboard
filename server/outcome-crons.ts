@@ -3,7 +3,6 @@
 // Registered at startup via startOutcomeCrons(); safe to call multiple times (idempotent).
 
 import { createLogger } from './logger.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
 import { runBackfill } from './outcome-backfill.js';
@@ -14,6 +13,8 @@ import type * as OutcomePlaybooks from './outcome-playbooks.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 import type * as ActivityLog from './activity-log.js';
 import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
+import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
+import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
 
 const log = createLogger('outcome-crons');
 
@@ -31,16 +32,14 @@ let playbooksInterval: ReturnType<typeof setInterval> | null = null;
 let backfillInterval: ReturnType<typeof setInterval> | null = null;
 let decayScanInterval: ReturnType<typeof setInterval> | null = null;
 let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
+let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
+let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
-// if shutdown is called within the first 35s of startup.
+// if shutdown is called during the startup warmup window (currently up to ~60s).
 let startupTimeouts: ReturnType<typeof setTimeout>[] = [];
 
 export function startOutcomeCrons() {
-  if (!isFeatureEnabled('outcome-tracking')) {
-    log.info('Outcome tracking disabled — skipping cron registration');
-    return;
-  }
   if (measureInterval) return; // already started
 
   const runMeasure = async () => {
@@ -80,9 +79,8 @@ export function startOutcomeCrons() {
       }
 
       // Enqueue a recommendation regen for each measured workspace so ranking
-      // reflects the new outcomes. NOTE: recsInFlight only dedupes concurrent
-      // regens for the SAME workspace — this loop still issues one regen per
-      // distinct measured workspace, bounded by the number measured this run
+      // reflects the new outcomes. The shared scheduler serializes per workspace,
+      // while this loop still issues one refresh per distinct measured workspace
       // (a handful at current scale, acceptable). If the client count grows
       // materially, add cross-workspace concurrency limiting/staggering here.
       for (const wsId of workspaceIds) {
@@ -164,9 +162,10 @@ export function startOutcomeCrons() {
       }
 
       // Enqueue a recommendation regen after the learnings update. As above,
-      // recsInFlight dedupes only per-workspace; this issues one regen per
-      // distinct affected workspace (bounded by the run, acceptable at current
-      // scale — revisit with concurrency limiting if client count grows).
+      // the shared scheduler only serializes per workspace; this still issues
+      // one refresh per distinct affected workspace (bounded by the run,
+      // acceptable at current scale — revisit with concurrency limiting if
+      // client count grows).
       for (const wsId of affectedWsIds) {
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: wsId });
       }
@@ -176,7 +175,6 @@ export function startOutcomeCrons() {
   };
 
   const runDetection = async () => {
-    if (!isFeatureEnabled('outcome-external-detection')) return;
     try {
       const { detectExternalExecutions }: typeof ExternalDetection = await import('./external-detection.js'); // dynamic-import-ok
       await detectExternalExecutions();
@@ -186,7 +184,6 @@ export function startOutcomeCrons() {
   };
 
   const runPlaybooks = async () => {
-    if (!isFeatureEnabled('outcome-playbooks')) return;
     try {
       const { detectAllWorkspacePlaybooks }: typeof OutcomePlaybooks = await import('./outcome-playbooks.js'); // dynamic-import-ok
       await detectAllWorkspacePlaybooks();
@@ -219,7 +216,7 @@ export function startOutcomeCrons() {
   // Thin cron wrapper around runDecayDetector (see opportunity-detectors.ts): reads
   // the PERSISTED decay analysis (no crawl), emits DECAYING `decay` events for
   // critical / repeat-decay pages, and enqueues a debounced regen. ENTIRELY gated by
-  // the `opportunity-value-events` flag inside the detector — flag OFF is a no-op.
+  // the default-on detector path — an empty event ledger remains a natural no-op.
   // Loaded via dynamic import so the cron module doesn't pull the detector's
   // transitive deps at startup.
   const runDecayScan = async () => {
@@ -245,6 +242,48 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── A5 (audit #20) — P6 realized-vs-predicted EMV calibration + effort priors. ──
+  // Weekly recompute of outcome_emv_calibration from the predictedEmv snapshots +
+  // realized attributed_value pairs, plus the per-actionType time-to-completion effort
+  // priors. Runs AFTER the backfill startup pass (55s > 40s) so freshly snapshotted
+  // backfill rows are included in the first computation. Derived data only — honest
+  // `inconclusive` below the pair floor, never fabricated (FM-2).
+  const runEmvCalibrationJob = async () => {
+    try {
+      const { runEmvCalibration }: typeof OutcomeEmvCalibration = await import('./outcome-emv-calibration.js'); // dynamic-import-ok
+      const result = runEmvCalibration();
+      log.info(
+        {
+          workspacesProcessed: result.workspacesProcessed,
+          conclusiveEntries: result.conclusiveEntries,
+          inconclusiveEntries: result.inconclusiveEntries,
+          errors: result.errors,
+        },
+        'EMV calibration cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'EMV calibration cron failed');
+    }
+  };
+
+  // A6 (audit #22): recompute the anonymized cross-workspace win-rate priors — the
+  // no_data/degraded FALLBACK tier for the Outcome Learning default path. Aggregates
+  // every workspace's scored outcomes per action type, publishing only above the cohort
+  // + sample floors (FM-2: below either floor -> absent, never fabricated). Runs AFTER
+  // EMV calibration (60s > 55s) so it sees the same settled cross-workspace dataset.
+  const runPlatformPriorsJob = async () => {
+    try {
+      const { recomputePlatformPriors }: typeof PlatformLearningsPriors = await import('./platform-learnings-priors.js'); // dynamic-import-ok
+      const result = recomputePlatformPriors();
+      log.info(
+        { publishedEntries: result.publishedEntries, suppressedBelowFloor: result.suppressedBelowFloor },
+        'Platform learnings priors cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'Platform learnings priors cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -256,6 +295,8 @@ export function startOutcomeCrons() {
     setTimeout(runBackfillJob, 40_000),
     setTimeout(() => void runDecayScan(), 45_000),
     setTimeout(() => void runRankDeclineScan(), 50_000),
+    setTimeout(() => void runEmvCalibrationJob(), 55_000),
+    setTimeout(() => void runPlatformPriorsJob(), 60_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -265,6 +306,8 @@ export function startOutcomeCrons() {
   backfillInterval = setInterval(runBackfillJob, WEEKLY_MS);
   decayScanInterval = setInterval(() => void runDecayScan(), DAILY_MS);
   rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
+  emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
+  platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -282,6 +325,8 @@ export function stopOutcomeCrons() {
   if (backfillInterval) clearInterval(backfillInterval);
   if (decayScanInterval) clearInterval(decayScanInterval);
   if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
+  if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
+  if (platformPriorsInterval) clearInterval(platformPriorsInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -290,5 +335,7 @@ export function stopOutcomeCrons() {
   backfillInterval = null;
   decayScanInterval = null;
   rankDeclineScanInterval = null;
+  emvCalibrationInterval = null;
+  platformPriorsInterval = null;
   log.info('Outcome crons stopped');
 }

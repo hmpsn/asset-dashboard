@@ -14,19 +14,19 @@
  *       * highPriority = critical + warning; mediumPriority = opportunity
  *   - formatPipelineForClient arithmetic (inProgress brief/post statuses)
  *   - formatSiteHealthForClient cwvPassRatePct math
+ *   - keywordFeedbackSummary projects client-safe approve/reject signals
  *   - Workspace isolation: one workspace's insights don't bleed into another
  *
- * Port: 13366 (port-ok: next free after 13365)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
+import { LEARNINGS_LOGIC_VERSION } from '../../server/workspace-learnings.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13366); // port-ok: next free after 13365
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 // Seeded workspaces — created after server starts so DB is guaranteed up.
@@ -38,12 +38,16 @@ let trialWs: SeededFullWorkspace;
 let insightWs: SeededFullWorkspace;
 let largeInsightWs: SeededFullWorkspace;
 let readyLearningsWs: SeededFullWorkspace;
+let healthBreakdownWs: SeededFullWorkspace;
+let keywordFeedbackWs: SeededFullWorkspace;
 
 // IDs of rows we insert directly so afterAll can clean them up
 const insertedInsightIds: string[] = [];
 const insertedActionIds: string[] = [];
 const insertedOutcomeIds: string[] = [];
 const insertedLearningWorkspaceIds: string[] = [];
+const insertedChurnSignalIds: string[] = [];
+const insertedClientUserIds: string[] = [];
 
 function insertInsight(opts: {
   id?: string;
@@ -73,7 +77,6 @@ function insertInsight(opts: {
 }
 
 beforeAll(async () => {
-  setFlagOverride('outcome-ai-injection', true);
   await ctx.startServer();
 
   // clientPassword: '' lets public endpoints skip auth cookies (consistent
@@ -91,6 +94,8 @@ beforeAll(async () => {
   insightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
   largeInsightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
   readyLearningsWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
+  healthBreakdownWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
+  keywordFeedbackWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
 
   // Insert a known mix of insights into insightWs so we can assert exact counts.
   //
@@ -139,6 +144,10 @@ beforeAll(async () => {
     INSERT OR REPLACE INTO workspace_learnings (id, workspace_id, learnings, computed_at)
     VALUES (?, ?, ?, datetime('now'))
   `).run(learningId, readyLearningsWs.workspaceId, JSON.stringify({
+    // A1: cached learnings blobs carry a logic-version stamp; an unstamped blob
+    // is treated as pre-A1 corrupted cache and recomputed from tracked actions.
+    // This test wants the CACHED aggregate served, so stamp the current version.
+    logicVersion: LEARNINGS_LOGIC_VERSION,
     confidence: 'medium',
     totalScoredActions: 12,
     content: null,
@@ -203,10 +212,54 @@ beforeAll(async () => {
     JSON.stringify({}),
   );
   insertedOutcomeIds.push(outcomeId);
+
+  const churnSignalId = `churn-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO churn_signals
+      (id, workspace_id, workspace_name, type, severity, title, description, detected_at, dismissed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), NULL)
+  `).run(
+    churnSignalId,
+    healthBreakdownWs.workspaceId,
+    'Health Breakdown Workspace',
+    'no_login_14d',
+    'critical',
+    'No login diagnostic',
+    'Internal client-health warning: high churnRisk',
+  );
+  insertedChurnSignalIds.push(churnSignalId);
+
+  const clientUserId = `cu-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO client_users
+      (id, email, name, password_hash, role, workspace_id, avatar_url, invited_by, last_login_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, datetime('now'), datetime('now'))
+  `).run(
+    clientUserId,
+    `health-${randomUUID()}@example.com`,
+    'Health Breakdown Tester',
+    'test-hash',
+    'client_member',
+    healthBreakdownWs.workspaceId,
+    new Date().toISOString(),
+  );
+  insertedClientUserIds.push(clientUserId);
+
+  const keywordFeedbackStmt = db.prepare(`
+    INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+    VALUES (?, ?, ?, ?, ?, 'test-client')
+    ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      updated_at = datetime('now')
+  `);
+  keywordFeedbackStmt.run(keywordFeedbackWs.workspaceId, 'seo consulting', 'approved', null, 'content_gap');
+  keywordFeedbackStmt.run(keywordFeedbackWs.workspaceId, 'technical seo audit', 'approved', null, 'content_gap');
+  keywordFeedbackStmt.run(keywordFeedbackWs.workspaceId, 'cheap backlinks', 'declined', 'Off-brand', 'content_gap');
+  keywordFeedbackStmt.run(keywordFeedbackWs.workspaceId, 'free traffic hacks', 'declined', 'Off-brand', 'keyword_gap');
 }, 25_000);
 
 afterAll(async () => {
-  setFlagOverride('outcome-ai-injection', null);
   for (const id of insertedOutcomeIds) {
     db.prepare('DELETE FROM action_outcomes WHERE id = ?').run(id);
   }
@@ -216,9 +269,18 @@ afterAll(async () => {
   for (const workspaceId of insertedLearningWorkspaceIds) {
     db.prepare('DELETE FROM workspace_learnings WHERE workspace_id = ?').run(workspaceId);
   }
+  for (const id of insertedClientUserIds) {
+    db.prepare('DELETE FROM client_users WHERE id = ?').run(id);
+  }
+  for (const id of insertedChurnSignalIds) {
+    db.prepare('DELETE FROM churn_signals WHERE id = ?').run(id);
+  }
   // Clean up inserted insight rows (FK cascade is OFF in tests)
   for (const id of insertedInsightIds) {
     db.prepare('DELETE FROM analytics_insights WHERE id = ?').run(id);
+  }
+  if (keywordFeedbackWs) {
+    db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ?').run(keywordFeedbackWs.workspaceId);
   }
 
   const tryCleanup = (w: SeededFullWorkspace | undefined) => w?.cleanup();
@@ -229,6 +291,8 @@ afterAll(async () => {
   tryCleanup(insightWs);
   tryCleanup(largeInsightWs);
   tryCleanup(readyLearningsWs);
+  tryCleanup(healthBreakdownWs);
+  tryCleanup(keywordFeedbackWs);
 
   await ctx.stopServer();
 });
@@ -327,6 +391,14 @@ describe('free tier — correct fields present and absent', () => {
     expect('compositeHealthScore' in body).toBe(false);
   });
 
+  it('compositeHealthBreakdown key is absent', () => {
+    expect('compositeHealthBreakdown' in body).toBe(false);
+  });
+
+  it('keywordFeedbackSummary key is absent', () => {
+    expect('keywordFeedbackSummary' in body).toBe(false);
+  });
+
   it('weCalledIt key is absent', () => {
     expect('weCalledIt' in body).toBe(false);
   });
@@ -389,6 +461,14 @@ describe('growth tier — correct fields present and absent', () => {
     expect('compositeHealthScore' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present (may be null)', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
+  it('keywordFeedbackSummary key is present (may be null)', () => {
+    expect('keywordFeedbackSummary' in body).toBe(true);
+  });
+
   it('weCalledIt key is present (must be an array)', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -448,6 +528,14 @@ describe('premium tier — all fields present', () => {
     expect('compositeHealthScore' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
+  it('keywordFeedbackSummary key is present', () => {
+    expect('keywordFeedbackSummary' in body).toBe(true);
+  });
+
   it('weCalledIt key is present and is an array', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -498,6 +586,14 @@ describe('trial workspace — free base tier promotes to growth', () => {
     expect('serpOpportunities' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
+  it('keywordFeedbackSummary key is present', () => {
+    expect('keywordFeedbackSummary' in body).toBe(true);
+  });
+
   it('weCalledIt key is present', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -539,6 +635,51 @@ describe('expired trial workspace — stays on free tier', () => {
     const res = await api(`/api/public/intelligence/${expiredTrialWs.workspaceId}`);
     const body = await res.json();
     expect('learningHighlights' in body).toBe(false);
+  });
+
+  it('compositeHealthBreakdown absent when trial expired', async () => {
+    const res = await api(`/api/public/intelligence/${expiredTrialWs.workspaceId}`);
+    const body = await res.json();
+    expect('compositeHealthBreakdown' in body).toBe(false);
+  });
+
+  it('keywordFeedbackSummary absent when trial expired', async () => {
+    const res = await api(`/api/public/intelligence/${expiredTrialWs.workspaceId}`);
+    const body = await res.json();
+    expect('keywordFeedbackSummary' in body).toBe(false);
+  });
+});
+
+// ── keywordFeedbackSummary projection ─────────────────────────────────────────
+
+describe('keywordFeedbackSummary — client-safe projection', () => {
+  it('projects approved and declined keyword feedback into counts, samples, and reasons', async () => {
+    const res = await api(`/api/public/intelligence/${keywordFeedbackWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.keywordFeedbackSummary).toMatchObject({
+      approvedCount: 2,
+      rejectedCount: 2,
+      approveRate: 0.5,
+      rejectionReasons: ['Off-brand'],
+    });
+    expect(body.keywordFeedbackSummary.approvedSamples).toHaveLength(2);
+    expect(body.keywordFeedbackSummary.approvedSamples).toEqual(
+      expect.arrayContaining(['seo consulting', 'technical seo audit']),
+    );
+    expect(body.keywordFeedbackSummary.rejectedSamples).toHaveLength(2);
+    expect(body.keywordFeedbackSummary.rejectedSamples).toEqual(
+      expect.arrayContaining(['cheap backlinks', 'free traffic hacks']),
+    );
+  });
+
+  it('does not expose keyword feedback internals on the public response', async () => {
+    const res = await api(`/api/public/intelligence/${keywordFeedbackWs.workspaceId}`);
+    const body = await res.json();
+
+    expect(body.clientSignals).toBeUndefined();
+    expect(body.keywordFeedback).toBeUndefined();
   });
 });
 
@@ -773,6 +914,8 @@ describe('growth tier — learningHighlights shape', () => {
     expect(body.weCalledIt).toHaveLength(1);
     expect(body.weCalledIt[0]).toMatchObject({
       actionId: insertedActionIds[0],
+      prediction: 'content refresh on /ready-learnings',
+      outcome: 'Clicks improved from 100 to 175 (+75%).',
       score: 'strong_win',
       pageUrl: '/ready-learnings',
     });
@@ -873,6 +1016,22 @@ describe('admin-only fields never exposed to client', () => {
     const res = await api(`/api/public/intelligence/${growthWs.workspaceId}`);
     const body = await res.json();
     expect('churnRisk' in body).toBe(false);
+    expect(JSON.stringify(body)).not.toContain('churnRisk');
+  });
+
+  it('compositeHealthBreakdown does not expose churn diagnostics or raw signal copy', async () => {
+    const res = await api(`/api/public/intelligence/${healthBreakdownWs.workspaceId}`);
+    const body = await res.json();
+    const breakdown = body.compositeHealthBreakdown as {
+      rows: Array<{ id: string; weight: number }>;
+    } | null;
+
+    expect(breakdown).not.toBeNull();
+    expect(breakdown?.rows.map(row => row.id)).toEqual(['retention', 'engagement']);
+    expect(breakdown?.rows.reduce((sum, row) => sum + row.weight, 0)).toBe(100);
+
+    const serialized = JSON.stringify(breakdown);
+    expect(serialized).not.toMatch(/churn|churnRisk|client-health warning|No login diagnostic|Internal|critical|warning|high/i);
   });
 
   it('impactScore is not present in any tier response', async () => {

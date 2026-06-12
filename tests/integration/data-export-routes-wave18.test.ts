@@ -5,7 +5,6 @@
  * and confirms that a fresh workspace returns 200 with a valid (empty) payload
  * in both JSON and CSV format.
  *
- * Ports: 13425 (exclusive to wave-18 batch A2)
  *
  * Routes covered:
  *   GET /api/export/:workspaceId/briefs
@@ -18,11 +17,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13425;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 const UNKNOWN_ID = 'ws_wave18_does_not_exist_xq9z';
@@ -31,7 +29,7 @@ let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`Wave18 Export Test ${PORT}`).id;
+  wsId = createWorkspace(`Wave18 Export Test ${ctx.PORT}`).id;
 }, 25_000);
 
 afterAll(async () => {

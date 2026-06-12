@@ -11,7 +11,7 @@
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
@@ -19,7 +19,7 @@ import { createClientUser, deleteClientUser, signClientToken } from '../../serve
 import { updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
-const ctx = createTestContext(13367); // port-ok: next free after 13366
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 /**
@@ -284,7 +284,7 @@ describe('requireClientStrategyMutationAuth — authentication enforcement', () 
   it('returns 401 with no cookies at all', async () => {
     const res = await api(kfEndpoint(wsA.workspaceId), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify(validFeedback),
     });
     expect(res.status).toBe(401);
@@ -522,10 +522,10 @@ describe('POST /api/public/keyword-feedback/:workspaceId — validation', () => 
     }
   });
 
-  it('returns 401 for an unknown workspace (auth check before workspace lookup)', async () => {
-    // requireClientStrategyMutationAuth runs before the workspace lookup,
-    // so a nonexistent workspace returns 401 (no valid auth cookie) rather than 404.
-    // clientTokenA is for wsA — workspace in token != nonexistent-ws-99999 → 401
+  it('returns 404 for an unknown workspace before mutation logic', async () => {
+    // requireAuthenticatedClientPortalAuth now validates workspace existence before
+    // route mutation logic, so nonexistent workspaces resolve to the canonical 404.
+    // clientTokenA is for wsA, but the target workspace does not exist.
     const res = await fetch(`${ctx.BASE}/api/public/keyword-feedback/nonexistent-ws-99999`, {
       method: 'POST',
       headers: {
@@ -535,7 +535,7 @@ describe('POST /api/public/keyword-feedback/:workspaceId — validation', () => 
       body: JSON.stringify({ keyword: 'test keyword', status: 'approved' }),
       redirect: 'manual',
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 });
 
@@ -566,7 +566,7 @@ describe('POST /api/public/business-priorities/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/business-priorities/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ priorities: [{ text: 'Grow revenue', category: 'growth' }] }),
     });
     expect(res.status).toBe(401);
@@ -848,6 +848,7 @@ describe('DELETE /api/public/keyword-feedback/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/keyword-feedback/${delWs.workspaceId}?keyword=test`, {
       method: 'DELETE',
+      headers: { 'x-no-auto-public-auth': 'true' },
     });
     expect(res.status).toBe(401);
   });
@@ -906,7 +907,7 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/content-gap-vote/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ keyword: 'test', vote: 'up' }),
     });
     expect(res.status).toBe(401);
@@ -1020,7 +1021,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/workspaces/${wsA.workspaceId}/business-profile`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ phone: '555-1234' }),
     });
     expect(res.status).toBe(401);
@@ -1120,7 +1121,7 @@ describe('POST /api/public/keyword-feedback/:workspaceId/bulk', () => {
   it('returns 401 without auth', async () => {
     const res = await api(`/api/public/keyword-feedback/${wsA.workspaceId}/bulk`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ keywords: [{ keyword: 'test', status: 'approved' }] }),
     });
     expect(res.status).toBe(401);

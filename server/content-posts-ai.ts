@@ -3,7 +3,6 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
 import { callAI } from './ai.js';
 import type { AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
@@ -20,6 +19,7 @@ import {
   getPageTypeCopyContract,
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
+import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -145,12 +145,10 @@ export async function callCreativeAI(opts: {
 }
 
 export async function buildVoiceContext(workspaceId: string): Promise<string> {
-  const slices = ['seoContext', 'learnings'] as const;
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'content' });
-  const seo = intel.seoContext;
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
-  const kwMapBlock = formatPageMapForPrompt(seo);
-  return `${fullContext}${kwMapBlock}`;
+  const seoPrompt = await buildSeoPromptContext(workspaceId, {
+    learningsDomain: 'content',
+  });
+  return seoPrompt.seoPromptContext;
 }
 
 // --- Page-type-specific writing instructions ---

@@ -17,11 +17,12 @@ vi.mock('../../src/hooks/admin/useClientSignals', () => ({
 vi.mock('../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [], isLoading: false }),
 }));
-// useFeatureFlag also uses React Query (fetches /api/feature-flags). Stub it to
-// return `true` so the Copy Engine ('brand') nav item renders in legacy tests;
-// dedicated feature-flag rendering tests live in their own file.
+// useFeatureFlag also uses React Query (fetches /api/feature-flags). Stub it so
+// the Copy Engine ('brand') nav item renders in legacy tests, but keyword-hub is
+// OFF by default (byte-identical legacy nav); the P4 relabel tests flip it ON.
+const featureFlagMock = vi.fn((flag: string) => flag !== 'keyword-hub');
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: () => true,
+  useFeatureFlag: (...args: unknown[]) => featureFlagMock(...args),
 }));
 
 const WORKSPACES: Workspace[] = [
@@ -52,7 +53,12 @@ function renderSidebar(overrides = {}) {
 }
 
 describe('Sidebar', () => {
-  beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    // Default: keyword-hub OFF.
+    featureFlagMock.mockImplementation((flag: string) => flag !== 'keyword-hub');
+  });
 
   it('renders the Home nav item', () => {
     renderSidebar();
@@ -133,5 +139,19 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Search & Traffic')).not.toBeInTheDocument();
     fireEvent.click(monitoringHeader);
     expect(screen.getByText('Search & Traffic')).toBeInTheDocument();
+  });
+
+  // ── Keyword Hub nav (post-W4-cutover: unconditional) ─────────────────────────
+  // The Hub is the only keyword surface. The nav shows "Keyword Hub"
+  // unconditionally; the standalone "Rank Tracker" entry and the old "Keywords"
+  // label are gone regardless of any flag state.
+  describe('keyword nav', () => {
+    it('shows "Keyword Hub" and never the retired "Rank Tracker" / "Keywords" entries', () => {
+      featureFlagMock.mockReturnValue(true);
+      renderSidebar();
+      expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+      expect(screen.queryByText('Rank Tracker')).not.toBeInTheDocument();
+      expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
+    });
   });
 });

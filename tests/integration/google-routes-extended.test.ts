@@ -44,6 +44,7 @@ import type { AddressInfo } from 'net';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ---------------------------------------------------------------------------
 // vi.mock declarations (hoisted before imports)
@@ -106,6 +107,7 @@ vi.mock('../../server/search-console.js', async (importOriginal) => {
 
 const ga4State = vi.hoisted(() => ({
   properties: [{ propertyId: '123456789', displayName: 'My Property', createTime: '2021-01-01' }] as Array<{ propertyId: string; displayName: string; createTime: string }>,
+  landingPagesCalls: [] as Array<{ propertyId: string; days: number; limit: number; organicOnly: boolean }>,
   shouldThrow: false,
 }));
 
@@ -116,6 +118,15 @@ vi.mock('../../server/google-analytics.js', async (importOriginal) => {
     listGA4Properties: vi.fn(async () => {
       if (ga4State.shouldThrow) throw new Error('GA4 API error');
       return ga4State.properties;
+    }),
+    getGA4LandingPages: vi.fn(async (
+      propertyId: string,
+      days: number,
+      limit: number,
+      organicOnly: boolean,
+    ) => {
+      ga4State.landingPagesCalls.push({ propertyId, days, limit, organicOnly });
+      return [{ landingPage: '/', sessions: 1, users: 1, bounceRate: 0, avgEngagementTime: 0, conversions: 0 }];
     }),
   };
 });
@@ -183,7 +194,7 @@ async function req(
   path: string,
   opts?: RequestInit,
 ): Promise<{ status: number; body: unknown; headers: Headers }> {
-  const res = await fetch(`${baseUrl}${path}`, { ...opts, redirect: 'manual' });
+  const res = await fetch(`${baseUrl}${path}`, withPublicTestAuth(path, { ...opts, redirect: 'manual' }));
   let body: unknown;
   const ct = res.headers.get('content-type') ?? '';
   if (ct.includes('application/json')) {
@@ -389,7 +400,10 @@ describe('GET /api/google/gsc-sites — global GSC sites', () => {
     gscState.shouldThrow = true;
     const { status, body } = await getJson(baseUrl, '/api/google/gsc-sites');
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('GSC API error');
+    expect(error).toContain('Unable to load Search Console sites');
   });
 });
 
@@ -451,6 +465,7 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
     expect(status).toBe(500);
     expect(typeof body).toBe('string');
     expect((body as string)).toContain('Google auth failed');
+    expect((body as string)).not.toContain('Token exchange failed');
   });
 });
 
@@ -478,7 +493,56 @@ describe('GET /api/google/ga4-properties', () => {
     ga4State.shouldThrow = true;
     const { status, body } = await getJson(baseUrl, '/api/google/ga4-properties');
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('GA4 API error');
+    expect(error).toContain('Unable to load GA4 properties');
+  });
+});
+
+describe('GET /api/google/analytics-landing-pages/:workspaceId', () => {
+  let ws: SeededFullWorkspace;
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+
+  beforeEach(async () => {
+    ws = seedWorkspace({ ga4PropertyId: 'ga4-prop-123' });
+    ga4State.landingPagesCalls = [];
+    const srv = await startTestServer();
+    baseUrl = srv.baseUrl;
+    stop = srv.stop;
+  });
+
+  afterEach(async () => {
+    ws.cleanup();
+    await stop();
+  });
+
+  it('passes days, limit, and organic flag through to GA4 provider', async () => {
+    const { status, body } = await getJson(
+      baseUrl,
+      `/api/google/analytics-landing-pages/${ws.workspaceId}?days=14&limit=20&organic=true`,
+    );
+
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect(ga4State.landingPagesCalls).toEqual([{
+      propertyId: 'ga4-prop-123',
+      days: 14,
+      limit: 20,
+      organicOnly: true,
+    }]);
+  });
+
+  it('rejects invalid limit values', async () => {
+    const { status, body } = await getJson(
+      baseUrl,
+      `/api/google/analytics-landing-pages/${ws.workspaceId}?limit=0`,
+    );
+
+    expect(status).toBe(400);
+    expect((body as Record<string, unknown>).error).toContain('limit');
+    expect(ga4State.landingPagesCalls).toEqual([]);
   });
 });
 
@@ -543,7 +607,10 @@ describe('GET /api/google/search-overview/:siteId — validation and errors', ()
       `/api/google/search-overview/${ws.webflowSiteId}?workspaceId=${ws.workspaceId}&gscSiteUrl=https://gsc.example.com/`,
     );
     expect(status).toBe(500);
-    expect((body as Record<string, unknown>).error).toBeTruthy();
+    const error = String((body as Record<string, unknown>).error);
+    expect(error).toBeTruthy();
+    expect(error).not.toContain('Search overview API error');
+    expect(error).toContain('Unable to load Search Console overview');
   });
 });
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBroadcast } from '../../server/broadcast.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
@@ -10,6 +11,7 @@ import {
 } from '../../server/keyword-command-center.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
+import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
@@ -170,6 +172,8 @@ function seedStrategy() {
     generatedAt,
   };
   updateWorkspace(workspaceId, { keywordStrategy: strategy });
+  // siteKeywordMetrics is table-only post-strip — populate the table to match the blob.
+  replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'Cosmetic Dentist', volume: 900, difficulty: 38 }]);
   upsertPageKeyword(workspaceId, {
     pagePath: '/services/cosmetic-dentistry',
     pageTitle: 'Cosmetic Dentistry',
@@ -1201,9 +1205,10 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     // (observed on Swish: badge 224 / table 227).
     seedStrategy();
     // Tracked keyword promoted from strategy that isn't already in strategy.siteKeywords
-    // — this is the case that caused the drift on Swish.
-    addTrackedKeyword(workspaceId, 'orthodontics austin', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY });
-    addTrackedKeyword(workspaceId, 'family dentist', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD });
+    // — this is the case that caused the drift on Swish. Wave 3d-ii: IN_STRATEGY now
+    // keys on strategyOwned (set by reconcile), so seed it explicitly.
+    addTrackedKeyword(workspaceId, 'orthodontics austin', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY, strategyOwned: true });
+    addTrackedKeyword(workspaceId, 'family dentist', { source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD, strategyOwned: true });
     // Approved feedback keyword — also counts as in_strategy via rows path.
     seedFeedback('teeth whitening near me', 'approved');
     // Declined/requested feedback keywords — must NOT count even if they overlap a page.
@@ -1357,10 +1362,49 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     expect(detail!.row.tracking.hasSignal).toBe(false);
   });
 
-  it('infers UNKNOWN tracking source from strategy.siteKeywords', async () => {
-    // Regression: Swish audit showed 231/235 active-tracked rows had source="unknown"
-    // due to legacy migration. Read-time inference recovers provenance so the row
-    // gets proper source labels and protected-state UI.
+  it('Wave 4 P0: tracking.strategyOwned is projected onto the emitted KCC row when strategy_owned=1', async () => {
+    // Wave 3d-ii merges strategyOwned onto row.tracking via mergeTrackedKeywordProvenance,
+    // but finalizeDraftRow did NOT project it onto the emitted bundle row. P0-T2 opens
+    // the projection gate (admin-only). Three-state: true is a real, projected value.
+    addTrackedKeyword(workspaceId, 'owned strategy keyword', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
+    });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'owned strategy keyword');
+    expect(detail!.row.tracking.strategyOwned).toBe(true);
+  });
+
+  it('Wave 4 P0: tracking.strategyOwned is undefined (NOT false) when ownership is unknown', async () => {
+    // Three-state discipline: a row seeded WITHOUT strategyOwned must read back as
+    // `undefined` (ownership unknown), never coerced to `false`. A truthiness/`?? false`
+    // guard would mislabel every pre-reconcile row as "explicitly not owned".
+    addTrackedKeyword(workspaceId, 'unowned manual keyword', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+
+    const detail = await buildKeywordCommandCenterDetail(workspaceId, 'unowned manual keyword');
+    expect(detail!.row.tracking.strategyOwned).toBeUndefined();
+  });
+
+  it('Wave 3d-ii: read-time source inference is RETIRED — an UNKNOWN tracked source stays UNKNOWN at read time', () => {
+    // Regression GUARD: read-time inferTrackedKeywordSources was retired. The boot
+    // backfill stamps legacy UNKNOWN sources ONCE; the read paths must NOT re-infer.
+    // So an UNKNOWN keyword added post-boot keeps source=UNKNOWN when read (its label
+    // detail is suppressed, never the literal "unknown" string).
+    updateWorkspace(workspaceId, {
+      keywordStrategy: {
+        siteKeywords: ['cosmetic dentistry'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+        businessContext: 'Dental',
+        generatedAt: '2026-05-20T10:00:00.000Z',
+      },
+    });
+    addTrackedKeyword(workspaceId, 'cosmetic dentistry', {
+      source: TRACKED_KEYWORD_SOURCE.UNKNOWN,
+    });
+  });
+
+  it('Wave 3d-ii: a strategy-declared UNKNOWN keyword classifies IN_STRATEGY via the strategy match, not a re-inferred source', async () => {
     updateWorkspace(workspaceId, {
       keywordStrategy: {
         siteKeywords: ['cosmetic dentistry'],
@@ -1376,34 +1420,37 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'cosmetic dentistry');
     expect(detail).not.toBeNull();
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD);
-    // Source label detail should no longer be the literal "unknown" string
-    const trackingSourceLabel = detail!.row.sourceLabels.find(s => s.kind === 'tracking');
-    expect(trackingSourceLabel?.detail).toBe('strategy site keyword');
+    // Source is NOT re-inferred at read time — it stays UNKNOWN.
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
+    // But the row still classifies IN_STRATEGY because the strategy explanation
+    // (siteKeywords match) drives the lifecycle status, independent of the source enum.
+    expect(detail!.row.lifecycleStatus).toBe(KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY);
   });
 
-  it('infers UNKNOWN tracking source as STRATEGY_PRIMARY when keyword is in siteKeywordMetrics', async () => {
+  it('Wave 3d-ii: an UNKNOWN keyword in siteKeywordMetrics is NOT re-inferred to STRATEGY_PRIMARY at read time', async () => {
     updateWorkspace(workspaceId, {
       keywordStrategy: {
         siteKeywords: [],
-        siteKeywordMetrics: [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }],
         opportunities: [],
         businessContext: 'Dental',
         generatedAt: '2026-05-20T10:00:00.000Z',
       },
     });
+    replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: 'orthodontics', volume: 1200, difficulty: 45 }]);
     addTrackedKeyword(workspaceId, 'orthodontics', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'orthodontics');
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY);
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
   });
 
-  it('infers UNKNOWN tracking source as CLIENT_REQUESTED when matching requested feedback', async () => {
+  it('Wave 3d-ii: an UNKNOWN keyword matching requested feedback is NOT re-inferred to CLIENT_REQUESTED at read time', async () => {
     addTrackedKeyword(workspaceId, 'invisalign cost', { source: TRACKED_KEYWORD_SOURCE.UNKNOWN });
     seedFeedback('invisalign cost', 'requested', 'Client asked');
 
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'invisalign cost');
-    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED);
+    // Read-time inference retired — the tracking source stays UNKNOWN. (The feedback
+    // status still surfaces via the feedback channel / lifecycle, not the source enum.)
+    expect(detail!.row.tracking.source).toBe(TRACKED_KEYWORD_SOURCE.UNKNOWN);
   });
 
   it('leaves UNKNOWN tracking source unchanged when no inference hint matches', async () => {
@@ -1472,6 +1519,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       businessProfile: {
         address: { street: '123 Main', city: 'Austin', region: 'TX', country: 'US', postalCode: '78701' },
         serviceAreas: ['Austin', 'Round Rock'],
+      },
+      // W6.1: buildWorkspaceServiceTermRegex is workspace-derived. Provide siteKeywords
+      // containing the service vocabulary so 'plumbing' is in the service term regex
+      // and the page keywords classify as local candidates.
+      keywordStrategy: {
+        siteKeywords: ['plumbing service', 'drain cleaning'],
+        siteKeywordMetrics: [],
+        opportunities: [],
       },
     } as never);
     updateLocalSeoConfiguration(workspaceId, {
@@ -1581,6 +1636,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       businessProfile: {
         address: { street: '1 Main St', city: 'Austin', state: 'TX', country: 'US' },
       },
+      // W6.1: buildWorkspaceServiceTermRegex is workspace-derived. Provide siteKeywords
+      // so 'pipe' and 'repair' tokens go into the service term regex, making
+      // 'pipe repair' classify as a service keyword and generate local_variant candidates.
+      keywordStrategy: {
+        siteKeywords: ['pipe repair', 'plumbing'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+      },
     });
     updateLocalSeoConfiguration(workspaceId, {
       posture: LOCAL_SEO_POSTURE.LOCAL,
@@ -1637,6 +1700,130 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     // Every row returned must be lifecycle=CANDIDATE (the filter contract).
     for (const row of payload!.rows) {
       expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
+    }
+  });
+});
+
+describe('valueReasons on KCC rows (Task 2.2)', () => {
+  it('a Hub row carries valueReasons (non-empty) for a scored keyword when flag is ON', async () => {
+    // Seed a page keyword with enough signal to trigger value scoring
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'dental implants',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 2400,
+      difficulty: 40,
+      cpc: 9,
+    });
+
+    // Enable the value scoring flag for this workspace
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+
+    try {
+      const payload = await buildKeywordCommandCenterRows(workspaceId, {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        pageSize: 100,
+      });
+      expect(payload).not.toBeNull();
+      const dentalRow = payload!.rows.find(r => r.normalizedKeyword === 'dental implants');
+      expect(dentalRow).toBeDefined();
+      // valueReasons must be present and non-empty when flag is ON
+      expect(dentalRow!.valueReasons).toBeDefined();
+      expect(dentalRow!.valueReasons!.length).toBeGreaterThan(0);
+      // Must include an intent reason
+      expect(dentalRow!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+    }
+  });
+
+  it('valueReasons is absent when the flag is OFF', async () => {
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-cleaning',
+      pageTitle: 'Dental Cleaning',
+      primaryKeyword: 'dental cleaning',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 1200,
+      difficulty: 30,
+      cpc: 5,
+    });
+
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+
+    const payload = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    expect(payload).not.toBeNull();
+    const cleaningRow = payload!.rows.find(r => r.normalizedKeyword === 'dental cleaning');
+    expect(cleaningRow).toBeDefined();
+    // valueReasons must be absent when flag is OFF
+    expect(cleaningRow!.valueReasons).toBeUndefined();
+  });
+});
+
+describe('cpc join from page_keywords (Task 3.2)', () => {
+  it('a KCC row carries metrics.cpc populated from the page_keywords cpc', async () => {
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/services/dental-bridges',
+      pageTitle: 'Dental Bridges',
+      primaryKeyword: 'dental bridges',
+      secondaryKeywords: [],
+      searchIntent: 'commercial',
+      volume: 800,
+      difficulty: 35,
+      cpc: 7.5,
+    });
+
+    const payload = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    expect(payload).not.toBeNull();
+    const bridgeRow = payload!.rows.find(r => r.normalizedKeyword === 'dental bridges');
+    expect(bridgeRow).toBeDefined();
+    expect(bridgeRow!.metrics.cpc).toBe(7.5);
+  });
+});
+
+describe('content-gap cpc on KCC rows (cross-surface consistency fix)', () => {
+  it('a content-gap-only row is cpc-aware in score/reasons (flag ON) but shows NO realized $ block', async () => {
+    // Real content-gap cpc (#1103) must reach the KCC value score the same way it
+    // reaches enrichment/strategy — otherwise the same keyword scores/sorts
+    // differently in the Hub vs the client. But content gaps have no GSC signal, so
+    // they must NOT surface a realized-$ block (the client computes $ for pages only).
+    replaceAllContentGaps(workspaceId, [{
+      topic: 'Invisalign cost guide',
+      targetKeyword: 'invisalign cost',
+      intent: 'commercial',
+      priority: 'high',
+      rationale: 'Patients compare aligner pricing before booking.',
+      volume: 1800,
+      difficulty: 38,
+      cpc: 12,
+    }]);
+
+    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
+    try {
+      const payload = await buildKeywordCommandCenterRows(workspaceId, {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        pageSize: 100,
+      });
+      const row = payload!.rows.find(r => r.normalizedKeyword === 'invisalign cost');
+      expect(row).toBeDefined();
+      // cpc threaded into the row metrics → cpc-aware value score
+      expect(row!.metrics.cpc).toBe(12);
+      // Hub (admin) reasons are cpc-aware and may show the raw "$X CPC"
+      expect(row!.valueReasons).toBeDefined();
+      expect(row!.valueReasons!.some(r => /\$12/.test(r))).toBe(true);
+      // No realized-$ block: content gaps carry no clicks/impressions/rank
+      expect(row!.currentMonthly).toBeUndefined();
+      expect(row!.upsideMonthly).toBeUndefined();
+    } finally {
+      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
     }
   });
 });

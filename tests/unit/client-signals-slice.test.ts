@@ -181,6 +181,11 @@ describe('assembleClientSignals', () => {
     expect(result.churnRisk).toBe('low');
     expect(result.engagement?.loginFrequency).toBe('daily');
     expect(result.compositeHealthScore).toBe(77);
+    expect(result.compositeHealthBreakdown?.rows).toEqual([
+      expect.objectContaining({ id: 'retention', score: 60, weight: 57 }),
+      expect.objectContaining({ id: 'engagement', score: 100, weight: 43 }),
+    ]);
+    expect(result.compositeHealthBreakdown?.rows.reduce((sum, row) => sum + row.weight, 0)).toBe(100);
   });
 
   it('returns null compositeHealthScore when only one component is available', async () => {
@@ -198,6 +203,7 @@ describe('assembleClientSignals', () => {
 
     expect(result.churnRisk).toBe('high');
     expect(result.compositeHealthScore).toBeNull();
+    expect(result.compositeHealthBreakdown).toBeNull();
   });
 
   it('maps login frequency boundaries consistently', async () => {

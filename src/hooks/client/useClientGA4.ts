@@ -3,6 +3,7 @@ import type {
   GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4ConversionSummary,
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../components/client/types';
+import { STALE_TIMES } from '../../lib/queryClient';
 import { useGA4Base } from '../shared/useGA4Base';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
@@ -19,6 +20,17 @@ export interface ClientGA4Data {
   ga4NewVsReturning: GA4NewVsReturning[];
   ga4Organic: GA4OrganicOverview | null;
   ga4LandingPages: GA4LandingPage[];
+  dataUpdatedAt: number | null;
+}
+
+type FreshnessQuery = {
+  status: 'pending' | 'error' | 'success';
+  dataUpdatedAt: number;
+};
+
+function primaryDataUpdatedAt(query: FreshnessQuery, data: unknown): number | null {
+  if (!data || query.status !== 'success' || query.dataUpdatedAt <= 0) return null;
+  return query.dataUpdatedAt;
 }
 
 export function useClientGA4(
@@ -38,6 +50,7 @@ export function useClientGA4(
     keyPrefix: 'client-ga4',
     includeEvents: true,
     landingOpts: { organic: true, limit: 15 },
+    staleTime: STALE_TIMES.ANALYTICS,
   });
 
   // Aggregate partial failures
@@ -61,8 +74,10 @@ export function useClientGA4(
       ? `Partial analytics load — failed: ${failedKeys.join(', ')}`
       : null;
 
+  const ga4Overview = (overviewQ.data ?? null) as GA4Overview | null;
+
   return {
-    ga4Overview: (overviewQ.data ?? null) as GA4Overview | null,
+    ga4Overview,
     ga4Trend: trendQ.data ?? [],
     ga4Pages: topPagesQ.data ?? [],
     ga4Sources: sourcesQ.data ?? [],
@@ -74,6 +89,7 @@ export function useClientGA4(
     ga4NewVsReturning: nvrQ.data ?? [],
     ga4Organic: (organicQ.data ?? null) as GA4OrganicOverview | null,
     ga4LandingPages: landingQ.data ?? [],
+    dataUpdatedAt: primaryDataUpdatedAt(overviewQ, ga4Overview),
     isLoading: overviewQ.isLoading || trendQ.isLoading,
     sectionError,
   };

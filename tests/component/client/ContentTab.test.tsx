@@ -131,6 +131,24 @@ describe('ContentTab', () => {
     expect(screen.getByRole('button', { name: /suggest a topic/i })).toBeInTheDocument();
   });
 
+  it('shows prices on the service chooser buttons before opening checkout', () => {
+    render(<ContentTab {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /suggest a topic/i }));
+
+    expect(screen.getByRole('button', { name: /content brief \$199/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /full blog post \$499/i })).toBeInTheDocument();
+  });
+
+  it('hides service chooser prices for external billing workspaces', () => {
+    render(<ContentTab {...defaultProps} hidePrices />);
+    fireEvent.click(screen.getByRole('button', { name: /suggest a topic/i }));
+
+    expect(screen.getByRole('button', { name: /^content brief$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^full blog post$/i })).toBeInTheDocument();
+    expect(screen.queryByText('$199')).not.toBeInTheDocument();
+    expect(screen.queryByText('$499')).not.toBeInTheDocument();
+  });
+
   it('renders a list of content request items', () => {
     const requests = [
       makeRequest({ id: 'req-1', topic: 'SEO Basics Guide' }),

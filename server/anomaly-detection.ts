@@ -26,9 +26,8 @@ import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
-import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams, deleteStaleInsightsByType } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
@@ -48,6 +47,35 @@ export function initAnomalyBroadcast(fn: (workspaceId: string, event: string, da
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
 const MIN_SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // Skip startup scan if last scan < 6h ago
 const COMPARISON_DAYS = 28;
+
+// Anomaly de-duplication window. `alreadyDetected()` suppresses re-emission of the same
+// anomaly type for this many hours (its default `withinHours`). Scans run every 6–12h, so an
+// ONGOING anomaly is intentionally absent from `detected` for most of this window — its
+// anomaly_digest row is NOT re-stamped each cycle even though the anomaly is still active.
+// The stale-prune cutoff MUST therefore lag `cycleStart` by at least this window; otherwise a
+// cycle that fires a *different* anomaly would delete the still-active row (wiping
+// firstDetected / durationDays continuity, anomaly-detection.ts:659-666).
+const ANOMALY_DEDUP_WINDOW_HOURS = 48;
+const ANOMALY_DEDUP_WINDOW_MS = ANOMALY_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
+
+/**
+ * Prune stale anomaly_digest insight rows for a workspace.
+ *
+ * Runs UNCONDITIONALLY (every workspace, every cycle — including the no-data-connection
+ * `continue` path and the detected.length === 0 path) so that rows minted by a previous
+ * cycle are cleaned once their anomaly clears. The cutoff lags `cycleStart` by the dedup
+ * window so a still-active anomaly (absent from `detected` because of the 48h re-emission
+ * suppression) is NOT deleted. Mirrors the competitor_alert cleanup precedent
+ * (intelligence-crons.ts:104/109/224-226) and analytics-insights.md §8.2.
+ */
+function pruneStaleAnomalyDigests(workspaceId: string, cycleStart: string): void {
+  const cutoff = new Date(new Date(cycleStart).getTime() - ANOMALY_DEDUP_WINDOW_MS).toISOString();
+  try {
+    deleteStaleInsightsByType(workspaceId, 'anomaly_digest', cutoff);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'anomaly_digest stale prune failed');
+  }
+}
 
 // --- Minimum traffic floors — skip anomalies on low-volume pages to reduce noise ---
 const MIN_CLICKS = 200;        // previous period clicks must be ≥200 to trigger click anomaly
@@ -229,10 +257,9 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * waiting for the next periodic scan. Uses applyScoreAdjustment with delta=0 to remove
  * the 'anomaly' key from _scoreAdjustments, which restores the original base score.
  *
- * ── bridge-anomaly-boost feature flag checklist ──
- * All functions that apply or reverse anomaly boosts MUST gate on
- * isFeatureEnabled('bridge-anomaly-boost'). When adding a new boost/reversal
- * code path, add the gate and update this list:
+ * ── anomaly boost path checklist ──
+ * Anomaly boosts are default-on. When adding a new boost/reversal code path,
+ * keep it isolated and update this list:
  *   1. reverseAnomalyBoostIfNoneRemain() — dismiss-triggered reversal (below)
  *   2. debouncedAnomalyBoost() call in runAnomalyScan() — boost application
  *   3. Bridge #10 reversal loop in runAnomalyScan() — periodic scan reversal
@@ -240,9 +267,6 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * Exported for testing — not intended for direct use outside this module.
  */
 export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
-  // Respect the feature flag — if boost behavior is disabled, skip reversal too
-  if (!isFeatureEnabled('bridge-anomaly-boost')) return 0;
-
   // Only consider anomalies detected within the last 24h — older undismissed anomalies
   // are stale and should not keep boosts alive indefinitely.
   // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL),
@@ -342,9 +366,9 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
   const detected: Anomaly[] = [];
 
   // --- GSC anomalies ---
-  if (ws.gscPropertyUrl) {
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
-      const cmp = await getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS);
+      const cmp = await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, COMPARISON_DAYS);
       const { current, previous, changePercent } = cmp;
 
       // Traffic drop (clicks)
@@ -538,13 +562,20 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
     }
   }
   log.info('Starting anomaly detection scan...');
+  const cycleStart = new Date().toISOString();
   const workspaces = listWorkspaces();
   const existingCount = (stmts().selectAll.all() as AnomalyRow[]).length;
   const allNew: Anomaly[] = [];
 
   for (const ws of workspaces) {
-    // Skip workspaces without data connections
-    if (!ws.gscPropertyUrl && !ws.ga4PropertyId && !ws.webflowSiteId) continue;
+    // Skip workspaces without data connections. A workspace that previously had a connection
+    // (and minted anomaly_digest rows) but has since lost it must still be pruned — otherwise
+    // its orphaned digest rows live in the client feed forever (mirrors the competitor cron's
+    // wipe of unconfigured workspaces, intelligence-crons.ts:104/109).
+    if (!ws.gscPropertyUrl && !ws.ga4PropertyId && !ws.webflowSiteId) {
+      pruneStaleAnomalyDigests(ws.id, cycleStart);
+      continue;
+    }
 
     try {
       const detected = await detectForWorkspace(ws);
@@ -760,6 +791,13 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         });
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}: programming error`); else log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}`); } // url-fetch-ok
+
+    // ── G2/C1: Prune stale anomaly_digest insight rows ───────────────────────
+    // UNCONDITIONAL — outside the try AND outside the detected.length>0 guard — so the prune
+    // runs (a) when this workspace's anomalies clear (detected.length===0), and (b) even when
+    // detection threw. The cutoff lags cycleStart by the dedup window so a still-active anomaly
+    // (suppressed from `detected` by alreadyDetected's 48h window) survives. analytics-insights.md §8.2.
+    pruneStaleAnomalyDigests(ws.id, cycleStart);
   }
 
   if (allNew.length > 0) {
@@ -772,10 +810,6 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
   // For every workspace, check if recent (<24h) anomalies still exist.
   // If none remain AND insights have an 'anomaly' score adjustment, reverse it (delta=0).
   // This prevents stale +10 boosts from lingering indefinitely after anomalies resolve.
-  // Gated behind same feature flag as the boost itself — no point reversing if boosts were never applied.
-  if (!isFeatureEnabled('bridge-anomaly-boost')) {
-    log.debug('Bridge #10 reversal skipped — bridge-anomaly-boost flag OFF');
-  } else
   for (const ws of workspaces) {
     try {
       const recentForWs = listAnomalies(ws.id, false)

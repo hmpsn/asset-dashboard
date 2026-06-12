@@ -29,13 +29,12 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/diagnostic-orchestrator.ts', aiImport: "from './ai.js'" },
   { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
   { path: 'server/schema-plan.ts', aiImport: "from './ai.js'" },
-  { path: 'server/routes/content-posts.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/content-posts-ai-jobs.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
 ];
 
 const migratedOperationBackedStructuredFiles: Array<{ path: string; aiImport: string; operations: string[] }> = [
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
-  { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'", operations: ['voice-feedback-suggest'] },
   { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'", operations: ['meeting-brief'] },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
 ];
@@ -116,12 +115,12 @@ describe('AI dispatch migration', () => {
   });
 
   it('keeps bulk SEO job creative copy on the unified creative dispatcher', () => {
-    const source = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO job dispatcher migration
-    expect(source).toContain("from '../content-posts-ai.js'");
+    const source = readFileSync('server/webflow-bulk-seo-fix-background-job.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO job dispatcher migration
+    expect(source).toContain("from './content-posts-ai.js'");
     expect(source).toContain('callCreativeAI({');
-    expect(source).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
-    expect(source).not.toContain("from '../openai-helpers.js'");
-    expect(source).not.toContain("from '../anthropic-helpers.js'");
+    expect(source).toContain('systemPrompt: buildSystemPrompt(workspaceId');
+    expect(source).not.toContain("from './openai-helpers.js'");
+    expect(source).not.toContain("from './anthropic-helpers.js'");
     expect(source).not.toContain('callOpenAI({');
     expect(source).not.toContain('callAnthropic({');
   });

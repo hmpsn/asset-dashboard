@@ -1,48 +1,100 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, History, Search, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowUpRight, CheckCircle2, History, MapPin, Pin, Search, X } from 'lucide-react';
 
 import { adminPath } from '../../routes';
+import { get } from '../../api/client';
+import { keywordTrackingKey, rankTrackingHistoryPath } from '../../lib/keywordTracking';
+import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
+import { queryKeys } from '../../lib/queryKeys';
+import { positionColor } from '../ui/constants';
+import { formatDate } from '../../utils/formatDates';
+import { fmtMoney } from '../../utils/formatNumbers';
+import { useRankTrackingTogglePin } from '../../hooks/admin/useKeywordCommandCenter';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
+import type { OutcomeReadback } from '../../../shared/types/outcome-tracking';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
-import { Badge, Button, EmptyState, Icon, IconButton, StatusBadge, TableSkeleton } from '../ui';
+import { RankHistoryChart } from '../shared/RankTable';
+import { Badge, Button, EmptyState, Icon, IconButton, OutcomeReadbackChip, Skeleton, StatusBadge, TableSkeleton } from '../ui';
 import { KeywordDetailPanel } from './KeywordDetailPanel';
+import { KeywordSparkline } from './KeywordSparkline';
 import {
   actionVariant,
   compactNumber,
+  formatSourceGapKey,
   localPriorityTone,
   percent,
 } from './kccDisplayHelpers';
 
+type HistoryPoint = { date: string; positions: Record<string, number> };
+
+const MAX_INLINE_MARKETS = 6;
+
 interface KeywordDetailDrawerProps {
   open: boolean;
   row: KeywordCommandCenterRow | null;
+  /** W5.1: read-back outcome verdict for this keyword (from the detail response). */
+  outcome?: OutcomeReadback;
   workspaceId: string;
   isLoading?: boolean;
   loadingAction?: string;
   onAction: (action: KeywordCommandCenterNextAction) => void;
+  /**
+   * In-Hub selection callback for the "View replaced-by" affordance. When
+   * provided, clicking the replaced-by link selects the replacement keyword in
+   * place (normalized) instead of navigating. When omitted, the drawer falls
+   * back to a Hub deep-link navigation. Receives the normalized keyword.
+   */
+  onSelectKeyword?: (keyword: string) => void;
   onClose: () => void;
 }
 
 export function KeywordDetailDrawer({
   open,
   row,
+  outcome,
   workspaceId,
   isLoading,
   loadingAction,
   onAction,
+  onSelectKeyword,
   onClose,
 }: KeywordDetailDrawerProps) {
   const navigate = useNavigate();
+  const togglePin = useRankTrackingTogglePin(workspaceId);
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  const [showAllMarkets, setShowAllMarkets] = useState(false);
+
+  // Lock background scroll while the drawer is open so the page underneath can't
+  // be scrolled past its bounds behind the fixed backdrop. drawerRef resolves the
+  // scroll container (admin `<main>` / client `<body>`); see useScrollLock.
+  useScrollLock(open, drawerRef);
+
+  // Lazy national-rank history for the sparkline. Only fetched when the drawer
+  // is open, a row exists, and the keyword is tracked.
+  const rankHistoryEnabled = open
+    && !!row
+    && row.tracking.status !== 'not_tracked';
+  const rankHistoryKeyword = row?.keyword ?? '';
+  const rankHistory = useQuery({
+    queryKey: queryKeys.admin.rankTrackingHistoryQueries(workspaceId, [rankHistoryKeyword]),
+    queryFn: () => get<HistoryPoint[]>(
+      rankTrackingHistoryPath(workspaceId, [rankHistoryKeyword]),
+    ),
+    enabled: rankHistoryEnabled,
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     if (!open) return;
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusTimer = window.setTimeout(() => {
-      closeButtonRef.current?.focus();
+      closeButtonRef.current?.focus({ preventScroll: true });
     }, 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -95,16 +147,63 @@ export function KeywordDetailDrawer({
   if (!open) return null;
 
   const isAwaitingSignal = row?.tracking.status === 'active' && row.tracking.hasSignal === false;
+  // Never surface the raw `deprecated`/`replaced` enums — show the user-facing
+  // "Retired"/"Replaced" labels instead.
+  const hubStatusLabel = row?.tracking.status === 'deprecated'
+    ? 'Retired'
+    : row?.tracking.status === 'replaced'
+      ? 'Replaced'
+      : row?.tracking.status.replace(/_/g, ' ');
   const trackingLabel = row?.tracking.status === 'not_tracked'
     ? 'Not tracked'
     : isAwaitingSignal
       ? 'Active - waiting for first signal'
-      : row?.tracking.status.replace(/_/g, ' ');
+      : hubStatusLabel;
   const trackingSourceLabel = row?.tracking.source && row.tracking.source !== 'unknown'
     ? row.tracking.source.replace(/_/g, ' ')
     : row?.tracking.status === 'not_tracked'
       ? null
       : 'Source not recorded';
+
+  // ── Journey-section derivations (only meaningful when row is present) ──
+
+  // T1 Origin: descriptor for where the keyword came from. Returns null → omit.
+  const origin = (() => {
+    if (!row) return null;
+    const gapLabel = formatSourceGapKey(row.tracking.sourceGapKey);
+    if (gapLabel) return { kind: 'gap' as const, label: 'From content gap', detail: gapLabel };
+    switch (row.tracking.source) {
+      case 'client_requested':
+        return { kind: 'client' as const, label: 'Client requested', detail: null };
+      case 'manual':
+        return { kind: 'manual' as const, label: 'Manually added', detail: null };
+      case 'strategy_primary':
+      case 'strategy_site_keyword':
+        return { kind: 'strategy' as const, label: 'Added via strategy', detail: null };
+      default:
+        return null;
+    }
+  })();
+
+  // T3 National rank: sparkline data + current position.
+  const currentPosition = row?.metrics.currentPosition;
+  const sparklineData = (rankHistory.data ?? [])
+    .map(point => ({ date: point.date, position: point.positions[rankHistoryKeyword] }))
+    .filter((p): p is { date: string; position: number } => typeof p.position === 'number');
+  const showNationalRank = !!row && row.tracking.status !== 'not_tracked';
+
+  // T4 Local visibility: per-market breakdown (sorted by marketLabel).
+  const allMarkets = row?.localSeo?.markets
+    ? [...row.localSeo.markets].sort((a, b) => a.marketLabel.localeCompare(b.marketLabel))
+    : [];
+  const hasMarkets = allMarkets.length > 0;
+  const visibleMarkets = showAllMarkets ? allMarkets : allMarkets.slice(0, MAX_INLINE_MARKETS);
+  const hiddenMarketCount = allMarkets.length - visibleMarkets.length;
+
+  // T5 Lifecycle / why-retired: render only for retired rows or rows with a
+  // deprecation timestamp. Never surface the raw `deprecated` enum.
+  const showLifecycle = !!row
+    && (row.lifecycleStatus === 'retired' || !!row.tracking.deprecatedAt);
 
   return (
     <>
@@ -152,7 +251,7 @@ export function KeywordDetailDrawer({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           {isLoading ? (
             <TableSkeleton rows={6} columns={1} />
           ) : !row ? (
@@ -163,6 +262,39 @@ export function KeywordDetailDrawer({
             />
           ) : (
             <div className="space-y-5">
+              {origin && (
+                <div>
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Origin</p>
+                  <KeywordDetailPanel>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="t-caption font-medium text-[var(--brand-text-bright)]">{origin.label}</p>
+                        {origin.detail && (
+                          <p className="t-caption-sm text-[var(--brand-text-muted)] break-words mt-0.5">{origin.detail}</p>
+                        )}
+                      </div>
+                      {origin.kind === 'gap' && (
+                        // P4-T3: the Hub->Strategy back-link. Navigate to the
+                        // strategy surface carrying the keyword + sourceGapKey
+                        // (an action = teal) so the user lands on the originating
+                        // gap context.
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={ArrowUpRight}
+                          data-testid="view-in-strategy-link"
+                          onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'), {
+                            state: { keyword: row.keyword, sourceGapKey: row.tracking.sourceGapKey },
+                          })}
+                        >
+                          View in Strategy
+                        </Button>
+                      )}
+                    </div>
+                  </KeywordDetailPanel>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2">
                 <KeywordDetailPanel>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Volume</p>
@@ -179,6 +311,38 @@ export function KeywordDetailDrawer({
                   <p className="t-caption font-semibold text-blue-400 tabular-nums">{percent(row.metrics.ctr)}</p>
                 </KeywordDetailPanel>
               </div>
+
+              {/* W5.1: closed-loop outcome read-back — baseline→current position +
+                  verdict for this keyword's tracked action. Absent when no scored
+                  action exists yet. Honest about direction (chip trusts outcome.direction). */}
+              {outcome && (
+                <div data-testid="keyword-outcome-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Outcome So Far</p>
+                  <OutcomeReadbackChip outcome={outcome} />
+                </div>
+              )}
+
+              {/* Task 3.3: per-keyword realized $ (server-computed via the single
+                  keywordDollarValue helper; emerald = success/$ law). Absent when no cpc. */}
+              {(row.currentMonthly != null || row.upsideMonthly != null) && (
+                <div data-testid="revenue-potential-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Revenue Potential</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {row.currentMonthly != null && (
+                      <KeywordDetailPanel>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">Value today</p>
+                        <p className="t-caption font-semibold text-emerald-400 tabular-nums">{fmtMoney(row.currentMonthly)}/mo</p>
+                      </KeywordDetailPanel>
+                    )}
+                    {row.upsideMonthly != null && row.upsideMonthly > 0 && (
+                      <KeywordDetailPanel>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">Upside if it moves up</p>
+                        <p className="t-caption font-semibold text-emerald-400 tabular-nums">+{fmtMoney(row.upsideMonthly)}/mo</p>
+                      </KeywordDetailPanel>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <p className="t-label text-[var(--brand-text-muted)] mb-2">Where It Came From</p>
@@ -218,14 +382,53 @@ export function KeywordDetailDrawer({
                 </div>
               )}
 
+              {row.valueReasons && row.valueReasons.length > 0 && (
+                <div data-testid="value-reasons-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Why this score</p>
+                  <div className="space-y-2">
+                    {row.valueReasons.map(reason => (
+                      <KeywordDetailPanel key={reason} tone="blue" className="py-2">
+                        <p className="t-caption-sm text-blue-400 break-words">{reason}</p>
+                      </KeywordDetailPanel>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="t-label text-[var(--brand-text-muted)] mb-2">Tracking State</p>
                 <KeywordDetailPanel>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="t-caption font-medium text-[var(--brand-text-bright)] capitalize">{trackingLabel}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="t-caption font-medium text-[var(--brand-text-bright)] capitalize">{trackingLabel}</p>
+                        {/* O2: pin toggle — only for tracked keywords (the server
+                            no-ops the broadcast for untracked ones). Optimistic via
+                            invalidation; pending disables the control. Uses the
+                            existing rank-tracking pin endpoint. */}
+                        {row.tracking.status !== 'not_tracked' && (
+                          <Button
+                            variant={row.tracking.pinned === true ? 'secondary' : 'ghost'}
+                            size="sm"
+                            icon={Pin}
+                            data-testid="keyword-pin-toggle"
+                            loading={togglePin.isPending}
+                            disabled={togglePin.isPending}
+                            aria-pressed={row.tracking.pinned === true}
+                            title={row.tracking.pinned === true ? 'Unpin this keyword' : 'Pin this keyword'}
+                            onClick={() => togglePin.mutate(row.keyword)}
+                          >
+                            {row.tracking.pinned === true ? 'Pinned' : 'Pin'}
+                          </Button>
+                        )}
+                      </div>
                       {trackingSourceLabel && (
                         <p className="t-caption-sm text-[var(--brand-text-muted)]">{trackingSourceLabel}</p>
+                      )}
+                      {row.tracking.addedAt && (
+                        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                          Tracked since {formatDate(row.tracking.addedAt)}
+                        </p>
                       )}
                       {isAwaitingSignal && (
                         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
@@ -233,22 +436,163 @@ export function KeywordDetailDrawer({
                         </p>
                       )}
                     </div>
-                    {row.tracking.status !== 'not_tracked' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={History}
-                        onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))}
-                      >
-                        Rank Tracker
-                      </Button>
-                    )}
+                    {/* P4-T3: the old "Rank Tracker" jump is retired — rank now
+                        lives in the in-drawer National rank section below
+                        (P2's nationalRank journey section). */}
                   </div>
+                  {/* Three-state: ONLY strategyOwned === true shows the note; false/undefined omit it. */}
+                  {row.tracking.strategyOwned === true && (
+                    <p className="t-caption-sm text-teal-400 mt-2">
+                      Auto-managed — strategy refreshes maintain this keyword&apos;s lifecycle.
+                    </p>
+                  )}
                   {row.protectionReason && (
                     <p className="t-caption-sm text-amber-400/80 mt-2">{row.protectionReason} is protected from accidental retirement.</p>
                   )}
                 </KeywordDetailPanel>
               </div>
+
+              {showNationalRank && (
+                <div>
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">National rank</p>
+                  <KeywordDetailPanel>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">Current position</p>
+                        <p className={`t-caption font-semibold tabular-nums ${positionColor(currentPosition)}`}>
+                          {typeof currentPosition === 'number' ? `#${currentPosition.toFixed(1)}` : '—'}
+                        </p>
+                      </div>
+                      <div className="flex gap-4">
+                        <div>
+                          <p className="t-caption-sm text-[var(--brand-text-muted)]">Clicks</p>
+                          <p className="t-caption font-semibold text-blue-400 tabular-nums">{compactNumber(row.metrics.clicks)}</p>
+                        </div>
+                        <div>
+                          <p className="t-caption-sm text-[var(--brand-text-muted)]">Impressions</p>
+                          <p className="t-caption font-semibold text-blue-400 tabular-nums">{compactNumber(row.metrics.impressions)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      {rankHistory.isLoading ? (
+                        <Skeleton className="h-10 w-full" />
+                      ) : sparklineData.length >= 2 ? (
+                        <>
+                          {/* Compact at-a-glance sparkline + the full multi-snapshot
+                              trend chart (RankTracker parity). The chart is the
+                              shared RankHistoryChart primitive fed this keyword's
+                              single-series history (maxKeywords=1 → one line, its own
+                              legend label). */}
+                          <KeywordSparkline data={sparklineData} />
+                          <div data-testid="rank-history-chart" className="mt-3">
+                            <RankHistoryChart
+                              rankHistory={rankHistory.data ?? []}
+                              maxKeywords={1}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <EmptyState
+                          icon={History}
+                          title="Not enough snapshots for trend yet."
+                          className="py-3"
+                        />
+                      )}
+                    </div>
+                  </KeywordDetailPanel>
+                </div>
+              )}
+
+              {hasMarkets && (
+                <div>
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Local visibility</p>
+                  <div className="space-y-2">
+                    {visibleMarkets.map(market => (
+                      <KeywordDetailPanel key={market.marketId} className="py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{market.marketLabel}</p>
+                            <p className={`t-caption-sm ${
+                              market.businessMatchConfidence === 'possible_match'
+                                ? 'text-amber-400'
+                                : market.businessMatchConfidence === 'verified'
+                                  ? 'text-emerald-400'
+                                  : 'text-[var(--brand-text-muted)]'
+                            }`}>
+                              {typeof market.localRank === 'number' ? `Pack rank #${market.localRank}` : 'Not ranked'}
+                            </p>
+                            {market.label && (
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{market.label}</p>
+                            )}
+                          </div>
+                          <LocalSeoVisibilityBadge visibility={market} />
+                        </div>
+                      </KeywordDetailPanel>
+                    ))}
+                  </div>
+                  {hiddenMarketCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={MapPin}
+                      data-testid="local-markets-more"
+                      className="mt-2"
+                      onClick={() => setShowAllMarkets(true)}
+                    >
+                      +{hiddenMarketCount} more
+                    </Button>
+                  )}
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+                    Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
+                  </p>
+                </div>
+              )}
+
+              {showLifecycle && (
+                <div>
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Lifecycle</p>
+                  <KeywordDetailPanel tone="amber">
+                    <p className="t-caption font-medium text-amber-400">
+                      {row.tracking.deprecatedAt
+                        ? `Retired on ${formatDate(row.tracking.deprecatedAt)}`
+                        : 'Retired'}
+                    </p>
+                    {row.tracking.replacedBy ? (
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="t-caption-sm text-[var(--brand-text)] break-words">
+                          Replaced by: <span className="font-medium text-[var(--brand-text-bright)]">{row.tracking.replacedBy}</span>
+                        </p>
+                        {/* P4: "View replaced-by" — within the Hub, prefer in-place
+                            selection of the replacement keyword (onSelectKeyword,
+                            normalized) so the drawer re-targets without a full
+                            navigation; otherwise fall back to a Hub deep-link. */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={ArrowUpRight}
+                          data-testid="view-replaced-by-link"
+                          onClick={() => {
+                            const replacedBy = row.tracking.replacedBy;
+                            if (!replacedBy) return;
+                            if (onSelectKeyword) {
+                              onSelectKeyword(keywordTrackingKey(replacedBy));
+                            } else {
+                              navigate(
+                                `${adminPath(workspaceId, 'seo-keywords')}${buildHubDeepLinkQuery({ keyword: replacedBy })}`,
+                              );
+                            }
+                          }}
+                        >
+                          View in Hub
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">No replacement recorded.</p>
+                    )}
+                  </KeywordDetailPanel>
+                </div>
+              )}
 
               {row.feedback?.status && (
                 <div>
@@ -265,7 +609,7 @@ export function KeywordDetailDrawer({
                 </div>
               )}
 
-              {row.localSeoState && (
+              {row.localSeoState && !hasMarkets && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Local Visibility</p>
                   <KeywordDetailPanel tone="blue">

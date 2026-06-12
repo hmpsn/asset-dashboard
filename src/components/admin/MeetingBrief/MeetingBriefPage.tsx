@@ -52,7 +52,7 @@ export function MeetingBriefPage({ workspaceId, onNavigate }: Props) {
   const resolveTextRoute = (text: string): Page => {
     const t = text.toLowerCase();
     if (t.includes('blueprint')) return 'brief';
-    if (t.includes('rank') || t.includes('keyword') || t.includes('position')) return 'seo-ranks';
+    if (t.includes('rank') || t.includes('keyword') || t.includes('position')) return 'seo-keywords';
     if (t.includes('pipeline') || t.includes('brief') || t.includes('content')) return 'content-pipeline';
     if (t.includes('win rate') || t.includes('outcome') || t.includes('conversion')) return 'outcomes';
     if (t.includes('traffic') || t.includes('session') || t.includes('click') || t.includes('impression')) return 'analytics-hub';

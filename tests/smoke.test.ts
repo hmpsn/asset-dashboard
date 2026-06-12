@@ -154,8 +154,8 @@ describe('Smoke tests — unauthenticated endpoints', () => {
     expect(res.status).toBe(200);
   });
 
-  it('GET /api/semrush/status returns 200', async () => {
-    const res = await api('/api/semrush/status');
+  it('GET /api/seo/status returns 200', async () => {
+    const res = await api('/api/seo/status');
     expect(res.status).toBe(200);
   });
 

@@ -7,10 +7,10 @@
  * - DELETE /api/public/recommendations/:workspaceId/:recId (dismiss)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13212);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, patchJson, del } = ctx;
 
 let testWsId = '';
@@ -28,10 +28,12 @@ afterAll(async () => {
 
 describe('Recommendations — list', () => {
   it('GET /api/public/recommendations/:workspaceId returns recommendation set', async () => {
-    // This may auto-generate if none exist (requires OpenAI), or return 500 if no key
+    // Cost fix (Task #13): the GET never generates inline. A known workspace with
+    // no cached set returns 200 with an empty set — no OpenAI key required.
     const res = await api(`/api/public/recommendations/${testWsId}`);
-    // Either 200 (cached or generated) or 500 (no OpenAI key in test env)
-    expect([200, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.recommendations)).toBe(true);
   });
 });
 

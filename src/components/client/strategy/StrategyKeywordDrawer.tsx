@@ -1,6 +1,8 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Badge, Button, IconButton } from '../../ui';
+import { Badge, Button, IconButton, tierAtLeast, type Tier } from '../../ui';
+import { positionColor } from '../../ui/constants';
+import { useScrollLock } from '../../../hooks/useScrollLock';
 import { kdFraming } from '../../../lib/kdFraming.js';
 import {
   ROLE_DISPLAY_LABELS,
@@ -9,17 +11,18 @@ import {
   confidenceStatement,
   fmtAudience,
   fmtMomentum,
-  fmtNum,
   intentColor,
   roleBadgeClass,
   type PriorityKeywordItem,
   type StrategyKeywordTableRow,
 } from './strategyKeywordDisplay';
+import { fmtNum, fmtMoney } from '../../../utils/formatNumbers';
 
 interface StrategyKeywordDrawerProps {
   drawerRow: StrategyKeywordTableRow;
   drawerClosing: boolean;
   drawerRef: RefObject<HTMLDivElement | null>;
+  effectiveTier: Tier;
   drawerEvidenceOpen: boolean;
   setDrawerEvidenceOpen: Dispatch<SetStateAction<boolean>>;
   removingKeyword: string | null;
@@ -42,6 +45,7 @@ export function StrategyKeywordDrawer({
   drawerRow,
   drawerClosing,
   drawerRef,
+  effectiveTier,
   drawerEvidenceOpen,
   setDrawerEvidenceOpen,
   removingKeyword,
@@ -59,6 +63,14 @@ export function StrategyKeywordDrawer({
   const explanation = drawerRow.explanation;
   const primaryReason = explanation?.reasons[0] ?? drawerRow.rationale ?? drawerRow.opportunityDetail;
   const nextAction = explanation?.nextAction;
+  // Per-keyword realized $ is Growth+ (same class as ROIDashboard). The drawer's
+  // only trigger lives inside a Growth+ TierGate, but the $ data is on the public
+  // wire for all tiers — so gate the block explicitly here too (defense in depth).
+  const canViewRevenue = tierAtLeast(effectiveTier, 'growth');
+
+  // Lock background scroll while the drawer is mounted (it renders only when open)
+  // so the page can't be scrolled past its bounds behind the fixed backdrop.
+  useScrollLock(true, drawerRef);
 
   return (
     <>
@@ -100,7 +112,7 @@ export function StrategyKeywordDrawer({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-5 px-4 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-5 px-4 py-4">
           {unenriched ? (
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] px-3 py-3 flex items-start gap-2.5">
               <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" />
@@ -139,13 +151,13 @@ export function StrategyKeywordDrawer({
                 {drawerRow.currentPosition != null && (
                   <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current rank</div>
-                    <div className={`t-page font-semibold ${
-                      drawerRow.currentPosition <= 10 ? 'text-emerald-400' :
-                      drawerRow.currentPosition <= 30 ? 'text-amber-400' :
-                      'text-[var(--brand-text)]'
-                    }`}>#{drawerRow.currentPosition}</div>
+                    <div className={`t-page font-semibold ${positionColor(drawerRow.currentPosition)}`}>#{drawerRow.currentPosition}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                      {drawerRow.currentPosition <= 10 ? 'On page 1' :
+                      {/* Label reconciled to authority bands (3/10/20) so color and label agree:
+                          ≤10 → emerald "Page 1"; ≤20 → amber "Top of page 2"; >20 → red "Page 2+".
+                          Old color used a unique ≤30 amber band that was inconsistent with the ≤20
+                          "Page 2+" label boundary — fixed here by aligning both to the 10/20 authority. */}
+                      {drawerRow.currentPosition <= 10 ? 'Page 1' :
                        drawerRow.currentPosition <= 20 ? 'Top of page 2' : 'Page 2+'}
                     </div>
                   </div>
@@ -157,6 +169,30 @@ export function StrategyKeywordDrawer({
                       {drawerRow.impressions >= 1000 ? `${(drawerRow.impressions / 1000).toFixed(1)}k` : drawerRow.impressions}
                     </div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">via Google Search</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Task 3.3: per-keyword realized $ (server-computed via keywordDollarValue;
+              emerald = success/$ law). Absent when no cpc. currentMonthly may be 0
+              (ranking but no clicks yet) while upside is positive — render whenever
+              either figure is defined. */}
+          {canViewRevenue && (drawerRow.currentMonthly != null || drawerRow.upsideMonthly != null) && (
+            <div data-testid="revenue-potential-section" className="rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20 px-3 py-3">
+              <div className="t-caption-sm font-medium text-emerald-400/90 uppercase tracking-wider mb-2">Revenue potential</div>
+              <div className="grid grid-cols-2 gap-3">
+                {drawerRow.currentMonthly != null && (
+                  <div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Value today</div>
+                    <div className="t-page font-semibold text-emerald-400">{fmtMoney(drawerRow.currentMonthly)}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
+                  </div>
+                )}
+                {drawerRow.upsideMonthly != null && drawerRow.upsideMonthly > 0 && (
+                  <div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Upside if it moves up</div>
+                    <div className="t-page font-semibold text-emerald-400">+{fmtMoney(drawerRow.upsideMonthly)}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
                   </div>
                 )}
               </div>
@@ -254,6 +290,15 @@ export function StrategyKeywordDrawer({
                     Tracking: <span className="text-[var(--brand-text)]">
                       {explanation.tracking.status === 'not_tracked' ? 'Not tracked yet' : explanation.tracking.status.replace('_', ' ')}
                     </span>
+                  </div>
+                )}
+                {drawerRow.valueReasons && drawerRow.valueReasons.length > 0 && (
+                  <div data-testid="value-reasons-section" className="flex flex-col gap-1">
+                    {drawerRow.valueReasons.map(reason => (
+                      <span key={reason} className="t-caption-sm text-blue-400">
+                        {reason}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>

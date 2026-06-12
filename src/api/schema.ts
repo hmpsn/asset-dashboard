@@ -1,6 +1,11 @@
 // ── Schema-domain API endpoints ──────────────────────────────────
 import { get, post, put, del, getSafe, getOptional } from './client';
-import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
+import type {
+  SchemaPlanGenerationResponse,
+  SchemaSitePlan,
+  PageRoleAssignment,
+  CanonicalEntity,
+} from '../../shared/types/schema-plan';
 import type { WholeSiteSchemaGraphValidationResult } from '../../shared/types/schema-validation';
 
 const workspaceQuery = (workspaceId?: string) => workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
@@ -51,7 +56,7 @@ export const schemaPlan = {
     getOptional<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
 
   generate: (siteId: string, workspaceId?: string) =>
-    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
+    post<SchemaPlanGenerationResponse>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
 
   update: (siteId: string, pageRoles: PageRoleAssignment[], canonicalEntities?: CanonicalEntity[], workspaceId?: string) =>
     put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`, { pageRoles, canonicalEntities }),

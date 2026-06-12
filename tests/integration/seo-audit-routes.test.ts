@@ -9,7 +9,7 @@
  *   5. Integration — HTTP route: suggestions dismiss endpoint
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import {
   auditPage,
@@ -22,8 +22,7 @@ import {
   dismissSuggestions,
 } from '../../server/seo-suggestions.js';
 
-// ─── HTTP test context (unique port) ────────────────────────────────────────
-const ctx = createTestContext(13306);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, del } = ctx;
 
 beforeAll(async () => {

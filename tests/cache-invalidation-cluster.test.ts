@@ -15,29 +15,9 @@
  *     is actually called with the workspaceId when the service function runs.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { boundedSection, readProjectFile } from './helpers/source-contracts';
 
-const read = (rel: string) =>
-  readFileSync(resolve(import.meta.dirname, '..', rel), 'utf-8'); // readFile-ok — wiring guard
-
-/**
- * Returns the source slice for one named function/route, bounded to the NEXT
- * boundary marker so a later sibling's call can never satisfy the assertion.
- * `boundaryMarkers` are searched starting just after `start`; the slice ends at
- * the earliest one found (or EOF if none — only acceptable for the last decl).
- */
-function boundedSlice(src: string, start: string, boundaryMarkers: string[]): string {
-  const startIdx = src.indexOf(start);
-  if (startIdx === -1) throw new Error(`boundedSlice: start marker not found: ${start}`);
-  const after = startIdx + start.length;
-  let end = src.length;
-  for (const marker of boundaryMarkers) {
-    const idx = src.indexOf(marker, after);
-    if (idx !== -1 && idx < end) end = idx;
-  }
-  return src.slice(startIdx, end);
-}
+const read = readProjectFile;
 
 describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded source guards', () => {
   // ── approvals.ts service fns (bounded to the next export function) ─────────
@@ -48,7 +28,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/approvals.ts calls invalidateIntelligenceCache in createBatch (bounded)', () => {
     const src = read('server/approvals.ts');
-    const section = boundedSlice(src, 'export function createBatch', ['export function listBatches']);
+    const section = boundedSection(src, 'export function createBatch', ['export function listBatches']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -57,7 +37,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     // updateItem → next export is markBatchApplied. recalcBatchStatus (a private
     // helper) sits between them but is NOT an export boundary, so bound on the
     // next EXPORTED function to keep the slice tight to updateItem's own body.
-    const section = boundedSlice(src, 'export function updateItem', ['function recalcBatchStatus']);
+    const section = boundedSection(src, 'export function updateItem', ['function recalcBatchStatus']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -65,7 +45,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     const src = read('server/approvals.ts');
     // Bound to deleteBatch so the old EOF-spanning slice (which was satisfied by
     // deleteBatch's own call) can no longer pass vacuously.
-    const section = boundedSlice(src, 'export function markBatchApplied', ['export function deleteBatch']);
+    const section = boundedSection(src, 'export function markBatchApplied', ['export function deleteBatch']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -73,7 +53,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     const src = read('server/approvals.ts');
     // deleteBatch is the last export; bound on a stable trailing marker to avoid
     // EOF-span. Fall back to EOF only if no trailing export exists.
-    const section = boundedSlice(src, 'export function deleteBatch', ['\nexport function ', '\nfunction ']);
+    const section = boundedSection(src, 'export function deleteBatch', ['\nexport function ', '\nfunction ']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -86,26 +66,26 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
   it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-publish (bounded — not whole-file)', () => {
     const src = read('server/routes/webflow-schema.ts');
     // The old slice ran to EOF (whole file). Bound it to the next route decl.
-    const section = boundedSlice(src, "router.post('/api/webflow/schema-publish/:siteId'", ['\nrouter.']);
+    const section = boundedSection(src, "router.post('/api/webflow/schema-publish/:siteId'", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
   it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-rollback (bounded)', () => {
     const src = read('server/routes/webflow-schema.ts');
-    const section = boundedSlice(src, "router.post('/api/webflow/schema-rollback/:siteId'", ['\nrouter.']);
+    const section = boundedSection(src, "router.post('/api/webflow/schema-rollback/:siteId'", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
-  it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-plan DELETE (bounded)', () => {
-    const src = read('server/routes/webflow-schema.ts');
-    const section = boundedSlice(src, "router.delete('/api/webflow/schema-plan/:siteId'", ['\nrouter.']);
+  it('server/domains/schema/schema-plan-admin-mutations.ts calls invalidateIntelligenceCache on schema-plan DELETE (bounded)', () => {
+    const src = read('server/domains/schema/schema-plan-admin-mutations.ts');
+    const section = boundedSection(src, 'export function deleteSchemaPlanForAdmin', ['\nexport function ']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
   it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-retract (bounded)', () => {
     const src = read('server/routes/webflow-schema.ts');
     // Previously untested. schema-retract flips a page state and must invalidate.
-    const section = boundedSlice(src, "router.delete('/api/webflow/schema-retract/:siteId/:pageId'", ['\nrouter.']);
+    const section = boundedSection(src, "router.delete('/api/webflow/schema-retract/:siteId/:pageId'", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -117,7 +97,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/routes/outcomes.ts calls invalidateIntelligenceCache in record-action POST (bounded)', () => {
     const src = read('server/routes/outcomes.ts');
-    const section = boundedSlice(src, "/api/outcomes/:workspaceId/actions'", ['\nrouter.']);
+    const section = boundedSection(src, "/api/outcomes/:workspaceId/actions'", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -129,7 +109,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/routes/webflow-analysis.ts calls invalidateIntelligenceCache after internal-links recordAction (bounded)', () => {
     const src = read('server/routes/webflow-analysis.ts');
-    const section = boundedSlice(src, "/api/webflow/internal-links/:siteId", ['\nrouter.']);
+    const section = boundedSection(src, "/api/webflow/internal-links/:siteId", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -141,7 +121,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/routes/webflow.ts calls invalidateIntelligenceCache in the seo-update PUT (bounded)', () => {
     const src = read('server/routes/webflow.ts');
-    const section = boundedSlice(src, "/api/webflow/pages/:pageId/seo", ['\nrouter.']);
+    const section = boundedSection(src, "/api/webflow/pages/:pageId/seo", ['\nrouter.']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -153,7 +133,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     const src = read('server/webflow-seo-bulk-accept-fixes-job.ts');
     // Bound from BULK_OPERATION_COMPLETE to the outer catch so the assertion is
     // tied to the success path, not the whole file.
-    const section = boundedSlice(src, 'BULK_OPERATION_COMPLETE', ['} catch (err) {']);
+    const section = boundedSection(src, 'BULK_OPERATION_COMPLETE', ['} catch (err) {']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -163,7 +143,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/routes/webflow-seo-suggestions.ts calls invalidateIntelligenceCache in apply endpoint (bounded)', () => {
     const src = read('server/routes/webflow-seo-suggestions.ts');
-    const section = boundedSlice(src, "/api/webflow/seo-suggestions/:workspaceId/apply", ['\nrouter.', '\nexport default']);
+    const section = boundedSection(src, "/api/webflow/seo-suggestions/:workspaceId/apply", ['\nrouter.', '\nexport default']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 
@@ -173,7 +153,7 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 
   it('server/routes/webflow-seo-apply.ts calls invalidateIntelligenceCache in seo-pattern-apply (bounded)', () => {
     const src = read('server/routes/webflow-seo-apply.ts');
-    const section = boundedSlice(src, "/api/webflow/seo-pattern-apply/:siteId", ['\nrouter.', '\nexport default']);
+    const section = boundedSection(src, "/api/webflow/seo-pattern-apply/:siteId", ['\nrouter.', '\nexport default']);
     expect(section).toContain('invalidateIntelligenceCache');
   });
 });

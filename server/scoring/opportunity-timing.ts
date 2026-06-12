@@ -6,11 +6,6 @@
  * once per rec-gen cycle and threads `timingBoost` into every computeOpportunityValue
  * call — where it lifts the timing multiplier (`timing = 1 + max(0, timingBoost)`).
  *
- * ═══ NO-OP WHEN THE EVENTS FLAG IS OFF ═══
- * When `opportunity-value-events` is OFF, computeTimingBoosts returns an EMPTY map.
- * maxBoostForPages on an empty map is always 0 → timingBoost 0 → timing multiplier 1
- * → computeOpportunityValue output is byte-identical to the pre-PR7 frozen snapshot.
- *
  * Read-only + try/catch → empty map. A failure here can NEVER break rec generation.
  *
  * Decay model: per page, boost_page = Σ over the page's active events of
@@ -19,7 +14,7 @@
  * Events whose decayed contribution is below NEGLIGIBLE_BOOST are skipped.
  *
  * ═══ DEFERRED (out of scope for PR7 — documented per the plan) ═══
- *  • SEASONAL events + keyword_monthly_volumes (migration 111): a monthly seasonal
+ *  • SEASONAL events + keyword_monthly_volumes (migration 115): a monthly seasonal
  *    `timing` boost needs ≥1yr of the 12-month volume series that trendDirection()
  *    currently drops (seo-provider-signals.ts). Deferred until that series is
  *    persisted and ≥1yr of data has accrued.
@@ -27,7 +22,6 @@
  *    boost on EXISTING recs (the value) but does NOT mint a net-new defensive rec.
  *    Minting is deferred (design §5 / plan PR7).
  */
-import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import {
   listActiveOpportunityEvents,
@@ -75,16 +69,13 @@ function decayedContribution(event: OpportunityEvent, now: Date): number {
 /**
  * Aggregate the DECAYING timing boost per page for a workspace.
  *
- * @returns Map<pagePath (slug), totalBoost capped at MAX_PAGE_BOOST>. EMPTY when
- *          the events flag is OFF, on any error, or when no event contributes
- *          a non-negligible boost. Domain-level events (no pagePath) are ignored
- *          here because the boost is applied per affected page.
+ * @returns Map<pagePath (slug), totalBoost capped at MAX_PAGE_BOOST>. EMPTY on
+ *          any error or when no event contributes a non-negligible boost.
+ *          Domain-level events (no pagePath) are ignored here because the boost
+ *          is applied per affected page.
  */
 export function computeTimingBoosts(workspaceId: string, now: Date = new Date()): Map<string, number> {
   const boosts = new Map<string, number>();
-
-  // ── THE no-op gate: flag OFF → empty map → timingBoost 0 everywhere. ──
-  if (!isFeatureEnabled('opportunity-value-events')) return boosts;
 
   try {
     const events = listActiveOpportunityEvents(workspaceId);
@@ -112,7 +103,7 @@ export function computeTimingBoosts(workspaceId: string, now: Date = new Date())
  * The max timing boost across a rec's affected pages (or 0). Used at each
  * computeOpportunityValue push site as `timingBoost`. Slug-normalises each page so
  * it matches the keys computeTimingBoosts produces. On an empty map this is always
- * 0 (the flag-off identity path).
+ * 0 (the empty-ledger identity path).
  */
 export function maxBoostForPages(boosts: Map<string, number>, affectedPages: readonly string[]): number {
   if (boosts.size === 0 || !affectedPages || affectedPages.length === 0) return 0;

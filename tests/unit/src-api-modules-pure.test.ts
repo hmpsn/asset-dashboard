@@ -89,25 +89,22 @@ describe('src/api/analytics — gsc (Search Console)', () => {
     expect(url).toContain('endDate=2024-01-28');
   });
 
-  it('gsc.trend uses getSafe with empty array fallback', async () => {
+  it('gsc.trend uses get so provider failures surface', async () => {
     await gsc.trend('ws-2', 90);
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/performance-trend/ws-2');
     expect(url).toContain('days=90');
-    expect(fallback).toEqual([]);
   });
 
-  it('gsc.comparison uses getSafe with null fallback', async () => {
+  it('gsc.comparison uses getOptional for nullable comparison data', async () => {
     await gsc.comparison('ws-1', 7);
-    const [, fallback] = mockedGetSafe.mock.calls[0];
-    expect(fallback).toBeNull();
+    expect(mockedGetOptional).toHaveBeenCalled();
   });
 
-  it('gsc.devices uses getSafe with empty array fallback', async () => {
+  it('gsc.devices uses get so provider failures surface', async () => {
     await gsc.devices('ws-1', 30);
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/search-devices/ws-1');
-    expect(fallback).toEqual([]);
   });
 });
 
@@ -119,43 +116,42 @@ describe('src/api/analytics — ga4 (Google Analytics 4)', () => {
     expect(url).toContain('days=30');
   });
 
-  it('ga4.trend uses getSafe with empty array fallback', async () => {
+  it('ga4.trend uses get so provider failures surface', async () => {
     await ga4.trend('ws-1', 28);
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-trend/ws-1');
-    expect(fallback).toEqual([]);
   });
 
-  it('ga4.topPages uses getSafe with empty array fallback', async () => {
+  it('ga4.topPages uses get so provider failures surface', async () => {
     await ga4.topPages('ws-1', 14);
-    const [, fallback] = mockedGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
+    const [url] = mockedGet.mock.calls[0];
+    expect(url).toContain('/api/public/analytics-top-pages/ws-1');
   });
 
   it('ga4.eventTrend URL-encodes the event name', async () => {
     await ga4.eventTrend('ws-1', 'click & convert', 30);
-    const [url] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('event=click%20%26%20convert');
     expect(url).toContain('days=30');
   });
 
   it('ga4.eventPages URL-encodes event name', async () => {
     await ga4.eventPages('ws-1', 'form submit', 7);
-    const [url] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/analytics-event-explorer/ws-1');
     expect(url).toContain('event=form%20submit');
   });
 
   it('ga4.landingPages includes optional organic and limit params', async () => {
     await ga4.landingPages('ws-1', 30, { organic: true, limit: 10 });
-    const [url] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('organic=true');
     expect(url).toContain('limit=10');
   });
 
   it('ga4.landingPages omits organic and limit when not provided', async () => {
     await ga4.landingPages('ws-1', 30);
-    const [url] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).not.toContain('organic=');
     expect(url).not.toContain('limit=');
   });
@@ -171,10 +167,9 @@ describe('src/api/analytics — gscAdmin', () => {
     expect(url).toContain('days=30');
   });
 
-  it('gscAdmin.trend uses getSafe with array fallback', async () => {
+  it('gscAdmin.trend uses get so provider failures surface', async () => {
     await gscAdmin.trend('ws-1', 'site-1', 'https://example.com/', 7);
-    const [, fallback] = mockedGetSafe.mock.calls[0];
-    expect(fallback).toEqual([]);
+    expect(mockedGet).toHaveBeenCalled();
   });
 
   it('gscAdmin.chat uses post with workspaceId merged into body', async () => {
@@ -188,8 +183,8 @@ describe('src/api/analytics — gscAdmin', () => {
 });
 
 describe('src/api/analytics — fetchClientIntelligence', () => {
-  it('calls getSafe with correct url and fallback shape', async () => {
-    mockedGetSafe.mockResolvedValueOnce({
+  it('calls get with correct url and returns the server intelligence payload', async () => {
+    mockedGet.mockResolvedValueOnce({
       workspaceId: 'ws-1',
       assembledAt: '2024-01-01',
       tier: 'free',
@@ -197,10 +192,16 @@ describe('src/api/analytics — fetchClientIntelligence', () => {
       pipelineStatus: null,
     });
     const result = await fetchClientIntelligence('ws-1');
-    expect(mockedGetSafe).toHaveBeenCalled();
-    const [url] = mockedGetSafe.mock.calls[0];
+    expect(mockedGet).toHaveBeenCalled();
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/intelligence/ws-1');
     expect(result.workspaceId).toBe('ws-1');
+  });
+
+  it('does not return a fallback intelligence timestamp when the request fails', async () => {
+    mockedGet.mockRejectedValueOnce(new Error('network down'));
+    await expect(fetchClientIntelligence('ws-1')).rejects.toThrow('network down');
+    expect(mockedGetSafe).not.toHaveBeenCalled();
   });
 });
 
@@ -683,11 +684,21 @@ describe('src/api/misc — trackedKeywords', () => {
 });
 
 describe('src/api/misc — businessPriorities', () => {
-  it('businessPriorities.get uses getSafe with priorities fallback', async () => {
+  it('businessPriorities.get uses get with the public route', async () => {
     await businessPriorities.get('ws-1');
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
+    const [url] = mockedGet.mock.calls[0];
     expect(url).toContain('/api/public/business-priorities/ws-1');
-    expect(fallback).toEqual({ priorities: [] });
+  });
+
+  it('businessPriorities.save posts priorities and expectedUpdatedAt', async () => {
+    await businessPriorities.save('ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: null,
+    });
+    expect(mockedPost).toHaveBeenCalledWith('/api/public/business-priorities/ws-1', {
+      priorities: [{ text: 'Grow', category: 'growth' }],
+      expectedUpdatedAt: null,
+    });
   });
 });
 

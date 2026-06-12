@@ -25,9 +25,11 @@ import {
   type KeywordCommandCenterNextAction,
   type KeywordCommandCenterRow,
 } from '../../../shared/types/keyword-command-center';
+import { fmtNum } from '../../utils/formatNumbers';
 
 export const FILTER_ICONS: Record<KeywordCommandCenterFilter, LucideIcon> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.ALL]: SlidersHorizontal,
+  [KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE]: TrendingUp,
   [KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY]: Target,
   [KEYWORD_COMMAND_CENTER_FILTERS.TRACKED]: TrendingUp,
   [KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW]: Eye,
@@ -52,16 +54,40 @@ export function filterCountLabel(filterId: KeywordCommandCenterFilter, count: nu
   return compactNumber(count);
 }
 
-export function compactNumber(value: number | undefined): string {
+/**
+ * Null-safe compact number formatter for KCC volume columns.
+ * Returns '-' sentinel for null/undefined (callers depend on this for empty cells).
+ * For sub-1000 values, returns Math.round(value) as a string (no decimal, matching
+ * the original KCC behaviour). For ≥1000, delegates to the canonical fmtNum (UPPERCASE K/M).
+ *
+ * NOTE (Wave 2 T2): the UPPERCASE K/M form was already what this function produced before
+ * T2 (compactNumber and fmtNum agreed on uppercase). The only change is the sub-1000 path:
+ * compactNumber used Math.round while fmtNum uses toLocaleString — we preserve Math.round
+ * here so KCC cell rendering stays pixel-identical.
+ */
+export function compactNumber(value: number | undefined | null): string {
   if (value == null) return '-';
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (value >= 1_000) return fmtNum(value);
   return String(Math.round(value));
 }
 
 export function percent(value: number | undefined): string {
   if (value == null) return '-';
   return `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * Wave 4 P2 (Keyword Journey Drawer — Origin section). Renders a content-addressed
+ * `sourceGapKey` provenance pointer (e.g. `gap:dental-implants-austin`) into a
+ * short, human-readable label. Returns null when there is no gap key, so the
+ * caller can omit the line entirely. The raw key prefix (`gap:` / `keyword_gap:` /
+ * `content_gap:`) is stripped; remaining separators become spaces.
+ */
+export function formatSourceGapKey(sourceGapKey: string | undefined): string | null {
+  if (!sourceGapKey) return null;
+  const withoutPrefix = sourceGapKey.replace(/^(gap|keyword_gap|content_gap):/i, '');
+  const cleaned = withoutPrefix.replace(/[-_]+/g, ' ').trim();
+  return cleaned.length > 0 ? cleaned : sourceGapKey;
 }
 
 export function localPriorityTone(priority: NonNullable<KeywordCommandCenterRow['localSeoState']>['priority']): 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'zinc' {

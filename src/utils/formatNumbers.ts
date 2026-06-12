@@ -10,6 +10,16 @@ export function fmtNum(n: number): string {
   return n.toLocaleString();
 }
 
+/**
+ * Null-safe volume formatter.
+ * Returns '-' for null/undefined (preserving the sentinel that KCC callers rely on),
+ * and delegates to fmtNum for all valid numbers.
+ */
+export function fmtNumSafe(n: number | null | undefined): string {
+  if (n == null) return '-';
+  return fmtNum(n);
+}
+
 /** Compact money: 1234 → "$1.2k", 50 → "$50.00" */
 export function fmtMoney(value: number): string {
   if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}k`;

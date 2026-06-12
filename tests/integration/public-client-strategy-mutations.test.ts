@@ -51,14 +51,17 @@ vi.mock('../../server/email.js', () => ({
 // Bypass rate limiting — tests issue many writes in rapid succession and would
 // otherwise exhaust the 10 req/min publicWriteLimiter or 60 req/min publicApiLimiter.
 // The rate-limiter module is already covered by its own dedicated tests.
-const noopMiddleware = (_req: unknown, _res: unknown, next: () => void) => next();
+// noopMiddleware is inlined inside the factory (not a module-level const) to
+// avoid TDZ: vi.mock factories are hoisted above all module declarations, so any
+// const defined at module scope is uninitialized when the factory runs.
 vi.mock('../../server/middleware.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/middleware.js')>();
+  const noop = (_req: unknown, _res: unknown, next: () => void) => next();
   return {
     ...original,
-    publicWriteLimiter: noopMiddleware,
-    publicApiLimiter: noopMiddleware,
-    globalPublicLimiter: noopMiddleware,
+    publicWriteLimiter: noop,
+    publicApiLimiter: noop,
+    globalPublicLimiter: noop,
   };
 });
 
@@ -68,6 +71,7 @@ import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── In-process server setup ───────────────────────────────────────────────────
 
@@ -125,7 +129,7 @@ async function clientPatchJson(path: string, body: unknown, workspaceId = wsId, 
 }
 
 async function getJson(path: string): Promise<Response> {
-  return fetch(`${baseUrl}${path}`);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
 }
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
@@ -204,8 +208,10 @@ describe('POST /api/public/business-priorities/:workspaceId', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { saved: number };
+    const body = await res.json() as { saved: number; priorities: unknown[]; updatedAt: string };
     expect(body.saved).toBe(2);
+    expect(body.priorities).toHaveLength(2);
+    expect(body.updatedAt).toEqual(expect.any(String));
   });
 
   it('priorities persist and appear in subsequent GET', async () => {
@@ -559,8 +565,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
       body: JSON.stringify({ phone: '+1-555-0999' }),
     });
 
-    // No auth cookie → 401 before workspace lookup
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 
   it('returns 401 without auth cookie', async () => {

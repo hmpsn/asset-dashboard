@@ -56,10 +56,10 @@ Dark-launch incomplete phases so production never serves broken UI.
 | Action | Command / location |
 |--------|-------------------|
 | Add a new flag | `shared/types/feature-flags.ts` — add to `FEATURE_FLAGS` (default `false`) |
-| Enable on staging | Render staging env: `FEATURE_COPY_ENGINE=true` |
-| Enable on production | Render production env: `FEATURE_COPY_ENGINE=true` |
-| Wrap UI | `<FeatureFlag flag="copy-engine"><YourComponent /></FeatureFlag>` |
-| Gate a server route | `if (!isFeatureEnabled('copy-engine')) return res.status(404).json({ error: 'Not found' });` |
+| Enable on staging | Render staging env: `FEATURE_KEYWORD_HUB=true` |
+| Enable on production | Render production env: `FEATURE_KEYWORD_HUB=true` |
+| Wrap UI | `<FeatureFlag flag="keyword-hub"><YourComponent /></FeatureFlag>` |
+| Gate a server route | `if (!isFeatureEnabled('keyword-hub')) return res.status(404).json({ error: 'Not found' });` |
 
 ---
 

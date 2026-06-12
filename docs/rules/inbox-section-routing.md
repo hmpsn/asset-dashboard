@@ -1,7 +1,7 @@
 # Inbox Section Routing
 
 **Introduced:** PR 1.2 (2026-05-10) — Client IA Restructure  
-**Feature flag:** `new-inbox-ia` (default `false`; flip manually after staging verification)
+**Status:** Canonical client inbox routing contract. The legacy `new-inbox-ia` rollout flag was retired on 2026-06-04.
 
 ---
 

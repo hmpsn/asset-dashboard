@@ -41,7 +41,8 @@ describe('background job task panel wiring', () => {
   it('tracks direct content post generation jobs in ContentBriefs', () => {
     const contentBriefs = read('src/components/ContentBriefs.tsx');
 
-    expect(contentBriefs).toContain('const { trackJob } = useBackgroundTasks()');
+    expect(contentBriefs).toContain('const { trackJob, jobs } = useBackgroundTasks()');
     expect(contentBriefs).toContain('attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId })');
+    expect(contentBriefs).toContain("type: BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION");
   });
 });

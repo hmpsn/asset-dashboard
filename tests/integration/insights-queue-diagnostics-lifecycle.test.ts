@@ -96,12 +96,6 @@ beforeAll(async () => {
   const other = createWorkspace('Insights Queue Isolation Other');
   otherWsId = other.id;
 
-  // Enable the deep-diagnostics feature flag via the admin API
-  await api('/api/admin/feature-flags/deep-diagnostics', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
 }, 25_000);
 
 beforeEach(() => {
@@ -115,14 +109,6 @@ afterAll(async () => {
   // Clean up diagnostic reports
   db.prepare('DELETE FROM diagnostic_reports WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM diagnostic_reports WHERE workspace_id = ?').run(otherWsId);
-
-  // Reset the feature flag
-  await api('/api/admin/feature-flags/deep-diagnostics', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
-
   deleteWorkspace(wsId);
   deleteWorkspace(otherWsId);
   await stopTestServer();

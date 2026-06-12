@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Copy, MapPin, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
 import type {
   LocalSeoLocationLookupCandidate,
   LocalSeoMarket,
@@ -146,7 +146,7 @@ function ServiceGapNudge({ gap }: { gap: LocalSeoServiceGap }) {
 
 function BusinessLocationsShortcut({ workspaceId }: { workspaceId: string }) {
   const { data: locations, isLoading } = useLocalSeoLocations(workspaceId);
-  const brandLocationsUrl = `${adminPath(workspaceId, 'brand')}?tab=locations`;
+  const brandLocationsUrl = `${adminPath(workspaceId, 'brand')}?tab=business-footprint&focus=locations-section`;
 
   if (isLoading) {
     return (
@@ -224,12 +224,97 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
   const locationLookup = useLocalSeoLocationLookup(workspaceId);
   const setPrimary = useSetPrimaryMarket(workspaceId);
 
+  // Track the last prop values that were synced into local state. This allows
+  // the "already-open" resync to compare current state against what it last
+  // received, not against the incoming live prop — comparing to the live prop
+  // guarantees the dirty check never fires after an external update.
+  const lastSyncedRef = useRef<{
+    markets: typeof data.markets;
+    posture: typeof data.settings.posture;
+    keywordsPerRefresh: typeof data.settings.keywordsPerRefresh;
+  } | null>(null);
+
+  // Tracks whether the drawer was open on the previous render so the sync
+  // effect can distinguish "just opened" from "already open + data changed".
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+
     if (!open) return;
-    previousFocusRef.current = document.activeElement as HTMLElement | null;
+
+    if (justOpened) {
+      // Opening fresh: always sync — no in-progress drafts exist yet.
+      // Split server markets into active (configurable) vs inactive (deactivated).
+      lastSyncedRef.current = {
+        markets: data.markets,
+        posture: data.settings.posture,
+        keywordsPerRefresh: data.settings.keywordsPerRefresh,
+      };
+      setPosture(data.settings.posture);
+      setMarkets(data.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
+      setRemovedMarkets(data.markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
+      setKeywordsPerRefreshInput(
+        typeof data.settings.keywordsPerRefresh === 'number'
+          ? String(data.settings.keywordsPerRefresh)
+          : '',
+      );
+      setError(null);
+      setLocationCandidatesByIndex({});
+      setLookupPendingIndex(null);
+      const frame = window.requestAnimationFrame(() => drawerRef.current?.focus());
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    // Drawer is already open and a background refetch delivered new prop values.
+    // Determine dirtiness by comparing current state to the LAST SYNCED snapshot,
+    // not to the incoming prop (comparing to the live prop would mean the dirty
+    // check never fires after an external update — the classic stale-closure trap).
+    const synced = lastSyncedRef.current;
+    if (!synced) return;
+
+    const isDirtyPosture = posture !== synced.posture;
+    const syncedKeywords = typeof synced.keywordsPerRefresh === 'number'
+      ? String(synced.keywordsPerRefresh)
+      : '';
+    const isDirtyKeywords = keywordsPerRefreshInput !== syncedKeywords;
+
+    // Draft markets are dirty if any field was changed vs. the last-synced snapshot.
+    // Inactive markets are tracked in removedMarkets — exclude them from the active comparison.
+    const syncedDrafts = synced.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(m => draftFromMarket(m));
+    const isDirtyMarkets = markets.length !== syncedDrafts.length
+      || markets.some((draft, i) => {
+        const s = syncedDrafts[i];
+        return !s
+          || draft.label !== s.label
+          || draft.city !== s.city
+          || draft.stateOrRegion !== s.stateOrRegion
+          || draft.country !== s.country
+          || draft.status !== s.status
+          || draft.providerLocationCode !== s.providerLocationCode
+          || draft.providerLocationName !== s.providerLocationName
+          || draft.latitude !== s.latitude
+          || draft.longitude !== s.longitude;
+      });
+
+    const isDirty = isDirtyPosture || isDirtyKeywords || isDirtyMarkets || removedMarkets.length > 0;
+
+    if (isDirty) {
+      // Preserve in-progress drafts — do NOT resync. No merge UI.
+      return;
+    }
+
+    // Pristine: resync from the fresh server data.
+    // Split server markets into active (configurable) vs inactive (deactivated).
+    lastSyncedRef.current = {
+      markets: data.markets,
+      posture: data.settings.posture,
+      keywordsPerRefresh: data.settings.keywordsPerRefresh,
+    };
     setPosture(data.settings.posture);
-    setMarkets(data.markets.map(market => draftFromMarket(market)));
-    setRemovedMarkets([]);
+    setMarkets(data.markets.filter(m => m.status !== LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
+    setRemovedMarkets(data.markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.INACTIVE).map(market => draftFromMarket(market)));
     setKeywordsPerRefreshInput(
       typeof data.settings.keywordsPerRefresh === 'number'
         ? String(data.settings.keywordsPerRefresh)
@@ -238,12 +323,17 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
     setError(null);
     setLocationCandidatesByIndex({});
     setLookupPendingIndex(null);
-    const frame = window.requestAnimationFrame(() => drawerRef.current?.focus());
-    return () => {
-      window.cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: posture/markets/keywordsPerRefreshInput are current state compared to lastSyncedRef snapshot; wasOpenRef tracks open transition without being a dep
+  }, [data.markets, data.settings.posture, data.settings.keywordsPerRefresh, open]);
+
+  // Capture trigger element on open; restore focus only on actual close.
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    } else {
       previousFocusRef.current?.focus?.();
-    };
-  }, [data.markets, data.settings.posture, open]);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -601,18 +691,16 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
                     )}
                     <IconButton
                       icon={Trash2}
-                      label={`Remove ${marketLabel(market)}`}
+                      label={`Deactivate ${marketLabel(market)}`}
                       variant="ghost"
                       size="sm"
                       className="text-[var(--brand-text-muted)] hover:text-red-400"
                       onClick={() => {
                         setMarkets(current => current.filter((_, i) => i !== index));
-                        if (market.id) {
-                          setRemovedMarkets(current => [
-                            ...current.filter(item => item.id !== market.id),
-                            { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
-                          ]);
-                        }
+                        setRemovedMarkets(current => [
+                          ...current.filter(item => item.id !== market.id),
+                          { ...market, status: LOCAL_SEO_MARKET_STATUS.INACTIVE },
+                        ]);
                       }}
                     />
                   </div>
@@ -710,6 +798,31 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
             ))}
           </section>
 
+          {removedMarkets.length > 0 && (
+            <section aria-label="Inactive markets" className="space-y-3">
+              <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Inactive markets</h3>
+              {removedMarkets.map(market => (
+                <div key={market.id ?? market.label} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/20 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="t-caption font-semibold text-[var(--brand-text-muted)] truncate">{marketLabel(market)}</p>
+                    <p className="t-caption-sm text-[var(--brand-text-muted)]">Deactivated — not included in refreshes</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={() => {
+                      setRemovedMarkets(current => current.filter(m => m.id !== market.id || m.label !== market.label));
+                      setMarkets(current => [...current, { ...market, status: LOCAL_SEO_MARKET_STATUS.ACTIVE }]);
+                    }}
+                  >
+                    Reactivate
+                  </Button>
+                </div>
+              ))}
+            </section>
+          )}
+
           <section className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
             <div className="mb-3">
               <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Refresh keyword budget</h3>
@@ -741,7 +854,10 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
           </section>
 
           {(error || update.error || refresh.error || setPrimary.error) && (
-            <div className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/8 px-4 py-3 flex items-start gap-2">
+            <div
+              role="alert"
+              className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/8 px-4 py-3 flex items-start gap-2"
+            >
               <Icon as={AlertTriangle} size="sm" className="text-red-400/80 mt-0.5" />
               <p className="t-caption-sm text-red-400/90">
                 {error
@@ -754,26 +870,34 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-[var(--brand-border)] flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            Local visibility checks are separate from Rank Tracker and strategy generation.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button variant="secondary" size="sm" loading={(update.isPending && !refresh.isPending) || lookingUp} disabled={saving || lookingUp} onClick={() => save(false)}>
-              Save market
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={refresh.isPending ? undefined : RefreshCw}
-              loading={refresh.isPending}
-              disabled={saving || lookingUp || !canSaveAndRefresh}
-              title={!canSaveAndRefresh ? 'Choose at least one active local market before refreshing visibility.' : undefined}
-              onClick={() => save(true)}
-            >
-              Save and refresh visibility
-            </Button>
+        <div className="px-5 py-4 border-t border-[var(--brand-border)] flex-shrink-0 flex flex-col gap-2">
+          {(error || update.error || refresh.error || setPrimary.error) && (
+            <p aria-hidden="true" className="flex items-center gap-1.5 text-red-400/80 t-caption-sm">
+              <Icon as={AlertTriangle} size="xs" className="shrink-0" />
+              Fix errors above before saving.
+            </p>
+          )}
+          <div className="flex flex-row sm:items-center sm:justify-between gap-3">
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Local visibility checks are separate from Rank Tracker and strategy generation.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button variant="secondary" size="sm" loading={(update.isPending && !refresh.isPending) || lookingUp} disabled={saving || lookingUp} onClick={() => save(false)}>
+                Save market
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={refresh.isPending ? undefined : RefreshCw}
+                loading={refresh.isPending}
+                disabled={saving || lookingUp || !canSaveAndRefresh}
+                title={!canSaveAndRefresh ? 'Choose at least one active local market before refreshing visibility.' : undefined}
+                onClick={() => save(true)}
+              >
+                Save and refresh visibility
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,7 @@
-import { Badge, Icon } from '../ui';
-import { Eye, Users } from 'lucide-react';
+import { Badge, Icon, IconButton } from '../ui';
+import { ArrowUpRight, Eye, Users } from 'lucide-react';
+import { adminPath } from '../../routes';
+import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
 
 interface KeywordGapItem {
   keyword: string;
@@ -12,10 +14,15 @@ interface KeywordGapItem {
 export interface KeywordGapsProps {
   keywordGaps: KeywordGapItem[];
   difficultyColor: (kd?: number) => string;
+  /** When workspaceId + navigate are provided, each row gets a "View in Hub" link. */
+  workspaceId?: string;
+  navigate?: (path: string) => void;
 }
 
-export function KeywordGaps({ keywordGaps, difficultyColor }: KeywordGapsProps) {
+export function KeywordGaps({ keywordGaps, difficultyColor, workspaceId, navigate }: KeywordGapsProps) {
   if (keywordGaps.length === 0) return null;
+
+  const showHubLink = !!(workspaceId && navigate);
 
   return (
     <div className="bg-[var(--surface-2)] border border-orange-500/20 p-5 rounded-[var(--radius-signature)]">
@@ -36,6 +43,17 @@ export function KeywordGaps({ keywordGaps, difficultyColor }: KeywordGapsProps) 
               <span className="t-mono text-[var(--brand-text-muted)]">{gap.volume.toLocaleString()}/mo</span>
               <span className={`t-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{gap.competitorDomain} #{gap.competitorPosition}</span>
+              {showHubLink && (
+                <IconButton
+                  onClick={() => navigate!(adminPath(workspaceId!, 'seo-keywords') + buildHubDeepLinkQuery({ keyword: gap.keyword }))}
+                  title="View in Hub"
+                  label="View in Hub"
+                  icon={ArrowUpRight}
+                  size="sm"
+                  variant="ghost"
+                  className="text-[var(--brand-text-muted)] hover:text-accent-brand"
+                />
+              )}
             </div>
           </div>
         ))}

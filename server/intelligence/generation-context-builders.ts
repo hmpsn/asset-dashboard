@@ -3,9 +3,17 @@ import type {
   IntelligenceSlice,
   LearningsSlice,
   PromptVerbosity,
+  SeoContextSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
+import {
+  buildWorkspaceIntelligence,
+  formatForPrompt,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
+  formatPageMapForPrompt,
+  formatPersonasForPrompt,
+} from '../workspace-intelligence.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
 
@@ -31,6 +39,27 @@ export interface GenerationContextResult {
 export interface ContentGenerationContextOptions extends GenerationContextBuilderOptions {}
 
 export interface RecommendationGenerationContextOptions extends GenerationContextBuilderOptions {}
+
+export interface SeoPromptContextOptions extends GenerationContextBuilderOptions {
+  includePageMap?: boolean;
+}
+
+export interface SeoPromptContextResult extends GenerationContextResult {
+  pageMapContext: string;
+  seoPromptContext: string;
+}
+
+export interface SeoPromptBlocksOptions {
+  includePageMap?: boolean;
+}
+
+export interface SeoPromptBlocks {
+  keywordBlock: string;
+  brandVoiceBlock: string;
+  personasBlock: string;
+  knowledgeBlock: string;
+  pageMapBlock: string;
+}
 
 async function buildGenerationContext(
   workspaceId: string,
@@ -115,4 +144,37 @@ export async function buildRecommendationGenerationContext(
     verbosity: opts.verbosity ?? 'detailed',
     learningsDomain: opts.learningsDomain ?? 'all',
   });
+}
+
+export async function buildSeoPromptContext(
+  workspaceId: string,
+  opts: SeoPromptContextOptions = {},
+): Promise<SeoPromptContextResult> {
+  const slices = opts.slices ?? ['seoContext', 'learnings'];
+  const result = await buildGenerationContext(workspaceId, slices, {
+    ...opts,
+    verbosity: opts.verbosity ?? 'detailed',
+    learningsDomain: opts.learningsDomain ?? 'all',
+  });
+  const pageMapContext = opts.includePageMap === false
+    ? ''
+    : formatPageMapForPrompt(result.intelligence.seoContext);
+  return {
+    ...result,
+    pageMapContext,
+    seoPromptContext: `${result.promptContext}${pageMapContext}`,
+  };
+}
+
+export function buildSeoPromptBlocks(
+  seoContext: SeoContextSlice | null | undefined,
+  opts: SeoPromptBlocksOptions = {},
+): SeoPromptBlocks {
+  return {
+    keywordBlock: formatKeywordsForPrompt(seoContext),
+    brandVoiceBlock: seoContext?.effectiveBrandVoiceBlock ?? '',
+    personasBlock: formatPersonasForPrompt(seoContext?.personas ?? []),
+    knowledgeBlock: formatKnowledgeBaseForPrompt(seoContext?.knowledgeBase),
+    pageMapBlock: opts.includePageMap === false ? '' : formatPageMapForPrompt(seoContext),
+  };
 }

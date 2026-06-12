@@ -1,7 +1,7 @@
 // src/components/client/SubmitRequestForm.tsx
 //
-// Item 1 — the reusable "Submit a Request" task-request form, EXTRACTED from RequestsTab so BOTH the
-// legacy RequestsTab AND the new unified-inbox chooser modal mount the SAME form (DRY). The
+// Item 1 — the reusable "Submit a Request" task-request form, extracted from RequestsTab so BOTH
+// the legacy RequestsTab AND the unified inbox chooser modal mount the SAME form (DRY). The
 // extraction is purely additive: RequestsTab now renders <SubmitRequestForm/> in place of the inline
 // SectionCard block, producing byte-identical DOM + behavior. The free-form request lands via
 // POST /api/public/requests/:ws (the proven public requests route) + optional attachment upload.
@@ -26,8 +26,8 @@ interface SubmitRequestFormProps {
 
 /**
  * SubmitRequestForm — the "Submit a Request" form, byte-identical to the block it was extracted from
- * in RequestsTab. Owns its own form state + submit so it can be mounted standalone (the unified-inbox
- * chooser modal) OR inside RequestsTab. The markup is the SAME SectionCard + fields so the legacy tab
+ * in RequestsTab. Owns its own form state + submit so it can be mounted standalone (the chooser
+ * modal) OR inside RequestsTab. The markup is the SAME SectionCard + fields so the legacy tab
  * renders identically.
  */
 export function SubmitRequestForm({ workspaceId, clientUser, setToast, onSubmitted, onCancel }: SubmitRequestFormProps) {

@@ -12,7 +12,6 @@ import { isStripeConfigured } from '../stripe.js';
 import { getStripeConfigSafe } from '../stripe-config.js';
 import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
-import { getSemrushUsage } from '../semrush.js';
 import { getDataForSeoUsage } from '../providers/dataforseo-provider.js';
 import { listProviders } from '../seo-data-provider.js';
 import { getTokenUsage } from '../openai-helpers.js';
@@ -167,10 +166,8 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
   const hasWebflowToken = hasWebflowSite ? !!getTokenForSite(workspace.webflowSiteId!) : false;
 
   const providerStatus = listProviders();
-  const semrushProvider = providerStatus.find(provider => provider.name === 'semrush');
   const dataforseoProvider = providerStatus.find(provider => provider.name === 'dataforseo');
 
-  const semrushUsage = getSemrushUsage(workspaceId);
   const dataforseoUsage = getDataForSeoUsage(workspaceId);
   const aiUsage = getTokenUsage(workspaceId);
   const openAiUsageEntries = aiUsage.entries.filter(entry => !entry.model.includes('claude'));
@@ -249,22 +246,6 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       notes: hasGa4Property
         ? 'Successful-call telemetry is not yet tracked for this integration.'
         : 'Select a GA4 property in the Connections tab.',
-    }),
-    createIntegration({
-      key: 'semrush',
-      label: 'SEMRush',
-      configured: !!semrushProvider?.configured,
-      connected: !!semrushProvider?.configured,
-      lastSuccessAt: latestTimestamp(semrushUsage.entries),
-      lastErrorAt: null,
-      lastError: semrushProvider?.configured ? null : 'SEMRush API key is not configured',
-      quotaStatus: semrushProvider?.configured ? 'unknown' : 'unknown',
-      quotaDetail: semrushProvider?.configured
-        ? `Credits used: ${semrushUsage.totalCredits} across ${semrushUsage.totalCalls} calls.`
-        : 'SEMRush usage unavailable until configured.',
-      tokenExpiresAt: null,
-      affectedFeatures: ['Competitor intelligence', 'Keyword opportunities', 'Content strategy'],
-      notes: semrushProvider?.configured ? null : 'Configure SEMRush credentials to enable direct provider fallback.',
     }),
     createIntegration({
       key: 'dataforseo',

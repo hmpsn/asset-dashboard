@@ -15,19 +15,11 @@ import type {
   PromptFormatOptions,
 } from '../shared/types/intelligence.js';
 import { INTELLIGENCE_SLICES } from '../shared/types/intelligence.js';
-import { assemblePageElements } from './intelligence/page-elements-slice.js';
-import { assembleSiteInventory } from './intelligence/site-inventory-slice.js';
-import { assembleSeoContext } from './intelligence/seo-context-slice.js';
-import { assembleInsights } from './intelligence/insights-slice.js';
-import { assembleLearnings } from './intelligence/learnings-slice.js';
-import { assembleContentPipeline } from './intelligence/content-pipeline-slice.js';
-import { assembleSiteHealth } from './intelligence/site-health-slice.js';
-import { assembleClientSignals } from './intelligence/client-signals-slice.js';
-import { assembleOperational } from './intelligence/operational-slice.js';
-import { assemblePageProfile } from './intelligence/page-profile-slice.js';
-import { assembleLocalSeo } from './intelligence/local-seo-slice.js';
-import { assembleEntityResolution } from './intelligence/entity-resolution-slice.js';
-import { assembleEeatAssets } from './intelligence/eeat-assets-slice.js';
+import {
+  canAssembleIntelligenceSlice,
+  type IntelligenceSliceMetadataEntry,
+  INTELLIGENCE_SLICE_METADATA_REGISTRY,
+} from './intelligence/slice-metadata-registry.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
@@ -96,60 +88,11 @@ async function assembleSlice(
   slice: IntelligenceSlice,
   opts?: IntelligenceOptions,
 ): Promise<void> {
-  switch (slice) {
-    case 'seoContext':
-      result.seoContext = await assembleSeoContext(workspaceId, opts);
-      break;
-    case 'insights':
-      result.insights = await assembleInsights(workspaceId, opts);
-      break;
-    case 'learnings':
-      result.learnings = await assembleLearnings(workspaceId, opts);
-      break;
-    case 'contentPipeline':
-      result.contentPipeline = await assembleContentPipeline(workspaceId);
-      break;
-    case 'siteHealth':
-      try {
-        result.siteHealth = await Promise.race([
-          assembleSiteHealth(workspaceId, opts),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('siteHealth assembler timed out')), 5000),
-          ),
-        ]);
-      } catch (err) {
-        log.warn({ workspaceId, slice, err }, 'siteHealth slice assembly failed — skipping');
-      }
-      break;
-    case 'clientSignals':
-      result.clientSignals = await assembleClientSignals(workspaceId, opts);
-      break;
-    case 'operational':
-      result.operational = await assembleOperational(workspaceId, opts);
-      break;
-    case 'pageProfile':
-      if (opts?.pagePath) {
-        result.pageProfile = await assemblePageProfile(workspaceId, opts.pagePath, opts);
-      }
-      break;
-    case 'pageElements':
-      if (!opts?.pagePath) break;
-      result.pageElements = await assemblePageElements(workspaceId, opts.pagePath);
-      break;
-    case 'siteInventory':
-      if (!opts?.siteId || !opts.siteBaseUrl) break;
-      result.siteInventory = await assembleSiteInventory(workspaceId, opts.siteId, opts.siteBaseUrl, opts.webflowToken);
-      break;
-    case 'localSeo':
-      result.localSeo = await assembleLocalSeo(workspaceId);
-      break;
-    case 'entityResolution':
-      result.entityResolution = await assembleEntityResolution(workspaceId, opts);
-      break;
-    case 'eeatAssets':
-      result.eeatAssets = await assembleEeatAssets(workspaceId);
-      break;
-  }
+  const entry: IntelligenceSliceMetadataEntry = INTELLIGENCE_SLICE_METADATA_REGISTRY[slice];
+  if (!canAssembleIntelligenceSlice(entry, opts)) return;
+
+  const assembled = await entry.assemble(workspaceId, opts);
+  Object.assign(result, assembled);
 }
 
 export async function buildIntelPrompt(

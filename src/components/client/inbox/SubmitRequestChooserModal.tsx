@@ -1,8 +1,7 @@
 // src/components/client/inbox/SubmitRequestChooserModal.tsx
 //
-// Item 1 — the "Submit a request" chooser (DARK; mounted only from UnifiedInbox behind the
-// `unified-inbox` flag). Flag-on clients previously had NO way to initiate a request. This modal
-// opens from the persistent "Submit a request" primary button and offers BOTH paths the owner chose:
+// Item 1 — the "Submit a request" chooser, mounted from UnifiedInbox. This modal opens from the
+// persistent "Submit a request" primary button and offers BOTH paths the owner chose:
 //
 //   - "Ask for content"  → REUSES the existing topic-submission + pricing flow. A small topic form
 //                           (topic / target keyword / notes / brief-vs-full-post) calls the SAME
@@ -27,6 +26,10 @@ interface SubmitRequestChooserModalProps {
   /** Reuse the existing content-topic pricing flow (same handler ContentTab calls). */
   setPricingModal: (modal: PricingModalState | null) => void;
   pricingConfirming: boolean;
+  briefPrice: number | null;
+  fullPostPrice: number | null;
+  fmtPrice: (n: number) => string;
+  hidePrices?: boolean;
 }
 
 type ChooserStep = 'choose' | 'content' | 'request';
@@ -38,6 +41,10 @@ export function SubmitRequestChooserModal({
   onDismiss,
   setPricingModal,
   pricingConfirming,
+  briefPrice,
+  fullPostPrice,
+  fmtPrice,
+  hidePrices = false,
 }: SubmitRequestChooserModalProps) {
   const [step, setStep] = useState<ChooserStep>('choose');
 
@@ -83,6 +90,10 @@ export function SubmitRequestChooserModal({
 
   const title =
     step === 'content' ? 'Ask for content' : step === 'request' ? 'Send a request' : 'Submit a request';
+  const servicePrice = serviceType === 'brief_only' ? briefPrice : fullPostPrice;
+  const selectedServicePriceLabel = !hidePrices && servicePrice != null ? fmtPrice(servicePrice) : null;
+  const briefPriceLabel = !hidePrices && briefPrice != null ? fmtPrice(briefPrice) : null;
+  const fullPostPriceLabel = !hidePrices && fullPostPrice != null ? fmtPrice(fullPostPrice) : null;
 
   return (
     <div
@@ -161,7 +172,7 @@ export function SubmitRequestChooserModal({
           {step === 'content' && (
             <div className="space-y-3">
               <p className="t-caption text-[var(--brand-text-muted)]">
-                Tell us the topic and target keyword — we'll confirm the price next.
+                Tell us the topic and target keyword{selectedServicePriceLabel ? ` — ${selectedServicePriceLabel} before checkout.` : " — we'll confirm the request next."}
               </p>
               <FormInput
                 type="text"
@@ -190,18 +201,24 @@ export function SubmitRequestChooserModal({
                   <Button
                     type="button"
                     variant="ghost"
+                    aria-label={briefPriceLabel ? `Content Brief ${briefPriceLabel}` : 'Content Brief'}
                     onClick={() => setServiceType('brief_only')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${serviceType === 'brief_only' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}
                   >
-                    <Icon as={FileText} size="md" /> Content Brief
+                    <Icon as={FileText} size="md" />
+                    <span>Content Brief</span>
+                    {briefPriceLabel && <span className="opacity-70">{briefPriceLabel}</span>}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
+                    aria-label={fullPostPriceLabel ? `Full Blog Post ${fullPostPriceLabel}` : 'Full Blog Post'}
                     onClick={() => setServiceType('full_post')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${serviceType === 'full_post' ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand' : 'bg-[var(--surface-1)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-strong)]'}`}
                   >
-                    <Icon as={Sparkles} size="md" /> Full Blog Post
+                    <Icon as={Sparkles} size="md" />
+                    <span>Full Blog Post</span>
+                    {fullPostPriceLabel && <span className="opacity-70">{fullPostPriceLabel}</span>}
                   </Button>
                 </div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{serviceType === 'brief_only' ? 'A detailed content strategy document for this topic' : 'Brief + professionally written article delivered ready to publish'}</div>
@@ -213,7 +230,7 @@ export function SubmitRequestChooserModal({
                   icon={Sparkles}
                   className="rounded-[var(--radius-lg)]"
                 >
-                  Continue
+                  {selectedServicePriceLabel ? `Continue - ${selectedServicePriceLabel}` : 'Continue'}
                 </Button>
                 <Button variant="ghost" onClick={() => setStep('choose')}>Back</Button>
               </div>

@@ -226,25 +226,10 @@ describe('schema-queue behavior', () => {
     ]);
   });
 
-  it('markSchemaApplied is idempotent and only updates existing pending rows', async () => {
-    const { markSchemaApplied, markSchemaStale } = await loadModule();
-
-    mocks.selectByCellIdGet.mockReturnValueOnce(undefined);
-    markSchemaApplied('ws_1', 'cell_1');
-    expect(mocks.updateStatusRun).not.toHaveBeenCalled();
-
-    mocks.selectByCellIdGet.mockReturnValueOnce({ id: 'ps_1' });
-    markSchemaApplied('ws_1', 'cell_1');
-    markSchemaApplied('ws_1', 'cell_1');
-
-    expect(mocks.updateStatusRun).toHaveBeenCalledTimes(1);
-    expect(mocks.updateStatusRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'ps_1',
-        workspace_id: 'ws_1',
-        status: 'applied',
-      }),
-    );
+  // markSchemaApplied was removed in W6.3 — no callers and no UI for the endpoint.
+  // The markSchemaStale path is still tested via the queueSchemaPreGeneration test above.
+  it('markSchemaStale marks all pending schemas for a cell as stale', async () => {
+    const { markSchemaStale } = await loadModule();
 
     markSchemaStale('ws_1', 'cell_1');
     expect(mocks.markStaleByCellIdRun).toHaveBeenCalledWith(

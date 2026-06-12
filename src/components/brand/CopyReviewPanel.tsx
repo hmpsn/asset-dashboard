@@ -405,7 +405,7 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   const { data: sections = [], isLoading, isError } = useCopySections(workspaceId, entryId);
   const { data: copyStatus } = useCopyStatus(workspaceId, entryId);
   const { data: metadata } = useCopyMetadata(workspaceId, entryId);
-  const generateCopy = useGenerateCopy(workspaceId, blueprintId);
+  const { startGenerate, isRunning: isGenerating } = useGenerateCopy(workspaceId, blueprintId, entryId);
   const sendToClient = useSendEntryToClientReview(workspaceId, blueprintId);
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -447,15 +447,15 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
         description="Generate the first draft to begin review. AI will create copy for each section based on the blueprint plan."
         action={
           <Button
-            onClick={() => generateCopy.mutate(entryId)}
-            disabled={generateCopy.isPending}
+            onClick={() => void startGenerate()}
+            disabled={isGenerating}
             variant="primary"
             size="md"
             icon={RefreshCw}
-            loading={generateCopy.isPending}
+            loading={isGenerating}
             aria-label="Generate copy for this entry"
           >
-            {generateCopy.isPending ? 'Generating...' : 'Generate Copy'}
+            {isGenerating ? 'Generating...' : 'Generate Copy'}
           </Button>
         }
       />
@@ -501,12 +501,12 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
               </Button>
             )}
             <Button
-              onClick={() => generateCopy.mutate(entryId)}
-              disabled={generateCopy.isPending}
+              onClick={() => void startGenerate()}
+              disabled={isGenerating}
               variant="secondary"
               size="sm"
               icon={RefreshCw}
-              loading={generateCopy.isPending}
+              loading={isGenerating}
               aria-label="Regenerate all copy"
             >
               Regenerate All

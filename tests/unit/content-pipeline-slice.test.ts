@@ -85,10 +85,16 @@ vi.mock('../../server/db/stmt-cache.js', () => ({
 vi.mock('../../server/db/index.js', () => ({
   default: {
     prepare: mocks.prepare.mockImplementation((sql: string) => {
-      if (sql.includes('FROM copy_sections') && sql.includes('GROUP BY status')) {
+      if (
+        sql.includes('FROM copy_sections') &&
+        sql.includes('GROUP BY status')
+      ) {
         return { all: mocks.sectionCountsAll };
       }
-      if (sql.includes('FROM copy_sections') && sql.includes('GROUP BY entry_id')) {
+      if (
+        sql.includes('FROM copy_sections') &&
+        sql.includes('GROUP BY entry_id')
+      ) {
         return { all: mocks.entryCountsAll };
       }
       if (sql.includes('FROM copy_batch_jobs')) {
@@ -111,7 +117,8 @@ vi.mock('../../server/logger.js', () => ({
   }),
 }));
 
-const { assembleContentPipeline } = await import('../../server/intelligence/content-pipeline-slice.js');
+const { assembleContentPipeline } =
+  await import('../../server/intelligence/content-pipeline-slice.js');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -207,28 +214,49 @@ beforeEach(() => {
   ]);
   mocks.lastBatchJobGet.mockReturnValue({
     status: 'running',
-    progress_json: JSON.stringify({ total: 20, generated: 8, reviewed: 4, approved: 3 }),
+    progress_json: JSON.stringify({
+      total: 20,
+      generated: 8,
+      reviewed: 4,
+      approved: 3,
+    }),
     created_at: '2026-05-24T08:00:00.000Z',
   });
   mocks.activePatternCountGet.mockReturnValue({ cnt: 4 });
 
-  mocks.parseJsonSafe.mockImplementation((raw: string, _schema: unknown, fallback: unknown) => {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return fallback;
-    }
-  });
+  mocks.parseJsonSafe.mockImplementation(
+    (raw: string, _schema: unknown, fallback: unknown) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return fallback;
+      }
+    },
+  );
 });
 
 describe('assembleContentPipeline', () => {
   it('assembles full content-pipeline shape and preserves graceful optional joins', async () => {
     const result = await assembleContentPipeline('ws_1');
 
-    expect(result.briefs).toEqual({ total: 12, byStatus: { draft: 5, approved: 7 } });
-    expect(result.posts).toEqual({ total: 4, byStatus: { scheduled: 2, published: 2 } });
-    expect(result.matrices).toEqual({ total: 2, cellsPlanned: 30, cellsPublished: 11 });
-    expect(result.requests).toEqual({ pending: 3, inProgress: 2, delivered: 1 });
+    expect(result.briefs).toEqual({
+      total: 12,
+      byStatus: { draft: 5, approved: 7 },
+    });
+    expect(result.posts).toEqual({
+      total: 4,
+      byStatus: { scheduled: 2, published: 2 },
+    });
+    expect(result.matrices).toEqual({
+      total: 2,
+      cellsPlanned: 30,
+      cellsPublished: 11,
+    });
+    expect(result.requests).toEqual({
+      pending: 3,
+      inProgress: 2,
+      delivered: 1,
+    });
     expect(result.workOrders).toEqual({ active: 2, pending: 1 });
     expect(result.seoEdits).toEqual({ pending: 1, applied: 8, inReview: 2 });
 
@@ -338,6 +366,7 @@ describe('assembleContentPipeline', () => {
       copyPipeline: undefined,
       rewritePlaybook: undefined,
       contentPricing: undefined,
+      inFlightTargetKeywords: [],
     });
     expect(mocks.logWarn).toHaveBeenCalled();
   });
@@ -348,5 +377,43 @@ describe('assembleContentPipeline', () => {
     const result = await assembleContentPipeline('ws_no_copy');
 
     expect(result.copyPipeline).toBeUndefined();
+  });
+
+  it('keeps optional provider failures at debug level with stable fallbacks', async () => {
+    mocks.listSuggestedBriefs.mockImplementation(() => {
+      throw new Error('suggested briefs unavailable');
+    });
+
+    const result = await assembleContentPipeline('ws_optional_error');
+
+    expect(result.suggestedBriefs).toBe(0);
+    expect(mocks.logDebug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws_optional_error',
+        err: expect.any(Error),
+      }),
+      'assembleContentPipeline: suggested briefs optional, degrading gracefully',
+    );
+  });
+
+  it('keeps programming errors on the same debug fallback path in this slice', async () => {
+    mocks.listSuggestedBriefs.mockImplementation(() => {
+      throw new TypeError('wrong export');
+    });
+
+    const result = await assembleContentPipeline('ws_programming_error');
+
+    expect(result.suggestedBriefs).toBe(0);
+    expect(mocks.logDebug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws_programming_error',
+        err: expect.any(TypeError),
+      }),
+      'assembleContentPipeline: suggested briefs optional, degrading gracefully',
+    );
+    expect(mocks.logWarn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'assembleContentPipeline: suggested briefs programming error',
+    );
   });
 });

@@ -15,14 +15,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { AdminDeliverableView } from '../../shared/types/admin-deliverable-view';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 // ── Mocks ──
+let capturedHandlers: Record<string, (data?: unknown) => void> = {};
 vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
-  useWorkspaceEvents: () => ({ send: vi.fn() }),
+  useWorkspaceEvents: (_workspaceId: string | undefined, handlers: Record<string, (data?: unknown) => void>) => {
+    capturedHandlers = handlers;
+    return { send: vi.fn() };
+  },
 }));
 
 const mockRemindMutate = vi.fn();
 const mockUseWorkspaceDeliverables = vi.fn();
+const invalidateQueriesSpy = vi.fn();
 vi.mock('../../src/hooks/admin/useWorkspaceDeliverables', () => ({
   useWorkspaceDeliverables: (...args: unknown[]) => mockUseWorkspaceDeliverables(...args),
   useRemindDeliverable: () => ({ mutate: mockRemindMutate, isPending: false }),
@@ -32,7 +39,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+    useQueryClient: () => ({ invalidateQueries: invalidateQueriesSpy }),
   };
 });
 
@@ -70,6 +77,7 @@ function makeView(overrides: Partial<AdminDeliverableView> = {}): AdminDeliverab
 
 beforeEach(() => {
   vi.clearAllMocks();
+  capturedHandlers = {};
   mockUseWorkspaceDeliverables.mockReturnValue({
     unifiedInbox: true,
     deliverables: [],
@@ -158,5 +166,17 @@ describe('ClientDeliverablesPane', () => {
   it('renders an action-oriented empty state when nothing has been sent', () => {
     render(<ClientDeliverablesPane workspaceId="ws-1" />);
     expect(screen.getByText('Nothing sent to this client yet')).toBeInTheDocument();
+  });
+
+  it('invalidates the workspace deliverables query on deliverable events', () => {
+    render(<ClientDeliverablesPane workspaceId="ws-1" />);
+
+    capturedHandlers[WS_EVENTS.DELIVERABLE_SENT]?.();
+    capturedHandlers[WS_EVENTS.DELIVERABLE_UPDATED]?.();
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.admin.workspaceDeliverables('ws-1'),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledTimes(2);
   });
 });

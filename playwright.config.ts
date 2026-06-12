@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: {
     // Use a production-style server for both local and CI runs so E2E startup does
     // not depend on local file-watcher limits (`npm run dev:all` can fail with EMFILE).
-    command: "npm run build && APP_PASSWORD= JWT_SECRET=e2e-test-secret DATA_DIR=/tmp/asset-dashboard-e2e npm start",
+    command: "npm run build && APP_PASSWORD= JWT_SECRET=e2e-test-secret SESSION_SECRET=e2e-test-session-secret DATA_DIR=/tmp/asset-dashboard-e2e npm start",
     url: 'http://localhost:3001/api/health',
     reuseExistingServer: false,
     timeout: 180_000,

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientSignal } from '../../server/client-signals-store.js';
 
-const ctx = createTestContext(13737);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, patchJson, postJson } = ctx;
 
 let wsId = '';

@@ -1,7 +1,6 @@
 /**
  * Integration tests: full lifecycle for the public keyword feedback endpoints.
  *
- * Port: 13855
  *
  * Covers:
  * - GET  /api/public/keyword-feedback/:workspaceId     — empty and populated
@@ -46,6 +45,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import type { SafeClientUser } from '../../server/client-users.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Server setup ──────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ async function stopTestServer(): Promise<void> {
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function authedPostJson(

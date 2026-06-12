@@ -106,7 +106,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   auth: 'Auth Data',
   payments: 'Payment Records',
   'email-queue': 'Email Queue',
-  'semrush-usage': 'SEMRush Usage',
   'work-orders': 'Work Orders',
   approvals: 'Approvals',
   'ai-usage': 'AI Usage Logs',
@@ -128,7 +127,7 @@ export async function getStorageReport(): Promise<StorageReport> {
     'backups', 'chat-sessions', 'reports', 'content-briefs', 'content-posts',
     'content-requests', 'recommendations', 'rank-tracking', 'schemas',
     'redirects', 'performance', 'roi-history', 'activity', 'sales-reports',
-    'auth', 'payments', 'email-queue', 'semrush-usage',
+    'auth', 'payments', 'email-queue',
     'work-orders', 'approvals', 'ai-usage', 'metadata', 'admin', 'config',
   ];
 

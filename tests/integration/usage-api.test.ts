@@ -5,9 +5,9 @@
  * - GET /api/ai/usage (global AI usage stats)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13207);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 beforeAll(async () => {

@@ -18,8 +18,6 @@
  *   (7) public-leak               — the public recommendations route strips emv/predictedEmv and
  *       never emits a dollarized gain for the new recs.
  *
- * Port allocated for the HTTP leak test: 13881 (next free slot in the 13201–13899 range;
- * 13880 is reserved as a documentation slot by the P4 suite).
  */
 import { afterEach, beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -128,11 +126,9 @@ describe('P5 flag-ON minting', () => {
     replaceAllKeywordGaps(s.workspaceId, keywordGaps());
     replaceAllTopicClusters(s.workspaceId, topicClusters());
     replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     s.cleanup();
   });
@@ -186,33 +182,6 @@ describe('P5 flag-ON minting', () => {
   });
 });
 
-// ── (1) flag-OFF byte-identical ──────────────────────────────────────────────────
-
-describe('P5 flag-OFF byte-identical', () => {
-  it('umbrella OFF mints NO keyword_gap/topic_cluster/cannibalization recs/sources', async () => {
-    const s = seedWorkspace({});
-    try {
-      setMinimalStrategy(s.workspaceId);
-      replaceAllKeywordGaps(s.workspaceId, keywordGaps());
-      replaceAllTopicClusters(s.workspaceId, topicClusters());
-      replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, false);
-
-      const set = await generateRecommendations(s.workspaceId);
-      expect(set.recommendations.some(r => r.type === 'keyword_gap')).toBe(false);
-      expect(set.recommendations.some(r => r.type === 'topic_cluster')).toBe(false);
-      expect(set.recommendations.some(r => r.type === 'cannibalization')).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('keyword_gap:'))).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('topic_cluster:'))).toBe(false);
-      expect(set.recommendations.some(r => r.source.startsWith('cannibalization:'))).toBe(false);
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
-      cleanupOrphans(s.workspaceId);
-      s.cleanup();
-    }
-  });
-});
-
 // ── (4) FM-2 guard: a throwing orphan reader must NOT bulk auto-resolve prior recs ──
 
 describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () => {
@@ -221,7 +190,6 @@ describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () =>
     try {
       setMinimalStrategy(s.workspaceId);
       replaceAllKeywordGaps(s.workspaceId, keywordGaps());
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
 
       // Run 1: real keyword_gap recs persist.
       const first = await generateRecommendations(s.workspaceId);
@@ -252,7 +220,6 @@ describe('P5 FM-2 — throwing orphan reader is failedCategories-guarded', () =>
       // proving the throw was isolated to the keyword_gap category (not a total-generation abort).
       expect(after!.recommendations.length).toBeGreaterThanOrEqual(0);
     } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
       cleanupOrphans(s.workspaceId);
       s.cleanup();
     }
@@ -268,11 +235,9 @@ describe('P5 cannibalization dedupe vs active insight', () => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
     replaceAllCannibalizationIssues(s.workspaceId, cannibalization());
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     s.cleanup();
   });
@@ -362,11 +327,9 @@ describe('P5 C1 — active insight on a still-present cannibalization issue does
   beforeEach(() => {
     s = seedWorkspace({});
     setMinimalStrategy(s.workspaceId);
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, true);
   });
 
   afterEach(() => {
-    setWorkspaceFlagOverride('seo-generation-quality', s.workspaceId, null);
     cleanupOrphans(s.workspaceId);
     db.prepare('DELETE FROM page_edit_states WHERE workspace_id = ?').run(s.workspaceId);
     s.cleanup();
@@ -457,12 +420,11 @@ describe('P5 C1 — active insight on a still-present cannibalization issue does
 // ── (7) public-leak — new recs strip emv/predictedEmv + no dollarized gain ─────────
 
 describe('P5 public-leak — new recs strip money fields + no dollarized gain', () => {
-  const PORT = 13881; // port-ok: next free slot in the 13201–13899 range (13880 is a P4 doc slot)
 
   it('the public recommendations route never emits emv/predictedEmv or a $ gain for new recs', async () => {
-    const { createTestContext } = await import('./helpers.js');
+    const { createEphemeralTestContext } = await import('./helpers.js');
     const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
-    const ctx = createTestContext(PORT);
+    const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
     await ctx.startServer();
     // createWorkspace (no client_password) so the public GET is not session-gated by the
     // client-dashboard enforcement middleware (which 401s a public read on a passworded ws).
@@ -473,7 +435,6 @@ describe('P5 public-leak — new recs strip money fields + no dollarized gain', 
       replaceAllKeywordGaps(workspaceId, keywordGaps());
       replaceAllTopicClusters(workspaceId, topicClusters());
       replaceAllCannibalizationIssues(workspaceId, cannibalization());
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, true);
       await generateRecommendations(workspaceId);
 
       const res = await ctx.api(`/api/public/recommendations/${workspaceId}`);
@@ -492,7 +453,6 @@ describe('P5 public-leak — new recs strip money fields + no dollarized gain', 
         expect(r.opportunity && 'predictedEmv' in r.opportunity).toBeFalsy();
       }
     } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', workspaceId, null);
       cleanupOrphans(workspaceId);
       deleteWorkspace(workspaceId);
       await ctx.stopServer();

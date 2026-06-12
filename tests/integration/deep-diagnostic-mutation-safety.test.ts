@@ -61,7 +61,6 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
 }));
 
 import { clearCompletedJobs, createJob, listJobs, updateJob } from '../../server/jobs.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAnomalyDigestInsight, getInsightById } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
@@ -152,7 +151,6 @@ beforeAll(async () => {
 beforeEach(() => {
   workspaceAId = createWorkspace('Deep Diagnostic Mutation Safety A').id;
   workspaceBId = createWorkspace('Deep Diagnostic Mutation Safety B').id;
-  setFlagOverride('deep-diagnostics', true);
   aiState.mode = 'success';
   broadcastState.calls = [];
 
@@ -178,7 +176,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setFlagOverride('deep-diagnostics', null);
   resetWorkspaceState(workspaceAId);
   resetWorkspaceState(workspaceBId);
   deleteWorkspace(workspaceAId);

@@ -38,6 +38,14 @@ vi.mock('../../server/keyword-strategy-pages.js', () => ({
   })),
 }));
 
+vi.mock('../../server/seo-data-provider.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../server/seo-data-provider.js')>();
+  return {
+    ...actual,
+    getConfiguredProvider: vi.fn(() => null),
+  };
+});
+
 vi.mock('../../server/keyword-strategy-search-data.js', () => ({
   fetchKeywordStrategySearchData: vi.fn(async () => ({
     gscData: [],
@@ -60,9 +68,17 @@ vi.mock('../../server/keyword-strategy-seo-data.js', () => ({
       seoContext: '',
       domainKeywords: [],
       keywordGaps: [],
+      discoveryKeywords: [],
       relatedKeywords: [],
       questionKeywords: [],
       competitorKeywords: [],
+      seoDataStatus: {
+        mode: 'none',
+        status: 'disabled',
+        provider: undefined,
+        fallbackProviderAvailable: false,
+        reasons: [],
+      },
     };
   }),
 }));
@@ -248,6 +264,7 @@ vi.mock('../../server/keyword-strategy-enrichment.js', () => ({
     ],
     topicClusters: [],
     cannibalization: [],
+    prunedContentGaps: [],
   })),
 }));
 
@@ -529,6 +546,9 @@ describe('keyword strategy job mutation safety', () => {
     }]);
     addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      // Wave 3d-ii: reconcile-ownership is carried by strategyOwned (set by a prior
+      // reconcile); seed it so this strategy keyword is eligible for auto-retirement.
+      strategyOwned: true,
       pagePath: '/services/local-seo',
       strategyGeneratedAt: generatedAt,
       lastStrategySeenAt: generatedAt,
@@ -656,6 +676,9 @@ describe('keyword strategy job mutation safety', () => {
     });
     addTrackedKeyword(workspace.workspaceId, 'paper tiger', {
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      // Wave 3d-ii: reconcile-ownership is carried by strategyOwned (set by a prior
+      // reconcile); seed it so this strategy keyword is eligible for auto-retirement.
+      strategyOwned: true,
       pagePath: '/stale-dropped',
       strategyGeneratedAt: generatedAt,
       lastStrategySeenAt: generatedAt,

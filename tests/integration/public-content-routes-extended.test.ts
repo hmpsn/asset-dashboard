@@ -26,18 +26,16 @@
  *   POST /api/public/content-request/:id/request-post-changes — wrong-status guard
  *   Auth boundary — 401 for password-protected workspace without credentials
  *
- * Port: 13372 (port-ok: verified free)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { seedContentData } from '../fixtures/content-seed.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import db from '../../server/db/index.js';
 import { randomUUID } from 'crypto';
 
-const PORT = 13372;
-const ctx = createTestContext(PORT); // port-ok: Wave 9 — verified free
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, del } = ctx;
 
 // ── Fixtures created once for the whole suite ─────────────────────────────────
@@ -122,25 +120,33 @@ function makeRequest(wsId: string, status: 'requested' | 'client_review' | 'appr
 
 describe('Auth boundary — password-protected workspace', () => {
   it('returns 401 on GET /api/public/content-requests for a locked workspace without credentials', async () => {
-    const res = await api(`/api/public/content-requests/${lockedWsId}`);
+    const res = await api(`/api/public/content-requests/${lockedWsId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
     const body = await res.json() as { error: string };
     expect(body.error).toMatch(/auth/i);
   });
 
   it('returns 401 on POST /api/public/content-request for a locked workspace without credentials', async () => {
-    const res = await postJson(`/api/public/content-request/${lockedWsId}`, {
-      topic: 'should fail',
-      targetKeyword: 'fail-kw',
-      intent: 'informational',
-      priority: 'medium',
-      rationale: 'test',
+    const res = await api(`/api/public/content-request/${lockedWsId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({
+        topic: 'should fail',
+        targetKeyword: 'fail-kw',
+        intent: 'informational',
+        priority: 'medium',
+        rationale: 'test',
+      }),
     });
     expect(res.status).toBe(401);
   });
 
   it('returns 401 on GET /api/public/tracked-keywords for a locked workspace without credentials', async () => {
-    const res = await api(`/api/public/tracked-keywords/${lockedWsId}`);
+    const res = await api(`/api/public/tracked-keywords/${lockedWsId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 });

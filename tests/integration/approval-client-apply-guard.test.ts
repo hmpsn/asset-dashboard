@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createBatch, getBatch, updateItem } from '../../server/approvals.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13333); // port-ok: 13201-13332 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { postJson } = ctx;
 
 let wsId = '';

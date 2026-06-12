@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { put } from '../api/client';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus,
-  BookOpen,
+  BookOpen, AlertTriangle, X,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
-import { Icon, cn, Button } from './ui';
+import { Icon, cn, Button, IconButton } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -72,6 +72,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
+
+  // `onPageGenerated` must have a STABLE identity across renders: the generation
+  // hook feeds it into `generateSinglePage` (a useCallback), which in turn is a
+  // dep of the fix-handoff effect. An inline arrow here would change identity
+  // every render, re-running that effect and cancelling its pending trigger —
+  // the PI "Add Schema" auto-generation would silently never fire. We hold the
+  // live callback body in a ref (updated below, after the publishing-workflow
+  // hook resolves clearManual* fns) and pass a stable wrapper to the hook.
+  const onPageGeneratedRef = useRef<(pageId: string) => void>(() => {});
+  const onPageGenerated = useCallback((pageId: string) => {
+    onPageGeneratedRef.current(pageId);
+  }, []);
+
   const {
     data,
     setData,
@@ -79,6 +93,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     started,
     regenerating,
     scanError,
+    singlePageError,
+    setSinglePageError,
+    fetchPagesError,
     progressMsg,
     showNextSteps,
     setShowNextSteps,
@@ -103,10 +120,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     siteId,
     workspaceId,
     fixContext,
-    onPageGenerated: pageId => {
-      setExpanded(prev => new Set(prev).add(pageId));
-      clearManualDeliveryForPage(pageId);
-    },
+    onPageGenerated,
   });
   const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
   const graphValidation = graphValidationQuery.data ?? null;
@@ -144,10 +158,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setConfirmPublish,
     sendingToClient,
     sentToClient,
+    sendToClientError,
+    setSendToClientError,
     approvalRefreshKey,
     setApprovalRefreshKey,
     sendingPage,
     sentPages,
+    sendPageErrors,
     retractingPages,
     retractedPages,
     bulkPublishing,
@@ -158,6 +175,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     schemaParseError,
     savingTemplate,
     templateSaved,
+    templateSaveError,
     getState,
     summary,
     unpublishedCount,
@@ -175,7 +193,27 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
+    clearManualEditForPage,
+    clearAllManualEdits,
   } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData, bulkPublishBlocked });
+
+  // Keep the stable onPageGenerated wrapper pointed at the latest closure. Assigned
+  // on every render (cheap) so it always sees current clearManual* references.
+  onPageGeneratedRef.current = (pageId: string) => {
+    setExpanded(prev => new Set(prev).add(pageId));
+    clearManualDeliveryForPage(pageId);
+    // Drop any stale manual JSON edit so the regenerated schema is authoritative
+    // (getEffectiveSchema prefers editedSchemaJson — an un-cleared edit would
+    // silently override the new generation in preview/Publish/Copy/send).
+    clearManualEditForPage(pageId);
+  };
+
+  // Full re-scan regenerates every page — drop ALL stale manual edits first so the
+  // freshly-generated schemas are authoritative (mirrors per-page clearing in onPageGenerated).
+  const handleRunScan = () => {
+    clearAllManualEdits();
+    runScan();
+  };
   const impactData = useSchemaImpactData(workspaceId);
 
   const toggleExpand = (id: string) => {
@@ -232,7 +270,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           />
         )}
         <SchemaGeneratorHero
-          onRunScan={runScan}
+          onRunScan={handleRunScan}
         />
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         <SchemaBusinessProfileCallout
@@ -296,7 +334,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           type="general"
           title="Schema Scan Failed"
           message={scanError}
-          action={{ label: 'Scan Again', onClick: runScan }}
+          action={{ label: 'Scan Again', onClick: handleRunScan }}
         />
       </div>
     );
@@ -306,9 +344,29 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
-        <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
-        <Button onClick={runScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
+        {singlePageError ? (
+          <div role="alert" className="w-full max-w-lg flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
+            <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="t-caption font-medium text-red-400">Page generation failed</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
+            </div>
+            <IconButton
+              icon={X}
+              label="Dismiss error"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSinglePageError(null)}
+              className="flex-shrink-0"
+            />
+          </div>
+        ) : (
+          <>
+            <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
+            <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
+          </>
+        )}
+        <Button onClick={handleRunScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
           Re-scan
         </Button>
       </div>
@@ -394,6 +452,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               graphValidationLoading={graphValidationQuery.isFetching}
             />
           )}
+          {sendToClientError && (
+            <span role="alert" className="flex items-center gap-1 t-caption text-red-400/80">
+              <Icon as={AlertTriangle} size="sm" />
+              {sendToClientError}
+              <IconButton
+                icon={X}
+                label="Dismiss"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSendToClientError(null)}
+                className="ml-1"
+              />
+            </span>
+          )}
           <div className="relative">
             <Button
               onClick={fetchPages}
@@ -416,8 +488,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                 onClose={() => { setShowPagePicker(false); setPageSearch(''); }}
               />
             )}
+            {fetchPagesError && (
+              <div role="alert" className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-start gap-1 px-2 py-1.5 max-w-xs bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80">
+                <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
+                {fetchPagesError}
+              </div>
+            )}
           </div>
-          <Button onClick={runScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
+          <Button onClick={handleRunScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
             Re-generate All
           </Button>
         </div>
@@ -426,6 +504,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
           <Icon as={Loader2} size="sm" className="animate-spin text-accent-brand" />
           <span className="t-caption text-accent-brand">Generating schema for page...</span>
+        </div>
+      )}
+
+      {/* Single-page generation error — dismissible inline banner, does NOT replace the results view */}
+      {singlePageError && (
+        <div role="alert" className="flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
+          <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="t-caption font-medium text-red-400">Page generation failed</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
+          </div>
+          <IconButton
+            icon={X}
+            label="Dismiss error"
+            size="sm"
+            variant="ghost"
+            onClick={() => setSinglePageError(null)}
+            className="flex-shrink-0"
+          />
         </div>
       )}
 
@@ -465,6 +562,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               confirmPublish={confirmPublish === page.pageId}
               sentPage={sentPages.has(page.pageId)}
               sendingPage={sendingPage.has(page.pageId)}
+              sendPageError={sendPageErrors[page.pageId]}
               editingSchema={editingSchema.has(page.pageId)}
               editedSchemaJson={editedSchemaJson[page.pageId]}
               schemaParseError={schemaParseError[page.pageId]}
@@ -475,10 +573,24 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               isHomepage={!page.slug || page.slug === '/' || page.slug === 'index' || page.slug === 'home'}
               savingTemplate={savingTemplate}
               templateSaved={templateSaved}
+              templateSaveError={templateSaveError ?? undefined}
+              pageTypeError={pageTypeErrors[page.pageId]}
               onPageTypeChange={(pid, t) => {
+                // Capture prior value BEFORE the optimistic update so we can restore on failure.
+                const priorType = pageTypes[pid];
                 setPageTypes(prev => ({ ...prev, [pid]: t }));
-                // Persist to server (fire-and-forget)
-                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch(() => {});
+                setPageTypeErrors(prev => { const n = { ...prev }; delete n[pid]; return n; });
+                // Persist page-type to server; surface failure so the user knows the selection wasn't saved
+                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch((err: unknown) => {
+                  const msg = err instanceof Error ? err.message : 'Page type not saved — try again.';
+                  setPageTypeErrors(prev => ({ ...prev, [pid]: msg }));
+                  // Revert local state to the prior saved value (not deleted — that would show 'auto' even if server has a different value)
+                  setPageTypes(prev => {
+                    const n = { ...prev };
+                    if (priorType !== undefined) { n[pid] = priorType; } else { delete n[pid]; }
+                    return n;
+                  });
+                });
               }}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}

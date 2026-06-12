@@ -219,15 +219,23 @@ export function getDeliverableTransitions(type: string): Readonly<Record<string,
 // (server/content-matrices.ts) is currently any-to-any (CP-K4 gap) — this map brings
 // it under validateTransition during the content_plan cutover (design §4.4, M6).
 // Forward pipeline with the operator send-back edges (review→draft, flagged→draft).
+// Admin shortcuts included:
+//   planned/keyword_validated/brief_generated → review  (send-samples admin action)
+//   planned/keyword_validated/brief_generated → approved (batch-approve admin action)
+// Client review action (G2/C2): a client may flag ANY client-visible cell for changes.
+// CLIENT_VISIBLE_CELL_STATUSES (review/flagged/approved/published) ALL surface the flag form
+// in the client UI (MatrixProgressView CellPreviewModal), so flagging must be a legal edge from
+// review/approved/published too — not just review. Without approved→flagged / published→flagged
+// the public flag route threw InvalidTransitionError → 500 for an in-spec client action.
 export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
-  planned:           ['keyword_validated', 'brief_generated', 'draft'],
-  keyword_validated: ['brief_generated', 'draft', 'planned'],
-  brief_generated:   ['draft', 'keyword_validated'],
+  planned:           ['keyword_validated', 'brief_generated', 'draft', 'review', 'approved'],
+  keyword_validated: ['brief_generated', 'draft', 'planned', 'review', 'approved'],
+  brief_generated:   ['draft', 'keyword_validated', 'review', 'approved'],
   draft:             ['review', 'brief_generated'],
   review:            ['flagged', 'approved', 'draft'],
   flagged:           ['review', 'draft', 'approved'],
-  approved:          ['published', 'review'],
-  published:         [], // terminal
+  approved:          ['published', 'review', 'flagged'], // flagged: client flags an approved cell (G2/C2)
+  published:         ['flagged'], // client flags a published cell for changes (G2/C2) — otherwise terminal
 };
 
 // ── Client Request (support tickets) ──
@@ -245,6 +253,73 @@ export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
 };
 
 export type RequestTransitionStatus = 'new' | 'in_review' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
+
+// ── Schema Site Plan ──
+// Five statuses derived from SchemaSitePlan['status']:
+//   draft → sent_to_client         admin sends for review
+//   draft → active                  admin activates without client review (SchemaPlanPanel
+//                                    offers "Activate Plan" alongside "Send to client" on drafts)
+//   sent_to_client → client_approved | client_changes_requested   client responds
+//   client_changes_requested → draft | sent_to_client              admin revises or resends
+//   client_approved → active        admin activates the plan
+//   sent_to_client → active         admin fast-tracks without waiting for client response
+//   active → draft                  admin resets to rework (e.g. site redesign)
+//
+// The `sendSchemaPlanToClientForReview` mutation is UI-gated to draft plans only.
+// `activateSchemaPlanForAdmin` is allowed from draft, sent_to_client, or client_approved —
+// the SchemaPlanPanel renders "Activate Plan" whenever status is draft or client_approved,
+// so direct draft → active must be legal (admin self-serve activation, no client gate).
+// No self-transitions and no backward jumps from client_approved → draft directly
+// (force the admin to activate, then reset if needed).
+export const SCHEMA_PLAN_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:                    ['sent_to_client', 'active'],
+  sent_to_client:           ['client_approved', 'client_changes_requested', 'active'],
+  client_changes_requested: ['draft', 'sent_to_client'],
+  client_approved:          ['active'],
+  active:                   ['draft'],  // admin resets to rework
+};
+
+export type SchemaPlanStatus =
+  | 'draft'
+  | 'sent_to_client'
+  | 'client_approved'
+  | 'client_changes_requested'
+  | 'active';
+
+// ── Tracked Keyword (rank-tracking lifecycle) ──
+// The four TRACKED_KEYWORD_STATUS values (shared/types/rank-tracking.ts). Until P3
+// (Keyword Hub Wave 4) the tracked-keyword lifecycle was the ONLY status entity whose
+// mutations were not state-machine-guarded: every other status column already routes
+// through validateTransition, but `applyKeywordCommandCenterActionInternal` flipped
+// active↔paused↔deprecated directly. This map closes that gap so the live KCC/Hub
+// action engine refuses illegal moves (defense-in-depth: an illegal transition is
+// "never allowed", orthogonal to protection which is "needs confirmation").
+//
+// The edge set is DERIVED from the real action switch (`applyKeywordCommandCenterActionInternal`)
+// — the minimal map that ADMITS every transition the switch performs and REJECTS the rest:
+//   active → paused      PAUSE_TRACKING
+//   active → deprecated  RETIRE, DECLINE-of-tracked
+//   paused → deprecated  RETIRE / DECLINE while paused (Retire is offered whenever row.tracking exists)
+//   paused → active      RESTORE
+//   deprecated → active  RESTORE (revive clears deprecatedAt/replacedBy — rank-tracking.ts)
+// Plus the reconcile-only lifecycle edge active|paused → replaced (rank-tracking-reconciliation.ts
+// flips an active strategy-owned keyword to REPLACED when a current target supersedes it; that
+// path does NOT route through this validator but the edge is part of the real lifecycle, so the
+// model includes it to stay faithful). `replaced` and the unreachable cross-edges are terminal:
+// deprecated/replaced are NOT freely interconvertible, and `replaced` never revives (the only
+// revive path, RESTORE, targets `active` from paused/deprecated — a replaced keyword has been
+// superseded and is re-tracked as a fresh insert, not a transition).
+//
+// NOT a machine state: `not_tracked`. TRACK/PROMOTE_EVIDENCE/ADD_TO_STRATEGY create a row at
+// ACTIVE — an INSERT, not a transition — so those paths do not route through validateTransition.
+export const TRACKED_KEYWORD_TRANSITIONS: Record<string, readonly string[]> = {
+  active:     ['paused', 'deprecated', 'replaced'],
+  paused:     ['active', 'deprecated', 'replaced'],
+  deprecated: ['active'],   // RESTORE — the only edge out of deprecated
+  replaced:   [],           // terminal — superseded; re-tracking is a fresh insert
+};
+
+export type TrackedKeywordTransitionStatus = 'active' | 'paused' | 'deprecated' | 'replaced';
 
 // ── Generic validator ──
 

@@ -26,7 +26,6 @@ import type {
   OpportunityComponent,
   OpportunityWeights,
   OpportunityDimension,
-  Recommendation,
 } from '../../shared/types/recommendations.js';
 import { classifyKdGap } from '../authority-context.js';
 import { ctrAt } from './ctr-curve.js';
@@ -65,13 +64,13 @@ const UNGROUNDED_MIN_EFFORT_DAYS = 5;
 
 /** Intent → value-per-click weight. Commercial-value (rubric dim 3). When CPC is
  *  present, valuePerClick = cpc × intentWeight; otherwise intentWeight is the proxy. */
-const INTENT_WEIGHT: Record<NonNullable<OpportunityInput['intent']>, number> = {
+export const INTENT_WEIGHT: Record<NonNullable<OpportunityInput['intent']>, number> = {
   transactional: 1.0,
   commercial: 0.7,
   informational: 0.3,
   navigational: 0.2,
 };
-const DEFAULT_INTENT_WEIGHT = 0.5;
+export const DEFAULT_INTENT_WEIGHT = 0.5;
 
 /** KD-vs-authority winnability multiplier, reused from the authority module so
  *  the OV scorer and the existing adjustKdImpactScore agree. Mirrors
@@ -389,15 +388,4 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 function clamp01(v: number): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
-}
-
-/**
- * Strangler-fig selector — the single chokepoint for the legacy↔OV cutover.
- * Returns the OV value only when the caller resolves the `opportunity-value-scorer`
- * flag ON for the workspace (resolution wired in P3); otherwise the legacy score.
- * Pure: the flag boolean is passed in, never read here.
- */
-export function pickImpactScore(rec: Pick<Recommendation, 'impactScore' | 'opportunity'>, useOpportunityValue: boolean): number {
-  if (useOpportunityValue && rec.opportunity) return rec.opportunity.value;
-  return rec.impactScore;
 }

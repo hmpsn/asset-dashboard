@@ -27,7 +27,7 @@ describe('SchemaGeneratorSetup', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Your business profile is incomplete');
     expect(screen.getByRole('link', { name: /complete business profile/i })).toHaveAttribute(
       'href',
-      '/ws/workspace-1/brand?tab=business-profile',
+      '/ws/workspace-1/brand?tab=business-footprint',
     );
 
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));

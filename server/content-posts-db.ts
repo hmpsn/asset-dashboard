@@ -7,9 +7,10 @@ import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
+import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
+import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
 
 const log = createLogger('content-posts-db');
 
@@ -36,7 +37,9 @@ interface PostRow {
   webflow_collection_id: string | null;
   published_at: string | null;
   published_slug: string | null;
+  planned_publish_at: string | null;
   review_checklist: string | null;
+  ai_review: string | null;
   voice_score: number | null;
   voice_feedback: string | null;
   generation_style: string | null;
@@ -155,16 +158,18 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist,
+            unification_note, review_checklist, ai_review,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
+            planned_publish_at,
             voice_score, voice_feedback, generation_style,
             created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist,
+            @unification_note, @review_checklist, @ai_review,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
+            @planned_publish_at,
             @voice_score, @voice_feedback, @generation_style,
             @created_at, @updated_at)`,
   ),
@@ -182,8 +187,10 @@ const stmts = createStmtCache(() => ({
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
            unification_note = @unification_note, review_checklist = @review_checklist,
+           ai_review = @ai_review,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
+           planned_publish_at = @planned_publish_at,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
            generation_style = @generation_style,
            updated_at = @updated_at
@@ -225,11 +232,15 @@ function rowToPost(row: PostRow): GeneratedPost {
     webflowCollectionId: row.webflow_collection_id ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
+    plannedPublishAt: row.planned_publish_at ?? undefined,
     reviewChecklist: row.review_checklist
       ? parseJsonSafe(row.review_checklist, reviewChecklistSchema, {
           factual_accuracy: false, brand_voice: false, internal_links: false,
           no_hallucinations: false, meta_optimized: false, word_count_target: false,
         }, { field: 'review_checklist', table: 'content_posts' })
+      : undefined,
+    aiReview: row.ai_review
+      ? parseJsonSafe(row.ai_review, storedAiReviewSchema, null, { workspaceId: row.workspace_id, field: 'ai_review', table: 'content_posts' }) ?? undefined
       : undefined,
     voiceScore: row.voice_score ?? undefined,
     voiceFeedback: row.voice_feedback ?? undefined,
@@ -261,7 +272,9 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     webflow_collection_id: post.webflowCollectionId ?? null,
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
+    planned_publish_at: post.plannedPublishAt ?? null,
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
+    ai_review: post.aiReview ? JSON.stringify(post.aiReview) : null,
     voice_score: post.voiceScore ?? null,
     voice_feedback: post.voiceFeedback ?? null,
     generation_style: resolveContentGenerationStyle(post.generationStyle),
@@ -273,6 +286,38 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
 export function listPosts(workspaceId: string): GeneratedPost[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
   return rows.map(rowToPost);
+}
+
+/**
+ * W5.1: badge PUBLISHED posts with their read-back outcome verdict (90-day
+ * clicks/position delta + verdict). Read-side decoration only — NOT persisted on
+ * the row, so it lives at the list-route boundary rather than in listPosts (which
+ * many non-list consumers call). Joins each published post's tracked action
+ * (recorded under sourceType='post', sourceId=postId, targetKeyword) back to its
+ * scored outcome via the shared read-back indexes. Source-id exact match first
+ * ('post::<postId>'), keyword fallback second. ONE indexed batch read per call.
+ * Only posts with a publishedAt (or a Webflow item) are eligible — a draft has no
+ * measurable outcome. Returns NEW post objects for badged posts; never mutates
+ * the input array.
+ */
+export function enrichPostsWithOutcomes(workspaceId: string, posts: GeneratedPost[]): GeneratedPost[] {
+  const publishedCount = posts.filter(p => p.publishedAt || p.webflowItemId).length;
+  if (publishedCount === 0) return posts;
+  let readbacks: ReturnType<typeof getScoredOutcomeReadbacks>;
+  try {
+    readbacks = getScoredOutcomeReadbacks(workspaceId);
+  } catch (err) {
+    // catch-ok: outcome badge is informational; degrade to no badge on read failure.
+    log.debug({ err, workspaceId }, 'Outcome read-back unavailable for posts list');
+    return posts;
+  }
+  if (readbacks.bySource.size === 0 && readbacks.byKeyword.size === 0) return posts;
+  return posts.map(post => {
+    if (!(post.publishedAt || post.webflowItemId)) return post;
+    const outcome = readbacks.bySource.get(`post::${post.id}`)
+      ?? (post.targetKeyword ? readbacks.byKeyword.get(post.targetKeyword.trim().toLowerCase()) : undefined);
+    return outcome ? { ...post, outcome } : post;
+  });
 }
 
 export function monthKeys(now: Date, months: number): string[] {

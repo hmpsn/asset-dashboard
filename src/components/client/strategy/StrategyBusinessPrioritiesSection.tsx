@@ -1,12 +1,14 @@
 import type { RefObject } from 'react';
 import { Briefcase, ChevronDown, Plus, X } from 'lucide-react';
-import { Button, FormInput, FormSelect, Icon, IconButton, SectionCard } from '../../ui';
+import { Button, ErrorState, FormInput, FormSelect, Icon, IconButton, SectionCard } from '../../ui';
 import type { StrategyBusinessPriority } from './useStrategyBusinessPriorities';
 
 interface StrategyBusinessPrioritiesSectionProps {
   businessPrioritiesRef: RefObject<HTMLDivElement | null>;
   workspaceId?: string;
   prioritiesLoaded: boolean;
+  prioritiesError: boolean;
+  reloadPriorities: () => void;
   priorities: StrategyBusinessPriority[];
   newPriority: string;
   setNewPriority: (value: string) => void;
@@ -31,6 +33,8 @@ export function StrategyBusinessPrioritiesSection({
   businessPrioritiesRef,
   workspaceId,
   prioritiesLoaded,
+  prioritiesError,
+  reloadPriorities,
   priorities,
   newPriority,
   setNewPriority,
@@ -75,6 +79,16 @@ export function StrategyBusinessPrioritiesSection({
 
         {expandedSections.has('business-priorities') && (
           <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
+            {prioritiesError ? (
+              <ErrorState
+                title="Priorities unavailable"
+                message="We couldn't load your current business priorities, so editing is paused until the latest version is available."
+                action={{ label: 'Retry', onClick: reloadPriorities }}
+                type="network"
+                className="py-5"
+              />
+            ) : (
+              <>
             <p className="t-body text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
               Share business goals and priorities that should shape future strategy recommendations. Keywords are managed in the Strategy Keywords section.
             </p>
@@ -140,6 +154,8 @@ export function StrategyBusinessPrioritiesSection({
             </div>
             {priorities.length >= 10 && (
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">Maximum 10 priorities reached</p>
+            )}
+              </>
             )}
           </div>
         )}

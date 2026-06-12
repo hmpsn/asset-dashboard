@@ -13,12 +13,12 @@
  *   clickDeclinePct <  -10  → 'watch'
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { DecayAnalysis, DecayingPage } from '../../server/content-decay.js';
 
-const ctx = createTestContext(13311);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // ── Workspace IDs ───────────────────────────────────────────────────────────

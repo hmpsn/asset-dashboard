@@ -1,10 +1,20 @@
 import { expect, test } from '@playwright/test';
+import { createHmac } from 'crypto';
+
+// E3: portals are closed until configured. Public API calls that need portal
+// auth use the admin HMAC token. SESSION_SECRET matches playwright.config.ts.
+const E2E_SESSION_SECRET = process.env.SESSION_SECRET ?? 'e2e-test-session-secret';
+const E2E_ADMIN_TOKEN = createHmac('sha256', E2E_SESSION_SECRET).update('admin').digest('hex');
+const publicAuthHeaders = { 'x-auth-token': E2E_ADMIN_TOKEN };
 
 let workspaceId = '';
 let freeTierWorkspaceId = '';
 let approvalBatchId = '';
 let approvalItemId = '';
 let schemaSiteId = '';
+let clientUserId = '';
+let clientUserEmail = '';
+const clientUserPassword = 'ClientWorkflowSmoke1!';
 
 async function gotoClientRouteWithFallback(
   page: import('@playwright/test').Page,
@@ -60,6 +70,19 @@ test.describe('Client workflow smoke pack', () => {
         billingMode: 'platform',
       },
     });
+
+    clientUserEmail = `client-workflow-smoke-${Date.now()}@test.local`;
+    const clientUserRes = await request.post(`/api/workspaces/${workspaceId}/client-users`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+        name: 'E2E Client Workflow Client',
+        role: 'client_member',
+      },
+    });
+    expect(clientUserRes.ok()).toBe(true);
+    const clientUser = await clientUserRes.json() as { id: string };
+    clientUserId = clientUser.id;
   });
 
   test.afterAll(async ({ request }) => {
@@ -68,6 +91,9 @@ test.describe('Client workflow smoke pack', () => {
     }
     if (schemaSiteId) {
       await request.delete(`/api/webflow/schema-plan/${schemaSiteId}`).catch(() => undefined);
+    }
+    if (workspaceId && clientUserId) {
+      await request.delete(`/api/workspaces/${workspaceId}/client-users/${clientUserId}`).catch(() => undefined);
     }
     if (workspaceId) {
       await request.delete(`/api/workspaces/${workspaceId}`);
@@ -97,13 +123,15 @@ test.describe('Client workflow smoke pack', () => {
     approvalBatchId = batch.id;
     approvalItemId = batch.items[0].id;
 
-    const publicListRes = await request.get(`/api/public/approvals/${workspaceId}`);
+    // E3: approvals endpoint requires portal auth — pass admin token.
+    const publicListRes = await request.get(`/api/public/approvals/${workspaceId}`, { headers: publicAuthHeaders });
     expect(publicListRes.ok()).toBe(true);
     const publicList = await publicListRes.json() as Array<{ id: string }>;
     expect(publicList.some(item => item.id === approvalBatchId)).toBe(true);
 
     const publicApproveRes = await request.patch(`/api/public/approvals/${workspaceId}/${approvalBatchId}/${approvalItemId}`, {
       data: { status: 'approved' },
+      headers: publicAuthHeaders,
     });
     expect(publicApproveRes.ok()).toBe(true);
 
@@ -170,25 +198,37 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('workflow smoke: inbox conversation/review deep-links stay routable', async ({ page }) => {
+    // E3: the portal requires a client session for in-browser data fetches.
+    // page.request shares the browser context's cookie jar, so logging in here
+    // authenticates the page navigations that follow.
+    const loginRes = await page.request.post(`/api/public/client-login/${workspaceId}`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+      },
+    });
+    expect(loginRes.ok()).toBe(true);
+
     await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=conversations`);
     await dismissOnboardingIfPresent(page);
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=conversations`));
-    await expect(page.getByRole('button', { name: /^Conversations/ })).toBeVisible();
+    await expect(page.getByText('Everything that needs your attention — all in one place.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit a request' })).toBeVisible();
 
     await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=reviews`);
     await dismissOnboardingIfPresent(page);
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=reviews`));
-    const reviewsVisible = await page.getByRole('button', { name: /^Reviews/ }).isVisible().catch(() => false);
-    if (!reviewsVisible) {
-      await expect(page.getByRole('button', { name: /^Decisions/ })).toBeVisible();
-    }
+    await expect(page.getByText('Everything that needs your attention — all in one place.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit a request' })).toBeVisible();
   });
 
   test('client smoke: free tier public workspace + tier endpoints stay coherent', async ({ request }) => {
+    // E3: content-requests requires portal auth and the free-tier workspace has
+    // no client user — pass the admin token (workspace/tier stay public-info).
     const [workspaceRes, tierRes, requestsRes] = await Promise.all([
       request.get(`/api/public/workspace/${freeTierWorkspaceId}`),
       request.get(`/api/public/tier/${freeTierWorkspaceId}`),
-      request.get(`/api/public/content-requests/${freeTierWorkspaceId}`),
+      request.get(`/api/public/content-requests/${freeTierWorkspaceId}`, { headers: publicAuthHeaders }),
     ]);
 
     expect(workspaceRes.ok()).toBe(true);
@@ -208,6 +248,14 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('workflow smoke: schema + content publish visibility stays coherent across public reads', async ({ request }) => {
+    const loginRes = await request.post(`/api/public/client-login/${workspaceId}`, {
+      data: {
+        email: clientUserEmail,
+        password: clientUserPassword,
+      },
+    });
+    expect(loginRes.ok()).toBe(true);
+
     const requestRes = await request.post(`/api/public/content-request/${workspaceId}`, {
       data: {
         topic: `Smoke Publish Topic ${Date.now()}`,
@@ -246,6 +294,11 @@ test.describe('Client workflow smoke pack', () => {
 
     const generatePlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}`);
     expect(generatePlanRes.ok()).toBe(true);
+    await expect.poll(async () => {
+      const res = await request.get(`/api/webflow/schema-plan/${schemaSiteId}`);
+      if (!res.ok()) return null;
+      return await res.json();
+    }).not.toBeNull();
 
     const sendPlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}/send-to-client`);
     expect(sendPlanRes.ok()).toBe(true);

@@ -10,6 +10,8 @@
 
 // --- Workspace-scoped events (sent via broadcastToWorkspace) ---
 export const WS_EVENTS = {
+  JOB_CREATED: 'job:created',
+  JOB_UPDATED: 'job:update',
   WORKSPACE_UPDATED: 'workspace:updated',
   PAGE_STATE_UPDATED: 'page-state:updated',
   CONTENT_SUBSCRIPTION_CREATED: 'content-subscription:created',
@@ -32,6 +34,7 @@ export const WS_EVENTS = {
   POST_UPDATED: 'post:updated',
   INSIGHT_RESOLVED: 'insight:resolved',
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
+  SCHEMA_PLAN_UPDATED: 'schema:plan_updated',
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
   SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
   SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated',

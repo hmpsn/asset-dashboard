@@ -12,11 +12,10 @@
  *   POST /api/seo/:workspaceId/bulk-accept-fixes
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-// ── Unique port ──────────────────────────────────────────────────────────────
-const ctx = createTestContext(13223);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 const OWNED_SITE = 'site_owned_aabbcc';

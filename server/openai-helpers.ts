@@ -9,7 +9,8 @@ import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
 import { stripCodeFences } from './helpers.js';
-import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { recordOperationTrace } from './platform-observability.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 
@@ -366,88 +367,96 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   });
 
   const callStartMs = Date.now();
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-        signal: composeTimeoutSignal(timeoutMs, signal),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-
-        // Quota exceeded — never retryable, fail fast
-        if (res.status === 429 && errText.includes('insufficient_quota')) {
-          log.error(`[${feature}] OpenAI quota exceeded — add credits at platform.openai.com/account/billing`);
-          throw new Error(`OpenAI quota exceeded. Add credits at https://platform.openai.com/account/billing`);
-        }
-
-        const isRetryable = res.status === 429 || res.status >= 500;
-        if (isRetryable && attempt < maxRetries) {
-          // Parse retry-after header if available
-          const retryAfterMs = res.headers.get('retry-after-ms');
-          let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
-          if (retryAfterMs) waitMs = Math.max(parseInt(retryAfterMs, 10) + 500, waitMs);
-          log.info(`[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
-          await abortableDelay(waitMs, signal, AI_REQUEST_CANCELLED_MESSAGE);
-          continue;
-        }
-        throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 300)}`);
-      }
-
-      const data = await res.json() as {
-        choices?: Array<{ message?: { content?: string } }>;
-        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-      };
-
-      const text = data.choices?.[0]?.message?.content?.trim() || '';
-      const promptTokens = data.usage?.prompt_tokens || 0;
-      const completionTokens = data.usage?.completion_tokens || 0;
-      const totalTokens = data.usage?.total_tokens || 0;
-
-      // Track usage
-      const durationMs = Date.now() - callStartMs;
-      logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs });
-      recordOperationTrace({
-        source: 'ai',
-        operation: feature,
-        status: 'success',
-        durationMs,
-        workspaceId,
-        message: `${model} call completed`,
-      });
-
-      return { text, promptTokens, completionTokens, totalTokens };
-    } catch (err) {
-      if (signal?.aborted) throw err;
-      if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        log.info(`[${feature}] OpenAI timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
-        await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
-        continue;
-      }
-      if (attempt === maxRetries) {
-        recordOperationTrace({
-          source: 'ai',
-          operation: feature,
-          status: 'error',
-          durationMs: Date.now() - callStartMs,
-          workspaceId,
-          message: err instanceof Error ? err.message : String(err),
+  try {
+    const result = await withProviderRetry({
+      feature,
+      providerLabel: 'OpenAI',
+      logger: log,
+      maxRetries,
+      signal,
+      cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
+      run: async (attempt) => {
+        throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+          signal: composeTimeoutSignal(timeoutMs, signal),
         });
-        throw err;
-      }
-      // Generic retry for network errors
-      log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+
+          if (res.status === 429 && errText.includes('insufficient_quota')) {
+            log.error(`[${feature}] OpenAI quota exceeded — add credits at platform.openai.com/account/billing`);
+            throw new Error('OpenAI quota exceeded. Add credits at https://platform.openai.com/account/billing');
+          }
+
+          if (res.status === 429 || res.status >= 500) {
+            const waitMs = buildProviderRetryDelayMs({
+              attempt,
+              retryAfterHeader: res.headers.get('retry-after-ms'),
+              retryAfterUnit: 'milliseconds',
+            });
+            throw new RetryableProviderError(`OpenAI ${res.status}: ${errText.slice(0, 300)}`, {
+              waitMs,
+              retryLog: `[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`,
+            });
+          }
+
+          throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const data = await res.json() as {
+          choices?: Array<{ message?: { content?: string } }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+        };
+
+        const text = data.choices?.[0]?.message?.content?.trim() || '';
+        const promptTokens = data.usage?.prompt_tokens || 0;
+        const completionTokens = data.usage?.completion_tokens || 0;
+        const totalTokens = data.usage?.total_tokens || 0;
+        return { text, promptTokens, completionTokens, totalTokens };
+      },
+    });
+
+    const durationMs = Date.now() - callStartMs;
+    logTokenUsage({
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      totalTokens: result.totalTokens,
+      model,
+      feature,
+      workspaceId,
+      durationMs,
+    });
+    recordOperationTrace({
+      source: 'ai',
+      operation: feature,
+      status: 'success',
+      durationMs,
+      workspaceId,
+      message: `${model} call completed`,
+    });
+
+    return result;
+  } catch (err) {
+    if (signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE)) {
+      throw err;
     }
+    recordOperationTrace({
+      source: 'ai',
+      operation: feature,
+      status: 'error',
+      durationMs: Date.now() - callStartMs,
+      workspaceId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
-  throw new Error(`[${feature}] OpenAI call failed after ${maxRetries} retries`);
 }
 
 // --- Time Saved Estimation ---

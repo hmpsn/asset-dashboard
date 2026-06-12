@@ -48,6 +48,7 @@ export type ActivityType =
   | 'strategy_generated'
   | 'keyword_added'
   | 'rank_tracking_updated'
+  | 'recommendations_generated'
   | 'rank_snapshot'
   | 'chat_session'
   | 'payment_received'
@@ -61,9 +62,11 @@ export type ActivityType =
   | 'anomaly_acknowledged'
   | 'post_generated'
   | 'post_reverted'
+  | 'post_ai_review'   // admin-only: AI review verdicts persisted (C4) — NOT client-visible
   | 'brief_sent_for_review'
   | 'post_sent_for_review'
   | 'content_published'
+  | 'content_publish_failed'
   | 'aeo_review'
   | 'content_subscription'
   | 'subscription_issue'
@@ -137,7 +140,16 @@ export type ActivityType =
   | 'action_backlog_alert'
   | 'post_approved'
   | 'post_changes_requested'
-  | 'post_client_edit';
+  | 'post_client_edit'
+  | 'llms_txt_generated'
+  // rec_status_updated / rec_dismissed are deliberately NOT in CLIENT_VISIBLE_TYPES:
+  // recommendation triage is an internal admin-facing audit trail, not a client deliverable.
+  | 'rec_status_updated'   // client triage: pending/in_progress/completed
+  | 'rec_dismissed'        // client dismissed a recommendation
+  | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
+  | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
+  | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
+  | 'post_voice_scored';         // admin-only: voice score persisted for a post
 
 export interface ActivityEntry {
   id: string;
@@ -228,7 +240,7 @@ const stmts = createStmtCache(() => ({
     'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
   ),
   selectClientVisible: db.prepare(
-    `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
+    `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
   ),
   hasRecent: db.prepare(
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
@@ -306,8 +318,8 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   return rows.map(rowToEntry);
 }
 
-export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
-  const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
+export function listClientActivity(workspaceId: string, limit = 50, offset = 0): ActivityEntry[] {
+  const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit, offset) as ActivityRow[];
   return rows.map(rowToEntry);
 }
 

@@ -24,16 +24,17 @@
  *     endpoints (cookie names are workspace-namespaced).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13871);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, clearCookies } = ctx;
 
 let wsAId = '';
 let wsBId = '';
 let wsCId = '';
 let wsPasswordlessId = '';
+let wsDisabledId = '';
 const wsAPassword = 'test-password-A';
 const wsBPassword = 'test-password-B';
 const wsCPassword = 'test-password-C';
@@ -58,6 +59,10 @@ beforeAll(async () => {
   wsPasswordlessId = wsPasswordless.id;
   // Intentionally no clientPassword set — simulates a freshly-created
   // workspace whose dashboard hasn't been configured yet.
+
+  const wsDisabled = createWorkspace('Public Auth Test WS Disabled');
+  wsDisabledId = wsDisabled.id;
+  updateWorkspace(wsDisabledId, { clientPassword: 'disabled-password', clientPortalEnabled: false });
 }, 25_000);
 
 afterAll(async () => {
@@ -65,6 +70,7 @@ afterAll(async () => {
   deleteWorkspace(wsBId);
   deleteWorkspace(wsCId);
   deleteWorkspace(wsPasswordlessId);
+  deleteWorkspace(wsDisabledId);
   await ctx.stopServer();
 });
 
@@ -76,6 +82,65 @@ const hardProtectedEndpoints = (wsId: string) => [
   { label: 'rank-tracking latest', path: `/api/public/rank-tracking/${wsId}/latest` },
   { label: 'audit-traffic', path: `/api/public/audit-traffic/${wsId}` },
   { label: 'anomalies', path: `/api/public/anomalies/${wsId}` },
+  { label: 'roi', path: `/api/public/roi/${wsId}` },
+  { label: 'reports list', path: `/api/public/reports/${wsId}` },
+];
+
+const hardProtectedMutationEndpoints = (wsId: string) => [
+  {
+    label: 'content request submit',
+    path: `/api/public/content-request/${wsId}/submit`,
+    method: 'POST',
+    body: { topic: 'Emergency dental SEO', targetKeyword: 'emergency dentist near me' },
+  },
+  {
+    label: 'tracked keyword add',
+    path: `/api/public/tracked-keywords/${wsId}`,
+    method: 'POST',
+    body: { keyword: 'emergency dentist near me' },
+  },
+  {
+    label: 'tracked keyword remove',
+    path: `/api/public/tracked-keywords/${wsId}`,
+    method: 'DELETE',
+    body: { keyword: 'emergency dentist near me' },
+  },
+  {
+    label: 'recommendation generate',
+    path: `/api/public/recommendations/${wsId}/generate`,
+    method: 'POST',
+    body: {},
+  },
+  {
+    label: 'recommendation status',
+    path: `/api/public/recommendations/${wsId}/rec_missing`,
+    method: 'PATCH',
+    body: { status: 'completed' },
+  },
+  {
+    label: 'recommendation dismiss',
+    path: `/api/public/recommendations/${wsId}/rec_missing`,
+    method: 'DELETE',
+    body: {},
+  },
+  {
+    label: 'client action respond',
+    path: `/api/public/client-actions/${wsId}/act_missing/respond`,
+    method: 'PATCH',
+    body: { status: 'approved' },
+  },
+  {
+    label: 'content plan cell flag',
+    path: `/api/public/content-plan/${wsId}/matrix_missing/cells/cell_missing/flag`,
+    method: 'POST',
+    body: { comment: 'Please revise this idea.' },
+  },
+  {
+    label: 'upgrade checkout',
+    path: `/api/public/upgrade-checkout/${wsId}`,
+    method: 'POST',
+    body: { planId: 'growth' },
+  },
 ];
 
 // requireClientPortalAuth — soft gate; passwordless workspaces pass through (workspace ID is the credential).
@@ -97,7 +162,9 @@ describe('Public endpoint auth — unauthenticated callers on password-set works
     it(`GET ${label} without any auth returns 401`, async () => {
       clearCookies();
       const realPath = path.replace('PLACEHOLDER', wsAId);
-      const res = await api(realPath);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // is truly unauthenticated and the auth gate can return 401.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
       const body = await res.json().catch(() => ({}));
       expect(body).toHaveProperty('error');
@@ -114,8 +181,54 @@ describe('Public endpoint auth — unauthenticated callers on passwordless works
     it(`GET ${label} on passwordless workspace without auth returns 401`, async () => {
       clearCookies();
       const realPath = path.replace('PLACEHOLDER', wsPasswordlessId);
-      const res = await api(realPath);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // is truly unauthenticated and the auth gate can return 401.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
+    });
+  }
+});
+
+describe('Public mutation auth — passwordless workspaces are read-only without a real actor', () => {
+  for (const endpoint of hardProtectedMutationEndpoints('PLACEHOLDER')) {
+    it(`${endpoint.method} ${endpoint.label} on passwordless workspace without auth returns 401`, async () => {
+      clearCookies();
+      const realPath = endpoint.path.replace('PLACEHOLDER', wsPasswordlessId);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // is truly unauthenticated and the auth gate can return 401.
+      const res = await api(realPath, {
+        method: endpoint.method,
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+        body: endpoint.method === 'DELETE' || endpoint.method === 'PATCH' || endpoint.method === 'POST'
+          ? JSON.stringify(endpoint.body)
+          : undefined,
+      });
+      expect(res.status).toBe(401);
+    });
+  }
+});
+
+describe('Disabled client portal — public routes and login routes refuse access', () => {
+  const disabledChecks = (wsId: string) => [
+    { label: 'workspace bootstrap', path: `/api/public/workspace/${wsId}`, method: 'GET', body: undefined },
+    { label: 'soft public read', path: `/api/public/content-requests/${wsId}`, method: 'GET', body: undefined },
+    { label: 'hard public read', path: `/api/public/roi/${wsId}`, method: 'GET', body: undefined },
+    { label: 'shared-password login', path: `/api/public/auth/${wsId}`, method: 'POST', body: { password: 'disabled-password' } },
+    { label: 'client-user login', path: `/api/public/client-login/${wsId}`, method: 'POST', body: { email: 'client@test.local', password: 'ClientPass1!' } },
+    { label: 'auth mode', path: `/api/public/auth-mode/${wsId}`, method: 'GET', body: undefined },
+    { label: 'public mutation', path: `/api/public/content-request/${wsId}/submit`, method: 'POST', body: { topic: 'Blocked', targetKeyword: 'blocked' } },
+  ];
+
+  for (const endpoint of disabledChecks('PLACEHOLDER')) {
+    it(`${endpoint.method} ${endpoint.label} returns 403`, async () => {
+      clearCookies();
+      const realPath = endpoint.path.replace('PLACEHOLDER', wsDisabledId);
+      const res = await api(realPath, {
+        method: endpoint.method,
+        headers: endpoint.body ? { 'Content-Type': 'application/json' } : undefined,
+        body: endpoint.body ? JSON.stringify(endpoint.body) : undefined,
+      });
+      expect(res.status).toBe(403);
     });
   }
 });
@@ -149,7 +262,9 @@ describe('Public endpoint auth — cross-workspace session rejected', () => {
   for (const { label, path } of protectedEndpoints('PLACEHOLDER')) {
     it(`GET ${label} on workspace B with workspace A session returns 401`, async () => {
       const realPath = path.replace('PLACEHOLDER', wsBId);
-      const res = await api(realPath);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // only has the cross-workspace session cookie, which must be rejected.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
       // Session cookie is workspace-namespaced (`client_session_<wsId>`),
       // so neither the global gate nor the per-route middleware sees a
       // usable credential for ws B.
@@ -199,21 +314,26 @@ describe('Soft-gated endpoint auth — unauthenticated callers on password-set w
     it(`GET ${label} without auth on password-set workspace returns 401`, async () => {
       clearCookies();
       const realPath = path.replace('PLACEHOLDER', wsAId);
-      const res = await api(realPath);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // is truly unauthenticated and the auth gate can return 401.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
     });
   }
 });
 
-describe('Soft-gated endpoint auth — passwordless workspace passes through', () => {
+// E3: requireClientPortalAuth no longer passes through passwordless workspaces.
+// The "soft-gated" endpoints now return 401 for unconfigured workspaces too.
+describe('Soft-gated endpoint auth — passwordless workspace returns 401 (E3: closed until configured)', () => {
   for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
-    it(`GET ${label} on passwordless workspace without auth is not 401`, async () => {
+    it(`GET ${label} on passwordless workspace without auth → 401`, async () => {
       clearCookies();
       const realPath = path.replace('PLACEHOLDER', wsPasswordlessId);
-      const res = await api(realPath);
-      // requireClientPortalAuth lets passwordless workspaces through; handler
-      // may return 200, 402, 403, or 404 depending on data state.
-      expect(res.status).not.toBe(401);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // is truly unauthenticated and the auth gate can return 401.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
+      // E3 flip: requireClientPortalAuth now blocks passwordless workspaces.
+      expect(res.status).toBe(401);
     });
   }
 });
@@ -246,7 +366,9 @@ describe('Soft-gated endpoint auth — cross-workspace session rejected', () => 
   for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {
     it(`GET ${label} on workspace A with workspace C session returns 401`, async () => {
       const realPath = path.replace('PLACEHOLDER', wsAId);
-      const res = await api(realPath);
+      // x-no-auto-public-auth: suppress admin token injection so the request
+      // only has the cross-workspace session cookie, which must be rejected.
+      const res = await api(realPath, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
     });
   }

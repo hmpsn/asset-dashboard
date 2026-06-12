@@ -92,17 +92,17 @@ export const keywords = {
   strategyDiff: (wsId: string) =>
     getOptional<StrategyDiff | null>(`/api/webflow/keyword-strategy/${wsId}/diff`),
 
-  semrushStatus: () =>
-    getOptional<{ configured: boolean }>('/api/semrush/status'),
+  seoStatus: () =>
+    getOptional<{ configured: boolean }>('/api/seo/status'),
 
   providerStatus: () =>
-    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
+    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo/providers/status'),
 
   discoverCompetitors: (wsId: string) =>
-    get<{ competitors: Array<{ domain: string; competitorRelevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
+    get<{ competitors: Array<{ domain: string; competitorRelevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/seo/discover-competitors/${wsId}`),
 
   saveCompetitors: (wsId: string, domains: string[]) =>
-    post<{ competitors: string[] }>(`/api/semrush/competitors/${wsId}`, { domains }),
+    post<{ competitors: string[] }>(`/api/seo/competitors/${wsId}`, { domains }),
 
   feedback: (wsId: string) =>
     getSafe<AdminKeywordFeedbackListRow[]>(`/api/webflow/keyword-feedback/${wsId}`, []),
@@ -121,6 +121,18 @@ export const rankTracking = {
 
   history: (wsId: string) =>
     getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history`, []),
+
+  /** Filtered public rank history — repeated `query` params + explicit `limit`
+   *  (A4: the client requested-keyword trend card reads 180 days). */
+  historyFiltered: (wsId: string, queries: string[], limit: number) => {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    for (const query of queries) {
+      const trimmed = query.trim();
+      if (trimmed) params.append('query', trimmed);
+    }
+    return getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history?${params.toString()}`, []);
+  },
 
   addKeyword: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/rank-tracking/${wsId}/keywords`, body),
@@ -281,8 +293,9 @@ export const aeoReview = {
   pageDetail: (wsId: string, path: string) =>
     get<unknown>(`/api/aeo-review/${wsId}/page?path=${encodeURIComponent(path)}`),
 
+  /** Enqueue async site review. Returns { jobId }. */
   siteReview: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/aeo-review/${wsId}/site`, body),
+    post<{ jobId: string }>(`/api/aeo-review/${wsId}/site`, body),
 
   pageReview: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/aeo-review/${wsId}/page`, body),

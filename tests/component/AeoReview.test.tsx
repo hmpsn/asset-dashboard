@@ -30,6 +30,21 @@ vi.mock('../../src/api/clientActions', () => ({
   },
 }));
 
+// Site review now runs through the background job platform (C2). The component
+// consumes the shared useJobProgress contract, so these tests mock that hook
+// rather than the retired synchronous aeoReview.siteReview API call.
+const startSiteReviewJobMock = vi.fn();
+const jobProgressState = { isRunning: false, error: null as string | null };
+
+vi.mock('../../src/hooks/useJobProgress', () => ({
+  useJobProgress: () => ({
+    startJob: (...args: unknown[]) => startSiteReviewJobMock(...args),
+    isRunning: jobProgressState.isRunning,
+    jobId: null,
+    error: jobProgressState.error,
+  }),
+}));
+
 // ── Import component under test ───────────────────────────────────────────────
 import { AeoReview } from '../../src/components/AeoReview';
 import type { AeoSiteReview, AeoPageReview, AeoPageChange } from '../../shared/types/aeo';
@@ -97,6 +112,9 @@ describe('AeoReview', () => {
     aeoSiteReviewMock.mockResolvedValue(makeSiteReview());
     aeoPageReviewMock.mockResolvedValue(makePage());
     clientActionsCreateMock.mockResolvedValue({});
+    startSiteReviewJobMock.mockResolvedValue('job-1');
+    jobProgressState.isRunning = false;
+    jobProgressState.error = null;
   });
 
   // ── Empty state (no review yet) ─────────────────────────────────────────────
@@ -117,15 +135,10 @@ describe('AeoReview', () => {
     });
   });
 
-  it('shows loading spinner when site review is in progress', async () => {
-    // Never resolve so we stay in loading state
-    aeoSiteReviewMock.mockReturnValue(new Promise(() => {}));
+  it('shows loading spinner when the site review job is running', async () => {
+    jobProgressState.isRunning = true;
 
     render(<AeoReview workspaceId="ws-1" />, { wrapper: makeWrapper() });
-
-    // Click Run AEO Review to start loading
-    await waitFor(() => screen.getByRole('button', { name: /run aeo review/i }));
-    fireEvent.click(screen.getByRole('button', { name: /run aeo review/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Running AEO review/i)).toBeInTheDocument();
@@ -427,7 +440,7 @@ describe('AeoReview', () => {
     });
   });
 
-  it('calls aeoReview.siteReview when Re-run Review is clicked', async () => {
+  it('starts a site review job when Re-run Review is clicked', async () => {
     aeoGetMock.mockResolvedValue(makeSiteReview());
 
     render(<AeoReview workspaceId="ws-1" />, { wrapper: makeWrapper() });
@@ -436,20 +449,17 @@ describe('AeoReview', () => {
     fireEvent.click(rerunBtn);
 
     await waitFor(() => {
-      expect(aeoSiteReviewMock).toHaveBeenCalledWith('ws-1', expect.objectContaining({ maxPages: 15 }));
+      expect(startSiteReviewJobMock).toHaveBeenCalledWith(expect.objectContaining({ maxPages: 15 }));
     });
   });
 
   // ── Error state ───────────────────────────────────────────────────────────────
 
-  it('shows error message when siteReview API call fails', async () => {
+  it('shows error message when the site review job fails', async () => {
     aeoGetMock.mockResolvedValue(null);
-    aeoSiteReviewMock.mockRejectedValue(new Error('Network error'));
+    jobProgressState.error = 'Network error';
 
     render(<AeoReview workspaceId="ws-1" />, { wrapper: makeWrapper() });
-
-    await waitFor(() => screen.getByRole('button', { name: /run aeo review/i }));
-    fireEvent.click(screen.getByRole('button', { name: /run aeo review/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();

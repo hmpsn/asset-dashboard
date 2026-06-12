@@ -4,6 +4,7 @@ import {
   clearCompletedJobs,
   createJob,
   getJob,
+  getJobCancellationError,
   isJobCancelled,
   registerAbort,
   unregisterAbort,
@@ -58,5 +59,25 @@ describe('job cancellation state', () => {
     expect(getJob(job.id)?.status).toBe('cancelled');
     expect(getJob(job.id)?.message).toBe('Cancelled by user');
     expect(isJobCancelled(job.id)).toBe(true);
+  });
+
+  it('reports a cancellation error for non-cancellable active jobs but allows cancellable ones', () => {
+    const workspaceId = `ws_cancel_policy_${Date.now()}`;
+    workspaceIds.add(workspaceId);
+
+    const recommendationsJob = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      message: 'Generating recommendations...',
+      workspaceId,
+    });
+    updateJob(recommendationsJob.id, { status: 'running' });
+
+    const localSeoJob = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+      message: 'Refreshing local SEO...',
+      workspaceId,
+    });
+    updateJob(localSeoJob.id, { status: 'running' });
+
+    expect(getJobCancellationError(recommendationsJob)).toContain('cannot be cancelled');
+    expect(getJobCancellationError(localSeoJob)).toBeNull();
   });
 });

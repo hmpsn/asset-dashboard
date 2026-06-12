@@ -19,13 +19,13 @@
  *   premium: { ai_chats: Infinity, strategy_generations: Infinity, alt_text_generations: Infinity, workspace_context_generations: Infinity }
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
-import { addMessage } from '../../server/chat-memory.js';
+import { incrementUsage } from '../../server/usage-tracking.js';
 
-const ctx = createTestContext(13312);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 let freeWs: SeededFullWorkspace;
@@ -154,15 +154,14 @@ describe('GET /api/public/chat-usage/:workspaceId — chat tier gating', () => {
     expect(body.remaining).toBe(3);
   });
 
-  it('growth tier: returns allowed=true with unlimited (Infinity)', async () => {
+  it('growth tier: returns allowed=true with monthly limit of 50', async () => {
     const res = await api(`/api/public/chat-usage/${growthWs.workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.tier).toBe('growth');
     expect(body.allowed).toBe(true);
-    // Growth/premium returns Infinity which serializes to null in JSON
-    expect(body.limit).toBeNull();
-    expect(body.remaining).toBeNull();
+    expect(body.limit).toBe(50);
+    expect(body.remaining).toBe(50);
   });
 
   it('trial workspace: free base tier resolves to growth chat access', async () => {
@@ -171,8 +170,8 @@ describe('GET /api/public/chat-usage/:workspaceId — chat tier gating', () => {
     const body = await res.json();
     expect(body.tier).toBe('growth');
     expect(body.allowed).toBe(true);
-    expect(body.limit).toBeNull();
-    expect(body.remaining).toBeNull();
+    expect(body.limit).toBe(50);
+    expect(body.remaining).toBe(50);
   });
 
   it('premium tier: returns allowed=true with unlimited (Infinity)', async () => {
@@ -200,9 +199,9 @@ describe('POST /api/public/search-chat/:workspaceId — trial tier rate gate', (
     await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
   });
 
-  it('trial workspace bypasses free conversation cap before AI configuration check', async () => {
+  it('trial workspace bypasses free chat usage cap before AI configuration check', async () => {
     for (let i = 0; i < 3; i += 1) {
-      addMessage(trialWs.workspaceId, `trial-rate-test-${i}`, 'client', 'user', 'hello');
+      incrementUsage(trialWs.workspaceId, 'ai_chats');
     }
 
     const res = await postJson(`/api/public/search-chat/${trialWs.workspaceId}`, {
@@ -442,12 +441,12 @@ describe('Chat rate limit: tier-aware enforcement at the module level', () => {
     expect(result.remaining).toBeGreaterThanOrEqual(0);
   });
 
-  it('growth tier: always allowed with Infinity limit', async () => {
+  it('growth tier: allowed with monthly limit of 50', async () => {
     const { checkChatRateLimit } = await import('../../server/chat-memory.js');
     const result = checkChatRateLimit(growthWs.workspaceId, 'growth');
     expect(result.allowed).toBe(true);
-    expect(result.limit).toBe(Infinity);
-    expect(result.remaining).toBe(Infinity);
+    expect(result.limit).toBe(50);
+    expect(result.remaining).toBe(50);
   });
 
   it('premium tier: always allowed with Infinity limit', async () => {

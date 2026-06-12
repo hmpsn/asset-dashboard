@@ -12,10 +12,10 @@ export interface FieldTarget {
 export const FIELD_TARGETS: Record<string, FieldTarget> = {
   'publisher.logo': { tab: 'features', focus: 'brandLogoUrl', label: 'Publisher logo' },
   'publisher.logo.url': { tab: 'features', focus: 'brandLogoUrl', label: 'Publisher logo URL' },
-  'address': { tab: 'business-profile', focus: 'address', label: 'Business address' },
-  'telephone': { tab: 'business-profile', focus: 'phone', label: 'Phone number' },
-  'sameAs': { tab: 'business-profile', focus: 'socialProfiles', label: 'Social profiles' },
-  'foundedDate': { tab: 'business-profile', focus: 'foundedDate', label: 'Founded date' },
+  'address': { tab: 'business-footprint', focus: 'address', label: 'Business address' },
+  'telephone': { tab: 'business-footprint', focus: 'phone', label: 'Phone number' },
+  'sameAs': { tab: 'business-footprint', focus: 'socialProfiles', label: 'Social profiles' },
+  'foundedDate': { tab: 'business-footprint', focus: 'foundedDate', label: 'Founded date' },
 };
 
 export const KNOWN_TARGET_FIELDS = new Set(Object.keys(FIELD_TARGETS));

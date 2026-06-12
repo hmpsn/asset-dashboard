@@ -9,11 +9,11 @@
  * - GET /api/content-performance/:workspaceId (content performance)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13218);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';

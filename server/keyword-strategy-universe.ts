@@ -139,10 +139,12 @@ export interface BuildKeywordUniverseOptions {
   /** Provider (already configured) for the discovery fetch. Null → no discovery. */
   provider: SeoDataProvider | null;
   /**
-   * Credit depth. Repurposed from the legacy quick/full `seoDataMode`. On the
-   * flag-ON path, "provider present" means a real universe is built regardless of
-   * the legacy `'none'` collapse (so MCP-triggered generations are not starved) —
-   * a `'none'` mode is treated as `'quick'` depth when a provider exists.
+   * Credit depth. Repurposed from the legacy quick/full `seoDataMode`. An explicit
+   * `'none'` is a user no-spend choice (the admin UI promises "No DataForSEO credits
+   * used"), so the discovery fetch is SKIPPED even when a provider is present — the
+   * universe is built from non-provider inputs only (GSC, client, gaps, local).
+   * The absent-mode MCP/chat case is promoted to 'quick' upstream by
+   * `resolveEffectiveSeoDataMode` BEFORE it reaches the assembler.
    */
   seoDataMode: 'quick' | 'full' | 'none';
   /** Resolved site domain (host only) for `getKeywordsForSite`. */
@@ -175,18 +177,13 @@ export interface BuildKeywordUniverseOptions {
    */
   contentGapVotes?: { topic: string; votes: number }[];
   /**
-   * SEO Generation Quality P7.2 — the local-intent source gate (default false).
+   * Local-intent source gate (default false).
    *
-   * Resolved ONCE by the caller (mirrors P7.1's three-gate in `recommendations.ts`
-   * and how the umbrella `seo-generation-quality` flag is resolved in synthesis and
-   * threaded as a plain boolean — never `isFeatureEnabled` in a hot loop). The caller
-   * sets this true ONLY when ALL THREE hold: (1) the gen-quality umbrella flag is on
-   * for the workspace, (2) posture ∈ {local, hybrid}, and (3) `local-seo-visibility`
-   * is on. When false, NO local source runs → the pool, `sourceCounts`, and
-   * `poolSize` are byte-identical to pre-P7.2 (proven by the parity test). The local
-   * source reads STORED candidates only (`buildLocalSeoKeywordCandidates`) — no
-   * synchronous provider/`getLocalVisibility` call in the strategy path
-   * (docs/rules/local-seo-visibility.md provider-cost + intelligence boundary).
+   * Resolved once by the caller and threaded as a plain boolean — never computed
+   * inside the hot loop. When false, no local source runs and the pool remains
+   * byte-identical to the non-local path. The local source reads STORED candidates
+   * only (`buildLocalSeoKeywordCandidates`) — no synchronous provider visibility
+   * call in the strategy path.
    */
   includeLocal?: boolean;
   /** Optional progress reporter (mirrors synthesis `sendProgress`). */
@@ -239,8 +236,8 @@ export async function buildKeywordUniverse(
     sendProgress,
   } = opts;
 
-  // "provider present" → build a real universe; depth defaults to quick when the
-  // legacy mode collapsed to 'none' (the MCP-seed path) but a provider exists.
+  // Depth caps discovery breadth on quick vs full. Mode 'none' skips discovery
+  // entirely (gate below) — the depth value is then only a label on the universe.
   const depth: KeywordUniverseCreditDepth = seoDataMode === 'full' ? 'full' : 'quick';
   const limits = depthLimits(depth);
 
@@ -258,9 +255,12 @@ export async function buildKeywordUniverse(
   };
 
   // ── (1) Provider discovery fetch (geo + language threaded) ──
-  // Owned by the assembler on the flag-ON path. ALWAYS runs when a provider
-  // exists (depth-capped), not gated on on/off. The pre-fetched discovery/related
-  // arrays (flag-OFF inputs) are still merged so nothing is lost.
+  // Owned by the assembler on the flag-ON path. Runs whenever a provider exists
+  // (depth-capped) UNLESS the caller chose an explicit 'none' — that is a user
+  // no-spend contract ("No DataForSEO credits used"), matching the
+  // `provider && seoDataMode !== 'none'` gate every other provider call site uses.
+  // The pre-fetched discovery/related arrays (flag-OFF inputs) are still merged
+  // so nothing is lost.
   // NOTE: SemRush is language/geo-blind for discovery — it implements only
   // getRelatedKeywords/getQuestionKeywords and ignores the threaded
   // locationCode/languageCode args; DataForSEO (the default provider) honors both. (M3)
@@ -270,7 +270,7 @@ export async function buildKeywordUniverse(
   // shape the legacy seoDataMode === 'full' prefetch produced. The questions also
   // enter the pool via `fetchedDiscovery` below; this grouping is additive.
   const questionKeywords: QuestionKeywordGroup[] = [];
-  if (provider) {
+  if (provider && seoDataMode !== 'none') {
     sendProgress?.('seo-data', 'Building keyword universe (discovery)...', 0.5);
     const discoverySeeds = [
       ...domainKeywords.filter(k => k.keyword?.trim()).slice(0, limits.domainSeeds).map(k => k.keyword),

@@ -21,8 +21,59 @@ import {
 } from '../workspace-mutation-helper.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
+
 const router = Router();
 const log = createLogger('content-templates-routes');
+
+// ── Validation schemas ──
+
+const contentPageTypeValues = [
+  'blog', 'landing', 'service', 'location', 'product',
+  'pillar', 'resource', 'provider-profile', 'procedure-guide', 'pricing-page',
+  'homepage', 'about', 'contact', 'faq', 'testimonials', 'custom',
+] as const;
+
+const templateVariableSchema = z.object({
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+});
+
+const templateSectionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  headingTemplate: z.string(),
+  guidance: z.string(),
+  wordCountTarget: z.number().int().nonnegative(),
+  order: z.number().int().nonnegative(),
+  cmsFieldSlug: z.string().optional(),
+  narrativeRole: z.string().optional(),
+  brandNote: z.string().optional(),
+  seoNote: z.string().optional(),
+});
+
+const createTemplateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  pageType: z.enum(contentPageTypeValues).optional(),
+  variables: z.array(templateVariableSchema).optional(),
+  sections: z.array(templateSectionSchema).optional(),
+  urlPattern: z.string().or(z.literal('')).optional(),
+  keywordPattern: z.string().or(z.literal('')).optional(),
+  titlePattern: z.string().or(z.literal('')).optional(),
+  metaDescPattern: z.string().or(z.literal('')).optional(),
+  cmsFieldMap: z.record(z.string()).optional(),
+  toneAndStyle: z.string().optional(),
+  schemaTypes: z.array(z.string()).optional(),
+});
+
+// PUT accepts a superset (all fields optional, id/workspaceId/timestamps ignored by store)
+const updateTemplateSchema = createTemplateSchema.partial();
+
+const duplicateTemplateSchema = z.object({
+  name: z.string().optional(),
+});
 
 function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
@@ -42,10 +93,9 @@ router.get('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAc
 });
 
 // Create a new template
-router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createTemplateSchema), (req, res) => {
   try {
     const { name, description, pageType, variables, sections, urlPattern, keywordPattern, titlePattern, metaDescPattern, cmsFieldMap, toneAndStyle } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
 
     const template = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
@@ -88,7 +138,7 @@ router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('works
 });
 
 // Update an existing template
-router.put('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.put('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), validate(updateTemplateSchema), (req, res) => {
   try {
     const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
@@ -158,7 +208,7 @@ router.delete('/api/content-templates/:workspaceId/:templateId', requireWorkspac
 });
 
 // Duplicate a template
-router.post('/api/content-templates/:workspaceId/:templateId/duplicate', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/content-templates/:workspaceId/:templateId/duplicate', requireWorkspaceAccess('workspaceId'), validate(duplicateTemplateSchema), (req, res) => {
   try {
     const { name } = req.body;
     const copy = runWorkspaceMutation({

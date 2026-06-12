@@ -37,6 +37,7 @@ interface ContentGapRow {
   question_keywords: string | null;
   serp_targeting: string | null;
   opportunity_score: number | null;
+  cpc: number | null;
   // SEO Generation Quality P2 — re-admitted by the deterministic backfill floor (0/1, migration 115).
   backfilled: number | null;
 }
@@ -67,6 +68,7 @@ function rowToModel(r: ContentGapRow): ContentGap {
   if (r.competitor_proof) m.competitorProof = r.competitor_proof;
   if (r.question_keywords) m.questionKeywords = parseJsonSafeArray(r.question_keywords, z.string(), { table: 'content_gaps', field: 'question_keywords' });
   if (r.serp_targeting) m.serpTargeting = parseJsonSafeArray(r.serp_targeting, z.string(), { table: 'content_gaps', field: 'serp_targeting' });
+  if (r.cpc != null) m.cpc = r.cpc;
   if (r.opportunity_score != null) m.opportunityScore = r.opportunity_score;
   // SEO Generation Quality P2 — only surface the flag when set, mirroring the other
   // optional fields (keeps non-backfilled gaps byte-identical to pre-P2 shape).
@@ -92,6 +94,7 @@ function modelToParams(workspaceId: string, m: ContentGap) {
     question_keywords: m.questionKeywords ? JSON.stringify(m.questionKeywords) : null,
     serp_targeting: m.serpTargeting ? JSON.stringify(m.serpTargeting) : null,
     opportunity_score: m.opportunityScore ?? null,
+    cpc: m.cpc ?? null,
     backfilled: m.backfilled ? 1 : 0,
   };
 }
@@ -110,12 +113,12 @@ const stmts = createStmtCache(() => ({
       workspace_id, target_keyword, topic, intent, priority, rationale,
       suggested_page_type, volume, difficulty, trend_direction, serp_features,
       impressions, competitor_proof, question_keywords, serp_targeting, opportunity_score,
-      backfilled
+      cpc, backfilled
     ) VALUES (
       @workspace_id, @target_keyword, @topic, @intent, @priority, @rationale,
       @suggested_page_type, @volume, @difficulty, @trend_direction, @serp_features,
       @impressions, @competitor_proof, @question_keywords, @serp_targeting, @opportunity_score,
-      @backfilled
+      @cpc, @backfilled
     )
     ON CONFLICT(workspace_id, target_keyword) DO UPDATE SET
       topic = excluded.topic,
@@ -132,6 +135,7 @@ const stmts = createStmtCache(() => ({
       question_keywords = excluded.question_keywords,
       serp_targeting = excluded.serp_targeting,
       opportunity_score = excluded.opportunity_score,
+      cpc = excluded.cpc,
       backfilled = excluded.backfilled
   `),
   deleteOne: db.prepare<[workspaceId: string, targetKeyword: string]>(

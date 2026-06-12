@@ -24,6 +24,7 @@ import { execSync, execFileSync } from 'child_process';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws-contract-parser.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -392,6 +393,12 @@ function loadStyleExceptions(): StyleExceptionEntry[] {
  *
  * See docs/rules/pr-check-rule-authoring.md → "Common mistakes" for the
  * explanation and the funcBoundaryRe / ws-scope-ok / ai-race-ok precedents.
+ *
+ * Intentional exception: the security rule "public-portal.ts GET missing
+ * portal-auth middleware" is inline-only by design (a hatch above a route
+ * definition is too easy to leave behind when routes are reordered, and
+ * `router.get(` lines always have room for an inline comment). Do not
+ * "fix" it to use hasHatch.
  */
 function hasHatch(lines: string[], i: number, hatch: string): boolean {
   if (lines[i]?.includes(hatch)) return true;
@@ -568,7 +575,7 @@ export function extractBuildWorkspaceIntelligenceCall(chunk: string): string {
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
 // declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
-// in their corresponding format*Section function (server/workspace-intelligence.ts
+// in their corresponding format*Section function (server/intelligence/formatters.ts
 // or a focused extracted formatter module).
 // Must live at module scope because the rule lives in the CHECKS array and its
 // customCheck closure looks these up by lexical binding at invocation time.
@@ -593,17 +600,30 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // SeoContextSlice — backlinkProfile and serpFeatures are now rendered by formatSeoContextSection()
   // InsightsSlice
   'byType', 'forPage',
+  // countsByType / countsByTypeBySeverity: pre-cap count rollups for count consumers
+  // (G3); the prompt renders the severity summary line instead — per-type counts are
+  // structured data
+  'countsByType', 'countsByTypeBySeverity',
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
   // availability is control-plane metadata for callers; it intentionally does not render into prompt text
   'availability', 'forPage', 'winRateByActionType',
+  // platformPriors (A6, audit #22): the anonymized cross-workspace fallback tier. It is NOT
+  // rendered by the learnings slice formatter — it is surfaced as a clearly-labeled benchmark
+  // through the default-path helpers (buildPlatformPriorPromptNote / buildOutcomeLearningStatusNote)
+  // only when the workspace's own availability is no_data/degraded, so callers control the labeling.
+  'platformPriors',
   // SiteHealthSlice
   // PageProfileSlice
   // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
   'searchIntent',
   // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
   'insights',
+  // ContentPipelineSlice — inFlightTargetKeywords is mechanical matching data (D2, audit
+  // #11): comparison-keyed brief/post keywords consumed by the recommendation engine's
+  // in-flight suppression pass, never prompt material (normalized keys would only burn tokens).
+  'inFlightTargetKeywords',
   // ClientSignalsSlice — businessPriorities is the RAW client-only store field; it is
   // intentionally not injected into prompts. Only effectiveBusinessPriorities (the resolved
   // superset) is rendered by formatClientSignalsSection. The raw field remains in the type
@@ -843,27 +863,7 @@ function loadWsEventValues(): Set<string> {
   const wsEventsPath = path.join(ROOT, 'server', 'ws-events.ts');
   const content = readFileOrEmpty(wsEventsPath);
   if (!content) return new Set();
-  const valueRe = /:\s*['"]([^'"]+)['"]/g;
-
-  // Extract the WS_EVENTS block (ends at `} as const;`)
-  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
-  if (!wsBlock) return new Set();
-  const wsValues = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = valueRe.exec(wsBlock[1])) !== null) {
-    wsValues.add(m[1]);
-  }
-
-  // Extract the ADMIN_EVENTS block and subtract overlapping values.
-  const adminBlock = content.match(/export\s+const\s+ADMIN_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
-  if (adminBlock) {
-    valueRe.lastIndex = 0;
-    while ((m = valueRe.exec(adminBlock[1])) !== null) {
-      wsValues.delete(m[1]);
-    }
-  }
-
-  return wsValues;
+  return parseWsEventValues(content, { subtractAdminEvents: true });
 }
 
 /** Extracts the set of activity-type string literals from the
@@ -977,6 +977,472 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    name: 'Retired outcome feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/122-retire-outcome-feature-flags.sql'],
+    message:
+      'Outcome feature flags were retired in PR1; make the enabled behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'outcome-tracking',
+        'outcome-dashboard',
+        'outcome-playbooks',
+        'outcome-external-detection',
+        'outcome-client-reporting',
+        'outcome-ai-injection',
+        'outcome-predictive',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`);
+      const componentRe = new RegExp(`<FeatureFlag\\b[^>]*\\bflag=['"](?:${keyPattern})['"]`);
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\[['"](?:${keyPattern})['"]\\]`);
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (helperRe.test(line) || componentRe.test(line) || indexedRe.test(line) || envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Retired bridge/opportunity feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql'],
+    message:
+      'Bridge/opportunity feature flags were retired in PR2; keep bridge source identifiers but do not use retired keys in flag APIs.',
+    severity: 'error',
+    rationale:
+      'Retired bridge/opportunity rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'intelligence-shadow-mode',
+        'opportunity-value-scorer',
+        'opportunity-value-calibration',
+        'opportunity-value-events',
+        'bridge-outcome-reweight',
+        'bridge-decay-suggested-brief',
+        'bridge-strategy-invalidate',
+        'bridge-insight-to-action',
+        'bridge-page-analysis-invalidate',
+        'bridge-action-auto-resolve',
+        'bridge-content-to-insight',
+        'bridge-schema-to-insight',
+        'bridge-anomaly-boost',
+        'bridge-settings-cascade',
+        'bridge-audit-page-health',
+        'bridge-action-annotation',
+        'bridge-annotation-to-insight',
+        'bridge-audit-site-health',
+        'bridge-audit-auto-resolve',
+        'bridge-briefing-candidate-refresh',
+        'bridge-client-signal',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired unified inbox feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/124-retire-unified-inbox-feature-flags.sql'],
+    message:
+      'Unified inbox / deliverables rollout flags were retired in PR3; make the unified behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired inbox/deliverable rollout flags must not re-enter runtime/UI/test flag APIs after the unified path becomes canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'new-inbox-ia',
+        'unified-deliverables-approval-family',
+        'unified-deliverables-broken-family',
+        'unified-deliverables-rest',
+        'unified-inbox',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired product/UI feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/125-retire-product-ui-feature-flags.sql'],
+    message:
+      'Product/UI rollout flags were retired in PR4; make the enabled behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired product/UI rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const retired = [
+        'copy-engine',
+        'copy-engine-voice',
+        'copy-engine-pipeline',
+        'deep-diagnostics',
+        'client-brand-section',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:COPY_ENGINE(?:_VOICE|_PIPELINE)?|DEEP_DIAGNOSTICS|CLIENT_BRAND_SECTION)\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired SEO/runtime feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/126-retire-seo-runtime-feature-flags.sql'],
+    message:
+      'SEO/runtime rollout flags were retired in PR5; make the canonical behavior unconditional instead of using retired keys.',
+    severity: 'error',
+    rationale:
+      'Retired SEO/runtime rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const filesToScan = SCAN_ALL
+        ? Array.from(new Set([
+          ...files,
+          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
+          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
+        ]))
+        : files;
+      const retired = [
+        'local-seo-visibility',
+        'schema-ai-element-classifier',
+        'seo-generation-quality',
+      ];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:LOCAL_SEO_VISIBILITY|SCHEMA_AI_ELEMENT_CLASSIFIER|SEO_GENERATION_QUALITY)\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of filesToScan) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.endsWith('tests/pr-check.test.ts')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired Keyword Hub feature flag key used in flag API',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/db/migrations/135-retire-keyword-hub-feature-flag.sql'],
+    message:
+      'The keyword-hub umbrella flag was retired at the Phase C cutover (2026-06-11). The Hub is the only keyword surface — make the Hub path unconditional instead of using the retired key.',
+    severity: 'error',
+    rationale:
+      'After the Keyword Hub cutover deleted KCC/Rank Tracker, the keyword-hub flag must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a legacy path that no longer exists.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const filesToScan = SCAN_ALL
+        ? Array.from(new Set([
+          ...files,
+          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
+          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
+        ]))
+        : files;
+      const retired = ['keyword-hub'];
+      const keyPattern = retired.join('|');
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/;
+
+      function lineNumberForIndex(content: string, index: number): number {
+        return content.slice(0, index).split('\n').length;
+      }
+
+      function pushMatch(file: string, content: string, index: number, fallback: string): void {
+        const line = lineNumberForIndex(content, index);
+        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+        hits.push({ file, line, text });
+      }
+
+      for (const file of filesToScan) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.endsWith('tests/pr-check.test.ts')) continue;
+        const content = readFileOrEmpty(file);
+        const lines = content.split('\n');
+
+        for (const match of content.matchAll(helperRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(componentRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        for (const match of content.matchAll(indexedRe)) {
+          pushMatch(file, content, match.index ?? 0, match[0]);
+        }
+        if (file.endsWith('shared/types/feature-flags.ts')) {
+          for (const match of content.matchAll(featureFlagLiteralRe)) {
+            pushMatch(file, content, match.index ?? 0, match[0]);
+          }
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (envRe.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+
+      const deduped: CustomCheckMatch[] = [];
+      const seen = new Set<string>();
+      for (const hit of hits) {
+        const key = `${hit.file}:${hit.line}:${hit.text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(hit);
+      }
+      return deduped;
+    },
+  },
+  {
+    name: 'Retired seo-ranks route literal in src',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message: "The standalone Rank Tracker (seo-ranks) route was folded into the Keyword Hub (seo-keywords) at the Keyword Hub cutover. Do not reference the 'seo-ranks' Page literal in src/ — route to 'seo-keywords' instead. If a transitional redirect genuinely needs it, add a // seo-ranks-fold-ok hatch.",
+    severity: 'error',
+    rationale:
+      "After the Keyword Hub cutover removed RankTracker.tsx and folded seo-ranks into the Hub, any new 'seo-ranks' literal in src/ resurrects a dead route or silently bypasses the Hub. Promoted from the route-fold-in-seo-ranks drift test into a mechanized pr-check rule.",
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      const literalRe = /['"]seo-ranks['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/src/') && !file.startsWith('src/')) continue;
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (literalRe.test(line) && !hasHatch(lines, i, 'seo-ranks-fold-ok')) {
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
+  },
+  {
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
@@ -1079,21 +1545,19 @@ export const CHECKS: Check[] = [
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
-      'server/semrush.ts', // disk files: SEMRush API usage log + credit log files (not DB columns)
+      'server/semrush.ts', // legacy disk files: SEMRush API usage log + credit log files (not DB columns)
       'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
       'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)
       'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
       'server/storage-stats.ts', // disk files: workspace storage stat files (not DB columns)
       'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
-      'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
       'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
-      'server/routes/semrush.ts', // disk cache files: SEMRush response cache (not DB columns)
+      'server/routes/seo-provider.ts', // disk cache files: provider response cache (not DB columns)
       'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
       'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
-      'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
       'server/schema/extractors/page-elements/howto-ai-fallback.ts', // AI response text parser (HowTo disambiguation JSON), not DB columns
     ],
@@ -1431,6 +1895,58 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // 2026-06-09 audit (quick-wins): scanning listWorkspaces() to keep one row
+    // materializes EVERY workspace (full JSON-column parse) and runs an
+    // attachPageStates query per workspace (N+1). Catches BOTH the chained
+    // `listWorkspaces().find(` form AND the two-line `const x = listWorkspaces();
+    // x.find(` form (a regex on the chained form alone missed three live routes).
+    name: 'listWorkspaces().find() — use indexed getWorkspaceBySiteId / getWorkspace',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// list-workspaces-find-ok'],
+    message: 'Do not scan-and-find over listWorkspaces(): it parses every workspace row + runs N+1 page-state queries. Use getWorkspaceBySiteId(siteId) for webflowSiteId lookups or getWorkspace(id) for id lookups (server/workspaces.ts). Add // list-workspaces-find-ok on the .find line only for a genuine multi-match / folder / case-insensitive scan with no helper.',
+    severity: 'error',
+    rationale: 'Per-request full-table workspace materialization + N+1 page-state queries on ~47 hot paths.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const chainedRe = /listWorkspaces\(\)\s*\.\s*find\(/;
+      const assignRe = /\b(?:const|let|var)\s+(\w+)\s*=\s*listWorkspaces\(\)\s*;/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes(`server${path.sep}`) && !file.includes('server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          // Form 1: chained listWorkspaces().find( on one line.
+          if (chainedRe.test(lines[i])) {
+            if (!hasHatch(lines, i, '// list-workspaces-find-ok')) {
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
+            }
+            continue;
+          }
+          // Form 2: const VAR = listWorkspaces(); then VAR.find( within ~5 lines.
+          const m = assignRe.exec(lines[i]);
+          if (m) {
+            const v = m[1];
+            const findRe = new RegExp(`\\b${v}\\s*\\.\\s*find\\(`);
+            for (let j = i + 1; j <= Math.min(i + 5, lines.length - 1); j++) {
+              if (findRe.test(lines[j])) {
+                if (!hasHatch(lines, j, '// list-workspaces-find-ok')) {
+                  hits.push({ file, line: j + 1, text: lines[j].trim() });
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
     name: 'Direct buildSeoContext() call',
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],
@@ -1660,7 +2176,7 @@ export const CHECKS: Check[] = [
     pattern: 'JSON\\.parse\\(row\\.',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/db/json-validation.ts', 'server/db/json-column.ts', 'server/db/migrate-json.ts'],
+    exclude: ['server/db/json-validation.ts', 'server/db/migrate-json.ts'],
     message: 'Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data.',
     severity: 'error',
   },
@@ -1720,8 +2236,8 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
-    // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
+    // Excludes: function/method definitions, interface declarations, and existing callers
+    // that go via the provider abstraction (routes/backlinks.ts, routes/seo-provider.ts)
     name: 'getBacklinksOverview called outside workspace intelligence SEO context',
     pattern: 'getBacklinksOverview\\s*\\(',
     fileGlobs: ['*.ts'],
@@ -1735,9 +2251,31 @@ export const CHECKS: Check[] = [
       'server/providers/dataforseo-provider.ts', // provider implementation
       'server/providers/fake-seo-provider.ts',   // local fake provider implementation
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
-      'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
+      'server/routes/seo-provider.ts',           // route caller via provider abstraction
     ],
     message: 'getBacklinksOverview() is an expensive external API call. Only call it from the workspace intelligence SEO context path where caching and rate-limiting are enforced.',
+    severity: 'error',
+  },
+  {
+    name: 'SemrushProvider runtime import outside legacy files',
+    pattern: 'semrush-provider\\.js',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'server/providers/semrush-provider.ts',
+      'tests/unit/semrush-provider.test.ts',
+    ],
+    message: 'Do not add new runtime imports of SemrushProvider. DataForSEO is the canonical SEO provider; keep SEMRush provider references in legacy implementation/tests only.',
+    severity: 'error',
+  },
+  {
+    name: 'registerProvider semrush outside tests',
+    pattern: 'registerProvider\\([\'"]semrush[\'"]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'tests/unit/keyword-strategy-seo-data.test.ts',
+      'tests/unit/seo-provider-routing.test.ts',
+    ],
+    message: 'Do not register SEMRush in runtime code. DataForSEO is the only supported runtime SEO provider in PR1.',
     severity: 'error',
   },
   {
@@ -2441,7 +2979,15 @@ export const CHECKS: Check[] = [
     // formatter module changes; the customCheck always reads the fixed type
     // file plus formatter sources from disk.
     name: 'Assembled-but-never-rendered slice fields',
-    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'formatters.ts', 'page-elements-slice.ts'],
+    fileGlobs: [
+      'intelligence.ts',
+      'workspace-intelligence.ts',
+      'formatters.ts',
+      'page-elements-slice.ts',
+      'formatter-content-pipeline.ts',
+      'formatter-site-health.ts',
+      'formatter-operational.ts',
+    ],
     exclude: ['.test.ts'],
     displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts + extracted intelligence formatters',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
@@ -2458,6 +3004,9 @@ export const CHECKS: Check[] = [
       const formatterModules = [
         path.join(ROOT, 'server/intelligence/formatters.ts'),
         path.join(ROOT, 'server/intelligence/page-elements-slice.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-content-pipeline.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-site-health.ts'),
+        path.join(ROOT, 'server/intelligence/formatter-operational.ts'),
       ];
       const serverContent = [
         readFileOrEmpty(serverPath),
@@ -2706,6 +3255,73 @@ export const CHECKS: Check[] = [
     // out a user from workspace B by guessing the UUID. PR #168 commit
     // 293485d addressed the existing three functions (`updateClientUser`,
     // `changeClientPassword`, `deleteClientUser`); TypeScript catches
+    // The global admin gate accepts ANY valid internal JWT with no workspace
+    // check, so a member scoped to workspace A can read workspace B via any
+    // admin route that derives workspaceId from the query string or body —
+    // UNLESS the route applies a workspace guard. This rule flags route
+    // registrations whose handler reads req.query.workspaceId / req.body.
+    // workspaceId without requireWorkspaceAccessFromQuery|FromBody (or the
+    // site-scoped variants, which validate workspace access via the site).
+    name: 'Admin route reads request workspaceId without a workspace-access guard',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// workspace-scope-from-request-ok'],
+    message: 'This route handler reads workspaceId from the query string or body but its route registration has no workspace-access guard, so any internal JWT (even one scoped to a different workspace) can reach it. Add requireWorkspaceAccessFromQuery()/requireWorkspaceAccessFromBody() (or a requireWorkspaceSiteAccess* variant) to the route chain, OR an inline requestUserCanAccessWorkspace() check, OR // workspace-scope-from-request-ok with a justification. See CLAUDE.md Auth Conventions.',
+    severity: 'error',
+    rationale: 'The global admin gate does not scope JWT users to a workspace; an unguarded query/body workspaceId route is a cross-tenant read/write oracle for any provisioned member.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Reads of a request-derived workspaceId inside a handler body — BOTH direct
+      // property access (req.body.workspaceId) AND destructuring
+      // (const { workspaceId } = req.body), which is the more common form and was
+      // the rule's original blind spot (a destructured-only route slipped the sweep).
+      const directReadRe = /req\.(query|body)(?:\.workspaceId\b|\[(['"])workspaceId\2\])/;
+      const destructureReadRe = /(?:const|let|var)\s*\{[^}]*\bworkspaceId\b[^}]*\}\s*=\s*req\.(query|body)\b/;
+      const readRe = { test: (line: string) => directReadRe.test(line) || destructureReadRe.test(line) };
+      // Any guard that establishes workspace access (chain middleware or inline).
+      const guardRe = /requireWorkspaceAccessFromQuery|requireWorkspaceAccessFromBody|requireWorkspaceAccess\b|requireWorkspaceSiteAccess(?:FromQuery)?|requestUserCanAccessWorkspace|internalJwtCanAccessWorkspace|canAccessRequest/;
+      // A route registration line opens a new handler scope.
+      const routeRe = /\brouter\.(get|post|put|patch|delete)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes(`server${path.sep}routes${path.sep}`) && !file.includes('server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Walk handlers: a route registration starts a block; collect lines until
+        // the next route registration. A block is a violation if it READS a
+        // request workspaceId but contains NO guard token anywhere in the block
+        // (covers both chain middleware on the registration line and inline
+        // checks in the body). Hatch on the reading line or the line above.
+        let blockStart = -1;
+        let blockText = '';
+        let blockReadLine = -1;
+        const flush = () => {
+          if (blockStart === -1) return;
+          if (blockReadLine !== -1 && !guardRe.test(blockText) && !hasHatch(lines, blockReadLine, '// workspace-scope-from-request-ok')) {
+            hits.push({ file, line: blockReadLine + 1, text: lines[blockReadLine].trim() });
+          }
+          blockStart = -1; blockText = ''; blockReadLine = -1;
+        };
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) {
+            flush();
+            blockStart = i;
+            blockText = lines[i];
+            continue;
+          }
+          if (blockStart === -1) continue;
+          blockText += '\n' + lines[i];
+          if (blockReadLine === -1 && readRe.test(lines[i])) blockReadLine = i;
+        }
+        flush();
+      }
+      return hits;
+    },
+  },
+  {
     // callers that forget to pass the argument NOW, but cannot catch a
     // NEW mutation function added without the parameter at all.
     //
@@ -3312,66 +3928,67 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // P1 expansion rule: port collision in integration tests.
+    // P1 expansion rule: fixed test server ports are forbidden.
     //
-    // Every integration test file allocates a unique port via
-    // `createTestContext(NNNN)`. If two files share a port, the second test
-    // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
-    // all port allocations across every `*.test.ts` file and flags any
-    // duplicate. It also flags ports outside the documented range
-    // (13201–13899 per CLAUDE.md) as a separate warning.
-    name: 'Port collision in integration tests',
+    // Normal tests must use the lock-backed
+    // `createEphemeralTestContext(import.meta.url)` helper or raw
+    // `server.listen(0, '127.0.0.1')` for in-process servers. Fixed literal
+    // ports collide when multiple local agents or CI shards run the suite at
+    // the same time, even if the committed port numbers are unique.
+    name: 'Fixed test ports are forbidden',
     pattern: '',
-    fileGlobs: ['*.test.ts'],
+    fileGlobs: ['*.test.ts', '*.test.tsx'],
     pathFilter: 'tests/',
-    excludeLines: ['// port-ok'],
     message:
-      'Two or more test files use the same port in createTestContext(). ' +
-      'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
-      'Pick an unused port in the 13201–13899 range (grep existing ports first). ' +
-      'Suppress with // port-ok if this is intentionally shared.',
+      'Tests must not bind fixed server ports. Use createEphemeralTestContext(import.meta.url) ' +
+      'for child-process integration tests, or server.listen(0, "127.0.0.1") and derive baseUrl ' +
+      'from server.address().port for in-process servers.',
     severity: 'error',
     rationale:
-      'Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, ' +
-      'producing intermittent failures that are hard to diagnose.',
+      'Fixed test ports cause flaky local and CI runs when multiple agents or workers run the test suite concurrently.',
     claudeMdRef: '#testing-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Collect all port → [{ file, line }] mappings
-      const portMap = new Map<number, { file: string; line: number; text: string }[]>();
-      const portRe = /\bcreateTestContext\(\s*(\d+)\s*\)/;
-      for (const file of files) {
-        if (!file.endsWith('.test.ts')) continue;
+      const scannedFiles = new Set(files);
+      for (const glob of ['*.test.ts', '*.test.tsx']) {
+        for (const serverTestFile of getFiles(path.join(ROOT, 'server/__tests__'), glob)) {
+          scannedFiles.add(serverTestFile);
+        }
+      }
+      for (const file of scannedFiles) {
+        if (!file.endsWith('.test.ts') && !file.endsWith('.test.tsx')) continue;
+        if (!file.includes('/tests/') && !file.includes('/server/__tests__/')) continue;
         // Skip the pr-check test harness — its fixture strings contain
-        // createTestContext() literals that aren't real port allocations.
+        // createTestContext() literals that aren't real allocations.
         if (file.endsWith('pr-check.test.ts')) continue;
+        // Skip the meta-port-uniqueness test — its error message strings contain
+        // createTestContext(port) as human-readable diagnostic text, not real allocations.
+        if (file.endsWith('meta-port-uniqueness.test.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
+        const fixedPortConsts = new Set<string>();
+        for (const line of lines) {
+          const code = line.replace(/\/\/.*$/, '');
+          const constMatch = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:13[0-9]{3}|[1-9][0-9]{3,})\b/.exec(code);
+          if (constMatch && /PORT/i.test(constMatch[1])) {
+            fixedPortConsts.add(constMatch[1]);
+          }
+        }
         for (let i = 0; i < lines.length; i++) {
-          const m = portRe.exec(lines[i]);
-          if (!m) continue;
-          if (hasHatch(lines, i, '// port-ok')) continue;
-          const port = parseInt(m[1], 10);
-          if (!portMap.has(port)) portMap.set(port, []);
-          portMap.get(port)!.push({ file, line: i + 1, text: lines[i].trim() });
-        }
-      }
-      // Flag every occurrence of a port used more than once
-      for (const [, usages] of portMap) {
-        if (usages.length > 1) {
-          for (const u of usages) hits.push(u);
-        }
-      }
-      // Flag ports outside the documented 13201–13899 range
-      const PORT_MIN = 13201;
-      const PORT_MAX = 13899;
-      for (const [port, usages] of portMap) {
-        if (port < PORT_MIN || port > PORT_MAX) {
-          for (const u of usages) {
-            // Don't double-flag if already flagged as a duplicate
-            if (!hits.some((h) => h.file === u.file && h.line === u.line)) {
-              hits.push(u);
+          const code = lines[i].replace(/\/\/.*$/, '');
+          if (/\bcreateTestContext\s*\(/.test(code)) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+            continue;
+          }
+          if (/\blisten\s*\(\s*(?:[1-9][0-9]{3,}|13[0-9]{3})\b/.test(code)) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+            continue;
+          }
+          for (const portConst of fixedPortConsts) {
+            if (new RegExp(`\\blisten\\s*\\(\\s*${portConst}\\b`).test(code)) {
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
+              break;
             }
           }
         }
@@ -4384,14 +5001,7 @@ export const CHECKS: Check[] = [
         );
       }
 
-      // Extract every [WS_EVENTS.NAME] handler key present in the file.
-      // Pattern: `[WS_EVENTS.SOME_EVENT_NAME]` at computed-property position.
-      const keyRe = /\[WS_EVENTS\.([A-Z_]+)\]/g;
-      const centralizedEvents = new Set<string>();
-      let km: RegExpExecArray | null;
-      while ((km = keyRe.exec(wsInvalidationContent)) !== null) {
-        centralizedEvents.add(km[1]);
-      }
+      const centralizedEvents = parseCoveredWsEventKeys(wsInvalidationContent);
 
       if (centralizedEvents.size === 0) {
         throw new Error(
@@ -4408,13 +5018,7 @@ export const CHECKS: Check[] = [
       // skipped by a computed-key-only scanner.
       const wsEventsPath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
       const wsEventsContent = readFileOrEmpty(wsEventsPath);
-      const wsEventsBlock = wsEventsContent.match(/export const WS_EVENTS = \{([\s\S]*?)\n\} as const;/)?.[1] ?? '';
-      const eventValueToName = new Map<string, string>();
-      const eventConstRe = /^\s*([A-Z_]+):\s*['"]([^'"]+)['"]/gm;
-      let em: RegExpExecArray | null;
-      while ((em = eventConstRe.exec(wsEventsBlock)) !== null) {
-        eventValueToName.set(em[2], em[1]);
-      }
+      const eventValueToName = new Map([...parseWsEvents(wsEventsContent)].map(([key, value]) => [value, key]));
       if (eventValueToName.size === 0) {
         throw new Error(
           'useWorkspaceEvents-centralization rule: found zero WS_EVENTS values in ' +
@@ -4494,7 +5098,7 @@ export const CHECKS: Check[] = [
       '// background-generation-ok with a reason for reviewed short-lived exceptions.',
     severity: 'warn',
     rationale:
-      'Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation.',
+      'Anonymous post-response generation promises drift away from NotificationBell visibility, cancellation, activity, and cache invalidation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -4535,6 +5139,28 @@ export const CHECKS: Check[] = [
       }
       return hits;
     },
+  },
+  {
+    // ── C2 lane guardrail: sync calls to C2-migrated generators in route handlers ──
+    //
+    // The four generators migrated in C2 (generateLlmsTxt, generateBlueprint,
+    // generateCopyForEntry, reviewSitePages) must not be called synchronously in
+    // route handlers after migration — they run inside job runners, invoked via
+    // POST /api/jobs. A direct call in a route handler re-introduces the sync AI
+    // anti-pattern that C2 eliminated. Escape hatch: // c2-sync-generation-ok
+    name: 'C2-migrated generators must not be called synchronously in route handlers',
+    pattern: '\\b(generateLlmsTxt|generateBlueprint|generateCopyForEntry|reviewSitePages)\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// c2-sync-generation-ok'],
+    message:
+      'generateLlmsTxt, generateBlueprint, generateCopyForEntry, and reviewSitePages are C2-migrated generators ' +
+      'that must run inside job runners (via POST /api/jobs), not inline in route handlers. ' +
+      'Add // c2-sync-generation-ok if this is an intentional reviewed exception.',
+    severity: 'error',
+    rationale:
+      'Calling these generators synchronously in route handlers re-introduces the sync-AI anti-pattern that C2 eliminated — long-running AI crawls block the request/response cycle.',
+    claudeMdRef: '#code-conventions',
   },
   {
     // ── Route read/write contracts ────────────────────────────────────────
@@ -4872,7 +5498,6 @@ export const CHECKS: Check[] = [
         'src/components/ContentBriefs.tsx',
         'src/components/RevenueDashboard.tsx',
         'src/components/ClientDashboard.tsx',
-        'src/components/KeywordAnalysis.tsx',
         // Already have PageHeader (guard against regression):
         'src/components/WorkspaceHome.tsx',
         'src/components/WorkspaceOverview.tsx',
@@ -7202,14 +7827,17 @@ export const CHECKS: Check[] = [
     // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
     //
     // Every `/api/public/<resource>/:workspaceId/...` route that serves
-    // workspace-scoped data must apply either `requireClientPortalAuth()`
-    // (allows passwordless workspaces) or `requireAuthenticatedClientPortalAuth()`
-    // (rejects passwordless workspaces — preferred for sensitive data).
+    // workspace-scoped data must apply either `requireClientPortalAuth()` or
+    // `requireAuthenticatedClientPortalAuth()`. As of E3 (passwordless portal
+    // closure) BOTH reject passwordless workspaces — a portal returns 401 until
+    // a client credential is configured. `requireAuthenticatedClientPortalAuth`
+    // additionally rejects internal-JWT-only access and is preferred for the
+    // most sensitive mutations.
     //
-    // The global app gate at server/app.ts:262 short-circuits to next() when
-    // `!ws.clientPassword`, which silently leaks data for any workspace whose
-    // dashboard has not been configured yet. The per-route middleware closes
-    // that hole.
+    // The global app gate at server/app.ts advances passwordless requests to
+    // the route (it is an advance-only defense-in-depth layer, not the backstop
+    // — see the comment there). This per-route middleware is the real backstop,
+    // which is why full per-route coverage is mandatory and enforced here.
     //
     // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
     // allowed by the global gate (server/app.ts:258): bootstrap/login flow
@@ -7230,8 +7858,9 @@ export const CHECKS: Check[] = [
       // public-content.ts and public-requests.ts use router.use() file-level
       // portal auth — Pass 1 detects that, so no exclude needed.
       'server/routes/reports.ts',
-      // recommendations.ts and stripe.ts have mixed auth coverage — individual
-      // unprotected routes are hatched with // public-no-auth-ok inline.
+      // stripe.ts has mixed auth coverage — individual unprotected routes are
+      // hatched with // public-no-auth-ok inline. (recommendations.ts is now
+      // fully gated with requireClientPortalAuth() — no inline hatches remain.)
     ],
     message:
       'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
@@ -7307,6 +7936,73 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ── E1: public-portal.ts GET-specific auth guard (2026-06-10) ───────────
+  {
+    // Specifically targets server/routes/public-portal.ts GETs (excluded from
+    // the broader "Public route under /api/public/" rule above, which uses a
+    // different exclude strategy). The three intentionally-public bootstrap
+    // GETs (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
+    // `// portal-auth-public-ok` since they serve the login screen and must
+    // be accessible before authentication. All other GET routes in this file
+    // must carry either requireClientPortalAuth() or
+    // requireAuthenticatedClientPortalAuth() as middleware.
+    name: 'public-portal.ts GET missing portal-auth middleware',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    displayScope: 'server/routes/public-portal.ts',
+    excludeLines: ['// portal-auth-public-ok'],
+    message:
+      'Every router.get() in server/routes/public-portal.ts must include ' +
+      'requireClientPortalAuth() or requireAuthenticatedClientPortalAuth() as middleware. ' +
+      'The three intentionally-public bootstrap endpoints (workspace/:id, tier/:id, ' +
+      'pricing/:id) that serve the login screen itself are exempt — add ' +
+      '// portal-auth-public-ok on the same router.get( line to suppress.',
+    severity: 'error',
+    rationale:
+      'Unguarded GETs in public-portal.ts silently expose workspace data without ' +
+      'authentication. Defense-in-depth: route-level guards complement the global app.ts ' +
+      'middleware and are the only layer that survives future refactors.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        if (rel !== 'server/routes/public-portal.ts' &&
+            !rel.endsWith('/server/routes/public-portal.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (!/\brouter\.get\s*\(/.test(line)) continue;
+          // Hatch on the same line as router.get(
+          if (line.includes('// portal-auth-public-ok')) continue;
+          // Look forward up to 8 lines for auth middleware (covers multi-line
+          // signatures). Comment text is stripped so a `// TODO: add
+          // requireClientPortalAuth() later` cannot silence the rule, and the
+          // window stops at the handler opener / next route so an adjacent
+          // guarded route's middleware cannot bleed into this route's window.
+          const windowLines: string[] = [];
+          for (let j = i; j < Math.min(i + 8, lines.length); j++) {
+            let wl = lines[j];
+            if (j > i && /\brouter\.\w+\s*\(/.test(wl)) break; // next route definition
+            if (/^\s*(\/\/|\*)/.test(wl)) continue; // full-line comments never count
+            const slash = wl.indexOf('//');
+            if (slash >= 0) wl = wl.slice(0, slash); // strip trailing comments
+            windowLines.push(wl);
+            if (wl.includes('(req, res)') || /=>\s*\{?\s*$/.test(wl)) break; // handler reached
+          }
+          const window = windowLines.join('\n');
+          if (window.includes('requireClientPortalAuth(')) continue;
+          if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
   // ── Plan A Task 2: trial-state centralization (2026-05-27) ──────────────
   {
     name: 'Inline trial-state computation outside billing module',
@@ -7355,7 +8051,6 @@ export const CHECKS: Check[] = [
     exclude: [
       'server/db/', 'server/schemas/', 'tests/', 'server/ai.ts',
       'server/openai-helpers.ts', 'server/anthropic-helpers.ts',
-      'server/briefing-cron.ts',      // uses briefingAIResponseSchema — already validated
       'server/meeting-brief-generator.ts', // comment-only exclusion, validated elsewhere
       'server/routes/content-publish.ts', // field-mapping suggestion, not critical schema
       'server/schema/extractors/', 'server/content-posts-ai.ts',
@@ -7595,55 +8290,52 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // Unified Send-to-Client: every ACTIVE deliverable type (one whose phase-group flag
-    // is enabled) must have a registered adapter file under deliverable-adapters/. Starts
-    // as `warn` (Phase 0: all flags default false, so this never fires until a flag flips).
-    // Projected (copy_section/content_request) and notification (briefing) types are exempt
-    // — they implement projectFromSource / have no client transitions but still ship an
-    // adapter file when active, so they ARE required here too once their flag is on.
+    // Unified Send-to-Client: every deliverable type must have a registered adapter file under
+    // deliverable-adapters/. PR3 retired the phase-group flags, so this now checks the full
+    // canonical type list unconditionally.
     // Escape hatch: // deliverable-adapter-ok
     name: 'every-active-type-has-an-adapter',
     fileGlobs: ['*.ts'],
     pathFilter: 'shared/types/client-deliverable.ts',
     message:
-      'A deliverable type whose phase-group flag is enabled has no adapter file under ' +
+      'A deliverable type has no adapter file under ' +
       'server/domains/inbox/deliverable-adapters/<type>.ts. Add the adapter (with registerAdapter) ' +
       'and its import line in deliverable-adapters/index.ts. Add // deliverable-adapter-ok if intentional.',
     severity: 'warn',
     excludeLines: ['deliverable-adapter-ok'],
     rationale:
-      'sendToClient() resolves an adapter per type; an active type without one throws at send time. Phase-aware so it only fires once a flag group is enabled.',
+      'sendToClient() resolves an adapter per type; any deliverable type without one throws at send time.',
     claudeMdRef: '#code-conventions',
     customCheck: () => {
       const hits: CustomCheckMatch[] = [];
-      // Read the active flag groups + type→group mapping statically. In Phase 0 every
-      // flag defaults false, so no group is active and this returns no hits.
-      const ACTIVE_GROUPS: Record<string, string[]> = {
-        'unified-deliverables-approval-family': [
-          'seo_edit', 'audit_issue', 'schema_item', 'content_plan_sample', 'content_plan_template',
-        ],
-        'unified-deliverables-broken-family': ['redirect', 'internal_link', 'aeo_change', 'content_decay'],
-        'unified-deliverables-rest': ['schema_plan', 'copy_section', 'content_request', 'work_order', 'briefing'],
-      };
-      const flagsFile = readFileOrEmpty(path.join(ROOT, 'shared/types/feature-flags.ts'));
+      const deliverableTypes = [
+        'seo_edit',
+        'audit_issue',
+        'schema_item',
+        'schema_plan',
+        'redirect',
+        'internal_link',
+        'aeo_change',
+        'content_decay',
+        'content_plan_sample',
+        'content_plan_template',
+        'work_order',
+        'briefing',
+        'copy_section',
+        'content_request',
+      ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
-      for (const [flag, types] of Object.entries(ACTIVE_GROUPS)) {
-        // A flag is "active" only if its default literal in FEATURE_FLAGS is true.
-        const enabled = new RegExp(`'${flag}'\\s*:\\s*true`).test(flagsFile);
-        if (!enabled) continue;
-        for (const type of types) {
-          // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
-          // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
-          // resolving the file. (Without this the rule false-positives for every multi-word
-          // type once its flag flips, even though the adapter exists.)
-          const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
-          if (!existsSync(adapterPath)) {
-            hits.push({
-              file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
-              line: 1,
-              text: `active deliverable type '${type}' (flag ${flag}) has no adapter file`,
-            });
-          }
+      for (const type of deliverableTypes) {
+        // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
+        // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
+        // resolving the file.
+        const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
+        if (!existsSync(adapterPath)) {
+          hits.push({
+            file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
+            line: 1,
+            text: `deliverable type '${type}' has no adapter file`,
+          });
         }
       }
       return hits;
@@ -7854,6 +8546,259 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Post-flip OV cleanup: recommendation ranking now has ONE scoring authority
+    // (`computeOpportunityValue()` + deriveCanonicalRecommendationFields()). A new
+    // inline `impactScore` bucket inside server/recommendations.ts silently forks
+    // queue ordering away from the canonical scorer.
+    //
+    // This rule intentionally stays narrow: it governs only recommendation runtime
+    // scoring in server/recommendations.ts, not other bounded contexts that have
+    // their own impactScore concepts (e.g. insight enrichment).
+    //
+    // Escape hatch: // rec-impactscore-ok
+    name: 'recommendation impactScore must flow from canonical OV scorer',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/recommendations.ts',
+    message:
+      'Do not hand-roll recommendation impactScore math in server/recommendations.ts. ' +
+      'Route scoring through computeOpportunityValue() and write `impactScore` from the ' +
+      'canonical OV fields (`scoring.impactScore` / `opportunity.value`). Add ' +
+      '`// rec-impactscore-ok` only for a tightly-justified exception.',
+    severity: 'error',
+    rationale:
+      'Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
+      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
+      if (!content) return hits;
+
+      const lines = content.split('\n');
+      const localImpactScoreRe = /\b(?:const|let)\s+(?:adjustedImpactScore|impactScore)\s*=/;
+      const objectImpactScoreRe = /\bimpactScore:\s*/;
+      const assignmentImpactScoreRe = /\br\.impactScore\s*=/;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('*') || line.includes('rec-impactscore-ok')) continue;
+
+        if (localImpactScoreRe.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+          continue;
+        }
+
+        if (objectImpactScoreRe.test(line) && !/\bimpactScore:\s*(?:scoring\.impactScore|opportunity\.value)\b/.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+          continue;
+        }
+
+        if (assignmentImpactScoreRe.test(line) && !/\br\.impactScore\s*=\s*scoring\.impactScore\b/.test(line)) {
+          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+        }
+      }
+
+      return hits;
+    },
+  },
+
+  {
+    // ── tracked_keywords bare read→write outside withTrackedKeywordsTxn ──
+    //
+    // The tracked_keywords JSON blob is mutated via a read→mutate→write sequence.
+    // Every writer MUST go through withTrackedKeywordsTxn (BEGIN IMMEDIATE) to
+    // prevent the lost-update race: two concurrent writers both reading the same
+    // blob, mutating independently, and last-write-wins silently dropping keywords.
+    //
+    // The old (broken) pattern was:
+    //   const config = readConfig(workspaceId);      // bare read
+    //   config.trackedKeywords = ...;
+    //   writeConfig(workspaceId, config);             // bare write — no serialisation
+    //
+    // The correct pattern routes through withTrackedKeywordsTxn (or updateTrackedKeywords
+    // which delegates to it). Direct readConfig() + writeConfig() calls in the same
+    // function outside withTrackedKeywordsTxn are a race condition.
+    //
+    // Files authorised for internal implementation (they ARE the lock boundary):
+    //   server/rank-tracking.ts — defines withTrackedKeywordsTxn itself
+    //
+    // Escape hatch: `// tracked-keywords-txn-ok` on the flagged line or the line above.
+    name: 'tracked_keywords bare read→write outside withTrackedKeywordsTxn',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/rank-tracking.ts', 'server/db/migrations'],
+    excludeLines: ['// tracked-keywords-txn-ok'],
+    message:
+      'Direct readConfig() + writeConfig() calls for tracked_keywords must be ' +
+      'wrapped in withTrackedKeywordsTxn() (BEGIN IMMEDIATE) to prevent the ' +
+      'lost-update race where concurrent writers silently drop keywords. ' +
+      'Use withTrackedKeywordsTxn() or updateTrackedKeywords() instead. ' +
+      'Add // tracked-keywords-txn-ok if this is an intentional raw access.',
+    severity: 'error',
+    rationale:
+      'Two concurrent tracked_keywords writers both read the same JSON blob, ' +
+      'mutate independently, and last-write-wins silently drops the other writer\'s keywords. ' +
+      'BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer\'s result.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Detect direct readConfig() followed by writeConfig() in the same function,
+      // outside of withTrackedKeywordsTxn. This is the exact pattern that causes
+      // the lost-update race.
+      const readConfigRe = /\breadConfig\s*\(/;
+      const writeConfigRe = /\bwriteConfig\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/rank-tracking.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!readConfigRe.test(content) && !writeConfigRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!readConfigRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// tracked-keywords-txn-ok')) continue;
+          // Look for a writeConfig() within the next 30 lines in the same function
+          const lookaheadEnd = Math.min(lines.length, i + 30);
+          for (let j = i + 1; j < lookaheadEnd; j++) {
+            if (FUNC_BOUNDARY_RE.test(lines[j])) break; // different function
+            if (writeConfigRe.test(lines[j])) {
+              if (!hasHatch(lines, j, '// tracked-keywords-txn-ok')) {
+                hits.push({ file, line: i + 1, text: lines[i].trim() });
+              }
+              break;
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
+  {
+    // ── positionColor / positionTone authority guard ──
+    //
+    // `positionColor()` and `positionTone()` are the ONLY sanctioned rank-color
+    // helpers for this codebase. Their single definitions live in
+    // `src/components/ui/constants.ts`. This rule prevents a future contributor
+    // from re-introducing a local rank-color helper instead of importing the
+    // authority.
+    //
+    // Detects a DEFINITION (function declaration or const arrow) of a function
+    // named positionColor or positionTone in any src/ file OTHER than the
+    // canonical authority. Import/call sites are NOT flagged.
+    //
+    // Escape hatch: `// position-color-authority-ok` on the definition line
+    // (or the line immediately above it) for a legitimately distinct helper.
+    name: 'positionColor/positionTone redefinition outside authority',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    displayScope: 'src/ (excluding src/components/ui/constants.ts)',
+    severity: 'error',
+    message:
+      'positionColor() and positionTone() are defined exclusively in ' +
+      'src/components/ui/constants.ts. Import from there instead of ' +
+      'defining a local rank-color helper. Add ' +
+      '// position-color-authority-ok on the definition line (or the line ' +
+      'above it) if this is intentionally a distinct helper.',
+    rationale:
+      'A locally-defined positionColor/positionTone bypasses the canonical ' +
+      'color authority, causing silent palette drift when rank-color thresholds ' +
+      'or accent tokens change.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    excludeLines: ['// position-color-authority-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Regex: catches `function positionColor`, `function positionTone`,
+      // `const positionColor =`, and `const positionTone =`.
+      // Does NOT match import statements or call expressions.
+      const DEFN_RE = /\b(?:function|const)\s+position(?:Color|Tone)\b/;
+      const HATCH = '// position-color-authority-ok';
+
+      for (const file of files) {
+        // Only scan src/ files
+        const normalised = file.replace(/\\/g, '/');
+        if (!normalised.includes('/src/')) continue;
+        // Exclude the canonical authority itself
+        if (normalised.endsWith('src/components/ui/constants.ts') ||
+            normalised.endsWith('src/components/ui/constants.js')) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!DEFN_RE.test(lines[i])) continue;
+          // Check inline hatch on the same line or the line immediately above
+          if (lines[i].includes(HATCH)) continue;
+          if (i > 0 && lines[i - 1].includes(HATCH)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  {
+    name: 'Hardcoded nav metadata outside the nav registry',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    message:
+      'Sidebar.tsx, CommandPalette.tsx, and Breadcrumbs.tsx must source nav ' +
+      'identity (label / needsSite / description) from src/lib/navRegistry.tsx, ' +
+      'not re-inline it. Found a hardcoded nav-metadata object literal or a ' +
+      'literal needsSite: true|false. Add the entry to NAV_REGISTRY and read it ' +
+      'via resolveNavLabel()/entry.needsSite instead. If this line is genuinely ' +
+      'not nav metadata (e.g. an unrelated object that happens to use these ' +
+      'keys), add // nav-registry-ok on the line or the line immediately above.',
+    severity: 'error',
+    rationale:
+      'Nav metadata triplicated across the three consumer surfaces silently ' +
+      'drifts (a tab missing from one surface, disagreeing needsSite gating). ' +
+      'The registry is the single source of truth.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    excludeLines: ['// nav-registry-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Only the three nav consumer surfaces are in scope. The registry itself
+      // is the authority and is never flagged.
+      const CONSUMER_SUFFIXES = [
+        'src/components/layout/Sidebar.tsx',
+        'src/components/CommandPalette.tsx',
+        'src/components/layout/Breadcrumbs.tsx',
+      ];
+      const HATCH = '// nav-registry-ok';
+      // (a) A hardcoded site-gating literal — `needsSite: true` / `needsSite: false`.
+      //     `needsSite: entry.needsSite` (reading FROM the registry) is allowed.
+      const NEEDS_SITE_LITERAL_RE = /\bneedsSite:\s*(?:true|false)\b/;
+      // (b) A nav-metadata object literal — `id: '<page-slug>'` on the same line
+      //     as a string `label:`. This is the NAV_ITEMS / buildNavGroups inline
+      //     signature. Reading `entry.id` / `entry.label` does NOT match (no
+      //     quoted slug + quoted label pair).
+      const NAV_OBJECT_RE = /\bid:\s*'[a-z][a-z0-9-]*'\s*,\s*label:\s*['"`]/;
+
+      for (const file of files) {
+        const normalised = file.replace(/\\/g, '/');
+        if (!CONSUMER_SUFFIXES.some((suffix) => normalised.endsWith(suffix))) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!NEEDS_SITE_LITERAL_RE.test(line) && !NAV_OBJECT_RE.test(line)) continue;
+          // Inline hatch on the same line or the line immediately above.
+          if (line.includes(HATCH)) continue;
+          if (i > 0 && lines[i - 1].includes(HATCH)) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
 
 ];
 
@@ -7897,7 +8842,7 @@ export function checkFile(file: string, check: Check): string[] {
 // Directories that should never be scanned (vendor code, test fixtures, build output)
 const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
-const EXCLUDED_FILES = ['test-branding.ts'];
+const EXCLUDED_FILES: string[] = [];
 
 // Exported for tests/pr-check.test.ts — see the 'pathFilter vs EXCLUDED_DIRS
 // collision' regression test. Not part of the public API; do not import from

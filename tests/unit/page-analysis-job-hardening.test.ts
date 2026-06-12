@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   addActivity: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
   debouncedPageAnalysisInvalidate: vi.fn(),
   invalidateSubCachePrefix: vi.fn(),
   parseJsonSafe: vi.fn(),
@@ -41,6 +42,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../server/activity-log.js', () => ({ addActivity: mocks.addActivity }));
+vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadcastToWorkspace }));
 vi.mock('../../server/bridge-infrastructure.js', () => ({
   debouncedPageAnalysisInvalidate: mocks.debouncedPageAnalysisInvalidate,
   invalidateSubCachePrefix: mocks.invalidateSubCachePrefix,
@@ -183,6 +185,12 @@ describe('page-analysis job hardening', () => {
       message: 'Page analysis needs an OpenAI API key before it can run.',
       result: expect.objectContaining({ analyzed: 0, skipped: 0, skippedFetch: 0, failed: 0, total: 1 }),
     }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws_1',
+      'strategy:updated',
+      expect.objectContaining({ action: 'analysis_failed', total: 1 }),
+    );
+    expect(mocks.debouncedPageAnalysisInvalidate).toHaveBeenCalled();
     expect(mocks.callAI).not.toHaveBeenCalled();
   });
 
@@ -257,6 +265,12 @@ describe('page-analysis job hardening', () => {
       message: 'Cancelled — 1 of 1 pages analyzed',
       result: expect.objectContaining({ analyzed: 1, skipped: 0, skippedFetch: 0, failed: 0, total: 1 }),
     }));
+    expect(mocks.addActivity).toHaveBeenCalledWith(
+      'ws_1',
+      'page_analysis',
+      'Bulk page analysis cancelled — 1 pages',
+      '1 total pages, 1 queued, 0 skipped',
+    );
   });
 
   it('zeros AI-invented keyword metrics in bulk page analysis when provider has no exact match', async () => {

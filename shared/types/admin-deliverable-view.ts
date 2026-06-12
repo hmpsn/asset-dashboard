@@ -1,5 +1,5 @@
 /**
- * AdminDeliverableView — the admin "Client Deliverables" pane read contract (PR-2b, DARK).
+ * AdminDeliverableView — the admin "Client Deliverables" pane read contract.
  *
  * The admin inbox needs ONE operator view of everything sent to a client, grouped by a STATUS
  * AXIS with a staleness signal (audit §E1/E2/E6/E7; design §6). This is a thin annotation over
@@ -17,8 +17,7 @@
  * `STALE_AWAITING_DAYS` (7). `ageDays` is the whole-day age from `sentAt` (null when never sent).
  *
  * Typed contract at a layer boundary (CLAUDE.md Data Flow #5): server assembles → API → admin
- * hook/pane. No `unified-*` flag dependency here — the `unified-inbox` flag gates whether the
- * admin pane FETCHES this; the read itself is inert (empty physical table) until cutover.
+ * hook/pane.
  */
 import type { ClientDeliverable } from './client-deliverable.js';
 

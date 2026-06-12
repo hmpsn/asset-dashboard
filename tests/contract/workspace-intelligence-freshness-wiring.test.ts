@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { getWorkspaceInvalidationKeys } from '../../src/lib/wsInvalidation';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 
 const root = resolve(import.meta.dirname, '../..');
 
@@ -14,7 +17,9 @@ describe('workspace intelligence freshness wiring', () => {
       'server/routes/content-briefs.ts',
       'server/content-posts.ts',
       'server/routes/content-matrices.ts',
-      'server/routes/content-publish.ts',
+      // C3 (audit item #12): the publish mutation's freshness boundary moved into the shared
+      // publishPostToWebflow() service, consumed by BOTH the manual route and the auto-publish job.
+      'server/domains/content/publish-post-to-webflow.ts',
       'server/routes/suggested-briefs.ts',
       'server/routes/content-decay.ts',
       'server/content-subscriptions.ts',
@@ -61,13 +66,16 @@ describe('workspace intelligence freshness wiring', () => {
   it('recommendation page-state writes broadcast page-state freshness', () => {
     const route = source('server/routes/recommendations.ts');
     const generator = source('server/recommendations.ts');
-    const invalidationHook = source('src/hooks/useWsInvalidation.ts');
+    const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'admin');
+    const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'client-dashboard');
 
     expect(route).toContain('updatedPageStateIds.push(resolvedPageId)');
     expect(route).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
     expect(generator).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(generator).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
-    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, false)');
-    expect(invalidationHook).toContain('queryKeys.shared.pageEditStates(workspaceId, true)');
+    expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
+    expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));
+    expect(clientKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
+    expect(clientKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));
   });
 });

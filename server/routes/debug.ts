@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
 import { getWorkspace } from '../workspaces.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 import {
   PROMPT_FORMATTABLE_INTELLIGENCE_SLICES,
   isPromptFormattableIntelligenceSlice,
@@ -27,7 +28,7 @@ const router = Router();
  *
  * Returns plain text prompt output for inspection.
  */
-router.get('/api/debug/prompt', async (req, res) => {
+router.get('/api/debug/prompt', requireWorkspaceAccessFromQuery(), async (req, res) => {
   if (DISABLED) {
     return res.status(404).json({ error: 'Not found' });
   }
@@ -41,9 +42,9 @@ router.get('/api/debug/prompt', async (req, res) => {
     siteBaseUrl,
   } = req.query as Record<string, string | undefined>;
 
-  // Auth: all /api/ routes are protected by the global APP_PASSWORD gate in app.ts.
-  // requireWorkspaceAccess() cannot be used here because workspaceId is a query param, not a route param.
-  // Workspace existence is validated explicitly below.
+  // Auth: the global admin gate in app.ts (HMAC or any internal JWT) plus the
+  // requireWorkspaceAccessFromQuery middleware above (denies JWT users scoped to
+  // other workspaces). Workspace existence is validated explicitly below.
   if (!workspaceId) {
     return res.status(400).json({ error: 'workspaceId is required' });
   }

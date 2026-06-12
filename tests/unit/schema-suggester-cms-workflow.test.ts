@@ -46,8 +46,9 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(seoApi).toContain("from './schema'");
   });
 
-  it('routes schema plan and inventory reads through schema intelligence instead of raw workspace strategy', () => {
+  it('routes schema plan generation through the durable worker while preserving schema intelligence sourcing', () => {
     const routes = readFileSync('server/routes/webflow-schema.ts', 'utf-8'); // readFile-ok — schema intelligence route contract guard
+    const worker = readFileSync('server/schema-plan-generation-job.ts', 'utf-8'); // readFile-ok — durable worker contract guard
     const planRouteStart = routes.indexOf("router.post('/api/webflow/schema-plan/:siteId'");
     const planRouteEnd = routes.indexOf("// GET: retrieve the current plan for a site");
     const planRoute = routes.slice(planRouteStart, planRouteEnd);
@@ -55,12 +56,26 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     const inventoryRouteEnd = routes.indexOf("router.get('/api/webflow/schema-cms-field-mappings/:siteId'");
     const inventoryRoute = routes.slice(inventoryRouteStart, inventoryRouteEnd);
 
-    expect(planRoute).toContain('buildSchemaIntelligence({ siteId })');
-    expect(planRoute).toContain('strategy: schemaIntel?.seoContext?.strategy');
+    expect(planRoute).toContain('startSchemaPlanGenerationJob(siteId, workspaceId)');
     expect(planRoute).not.toContain('strategy: ws.keywordStrategy');
+    expect(worker).toContain('buildSchemaIntelligence({ siteId })');
+    expect(worker).toContain('strategy: schemaIntel?.seoContext?.strategy');
+    expect(worker).not.toContain('strategy: workspace.keywordStrategy');
     expect(inventoryRoute).toContain('buildSchemaIntelligence({');
     expect(inventoryRoute).toContain('includeSiteInventory: true');
     expect(inventoryRoute).not.toContain('buildSiteInventory({');
+  });
+
+  it('locks schema-plan editing controls while regeneration is active', () => {
+    const panel = readFileSync('src/components/schema/SchemaPlanPanel.tsx', 'utf-8'); // readFile-ok — schema plan concurrency guard contract
+
+    expect(panel).toContain('const planMutationsLocked = generating;');
+    expect(panel).toContain('Schema plan regeneration is running. Editing is temporarily locked.');
+    expect(panel).toContain('disabled={saving || planMutationsLocked}');
+    expect(panel).toContain('disabled={sending || dirty || planMutationsLocked}');
+    expect(panel).toContain('disabled={activating || dirty || planMutationsLocked}');
+    expect(panel).toContain('disabled={retracting || planMutationsLocked}');
+    expect(panel).toContain('disabled={planMutationsLocked}');
   });
 
   it('keeps saved page types below active schema plans in generation authority', () => {

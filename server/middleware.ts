@@ -126,6 +126,18 @@ setInterval(() => {
 
 // ── Session Signing ──
 
+// In production a stable secret is mandatory: a per-process random fallback would
+// silently invalidate every admin + client-portal session on each restart/redeploy
+// (2026-06-09 audit). Mirror jwt-config.ts's hard-fail. Dev/test keep the random
+// fallback so local runs need no env setup.
+if (
+  process.env.NODE_ENV === 'production'
+  && !process.env.SESSION_SECRET
+  && !process.env.APP_PASSWORD
+) {
+  throw new Error('SESSION_SECRET (or APP_PASSWORD) must be set in production');
+}
+
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.APP_PASSWORD || crypto.randomBytes(32).toString('hex');
 
 export function signClientSession(workspaceId: string): string {
@@ -184,12 +196,15 @@ export function internalJwtCanAccessWorkspace(req: express.Request, workspaceId:
 // ── Client Portal Auth Guard ──
 
 /** Require client portal authentication (JWT or legacy session cookie) on public endpoints.
- *  Passwordless workspaces (no client password set) are accessible by URL alone. */
+ *  Portals are closed until configured — workspaces with no client password return 401. */
 export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const workspaceId = req.params[wsIdParam];
     const ws = getWorkspace(workspaceId);
     if (!ws) return next();
+    if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
     // Admin HMAC token always passes through (admin reads all client portal data).
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();
@@ -201,8 +216,6 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
     if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
     // Allow internal users only when their JWT is scoped to this workspace.
     if (internalJwtCanAccessWorkspace(req, workspaceId)) return next();
-    // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
-    if (!ws.clientPassword) return next();
 
     return res.status(401).json({ error: 'Authentication required' });
   };
@@ -218,6 +231,9 @@ export function requireAuthenticatedClientPortalAuth(wsIdParam = 'workspaceId') 
     const workspaceId = req.params[wsIdParam];
     const ws = getWorkspace(workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
 
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();
@@ -250,8 +266,10 @@ export function moveUploadedFiles(
   workspaceId: string,
   isMeta: boolean
 ): string[] {
-  const workspaces = listWorkspaces();
-  const ws = workspaces.find(w => w.id === workspaceId || w.folder === workspaceId);
+  // Common case: an id → indexed lookup. Only fall back to a full scan for the
+  // legacy folder-name form (no index on `folder`).
+  const ws = getWorkspace(workspaceId)
+    ?? listWorkspaces().find(w => w.folder === workspaceId); // list-workspaces-find-ok: folder has no index; id path is indexed above
 
   let dest: string;
   if (ws) {

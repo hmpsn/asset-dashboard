@@ -1,5 +1,23 @@
 export type LocalSeoKeywordIntent = 'transactional' | 'commercial' | 'navigational' | 'informational' | 'comparison';
 
+export const LOCAL_DATA_STALE_DAYS = 30;
+export const LOCAL_NEEDS_REFRESH_REASON = {
+  MISSING: 'missing',
+  STALE: 'stale',
+  MARKETS_CHANGED: 'markets_changed',
+} as const;
+export type LocalNeedsRefreshReason =
+  (typeof LOCAL_NEEDS_REFRESH_REASON)[keyof typeof LOCAL_NEEDS_REFRESH_REASON];
+
+export interface LocalStrategySyncStatus {
+  applies: boolean;                       // posture is local | hybrid
+  localNeedsRefresh: boolean;
+  localNeedsRefreshReason: LocalNeedsRefreshReason | null;
+  strategyStaleVsLocal: boolean;
+  lastLocalRefreshAt: string | null;      // ISO; max(local_visibility_snapshots.captured_at)
+  lastStrategyGeneratedAt: string | null; // ISO; ws.keywordStrategy.generatedAt
+}
+
 export const LOCAL_SEO_POSTURE = {
   LOCAL: 'local',
   NON_LOCAL: 'non_local',
@@ -516,6 +534,26 @@ export interface LocalSeoServiceGap {
   starterKeywords: string[];
 }
 
+/**
+ * W5.3 — per-market visible-count trend over the retained (D4-thinned) snapshot window.
+ * One series per active market; each point is the count of (keyword, device, language)
+ * identities where the business was a verified local-pack match on that capture day.
+ */
+export interface LocalSeoVisibilityTrendPoint {
+  /** Capture day (YYYY-MM-DD). */
+  date: string;
+  /** Distinct (keyword, device, language) identities visible (verified match) that day. */
+  visibleCount: number;
+  /** Distinct identities checked that day (denominator for the visible share). */
+  checkedCount: number;
+}
+
+export interface LocalSeoVisibilityTrendSeries {
+  marketId: string;
+  marketLabel: string;
+  points: LocalSeoVisibilityTrendPoint[];
+}
+
 export interface LocalSeoReadResponse {
   featureEnabled: boolean;
   settings: LocalSeoWorkspaceSettings;
@@ -526,6 +564,11 @@ export interface LocalSeoReadResponse {
   report: LocalSeoReportSummary;
   competitorBrands: LocalSeoRepeatCompetitor[];
   serviceGaps: LocalSeoServiceGap[];
+  /**
+   * W5.3 — per-market visible-count trend over the retained snapshot window. Empty
+   * when the feature is disabled, no markets are configured, or no snapshots exist.
+   */
+  visibilityTrend: LocalSeoVisibilityTrendSeries[];
   caps: {
     maxMarkets: number;
     /**
@@ -572,6 +615,14 @@ export interface LocalSeoRefreshRequest {
   keywords?: string[];
   device?: LocalSeoDevice;
   languageCode?: string;
+  thenRegenerateStrategy?: boolean;
+  strategyGeneration?: {
+    businessContext?: string;
+    seoDataMode?: 'none' | 'quick' | 'full';
+    seoDataProvider?: string;
+    competitorDomains?: string[];
+    maxPages?: number;
+  };
 }
 
 export interface LocalSeoRefreshStartResponse {

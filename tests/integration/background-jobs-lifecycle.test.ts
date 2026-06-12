@@ -1,6 +1,5 @@
 /**
  * Integration tests for background job lifecycle.
- * port-ok: unique in integration suite (13865)
  *
  * Covers job shape, empty lists, cancel/non-cancel/missing-job scenarios,
  * cross-workspace isolation, per-job status endpoint, completed-job cleanup,
@@ -19,7 +18,7 @@
  * for a brand-new workspace.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js'; // port-ok: unique in integration suite
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   createJob,
@@ -32,10 +31,11 @@ import {
   getBackgroundJobLabel,
   isBackgroundJobCancellable,
 } from '../../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_LIFECYCLE_MATRIX } from '../helpers/background-job-test-matrix.js';
 
 // startupTimeoutMs raised to 40s so this test survives pre-commit runs where
 // multiple subprocess servers start concurrently under load.
-const ctx = createTestContext(13865, { startupTimeoutMs: 40_000 }); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { startupTimeoutMs: 40_000 });
 const { api, del } = ctx;
 
 let wsAId = '';
@@ -182,22 +182,37 @@ describe('Cancel — cancellable job', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Non-cancellable job metadata (type-level checks only)
-// The DELETE route does not gate on the cancellable flag — it always attempts
-// to cancel. These tests verify the metadata contracts in background-jobs.ts.
+// 4. Cancellation metadata (type-level checks only)
+// The DELETE route behavior itself is covered in jobs-routes.test.ts. This
+// suite keeps the metadata matrix honest across every registered job type.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Non-cancellable job metadata', () => {
-  it('non-cancellable job type metadata flag is false for SEO_AUDIT', () => {
-    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
-  });
+describe('Cancellation metadata', () => {
+  it.each(Object.entries(BACKGROUND_JOB_LIFECYCLE_MATRIX))(
+    '%s matches the pinned cancellable flag',
+    (type, entry) => {
+      expect(isBackgroundJobCancellable(type)).toBe(entry.expectedCancellable);
+    },
+  );
+});
 
-  it('non-cancellable job type metadata flag is false for KEYWORD_STRATEGY', () => {
-    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
-  });
+describe('Metadata completeness', () => {
+  it.each(Object.entries(BACKGROUND_JOB_LIFECYCLE_MATRIX))(
+    '%s matches the pinned result-behavior category',
+    (type, entry) => {
+      expect(BACKGROUND_JOB_METADATA[type].resultBehavior).toBe(entry.expectedResultBehavior);
+    },
+  );
 
-  it('non-cancellable job type metadata flag is false for BULK_COMPRESS', () => {
-    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.BULK_COMPRESS)).toBe(false);
+  it.each(Object.entries(BACKGROUND_JOB_LIFECYCLE_MATRIX))(
+    '%s matches the pinned label',
+    (type, entry) => {
+      expect(getBackgroundJobLabel(type)).toBe(entry.expectedLabel);
+    },
+  );
+
+  it('getBackgroundJobLabel falls back to the raw type string for unknown types', () => {
+    expect(getBackgroundJobLabel('some-unknown-job-type')).toBe('some-unknown-job-type');
   });
 });
 
@@ -389,30 +404,6 @@ describe('Completed job cleanup', () => {
 // 9. Job label lookup
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Job label lookup', () => {
-  it('getBackgroundJobLabel returns correct label for SEO_AUDIT', () => {
-    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(
-      BACKGROUND_JOB_METADATA[BACKGROUND_JOB_TYPES.SEO_AUDIT].label,
-    );
-  });
-
-  it('getBackgroundJobLabel returns correct label for SCHEMA_GENERATOR', () => {
-    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR)).toBe(
-      BACKGROUND_JOB_METADATA[BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR].label,
-    );
-  });
-
-  it('getBackgroundJobLabel returns correct label for CONTENT_POST_GENERATION', () => {
-    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(
-      BACKGROUND_JOB_METADATA[BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION].label,
-    );
-  });
-
-  it('getBackgroundJobLabel falls back to the raw type string for unknown types', () => {
-    expect(getBackgroundJobLabel('some-unknown-job-type')).toBe('some-unknown-job-type');
-  });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 10. Multiple concurrent jobs (using GET /api/jobs/:id per job)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -491,40 +482,10 @@ describe('Multiple concurrent jobs', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 11. Job result behavior metadata
+// 11. Job result payload behavior
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Job result behavior metadata', () => {
-  it('ephemeral jobs have resultBehavior === "ephemeral"', () => {
-    const ephemeralTypes = [
-      BACKGROUND_JOB_TYPES.COMPRESS,
-      BACKGROUND_JOB_TYPES.BULK_COMPRESS,
-      BACKGROUND_JOB_TYPES.BULK_ALT,
-      BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION,
-      BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION,
-      BACKGROUND_JOB_TYPES.PERSONA_GENERATION,
-    ];
-
-    expect(ephemeralTypes.length).toBeGreaterThan(0);
-    for (const t of ephemeralTypes) {
-      expect(BACKGROUND_JOB_METADATA[t].resultBehavior).toBe('ephemeral');
-    }
-  });
-
-  it('domain-store-and-result jobs have resultBehavior === "domain-store-and-result"', () => {
-    const persistResultTypes = [
-      BACKGROUND_JOB_TYPES.SEO_AUDIT,
-      BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR,
-      BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION,
-      BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE,
-    ];
-
-    expect(persistResultTypes.length).toBeGreaterThan(0);
-    for (const t of persistResultTypes) {
-      expect(BACKGROUND_JOB_METADATA[t].resultBehavior).toBe('domain-store-and-result');
-    }
-  });
-
+describe('Job result payload behavior', () => {
   it('domain-store-and-result job carries a result payload after done', async () => {
     const job = createJob(BACKGROUND_JOB_TYPES.SEO_AUDIT, { workspaceId: wsAId });
     updateJob(job.id, { status: 'done', result: { siteScore: 88 } });

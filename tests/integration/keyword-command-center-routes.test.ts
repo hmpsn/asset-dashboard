@@ -1,34 +1,27 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   getLostVisibilityCount,
   upsertDiscoveredQueries,
 } from '../../server/client-discovered-queries.js';
 import db from '../../server/db/index.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { updateTrackedKeywords } from '../../server/rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
+import type { KeywordCommandCenterRow } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13360); // port-ok: next free after 13359
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let workspaceId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true }),
-  });
   workspaceId = createWorkspace('Keyword Command Center Route Test').id;
 }, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(workspaceId);
-  await api('/api/admin/feature-flags/local-seo-visibility', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: null }),
-  });
   await ctx.stopServer();
 });
 
@@ -283,5 +276,72 @@ describe('discovered_queries integration', () => {
       'SELECT snapshot_count FROM discovered_queries WHERE workspace_id = ? AND query = ?',
     ).get(wsId, 'teeth whitening') as { snapshot_count: number };
     expect(row.snapshot_count).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1 Task 1.5 — value-first opportunity sort (flag-gated). The flag is set
+// via the admin HTTP route so the server PROCESS's in-memory flag cache is
+// invalidated immediately (a direct in-process setWorkspaceFlagOverride would
+// not invalidate the spawned server's cache for ~10s). Seeding is via direct DB
+// writes the server reads fresh on each /rows request.
+// ---------------------------------------------------------------------------
+
+describe('Keyword Command Center — value-first opportunity sort (flag-gated)', () => {
+  let wsId = '';
+
+  function tracked(query: string, extra: Partial<TrackedKeyword>): TrackedKeyword {
+    return {
+      query,
+      pinned: false,
+      addedAt: '2026-01-01T00:00:00.000Z',
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      ...extra,
+    };
+  }
+
+  async function setFlag(enabled: boolean | null): Promise<void> {
+    const res = await api(`/api/admin/workspaces/${wsId}/feature-flags/keyword-value-scoring`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  async function rowOrder(): Promise<string[]> {
+    const res = await api(`/api/webflow/keyword-command-center/${wsId}/rows?sort=opportunity&direction=desc&pageSize=50`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { rows: KeywordCommandCenterRow[] };
+    return body.rows.map(r => r.normalizedKeyword);
+  }
+
+  beforeEach(() => {
+    wsId = createWorkspace(`Value Scoring Test ${Date.now()}`).id;
+    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query
+    // with real CPC. Volume-weighted opportunity (flag OFF) leads with bad-breath;
+    // value-first (flag ON) leads with the transactional+CPC keyword.
+    updateTrackedKeywords(wsId, () => [
+      tracked('what causes bad breath', { volume: 22000, difficulty: 40, intent: 'informational' }),
+      tracked('teeth cleaning service', { volume: 480, difficulty: 30, cpc: 6, intent: 'transactional' }),
+    ]);
+  });
+
+  afterEach(() => {
+    if (wsId) deleteWorkspace(wsId);
+    wsId = '';
+  });
+
+  it('flag OFF: opportunity sort is volume-weighted (informational high-volume leads)', async () => {
+    await setFlag(false);
+    const order = await rowOrder();
+    expect(order.indexOf('what causes bad breath')).toBeLessThan(order.indexOf('teeth cleaning service'));
+  });
+
+  it('flag ON: opportunity sort is value-first (transactional + CPC leads despite far lower volume)', async () => {
+    await setFlag(true);
+    const order = await rowOrder();
+    expect(order.indexOf('teeth cleaning service')).toBeLessThan(order.indexOf('what causes bad breath'));
   });
 });

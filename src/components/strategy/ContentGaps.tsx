@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, Icon, StatusBadge } from '../ui';
-import { FileText, Sparkles, BarChart3, Eye, Swords, ArrowUpRight, MessageCircleQuestion } from 'lucide-react';
-import { TrendBadge } from '../ui/TrendBadge';
+import { Badge, Button, Icon, SectionCard, StatusBadge, type BadgeTone } from '../ui';
+import { FileText, Sparkles } from 'lucide-react';
+import { ContentGapRow } from '../shared/ContentGapRow';
 import { adminPath } from '../../routes';
-import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 
 interface ContentGap {
   topic: string;
@@ -23,9 +22,7 @@ interface ContentGap {
   opportunityScore?: number;
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-emerald-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
-const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
-const intentTone = (intent?: string): 'blue' | 'emerald' | 'amber' | 'teal' | 'zinc' => {
+const intentTone = (intent?: string): BadgeTone => {
   switch (intent) {
     case 'commercial': return 'blue';
     case 'informational': return 'emerald';
@@ -58,128 +55,55 @@ export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
   if (sorted.length === 0) return null;
 
   return (
-    <div className="bg-[var(--surface-2)] border border-blue-500/20 p-5 rounded-[var(--radius-signature)]">
-      <h4 className="t-caption-sm font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
-        <Icon as={FileText} size="md" className="text-blue-300" /> Content Gaps
-      </h4>
+    <SectionCard
+      title="Content Gaps"
+      titleIcon={<Icon as={FileText} size="md" className="text-blue-300" />}
+    >
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
         {sorted.map((gap, i) => {
-          return (
-            <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
-              <div className="flex items-center justify-between">
-                <span className="t-body font-medium text-[var(--brand-text-bright)]">{gap.topic}{gap.opportunityScore != null && (
-                  <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
-                )}</span>
-                <div className="flex items-center gap-2">
-                  <Badge label={gap.intent} tone={intentTone(gap.intent)} variant="outline" shape="pill" className="uppercase" />
-                  <StatusBadge status={gap.priority} domain="priority" />
-                  {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
-                    <Badge label={gap.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="t-caption-sm text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
-                  {gap.volume != null && <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>}
-                  {gap.difficulty != null && gap.difficulty > 0 && (
-                    <span
-                      className={`t-caption-sm font-medium ${kdColor(gap.difficulty)} cursor-help`}
-                      title={kdTooltip(gap.difficulty)}
-                    >
-                      KD {gap.difficulty}
-                    </span>
-                  )}
-                  {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
-                    <span className="t-caption-sm text-[var(--brand-text-muted)] leading-none">
-                      {kdFraming(gap.difficulty)}
-                    </span>
-                  )}
-                  {gap.impressions != null && gap.impressions > 0 && <span className="t-caption-sm text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="sm" className="text-blue-400" />{fmtNum(gap.impressions)} impr</span>}
-                  {gap.volume && gap.volume > 0 && (() => {
-                    const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
-                    if (impact < 10) return null;
-                    return (
-                      <span className="t-caption-sm text-blue-400/70 flex items-center gap-0.5">
-                        <Icon as={ArrowUpRight} size="sm" className="text-blue-400/70" />
-                        ~{fmtNum(impact)}/mo est. clicks at rank #3
-                      </span>
-                    );
-                  })()}
-                </div>
-                {workspaceId && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Button
-                      onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
-                    >
-                      <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
-                    </Button>
-                    <Button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
-                    >
-                      <Icon as={Sparkles} size="sm" className="text-teal-300" /> Generate Brief
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {/* Trend + SERP + Competitor badges */}
-              <div className="flex items-center gap-2 flex-wrap mt-1">
-                {gap.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium"><TrendBadge value={1} suffix="" iconOnly /> Rising</span>
-                )}
-                {gap.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium"><TrendBadge value={-1} suffix="" iconOnly /> Declining</span>
-                )}
-                {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium"><TrendBadge value={0} hideOnZero={false} suffix="" iconOnly /> Stable</span>
-                )}
-                {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {gap.serpFeatures.includes('featured_snippet') && (
-                      <Badge label="Snippet" tone="blue" variant="outline" />
-                    )}
-                    {gap.serpFeatures.includes('people_also_ask') && (
-                      <Badge label="PAA" tone="blue" variant="outline" />
-                    )}
-                    {gap.serpFeatures.includes('video') && (
-                      <Badge label="Video" tone="blue" variant="outline" />
-                    )}
-                    {gap.serpFeatures.includes('local_pack') && (
-                      <Badge label="Local" tone="blue" variant="outline" />
-                    )}
-                  </div>
-                )}
-                {gap.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-orange-400 font-medium"><Icon as={Swords} size="sm" className="text-orange-400" />{gap.competitorProof}</span>
-                )}
-              </div>
-              {gap.serpTargeting && gap.serpTargeting.length > 0 && (
-                <div className="mt-1.5 pl-2 border-l-2 border-yellow-500/20">
-                  {gap.serpTargeting.map((rec, ri) => (
-                    <div key={ri} className="t-caption-sm text-yellow-400/80 leading-relaxed">→ {rec}</div>
-                  ))}
-                </div>
+          // Header-right widgets after the shared intent badge: priority (StatusBadge) + page-type (admin chrome).
+          const headerRight = (
+            <>
+              <StatusBadge status={gap.priority} domain="priority" />
+              {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
+                <Badge label={gap.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
               )}
-              {gap.questionKeywords && gap.questionKeywords.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  <Icon as={MessageCircleQuestion} size="sm" className="text-cyan-400 flex-shrink-0" />
-                  {gap.questionKeywords.map((q, qi) => (
-                    <span key={qi} className="t-caption-sm text-cyan-400/80 italic">&ldquo;{q}&rdquo;</span>
-                  ))}
-                </div>
-              )}
-              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{gap.rationale}</div>
+            </>
+          );
+          // Admin nav-button footer (Draft Brief / Generate Brief).
+          const footer = workspaceId ? (
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button
+                onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
+                variant="ghost"
+                size="sm"
+                className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
+              >
+                <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
+              </Button>
+              <Button
+                onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
+                variant="ghost"
+                size="sm"
+                className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
+              >
+                <Icon as={Sparkles} size="sm" className="text-teal-300" /> Generate Brief
+              </Button>
             </div>
+          ) : undefined;
+          return (
+            <ContentGapRow
+              key={i}
+              audience="admin"
+              data={gap}
+              intentTone={intentTone}
+              headerRight={headerRight}
+              footer={footer}
+            />
           );
         })}
       </div>
-    </div>
+    </SectionCard>
   );
 }

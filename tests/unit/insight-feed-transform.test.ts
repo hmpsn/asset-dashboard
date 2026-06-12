@@ -183,11 +183,13 @@ describe('transformToFeedInsight', () => {
       const insight = makeInsight({
         insightType: 'serp_opportunity',
         severity: 'opportunity',
-        data: { schemaType: 'FAQ' },
+        // The producer writes schemaStatus (analytics-intelligence.ts), NOT schemaType —
+        // the old renderer read schemaType so the context line silently never rendered.
+        data: { schemaStatus: 'missing' },
       });
       const result = transformToFeedInsight(insight);
       expect(result.headline).toBe('eligible for rich results');
-      expect(result.context).toContain('FAQ');
+      expect(result.context).toContain('Schema missing');
     });
   });
 
@@ -258,6 +260,41 @@ describe('transformToFeedInsight', () => {
       delete (insight as Partial<AnalyticsInsight>).impactScore;
       const result = transformToFeedInsight(insight);
       expect(result.impactScore).toBe(0);
+    });
+  });
+
+  describe('local_visibility_shift', () => {
+    it('renders a risk headline for a visible→not_visible shift', () => {
+      const insight = makeInsight({
+        insightType: 'local_visibility_shift',
+        severity: 'warning',
+        data: { direction: 'risk', marketLabel: 'Austin, TX', keyword: 'dentist austin' },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.headline).toContain('Lost local pack visibility');
+      expect(result.headline).toContain('dentist austin');
+      expect(result.context).toContain('Austin, TX');
+    });
+
+    it('renders a win headline for a not_visible→visible shift', () => {
+      const insight = makeInsight({
+        insightType: 'local_visibility_shift',
+        severity: 'positive',
+        data: { direction: 'win', marketLabel: 'Austin, TX', keyword: 'dentist austin' },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.headline).toContain('Now visible in local pack');
+    });
+
+    it('renders a competitor headline with appearance count', () => {
+      const insight = makeInsight({
+        insightType: 'local_visibility_shift',
+        severity: 'opportunity',
+        data: { direction: 'competitor', marketLabel: 'Austin, TX', competitorName: 'Rival Dental', competitorAppearances: 3 },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.headline).toContain('Rival Dental');
+      expect(result.context).toContain('3 keywords');
     });
   });
 });

@@ -10,12 +10,12 @@
  * - Workspace isolation: admin list does not leak actions across workspaces
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 
-const ctx = createTestContext(13697);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

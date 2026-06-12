@@ -19,10 +19,11 @@
  * admitted ONLY for `kind:'order'` (see `CLIENT_FACING_ORDER_STATUSES` + `isClientFacingDeliverable`),
  * so no other type leaks `ordered`/`in_progress`/`completed` into the client list.
  *
- * This is a PURE read: it writes nothing. The `client_deliverable` table is empty until the
- * per-type send-path cutover flips (Phase 1), so in production this returns only the projected
- * copy/content_request entries — that's expected and correct (the endpoint is exercised with
- * seeded rows in tests). Leaf-ish: imports the store + source readers + the projected adapters.
+ * This is a PURE read: it writes nothing. The `client_deliverable` table is LIVE in
+ * production: the send-time dual-write mirrors (approval batches, client actions, schema
+ * plans, work orders, briefings) run unconditionally — no feature flag gates them — so this
+ * read returns physical rows alongside the projected copy/content_request entries.
+ * Leaf-ish: imports the store + source readers + the projected adapters.
  *
  * IMPORTANT: this module does NOT depend on any `unified-*` flag. The flag gates whether the
  * CLIENT fetches this endpoint (src/hooks/client/useUnifiedInbox.ts) — the read itself is inert
@@ -30,6 +31,7 @@
  * remain testable with seeded rows regardless of flag state.
  */
 import { listDeliverables } from '../../client-deliverables.js';
+import { countWorkOrderCommentsByOrderIds } from '../../work-order-comments.js';
 import { getSectionsForEntry, getMetadata } from '../../copy-review.js';
 import { listBlueprints } from '../../page-strategy.js';
 import { listContentRequests } from '../../content-requests.js';
@@ -83,6 +85,33 @@ function bySentDesc(a: ClientDeliverable, b: ClientDeliverable): number {
   const bk = b.sentAt ?? b.createdAt;
   if (ak !== bk) return ak < bk ? 1 : -1;
   return a.id < b.id ? 1 : -1;
+}
+
+/** Extract the work order id from a deliverable sourceRef (`work_order:<id>`), or null. */
+function workOrderIdFromSourceRef(sourceRef: string | null): string | null {
+  if (!sourceRef) return null;
+  const prefix = 'work_order:';
+  return sourceRef.startsWith(prefix) ? sourceRef.slice(prefix.length) : null;
+}
+
+function addWorkOrderCommentCounts(
+  workspaceId: string,
+  deliverables: ClientDeliverable[],
+): ClientDeliverable[] {
+  const orderIds = deliverables
+    .filter((d) => d.type === 'work_order' && d.kind === 'order')
+    .map((d) => workOrderIdFromSourceRef(d.sourceRef))
+    .filter((id): id is string => !!id);
+
+  if (orderIds.length === 0) return deliverables;
+
+  const counts = countWorkOrderCommentsByOrderIds(workspaceId, orderIds);
+  return deliverables.map((d) => {
+    if (d.type !== 'work_order' || d.kind !== 'order') return d;
+    const orderId = workOrderIdFromSourceRef(d.sourceRef);
+    if (!orderId) return d;
+    return { ...d, commentCount: counts.get(orderId) ?? 0 };
+  });
 }
 
 /**
@@ -139,7 +168,11 @@ function assembleAllDeliverables(workspaceId: string): ClientDeliverable[] {
   const projectedCopy = projectCopyEntries(workspaceId);
   const projectedRequests = projectContentRequests(workspaceId);
 
-  const all = [...physical, ...projectedCopy, ...projectedRequests];
+  const all = addWorkOrderCommentCounts(workspaceId, [
+    ...physical,
+    ...projectedCopy,
+    ...projectedRequests,
+  ]);
   all.sort(bySentDesc);
   return all;
 }

@@ -16,12 +16,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { WorkspaceHealthBadge } from '../../../src/components/admin/WorkspaceHealthBadge';
 import { ActionQueue } from '../../../src/components/admin/ActionQueue';
 import { BriefingReviewQueue } from '../../../src/components/admin/BriefingReviewQueue';
-import { CannibalizationAlert } from '../../../src/components/admin/CannibalizationAlert';
+import { CannibalizationAlert } from '../../../src/components/ui/CannibalizationAlert';
 import { ClientActionsTab } from '../../../src/components/admin/ClientActionsTab';
 import { AdminInbox } from '../../../src/components/admin/AdminInbox';
 
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
-import type { CannibalizationWarning } from '../../../shared/types/intelligence';
+import type { CannibalizationWarning, CannibalizationEntry } from '../../../shared/types/intelligence';
 import type { ClientAction } from '../../../shared/types/client-actions';
 import type { ClientSignal } from '../../../shared/types/client-signals';
 import type { BriefingDraft } from '../../../shared/types/briefing';
@@ -126,6 +126,15 @@ const makeWarning = (overrides: Partial<CannibalizationWarning> = {}): Cannibali
   severity: 'high',
   ...overrides,
 });
+
+/** Convert CannibalizationWarning (string pages) → CannibalizationEntry (object pages) for the unified component. */
+function warningsToEntries(warnings: CannibalizationWarning[]): CannibalizationEntry[] {
+  return warnings.map(w => ({
+    keyword: w.keyword,
+    severity: w.severity,
+    pages: w.pages.map(p => ({ path: p })),
+  }));
+}
 
 const makeBriefingDraft = (overrides: Partial<BriefingDraft> = {}): BriefingDraft => ({
   id: 'draft-1',
@@ -458,37 +467,31 @@ describe('BriefingReviewQueue', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('CannibalizationAlert', () => {
-  it('renders nothing when warnings is empty', () => {
+  it('renders nothing when entries is empty', () => {
     const { container } = renderWithWrapper(
-      <CannibalizationAlert warnings={[]} tier="growth" />,
+      <CannibalizationAlert entries={[]} tier="growth" />,
     );
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nothing when warnings is null', () => {
+  it('renders nothing when entries is empty array (null-source mapped)', () => {
+    // Mirrors ContentPipeline mapping: null warnings → []
     const { container } = renderWithWrapper(
-      <CannibalizationAlert warnings={null} tier="growth" />,
+      <CannibalizationAlert entries={warningsToEntries([])} tier="growth" />,
     );
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nothing when warnings is undefined', () => {
-    const { container } = renderWithWrapper(
-      <CannibalizationAlert warnings={undefined} tier="growth" />,
-    );
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('renders section card title when warnings exist', () => {
+  it('renders section card title when entries exist', () => {
     renderWithWrapper(
-      <CannibalizationAlert warnings={[makeWarning()]} tier="growth" />,
+      <CannibalizationAlert entries={warningsToEntries([makeWarning()])} tier="growth" />,
     );
     expect(screen.getByText('Keyword Cannibalization Detected')).toBeInTheDocument();
   });
 
   it('renders the keyword name', () => {
     renderWithWrapper(
-      <CannibalizationAlert warnings={[makeWarning({ keyword: 'content marketing' })]} tier="growth" />,
+      <CannibalizationAlert entries={warningsToEntries([makeWarning({ keyword: 'content marketing' })])} tier="growth" />,
     );
     // Text is broken across elements (quotes + text nodes), use container query
     expect(screen.getByText(/content marketing/)).toBeInTheDocument();
@@ -497,7 +500,7 @@ describe('CannibalizationAlert', () => {
   it('renders page paths for high severity', () => {
     renderWithWrapper(
       <CannibalizationAlert
-        warnings={[makeWarning({ pages: ['/blog/seo-tips', '/blog/seo-guide'] })]}
+        entries={warningsToEntries([makeWarning({ pages: ['/blog/seo-tips', '/blog/seo-guide'] })])}
         tier="growth"
       />,
     );
@@ -508,20 +511,20 @@ describe('CannibalizationAlert', () => {
   it('strips protocol and domain from page URLs', () => {
     renderWithWrapper(
       <CannibalizationAlert
-        warnings={[makeWarning({ pages: ['https://example.com/blog/post'] })]}
+        entries={warningsToEntries([makeWarning({ pages: ['https://example.com/blog/post'] })])}
         tier="growth"
       />,
     );
     expect(screen.getByText('/blog/post')).toBeInTheDocument();
   });
 
-  it('renders multiple warnings', () => {
+  it('renders multiple entries', () => {
     renderWithWrapper(
       <CannibalizationAlert
-        warnings={[
+        entries={warningsToEntries([
           makeWarning({ keyword: 'seo tips', severity: 'high' }),
           makeWarning({ keyword: 'link building', severity: 'medium' }),
-        ]}
+        ])}
         tier="growth"
       />,
     );
@@ -532,27 +535,27 @@ describe('CannibalizationAlert', () => {
 
   it('renders TierGate (no lock icon for growth tier)', () => {
     const { container } = renderWithWrapper(
-      <CannibalizationAlert warnings={[makeWarning()]} tier="growth" />,
+      <CannibalizationAlert entries={warningsToEntries([makeWarning()])} tier="growth" />,
     );
     // TierGate should show content (not gate) for growth tier
     expect(screen.getByText('Keyword Cannibalization Detected')).toBeInTheDocument();
     expect(container).toBeTruthy();
   });
 
-  it('renders with medium severity warning', () => {
+  it('renders with medium severity entry', () => {
     renderWithWrapper(
       <CannibalizationAlert
-        warnings={[makeWarning({ severity: 'medium' })]}
+        entries={warningsToEntries([makeWarning({ severity: 'medium' })])}
         tier="premium"
       />,
     );
     expect(screen.getByText('Keyword Cannibalization Detected')).toBeInTheDocument();
   });
 
-  it('renders with low severity warning', () => {
+  it('renders with low severity entry', () => {
     renderWithWrapper(
       <CannibalizationAlert
-        warnings={[makeWarning({ severity: 'low' })]}
+        entries={warningsToEntries([makeWarning({ severity: 'low' })])}
         tier="premium"
       />,
     );

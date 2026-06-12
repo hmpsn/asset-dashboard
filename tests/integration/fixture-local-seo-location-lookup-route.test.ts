@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { updateWorkspace } from '../../server/workspaces.js';
@@ -8,7 +8,7 @@ import {
   type LocalSeoLocationLookupResponse,
 } from '../../shared/types/local-seo.js';
 
-const ctx = createTestContext(13726);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace | null = null;
@@ -18,13 +18,6 @@ let workspaceId = '';
 describe('Fixture local SEO location-lookup route', () => {
   beforeAll(async () => {
     await ctx.startServer();
-
-    const featureEnable = await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
-    expect(featureEnable.status).toBe(200);
 
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
@@ -50,12 +43,6 @@ describe('Fixture local SEO location-lookup route', () => {
   afterAll(async () => {
     if (seeded) seeded.cleanup();
     if (scopedAuth) scopedAuth.cleanup();
-
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
 
     await ctx.stopServer();
   });

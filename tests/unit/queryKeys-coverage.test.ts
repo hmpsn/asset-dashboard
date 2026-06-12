@@ -36,6 +36,10 @@ describe('queryKeys.admin analytics keys', () => {
     const specific = queryKeys.admin.gsc(SITE, '/', 'impressions', 28);
     expect(specific.slice(0, all.length)).toEqual([...all]);
   });
+
+  it('gscAny returns global admin GSC namespace', () => {
+    expect(queryKeys.admin.gscAny()).toEqual(['admin-gsc']);
+  });
 });
 
 // ── Admin — content ────────────────────────────────────────────────────────────
@@ -91,6 +95,10 @@ describe('queryKeys.admin SEO keys', () => {
     expect(queryKeys.admin.auditTraffic(SITE)).toEqual(['admin-audit-traffic', SITE]);
   });
 
+  it('auditTrafficAll returns audit traffic namespace', () => {
+    expect(queryKeys.admin.auditTrafficAll()).toEqual(['admin-audit-traffic']);
+  });
+
   it('schemaSnapshot without wsId', () => {
     const key = queryKeys.admin.schemaSnapshot(SITE);
     expect(key).toEqual(['admin-schema-snapshot', SITE]);
@@ -122,6 +130,16 @@ describe('queryKeys.admin SEO keys', () => {
     const summary = queryKeys.admin.keywordCommandCenterSummary(WS);
     const detail = queryKeys.admin.keywordCommandCenterDetail(WS, 'x');
     expect(detail.slice(0, summary.length - 1)).toEqual(summary.slice(0, -1));
+  });
+
+  it('localSeoVariant uses the legacy summary and snapshot suffixes', () => {
+    const all = queryKeys.admin.localSeo(WS);
+    const summary = queryKeys.admin.localSeoVariant(WS, false);
+    const snapshots = queryKeys.admin.localSeoVariant(WS, true);
+    expect(summary).toEqual(['admin-local-seo', WS, 'summary']);
+    expect(snapshots).toEqual(['admin-local-seo', WS, 'with-snapshots']);
+    expect(summary.slice(0, all.length)).toEqual([...all]);
+    expect(snapshots.slice(0, all.length)).toEqual([...all]);
   });
 
   it('seoEditor without wsId', () => {
@@ -179,6 +197,20 @@ describe('queryKeys.admin brand engine keys', () => {
     expect(queryKeys.admin.blueprint(WS, ID)).toEqual(['admin-blueprint', WS, ID]);
   });
 
+  it('blueprintAll is a prefix of blueprint', () => {
+    const all = queryKeys.admin.blueprintAll(WS);
+    const specific = queryKeys.admin.blueprint(WS, ID);
+    expect(all).toEqual(['admin-blueprint', WS]);
+    expect(specific.slice(0, all.length)).toEqual([...all]);
+  });
+
+  it('blueprintVersionsAll is a prefix of blueprintVersions', () => {
+    const all = queryKeys.admin.blueprintVersionsAll(WS);
+    const specific = queryKeys.admin.blueprintVersions(WS, ID);
+    expect(all).toEqual(['admin-blueprint-versions', WS]);
+    expect(specific.slice(0, all.length)).toEqual([...all]);
+  });
+
   it('discoveryExtractions includes sourceId', () => {
     const key = queryKeys.admin.discoveryExtractions(WS, 'src-1');
     expect(key).toEqual(['admin-discovery-extractions', WS, 'src-1']);
@@ -233,6 +265,23 @@ describe('queryKeys.admin intelligence keys', () => {
 describe('queryKeys.admin outcome keys', () => {
   it('outcomeActions key shape', () => {
     expect(queryKeys.admin.outcomeActions(WS)).toEqual(['admin-outcome-actions', WS]);
+  });
+
+  it('outcomeActionsFiltered matches legacy empty-string filter suffixes', () => {
+    expect(queryKeys.admin.outcomeActionsFiltered(WS)).toEqual(['admin-outcome-actions', WS, '', '']);
+    expect(queryKeys.admin.outcomeActionsFiltered(WS, 'content', 'high')).toEqual([
+      'admin-outcome-actions',
+      WS,
+      'content',
+      'high',
+    ]);
+  });
+
+  it('outcomeAction is a detail key under outcomeActions', () => {
+    const all = queryKeys.admin.outcomeActions(WS);
+    const detail = queryKeys.admin.outcomeAction(WS, ID);
+    expect(detail).toEqual(['admin-outcome-actions', WS, ID]);
+    expect(detail.slice(0, all.length)).toEqual([...all]);
   });
 
   it('outcomeScorecard key shape', () => {
@@ -326,6 +375,13 @@ describe('queryKeys.client keys', () => {
     expect(key).toEqual(['client', 'post-preview', WS, 'post-1']);
   });
 
+  it('postPreviewAll is a prefix of postPreview', () => {
+    const all = queryKeys.client.postPreviewAll(WS);
+    const specific = queryKeys.client.postPreview(WS, 'post-1');
+    expect(all).toEqual(['client', 'post-preview', WS]);
+    expect(specific.slice(0, all.length)).toEqual([...all]);
+  });
+
   it('postPreview handles undefined postId', () => {
     const key = queryKeys.client.postPreview(WS, undefined);
     expect(key).toEqual(['client', 'post-preview', WS, undefined]);
@@ -335,6 +391,10 @@ describe('queryKeys.client keys', () => {
     const count = queryKeys.client.copyEntriesCount(WS);
     const entries = queryKeys.client.copyEntries(WS);
     expect(count).not.toEqual(entries);
+  });
+
+  it('trackedKeywords key shape', () => {
+    expect(queryKeys.client.trackedKeywords(WS)).toEqual(['client-tracked-keywords', WS]);
   });
 
   it('copySections includes entryId', () => {

@@ -11,7 +11,7 @@ import {
   detectCompetitorAlerts, saveCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
-import { isFeatureEnabled } from './feature-flags.js';
+import { computeImpactScore } from './insight-enrichment.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as OpportunityEvents from './opportunity-events.js';
 import type * as OpportunityRegen from './scoring/opportunity-regen.js';
@@ -111,28 +111,25 @@ async function runCompetitorCheck(): Promise<void> {
         }
 
         // ── PR7 · Spine B — competitor → opportunity-event detector setup. ──
-        // When the events flag is ON, resolve a keyword→our-page map once per
-        // workspace so a competitor-overtake alert can raise a DECAYING timing
-        // boost on the page that ranks for the overtaken keyword. Entirely gated +
-        // try/catch isolated; flag OFF leaves this map empty and emits no events.
-        const eventsFlagOn = isFeatureEnabled('opportunity-value-events');
+        // Resolve a keyword→our-page map once per workspace so a competitor-
+        // overtake alert can raise a DECAYING timing boost on the page that ranks
+        // for the overtaken keyword. Try/catch isolated; failures degrade to
+        // domain-level events only.
         const keywordToPage = new Map<string, string>();
         let competitorEventsWritten = 0;
-        if (eventsFlagOn) {
-          try {
-            const { listPageKeywords }: typeof PageKeywords = await import('./page-keywords.js'); // dynamic-import-ok
-            const { keywordComparisonKey } = await import('../shared/keyword-normalization.js'); // dynamic-import-ok
-            for (const pk of listPageKeywords(ws.id)) {
-              if (!pk.pagePath) continue;
-              const keys = [pk.primaryKeyword, ...(pk.secondaryKeywords ?? [])];
-              for (const kw of keys) {
-                const norm = keywordComparisonKey(kw);
-                if (norm && !keywordToPage.has(norm)) keywordToPage.set(norm, pk.pagePath);
-              }
+        try {
+          const { listPageKeywords }: typeof PageKeywords = await import('./page-keywords.js'); // dynamic-import-ok
+          const { keywordComparisonKey } = await import('../shared/keyword-normalization.js'); // dynamic-import-ok
+          for (const pk of listPageKeywords(ws.id)) {
+            if (!pk.pagePath) continue;
+            const keys = [pk.primaryKeyword, ...(pk.secondaryKeywords ?? [])];
+            for (const kw of keys) {
+              const norm = keywordComparisonKey(kw);
+              if (norm && !keywordToPage.has(norm)) keywordToPage.set(norm, pk.pagePath);
             }
-          } catch (mapErr) {
-            log.warn({ workspaceId: ws.id, err: mapErr }, 'competitor event keyword map build failed — emitting domain-level events only');
           }
+        } catch (mapErr) {
+          log.warn({ workspaceId: ws.id, err: mapErr }, 'competitor event keyword map build failed — emitting domain-level events only');
         }
 
         let anyDomainFailed = false;
@@ -156,21 +153,24 @@ async function runCompetitorCheck(): Promise<void> {
             for (const alert of alerts) {
               // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
               const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
+              const alertData = {
+                competitorDomain: alert.competitorDomain,
+                alertType: alert.alertType,
+                keyword: alert.keyword,
+                previousPosition: alert.previousPosition,
+                currentPosition: alert.currentPosition,
+                positionChange: alert.positionChange,
+                volume: alert.volume,
+                snapshotDate: alert.snapshotDate,
+              };
               const insight = upsertInsight({
                 workspaceId: ws.id,
                 pageId: alertPageId,
                 insightType: 'competitor_alert',
-                data: {
-                  competitorDomain: alert.competitorDomain,
-                  alertType: alert.alertType,
-                  keyword: alert.keyword,
-                  previousPosition: alert.previousPosition,
-                  currentPosition: alert.currentPosition,
-                  positionChange: alert.positionChange,
-                  volume: alert.volume,
-                  snapshotDate: alert.snapshotDate,
-                },
+                data: alertData,
                 severity: alert.severity,
+                domain: 'search',
+                impactScore: computeImpactScore(alert.severity, alertData as Record<string, unknown>),
               });
               // Link the alert row back to its insight for traceability
               linkAlertToInsight(alert.id, insight.id, ws.id);
@@ -180,8 +180,8 @@ async function runCompetitorCheck(): Promise<void> {
               // fading signal. We key the event to OUR page that ranks for that
               // keyword (when resolvable) so the boost lands on the right rec. We do
               // NOT mint a net-new defensive rec (DEFERRED) — the boost on existing
-              // recs is the value. Flag-gated + try/catch (never break the cron).
-              if (eventsFlagOn && alert.keyword) {
+              // recs is the value. Try/catch isolated so this never breaks the cron.
+              if (alert.keyword) {
                 try {
                   const { keywordComparisonKey } = await import('../shared/keyword-normalization.js'); // dynamic-import-ok
                   const { insertOpportunityEvent }: typeof OpportunityEvents = await import('./opportunity-events.js'); // dynamic-import-ok

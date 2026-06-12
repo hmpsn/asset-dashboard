@@ -17,11 +17,11 @@
  *   - The Zod schema is strict: missing or wrong-typed fields return 400
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { listClientSignals } from '../../server/client-signals-store.js';
 
-const ctx = createTestContext(13301);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { postJson, api } = ctx;
 
 // One workspace per describe block that sends POST requests.

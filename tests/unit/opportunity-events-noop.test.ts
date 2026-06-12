@@ -1,11 +1,9 @@
 /**
- * PR7 · Spine B — NO-OP proof: with the `opportunity-value-events` flag OFF,
- * event-driven re-ranking is completely inert.
+ * PR7 · Spine B — event-driven re-ranking proof.
  *
  *   1. computeOpportunityValue is byte-identical with timingBoost 0 vs the OFF path
  *      (no timingBoost) — proving the scorer math is unchanged (timing multiplier 1).
- *   2. With the flag OFF, even when active events exist, computeTimingBoosts is empty
- *      → every rec's attached opportunity value is identical to a run with NO events.
+ *   2. With a fresh active event on a target page, attached opportunity values rise.
  *   3. generateRecommendations does NOT write opportunity_events rows.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -49,7 +47,6 @@ vi.mock('../../server/analytics-insights-store.js', async (importOriginal) => {
 });
 
 import db from '../../server/db/index.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { generateRecommendations } from '../../server/recommendations.js';
 import { computeOpportunityValue } from '../../server/scoring/opportunity-value.js';
@@ -64,13 +61,11 @@ beforeAll(() => {
 afterAll(() => {
   db.prepare("DELETE FROM opportunity_events WHERE workspace_id = ?").run(ws.workspaceId);
   db.prepare("DELETE FROM recommendation_sets WHERE workspace_id = ?").run(ws.workspaceId);
-  setFlagOverride('opportunity-value-events', null);
   ws.cleanup();
 });
 
 beforeEach(() => {
   db.prepare("DELETE FROM opportunity_events WHERE workspace_id = ?").run(ws.workspaceId);
-  setFlagOverride('opportunity-value-events', false);
 });
 
 describe('computeOpportunityValue — timingBoost 0 is identity', () => {
@@ -88,16 +83,14 @@ describe('computeOpportunityValue — timingBoost 0 is identity', () => {
   });
 });
 
-describe('generateRecommendations — flag OFF no-op', () => {
-  it('attaches identical opportunity values whether or not active events exist', async () => {
-    // Run 1: no events.
+describe('generateRecommendations — event-driven re-ranking', () => {
+  it('raises attached opportunity values when active events exist', async () => {
     const set1 = await generateRecommendations(ws.workspaceId);
     const opp1 = set1.recommendations
       .filter(r => r.affectedPages.includes('services/hvac'))
-      .map(r => r.opportunity?.value);
+      .map(r => r.opportunity?.value ?? 0);
     expect(opp1.length).toBeGreaterThan(0);
 
-    // Insert a large, fresh event on the same page — would lift timing IF the flag were ON.
     insertOpportunityEvent({
       workspaceId: ws.workspaceId,
       type: 'competitor',
@@ -106,12 +99,12 @@ describe('generateRecommendations — flag OFF no-op', () => {
       halfLifeDays: 7,
     });
 
-    // Run 2: events present but flag OFF → identical opportunity values.
     const set2 = await generateRecommendations(ws.workspaceId);
     const opp2 = set2.recommendations
       .filter(r => r.affectedPages.includes('services/hvac'))
-      .map(r => r.opportunity?.value);
-    expect(opp2).toEqual(opp1);
+      .map(r => r.opportunity?.value ?? 0);
+    expect(opp2).toHaveLength(opp1.length);
+    expect(Math.max(...opp2)).toBeGreaterThan(Math.max(...opp1));
   });
 
   it('does NOT write opportunity_events rows during generation', async () => {

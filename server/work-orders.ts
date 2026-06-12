@@ -138,9 +138,8 @@ export function createWorkOrder(
 
   invalidateWorkOrderCaches(workspaceId);
 
-  // DARK dual-write (PR-1fg): mirror the freshly-created order into client_deliverable when the
-  // `unified-deliverables-rest` flag is on (default off → no-op). Best-effort/never-throws so it
-  // can never break the live create. Idempotent on `work_order:<id>`.
+  // Mirror the freshly-created order into client_deliverable. Best-effort/never-throws so it can
+  // never break the live create. Idempotent on `work_order:<id>`.
   mirrorWorkOrderToDeliverable(order);
 
   return order;
@@ -178,10 +177,9 @@ export function updateWorkOrder(
   });
   invalidateWorkOrderCaches(workspaceId);
 
-  // DARK dual-write (PR-1fg): re-mirror the order on a status change so the order deliverable
-  // reflects lifecycle progress (pending→ordered, in_progress, completed, cancelled). Gated on a
-  // status change to skip pure assignee/notes edits. When the `unified-deliverables-rest` flag is
-  // off (default) this is a no-op. Best-effort/never-throws; idempotent on `work_order:<id>`.
+  // Re-mirror the order on a status change so the order deliverable reflects lifecycle progress
+  // (pending→ordered, in_progress, completed, cancelled). Gated on a status change to skip pure
+  // assignee/notes edits. Best-effort/never-throws; idempotent on `work_order:<id>`.
   if (updates.status !== undefined) {
     mirrorWorkOrderToDeliverable(order);
   }

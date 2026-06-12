@@ -14,8 +14,9 @@ import {
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
+  deleteKeywordHard,
 } from '../keyword-command-center.js';
-import { isFeatureEnabled } from '../feature-flags.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { getWorkspace } from '../workspaces.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -68,9 +69,11 @@ const rowsQuerySchema = z.object({
     KEYWORD_COMMAND_CENTER_FILTERS.DECLINED,
     KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
     KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY,
+    KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE,
   ]).optional(),
   search: z.string().optional(),
-  sort: z.enum(['priority', 'keyword', 'demand', 'rank']).optional(),
+  sort: z.enum(['priority', 'keyword', 'demand', 'rank', 'clicks', 'difficulty', 'opportunity']).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 }).strict();
@@ -82,7 +85,7 @@ const detailQuerySchema = z.object({
 router.get('/api/webflow/keyword-command-center/:workspaceId/summary', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {
     const payload = await buildKeywordCommandCenterSummary(req.params.workspaceId, {
-      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+      includeLocalSeo: true,
     });
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
@@ -96,7 +99,7 @@ router.get('/api/webflow/keyword-command-center/:workspaceId/rows', requireWorks
     const parsed = rowsQuerySchema.safeParse(req.query);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
     const payload = await buildKeywordCommandCenterRows(req.params.workspaceId, parsed.data, {
-      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+      includeLocalSeo: true,
     });
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });
     res.json(payload);
@@ -111,7 +114,7 @@ router.get('/api/webflow/keyword-command-center/:workspaceId/detail', requireWor
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
     if (!getWorkspace(req.params.workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
     const payload = await buildKeywordCommandCenterDetail(req.params.workspaceId, parsed.data.keyword, {
-      includeLocalSeo: isFeatureEnabled('local-seo-visibility'),
+      includeLocalSeo: true,
     });
     if (!payload) return res.status(404).json({ error: 'Keyword not found' });
     res.json(payload);
@@ -129,7 +132,28 @@ router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireW
     if (message === 'Workspace not found') return res.status(404).json({ error: message });
     if (message === 'Keyword is not tracked') return res.status(404).json({ error: message });
     if (message === 'keyword required') return res.status(400).json({ error: message });
+    // Illegal lifecycle move (e.g. retire an already-retired keyword) — 409 Conflict.
+    if (err instanceof InvalidTransitionError) return res.status(409).json({ error: message });
     if (message.includes('requires explicit confirmation')) return res.status(409).json({ error: message });
+    next(err);
+  }
+});
+
+// Hard-delete a tracked keyword — its OWN channel, deliberately NOT a lifecycle action
+// (never in actionSchema / the bulk set). Ineligible (pinned / client / gap provenance)
+// without ?force=true → 403; retire is the soft alternative. Drops rank history too.
+router.delete('/api/webflow/keyword-command-center/:workspaceId/keywords/:keyword', requireWorkspaceAccess('workspaceId'), (req, res, next) => {
+  try {
+    const keyword = req.params.keyword;
+    const force = req.query.force === 'true';
+    const result = deleteKeywordHard(req.params.workspaceId, keyword, { force });
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Keyword delete failed';
+    if (message === 'Workspace not found') return res.status(404).json({ error: message });
+    if (message === 'Keyword is not tracked') return res.status(404).json({ error: message });
+    if (message === 'keyword required') return res.status(400).json({ error: message });
+    if (message.includes('not eligible for permanent deletion')) return res.status(403).json({ error: message });
     next(err);
   }
 });

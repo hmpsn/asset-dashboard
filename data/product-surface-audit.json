@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-18T18:38:03.404Z",
-  "featureAuditHeadlineCount": 369,
+  "generatedAt": "2026-06-05T02:46:31.636Z",
+  "featureAuditHeadlineCount": 478,
   "productSurfaceEntryCount": 18,
   "humanVerificationCount": 5,
   "recommendations": {
@@ -16,8 +16,8 @@
     "internal-only": 3
   },
   "lifecycle": {
-    "active": 13,
-    "flagged-dark-launch": 3,
+    "active": 16,
+    "flagged-dark-launch": 0,
     "deprecated-but-present": 1,
     "legacy-alias": 1
   },
@@ -129,20 +129,20 @@
         ]
       },
       {
-        "id": "brand-hub-copy-engine",
+        "id": "brand-hub",
         "capability": "Brand & AI Hub (Copy Engine)",
         "boundedContextId": "brand-engine",
         "placement": "progressive-disclosure",
         "role": "support-system",
-        "lifecycle": "flagged-dark-launch",
+        "lifecycle": "active",
         "recommendation": "keep",
         "clientFacing": true,
         "monetizable": true,
         "requiresHumanVerification": false,
         "owner": "brand-engine",
-        "notes": "Gated rollout is correct while phased copy-engine contracts continue to stabilize.",
+        "notes": "Brand Hub is now canonical for admin brand and copy workflows.",
         "evidence": [
-          "src/components/layout/Sidebar.tsx (Brand nav item hidden by copy-engine flag)"
+          "src/components/layout/Sidebar.tsx (Brand nav item)"
         ]
       },
       {
@@ -151,15 +151,15 @@
         "boundedContextId": "client-portal",
         "placement": "progressive-disclosure",
         "role": "support-system",
-        "lifecycle": "flagged-dark-launch",
+        "lifecycle": "active",
         "recommendation": "keep",
         "clientFacing": true,
         "monetizable": true,
         "requiresHumanVerification": false,
         "owner": "client-portal",
-        "notes": "Client-facing brand surface is correctly controlled while content maturity is assessed.",
+        "notes": "Client-facing brand surface is canonical wherever the client portal exposes brand context.",
         "evidence": [
-          "src/components/ClientDashboard.tsx (useFeatureFlag: client-brand-section)"
+          "src/components/ClientDashboard.tsx (brand tab)"
         ]
       },
       {
@@ -304,20 +304,20 @@
         ]
       },
       {
-        "id": "deep-diagnostics",
+        "id": "diagnostics",
         "capability": "Deep Diagnostics",
         "boundedContextId": "platform-foundation",
         "placement": "progressive-disclosure",
         "role": "platform-infrastructure",
-        "lifecycle": "flagged-dark-launch",
+        "lifecycle": "active",
         "recommendation": "hide-behind-progressive-disclosure",
         "clientFacing": false,
         "monetizable": false,
         "requiresHumanVerification": false,
         "owner": "platform-foundation",
-        "notes": "Already hidden behind feature flag and should stay opt-in until operational playbook is complete.",
+        "notes": "Canonical admin diagnostics surface available from progressive-disclosure navigation.",
         "evidence": [
-          "src/components/layout/Sidebar.tsx (diagnostics nav item hidden by deep-diagnostics flag)"
+          "src/components/layout/Sidebar.tsx (Diagnostics nav item)"
         ]
       },
       {

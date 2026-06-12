@@ -13,13 +13,10 @@
  * - Idempotency: same sourceType+sourceId → only one action
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-// Enable outcome tracking feature flag before server starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
-const ctx = createTestContext(13250);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
 
 let testWsId = '';

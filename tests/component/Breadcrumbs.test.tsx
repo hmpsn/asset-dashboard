@@ -10,6 +10,13 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+// useFeatureFlag uses React Query; stub it so it doesn't need a QueryClientProvider.
+// Default OFF (keyword-hub) → byte-identical legacy labels.
+const featureFlagMock = vi.fn((_flag: string) => false);
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (...args: unknown[]) => featureFlagMock(...args),
+}));
+
 // NotificationBell was removed from Breadcrumbs (moved to Sidebar only).
 
 const WORKSPACES: Workspace[] = [
@@ -33,7 +40,10 @@ function renderBreadcrumbs(overrides = {}) {
 }
 
 describe('Breadcrumbs', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    featureFlagMock.mockImplementation((_flag: string) => false);
+  });
 
   it('renders Command Center link', () => {
     renderBreadcrumbs();
@@ -108,5 +118,16 @@ describe('Breadcrumbs', () => {
     expect(TAB_LABELS['analytics-hub']).toBe('Search & Traffic');
     expect(TAB_LABELS['settings']).toBe('Settings');
     expect(TAB_LABELS['revenue']).toBe('Revenue');
+  });
+
+  // ── Keyword Hub crumb (post-W4-cutover: unconditional) ──────────────────────
+  // The Hub is the only keyword surface, so the seo-keywords crumb reads
+  // "Keyword Hub" unconditionally (the old "Keywords" label is retired).
+  it('seo-keywords crumb reads "Keyword Hub"', () => {
+    renderBreadcrumbs({ tab: 'seo-keywords' });
+    expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+    expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
+    // Static map reflects the registry label.
+    expect(TAB_LABELS['seo-keywords']).toBe('Keyword Hub');
   });
 });

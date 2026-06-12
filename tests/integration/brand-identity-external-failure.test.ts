@@ -1,11 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import db from '../../server/db/index.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { getUsageCount } from '../../server/usage-tracking.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createTestContext(13228);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 let workspace: SeededFullWorkspace;

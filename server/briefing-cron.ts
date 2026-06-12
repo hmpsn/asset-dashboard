@@ -11,13 +11,14 @@
 //   to MAX_DEFERRALS times by writing a placeholder draft with an incremented
 //   `preflightDeferralCount`. On the next run after MAX_DEFERRALS, generate
 //   anyway (better stale than silent).
-// - Soft-degrades when `outcome-ai-injection` is OFF: skip the learnings
+// - Soft-degrades when outcome learnings are unavailable: skip the learnings
 //   context block but still generate.
 // - Auto-publishes when ws.autoPublishBriefings && ws.autoPublishAfterHours === 0.
 //
-// Layer composition: instructions (briefing-prompt) → buildSystemPrompt
-// (prompt-assembly) injects voice DNA + guardrails. Do NOT inline voice DNA
-// here.
+// Voice DNA + guardrails are injected by buildSystemPrompt (prompt-assembly).
+// Do NOT inline voice DNA here. The main briefing path is fully deterministic
+// (templates in server/briefing-templates/); the only AI is the optional
+// hero-punch + weekly-opener passes in briefing-prompt.ts.
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -299,10 +300,9 @@ async function runBriefingForWorkspaceInner(
   // briefing templates". No AI call, no parse step, no Zod-on-AI failure
   // mode — the cron's main path is now fully deterministic.
   //
-  // The original AI path lives on disk in `briefing-prompt.ts` for
-  // Phase 2.5c's optional hero-headline punch + weekly-opener. Phase 2.5d
-  // (cleanup) deletes the multi-story narrative path entirely after the
-  // deterministic templates have soaked.
+  // The multi-story narrative AI path was removed in the Phase 2.5d cleanup;
+  // briefing-prompt.ts now holds only the optional hero-headline punch +
+  // weekly-opener passes (Phase 2.5e).
   const t0 = Date.now();
   const tier = (ws.tier as 'free' | 'growth' | 'premium' | undefined) ?? 'free';
   const roiData = (() => {
@@ -545,10 +545,9 @@ async function runBriefingForWorkspaceInner(
   ) {
     const published = markPublished(workspaceId, draft.id, { autoPublished: true });
     if (published) {
-      // DARK dual-write (PR-1fg): mirror the just-auto-published briefing into client_deliverable
-      // as a one-way notification when the `unified-deliverables-rest` flag is on (default off →
-      // no-op). Best-effort/never-throws so it can never break the live auto-publish. Idempotent
-      // on briefing:<id>.
+      // Mirror the just-auto-published briefing into client_deliverable as a one-way notification.
+      // Best-effort/never-throws so it can never break the live auto-publish. Idempotent on
+      // `briefing:<id>`.
       mirrorBriefingToDeliverable(published);
       addActivity(
         workspaceId,

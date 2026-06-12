@@ -23,7 +23,6 @@ import {
 } from '../../server/local-seo.js';
 import * as recommendationsModule from '../../server/recommendations.js';
 import { setBroadcast } from '../../server/broadcast.js';
-import { setFlagOverride, setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { createClientLocation } from '../../server/client-locations.js';
 import { clearCompletedJobs, createJob, getJob } from '../../server/jobs.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
@@ -625,13 +624,13 @@ describe('local SEO provider selection', () => {
     expect(plan?.keywords).toEqual(['cosmetic dentistry austin']);
   });
 
-  it('does not fall back to DataForSEO when the workspace selected SEMRush for local visibility', async () => {
+  it('refreshes local visibility through DataForSEO when the workspace uses the canonical provider', async () => {
     setBroadcast(vi.fn(), vi.fn());
     const ws = createWorkspace('Local SEO Provider Strictness Test');
     cleanupWorkspaceIds.add(ws.id);
     updateWorkspace(ws.id, {
       liveDomain: 'https://local-dental.example.com',
-      seoDataProvider: 'semrush',
+      seoDataProvider: 'dataforseo',
       businessProfile: {
         address: {
           street: '123 Congress Ave',
@@ -663,10 +662,18 @@ describe('local SEO provider selection', () => {
     await runLocalSeoRefreshJob(job.id, ws.id);
 
     expect(getJob(job.id)).toEqual(expect.objectContaining({
-      status: 'error',
-      error: 'No configured local visibility provider',
+      status: 'done',
+      result: expect.objectContaining({
+        refreshed: 1,
+        failed: 0,
+        skipped: 0,
+        workspaceId: ws.id,
+      }),
     }));
-  });
+  // 15 000 ms: this test runs a full refresh + retention prune + recommendation regen
+  // (dynamic import of recommendations.ts). Combined cost can exceed the 5s default on
+  // slower CI runs or when other tests contend for the same SQLite in-memory instance.
+  }, 15_000);
 
   it('counts local visibility per market and keyword instead of collapsing multi-market evidence', async () => {
     setBroadcast(vi.fn(), vi.fn());
@@ -1549,12 +1556,12 @@ describe('getLocalSeoServiceGaps — dental taxonomy', () => {
 
 // ── M-1 Scope D — regen-on-local-refresh hook in runLocalSeoRefreshJob ────────────
 //
-// After a refresh completes, runLocalSeoRefreshJob recomputes the three-gate useLocalGenQual
-// (seo-generation-quality flag + posture ∈ {local,hybrid} + local-seo-visibility flag) and, when
-// all three are ON, dynamic-imports generateRecommendations to surface the fresh evidence. The
-// regen is in its own try/catch — a regen throw must never fail the refresh job. These tests pin:
-//   (a) regen FIRES when all three gates are ON,
-//   (b) regen is a NO-OP when any gate is OFF (umbrella flag / posture non_local / local-seo flag),
+// After a refresh completes, runLocalSeoRefreshJob recomputes the posture gate
+// (posture ∈ {local,hybrid}) and, when true, dynamic-imports generateRecommendations
+// to surface the fresh evidence. The regen is in its own try/catch — a regen throw
+// must never fail the refresh job. These tests pin:
+//   (a) regen FIRES for local/hybrid posture,
+//   (b) regen is a NO-OP for non_local posture,
 //   (c) a regen THROW does NOT fail the refresh job (it still completes 'done').
 describe('Scope D — recommendation regen after local SEO refresh (M-1)', () => {
   let regenSpy: ReturnType<typeof vi.spyOn>;
@@ -1601,101 +1608,43 @@ describe('Scope D — recommendation regen after local SEO refresh (M-1)', () =>
     return ws;
   }
 
-  it('(a) regen FIRES when all three gates are ON (gen-quality + posture local + local-seo-visibility)', async () => {
+  it('(a) regen FIRES for local posture', async () => {
     const ws = seedRefreshableLocalWorkspace('Scope D regen all-gates-ON', LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
-    setFlagOverride('local-seo-visibility', true);
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen ON' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen ON' });
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
 
-      expect(getJob(job.id)?.status).toBe('done');
-      expect(regenSpy).toHaveBeenCalledTimes(1);
-      expect(regenSpy).toHaveBeenCalledWith(ws.id);
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
+    expect(getJob(job.id)?.status).toBe('done');
+    expect(regenSpy).toHaveBeenCalledTimes(1);
+    expect(regenSpy).toHaveBeenCalledWith(ws.id);
   });
 
   it('(a) regen FIRES for hybrid posture too', async () => {
     const ws = seedRefreshableLocalWorkspace('Scope D regen hybrid', LOCAL_SEO_POSTURE.HYBRID);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
-    setFlagOverride('local-seo-visibility', true);
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen hybrid' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
-      expect(getJob(job.id)?.status).toBe('done');
-      expect(regenSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
-  });
-
-  it('(b) regen is a NO-OP when the umbrella seo-generation-quality flag is OFF', async () => {
-    const ws = seedRefreshableLocalWorkspace('Scope D regen umbrella OFF', LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, false);
-    setFlagOverride('local-seo-visibility', true);
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'umbrella OFF' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
-      expect(getJob(job.id)?.status).toBe('done');
-      expect(regenSpy).not.toHaveBeenCalled();
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen hybrid' });
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+    expect(getJob(job.id)?.status).toBe('done');
+    expect(regenSpy).toHaveBeenCalledTimes(1);
   });
 
   it('(b) regen is a NO-OP when posture is non_local', async () => {
     const ws = seedRefreshableLocalWorkspace('Scope D regen non_local', LOCAL_SEO_POSTURE.NON_LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
-    setFlagOverride('local-seo-visibility', true);
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'non_local' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
-      // The refresh job itself still completes (non_local doesn't block the refresh) — only the
-      // regen hook no-ops on the recomputed gate.
-      expect(getJob(job.id)?.status).toBe('done');
-      expect(regenSpy).not.toHaveBeenCalled();
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
-  });
-
-  it('(b) regen is a NO-OP when the global local-seo-visibility flag is OFF', async () => {
-    const ws = seedRefreshableLocalWorkspace('Scope D regen local-seo-flag OFF', LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
-    setFlagOverride('local-seo-visibility', false);
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'local-seo OFF' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
-      expect(getJob(job.id)?.status).toBe('done');
-      expect(regenSpy).not.toHaveBeenCalled();
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'non_local' });
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+    // The refresh job itself still completes (non_local doesn't block the refresh) — only the
+    // regen hook no-ops on the recomputed gate.
+    expect(getJob(job.id)?.status).toBe('done');
+    expect(regenSpy).not.toHaveBeenCalled();
   });
 
   it('(c) a regen throw does NOT fail the refresh job — the job still completes', async () => {
     const ws = seedRefreshableLocalWorkspace('Scope D regen throw non-fatal', LOCAL_SEO_POSTURE.LOCAL);
-    setWorkspaceFlagOverride('seo-generation-quality', ws.id, true);
-    setFlagOverride('local-seo-visibility', true);
     regenSpy.mockRejectedValueOnce(new Error('boom: recommendation regen failed'));
-    try {
-      const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen throws' });
-      await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
-      // The regen threw, but its own try/catch swallows it — the refresh job still reaches 'done'.
-      expect(regenSpy).toHaveBeenCalledTimes(1);
-      const finalJob = getJob(job.id);
-      expect(finalJob?.status).toBe('done');
-      expect(finalJob?.error).toBeUndefined();
-    } finally {
-      setWorkspaceFlagOverride('seo-generation-quality', ws.id, null);
-      setFlagOverride('local-seo-visibility', null);
-    }
+    const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, { workspaceId: ws.id, message: 'regen throws' });
+    await runLocalSeoRefreshJob(job.id, ws.id, { keywords: ['Austin Dentist'] });
+    // The regen threw, but its own try/catch swallows it — the refresh job still reaches 'done'.
+    expect(regenSpy).toHaveBeenCalledTimes(1);
+    const finalJob = getJob(job.id);
+    expect(finalJob?.status).toBe('done');
+    expect(finalJob?.error).toBeUndefined();
   });
 });

@@ -4,10 +4,10 @@
  */
 import { Router } from 'express';
 import { listCollections, getCollectionSchema, listCollectionItems } from '../webflow-cms.js';
+import { listAssets } from '../webflow-assets.js';
 import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '../../shared/types/cms-images.ts';
-import type * as WebflowClient from '../webflow-client.js';
 import { isProgrammingError } from '../errors.js';
 import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { toInsightPageId } from '../helpers.js';
@@ -35,25 +35,18 @@ async function fetchAssetMap(
   byUrl: Map<string, string>; // hostedUrl → assetId
 }> {
   try {
-    const { webflowFetch }: typeof WebflowClient = await import('../webflow-client.js'); // dynamic-import-ok
     const byId = new Map<string, { altText?: string; size?: number; contentType?: string; hostedUrl?: string }>();
     const byUrl = new Map<string, string>();
-    let offset = 0;
-    const limit = 100;
-    while (true) {
-      const res = await webflowFetch(`/sites/${siteId}/assets?limit=${limit}&offset=${offset}`, {}, token);
-      if (!res.ok) break;
-      const data = await res.json() as {
-        assets?: Array<{ id: string; altText?: string; size?: number; contentType?: string; hostedUrl?: string; url?: string }>;
-      };
-      const batch = data.assets || [];
-      for (const a of batch) {
-        const hostedUrl = a.hostedUrl || a.url;
-        byId.set(a.id, { altText: a.altText, size: a.size, contentType: a.contentType, hostedUrl });
-        if (hostedUrl) byUrl.set(hostedUrl, a.id);
-      }
-      if (batch.length < limit) break;
-      offset += limit;
+    const assets = await listAssets(siteId, token);
+    for (const asset of assets) {
+      const hostedUrl = asset.hostedUrl || asset.url;
+      byId.set(asset.id, {
+        altText: asset.altText,
+        size: asset.size,
+        contentType: asset.contentType,
+        hostedUrl,
+      });
+      if (hostedUrl) byUrl.set(hostedUrl, asset.id);
     }
     return { byId, byUrl };
   } catch (err) {

@@ -19,20 +19,20 @@ import { WorkspaceFeatureFlagOverrides } from '../../src/components/settings/Wor
 
 function flag(overrides: Partial<WorkspaceFeatureFlagMeta>): WorkspaceFeatureFlagMeta {
   return {
-    key: 'seo-generation-quality',
+    key: 'keyword-universe-full',
     enabled: false,
     source: 'default',
     inheritedEnabled: false,
     inheritedSource: 'default',
     default: false,
-    label: 'SEO Generation Quality — umbrella (keyword-strategy + recommendation quality)',
-    group: 'SEO Generation Quality',
+    label: 'Keyword Hub — unified keyword surface (KCC + Rank Tracker consolidation)',
+    group: 'Keyword Hub',
     lifecycle: {
       owner: 'analytics-intelligence',
       createdAt: '2026-06-02',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after rollout.',
-      linkedRoadmapItemId: 'seo-genquality-p0-harness',
+      linkedRoadmapItemId: 'keyword-universe-overhaul',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-02',
     },
@@ -51,10 +51,10 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     expect(screen.getByText('Per-Workspace Feature Flags')).toBeInTheDocument();
   });
 
-  it('renders the seo-generation-quality flag with its inherited state and Default source', () => {
+  it('renders the keyword-universe-full flag with its inherited state and Default source', () => {
     useWorkspaceFeatureFlagsMock.mockReturnValue({ data: [flag({})], isLoading: false, isError: false, error: null });
     render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
-    expect(screen.getByText('seo-generation-quality')).toBeInTheDocument();
+    expect(screen.getByText('keyword-universe-full')).toBeInTheDocument();
     expect(screen.getByText('Default')).toBeInTheDocument();
     expect(screen.getByText(/Inherited OFF from default/i)).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     const toggle = screen.getByRole('switch');
     fireEvent.click(toggle);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'seo-generation-quality', enabled: true },
+      { key: 'keyword-universe-full', enabled: true },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
@@ -93,7 +93,7 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     const toggle = screen.getByRole('switch');
     fireEvent.click(toggle);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'seo-generation-quality', enabled: false },
+      { key: 'keyword-universe-full', enabled: false },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
@@ -107,10 +107,10 @@ describe('WorkspaceFeatureFlagOverrides', () => {
       error: null,
     });
     render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
-    const clearButton = screen.getByRole('button', { name: /Clear seo-generation-quality workspace override/i });
+    const clearButton = screen.getByRole('button', { name: /Clear keyword-universe-full workspace override/i });
     fireEvent.click(clearButton);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'seo-generation-quality', enabled: null },
+      { key: 'keyword-universe-full', enabled: null },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });

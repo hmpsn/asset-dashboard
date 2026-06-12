@@ -25,11 +25,9 @@ import { getWorkspace } from './workspaces.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
 import { listEeatAssets } from './eeat-assets.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
+import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
-  buildWorkspaceIntelligence,
-  formatForPrompt,
-  formatPageMapForPrompt,
   invalidateIntelligenceCache,
 } from './workspace-intelligence.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -116,6 +114,14 @@ export async function runPageAnalysisJob({
   let skippedFetch = 0;
   let failed = 0;
   let queuedTotal = 0;
+  const invalidatePageAnalysisReads = (payload: Record<string, unknown>) => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+    debouncedPageAnalysisInvalidate(workspaceId, () => {
+      invalidateIntelligenceCache(workspaceId);
+      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
+      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
+    });
+  };
 
   try {
     updateJob(jobId, { status: 'running', message: 'Discovering pages...' });
@@ -172,6 +178,7 @@ export async function runPageAnalysisJob({
       // but resets analysis results so removed pages don't retain stale scores.
       const cleared = clearAnalysisFields(workspaceId);
       log.info({ cleared }, 'Page analysis: cleared stale analysis fields for re-analyze');
+      invalidatePageAnalysisReads({ cleared, source: 'page-analysis-job', action: 'analysis_cleared' });
     } else {
       toAnalyze = pages.filter(p => {
         const existing = getPageKeyword(workspaceId, p.path);
@@ -206,13 +213,21 @@ export async function runPageAnalysisJob({
         message: 'Page analysis needs an OpenAI API key before it can run.',
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
       });
+      invalidatePageAnalysisReads({
+        analyzed,
+        skipped: skippedFetch + failed,
+        skippedFetch,
+        failed,
+        total: queuedTotal,
+        source: 'page-analysis-job',
+        action: 'analysis_failed',
+      });
       return;
     }
 
-    const slices = ['seoContext', 'learnings'] as const;
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
-    const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
-    const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
+    const seoPrompt = await buildSeoPromptContext(workspaceId);
+    const fullContext = seoPrompt.promptContext;
+    const kwMapCtx = seoPrompt.pageMapContext;
 
     const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 
@@ -410,6 +425,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         message: `Cancelled — ${analyzed} of ${total} pages analyzed`,
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total },
       });
+      addActivity(workspaceId, 'page_analysis', `Bulk page analysis cancelled — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     } else {
       const skipped = skippedFetch + failed;
       const message = skipped > 0
@@ -422,17 +438,11 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         message,
         result: { analyzed, skipped, skippedFetch, failed, total },
       });
+      addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     }
-    addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     if (analyzed > 0) {
-      broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { analyzed, source: 'page-analysis-job' });
+      invalidatePageAnalysisReads({ analyzed, source: 'page-analysis-job' });
     }
-    // Bridge #5: bulk page analysis complete — clear caches
-    debouncedPageAnalysisInvalidate(workspaceId, () => {
-      invalidateIntelligenceCache(workspaceId);
-      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
-      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
-    });
   } catch (err) {
     log.error({ err, jobId }, 'Page analysis job failed');
     if (!isJobCancelled(jobId)) {
@@ -441,6 +451,15 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         error: err instanceof Error ? err.message : String(err),
         message: 'Page analysis failed',
         result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
+      });
+      invalidatePageAnalysisReads({
+        analyzed,
+        skipped: skippedFetch + failed,
+        skippedFetch,
+        failed,
+        total: queuedTotal,
+        source: 'page-analysis-job',
+        action: 'analysis_failed',
       });
     }
   } finally {

@@ -1,11 +1,10 @@
 /**
- * schema_plan dual-write mirror (PR-1c, DARK behind the flag).
+ * schema_plan dual-write mirror.
  *
  * At the schema_plan SEND seam (`POST /api/webflow/schema-plan/:siteId/send-to-client` in
- * `server/routes/webflow-schema.ts`, where the plan status flips to `sent_to_client`), when the
- * `unified-deliverables-rest` flag is ON we ALSO mirror the freshly-sent `SchemaSitePlan` into
- * the unified `client_deliverable` model via the registered `schema_plan` adapter +
- * `upsertDeliverable`. Default off → this is a no-op (NO production behavior change).
+ * `server/routes/webflow-schema.ts`, where the plan status flips to `sent_to_client`), mirror the
+ * freshly-sent `SchemaSitePlan` into the unified `client_deliverable` model via the registered
+ * `schema_plan` adapter + `upsertDeliverable`.
  *
  * Scope (kept tight per the plan): this is the SEND-TIME mirror only. We do NOT mirror on the
  * public feedback path (`:874`), and we do NOT change any reads. Apply stays disabled (D-apply):
@@ -14,7 +13,6 @@
  *
  * The mirror is best-effort and MUST NEVER break the live legacy send: any failure is logged and
  * swallowed (the plan status is already persisted + the client already notified by the route).
- * The flag being off makes this unreachable, so a dark bug can never reach prod.
  *
  * siteId → workspaceId resolution: the deliverable's workspace_id must be the OWNING workspace.
  * The `SchemaSitePlan` already carries `workspaceId` (the owning workspace — `schema_site_plans`
@@ -26,21 +24,35 @@
  */
 import type { SchemaSitePlan } from '../../../shared/types/schema-plan.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
-import { upsertDeliverable } from '../../client-deliverables.js';
+import { findBySourceRef, upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import type { SchemaPlanInput } from './deliverable-adapters/schema-plan.js';
 import { createLogger } from '../../logger.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 
 const log = createLogger('schema-plan-dual-write');
 
-/** The flag that gates the entire schema_plan dual-write. GLOBAL flag, default false (dark). */
-export const SCHEMA_PLAN_FLAG = 'unified-deliverables-rest' as const;
+function schemaPlanDeliverableStatus(
+  status: SchemaSitePlan['status'],
+): ClientDeliverable['status'] | null {
+  switch (status) {
+    case 'sent_to_client':
+      return 'awaiting_client';
+    case 'client_approved':
+      return 'approved';
+    case 'client_changes_requested':
+      return 'changes_requested';
+    case 'active':
+      return 'applied';
+    default:
+      return null;
+  }
+}
 
 /**
- * Mirror a freshly-sent schema plan into `client_deliverable` IFF the flag is on. Returns the
- * mirrored deliverable, or null when the flag is off (no-op) or the mirror was skipped/failed.
- * Never throws — the live legacy send must not be affected.
+ * Mirror a freshly-sent schema plan into `client_deliverable`. Returns the mirrored deliverable, or
+ * null when the mirror was skipped/failed. Never throws — the live legacy send must not be affected.
  *
  * @param workspaceId the OWNING workspace (the route resolves it from `plan.workspaceId`).
  * @param plan the SchemaSitePlan as read back at the send seam (status already `sent_to_client`).
@@ -49,9 +61,6 @@ export function mirrorSchemaPlanToDeliverable(
   workspaceId: string,
   plan: SchemaSitePlan,
 ): ClientDeliverable | null {
-  // Flag default false → dark no-op. The single gate for the whole machinery.
-  if (!isFeatureEnabled(SCHEMA_PLAN_FLAG)) return null;
-
   try {
     const adapter = getAdapter('schema_plan');
     const input: SchemaPlanInput = { plan };
@@ -99,6 +108,92 @@ export function mirrorSchemaPlanToDeliverable(
     // Best-effort: the plan status is already persisted + the client notified. A mirror failure
     // must not surface to the operator or roll back the live send.
     log.error({ err, workspaceId, siteId: plan.siteId }, 'schema-plan mirror failed (swallowed)');
+    return null;
+  }
+}
+
+export function syncSchemaPlanDeliverable(plan: SchemaSitePlan): ClientDeliverable | null {
+  const adapter = getAdapter('schema_plan');
+  const input: SchemaPlanInput = { plan };
+  const sourceRef = adapter.sourceRef(input);
+  const deliverableStatus = schemaPlanDeliverableStatus(plan.status);
+  if (!sourceRef || !deliverableStatus) return null;
+
+  try {
+    const built = adapter.buildPayload(input);
+    const existing = findBySourceRef(plan.workspaceId, 'schema_plan', sourceRef);
+    const nowIso = new Date().toISOString();
+    const deliverable = upsertDeliverable({
+      id: existing?.id,
+      workspaceId: plan.workspaceId,
+      type: 'schema_plan',
+      kind: built.kind,
+      status: deliverableStatus,
+      title: built.title,
+      summary: built.summary ?? null,
+      payload: built.payload,
+      note: existing?.note ?? null,
+      clientResponseNote: existing?.clientResponseNote ?? null,
+      externalRef: built.externalRef ?? null,
+      parentDeliverableId: built.parentDeliverableId ?? null,
+      sentAt: existing?.sentAt ?? nowIso,
+      decidedAt: deliverableStatus === 'approved' || deliverableStatus === 'changes_requested'
+        ? (existing?.decidedAt ?? nowIso)
+        : existing?.decidedAt ?? null,
+      appliedAt: deliverableStatus === 'applied'
+        ? (existing?.appliedAt ?? nowIso)
+        : existing?.appliedAt ?? null,
+      generatedAt: plan.generatedAt,
+      source: existing?.source ?? 'schema-plan-sync',
+      sourceRef,
+    });
+    broadcastToWorkspace(plan.workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+    return deliverable;
+  } catch (err) {
+    log.error({ err, workspaceId: plan.workspaceId, siteId: plan.siteId }, 'schema-plan deliverable sync failed');
+    return null;
+  }
+}
+
+export function cancelSchemaPlanDeliverable(workspaceId: string, siteId: string): ClientDeliverable | null {
+  const sourceRef = `schema_plan:${siteId}`;
+  const existing = findBySourceRef(workspaceId, 'schema_plan', sourceRef);
+  if (!existing) return null;
+
+  try {
+    const deliverable = upsertDeliverable({
+      id: existing.id,
+      workspaceId: existing.workspaceId,
+      type: existing.type,
+      kind: existing.kind,
+      status: 'cancelled',
+      title: existing.title,
+      summary: existing.summary,
+      payload: existing.payload,
+      note: existing.note,
+      clientResponseNote: existing.clientResponseNote,
+      externalRef: existing.externalRef,
+      parentDeliverableId: existing.parentDeliverableId,
+      sentAt: existing.sentAt,
+      decidedAt: existing.decidedAt,
+      dueAt: existing.dueAt,
+      appliedAt: existing.appliedAt,
+      generatedAt: existing.generatedAt,
+      source: existing.source,
+      sourceRef: existing.sourceRef,
+    });
+    broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+    return deliverable;
+  } catch (err) {
+    log.error({ err, workspaceId, siteId }, 'schema-plan deliverable cancel sync failed');
     return null;
   }
 }

@@ -26,6 +26,7 @@ import {
   clearPageState,
   getClientPortalUrl,
   getTokenForSite,
+  getWorkspaceBySiteId,
   type PageEditStatus,
 } from '../../server/workspaces.js';
 
@@ -275,5 +276,30 @@ describe('clearPageState', () => {
 
   it('returns false for non-existent workspace', () => {
     expect(clearPageState('ws_nonexistent', 'p1')).toBe(false);
+  });
+});
+
+describe('getWorkspaceBySiteId', () => {
+  it('resolves a workspace by its linked Webflow site id (parity with listWorkspaces().find)', () => {
+    const siteId = 'site_' + Date.now();
+    const ws = createWorkspace('By Site ' + Date.now(), siteId);
+
+    const bySite = getWorkspaceBySiteId(siteId);
+    const byFind = listWorkspaces().find(w => w.webflowSiteId === siteId);
+
+    expect(bySite).toBeDefined();
+    expect(bySite!.id).toBe(ws.id);
+    // Same row the legacy scan would have returned.
+    expect(bySite!.id).toBe(byFind!.id);
+    expect(bySite!.webflowSiteId).toBe(siteId);
+    // Full structural parity with the legacy scan (same attachPageStates path).
+    expect(bySite).toEqual(byFind);
+
+    deleteWorkspace(ws.id);
+  });
+
+  it('returns undefined for an unknown site id and for empty input', () => {
+    expect(getWorkspaceBySiteId('site_does_not_exist')).toBeUndefined();
+    expect(getWorkspaceBySiteId('')).toBeUndefined();
   });
 });

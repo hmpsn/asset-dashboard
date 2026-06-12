@@ -1,7 +1,6 @@
 /**
  * Integration tests for public-portal READ paths — workspace, tier, and pricing.
  *
- * Port: 13600
  *
  * Covers:
  * - GET /api/public/workspace/:id  — 404 unknown, 200 shape for fresh workspace
@@ -9,10 +8,10 @@
  * - GET /api/public/pricing/:id    — 404 unknown, 200 with pricing shape
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13600);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-pub-99999';

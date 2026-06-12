@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
-import { requireClientPortalAuth, getClientActor } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth, getClientActor } from '../middleware.js';
 import {
   listClientActions,
+  listClientActionsPaged,
 } from '../client-actions.js';
+import { parsePaginationParams } from '../pagination.js';
 import { toClientInboxItem, toClientInboxItems } from '../serializers/client-safe.js';
 import { createLogger } from '../logger.js';
 import {
@@ -78,10 +80,18 @@ router.patch('/api/client-actions/:workspaceId/:actionId', requireWorkspaceAcces
 });
 
 router.get('/api/public/client-actions/:workspaceId', requireClientPortalAuth(), (req, res) => {
-  res.json(toClientInboxItems(listClientActions(req.params.workspaceId)));
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json(toClientInboxItems(listClientActions(req.params.workspaceId)));
+  }
+  const paged = listClientActionsPaged(req.params.workspaceId, pagination.limit, pagination.offset);
+  return res.json({
+    items: toClientInboxItems(paged.items),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
-router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
+router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireAuthenticatedClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
   const actor = getClientActor(req, req.params.workspaceId);
   try {
     const updated = respondToPublicClientAction(req.params.workspaceId, req.params.actionId, req.body, actor);

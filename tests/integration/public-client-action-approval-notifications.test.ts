@@ -66,6 +66,7 @@ import { createClientAction } from '../../server/client-actions.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Server setup ──────────────────────────────────────────────────────────────
 
@@ -94,11 +95,11 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 // ── Seed helpers ──────────────────────────────────────────────────────────────

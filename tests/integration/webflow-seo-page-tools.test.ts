@@ -9,11 +9,10 @@
  * to avoid relying on live Webflow APIs or OpenAI in CI.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const PORT = 13702;
-const ctx = createTestContext(PORT, { env: { OPENAI_API_KEY: '' } });
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { api, postJson } = ctx;
 
 let workspace: SeededFullWorkspace;

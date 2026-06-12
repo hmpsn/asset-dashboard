@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { deleteSchemaPlan, getSchemaPlan, saveSchemaPlan } from '../../server/schema-store.js';
 import db from '../../server/db/index.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 
-const ctx = createTestContext(13277);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 let workspaceId = '';
@@ -112,12 +112,15 @@ describe('public schema plan routes', () => {
     }));
 
     clearCookies();
-    const readRes = await api(`/api/public/schema-plan/${protectedWorkspaceId}`);
+    const readRes = await api(`/api/public/schema-plan/${protectedWorkspaceId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(readRes.status).toBe(401);
 
-    const feedbackRes = await postJson(`/api/public/schema-plan/${protectedWorkspaceId}/feedback`, {
-      action: 'approve',
-      note: 'This should not save.',
+    const feedbackRes = await api(`/api/public/schema-plan/${protectedWorkspaceId}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ action: 'approve', note: 'This should not save.' }),
     });
     expect(feedbackRes.status).toBe(401);
     expect(getSchemaPlan(protectedSiteId)?.status).toBe('sent_to_client');

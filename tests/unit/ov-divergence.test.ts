@@ -1,13 +1,14 @@
 /**
- * OV Divergence shadow-logging tests (PR4).
+ * OV Divergence historical shadow-log tests (PR4 / post-cutover cleanup).
  *
  * Covers:
- *   1. generateRecommendations writes an ov_divergence row — verifies agree/
- *      legacy_top/ov_top correctness on a workspace seeded so legacy and OV
- *      rank differently.
- *   2. recordOvDivergence never throws on degenerate inputs (empty recs, no
+ *   1. Runtime recommendation generation no longer writes fresh ov_divergence
+ *      rows now that legacy scoring has been removed.
+ *   2. recordOvDivergence still safely persists explicit legacy-vs-OV fixtures
+ *      for historical/debug coverage.
+ *   3. recordOvDivergence never throws on degenerate inputs (empty recs, no
  *      opportunity attached, already-completed recs).
- *   3. listOvDivergence is workspace-scoped (rows from wsA don't appear in wsB).
+ *   4. listOvDivergence is workspace-scoped (rows from wsA don't appear in wsB).
  */
 
 // ── Module-level mocks (hoisted by Vitest) ───────────────────────────────────
@@ -56,7 +57,7 @@ vi.mock('../../server/analytics-insights-store.js', async (importOriginal) => {
 
 // ── Imports (after mock declarations) ────────────────────────────────────────
 import { seedWorkspace, seedTwoWorkspaces } from '../fixtures/workspace-seed.js';
-import { generateRecommendations, saveRecommendations, sortRecommendations, deriveOvTier } from '../../server/recommendations.js';
+import { generateRecommendations, sortRecommendations, deriveOvTier } from '../../server/recommendations.js';
 import { recordOvDivergence, listOvDivergence } from '../../server/ov-divergence.js';
 import type { Recommendation, RecPriority } from '../../shared/types/recommendations.js';
 import db from '../../server/db/index.js';
@@ -90,7 +91,7 @@ function makeRec(overrides: Partial<Recommendation> & { id: string }): Recommend
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('OV Divergence — generateRecommendations writes a row', () => {
+describe('OV Divergence — runtime generation no longer writes rows', () => {
   let wsId: string;
   let cleanup: () => void;
 
@@ -105,20 +106,56 @@ describe('OV Divergence — generateRecommendations writes a row', () => {
     cleanup();
   });
 
-  it('writes at least one ov_divergence row after generateRecommendations', async () => {
+  it('does not write fresh ov_divergence rows after generateRecommendations', async () => {
     await generateRecommendations(wsId);
     const rows = listOvDivergence(wsId, 10);
-    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBe(0);
   });
 
-  it('row has expected shape (agree is boolean, computedAt is ISO string)', async () => {
+  it('manual historical rows still parse with the expected shape', () => {
+    const recA = makeRec({
+      id: 'rec_manual_shape_a',
+      workspaceId: wsId,
+      impactScore: 80,
+      opportunity: {
+        value: 30,
+        emvPerWeek: 5,
+        predictedEmv: 60,
+        roiPerEffortDay: 10,
+        confidence: 1.0,
+        calibration: 1.0,
+        groundedSpine: 'computed',
+        components: [],
+        calibrationVersion: 'platform-default',
+        modelVersion: 'ov-1',
+      },
+    });
+    const recB = makeRec({
+      id: 'rec_manual_shape_b',
+      workspaceId: wsId,
+      impactScore: 40,
+      opportunity: {
+        value: 90,
+        emvPerWeek: 50,
+        predictedEmv: 600,
+        roiPerEffortDay: 80,
+        confidence: 1.0,
+        calibration: 1.0,
+        groundedSpine: 'computed',
+        components: [],
+        calibrationVersion: 'platform-default',
+        modelVersion: 'ov-1',
+      },
+    });
+
+    recordOvDivergence(wsId, [recA, recB], [], sortRecommendations, deriveOvTier);
+
     const rows = listOvDivergence(wsId, 1);
-    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBe(1);
     const row = rows[0];
     expect(typeof row.agree).toBe('boolean');
     expect(row.workspaceId).toBe(wsId);
     expect(row.computedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    // legacyTop3 and ovTop3 should be arrays (may be empty for minimal workspace)
     expect(Array.isArray(row.legacyTop3)).toBe(true);
     expect(Array.isArray(row.ovTop3)).toBe(true);
     expect(Array.isArray(row.perRecDelta)).toBe(true);

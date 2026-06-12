@@ -1,6 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { listWorkspaces, getTokenForSite, getClientPortalUrl } from './workspaces.js';
+import { getClientPortalUrl, getTokenForSite, getWorkspace } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from './audit-snapshot-views.js';
@@ -115,7 +115,7 @@ function sendScoreDropAlert(ws: { name: string; id: string }, oldScore: number, 
 }
 
 async function runScheduledAudit(schedule: AuditSchedule) {
-  const ws = listWorkspaces().find(w => w.id === schedule.workspaceId);
+  const ws = getWorkspace(schedule.workspaceId);
   if (!ws?.webflowSiteId) return;
 
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
@@ -376,7 +376,7 @@ export function startScheduler() {
     const now = Date.now();
 
     for (const schedule of schedules) {
-      const ws = listWorkspaces().find(w => w.id === schedule.workspaceId);
+      const ws = getWorkspace(schedule.workspaceId);
       if (!ws?.webflowSiteId) continue;
 
       const lastRun = schedule.lastRunAt ? new Date(schedule.lastRunAt).getTime() : 0;

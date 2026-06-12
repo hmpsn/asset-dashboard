@@ -9,26 +9,25 @@
  * 5. Client: flag individual cells for changes
  */
 import { Router } from 'express';
-import { getMatrix, listMatrices, updateMatrixCell } from '../content-matrices.js';
+import { requireWorkspaceAccess } from '../auth.js';
+import { getMatrix, listMatrices } from '../content-matrices.js';
 import { getTemplate } from '../content-templates.js';
-import { createBatch } from '../approvals.js';
-import { mirrorApprovalBatchToDeliverable } from '../domains/inbox/approval-batch-dual-write.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
-import { broadcastToWorkspace } from '../broadcast.js';
-import { WS_EVENTS } from '../ws-events.js';
-import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
-import { requireClientPortalAuth } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import type { ContentMatrix, MatrixCell } from '../../shared/types/content.ts';
+import {
+  batchApproveMatrixCells,
+  ContentPlanReviewMutationError,
+  flagMatrixCell,
+  sendSamplesForReview,
+  sendTemplateForReview,
+} from '../domains/content-plan/review-mutations.js';
 
 const log = createLogger('routes:content-plan-review');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
-
-function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
-}
 
 const CLIENT_VISIBLE_CELL_STATUSES = new Set(['review', 'flagged', 'approved', 'published']);
 
@@ -126,40 +125,24 @@ router.get('/api/public/content-plan/:workspaceId/:matrixId', (req, res) => {
  */
 router.post(
   '/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag',
+  requireAuthenticatedClientPortalAuth('workspaceId'),
   validate(z.object({ comment: z.string().trim().min(1, 'comment is required').max(2000) })),
   (req, res) => {
   const { comment } = req.body;
 
   try {
-    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
-    const cell = matrix?.cells.find(c => c.id === req.params.cellId);
-    if (!matrix || !cell) return res.status(404).json({ error: 'Cell not found' });
-    if (!CLIENT_VISIBLE_CELL_STATUSES.has(cell.status)) return res.status(409).json({ error: 'Cell is not available for client review' });
-
-    const updated = updateMatrixCell(
-      req.params.workspaceId,
-      req.params.matrixId,
-      req.params.cellId,
-      { status: 'flagged', clientFlag: comment, clientFlaggedAt: new Date().toISOString() },
-    );
-    if (!updated) return res.status(404).json({ error: 'Cell not found' });
-
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Client flagged content plan page "${cell.targetKeyword}"`,
-      comment,
-      { matrixId: matrix.id, cellId: cell.id, action: 'matrix_cell_flagged' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, {
-      matrixId: matrix.id,
-      cellId: cell.id,
-      action: 'matrix_cell_flagged',
-      status: 'flagged',
-    });
-    log.info({ workspaceId: req.params.workspaceId, matrixId: req.params.matrixId, cellId: req.params.cellId }, 'Client flagged cell');
+    flagMatrixCell(req.params.workspaceId, req.params.matrixId, req.params.cellId, comment);
     res.json({ ok: true });
   } catch (err) {
+    if (err instanceof ContentPlanReviewMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    // Defense-in-depth: flagMatrixCell already 409s on non-client-visible cells, but if the
+    // state machine ever rejects the flag edge (e.g. a status added without a flag transition),
+    // surface a clean 409 instead of a 500 so the client sees an actionable error.
+    if (err instanceof InvalidTransitionError) {
+      return res.status(409).json({ error: 'Cell is not available for client review' });
+    }
     log.error({ err }, 'Failed to flag cell');
     res.status(500).json({ error: 'Failed to flag cell' });
   }
@@ -174,67 +157,12 @@ router.post(
  */
 router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
-    if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
-
-    const template = getTemplate(req.params.workspaceId, matrix.templateId);
-    if (!template) return res.status(404).json({ error: 'Template not found' });
-
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-    // Build template summary for client review
-    const sectionSummary = (template.sections || [])
-      .map((s, i) => `${i + 1}. ${s.headingTemplate} (${s.wordCountTarget || '~500'} words)`)
-      .join('\n');
-
-    const templateDescription = [
-      `Page Type: ${template.pageType}`,
-      `URL Pattern: ${template.urlPattern || 'N/A'}`,
-      `Keyword Pattern: ${template.keywordPattern || 'N/A'}`,
-      `Variables: ${(template.variables || []).map(v => v.name).join(', ') || 'None'}`,
-      `\nSections:\n${sectionSummary}`,
-      template.toneAndStyle ? `\nTone & Style: ${template.toneAndStyle}` : '',
-    ].filter(Boolean).join('\n');
-
-    const batch = createBatch(
-      req.params.workspaceId,
-      ws.webflowSiteId || '',
-      `Content Plan: ${matrix.name} — Template Review`,
-      [{
-        pageId: matrix.id,
-        pageTitle: `Template: ${template.name}`,
-        pageSlug: `content-plan-template-${matrix.id}`,
-        field: 'content_plan_template',
-        currentValue: '',
-        proposedValue: templateDescription,
-      }],
-    );
-
-    // Unified deliverables (DARK): mirror the template-review batch as content_plan_template
-    // when the approval-family flag is on. Default off → no-op; never throws.
-    mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, {
-      type: 'content_plan_template',
-      source: 'content-plan-template-review',
-    });
-
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Sent content plan template "${template.name}" for client review`,
-      `Matrix: ${matrix.name}`,
-      { matrixId: matrix.id, templateId: template.id, batchId: batch.id, action: 'template_review_sent' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, {
-      matrixId: matrix.id,
-      templateId: template.id,
-      batchId: batch.id,
-      action: 'template_review_sent',
-    });
-    log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id }, 'Template sent for client review');
+    const { batch } = sendTemplateForReview(req.params.workspaceId, req.params.matrixId);
     res.json({ batchId: batch.id, batch });
   } catch (err) {
+    if (err instanceof ContentPlanReviewMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to send template for review');
     res.status(500).json({ error: 'Failed to send template for review' });
   }
@@ -249,65 +177,12 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWork
   const { cellIds } = req.body as { cellIds: string[] };
 
   try {
-    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
-    if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
-
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-    const selectedCells = matrix.cells.filter(c => cellIds.includes(c.id));
-    if (!selectedCells.length) return res.status(400).json({ error: 'No matching cells found' });
-
-    const items = selectedCells.map(cell => ({
-      pageId: cell.id,
-      pageTitle: cell.targetKeyword,
-      pageSlug: cell.plannedUrl || cell.id,
-      field: 'content_plan_sample',
-      currentValue: '',
-      proposedValue: [
-        `Keyword: ${cell.targetKeyword}`,
-        `Planned URL: ${cell.plannedUrl || 'TBD'}`,
-        cell.variableValues ? `Variables: ${Object.entries(cell.variableValues).map(([k, v]) => `${k}=${v}`).join(', ')}` : '',
-        cell.keywordValidation ? `Volume: ${cell.keywordValidation.volume}, KD: ${cell.keywordValidation.difficulty}` : '',
-      ].filter(Boolean).join('\n'),
-    }));
-
-    const batch = createBatch(
-      req.params.workspaceId,
-      ws.webflowSiteId || '',
-      `Content Plan: ${matrix.name} — Sample Review (${selectedCells.length} pages)`,
-      items,
-    );
-
-    // Unified deliverables (DARK): mirror the sample-review batch as content_plan_sample
-    // when the approval-family flag is on. Default off → no-op; never throws.
-    mirrorApprovalBatchToDeliverable(req.params.workspaceId, batch, {
-      type: 'content_plan_sample',
-      source: 'content-plan-sample-review',
-    });
-
-    // Update cell statuses to review
-    for (const cell of selectedCells) {
-      updateMatrixCell(req.params.workspaceId, req.params.matrixId, cell.id, { status: 'review' });
-    }
-
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Sent ${selectedCells.length} content plan sample${selectedCells.length === 1 ? '' : 's'} for client review`,
-      `Matrix: ${matrix.name}`,
-      { matrixId: matrix.id, batchId: batch.id, cellIds, action: 'sample_review_sent' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, {
-      matrixId: matrix.id,
-      batchId: batch.id,
-      cellIds,
-      action: 'sample_review_sent',
-    });
-    log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id, cellCount: selectedCells.length }, 'Samples sent for client review');
-    res.json({ batchId: batch.id, batch, cellsSent: selectedCells.length });
+    const { batch, cellsSent } = sendSamplesForReview(req.params.workspaceId, req.params.matrixId, cellIds);
+    res.json({ batchId: batch.id, batch, cellsSent });
   } catch (err) {
+    if (err instanceof ContentPlanReviewMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to send samples for review');
     res.status(500).json({ error: 'Failed to send samples for review' });
   }
@@ -320,33 +195,12 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWork
  */
 router.post('/api/content-plan/:workspaceId/:matrixId/batch-approve', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
-    if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
-
-    const approvable = ['planned', 'keyword_validated', 'brief_generated'];
-    const cellsToApprove = matrix.cells.filter(c => approvable.includes(c.status));
-
-    let approvedCount = 0;
-    for (const cell of cellsToApprove) {
-      updateMatrixCell(req.params.workspaceId, req.params.matrixId, cell.id, { status: 'approved' });
-      approvedCount++;
-    }
-
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Approved ${approvedCount} content plan page${approvedCount === 1 ? '' : 's'}`,
-      `Matrix: ${matrix.name}`,
-      { matrixId: matrix.id, approvedCount, action: 'matrix_batch_approved' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, {
-      matrixId: matrix.id,
-      approvedCount,
-      action: 'matrix_batch_approved',
-    });
-    log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, approvedCount }, 'Batch approved remaining cells');
-    res.json({ ok: true, approvedCount, totalCells: matrix.cells.length });
+    const { approvedCount, totalCells } = batchApproveMatrixCells(req.params.workspaceId, req.params.matrixId);
+    res.json({ ok: true, approvedCount, totalCells });
   } catch (err) {
+    if (err instanceof ContentPlanReviewMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to batch approve cells');
     res.status(500).json({ error: 'Failed to batch approve' });
   }

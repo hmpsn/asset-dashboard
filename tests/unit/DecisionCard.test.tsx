@@ -119,6 +119,29 @@ describe('DecisionCard — uniform mode (PR-2a unified inbox)', () => {
     expect(screen.getByRole('button', { name: 'Request changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review →' })).not.toBeInTheDocument();
+    // submitting defaults to false → verbs are enabled.
+    expect(screen.getByRole('button', { name: 'Looks good — implement 3 →' })).toBeEnabled();
+  });
+
+  it('disables the verbs and swaps the approve label while a response is submitting (uniform mode)', () => {
+    // 2026-06-09 audit (client-ux): UnifiedInbox nulls the handlers while a respond
+    // mutation is in flight, but the buttons looked enabled and did nothing on click —
+    // 'the button is broken' on slow networks. InlineApprovalCard already disables +
+    // relabels via approveCtaLabel(submitting); DecisionCard must mirror it.
+    render(
+      <DecisionCard
+        decision={uniform}
+        uniformVerbs
+        submitting
+        onOpen={vi.fn()}
+        onApprove={vi.fn()}
+        onFlagWithNote={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Submitting…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
   });
 
   it('renders read-only "Review →" and NO write verbs when onReview is provided (projected)', () => {

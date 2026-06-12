@@ -3,11 +3,13 @@ import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 
 const approvalsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/approvals.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for approval outcome tracking.
+const approvalApplyService = readFileSync(join(import.meta.dirname, '../../server/domains/inbox/approval-batch-apply.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for extracted approval apply lifecycle.
 const schemaRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-schema.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema outcome tracking.
 const pageToolsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-page-tools.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for live page HTML fetches.
 const rewriteRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-seo-rewrite.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for SEO rewrite fetches.
-const jobsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/jobs.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for background SEO writes.
+const bulkSeoJob = readFileSync(join(import.meta.dirname, '../../server/webflow-bulk-seo-fix-background-job.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for background SEO writes.
 const contentPostsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/content-posts.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for content outcome tracking.
+const publishService = readFileSync(join(import.meta.dirname, '../../server/domains/content/publish-post-to-webflow.ts'), 'utf-8'); // readFile-ok — C3: content publish outcome tracking moved into the shared service consumed by both publish paths.
 const webflowKeywordsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-keywords.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for keyword intelligence context.
 const schemaGenerator = readFileSync(join(import.meta.dirname, '../../server/schema/generator.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for lean schema suggestions.
 const schemaSuggester = readFileSync(join(import.meta.dirname, '../../server/schema-suggester.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema suggestion publishing paths.
@@ -17,12 +19,13 @@ const seoDerived = readFileSync(join(import.meta.dirname, '../../src/components/
 describe('canonical page-address route wiring', () => {
   it('approval outcome tracking stores normalized canonical paths', () => {
     expect(approvalsRoute).toContain('publishedPath: z.string().nullable().optional()');
-    expect(approvalsRoute).toContain('const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug ||');
-    expect(approvalsRoute).toContain('normalizePageUrl(rawAppliedPagePath)');
-    expect(approvalsRoute).toContain('const rawPagePath = item.publishedPath || item.pageSlug ||');
-    expect(approvalsRoute).toContain('normalizePageUrl(rawPagePath)');
+    expect(approvalApplyService).toContain('const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug ||');
+    expect(approvalApplyService).toContain('normalizePageUrl(rawAppliedPagePath)');
+    expect(approvalApplyService).toContain('const rawPagePath = item.publishedPath || item.pageSlug ||');
+    expect(approvalApplyService).toContain('normalizePageUrl(rawPagePath)');
     expect(approvalsRoute).not.toContain('pageUrl: item.pageSlug ? `/${item.pageSlug}` : null');
-    expect(approvalsRoute).not.toContain('captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`)');
+    expect(approvalApplyService).not.toContain('pageUrl: item.pageSlug ? `/${item.pageSlug}` : null');
+    expect(approvalApplyService).not.toContain('captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`)');
   });
 
   it('schema publish paths receive and use publishedPath before pageSlug fallback', () => {
@@ -49,8 +52,11 @@ describe('canonical page-address route wiring', () => {
   });
 
   it('background and AI read paths do not persist or prompt with raw leaf slugs', () => {
-    expect(jobsRoute).toContain("const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '')");
-    expect(contentPostsRoute).toContain('const publishedPagePath = slug ? normalizePageUrl(slug) : null');
+    expect(bulkSeoJob).toContain("const seoChangePagePath = pagePath || (page.slug ? normalizePageUrl(page.slug) : '')");
+    // C3 (audit item #12): the publish outcome-tracking page-address logic moved out of the
+    // content-posts route into the shared publishPostToWebflow() service (one site, both paths).
+    expect(publishService).toContain('const publishedPagePath = slug ? normalizePageUrl(slug) : null');
+    expect(publishService).not.toContain('pageUrl: slug ? `/${slug}` : null');
     expect(contentPostsRoute).not.toContain('pageUrl: slug ? `/${slug}` : null');
     expect(webflowKeywordsRoute).toContain('const pagePath = slug ? normalizePageUrl(slug) : undefined');
     expect(webflowKeywordsRoute).not.toContain("slug.startsWith('/') ? slug : `/${slug}`");

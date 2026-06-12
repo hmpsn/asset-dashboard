@@ -1,22 +1,20 @@
 /**
  * Wave 18 — Integration tests for public-chat usage routes
- * Port: 13440
  *
  * Routes tested (server/routes/public-chat.ts):
  *   GET /api/public/chat-usage/:workspaceId — rate limit check for a workspace
  *   GET /api/public/usage/:workspaceId      — unified usage summary
  *
  * These routes are not covered in the existing public-chat-routes.test.ts
- * (port 13350), which focuses on session CRUD.
  *
  * Also covers supplemental cases for:
  *   GET /api/public/chat-sessions/:workspaceId — invalid channel filter → 400
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13440); // port-ok: wave-18-a3 range 13440-13454
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let workspaceId = '';
@@ -46,7 +44,7 @@ describe('GET /api/public/chat-usage/:workspaceId', () => {
     };
     expect(typeof body.allowed).toBe('boolean');
     expect(typeof body.used).toBe('number');
-    // limit/remaining may be Infinity (serialized as null in JSON) for non-free tiers
+    // limit/remaining are null only for unlimited premium-tier workspaces.
     expect(body).toHaveProperty('limit');
     expect(body).toHaveProperty('remaining');
     expect(typeof body.tier).toBe('string');
@@ -156,17 +154,17 @@ describe('GET /api/public/chat-sessions/:workspaceId — channel filter', () => 
     expect(Array.isArray(body)).toBe(true);
   });
 
-  it('returns 200 for valid channel=admin', async () => {
+  it('returns 400 for non-client channel=admin on the public route', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}?channel=admin`);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
   });
 
-  it('returns 200 for valid channel=search', async () => {
+  it('returns 400 for non-client channel=search on the public route', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}?channel=search`);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
   });
 
-  it('returns 200 with no channel filter (lists all sessions)', async () => {
+  it('returns 200 with no channel filter (defaults to client sessions)', async () => {
     const res = await api(`/api/public/chat-sessions/${workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as unknown[];

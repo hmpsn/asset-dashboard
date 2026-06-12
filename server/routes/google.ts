@@ -5,7 +5,20 @@ import { Router, type RequestHandler } from 'express';
 
 const router = Router();
 
-import { listGA4Properties } from '../google-analytics.js';
+import {
+  getGA4Countries,
+  getGA4Conversions,
+  getGA4DailyTrend,
+  getGA4DeviceBreakdown,
+  getGA4LandingPages,
+  getGA4NewVsReturning,
+  getGA4OrganicOverview,
+  getGA4Overview,
+  getGA4PeriodComparison,
+  getGA4TopPages,
+  getGA4TopSources,
+  listGA4Properties,
+} from '../google-analytics.js';
 import {
   getAuthUrl,
   exchangeCode,
@@ -32,8 +45,8 @@ import {
   listGscSites,
 } from '../search-console.js';
 import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
-import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
-import { getWorkspace, listWorkspaces } from '../workspaces.js';
+import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
+import { getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
 import { validate, z } from '../middleware/validate.js';
@@ -42,8 +55,20 @@ import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
+import { sanitizeProviderError, sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 
 const log = createLogger('google-auth');
+
+function sendGoogleProviderError(
+  res: import('express').Response,
+  err: unknown,
+  message: string,
+  fallback: string,
+  source: 'google' | 'gsc' | 'ga4' | 'ai' = 'google',
+): void {
+  log.error({ err }, message);
+  sendSanitizedProviderError(res, { source, fallback });
+}
 
 const requireWorkspaceGscPropertyAccess: RequestHandler = (req, res, next) => {
   const rawWorkspaceId = req.query.workspaceId;
@@ -101,8 +126,7 @@ router.get('/api/google/gsc-sites', requireAdminAuth, async (_req, res) => {
     const sites = await listGscSites(GLOBAL_KEY);
     res.json(sites);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to list global GSC sites', 'Unable to load Search Console sites. Please reconnect Google or try again.', 'gsc');
   }
 });
 
@@ -130,7 +154,11 @@ router.get('/api/google/callback', async (req, res) => {
     const redirectUrl = IS_PROD ? '/' : 'http://localhost:5173/';
     res.redirect(`${redirectUrl}?google=connected&siteId=${siteId}`);
   } else {
-    res.status(500).send(`Google auth failed: ${result.error}`);
+    log.error({ error: result.error }, 'Google OAuth code exchange failed');
+    res.status(500).send(sanitizeProviderError({
+      source: 'google',
+      fallback: 'Google auth failed. Please reconnect Google and try again.',
+    }));
   }
 });
 
@@ -148,8 +176,7 @@ router.get('/api/google/ga4-properties', requireAdminAuth, async (_req, res) => 
     const properties = await listGA4Properties();
     res.json(properties);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to list GA4 properties', 'Unable to load GA4 properties. Please reconnect Google or try again.', 'ga4');
   }
 });
 
@@ -158,8 +185,7 @@ router.get('/api/google/gsc-sites/:siteId', requireWorkspaceSiteAccessFromQuery(
     const sites = await listGscSites(req.params.siteId);
     res.json(sites);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to list site GSC properties', 'Unable to load Search Console sites. Please reconnect Google or try again.', 'gsc');
   }
 });
 
@@ -173,12 +199,11 @@ router.post('/api/google/search-chat/:siteId', requireWorkspaceSiteAccess({
   if (!openaiKey) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Look up workspace for keyword strategy context
-  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
-  const slices = ['seoContext', 'learnings'] as const;
-  const intel = wsId ? await buildWorkspaceIntelligence(wsId, { slices }) : null;
-  const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) : '';
-  const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
-  const bizCtx = intel?.seoContext?.businessContext ?? '';
+  const wsId = workspaceId || getWorkspaceBySiteId(req.params.siteId)?.id;
+  const seoPrompt = wsId ? await buildSeoPromptContext(wsId) : null;
+  const fullContext = seoPrompt?.promptContext ?? '';
+  const kwMapContext = seoPrompt?.pageMapContext ?? '';
+  const bizCtx = seoPrompt?.intelligence.seoContext?.businessContext ?? '';
 
   try {
     const strategySection = (fullContext || kwMapContext || bizCtx)
@@ -213,8 +238,7 @@ ${JSON.stringify(context, null, 2)}`;
 
     res.json({ answer: aiResult.text || 'No response generated.' });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to generate search chat answer', 'Unable to generate a search answer right now. Please try again.', 'ai');
   }
 });
 
@@ -227,8 +251,7 @@ router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFrom
     const overview = await fetchSearchOverview(req.params.siteId, gscSiteUrl, days);
     res.json(overview);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to fetch search overview', 'Unable to load Search Console overview. Please try again.', 'gsc');
   }
 });
 
@@ -241,8 +264,7 @@ router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFr
     const trend = await fetchPerformanceTrend(req.params.siteId, gscSiteUrl, days);
     res.json(trend);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendGoogleProviderError(res, err, 'Failed to fetch performance trend', 'Unable to load Search Console trend. Please try again.', 'gsc');
   }
 });
 
@@ -254,7 +276,7 @@ router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQ
   try {
     res.json(await fetchSearchDevices(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendGoogleProviderError(res, err, 'Failed to fetch search devices', 'Unable to load Search Console devices. Please try again.', 'gsc');
   }
 });
 
@@ -268,7 +290,7 @@ router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFro
   try {
     res.json(await fetchSearchCountries(req.params.siteId, gscSiteUrl, days, limit));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendGoogleProviderError(res, err, 'Failed to fetch search countries', 'Unable to load Search Console countries. Please try again.', 'gsc');
   }
 });
 
@@ -280,7 +302,7 @@ router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQue
   try {
     res.json(await fetchSearchTypes(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendGoogleProviderError(res, err, 'Failed to fetch search types', 'Unable to load Search Console search types. Please try again.', 'gsc');
   }
 });
 
@@ -292,7 +314,153 @@ router.get('/api/google/search-comparison/:siteId', requireWorkspaceSiteAccessFr
   try {
     res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendGoogleProviderError(res, err, 'Failed to fetch search comparison', 'Unable to load Search Console comparison. Please try again.', 'gsc');
+  }
+});
+
+// ── Admin GA4 Analytics ───────────────────────────────────────────
+
+function getAdminGa4Property(workspaceId: string, res: import('express').Response): string | null {
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.ga4PropertyId) {
+    res.status(400).json({ error: 'GA4 not configured' });
+    return null;
+  }
+  return ws.ga4PropertyId;
+}
+
+router.get('/api/google/analytics-overview/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4Overview(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 overview', 'Unable to load GA4 overview. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-trend/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4DailyTrend(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 trend', 'Unable to load GA4 trend. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-top-pages/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4TopPages(propertyId, days, 200));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 top pages', 'Unable to load GA4 top pages. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-sources/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4TopSources(propertyId, days, 10));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 sources', 'Unable to load GA4 sources. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-devices/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4DeviceBreakdown(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 devices', 'Unable to load GA4 devices. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-countries/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4Countries(propertyId, days, 10));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 countries', 'Unable to load GA4 countries. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-comparison/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4PeriodComparison(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 comparison', 'Unable to load GA4 comparison. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-new-vs-returning/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4NewVsReturning(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 new vs returning', 'Unable to load GA4 new vs returning. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-organic/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4OrganicOverview(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 organic', 'Unable to load GA4 organic overview. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-landing-pages/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const limit = parsePositiveIntQuery(req.query.limit, 25);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
+  const organicOnly = req.query.organic === 'true';
+  try {
+    res.json(await getGA4LandingPages(propertyId, days, limit, organicOnly));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 landing pages', 'Unable to load GA4 landing pages. Please try again.', 'ga4');
+  }
+});
+
+router.get('/api/google/analytics-conversions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const propertyId = getAdminGa4Property(req.params.workspaceId, res);
+  if (!propertyId) return;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  try {
+    res.json(await getGA4Conversions(propertyId, days));
+  } catch (err) {
+    sendGoogleProviderError(res, err, 'Failed to fetch GA4 conversions', 'Unable to load GA4 conversions. Please try again.', 'ga4');
   }
 });
 

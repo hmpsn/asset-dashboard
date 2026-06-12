@@ -9,9 +9,9 @@
  *   - GET /api/webflow/page-html/:siteId with a path but unreachable site → 404
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13408);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 const FAKE_SITE_ID = 'site_page_html_validation_99';

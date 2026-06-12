@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { BadgeTone } from './Badge';
 
 /** Detect light mode — reuses same check as scoreColor(). */
 function isLightMode(): boolean {
@@ -43,6 +44,34 @@ export function aeoScoreBgBarClass(score: number): string {
   if (score >= 60) return 'bg-teal-500';
   if (score >= 30) return 'bg-amber-500';
   return 'bg-red-500';
+}
+
+/**
+ * Canonical rank/position color authority (Wave 2 T1).
+ * Bands: ≤3 → success (emerald), ≤10 → success (emerald), ≤20 → warning (amber),
+ * else → danger (red). undefined / null / 0 → muted.
+ *
+ * FOUR-LAWS FIX: the ≤10 band is emerald (success), NOT teal (actions).
+ * Teal is reserved for interactive/action surfaces; position is a read-only rank metric.
+ *
+ * Returns accent-token class strings matching src/index.css definitions.
+ */
+export function positionColor(pos?: number | null): string {
+  if (!pos) return 'text-[var(--brand-text-muted)]';
+  if (pos <= 10) return 'text-accent-success';
+  if (pos <= 20) return 'text-accent-warning';
+  return 'text-accent-danger';
+}
+
+/**
+ * BadgeTone variant of positionColor — for Badge consumers (e.g. PageKeywordMapContent).
+ * Bands: ≤10 → emerald, ≤20 → amber, else → red. undefined / null / 0 → zinc (muted).
+ */
+export function positionTone(pos?: number | null): BadgeTone {
+  if (!pos) return 'zinc';
+  if (pos <= 10) return 'emerald';
+  if (pos <= 20) return 'amber';
+  return 'red';
 }
 
 /** Generic two-value theme switch. Returns `light` when .dashboard-light is active, `dark` otherwise. */

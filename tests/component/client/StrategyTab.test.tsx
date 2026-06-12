@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { StrategyTab } from '../../../src/components/client/StrategyTab';
 import type { ClientKeywordStrategy } from '../../../src/components/client/types';
 
+const { mockUseClientIntelligence } = vi.hoisted(() => ({
+  mockUseClientIntelligence: vi.fn(),
+}));
+
 // ── React Router ──────────────────────────────────────────────────────────────
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -16,6 +20,10 @@ vi.mock('react-router-dom', async () => {
 // ── BetaContext ───────────────────────────────────────────────────────────────
 vi.mock('../../../src/components/client/BetaContext', () => ({
   useBetaMode: () => false,
+}));
+
+vi.mock('../../../src/hooks/client', () => ({
+  useClientIntelligence: mockUseClientIntelligence,
 }));
 
 // ── Strategy hooks ────────────────────────────────────────────────────────────
@@ -107,6 +115,12 @@ vi.mock('../../../src/components/client/strategy/StrategyDeclinedKeywordsSection
   StrategyDeclinedKeywordsSection: () => <div data-testid="declined-keywords" />,
 }));
 
+// A4: requested-keyword trend card owns its own React Query hook — stub like the
+// other sections (covered by StrategyRequestedKeywordTrendSection.test.tsx).
+vi.mock('../../../src/components/client/strategy/StrategyRequestedKeywordTrendSection', () => ({
+  StrategyRequestedKeywordTrendSection: () => <div data-testid="requested-keyword-trend" />,
+}));
+
 vi.mock('../../../src/components/client/strategy/StrategyDeclineKeywordModal', () => ({
   StrategyDeclineKeywordModal: () => <div data-testid="decline-modal" />,
 }));
@@ -180,6 +194,7 @@ const defaultProps = {
 describe('StrategyTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseClientIntelligence.mockReturnValue({ data: undefined });
   });
 
   it('renders without crashing when strategy data is provided', () => {
@@ -241,6 +256,70 @@ describe('StrategyTab', () => {
       />,
     );
     expect(screen.getByTestId('refresh-summary')).toHaveTextContent('This is a refresh summary note.');
+  });
+
+  it('renders keyword feedback summary from client intelligence when available', () => {
+    mockUseClientIntelligence.mockReturnValue({
+      data: {
+        workspaceId: 'ws-strategy-test',
+        assembledAt: '2026-05-20T00:00:00.000Z',
+        tier: 'growth',
+        insightsSummary: null,
+        pipelineStatus: null,
+        keywordFeedbackSummary: {
+          approvedCount: 3,
+          rejectedCount: 1,
+          approveRate: 0.75,
+          approvedSamples: ['seo services'],
+          rejectedSamples: ['cheap backlinks'],
+          rejectionReasons: ['Off-brand'],
+        },
+      },
+    });
+
+    render(
+      <StrategyTab
+        {...defaultProps}
+        strategyData={makeStrategy()}
+      />,
+    );
+
+    expect(mockUseClientIntelligence).toHaveBeenCalledWith('ws-strategy-test');
+    expect(screen.getByText('Keyword Feedback')).toBeInTheDocument();
+    expect(screen.getByText(/You approved/i).closest('p')).toHaveTextContent(
+      'You approved 75% of keyword suggestions.',
+    );
+    expect(screen.getByText('seo services')).toBeInTheDocument();
+  });
+
+  it('does not render stale keyword feedback summary for a free-tier view', () => {
+    mockUseClientIntelligence.mockReturnValue({
+      data: {
+        workspaceId: 'ws-strategy-test',
+        assembledAt: '2026-05-20T00:00:00.000Z',
+        tier: 'growth',
+        insightsSummary: null,
+        pipelineStatus: null,
+        keywordFeedbackSummary: {
+          approvedCount: 3,
+          rejectedCount: 1,
+          approveRate: 0.75,
+          approvedSamples: ['seo services'],
+          rejectedSamples: ['cheap backlinks'],
+          rejectionReasons: ['Off-brand'],
+        },
+      },
+    });
+
+    render(
+      <StrategyTab
+        {...defaultProps}
+        effectiveTier="free"
+        strategyData={makeStrategy()}
+      />,
+    );
+
+    expect(screen.queryByText('Keyword Feedback')).not.toBeInTheDocument();
   });
 
   it('does NOT render refresh summary section when strategyUx.refreshSummary is absent', () => {

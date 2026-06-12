@@ -1,13 +1,13 @@
 /**
  * stripe routes — extracted from server/index.ts
  */
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 
 const router = Router();
 
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromBody } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
@@ -26,15 +26,51 @@ import {
   createBillingPortalSession,
   cancelSubscription,
   getProductConfig,
+  isProductType,
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
 import { getContentRequest } from '../content-requests.js';
+import { contentProductType } from '../../shared/types/payments.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
+import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
+import type { Workspace } from '../workspaces.js';
 
 const log = createLogger('stripe');
 
-function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: import('express').Response): boolean {
+type CheckoutReturnTab = 'content' | 'health' | 'plans';
+
+interface CheckoutPreflightContext {
+  ws: Workspace;
+  baseUrl: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export function buildCheckoutRedirectUrls(req: Pick<Request, 'protocol' | 'get'>, workspaceId: string, returnTab: CheckoutReturnTab): { baseUrl: string; successUrl: string; cancelUrl: string } {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  return {
+    baseUrl,
+    successUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=cancelled`,
+  };
+}
+
+function buildCheckoutContext(req: Request, res: Response, workspaceId: string, returnTab: CheckoutReturnTab): CheckoutPreflightContext | null {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) {
+    res.status(404).json({ error: 'Workspace not found' });
+    return null;
+  }
+  if (ws.billingMode === 'external') {
+    res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+    return null;
+  }
+  return { ws, ...buildCheckoutRedirectUrls(req, workspaceId, returnTab) };
+}
+
+function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: Response): boolean {
   if (productType !== 'post_polished') return true;
   if (!contentRequestId) {
     res.status(409).json({ error: 'Full-post upgrades require an approved brief request' });
@@ -51,6 +87,57 @@ function validateFullPostUpgradePayment(workspaceId: string, productType: string
   }
   return true;
 }
+
+const stripeProductPriceSchema = z.object({
+  productType: z.string().min(1).max(80).refine(isProductType, 'Unknown product type'),
+  stripePriceId: z.string().max(200),
+  displayName: z.string().min(1).max(200),
+  priceUsd: z.number().nonnegative(),
+  enabled: z.boolean(),
+});
+
+const stripeProductsConfigSchema = z.object({
+  products: z.array(stripeProductPriceSchema).max(100),
+});
+
+// Cart-checkout body caps. A fix cart is bounded — even a full-site audit yields
+// far fewer than these limits — so generous caps keep honest callers unaffected
+// while preventing an unbounded payload (which would also defeat §3's out-of-band
+// persistence). pageIds/issueChecks are capped per item to bound the persisted blob.
+const CART_MAX_ITEMS = 50;
+const CART_MAX_PAGE_IDS = 500;
+const CART_MAX_ISSUE_CHECKS = 100;
+// Content cart context (briefs/posts). Mirrors the single-purchase content
+// payload — server re-derives price + product from this, never trusts a
+// client-supplied amount.
+const cartContentContextSchema = z.object({
+  topic: z.string().min(1).max(200),
+  targetKeyword: z.string().min(1).max(200),
+  serviceType: z.enum(['brief_only', 'full_post']),
+  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']),
+  source: z.enum(['strategy', 'client']),
+  intent: z.string().max(50).optional(),
+  priority: z.string().max(20).optional(),
+  rationale: z.string().max(1000).optional(),
+  notes: z.string().max(1000).optional(),
+  targetPageId: z.string().max(100).optional(),
+  targetPageSlug: z.string().max(200).optional(),
+});
+const cartCheckoutSchema = z.object({
+  workspaceId: z.string().min(1).max(100),
+  items: z
+    .array(
+      z.object({
+        productType: z.string().min(1).max(80),
+        quantity: z.number().int().min(1).max(1000).optional(),
+        pageIds: z.array(z.string().max(400)).max(CART_MAX_PAGE_IDS).optional(),
+        issueChecks: z.array(z.string().max(120)).max(CART_MAX_ISSUE_CHECKS).optional(),
+        content: cartContentContextSchema.optional(),
+      }),
+    )
+    .min(1)
+    .max(CART_MAX_ITEMS),
+}).passthrough();
 
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
@@ -74,9 +161,8 @@ router.post('/api/stripe/config/keys', requireAdminAuth, (req, res) => {
 
 // Save product price mappings
 // Admin-only: product/price configuration is system-level. HMAC token only.
-router.post('/api/stripe/config/products', requireAdminAuth, (req, res) => {
+router.post('/api/stripe/config/products', requireAdminAuth, validate(stripeProductsConfigSchema), (req, res) => {
   const { products } = req.body;
-  if (!Array.isArray(products)) return res.status(400).json({ error: 'products must be an array' });
   saveStripeProducts(products as StripeProductPrice[]);
   res.json({ ok: true, products });
 });
@@ -97,21 +183,15 @@ router.get('/api/stripe/publishable-key', (_req, res) => {
 // --- Stripe Payments ---
 
 // Create a Stripe Checkout session
-router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => {
+router.post('/api/stripe/create-checkout', checkoutLimiter, requireWorkspaceAccessFromBody(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
   if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+  const context = buildCheckoutContext(req, res, workspaceId, 'content');
+  if (!context) return;
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
   if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
-
-  // Build redirect URLs
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}/content?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}/content?payment=cancelled`;
 
   try {
     const { sessionId, url } = await createCheckoutSession({
@@ -120,54 +200,77 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
       contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
       topic: topic ? sanitizeString(topic, 200) : undefined,
       targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
-      successUrl,
-      cancelUrl,
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start checkout. Please try again or contact support.',
+    });
   }
 });
 
 // Cart checkout: multiple SEO fix products in one Stripe session
-router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
+// validate() runs before the workspace-access guard so an over-cap payload is
+// rejected (400) regardless of auth, and bounds the persisted out-of-band cart.
+router.post('/api/stripe/cart-checkout', checkoutLimiter, validate(cartCheckoutSchema), requireWorkspaceAccessFromBody(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, items } = req.body;
   if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
-
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${workspaceId}/health?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${workspaceId}/health?payment=cancelled`;
+  const context = buildCheckoutContext(req, res, workspaceId, 'health');
+  if (!context) return;
 
   try {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
-      items: items.map((i: { productType: string; quantity: number; pageIds?: string[] }) => ({
-        productType: sanitizeString(i.productType, 50) as import('../payments.js').ProductType,
-        quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
-        pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
-      })),
-      successUrl,
-      cancelUrl,
+      items: items.map((i: { productType: string; quantity: number; pageIds?: string[]; issueChecks?: string[]; content?: import('../../shared/types/payments.js').ContentCartContext }) => {
+        // Content items: the server re-derives the productType from serviceType
+        // (contentProductType) so a client can't pick a cheaper content product.
+        const content = i.content
+          ? {
+              topic: sanitizeString(i.content.topic, 200),
+              targetKeyword: sanitizeString(i.content.targetKeyword, 200),
+              serviceType: i.content.serviceType,
+              pageType: i.content.pageType,
+              source: i.content.source,
+              intent: i.content.intent ? sanitizeString(i.content.intent, 50) : undefined,
+              priority: i.content.priority ? sanitizeString(i.content.priority, 20) : undefined,
+              rationale: i.content.rationale ? sanitizeString(i.content.rationale, 1000) : undefined,
+              notes: i.content.notes ? sanitizeString(i.content.notes, 1000) : undefined,
+              targetPageId: i.content.targetPageId ? sanitizeString(i.content.targetPageId, 100) : undefined,
+              targetPageSlug: i.content.targetPageSlug ? sanitizeString(i.content.targetPageSlug, 200) : undefined,
+            }
+          : undefined;
+        return {
+          productType: (content ? contentProductType(content.serviceType) : sanitizeString(i.productType, 50)) as import('../payments.js').ProductType,
+          quantity: content ? 1 : Math.max(1, Math.min(100, Number(i.quantity) || 1)),
+          pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
+          issueChecks: Array.isArray(i.issueChecks) ? i.issueChecks.map((c: string) => sanitizeString(c, 100)) : undefined,
+          content,
+        };
+      }),
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Cart checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create cart checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start cart checkout. Please try again or contact support.',
+    });
   }
 });
 
 // Public: tier upgrade checkout (client-facing)
-router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
-  const ws = getWorkspace(wsId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+  const context = buildCheckoutContext(req, res, wsId, 'plans');
+  if (!context) return;
 
   const { planId } = req.body;
   const productType = planId === 'growth' ? 'plan_growth' : planId === 'premium' ? 'plan_premium' : null;
@@ -176,21 +279,20 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Product not configured: ${productType}` });
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const successUrl = `${baseUrl}/client/${wsId}/plans?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}/client/${wsId}/plans?payment=cancelled`;
-
   try {
     const { sessionId, url } = await createCheckoutSession({
       workspaceId: wsId,
       productType,
-      successUrl,
-      cancelUrl,
+      successUrl: context.successUrl,
+      cancelUrl: context.cancelUrl,
     });
     res.json({ sessionId, url });
   } catch (err) {
     log.error({ err: err }, 'Tier upgrade checkout error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create checkout session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to start plan checkout. Please try again or contact support.',
+    });
   }
 });
 
@@ -220,7 +322,7 @@ router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAcces
 });
 
 // --- ROI Dashboard ---
-router.get('/api/public/roi/:workspaceId', (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+router.get('/api/public/roi/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const roi = computeROI(req.params.workspaceId);
   if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
   res.json(roi);
@@ -243,7 +345,10 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, requireA
     res.json({ url });
   } catch (err) {
     log.error({ err: err }, 'Billing portal error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create billing portal session' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to open the billing portal. Please try again or contact support.',
+    });
   }
 });
 
@@ -259,7 +364,10 @@ router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, req
     res.json(result);
   } catch (err) {
     log.error({ err: err }, 'Cancel subscription error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to cancel subscription' });
+    sendSanitizedProviderError(res, {
+      source: 'stripe',
+      fallback: 'Unable to update the subscription. Please try again or contact support.',
+    });
   }
 });
 

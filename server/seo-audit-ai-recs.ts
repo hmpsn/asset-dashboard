@@ -4,7 +4,7 @@
 
 import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
-import { listWorkspaces, getBrandName } from './workspaces.js';
+import { getBrandName, getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { findPageMapEntryByIdentity, sanitizeForPromptInjection, stripCodeFences } from './helpers.js';
@@ -61,14 +61,14 @@ export async function generateAiRecommendations(opts: AiRecsOpts): Promise<void>
   const apiKey = process.env.OPENAI_API_KEY;
   if (apiKey) {
     // Resolve workspaceId from siteId if not provided
-    const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+    const wsId = workspaceId || getWorkspaceBySiteId(siteId)?.id;
     const pagesNeedingFixes = results.filter(r =>
       r.issues.some(i => ['title', 'meta-description', 'og-tags'].includes(i.check))
     );
     log.info(`Generating AI recommendations for ${pagesNeedingFixes.length} pages (workspace: ${wsId || 'unknown'})...`);
 
     // Resolve brand name so AI uses correct name in suggestions
-    const auditWs = wsId ? listWorkspaces().find(w => w.id === wsId) : undefined;
+    const auditWs = wsId ? getWorkspace(wsId) : undefined;
     const auditBrandName = getBrandName(auditWs);
 
     // Pre-assemble workspace-level slices once — learnings and seoContext base data are identical

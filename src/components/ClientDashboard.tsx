@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { clientPath } from '../routes';
 import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
+import { useRecommendations } from '../hooks/useRecommendations';
+import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
 import {
   AlertTriangle,
   X,
@@ -22,6 +24,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { invalidateWorkspaceEventQueries } from '../lib/wsInvalidation';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
 import { useClientAuth } from '../hooks/useClientAuth';
@@ -34,7 +37,6 @@ import {
   useClientAnnotations,
   useClientAnomalies,
   useClientApprovals,
-  useClientActions,
   useClientRequests,
   useClientContentRequests,
   useClientAuditSummary,
@@ -42,12 +44,10 @@ import {
   useClientStrategy,
   useClientPricing,
   useClientContentPlan,
-  useClientPageKeywords,
   useClientCopyEntries,
 } from '../hooks/client/useClientQueries';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
@@ -61,7 +61,6 @@ import {
   type BusinessProfile,
   type WorkspaceInfo,
   type ClientTab,
-  type ApprovalBatch,
   type ClientContentRequest,
 } from './client/types';
 import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
@@ -88,7 +87,6 @@ function LazyClientTabPanel({ children }: { children: ReactNode }) {
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const queryClient = useQueryClient();
-  const brandTabEnabled = useFeatureFlag('client-brand-section');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -111,6 +109,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const [customDateRange, setCustomDateRange] = useState<AnalyticsDateRange | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dataEnabled, setDataEnabled] = useState(false);
+  const [dismissedTrialBannerKey, setDismissedTrialBannerKey] = useState<string | null>(null);
 
   const dateRange = customDateRange ?? undefined;
   const search = useClientSearch(workspaceId, days, dateRange, dataEnabled && !!ws?.gscPropertyUrl);
@@ -121,16 +120,24 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
-  const clientActionsQ = useClientActions(workspaceId, dataEnabled);
   const requestsQ = useClientRequests(workspaceId, dataEnabled);
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
   const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
   const auditDetailQ = useClientAuditDetail(workspaceId, dataEnabled);
   const strategyQ = useClientStrategy(workspaceId, dataEnabled);
-  const pageKeywordsQ = useClientPageKeywords(workspaceId, dataEnabled);
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
+
+  // ── Recommendations → impact-bands-by-check adapter (R1-A → R1-B seam) ──
+  // Shares the React Query cache with InsightsEngine / OverviewTab — no extra
+  // network request when those components are already mounted on the same page.
+  // gated on dataEnabled so it doesn't fire before workspace auth completes.
+  const { recs: clientRecs } = useRecommendations(dataEnabled ? workspaceId : undefined);
+  const impactBandsByCheck = useMemo(
+    () => buildImpactBandsByCheck(clientRecs),
+    [clientRecs],
+  );
 
   const contentRequests = useMemo(() => contentReqQ.data ?? [], [contentReqQ.data]);
   const requestedTopics = useMemo(() => {
@@ -144,10 +151,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     if (latestRanksQ.error) errs.ranks = 'Unable to load ranking data';
     if (auditSummaryQ.error) errs.audit = 'Unable to load site health data';
     if (approvalsQ.error) errs.approvals = 'Unable to load approvals';
-    if (clientActionsQ.error) errs.clientActions = 'Unable to load client actions';
     if (requestsQ.error) errs.requests = 'Unable to load requests';
     if (contentReqQ.error) errs.content = 'Unable to load content requests';
     if (strategyQ.error) errs.strategy = 'Unable to load SEO strategy';
+    if (search.error) errs.search = 'Unable to load search performance data';
     if (ga4Data.sectionError) errs.analytics = ga4Data.sectionError;
     return errs;
   }, [
@@ -155,18 +162,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     latestRanksQ.error,
     auditSummaryQ.error,
     approvalsQ.error,
-    clientActionsQ.error,
     requestsQ.error,
     contentReqQ.error,
     strategyQ.error,
+    search.error,
     ga4Data.sectionError,
   ]);
-
-  const setApprovalBatches = useCallback((val: ApprovalBatch[] | ((prev: ApprovalBatch[]) => ApprovalBatch[])) => {
-    queryClient.setQueryData(queryKeys.client.approvals(workspaceId), (prev: ApprovalBatch[] | undefined) => {
-      return typeof val === 'function' ? val(prev ?? []) : val;
-    });
-  }, [queryClient, workspaceId]);
 
   const setContentRequests = useCallback((val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => {
     queryClient.setQueryData(queryKeys.client.contentRequests(workspaceId), (prev: ClientContentRequest[] | undefined) => {
@@ -183,10 +184,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     queryClient.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
   }, [queryClient, workspaceId]);
 
-  const loadApprovals = useCallback((_wsId: string) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
-  }, [queryClient, workspaceId]);
-
   const changeDays = useCallback((d: number, _currentWs: WorkspaceInfo | null) => {
     setDays(d);
     setCustomDateRange(null);
@@ -200,44 +197,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     setShowDatePicker(false);
   }, []);
 
-  const refetchClient = useCallback((key: string, _url: string) => {
-    // Copy review has separate full-entry and count probes so the Inbox tab can
-    // detect availability without swallowing full-query errors.
-    if (key === 'copy') {
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
-      return;
-    }
-    const keyFns: Record<string, readonly unknown[]> = {
-      activity: queryKeys.client.activity(workspaceId),
-      approvals: queryKeys.client.approvals(workspaceId),
-      clientActions: queryKeys.client.clientActions(workspaceId),
-      workOrders: queryKeys.client.workOrders(workspaceId),
-      requests: queryKeys.client.requests(workspaceId),
-      content: queryKeys.client.contentRequests(workspaceId),
-      'content-plan': queryKeys.client.contentPlan(workspaceId),
-      audit: queryKeys.client.auditSummary(workspaceId),
-      'audit-detail': queryKeys.client.auditDetail(workspaceId),
-      annotations: queryKeys.client.annotations(workspaceId),
-      anomalies: queryKeys.client.anomalies(workspaceId),
-      'rank-history': queryKeys.client.rankHistory(workspaceId),
-      'latest-ranks': queryKeys.client.latestRanks(workspaceId),
-      strategy: queryKeys.client.strategy(workspaceId),
-      'page-keywords': queryKeys.client.pageKeywords(workspaceId),
-      pricing: queryKeys.client.pricing(workspaceId),
-      'content-subscription': queryKeys.client.contentSubscription(workspaceId),
-      recommendations: queryKeys.shared.recommendations(workspaceId),
-      'client-insights': queryKeys.client.clientInsights(workspaceId),
-      intelligence: queryKeys.client.intelligence(workspaceId),
-      'outcome-summary': queryKeys.client.outcomeSummary(workspaceId),
-      'outcome-wins': queryKeys.client.outcomeWins(workspaceId),
-      // Prefix key: invalidate all client post previews for this workspace.
-      'post-preview': ['client', 'post-preview', workspaceId],
-      // Published briefing refresh for the client briefing overview.
-      briefing: queryKeys.client.briefing(workspaceId),
-    };
-    const qk = keyFns[key];
-    if (qk) queryClient.invalidateQueries({ queryKey: qk });
+  const invalidateClientEvent = useCallback((eventName: typeof WS_EVENTS[keyof typeof WS_EVENTS], data?: unknown) => {
+    invalidateWorkspaceEventQueries(queryClient, eventName, workspaceId, data, 'client-dashboard');
   }, [queryClient, workspaceId]);
 
   const overview = search.overview;
@@ -258,11 +219,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const ga4NewVsReturning = ga4Data.ga4NewVsReturning;
   const ga4Organic = ga4Data.ga4Organic;
   const ga4LandingPages = ga4Data.ga4LandingPages;
+  const searchDataUpdatedAt = search.dataUpdatedAt;
+  const ga4DataUpdatedAt = ga4Data.dataUpdatedAt;
   const anomalies = anomaliesQ.data ?? [];
   const approvalBatches = approvalsQ.data ?? [];
-  const approvalsLoading = approvalsQ.isLoading;
-  const approvalPageKeywords = pageKeywordsQ.data ?? null;
-  const clientActions = clientActionsQ.data ?? [];
   const activityLog = activityQ.data ?? [];
   const rankHistory = rankHistoryQ.data ?? [];
   const latestRanks = latestRanksQ.data ?? [];
@@ -271,7 +231,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const requestsLoading = requestsQ.isLoading;
   const contentPlanSummary = contentPlanQ.data?.summary ?? null;
   const contentPlanKeywords = contentPlanQ.data?.keywords ?? new Map<string, string>();
-  const contentPlanReviewCells = contentPlanQ.data?.reviewCells ?? [];
   const hasCopyEntries = (copyEntriesQ.data ?? 0) > 0;
 
   // ── UI-only state (declared early — needed by hooks below) ──
@@ -313,27 +272,30 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     handlePasswordSubmit, handleClientUserLogin, handleClientLogout,
   } = useClientAuth(workspaceId, ws, loadDashboardData, () => turnstileTokenRef.current, () => setTurnstileReset((r: number) => r + 1));
 
+  // Active tab — resolved from the route. Lifted above chatDeps so the chat
+  // widget can send it as the `currentTab` hint (E4 server-side grounding).
+  const initialTabId = initialTab?.split('/')[0];
+  const tab: ResolvedClientTab = resolveClientTab(initialTabId);
+
   // ── Chat deps (passed to ClientChatWidget which owns the useChat call) ──
   const chatDeps = useMemo(() => ({
     ws, overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices,
     ga4Countries, ga4Events, ga4Conversions, searchComparison, ga4Comparison,
     ga4NewVsReturning, ga4Organic, audit, auditDetail, strategyData,
     latestRanks, activityLog, annotations, approvalBatches, requests,
-    anomalies, days, betaMode,
+    anomalies, days, betaMode, currentTab: tab,
     effectiveTier: (betaMode ? 'premium' : ((ws?.tier as import('./ui').Tier) || 'free')) as import('./ui').Tier,
   }), [ws, overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices,
     ga4Countries, ga4Events, ga4Conversions, searchComparison, ga4Comparison,
     ga4NewVsReturning, ga4Organic, audit, auditDetail, strategyData,
     latestRanks, activityLog, annotations, approvalBatches, requests,
-    anomalies, days, betaMode]);
+    anomalies, days, betaMode, tab]);
 
   // API surface bubbled up from ClientChatWidget for cross-component usage
   const [chatApi, setChatApi] = useState<ClientChatWidgetApi | null>(null);
 
   // ── UI-only state ──
   const clientNavigate = useNavigate();
-  const initialTabId = initialTab?.split('/')[0];
-  const tab: ResolvedClientTab = resolveClientTab(initialTabId, brandTabEnabled);
   const setTab = (t: ClientTab) => {
     clientNavigate(clientPath(workspaceId, t, betaMode));
   };
@@ -369,106 +331,94 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
   useWorkspaceEvents(authenticated ? workspaceId : undefined, {
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
+    [WS_EVENTS.ACTIVITY_NEW]: () => invalidateClientEvent(WS_EVENTS.ACTIVITY_NEW),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    [WS_EVENTS.APPROVAL_UPDATE]: () => invalidateClientEvent(WS_EVENTS.APPROVAL_UPDATE),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    [WS_EVENTS.APPROVAL_APPLIED]: () => invalidateClientEvent(WS_EVENTS.APPROVAL_APPLIED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
+    [WS_EVENTS.CLIENT_ACTION_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CLIENT_ACTION_UPDATE),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.WORK_ORDER_UPDATE]: () => refetchClient('workOrders', `/api/public/work-orders/${workspaceId}`),
+    [WS_EVENTS.WORK_ORDER_UPDATE]: () => invalidateClientEvent(WS_EVENTS.WORK_ORDER_UPDATE),
+    // ws-invalidation-ok — client dashboard keeps work-order comments fresh even when Inbox is not mounted
+    [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => invalidateClientEvent(WS_EVENTS.WORK_ORDER_COMMENT, data),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    [WS_EVENTS.REQUEST_CREATED]: () => invalidateClientEvent(WS_EVENTS.REQUEST_CREATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    [WS_EVENTS.REQUEST_UPDATE]: () => invalidateClientEvent(WS_EVENTS.REQUEST_UPDATE),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_REQUEST_CREATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CONTENT_REQUEST_UPDATE),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.CONTENT_UPDATED]: () => {
-      refetchClient('content', `/api/public/content-requests/${workspaceId}`);
-      refetchClient('content-plan', `/api/public/content-plan/${workspaceId}`);
-      refetchClient('intelligence', '');
-    },
+    [WS_EVENTS.BRIEF_UPDATED]: () => invalidateClientEvent(WS_EVENTS.BRIEF_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => refetchClient('content-subscription', ''),
+    [WS_EVENTS.CONTENT_UPDATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => refetchClient('content-subscription', ''),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => refetchClient('content-subscription', ''),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED),
+    // ws-invalidation-ok — client dashboard keeps unified-inbox cache fresh even when the inbox tab is not mounted
+    [WS_EVENTS.DELIVERABLE_SENT]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_SENT),
+    // ws-invalidation-ok — client dashboard keeps unified-inbox cache fresh even when the inbox tab is not mounted
+    [WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'post:updated': () => refetchClient('post-preview', ''),
+    [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateClientEvent(WS_EVENTS.COPY_SECTION_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'audit:complete': () => {
-      refetchClient('audit', '');
-      refetchClient('activity', '');
-    },
+    [WS_EVENTS.POST_UPDATED]: () => invalidateClientEvent(WS_EVENTS.POST_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'workspace:updated': () => {
+    [WS_EVENTS.AUDIT_COMPLETE]: () => invalidateClientEvent(WS_EVENTS.AUDIT_COMPLETE),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.WORKSPACE_UPDATED]: () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
-      refetchClient('pricing', '');
+      invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED);
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
-      refetchClient('activity', '');
-    },
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.PAGE_STATE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'recommendations:updated': () => refetchClient('recommendations', ''),
+    [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => invalidateClientEvent(WS_EVENTS.RECOMMENDATIONS_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    'briefing:published': () => refetchClient('briefing', ''),
+    [WS_EVENTS.BRIEFING_PUBLISHED]: () => invalidateClientEvent(WS_EVENTS.BRIEFING_PUBLISHED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.STRATEGY_UPDATED]: () => {
-      refetchClient('strategy', '');
-      refetchClient('page-keywords', '');
-    },
+    [WS_EVENTS.STRATEGY_UPDATED]: () => invalidateClientEvent(WS_EVENTS.STRATEGY_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
-      refetchClient('rank-history', '');
-      refetchClient('latest-ranks', '');
-      refetchClient('strategy', '');
-      refetchClient('page-keywords', '');
-    },
+    [WS_EVENTS.RANK_TRACKING_UPDATED]: () => invalidateClientEvent(WS_EVENTS.RANK_TRACKING_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.OUTCOME_SCORED]: () => {
-      refetchClient('outcome-summary', '');
-      refetchClient('outcome-wins', '');
-    },
+    [WS_EVENTS.OUTCOME_SCORED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_SCORED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => refetchClient('outcome-wins', ''),
+    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_EXTERNAL_DETECTED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
-      refetchClient('client-insights', '');
-      refetchClient('intelligence', '');
-    },
+    [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_LEARNINGS_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => {
-      refetchClient('client-insights', '');
-      refetchClient('intelligence', '');
-    },
+    [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_ACTION_RECORDED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
-      refetchClient('client-insights', '');
-      refetchClient('intelligence', '');
-    },
+    [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => refetchClient('annotations', ''),
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.INSIGHT_BRIDGE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.ANOMALIES_UPDATE]: () => refetchClient('anomalies', ''),
+    [WS_EVENTS.INSIGHT_RESOLVED]: () => invalidateClientEvent(WS_EVENTS.INSIGHT_RESOLVED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.SCHEMA_PLAN_SENT]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
-    },
+    [WS_EVENTS.CONTENT_PUBLISHED]: () => invalidateClientEvent(WS_EVENTS.CONTENT_PUBLISHED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaSnapshot(workspaceId) });
-    },
+    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.INTELLIGENCE_CACHE_UPDATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => invalidateClientEvent(WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => invalidateClientEvent(WS_EVENTS.ANNOTATION_BRIDGE_CREATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.ANOMALIES_UPDATE]: () => invalidateClientEvent(WS_EVENTS.ANOMALIES_UPDATE),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_PLAN_SENT]: () => invalidateClientEvent(WS_EVENTS.SCHEMA_PLAN_SENT),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_PLAN_UPDATED]: () => invalidateClientEvent(WS_EVENTS.SCHEMA_PLAN_UPDATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: () => invalidateClientEvent(WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED),
+    // ws-invalidation-ok — R2-B agency work feed: job events refresh the live-now jobs section
+    [WS_EVENTS.JOB_CREATED]: () => invalidateClientEvent(WS_EVENTS.JOB_CREATED),
+    // ws-invalidation-ok — R2-B agency work feed: job events refresh the live-now jobs section
+    [WS_EVENTS.JOB_UPDATED]: () => invalidateClientEvent(WS_EVENTS.JOB_UPDATED),
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
@@ -605,11 +555,21 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // Upgrade modal, SEO services cart). Per-request actions still work via the
   // bypass path in usePayments + PricingConfirmationModal.
   const isExternalBilling = ws?.billingMode === 'external';
+  const trialCountdownDays = ws.trialDaysRemaining ?? 0;
+  const trialBannerDismissKey = `client-trial-banner-dismissed:${workspaceId}:${ws.trialEndsAt ?? 'unknown'}`;
+  const isTrialBannerDismissed = dismissedTrialBannerKey === trialBannerDismissKey || (() => {
+    try { return localStorage.getItem(trialBannerDismissKey) === '1'; } catch { return false; }
+  })();
+  const showTrialCountdownBanner = !betaMode
+    && !isExternalBilling
+    && ws.isTrial
+    && trialCountdownDays <= 5
+    && trialCountdownDays > 0
+    && !isTrialBannerDismissed;
   const NAV = buildClientDashboardNav({
     ws,
     effectiveTier,
     betaMode,
-    brandTabEnabled,
     contentPlanSummary,
     strategyData,
   });
@@ -679,14 +639,25 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           icon={<Icon as={ActiveTabIcon} size="lg" className="text-accent-brand" />}
         />
 
-        {/* Trial countdown banner — shows at day 10 and under */}
-        {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
+        {/* Trial countdown banner — shows at five days and under */}
+        {showTrialCountdownBanner && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
             <Icon as={Clock} size="md" className="text-accent-warning flex-shrink-0" />
-            <p className="t-body text-accent-warning">
-              <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
-              {' '}Upgrade to keep access to all features.
+            <p className="t-body text-accent-warning flex-1">
+              <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
+              {' '}Choose a plan to keep access to all features.
             </p>
+            <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
+            <IconButton
+              icon={X}
+              label="Dismiss trial reminder"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
+                setDismissedTrialBannerKey(trialBannerDismissKey);
+              }}
+            />
           </div>
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
@@ -726,21 +697,21 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           panels={{
             overview: (
               <LazyClientTabPanel>
-                <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
+                <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} searchDataUpdatedAt={searchDataUpdatedAt} ga4DataUpdatedAt={ga4DataUpdatedAt} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
               </LazyClientTabPanel>
             ),
             performance: (
               <LazyClientTabPanel>
-                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} tier={effectiveTier} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ga4DataUpdatedAt={ga4DataUpdatedAt} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
               </LazyClientTabPanel>
             ),
             health: (
               <LazyClientTabPanel>
                 <ErrorBoundary label="Site Health">
-                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
+                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
                     <ErrorBoundary label="Action Plan">
                       <LazyClientTabPanel>
-                        <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+                        <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />
                       </LazyClientTabPanel>
                     </ErrorBoundary>
                   ) : undefined}
@@ -755,7 +726,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             inbox: (
               <LazyClientTabPanel>
-                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} hidePrices={isExternalBilling} />
               </LazyClientTabPanel>
             ),
             'content-plan': (
@@ -767,7 +738,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             plans: (
               <LazyClientTabPanel>
-                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
+                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} hidePrices={isExternalBilling} />
               </LazyClientTabPanel>
             ),
             roi: (
@@ -777,7 +748,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 </ErrorBoundary>
               </LazyClientTabPanel>
             ),
-            brand: brandTabEnabled ? (
+            brand: (
               <LazyClientTabPanel>
                 <ErrorBoundary label="Brand">
                   <BrandTab
@@ -791,7 +762,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   />
                 </ErrorBoundary>
               </LazyClientTabPanel>
-            ) : null,
+            ),
           }}
         />
 

@@ -10,6 +10,7 @@ export type { BadgeTone, BadgeVariant, BadgeSize, BadgeShape } from './Badge';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeDomain, StatusBadgeConfig } from './statusConfig';
 export { CharacterCounter } from './CharacterCounter';
+export { FreshnessStamp, type FreshnessStampProps } from './FreshnessStamp';
 export { SerpPreview } from './SerpPreview';
 export { SocialPreview } from './SocialPreview';
 export { EmptyState } from './EmptyState';
@@ -18,7 +19,7 @@ export { ErrorState, NetworkError, DataError, PermissionError } from './ErrorSta
 export { NextStepsCard } from './NextStepsCard';
 export { ProgressIndicator } from './ProgressIndicator';
 export { TabBar } from './TabBar';
-export { TierGate, TierBadge, type Tier } from './TierGate';
+export { TierGate, TierBadge, tierAtLeast, type Tier } from './TierGate';
 export { AIContextIndicator } from './AIContextIndicator';
 export { ScannerReveal } from './ScannerReveal';
 export { Skeleton, StatCardSkeleton, SectionCardSkeleton, OverviewSkeleton, AnalyticsSkeleton } from './Skeleton';
@@ -29,6 +30,8 @@ export {
   scoreBgBarClass,
   aeoScoreColorClass,
   aeoScoreBgBarClass,
+  positionColor,
+  positionTone,
   DATE_PRESETS_SHORT,
   DATE_PRESETS_FULL,
   DATE_PRESETS_SEARCH,
@@ -48,6 +51,7 @@ export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
 export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
+export { OutcomeReadbackChip, type OutcomeReadbackChipProps } from './OutcomeReadbackChip';
 export { ChartCard, type ChartCardProps } from './ChartCard';
 
 // ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
@@ -62,8 +66,6 @@ export type { IconSize, IconProps } from './Icon';
 // Actions
 export { Button } from './Button';
 export { IconButton } from './IconButton';
-export { ActionPill } from './ActionPill';
-export { SegmentedControl } from './SegmentedControl';
 export { ClickableRow } from './ClickableRow';
 
 // Forms

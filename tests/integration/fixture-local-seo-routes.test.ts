@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { updateWorkspace } from '../../server/workspaces.js';
@@ -7,7 +7,7 @@ import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import type { LocalSeoReadResponse } from '../../shared/types/local-seo.js';
 
-const ctx = createTestContext(13711);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace | null = null;
@@ -17,13 +17,6 @@ let foreignAuth: SeededAuth | null = null;
 describe('Fixture-based local SEO routes', () => {
   beforeAll(async () => {
     await ctx.startServer();
-
-    const featureEnable = await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
-    expect(featureEnable.status).toBe(200);
 
     seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
     workspaceId = seeded.workspaceId;
@@ -57,12 +50,6 @@ describe('Fixture-based local SEO routes', () => {
   afterAll(async () => {
     if (seeded) seeded.cleanup();
     foreignAuth?.cleanup();
-
-    await api('/api/admin/feature-flags/local-seo-visibility', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: null }),
-    });
 
     await ctx.stopServer();
   });

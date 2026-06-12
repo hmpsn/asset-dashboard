@@ -12,11 +12,8 @@ import type { UnifiedPage } from '../../../shared/types/page-join';
 import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
 import { scoreColorClass, Icon, IconButton, ClickableRow } from '../ui';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
-import {
-  intentColor,
-  kdColor,
-  positionColor,
-} from './pageIntelligenceDisplay';
+import { intentColor } from './pageIntelligenceDisplay';
+import { KeywordMetricCell } from '../shared/KeywordMetricCell';
 import { summarizeScoreTrend } from './pageIntelligenceData';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageDetails } from './PageIntelligencePageDetails';
@@ -148,21 +145,17 @@ export function PageIntelligencePageRow({
           )}
           <LocalSeoVisibilityBadge visibility={localSeoVisibility} subtle />
           {strategy?.validated === false && (
-            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
+            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in DataForSEO">{/* // arbitrary-text-ok */}
               Unvalidated
             </span>
           )}
-          {strategy?.volume !== undefined && strategy.volume > 0 && (
-            <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono">{strategy.volume.toLocaleString()}/mo</span>
-          )}
-          {strategy?.difficulty !== undefined && strategy.difficulty > 0 && (
-            <span className={`t-caption-sm ${kdColor(strategy.difficulty)} bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono`}>KD {strategy.difficulty}%</span>
-          )}
-          {strategy?.currentPosition ? (
-            <span className={`t-caption-sm ${positionColor(strategy.currentPosition)} font-mono font-medium bg-[var(--surface-3)] px-1.5 py-0.5 rounded`}>
-              #{strategy.currentPosition.toFixed(0)}
-            </span>
-          ) : null}
+          <KeywordMetricCell
+            volume={strategy?.volume}
+            difficulty={strategy?.difficulty}
+            position={strategy?.currentPosition ?? undefined}
+            mode="span"
+            kdForm="kd-percent"
+          />
           {displayScore !== undefined && (
             <span className={`t-caption font-bold tabular-nums ${scoreColorClass(displayScore)}`}>{displayScore}</span>
           )}

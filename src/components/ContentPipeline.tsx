@@ -1,19 +1,31 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
-import { LoadingState, Icon, IconButton, Button, cn, PageHeader } from './ui';
+import { ArrowUpRight, Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
+import { LoadingState, Icon, IconButton, Button, ClickableRow, cn, PageHeader } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
-import { CannibalizationAlert } from './admin/CannibalizationAlert';
+import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../App';
 import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
+
+/** Synthetic FixContext built from an AI-suggested signal to prefill ContentBriefs. */
+function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
+  return {
+    targetRoute: 'content-pipeline',
+    primaryKeyword: keyword || undefined,
+    // pageUrl from PipelineSignal is a path/slug — pass as pageSlug so
+    // handleGenerate() picks it up via fixContextRef.current?.pageSlug,
+    // targeting the correct page without polluting the keyword field.
+    pageSlug: pageUrl || undefined,
+  };
+}
 
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
 const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
@@ -21,7 +33,6 @@ const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide'
 
 interface Props {
   workspaceId: string;
-  onRequestCountChange?: (count: number) => void;
   fixContext?: FixContext | null;
   clearFixContext?: () => void;
 }
@@ -44,7 +55,7 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
-export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
+export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Props) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
@@ -62,9 +73,30 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       setSearchParams(next, { replace: true });
     }
   };
+
+  // Sync activeTab when the URL ?tab= param changes externally (e.g. ContentCalendar's
+  // openItem navigates to ?tab=posts&post=<id> while the pipeline is already mounted).
+  // Only update when the incoming param is a valid tab that differs from current state;
+  // guard avoids feedback-loops from the handleTabChange call above that clears the param.
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (!param) return;
+    const valid = TABS.some(t => t.id === param);
+    if (valid && param !== activeTab) {
+      setActiveTab(param as PipelineTab);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- activeTab intentionally excluded: including it would loop with handleTabChange
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
+  // Synthetic fixContext built from an AI-suggested signal click; overrides the
+  // parent's fixContext while the user is landing on the briefs tab from AiSuggested.
+  const [pipelinePrefill, setPipelinePrefill] = useState<FixContext | null>(null);
+  // Nonce incremented on every handleCreateBrief call so the ContentBriefs key changes,
+  // forcing a remount even if the user is already on the Briefs tab. Without this, the
+  // fixConsumed ref in ContentBriefs is never reset and a second "Create brief" click
+  // while already on the tab silently drops the new keyword.
+  const [prefillNonce, setPrefillNonce] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
 
   // React Query hook replaces manual data fetching
@@ -106,8 +138,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
     setExportOpen(false);
   };
 
-  // Navigate to briefs tab when an AI-suggested brief is actioned
-  const handleCreateBrief = () => {
+  // Navigate to briefs tab when an AI-suggested signal is actioned.
+  // Builds a synthetic fixContext from the signal's keyword + pageUrl so
+  // ContentBriefs pre-fills the generator instead of landing empty.
+  // Increments prefillNonce so the ContentBriefs key changes on every call,
+  // forcing a remount even if the Briefs tab is already active (the fixConsumed
+  // ref in ContentBriefs is per-mount, so a remount re-consumes the new context).
+  // suggestedBriefId is accepted for interface compatibility (AiSuggested marks it
+  // accepted in the store before calling this); no additional action needed here.
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
+    setPipelinePrefill(buildSignalPrefill(keyword, pageUrl));
+    setPrefillNonce(n => n + 1);
     setActiveTab('briefs');
   };
 
@@ -139,9 +180,13 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         </div>
       )}
 
-      {/* Content decay alert */}
+      {/* Content decay alert — clickable through to Content Decay in SEO Audit */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: 'var(--radius-signature)' }}>
+        <ClickableRow
+          onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+          className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10')}
+          style={{ borderRadius: 'var(--radius-signature)' }}
+        >
           <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-accent-danger' : 'text-accent-warning')} />
           <div className="flex-1">
             <span className="font-medium text-[var(--brand-text-bright)]">
@@ -154,20 +199,25 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
               <span className="ml-1.5">· avg {Math.abs(decay.avgDeclinePct).toFixed(0)}% decline</span>
             </span>
           </div>
+          <Icon as={ArrowUpRight} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
           <IconButton
-            onClick={() => setDecayDismissed(true)}
+            onClick={(e) => { e.stopPropagation(); setDecayDismissed(true); }}
             icon={X}
             label="Dismiss decay alert"
             size="sm"
             variant="ghost"
             className="flex-shrink-0"
           />
-        </div>
+        </ClickableRow>
       )}
 
-      {/* Cannibalization warnings from intelligence */}
+      {/* Cannibalization warnings from intelligence — string-path entries mapped to CannibalizationEntry[] */}
       <CannibalizationAlert
-        warnings={intel?.contentPipeline?.cannibalizationWarnings}
+        entries={(intel?.contentPipeline?.cannibalizationWarnings ?? []).map(w => ({
+          keyword: w.keyword,
+          severity: w.severity,
+          pages: w.pages.map(p => ({ path: p })),
+        }))}
         tier={workspaceTier}
       />
 
@@ -251,7 +301,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         </Suspense>
       )}
       {activeTab === 'briefs' && (
-        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} clearFixContext={clearFixContext} />
+        <ContentBriefs
+          // When pipelinePrefill is active we include the nonce so every handleCreateBrief
+          // call forces a fresh mount even if the tab was already visible, resetting the
+          // fixConsumed ref so the new keyword is reliably pre-filled.
+          key={pipelinePrefill ? `briefs-${workspaceId}-${prefillNonce}` : `briefs-${workspaceId}`}
+          workspaceId={workspaceId}
+          // pipelinePrefill wins over parent fixContext while a signal action is pending.
+          // ContentBriefs calls clearFixContext after consuming — that clears pipelinePrefill.
+          fixContext={pipelinePrefill ?? fixContext}
+          clearFixContext={pipelinePrefill ? () => { setPipelinePrefill(null); clearFixContext?.(); } : clearFixContext}
+        />
       )}
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />

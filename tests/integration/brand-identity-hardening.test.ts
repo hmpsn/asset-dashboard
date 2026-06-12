@@ -9,15 +9,14 @@
  *  I16 – sanitizeErrorMessage: forced AI/internal errors return a 5xx whose body
  *         does NOT contain raw SQLITE_ codes or stack-frame-looking content.
  *
- * Port: 13226 (unique — no other file uses this port).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { getUsageCount } from '../../server/usage-tracking.js';
 
 // Dedicated port — no other test file uses 13226
-const ctx = createTestContext(13226);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 let freeWsId = '';

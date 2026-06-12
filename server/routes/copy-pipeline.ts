@@ -2,18 +2,16 @@
 // Express routes for the Copy Pipeline (Phase 3 — Full Copy Pipeline).
 // Covers: generation, regeneration, review, batch, export, and intelligence patterns.
 
-import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { aiLimiter } from '../middleware.js';
+import { getWorkspace } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
-import { createStmtCache } from '../db/stmt-cache.js';
-import { parseJsonFallback } from '../db/json-validation.js';
 import {
   generateCopySchema,
   regenerateSectionSchema,
@@ -33,7 +31,7 @@ import {
   addClientSuggestion,
   getEntryCopyStatus,
 } from '../copy-review.js';
-import { generateCopyForEntry, regenerateSection } from '../copy-generation.js';
+import { regenerateSection } from '../copy-generation.js';
 import {
   getAllPatterns,
   getPatternsForPromotion,
@@ -44,8 +42,15 @@ import {
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { getBlueprint, getEntry } from '../page-strategy.js';
-import type { BatchJob } from '../../shared/types/copy-pipeline.js';
+import { getBlueprint } from '../page-strategy.js';
+import {
+  createCopyBatchGenerationJob,
+  getCopyBatchJob,
+  runCopyBatchGenerationJob,
+} from '../copy-batch-jobs.js';
+import { hasActiveJob, createJob } from '../jobs.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { runCopyEntryGenerationJob } from '../copy-entry-generation-job.js';
 
 const router = Router();
 const log = createLogger('copy-pipeline-routes');
@@ -54,105 +59,31 @@ function notifyCopyPipelineUpdated(workspaceId: string): void {
   invalidateContentPipelineIntelligence(workspaceId);
 }
 
-// ── Prepared statement cache for batch operations ───────────────────────────
-
-const batchStmts = createStmtCache(() => ({
-  insertJob: db.prepare(
-    `INSERT INTO copy_batch_jobs (id, workspace_id, blueprint_id, mode, entry_ids_json, batch_size, status, progress_json, accumulated_steering, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'running', ?, '[]', ?, ?)`,
-  ),
-  getSteering: db.prepare(
-    `SELECT accumulated_steering FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
-  ),
-  updateProgress: db.prepare(
-    `UPDATE copy_batch_jobs SET progress_json = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`,
-  ),
-  updateStatus: db.prepare(
-    `UPDATE copy_batch_jobs SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`, // status-ok: batch job lifecycle, not a state-machine column
-  ),
-  getById: db.prepare(
-    `SELECT * FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
-  ),
-}));
-
-// ── Batch job row mapper ─────────────────────────────────────────────────────
-
-interface BatchJobRow {
-  id: string;
-  workspace_id: string;
-  blueprint_id: string;
-  mode: string;
-  entry_ids_json: string;
-  batch_size: number;
-  status: string;
-  progress_json: string;
-  accumulated_steering: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface BatchProgressJson {
-  total: number;
-  generated: number;
-  reviewed: number;
-  approved: number;
-}
-
-function rowToBatchJob(row: BatchJobRow): BatchJob {
-  const entryIds = parseJsonFallback<string[]>(row.entry_ids_json, []);
-  const progress = parseJsonFallback<BatchProgressJson>(row.progress_json, { total: 0, generated: 0, reviewed: 0, approved: 0 });
-  const accumulatedSteering = parseJsonFallback<string[]>(row.accumulated_steering, []);
-  return {
-    id: row.id,
-    workspaceId: row.workspace_id,
-    blueprintId: row.blueprint_id,
-    entryIds,
-    status: row.status as BatchJob['status'],
-    batchSize: row.batch_size,
-    mode: row.mode as BatchJob['mode'],
-    progress,
-    accumulatedSteering,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
 // ── Generation routes ────────────────────────────────────────────────────────
 
 // POST /api/copy/:workspaceId/:blueprintId/:entryId/generate
-// Generate copy for all sections of a blueprint entry.
+// Enqueue copy generation for all sections of a blueprint entry.
+// Returns { jobId } immediately; poll /api/jobs/:jobId for progress.
 router.post(
   '/api/copy/:workspaceId/:blueprintId/:entryId/generate',
   requireWorkspaceAccess('workspaceId'),
   aiLimiter,
   validate(generateCopySchema),
-  async (req, res) => {
+  (req, res) => {
     const { workspaceId, blueprintId, entryId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
     const { accumulatedSteering } = req.body as { accumulatedSteering?: string[] };
-    try {
-      const { sections, metadata } = await generateCopyForEntry(
+    const job = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId });
+    setImmediate(() => {
+      void runCopyEntryGenerationJob({
+        jobId: job.id,
         workspaceId,
         blueprintId,
         entryId,
         accumulatedSteering,
-      );
-      notifyCopyPipelineUpdated(workspaceId);
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
-        entryId,
-        sectionCount: sections.length,
       });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_METADATA_UPDATED, { entryId });
-      const entry = getEntry(workspaceId, blueprintId, entryId);
-      addActivity(
-        workspaceId,
-        'copy_generated',
-        `Generated copy for "${entry?.name ?? entryId}"`,
-      );
-      return res.json({ sections, metadata });
-    } catch (err) {
-      log.error({ err, workspaceId, blueprintId, entryId }, 'Copy generation failed');
-      return res.status(500).json({ error: 'Copy generation failed' });
-    }
+    });
+    return res.json({ jobId: job.id });
   },
 );
 
@@ -319,98 +250,28 @@ router.post(
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
     const { entryIds, mode, batchSize } = req.body as { entryIds: string[]; mode?: string; batchSize?: number };
-
     const blueprint = getBlueprint(workspaceId, blueprintId);
     if (!blueprint) {
       return res.status(404).json({ error: 'Blueprint not found' });
     }
-
-    const batchId = `bj_${randomUUID()}`;
-    const now = new Date().toISOString();
-    const resolvedMode = mode ?? 'review_inbox';
-    const total = entryIds.length;
-    const resolvedBatchSize = batchSize ?? total;
-    const initialProgress = JSON.stringify({ total, generated: 0, reviewed: 0, approved: 0 });
-
-    try {
-      batchStmts().insertJob.run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), resolvedBatchSize, initialProgress, now, now);
-      notifyCopyPipelineUpdated(workspaceId);
-    } catch (err) {
-      log.error({ err, workspaceId, blueprintId }, 'Failed to create batch job record');
-      return res.status(500).json({ error: 'Failed to start batch job' });
+    const activeCopyBatchJob = hasActiveJob(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, workspaceId);
+    if (activeCopyBatchJob) {
+      return res.status(409).json({ error: 'Copy batch generation is already running for this workspace', jobId: activeCopyBatchJob.id });
     }
 
-    addActivity(
-      workspaceId,
-      'copy_batch_started',
-      `Batch copy generation started (${total} pages)`,
-    );
-
-    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_PROGRESS, {
-      batchId,
-      total,
-      generated: 0,
-      failed: 0,
-    });
-
-    // Fire-and-forget: generate in background
-    setImmediate(async () => {
-      let generated = 0;
-      let failed = 0;
-
-      // Read accumulated_steering from the job record so it's passed to every
-      // generation call (allows pre-seeded steering to influence all entries).
-      const jobRow = batchStmts().getSteering.get(batchId, workspaceId) as { accumulated_steering: string } | undefined;
-      const accumulatedSteering = parseJsonFallback<string[]>(
-        jobRow?.accumulated_steering ?? '[]',
-        [],
-      );
-
-      for (const entryId of entryIds) {
-        try {
-          await generateCopyForEntry(workspaceId, blueprintId, entryId, accumulatedSteering);
-          generated++;
-        } catch (err) {
-          log.error({ err, workspaceId, blueprintId, entryId }, 'Batch entry generation failed');
-          failed++;
-        }
-
-        const batchNow = new Date().toISOString();
-        const progressJson = JSON.stringify({ total, generated, reviewed: 0, approved: 0 });
-        // txn-ok: intentionally non-atomic — per-entry progress update is independent of final status update
-        batchStmts().updateProgress.run(progressJson, batchNow, batchId, workspaceId);
-
-        broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_PROGRESS, {
-          batchId,
-          total,
-          generated,
-          failed,
-        });
+    try {
+      const started = createCopyBatchGenerationJob({ workspaceId, blueprintId, entryIds, mode, batchSize });
+      res.json(started);
+      setTimeout(() => {
+        void runCopyBatchGenerationJob({ workspaceId, blueprintId, entryIds, mode, batchSize, ...started });
+      }, 100);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Blueprint not found') {
+        return res.status(404).json({ error: 'Blueprint not found' });
       }
-
-      const completedAt = new Date().toISOString();
-      const finalStatus = failed === total ? 'failed' : 'complete';
-
-      // status-ok: terminal state written after loop completion; no state-machine guard needed
-      batchStmts().updateStatus.run(finalStatus, completedAt, batchId, workspaceId);
-      notifyCopyPipelineUpdated(workspaceId);
-
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_COMPLETE, {
-        batchId,
-        total,
-        generated,
-        failed,
-        status: finalStatus,
-      });
-
-      addActivity(
-        workspaceId,
-        'copy_batch_complete',
-        `Batch copy generation complete (${generated}/${total} pages)`,
-      );
-    });
-
-    return res.json({ batchId });
+      log.error({ err, workspaceId, blueprintId }, 'Failed to start batch job');
+      return res.status(500).json({ error: 'Failed to start batch job' });
+    }
   },
 );
 
@@ -420,9 +281,9 @@ router.get(
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
     const { workspaceId, batchId } = req.params;
-    const job = batchStmts().getById.get(batchId, workspaceId) as BatchJobRow | undefined;
+    const job = getCopyBatchJob(workspaceId, batchId);
     if (!job) return res.status(404).json({ error: 'Batch job not found' });
-    return res.json(rowToBatchJob(job));
+    return res.json(job);
   },
 );
 

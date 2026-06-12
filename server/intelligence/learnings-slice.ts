@@ -1,31 +1,116 @@
 import type { IntelligenceOptions, LearningsSlice, ROIAttribution, WeCalledItEntry } from '../../shared/types/intelligence.js';
 import type { ActionOutcome, TopWin } from '../../shared/types/outcome-tracking.js';
 import { createLogger } from '../logger.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('workspace-intelligence/learnings');
+
+const ACTION_PHRASES: Record<string, string> = {
+  insight_acted_on: 'insight follow-up',
+  content_published: 'content publication',
+  brief_created: 'brief creation',
+  strategy_keyword_added: 'strategy keyword addition',
+  schema_deployed: 'schema deployment',
+  audit_fix_applied: 'audit fix',
+  content_refreshed: 'content refresh',
+  internal_link_added: 'internal link addition',
+  meta_updated: 'metadata update',
+  voice_calibrated: 'voice calibration',
+  competitor_gap_closed: 'competitor gap closure',
+  cluster_published: 'topic cluster publication',
+  cannibalization_resolved: 'cannibalization fix',
+  local_visibility_won: 'local visibility win',
+  local_service_added: 'local service addition',
+};
+
+const METRIC_LABELS: Record<string, string> = {
+  clicks: 'Clicks',
+  impressions: 'Impressions',
+  sessions: 'Sessions',
+  conversions: 'Conversions',
+  ctr: 'CTR',
+  position: 'Position',
+  page_health_score: 'Page health score',
+  voice_score: 'Voice score',
+};
+
+function humanizeUnderscore(value: string): string {
+  return value.replace(/_/g, ' ');
+}
+
+function formatActionPhrase(actionType: string): string {
+  return ACTION_PHRASES[actionType] ?? humanizeUnderscore(actionType);
+}
+
+function formatMetricLabel(metric: string | undefined): string {
+  if (!metric) return 'Primary metric';
+  return METRIC_LABELS[metric] ?? humanizeUnderscore(metric).replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatScoreLabel(score: string | null): string {
+  if (!score) return 'strong win';
+  return humanizeUnderscore(score);
+}
+
+function formatOutcomeNarrative(actionType: string, outcome: ActionOutcome): string {
+  const delta = outcome.deltaSummary;
+  if (
+    delta
+    && Number.isFinite(delta.baseline_value)
+    && Number.isFinite(delta.current_value)
+  ) {
+    const direction = delta.direction === 'declined'
+      ? 'declined'
+      : delta.direction === 'stable'
+        ? 'held steady'
+        : 'improved';
+    const percent = Number.isFinite(delta.delta_percent)
+      ? ` (${delta.direction === 'declined' ? '-' : delta.direction === 'improved' ? '+' : ''}${formatNumber(Math.abs(delta.delta_percent))}%)`
+      : '';
+    return `${formatMetricLabel(delta.primary_metric)} ${direction} from ${formatNumber(delta.baseline_value)} to ${formatNumber(delta.current_value)}${percent}.`;
+  }
+
+  return `${formatActionPhrase(actionType)} was recorded as a ${formatScoreLabel(outcome.score)}.`;
+}
 
 export async function assembleLearnings(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<LearningsSlice> {
-  // Only assemble if feature flag is enabled
-  if (!isFeatureEnabled('outcome-ai-injection')) {
-    return {
-      availability: 'disabled',
-      summary: null,
-      confidence: null,
-      topActionTypes: [],
-      overallWinRate: 0,
-      recentTrend: null,
-      playbooks: [],
-    };
-  }
-
   let summary: ReturnType<Awaited<typeof import('../workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
   let playbooks: ReturnType<Awaited<typeof import('../outcome-playbooks.js')>['getPlaybooks']> = [];
   let availability: LearningsSlice['availability'] = 'no_data';
+
+  // A1: administrative kill-switch. When learnings are disabled for this workspace,
+  // short-circuit to availability:'disabled' so consumers degrade to general best
+  // practices (per the LearningsSlice.availability contract) — skipping all
+  // summary/outcome/playbook reads.
+  try {
+    const { isLearningsDisabled } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    if (isLearningsDisabled(workspaceId)) {
+      return {
+        availability: 'disabled',
+        summary: null,
+        confidence: null,
+        topActionTypes: [],
+        overallWinRate: 0,
+        recentTrend: null,
+        playbooks: [],
+        roiAttribution: [],
+        topWins: [],
+        weCalledIt: [],
+        winRateByActionType: {},
+        scoringConfig: undefined,
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: disable-switch read failed, continuing');
+  }
+
   try {
     const { getWorkspaceLearnings } = await import('../workspace-learnings.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
@@ -49,7 +134,11 @@ export async function assembleLearnings(
   let topWins: TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('../outcome-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const actions = getActionsByWorkspace(workspaceId);
+    // A1: exclude `not_acted_on` actions before building ANY win surface. These are
+    // suggestions the workspace never executed — their outcomes are not our wins.
+    // getTopWinsFromActions filters internally too, but roiAttribution/weCalledIt loop
+    // over this list directly, so filter once here for all three surfaces.
+    const actions = getActionsByWorkspace(workspaceId).filter(a => a.attribution !== 'not_acted_on');
     // Lazy-caching outcomes accessor: fetches on first access, caches the result.
     // Shared between getTopWinsFromActions, roiAttribution, and the weCalledIt loop so
     // each action's outcomes are queried at most once.
@@ -94,8 +183,8 @@ export async function assembleLearnings(
       if (strongWin) {
         weCalledIt.push({
           actionId: action.id,
-          prediction: `${action.actionType} on ${action.pageUrl ?? 'site'}`,
-          outcome: 'strong_win',
+          prediction: `${formatActionPhrase(action.actionType)} on ${action.pageUrl ?? 'site'}`,
+          outcome: formatOutcomeNarrative(action.actionType, strongWin),
           score: 'strong_win',
           pageUrl: action.pageUrl ?? '',
           measuredAt: strongWin.measuredAt ?? '',
@@ -119,6 +208,22 @@ export async function assembleLearnings(
     log.debug({ err, workspaceId }, 'assembleLearnings: scoringConfig optional, degrading gracefully');
   }
 
+  // A6 (audit #22): cross-workspace platform priors as the FALLBACK tier. Only populated
+  // when this workspace's OWN availability is no_data/degraded — `ready` keeps its own
+  // learnings (availability stays authoritative) and `disabled` suppresses priors too.
+  // These are anonymized aggregates (no workspace ids/titles/urls); the assembler reads
+  // them as a labeled benchmark, never as this workspace's own results.
+  let platformPriors: LearningsSlice['platformPriors'];
+  if (availability === 'no_data' || availability === 'degraded') {
+    try {
+      const { getPlatformPriors } = await import('../platform-learnings-priors.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const priors = getPlatformPriors();
+      if (priors.length > 0) platformPriors = priors;
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleLearnings: platform priors optional, degrading gracefully');
+    }
+  }
+
   return {
     availability,
     summary: summary ?? null,
@@ -133,6 +238,7 @@ export async function assembleLearnings(
     winRateByActionType: Object.fromEntries(
       (summary?.overall.topActionTypes ?? []).map(t => [t.type, t.winRate]),
     ),
+    platformPriors,
     scoringConfig,
   };
 }

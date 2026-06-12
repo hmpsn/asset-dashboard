@@ -5,6 +5,7 @@
  * These tests catch regressions when migrated files are modified:
  *   — correct slices requested for buildWorkspaceIntelligence (via slices-var or buildIntelPrompt)
  *   — correct sections requested for formatForPrompt (via slices-var, sections: slices, or buildIntelPrompt)
+ *   — SEO prompt consumers stay on buildSeoPromptContext() instead of re-inlining prompt + page-map assembly
  *   — learningsDomain threaded correctly
  *   — formatPageMapForPrompt called without pagePath filter where full cross-page map is needed
  *   — hasMeaningfulContext guard present and complete in keyword-recommendations
@@ -86,21 +87,21 @@ function hasSectionsSeoContextLearnings(src: string): boolean {
   );
 }
 
+function usesSeoPromptBuilder(src: string): boolean {
+  return src.includes('buildSeoPromptContext');
+}
+
 // ── buildVoiceContext (content-posts-ai.ts) ───────────────────────────────────
 
 describe('buildVoiceContext migration contracts (content-posts-ai.ts)', () => {
   const src = read('content-posts-ai.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 
   it("uses learningsDomain:'content' for content-specific learnings", () => {
     expect(src).toContain("learningsDomain: 'content'");
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -126,7 +127,7 @@ describe('webflow-keywords.ts migration contracts', () => {
 
 describe('webflow SEO route N+1 prevention contracts', () => {
   const applySrc = readRoute('webflow-seo-apply.ts');
-  const jobsSrc = readRoute('jobs.ts');
+  const jobsSrc = read('webflow-bulk-seo-fix-background-job.ts');
   const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
   const rewriteJobSrc = read('webflow-seo-bulk-rewrite-job.ts');
 
@@ -143,9 +144,10 @@ describe('webflow SEO route N+1 prevention contracts', () => {
 
   it('bulk-fix job preserves the richer SEO copy prompt contract from the retired sync route', () => {
     expect(jobsSrc).toContain('callCreativeAI({');
-    expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
-    expect(jobsSrc).toContain('formatPersonasForPrompt(pageSeo?.personas');
-    expect(jobsSrc).toContain('formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase)');
+    expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(workspaceId');
+    expect(jobsSrc).toContain('buildSeoPromptBlocks(pageSeo');
+    expect(jobsSrc).toContain('const personasBlock = seoBlocks.personasBlock');
+    expect(jobsSrc).toContain('const knowledgeBlock = seoBlocks.knowledgeBlock');
     expect(jobsSrc).toContain('Use specific language from the knowledge base, not generic filler');
   });
 
@@ -238,12 +240,8 @@ describe('content-decay.ts migration contracts', () => {
 describe('google.ts search-chat migration contracts', () => {
   const src = readRoute('google.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 
@@ -252,19 +250,18 @@ describe('google.ts search-chat migration contracts', () => {
 describe('public-analytics.ts AI review migration contracts', () => {
   const src = readRoute('public-analytics.ts');
 
-  it('requests seoContext + learnings slices', () => {
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
-  });
-
-  it('formats with seoContext + learnings sections', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 
-// ── content-posts.ts (post AI review) ────────────────────────────────────────
+// ── content-posts-ai-jobs.ts (post AI review worker — W6.2 migration) ────────
+// W6.2 moved the AI review/fix/voice-score call sites from routes/content-posts.ts
+// into content-posts-ai-jobs.ts (background-job workers). The slice contract must
+// hold in the new module — the worker owns the heavy AI bodies.
 
-describe('content-posts.ts AI review migration contracts', () => {
-  const src = readRoute('content-posts.ts');
+describe('content-posts-ai-jobs.ts AI review migration contracts', () => {
+  const src = read('content-posts-ai-jobs.ts');
 
   it('requests seoContext + learnings slices for post brand-voice review', () => {
     expect(hasSlicesSeoContextLearnings(src)).toBe(true);
@@ -310,14 +307,16 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
 describe('page-analysis-job.ts migration contracts', () => {
   const src = read('page-analysis-job.ts');
 
-  it('requests seoContext + learnings slices for PA job AI context', () => {
-    // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
-    // which included learnings. Must include learnings slice.
-    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+  it('uses the shared SEO prompt context builder for PA job AI context', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
+});
 
-  it('formats with seoContext + learnings sections in PA job', () => {
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+describe('webflow-seo-bulk-analyze-job.ts migration contracts', () => {
+  const src = read('webflow-seo-bulk-analyze-job.ts');
+
+  it('uses the shared SEO prompt context builder', () => {
+    expect(usesSeoPromptBuilder(src)).toBe(true);
   });
 });
 
@@ -377,7 +376,7 @@ describe('slices/sections consistency — learnings section requires learnings s
     { label: 'page-analysis-job.ts', src: read('page-analysis-job.ts') },
     { label: 'routes/google.ts', src: readRoute('google.ts') },
     { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
-    { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
+    { label: 'content-posts-ai-jobs.ts', src: read('content-posts-ai-jobs.ts') },
     { label: 'routes/jobs.ts', src: readRoute('jobs.ts') },
   ];
 
@@ -392,18 +391,4 @@ describe('slices/sections consistency — learnings section requires learnings s
       expect(hasSliceLearnings(src)).toBe(true);
     });
   }
-});
-
-// ── assembleLearnings feature flag gate ──────────────────────────────────────
-
-describe('assembleLearnings feature flag gate', () => {
-  it('learnings-slice.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
-    const src = readFileSync(resolve(serverDir, 'intelligence/learnings-slice.ts'), 'utf-8'); // readFile-ok — contract guard: asserts assembleLearnings checks the outcome-ai-injection feature flag before expensive DB calls, preserving behavioral parity with the old buildSeoContext() gate.
-    // Feature flag gate must appear INSIDE assembleLearnings, before the expensive DB calls.
-    // This ensures behavioral parity with old buildSeoContext() which also gated on this flag.
-    const fnStart = src.indexOf('async function assembleLearnings(');
-    const fnEnd = src.indexOf('\nasync function ', fnStart + 1);
-    const fnBody = src.slice(fnStart, fnEnd > 0 ? fnEnd : fnStart + 2000);
-    expect(fnBody).toContain("isFeatureEnabled('outcome-ai-injection')");
-  });
 });

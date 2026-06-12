@@ -136,7 +136,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setWorkspaceFlagOverride('seo-generation-quality', workspace.workspaceId, null);
   db.prepare('DELETE FROM content_gaps WHERE workspace_id = ?').run(workspace.workspaceId);
   db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(workspace.workspaceId);
   db.prepare('UPDATE workspaces SET keyword_strategy = NULL WHERE id = ?').run(workspace.workspaceId);
@@ -148,10 +147,8 @@ afterAll(() => {
   else process.env.OPENAI_API_KEY = originalOpenAiKey;
 });
 
-describe('P2 eval fixture — sparse Faros-like workspace produces contentGaps >= 6 (flag-ON)', () => {
+describe('P2 eval fixture — sparse Faros-like workspace produces contentGaps >= 6', () => {
   it('fills the gap list to the floor and tags re-admitted gaps backfilled', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', workspace.workspaceId, true);
-
     const result = await generateKeywordStrategy({ workspaceId: workspace.workspaceId });
 
     // ACCEPTANCE BAR (promoted from P0 it.todo): the deterministic floor guarantees >= 6.
@@ -166,23 +163,6 @@ describe('P2 eval fixture — sparse Faros-like workspace produces contentGaps >
     // Telemetry reflects the floor hit.
     expect(result.generationQuality?.floorHit).toBe(true);
     expect(result.generationQuality?.backfilledCount).toBeGreaterThan(0);
-    expect(result.generationQuality?.suppressedCount).toBe(3);
-  });
-});
-
-describe('P2 flag-OFF parity — no backfill, byte-identical pruning', () => {
-  it('produces no backfilled gaps and floorHit=false when the flag is OFF', async () => {
-    // Flag left OFF (default).
-    const result = await generateKeywordStrategy({ workspaceId: workspace.workspaceId });
-
-    const persisted = listContentGaps(workspace.workspaceId);
-    // Only the two organic gaps survive — the floor backfill is skipped entirely.
-    expect(persisted.length).toBe(2);
-    expect(persisted.every(g => !g.backfilled)).toBe(true); // every-ok: length === 2 asserted above
-
-    expect(result.generationQuality?.backfilledCount).toBe(0);
-    expect(result.generationQuality?.floorHit).toBe(false);
-    // suppressedCount comes from synthesis regardless of the backfill path.
     expect(result.generationQuality?.suppressedCount).toBe(3);
   });
 });

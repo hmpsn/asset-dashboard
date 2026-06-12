@@ -158,6 +158,8 @@ const DEFAULTS_BY_CONTEXT: Record<BoundedContextId, RegistryDefaults> = {
 };
 
 const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
+  JOB_CREATED: 'platform-foundation',
+  JOB_UPDATED: 'platform-foundation',
   WORKSPACE_UPDATED: 'workspace-command-center',
   PAGE_STATE_UPDATED: 'seo-health',
   CONTENT_SUBSCRIPTION_CREATED: 'billing-monetization',
@@ -180,6 +182,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   POST_UPDATED: 'content-pipeline',
   INSIGHT_RESOLVED: 'analytics-intelligence',
   INTELLIGENCE_SIGNALS_UPDATED: 'analytics-intelligence',
+  SCHEMA_PLAN_UPDATED: 'schema',
   SCHEMA_PLAN_SENT: 'schema',
   SCHEMA_CMS_MAPPING_UPDATED: 'schema',
   SCHEMA_SNAPSHOT_UPDATED: 'schema',
@@ -225,6 +228,8 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
 };
 
 const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
+  JOB_CREATED: 'Background job lifecycle payload consumed by the task provider for progress rediscovery and task-surface updates.',
+  JOB_UPDATED: 'Background job progress/terminal payload consumed by the task provider for progress rediscovery and task-surface updates.',
   WORKSPACE_UPDATED: 'Workspace metadata and billing/tier updates propagated to admin/client caches.',
   PAGE_STATE_UPDATED: 'Page edit-state payload with page identity + operation details for SEO/CMS editors.',
   CONTENT_UPDATED: 'Content domain payload with `domain` discriminator and resource identifiers.',
@@ -232,6 +237,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   CLIENT_ACTION_UPDATE: 'Client-action lifecycle payload with action id/state metadata.',
   DELIVERABLE_SENT: 'Unified deliverable send signal with `deliverableId` and `type` (dark until the unified-deliverables-* flags flip).',
   DELIVERABLE_UPDATED: 'Unified deliverable response/apply update with `deliverableId`, `type`, and new `status` (dark until the unified-deliverables-* flags flip).',
+  SCHEMA_PLAN_UPDATED: 'Schema plan payload with `siteId`, mutation intent, and optional lifecycle/job metadata.',
   SCHEMA_SNAPSHOT_UPDATED: 'Schema snapshot payload with `siteId` and update intent.',
   BRIEFING_PUBLISHED: 'Briefing publication signal for weekly briefing consumers.',
   DIAGNOSTIC_FAILED: 'Diagnostic failure payload with report id and failure context.',
@@ -242,6 +248,8 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
+  JOB_CREATED: ['background task provider local state'],
+  JOB_UPDATED: ['background task provider local state'],
   WORKSPACE_UPDATED: ['queryKeys.admin.workspaceHome', 'queryKeys.admin.workspaceDetail', 'queryKeys.admin.workspaceOverview'],
   PAGE_STATE_UPDATED: ['queryKeys.shared.pageEditStates', 'queryKeys.admin.seoEditorAll', 'queryKeys.admin.cmsEditorAll'],
   CONTENT_UPDATED: ['queryKeys.admin.content*', 'queryKeys.client.contentRequests', 'queryKeys.client.contentPlan', 'queryKeys.client.intelligence'],
@@ -250,6 +258,7 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   CLIENT_ACTION_UPDATE: ['queryKeys.admin.clientActions', 'queryKeys.client.clientActions', 'queryKeys.admin.workspaceHome'],
   DELIVERABLE_SENT: ['queryKeys.admin.workspaceHome', 'queryKeys.client.inbox'],
   DELIVERABLE_UPDATED: ['queryKeys.admin.workspaceHome', 'queryKeys.client.inbox'],
+  SCHEMA_PLAN_UPDATED: ['queryKeys.admin.schemaPlan*', 'queryKeys.client.schemaPlan', 'queryKeys.admin.intelligenceAll'],
   SCHEMA_SNAPSHOT_UPDATED: ['queryKeys.admin.schemaSnapshot*', 'queryKeys.admin.schemaGraphValidation*'],
   BRIEFING_PUBLISHED: ['queryKeys.client.briefing', 'queryKeys.admin.briefing'],
   STRATEGY_UPDATED: ['queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.workspaceHome'],
@@ -265,6 +274,7 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   CONTENT_REQUEST_UPDATE: ['brief_approved', 'post_changes_requested'],
   CONTENT_PUBLISHED: ['content_published'],
   POST_UPDATED: ['post_client_edit', 'post_approved'],
+  SCHEMA_PLAN_UPDATED: ['schema_plan_generated', 'schema_plan_sent', 'schema_plan_deleted', 'changes_requested'],
   SCHEMA_PLAN_SENT: ['schema_plan_sent'],
   SCHEMA_SNAPSHOT_UPDATED: ['schema_published'],
   CLIENT_ACTION_UPDATE: ['client_action_completed'],

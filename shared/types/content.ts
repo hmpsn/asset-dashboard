@@ -1,5 +1,7 @@
 // ── Content domain types ────────────────────────────────────────
 
+import type { OutcomeReadback } from './outcome-tracking.js';
+
 export const CONTENT_GENERATION_STYLES = ['standard', 'concise', 'hybrid'] as const;
 export type ContentGenerationStyle = typeof CONTENT_GENERATION_STYLES[number];
 export const DEFAULT_CONTENT_GENERATION_STYLE: ContentGenerationStyle = 'standard';
@@ -63,6 +65,10 @@ export interface ContentBrief {
   metaDescVariants?: string[];
   // Content generation style selector (v8)
   generationStyle?: ContentGenerationStyle;
+  // Scraped source evidence (C4 / v9) — persisted SERP + reference source text
+  sourceEvidence?: BriefSourceEvidence;
+  // W2.5 lineage: set to the new brief's id when this brief is superseded by a regeneration
+  supersededBy?: string;
 }
 
 export interface BriefTemplateCrossrefSection {
@@ -169,6 +175,58 @@ export interface AIReviewResponse {
 }
 
 /**
+ * Persisted result of an AI review run (C4, audit #16).
+ * Stored on `content_posts.ai_review` so verdicts survive editor close.
+ * The stored map is always the post-provenance-marking map: provenance-sensitive
+ * keys (`factual_accuracy`, `no_hallucinations`) are persisted with `pass: false`
+ * + `humanReviewRequired: true` — never raw AI passes.
+ */
+export interface StoredAIReview {
+  review: AIReviewMap;
+  /** Evidence snapshot shown alongside verdicts; absent when the brief had no saved sources. */
+  evidence?: ContentReviewEvidence;
+  /** ISO timestamp of the review run. */
+  reviewedAt: string;
+  /** Model that produced the verdicts (when reported by the dispatcher). */
+  model?: string;
+}
+
+/**
+ * One scraped source page persisted for evidence grounding (C4, audit #16).
+ * Field-for-field mirror of the server `ScrapedPage` shape produced by C1's
+ * `collectBriefEnrichment` (server/content-brief-scrape-enrichment.ts) — do not
+ * diverge; the enrichment helper's exported interface is the contract.
+ */
+export interface BriefScrapedSource {
+  url: string;
+  title: string;
+  metaDescription: string;
+  headings: { level: number; text: string }[];
+  /** Plain-text excerpt — the scraper truncates to ~3000 chars before this is stored. */
+  bodyText: string;
+  wordCount: number;
+  fetchedAt: string;
+}
+
+/**
+ * Scraped SERP/reference source text persisted on the brief (C4, audit #16).
+ * Stored on `content_briefs.source_evidence`. Enables the real-text evidence
+ * ledger (#27). Admin-internal — stripped from public client brief responses.
+ */
+export interface BriefSourceEvidence {
+  /** Scraped reference URL content (admin-supplied competitor/inspiration URLs). */
+  scrapedReferences?: BriefScrapedSource[];
+  /** Real SERP organic results including snippet text (previously dropped at the generateBrief boundary). */
+  serpResults?: { position: number; title: string; url: string; snippet: string }[];
+  /** When the SERP was fetched. */
+  serpFetchedAt?: string;
+  /** Scraped own-site style example pages (GA4 top performers). */
+  styleExamples?: BriefScrapedSource[];
+  /** ISO timestamp the evidence pack was captured. */
+  capturedAt: string;
+}
+
+/**
  * Lightweight post summary used in admin list views (RequestList, ContentBriefs).
  * Full shape lives in GeneratedPost; this is the summary projection returned by
  * useAdminPostsList and threaded down to request-level UI.
@@ -203,16 +261,34 @@ export interface GeneratedPost {
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
+  /** Persisted AI review verdicts (C4) — survives editor close. Admin-internal; stripped from public post responses. */
+  aiReview?: StoredAIReview;
   // Webflow publish tracking
   webflowItemId?: string;
   webflowCollectionId?: string;
   publishedAt?: string;
   publishedSlug?: string;
+  /**
+   * W6.6: admin-set planned/scheduled publish date (ISO string) for the
+   * forward-planning Content Calendar. Distinct from publishedAt (the actual
+   * publish outcome): this is the *intent*. Unscheduled drafts have it absent.
+   * Admin-internal — NOT serialized on public post responses.
+   */
+  plannedPublishAt?: string;
   // Brand voice scoring (v2)
   voiceScore?: number;
   voiceFeedback?: string;
   // Content generation style used for this generated post
   generationStyle?: ContentGenerationStyle;
+  /**
+   * W5.1: read-back outcome verdict for this post's tracked action — the latest
+   * conclusive measurement (90-day clicks/position delta + verdict). Enriched at
+   * the list-route boundary (GET /api/content-posts/:workspaceId) by joining the
+   * post's targetKeyword to its scored outcome. Absent for unpublished posts or
+   * posts with no scored action yet. NOT persisted on the post row — purely a
+   * read-side decoration. Positions are honest (lower=better); trust `direction`.
+   */
+  outcome?: OutcomeReadback;
   createdAt: string;
   updatedAt: string;
 }

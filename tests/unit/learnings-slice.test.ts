@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn(),
   getWorkspaceLearnings: vi.fn(),
   getPlaybooks: vi.fn(),
   getActionsByWorkspace: vi.fn(),
@@ -11,10 +10,6 @@ const mocks = vi.hoisted(() => ({
   isProgrammingError: vi.fn(),
   logWarn: vi.fn(),
   logDebug: vi.fn(),
-}));
-
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: mocks.isFeatureEnabled,
 }));
 
 vi.mock('../../server/workspace-learnings.js', () => ({
@@ -53,7 +48,6 @@ const { assembleLearnings } = await import('../../server/intelligence/learnings-
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mocks.isFeatureEnabled.mockReturnValue(true);
   mocks.getWorkspaceLearnings.mockReturnValue({
     confidence: 'high',
     overall: {
@@ -89,10 +83,31 @@ beforeEach(() => {
         score: 'strong_win',
         checkpointDays: 30,
         metricsSnapshot: { clicks: 200 },
+        deltaSummary: {
+          primary_metric: 'clicks',
+          baseline_value: 120,
+          current_value: 200,
+          delta_absolute: 80,
+          delta_percent: 66.7,
+          direction: 'improved',
+        },
         measuredAt: '2026-05-22T12:00:00.000Z',
       }];
     }
-    return [{ score: 'neutral', checkpointDays: 30, metricsSnapshot: { clicks: 0 }, measuredAt: '2026-05-23T12:00:00.000Z' }];
+    return [{
+      score: 'neutral',
+      checkpointDays: 30,
+      metricsSnapshot: { clicks: 0 },
+      deltaSummary: {
+        primary_metric: 'clicks',
+        baseline_value: 0,
+        current_value: 0,
+        delta_absolute: 0,
+        delta_percent: 0,
+        direction: 'stable',
+      },
+      measuredAt: '2026-05-23T12:00:00.000Z',
+    }];
   });
   mocks.getTopWinsFromActions.mockImplementation((actions: Array<{ id: string }>, _limit: number, getOutcomes: (id: string) => Array<{ score: string }>) => {
     const action = actions.find((candidate: { id: string }) => getOutcomes(candidate.id).some(outcome => outcome.score === 'strong_win'));
@@ -144,8 +159,8 @@ describe('assembleLearnings', () => {
     expect(result.weCalledIt).toEqual([
       {
         actionId: 'action_1',
-        prediction: 'schema_fix on /pricing',
-        outcome: 'strong_win',
+        prediction: 'schema fix on /pricing',
+        outcome: 'Clicks improved from 120 to 200 (+66.7%).',
         score: 'strong_win',
         pageUrl: '/pricing',
         measuredAt: '2026-05-22T12:00:00.000Z',
@@ -163,24 +178,29 @@ describe('assembleLearnings', () => {
     });
   });
 
-  it('returns disabled baseline when feature flag is off', async () => {
-    mocks.isFeatureEnabled.mockReturnValue(false);
+  it('returns default-on no_data baseline when learnings are unavailable', async () => {
+    mocks.getWorkspaceLearnings.mockReturnValue(null);
+    mocks.getPlaybooks.mockReturnValue([]);
+    mocks.getActionsByWorkspace.mockReturnValue([]);
+    mocks.getTopWinsFromActions.mockReturnValue([]);
+    mocks.getWorkspace.mockReturnValue(null);
 
-    const result = await assembleLearnings('ws_disabled');
+    const result = await assembleLearnings('ws_no_data');
 
-    expect(result).toEqual({
-      availability: 'disabled',
-      summary: null,
-      confidence: null,
-      topActionTypes: [],
-      overallWinRate: 0,
-      recentTrend: null,
-      playbooks: [],
-    });
-    expect(mocks.getWorkspaceLearnings).not.toHaveBeenCalled();
-    expect(mocks.getPlaybooks).not.toHaveBeenCalled();
-    // roi_attributions no longer consulted (Task 2.3) — getActionsByWorkspace provides the data
-    expect(mocks.getActionsByWorkspace).not.toHaveBeenCalled();
+    expect(result.availability).toBe('no_data');
+    expect(result.summary).toBeNull();
+    expect(result.confidence).toBeNull();
+    expect(result.topActionTypes).toEqual([]);
+    expect(result.overallWinRate).toBe(0);
+    expect(result.recentTrend).toBeNull();
+    expect(result.playbooks).toEqual([]);
+    expect(result.roiAttribution).toEqual([]);
+    expect(result.topWins).toEqual([]);
+    expect(result.weCalledIt).toEqual([]);
+    expect(result.winRateByActionType).toEqual({});
+    expect(result.scoringConfig).toBeUndefined();
+    expect(mocks.getWorkspaceLearnings).toHaveBeenCalledWith('ws_no_data', 'all');
+    expect(mocks.getActionsByWorkspace).toHaveBeenCalledWith('ws_no_data');
   });
 
   it('degrades core load failures and preserves stable defaults', async () => {

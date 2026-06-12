@@ -5,16 +5,11 @@
  *   Server: FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *   Frontend: VITE_FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *
- * Example: to enable 'copy-engine' in production, set:
- *   FEATURE_COPY_ENGINE=true  (server)
- *   VITE_FEATURE_COPY_ENGINE=true  (Vite build)
+ * Example: to enable 'keyword-universe-full' in production, set:
+ *   FEATURE_KEYWORD_UNIVERSE_FULL=true  (server)
+ *   VITE_FEATURE_KEYWORD_UNIVERSE_FULL=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
-  // Copy & Brand Engine (3-phase feature)
-  'copy-engine': false,
-  'copy-engine-voice': false,
-  'copy-engine-pipeline': false,
-
   // Self-service onboarding
   'self-service-onboarding': false,
   'self-service-gsc-ga4': false,
@@ -25,88 +20,32 @@ export const FEATURE_FLAGS = {
   // White-label
   'white-label': false,
 
-  // Outcome Intelligence Engine
-  'outcome-tracking': false,
-  'outcome-dashboard': false,
-  'outcome-ai-injection': false,
-  'outcome-client-reporting': false,
-  'outcome-external-detection': false,
-  'outcome-playbooks': false,
-  'outcome-predictive': false,
-
-  // Unified Workspace Intelligence
-  'intelligence-shadow-mode': false,
-
-  // Unified Opportunity Value scorer — flips ranked impactScore to the OV value
-  'opportunity-value-scorer': false,
-  // Self-calibrating OV inputs — per-workspace realized-$ outcome calibration
-  // (identity 1.0 until enabled AND enough outcomes accrue). Dark by default.
-  'opportunity-value-calibration': false,
-  // Event-driven re-ranking (PR7 · Spine B) — opportunity events (decay,
-  // competitor overtake, rank decline, publish) raise a DECAYING timing boost on
-  // the affected page's recs and trigger a debounced re-rank. OFF = no events
-  // written, timingBoost 0 everywhere, no extra regens. Dark by default.
-  'opportunity-value-events': false,
-
-  // Intelligence Phase 2 — Event Bridges (all default OFF, individually toggleable)
-  'bridge-outcome-reweight': false,
-  'bridge-decay-suggested-brief': false,
-  'bridge-strategy-invalidate': false,
-  'bridge-insight-to-action': false,
-  'bridge-page-analysis-invalidate': false,
-  'bridge-action-auto-resolve': false,
-  'bridge-content-to-insight': false,
-  'bridge-schema-to-insight': false,
-  'bridge-anomaly-boost': false,
-  'bridge-settings-cascade': false,
-  'bridge-audit-page-health': false,
-  'bridge-action-annotation': false,
-  'bridge-annotation-to-insight': false,
-  'bridge-audit-site-health': false,
-  'bridge-audit-auto-resolve': false,
-  'bridge-briefing-candidate-refresh': false,
-  'bridge-client-signal': false,
-
   // Platform Intelligence Enhancements
   'smart-placeholders': false,
-  'client-brand-section': false,
 
   // Client Insights Briefing (5-phase feature)
   'client-briefing-v2': false,
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,
+  // R2-B: Agency-at-work transparency feed (live jobs + recent activity with narrative labels).
+  'client-work-feed': false,
 
-  // Deep Diagnostics
-  'deep-diagnostics': false,
-
-  // Page-Element Catalog (schema AI extractors)
-  'schema-ai-element-classifier': false,
-
-  // Client IA Redesign Phase 1 (PRs 1.2 + 1.3)
-  'new-inbox-ia': false,
-
-  // Local SEO Visibility
-  'local-seo-visibility': false,
-
-  // Unified Send-to-Client (strangler-fig, per phase group; dark by default).
-  // Finer per-type cutover granularity lives in a DB/env read-routing table keyed by
-  // type string, NOT the flag system (a per-type dynamic key is inexpressible against
-  // the closed FeatureFlagKey union — audit §C.3).
-  'unified-deliverables-approval-family': false,
-  'unified-deliverables-broken-family': false,
-  'unified-deliverables-rest': false,
-  // PR-2a — the client-facing unified inbox (Pillar 2). When ON, InboxTab renders the
-  // new unified PriorityStrip + uniform Approve / Request changes / Decline path backed
-  // by GET /api/public/deliverables/:workspaceId. OFF = the existing new-inbox-ia + legacy
-  // layouts render unchanged. Independent of the dual-write read-cutover flags above.
-  'unified-inbox': false,
-
-  // SEO Generation Quality (multi-phase keyword-strategy + recommendation quality plan).
-  // Umbrella kill-switch for the P1–P6 generation-quality work (universe assembler,
-  // backfill floor, closed-set prompting, OV-derived tier, orphan-table recs). Dark by
-  // default; per-phase sub-features stay flag-gated and roll out per-workspace via the
-  // P0 per-workspace flag dimension. See docs/plans/2026-06-02-seo-generation-quality-plan.md.
-  'seo-generation-quality': false,
+  // Keyword Hub (Wave 4). The `keyword-hub` umbrella flag was RETIRED at the Phase C
+  // cutover (2026-06-11): the Hub is now the only keyword surface (KCC + Rank Tracker
+  // deleted, seo-ranks redirected), so no kill-switch remains. The two sub-flags below
+  // gate independent coverage/scoring overhauls and keep their own removal conditions.
+  // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
+  // include every GSC-clicked/impressed query (full ranking coverage), keep all
+  // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
+  // staging and rollback is one switch. Junk gate + sort + window fixes ship
+  // unflagged. OFF = today's capped behavior, byte-identical.
+  // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
+  'keyword-universe-full': false,
+  // Keyword Value Scoring: replaces the Hub's crude volume×ease opportunity sort
+  // with a value-first, posture-driven keyword value score (commercial intent + CPC
+  // + local relevance multiplier). Also gates the content-gap opportunity spine.
+  // OFF = byte-identical to today. See docs/superpowers/plans/2026-06-05-keyword-value-scoring.md.
+  'keyword-value-scoring': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -151,20 +90,12 @@ export interface FeatureFlagLifecycleMeta {
 }
 
 export const FEATURE_FLAG_GROUP_LABELS = [
-  'Outcome Intelligence Engine',
-  'Copy & Brand Engine',
   'Self-Service Onboarding',
   'Team & Collaboration',
   'White-Label',
-  'Workspace Intelligence Bridges',
-  'Deep Diagnostics',
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
-  'Client IA Redesign',
-  'Local SEO',
-  'Schema AI',
-  'Unified Send-to-Client',
-  'SEO Generation Quality',
+  'Keyword Hub',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -176,17 +107,12 @@ export interface FeatureFlagCatalogEntry {
 }
 
 const LEGACY_ROADMAP = {
-  copyEngine: 'legacy-copy-engine',
   selfServe: 'legacy-self-service-onboarding',
   team: 'legacy-team-collaboration',
   whiteLabel: 'legacy-white-label',
   outcome: 'legacy-outcome-intelligence',
-  intelligence: 'legacy-workspace-intelligence',
   briefing: 'legacy-client-briefing-v2',
-  deepDiagnostics: 'legacy-deep-diagnostics',
   schema: 'legacy-schema-ai',
-  inboxIa: 'legacy-client-inbox-ia',
-  localSeo: 'intel-quality-local-pack-visibility-foundation',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
 } as const;
 
@@ -195,138 +121,6 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'outcome-tracking': {
-    label: 'Action tracking & measurement',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-10',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove after outcome tracking is default-on for all supported tiers for 2 releases.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-dashboard': {
-    label: 'Outcomes admin dashboard',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-10',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove once dashboard behaviors are stable and no rollback path depends on this gate.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-playbooks': {
-    label: 'Playbook pattern detection',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-20',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove after playbook scoring quality and DB migrations are fully settled.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-external-detection': {
-    label: 'External change detection (weekly)',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-22',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove when anomaly ingestion is production-hardened and independent kill-switch is unnecessary.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-ai-injection': {
-    label: 'Inject outcomes into AI context',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-03-25',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove after AI prompts consistently consume outcomes context and no prompt rollback relies on the gate.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-client-reporting': {
-    label: 'Client-facing outcome reporting',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-03-29',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once all supported client plans rely on the new reporting path by default.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'outcome-predictive': {
-    label: 'Predictive scoring (future)',
-    group: 'Outcome Intelligence Engine',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-04-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove if predictive scoring does not move to active implementation by the next architecture cycle.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.outcome,
-      staleAuditCadence: 'quarterly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'copy-engine': {
-    label: 'Copy Engine — core',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-14',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove when Copy Engine core is stable and becomes the only production path.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'copy-engine-voice': {
-    label: 'Copy Engine — voice calibration',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove when voice calibration is permanently enabled for eligible workspaces.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'copy-engine-pipeline': {
-    label: 'Copy Engine — pipeline',
-    group: 'Copy & Brand Engine',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-02-27',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove once pipeline side-effects and rollback paths are fully validated.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.copyEngine,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'self-service-onboarding': {
     label: 'Self-service Webflow onboarding',
     group: 'Self-Service Onboarding',
@@ -382,294 +176,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     },
   },
 
-  'intelligence-shadow-mode': {
-    label: 'Shadow-mode comparison logging',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-03-14',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after shadow/intelligence parity checks are complete and no longer needed for safe rollout.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'opportunity-value-scorer': {
-    label: 'Unified Opportunity Value scorer (ranked impactScore cutover)',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the Opportunity Value scorer is validated against legacy scoring and becomes the only ranking path.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'opportunity-value-calibration': {
-    label: 'Opportunity Value — per-workspace realized-$ calibration',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after per-workspace outcome calibration is validated against realized value and becomes the only calibration path.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'opportunity-value-events': {
-    label: 'Opportunity Value — event-driven re-ranking (decaying Timing boost)',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after event-driven re-ranking is validated against the frozen-snapshot baseline and becomes the only timing path.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-outcome-reweight': {
-    label: '#1: Outcome → reweight insight scores',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #1 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-decay-suggested-brief': {
-    label: '#2: Content decay → suggested brief',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #2 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-strategy-invalidate': {
-    label: '#3: Strategy update → cache invalidation',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #3 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-insight-to-action': {
-    label: '#4: Insight resolved → tracked action',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #4 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-page-analysis-invalidate': {
-    label: '#5: Page analysis → cache invalidation',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #5 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-action-auto-resolve': {
-    label: '#7: Action recorded → auto-resolve insights',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #7 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-content-to-insight': {
-    label: '#8: Content published → staleness insight',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #8 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-schema-to-insight': {
-    label: '#9: Schema validation → schema health insight',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'schema',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #9 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-anomaly-boost': {
-    label: '#10: Anomaly → boost insight severity',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #10 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-settings-cascade': {
-    label: '#11: Settings change → cascade invalidation',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'platform-foundation',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #11 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-audit-page-health': {
-    label: '#12: Audit → page health insights',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #12 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-action-annotation': {
-    label: '#13: Action recorded → analytics annotation',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #13 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-annotation-to-insight': {
-    label: '#14: Annotation → insight correlation',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #14 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-audit-site-health': {
-    label: '#15: Audit → site health insight',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-04-05',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #15 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-audit-auto-resolve': {
-    label: 'IG-4: Auto-resolve audit_finding insights on clean audit',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-04-12',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once IG-4 behavior is validated and no isolated switch is needed.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-briefing-candidate-refresh': {
-    label: 'CB-1: Audit complete → briefing candidate-pool freshness',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'content-pipeline',
-      createdAt: '2026-04-12',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once CB-1 behavior is validated and no isolated switch is needed.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'bridge-client-signal': {
-    label: '#16: Client feedback → signal insights',
-    group: 'Workspace Intelligence Bridges',
-    lifecycle: {
-      owner: 'inbox',
-      createdAt: '2026-04-12',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once bridge execution #16 is validated in production and no independent switch is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.intelligence,
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'deep-diagnostics': {
-    label: 'Deep diagnostics mode',
-    group: 'Deep Diagnostics',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-04-19',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once deep diagnostics is generally available and rollback path no longer depends on a flag.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.deepDiagnostics,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'smart-placeholders': {
     label: 'Smart placeholders (admin chips + client ghost text)',
     group: 'Platform Intelligence Enhancements',
@@ -678,19 +184,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       createdAt: '2026-05-06',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove when placeholder behavior has no fallback branch and is default-on for all supported paths.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'client-brand-section': {
-    label: 'Client portal — Brand tab (business profile)',
-    group: 'Platform Intelligence Enhancements',
-    lifecycle: {
-      owner: 'inbox',
-      createdAt: '2026-05-06',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove when client Brand tab is default for all eligible workspaces with no split rendering path.',
       linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
       staleAuditCadence: 'monthly',
       lastReviewedAt: REVIEWED_AT,
@@ -722,109 +215,41 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-
-  'new-inbox-ia': {
-    label: 'New 3-section inbox layout (Decisions / Reviews / Conversations)',
-    group: 'Client IA Redesign',
+  'client-work-feed': {
+    label: 'Client dashboard — agency-at-work transparency feed',
+    group: 'Client Insights Briefing',
     lifecycle: {
-      owner: 'inbox',
-      createdAt: '2026-05-08',
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-12',
       rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once new inbox IA is the only maintained client inbox layout.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.inboxIa,
+      removalCondition: 'Remove once agency work feed is validated on staging and shipped as default client overview experience.',
+      linkedRoadmapItemId: 'cda-sc5-work-feed',
       staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
+      lastReviewedAt: '2026-06-12',
     },
   },
-  'local-seo-visibility': {
-    label: 'Local SEO visibility',
-    group: 'Local SEO',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-05-15',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once local SEO reporting is validated and the admin visibility foundation no longer needs a kill-switch.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.localSeo,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'schema-ai-element-classifier': {
-    label: 'Schema AI — page-element role classifier',
-    group: 'Schema AI',
-    lifecycle: {
-      owner: 'schema',
-      createdAt: '2026-05-11',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once AI classifier quality is stable and schema extraction no longer needs a hard kill-switch.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.schema,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'unified-deliverables-approval-family': {
-    label: 'Unified deliverables — approval-batch family read cutover (seo_edit / audit_issue / schema_item / content_plan_*)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the approval-batch family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old approval_batches read path is deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-deliverables-broken-family': {
-    label: 'Unified deliverables — client_action family read cutover (redirect / internal_link / aeo_change / content_decay)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the client_action family reads client_deliverable in production for 2 releases with shadow-compare parity holding, and the old client_actions read path is deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-deliverables-rest': {
-    label: 'Unified deliverables — remaining types read cutover (schema_plan / copy / content_request / work_order / briefing)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the remaining deliverable types read the unified model (or projected source) in production for 2 releases and the bespoke read paths are deleted.',
-      linkedRoadmapItemId: 'unified-deliverables-phase-0-contracts',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'unified-inbox': {
-    label: 'Unified client inbox (PriorityStrip + uniform Approve / Request changes / Decline)',
-    group: 'Unified Send-to-Client',
-    lifecycle: {
-      owner: 'inbox-platform',
-      createdAt: REVIEWED_AT,
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the unified client inbox is the only maintained client inbox layout and the new-inbox-ia + legacy InboxTab layouts are torn down (Phase 3).',
-      linkedRoadmapItemId: 'unified-deliverables-phase-2a-client-inbox',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'seo-generation-quality': {
-    label: 'SEO Generation Quality — umbrella (keyword-strategy + recommendation quality)',
-    group: 'SEO Generation Quality',
+  'keyword-universe-full': {
+    label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
+    group: 'Keyword Hub',
     lifecycle: {
       owner: 'analytics-intelligence',
       createdAt: '2026-06-02',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the P1–P6 generation-quality phases are validated per-workspace and become the only generation/ranking path (no flag-off legacy fallback).',
-      linkedRoadmapItemId: 'seo-genquality-p0-harness',
+      removalCondition: 'Remove after the full keyword universe (uncapped coverage + junk gate) is validated on staging and becomes the default; the cap-based path is then deleted.',
+      linkedRoadmapItemId: 'keyword-universe-overhaul',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-02',
+    },
+  },
+  'keyword-value-scoring': {
+    label: 'Keyword Hub — value-first opportunity scoring (commercial intent + CPC + posture-driven local)',
+    group: 'Keyword Hub',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-02',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after value-first scoring is validated on staging and becomes the default; the crude computeOpportunityScore Hub path is then deleted.',
+      linkedRoadmapItemId: 'keyword-value-scoring',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-02',
     },
@@ -832,22 +257,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
-  {
-    label: 'Outcome Intelligence Engine',
-    keys: [
-      'outcome-tracking',
-      'outcome-dashboard',
-      'outcome-playbooks',
-      'outcome-external-detection',
-      'outcome-ai-injection',
-      'outcome-client-reporting',
-      'outcome-predictive',
-    ],
-  },
-  {
-    label: 'Copy & Brand Engine',
-    keys: ['copy-engine', 'copy-engine-voice', 'copy-engine-pipeline'],
-  },
   {
     label: 'Self-Service Onboarding',
     keys: ['self-service-onboarding', 'self-service-gsc-ga4'],
@@ -861,67 +270,16 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
     keys: ['white-label'],
   },
   {
-    label: 'Workspace Intelligence Bridges',
-    keys: [
-      'intelligence-shadow-mode',
-      'opportunity-value-scorer',
-      'opportunity-value-calibration',
-      'opportunity-value-events',
-      'bridge-outcome-reweight',
-      'bridge-decay-suggested-brief',
-      'bridge-strategy-invalidate',
-      'bridge-insight-to-action',
-      'bridge-page-analysis-invalidate',
-      'bridge-action-auto-resolve',
-      'bridge-content-to-insight',
-      'bridge-schema-to-insight',
-      'bridge-anomaly-boost',
-      'bridge-settings-cascade',
-      'bridge-audit-page-health',
-      'bridge-action-annotation',
-      'bridge-annotation-to-insight',
-      'bridge-audit-site-health',
-      'bridge-audit-auto-resolve',
-      'bridge-briefing-candidate-refresh',
-      'bridge-client-signal',
-    ],
-  },
-  {
-    label: 'Deep Diagnostics',
-    keys: ['deep-diagnostics'],
-  },
-  {
     label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders', 'client-brand-section'],
+    keys: ['smart-placeholders'],
   },
   {
     label: 'Client Insights Briefing',
-    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
+    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish', 'client-work-feed'],
   },
   {
-    label: 'Client IA Redesign',
-    keys: ['new-inbox-ia'],
-  },
-  {
-    label: 'Local SEO',
-    keys: ['local-seo-visibility'],
-  },
-  {
-    label: 'Schema AI',
-    keys: ['schema-ai-element-classifier'],
-  },
-  {
-    label: 'Unified Send-to-Client',
-    keys: [
-      'unified-deliverables-approval-family',
-      'unified-deliverables-broken-family',
-      'unified-deliverables-rest',
-      'unified-inbox',
-    ],
-  },
-  {
-    label: 'SEO Generation Quality',
-    keys: ['seo-generation-quality'],
+    label: 'Keyword Hub',
+    keys: ['keyword-universe-full', 'keyword-value-scoring'],
   },
 ];
 

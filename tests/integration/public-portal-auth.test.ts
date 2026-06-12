@@ -39,7 +39,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createClientUser,
   deleteClientUser,
@@ -50,8 +50,7 @@ import { createUser, deleteUser } from '../../server/users.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { JWT_SECRET } from '../../server/jwt-config.js';
 
-// ── Unique port (no other test file uses 13304) ────────────────────────────
-const ctx = createTestContext(13304);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -204,7 +203,7 @@ function clientCookieHeader(workspaceId: string, token: string): string {
 /** GET request without any auth cookies. */
 async function getNoAuth(path: string): Promise<Response> {
   ctx.clearCookies();
-  return ctx.api(path);
+  return ctx.api(path, { headers: { 'x-no-auto-public-auth': 'true' } });
 }
 
 /** GET request with a valid client JWT cookie for the protected workspace. */
@@ -226,7 +225,7 @@ async function postNoAuth(path: string, body: unknown = {}): Promise<Response> {
   ctx.clearCookies();
   return ctx.api(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
     body: JSON.stringify(body),
   });
 }
@@ -564,36 +563,28 @@ describe('GET /api/public/stripe/status/:workspaceId/:sessionId — explicit aut
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PASSWORDLESS WORKSPACE — auth gate must NOT activate (no clientPassword)
+// PASSWORDLESS WORKSPACE — E3: closed until configured (returns 401 with no auth)
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('Passwordless workspace — gated endpoints accessible without auth', () => {
-  it('GET /api/public/content-requests/:id — no auth → 200 for passwordless workspace', async () => {
+describe('Passwordless workspace — E3: closed until configured (401 without auth)', () => {
+  it('GET /api/public/content-requests/:id — no auth → 401 (E3: passwordless portals now closed)', async () => {
     const res = await getNoAuth(`/api/public/content-requests/${openWsId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/public/tracked-keywords/:id — no auth → 200 for passwordless workspace', async () => {
+  it('GET /api/public/tracked-keywords/:id — no auth → 401 (E3: passwordless portals now closed)', async () => {
     const res = await getNoAuth(`/api/public/tracked-keywords/${openWsId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(Array.isArray(body.keywords)).toBe(true);
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/public/requests/:id — no auth → 200 for passwordless workspace', async () => {
+  it('GET /api/public/requests/:id — no auth → 401 (E3: passwordless portals now closed)', async () => {
     const res = await getNoAuth(`/api/public/requests/${openWsId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/public/insights/:id — no auth → 200 for passwordless workspace', async () => {
+  it('GET /api/public/insights/:id — no auth → 401 (E3: passwordless portals now closed)', async () => {
     const res = await getNoAuth(`/api/public/insights/${openWsId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(res.status).toBe(401);
   });
 });
 

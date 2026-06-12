@@ -1,9 +1,11 @@
 /**
- * ov-divergence — shadow-log store for the Opportunity Value re-architecture (PR4).
+ * ov-divergence — historical shadow-log store for the Opportunity Value re-architecture (PR4).
  *
- * On every recommendation generation we record the divergence between the LEGACY
- * ranked #1 and the OPPORTUNITY-VALUE ranked #1, so the owner can review before any
- * flag flip. Zero client-facing effect — admin/internal read only.
+ * During the rollout we recorded the divergence between the LEGACY ranked #1 and the
+ * OPPORTUNITY-VALUE ranked #1 so the owner could review before the cutover. Runtime
+ * recommendation generation no longer writes new rows now that the legacy scorer has
+ * been removed; this module remains to read historical rows and for direct tests of the
+ * shadow-log shape. Zero client-facing effect — admin/internal read only.
  *
  * NOTE: `sortRecommendations` is injected into `recordOvDivergence` (dependency
  * injection) rather than imported from `./recommendations.js`. recommendations.ts
@@ -155,10 +157,11 @@ function top3(recs: Recommendation[]): Top3Entry[] {
 }
 
 /**
- * Compute and persist the legacy-vs-OV divergence for a generated rec set.
- * MUST be called BEFORE the pickImpactScore selector overwrites impactScore, so
- * `rec.impactScore` is still the legacy value and `rec.opportunity.value` is the OV value.
- * `sortRecs` is the canonical ranker (sortRecommendations), injected to avoid a cycle.
+ * Compute and persist a legacy-vs-OV divergence row for a supplied rec set.
+ * Historical/runtime callers had to invoke this before canonical OV sync overwrote
+ * `rec.impactScore` / `rec.priority`; direct tests may still exercise it with explicit
+ * pre-sync fixtures. `sortRecs` is the canonical ranker (sortRecommendations), injected
+ * to avoid a cycle.
  */
 export function recordOvDivergence(
   workspaceId: string,

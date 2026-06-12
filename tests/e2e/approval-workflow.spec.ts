@@ -9,6 +9,14 @@
  * - Verify final state
  */
 import { test, expect } from '@playwright/test';
+import { createHmac } from 'crypto';
+
+// E3: portals are closed until configured. Public API calls in e2e use the
+// admin HMAC token so they pass requireClientPortalAuth without needing a
+// client password or session cookie. The SESSION_SECRET matches playwright.config.ts.
+const E2E_SESSION_SECRET = process.env.SESSION_SECRET ?? 'e2e-test-session-secret';
+const E2E_ADMIN_TOKEN = createHmac('sha256', E2E_SESSION_SECRET).update('admin').digest('hex');
+const publicAuthHeaders = { 'x-auth-token': E2E_ADMIN_TOKEN };
 
 let testWsId = '';
 let batchId = '';
@@ -63,7 +71,7 @@ test.describe('Approval workflow', () => {
   });
 
   test('approval batch exists via API', async ({ request }) => {
-    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`);
+    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`, { headers: publicAuthHeaders });
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.id).toBe(batchId);
@@ -71,13 +79,13 @@ test.describe('Approval workflow', () => {
   });
 
   test('client can approve an item via API', async ({ request }) => {
-    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`);
+    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`, { headers: publicAuthHeaders });
     const batch = await res.json();
     const itemId = batch.items[0].id;
 
     const approveRes = await request.patch(
       `/api/public/approvals/${testWsId}/${batchId}/${itemId}`,
-      { data: { status: 'approved' } },
+      { data: { status: 'approved' }, headers: publicAuthHeaders },
     );
     expect(approveRes.ok()).toBe(true);
     const updated = await approveRes.json();
@@ -86,13 +94,13 @@ test.describe('Approval workflow', () => {
   });
 
   test('client can reject an item with note via API', async ({ request }) => {
-    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`);
+    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`, { headers: publicAuthHeaders });
     const batch = await res.json();
     const itemId = batch.items[1].id;
 
     const rejectRes = await request.patch(
       `/api/public/approvals/${testWsId}/${batchId}/${itemId}`,
-      { data: { status: 'rejected', clientNote: 'Keep the original' } },
+      { data: { status: 'rejected', clientNote: 'Keep the original' }, headers: publicAuthHeaders },
     );
     expect(rejectRes.ok()).toBe(true);
     const updated = await rejectRes.json();
@@ -102,7 +110,7 @@ test.describe('Approval workflow', () => {
   });
 
   test('final batch state reflects all decisions', async ({ request }) => {
-    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`);
+    const res = await request.get(`/api/public/approvals/${testWsId}/${batchId}`, { headers: publicAuthHeaders });
     expect(res.ok()).toBe(true);
     const batch = await res.json();
     const statuses = batch.items.map((i: { status: string }) => i.status);

@@ -1,7 +1,7 @@
 /**
  * keyword-strategy routes — extracted from server/index.ts
  *
- * @reads workspaces, page_keywords, strategy_history, keyword_feedback, snapshots, search_console, google_analytics, seo_provider, workspace_intelligence, workspace_pages, analytics_insights
+ * @reads workspaces, page_keywords, strategy_history, keyword_feedback, snapshots, search_console, google_analytics, seo_provider, workspace_intelligence, workspace_pages, analytics_insights, local_seo_workspace_settings, local_seo_markets, local_visibility_snapshots
  * @writes page_keywords, strategy_history, keyword_feedback, tracked_keywords, workspaces, usage_tracking, intelligence_cache
  */
 import { Router } from 'express';
@@ -19,10 +19,13 @@ import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
+import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
+import type { KeywordStrategySiteKeywordMetric } from '../keyword-strategy-enrichment.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
-import { parseJsonFallback } from '../db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from '../db/json-validation.js';
+import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from '../schemas/workspace-schemas.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -42,6 +45,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasActiveJob } from '../jobs.js';
 import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
+import { normalizeRuntimeSeoDataProvider } from '../seo-data-provider.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   adminBulkKeywordFeedbackSchema,
@@ -55,6 +59,7 @@ import {
   buildKeywordStrategyUxPayload,
 } from '../keyword-strategy-ux.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
+import { getLocalStrategySyncStatus } from '../local-strategy-sync.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -68,7 +73,7 @@ function readSeoDataMode(body: unknown): string | undefined {
 function readSeoDataProvider(body: unknown): string | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const candidate = (body as { seoDataProvider?: unknown }).seoDataProvider;
-  return typeof candidate === 'string' ? candidate : undefined;
+  return typeof candidate === 'string' ? normalizeRuntimeSeoDataProvider(candidate) : undefined;
 }
 
 function serializeKeywordStrategy(
@@ -79,17 +84,20 @@ function serializeKeywordStrategy(
   keywordGaps: KeywordGapItem[],
   topicClusters: TopicCluster[],
   cannibalization: CannibalizationItem[],
+  siteKeywordMetrics: KeywordStrategySiteKeywordMetric[] | undefined,
   strategyUx?: Awaited<ReturnType<typeof buildKeywordStrategyUxPayload>>,
 ) {
-  // Strip any stale table-backed and legacy alias fields left in the blob
-  // in favor of canonical table-backed sources and provider-neutral naming.
+  // The five table-backed arrays are supplied by assembleStoredKeywordStrategy and
+  // re-attached explicitly below, so they no longer need stripping here (the explicit
+  // keys win over the spread). Only the legacy `semrushMode` alias must still be
+  // dropped — it has no canonical replacement key and would otherwise leak.
   const rest: Record<string, unknown> = { ...strategy };
-  delete rest.contentGaps;
-  delete rest.quickWins;
-  delete rest.keywordGaps;
-  delete rest.topicClusters;
-  delete rest.cannibalization;
   delete rest.semrushMode;
+  // #7b: siteKeywordMetrics is table-only post-strip — the blob's `siteKeywordMetrics`
+  // is always undefined now, so `...strategy` cannot carry it. Drop any stale spread key
+  // and re-attach the assembler's TABLE-sourced value below (mirror of public-content.ts),
+  // otherwise paid metrics silently vanish from the admin UI.
+  delete rest.siteKeywordMetrics;
   const seoDataStatus = strategy.seoDataStatus;
   return {
     ...rest,
@@ -101,6 +109,7 @@ function serializeKeywordStrategy(
       reasons: seoDataStatus.reasons ?? [],
       fallbackProviderAvailable: seoDataStatus.fallbackProviderAvailable ?? false,
     } : undefined,
+    siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
     pageMap,
     contentGaps,
     quickWins,
@@ -111,8 +120,14 @@ function serializeKeywordStrategy(
   };
 }
 
-// --- Keyword Strategy Generation (SSE progress) ---
+const KEYWORD_STRATEGY_LEGACY_ROUTE_DEPRECATION =
+  'Deprecated: start keyword strategy generation with BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY via /api/jobs.';
+
+// --- Keyword Strategy Generation (legacy SSE compatibility) ---
+// @deprecated Use BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through /api/jobs. This
+// route remains for external compatibility only; first-party UI is job-based.
 router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  res.setHeader('X-Deprecated-Route', KEYWORD_STRATEGY_LEGACY_ROUTE_DEPRECATION);
   const wantsStream = req.headers.accept === 'text/event-stream';
   let streamStarted = false;
   const routeKeepalive: { stop: (() => void) | null } = { stop: null };
@@ -214,37 +229,60 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const strategy = ws.keywordStrategy;
-    const pageMap = listPageKeywords(ws.id);
-    const contentGapsFromTable = listContentGaps(ws.id);
-    const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
-    const quickWinsFromTable = listQuickWins(ws.id);
-    const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
-    const keywordGapsFromTable = listKeywordGaps(ws.id);
-    const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-    const topicClustersFromTable = listTopicClusters(ws.id);
-    const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
-    const cannibalizationFromTable = listCannibalizationIssues(ws.id);
-    const cannibalization = cannibalizationFromTable.length > 0 ? cannibalizationFromTable : (strategy?.cannibalization || []);
-    if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0 && cannibalization.length === 0) return res.json(null);
-    if (!strategy) {
+    const localSync = getLocalStrategySyncStatus(ws.id);
+    // Single read-path assembler (#2): table-as-truth + table-or-blob fallback,
+    // returning null on the existing short-circuit (no blob + all tables empty).
+    const assembled = assembleStoredKeywordStrategy(ws.id);
+    if (!assembled) {
+      if (!localSync.applies) return res.json(null);
+      const shellStrategyUx = await buildKeywordStrategyUxPayload({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        strategy: null,
+        pageMap: [],
+        contentGaps: [],
+        keywordGaps: [],
+        surface: 'admin',
+      });
+      shellStrategyUx.localSync = localSync;
       return res.json({
         siteKeywords: [],
         opportunities: [],
+        pageMap: [],
+        contentGaps: [],
+        quickWins: [],
+        keywordGaps: [],
+        topicClusters: [],
+        cannibalization: [],
+        strategyUx: shellStrategyUx,
+        generatedAt: null,
+      });
+    }
+    const { pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
+    if (!strategy) {
+      const shellStrategyUx = await buildKeywordStrategyUxPayload({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        strategy: null,
+        pageMap,
+        contentGaps,
+        keywordGaps,
+        surface: 'admin',
+      });
+      shellStrategyUx.localSync = localSync;
+      return res.json({
+        siteKeywords: [],
+        opportunities: [],
+        // #7b: surface table-resolved metrics on the synthesized shell too (the
+        // assembler resolves them even when the strategy blob is absent).
+        siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
         pageMap,
         contentGaps,
         quickWins,
         keywordGaps,
         topicClusters,
         cannibalization,
-        strategyUx: await buildKeywordStrategyUxPayload({
-          workspaceId: ws.id,
-          workspaceName: ws.name,
-          strategy: null,
-          pageMap,
-          contentGaps,
-          keywordGaps,
-          surface: 'admin',
-        }),
+        strategyUx: shellStrategyUx,
         generatedAt: null,
       });
     }
@@ -252,12 +290,17 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy,
+      // Bug 1 fix: pass table-backed siteKeywordMetrics so site-keyword explanations
+      // include real metric data. options.strategy?.siteKeywordMetrics is always undefined
+      // post-strip; the table-assembled value must be threaded explicitly.
+      siteKeywordMetrics: siteKeywordMetrics ?? undefined,
       pageMap,
       contentGaps,
       keywordGaps,
       surface: 'admin',
     });
-    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, strategyUx));
+    strategyUx.localSync = localSync;
+    res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics, strategyUx));
   } catch (err) {
     next(err);
   }
@@ -275,12 +318,13 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
     if (!prev) return res.json(null);
 
-    type PrevStrategyShape = {
-      siteKeywords?: string[];
-      contentGaps?: { targetKeyword: string }[];
-    };
-    const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
-    const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
+    const emptyPrevStrategy: StrategyHistoryStrategy = {};
+    const prevStrategy = parseJsonSafe(prev.strategy_json, strategyHistoryStrategySchema, emptyPrevStrategy, {
+      workspaceId: ws.id, field: 'strategy_json', table: 'strategy_history',
+    });
+    const prevPageMap = parseJsonSafeArray(prev.page_map_json, strategyHistoryPageMapSchema, {
+      workspaceId: ws.id, field: 'page_map_json', table: 'strategy_history',
+    });
     const currentPageMap = listPageKeywords(ws.id);
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
 
@@ -295,7 +339,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     // Current gaps come from the live content_gaps table - the blob no longer
     // carries them after #365 normalization.
     const currentContentGaps = listContentGaps(ws.id);
-    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+    const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).flatMap((g) => (g.targetKeyword ? [g.targetKeyword] : [])));
     const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
     const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
     const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
@@ -325,7 +369,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
       currentGeneratedAt: current.generatedAt,
       previousSiteKeywords: prevStrategy.siteKeywords ?? [],
       currentSiteKeywords: current.siteKeywords ?? [],
-      previousContentGapKeywords: prevStrategy.contentGaps?.map(gap => gap.targetKeyword) ?? [],
+      previousContentGapKeywords: prevStrategy.contentGaps?.flatMap(gap => (gap.targetKeyword ? [gap.targetKeyword] : [])) ?? [],
       currentContentGapKeywords: currentContentGaps.map(gap => gap.targetKeyword),
       previousPageMap: prevPageMap,
       currentPageMap,
@@ -333,10 +377,14 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
     });
     const keywordGapsFromTable = listKeywordGaps(ws.id);
     const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (current.keywordGaps || []);
+    // Bug 1 fix: read table-backed siteKeywordMetrics for the diff UX so explanations
+    // carry real metric data (strategy blob has this stripped — always undefined).
+    const assembledForDiff = assembleStoredKeywordStrategy(ws.id);
     const strategyUx = await buildKeywordStrategyUxPayload({
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy: current,
+      siteKeywordMetrics: assembledForDiff?.siteKeywordMetrics ?? undefined,
       pageMap: currentPageMap,
       contentGaps: currentContentGaps,
       keywordGaps,

@@ -10,11 +10,7 @@ import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { createLogger } from '../logger.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
-import {
-  getTokenForSite,
-  getWorkspace,
-  listWorkspaces,
-} from '../workspaces.js';
+import { getTokenForSite, getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-audit-route');
@@ -30,7 +26,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceSiteAccessFromQuery
     const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined, skipLinkCheck);
     // Auto-flag pages with issues for edit tracking
     const auditWsId = req.query.workspaceId as string | undefined;
-    const auditWs = auditWsId ? getWorkspace(auditWsId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const auditWs = auditWsId ? getWorkspace(auditWsId) : getWorkspaceBySiteId(req.params.siteId);
     if (auditWs) {
       handleOnDemandSeoAuditResult(auditWs, result);
     }

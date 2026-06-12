@@ -1,5 +1,5 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
-import { get, post, patch, put, del, getSafe, getOptional } from './client';
+import { get, post, patch, put, del, getSafe, getOptional, getText } from './client';
 import type {
   ContentBrief,
   GeneratedPost,
@@ -8,12 +8,43 @@ import type {
   ContentMatrix,
   KeywordRecommendationOptions,
   KeywordRecommendationResult,
-  AiFixResult,
-  AIReviewResponse,
   AiFixRequest,
   BriefTemplateCrossrefMatch,
 } from '../../shared/types/content';
 import type { ClientContentRequest } from '../components/client/types';
+import type { CopySectionStatus, ClientSuggestion } from '../../shared/types/copy-pipeline';
+
+export interface PublicCopyEntryListItem {
+  id: string;
+  name: string;
+  pageType: string;
+  blueprintId: string;
+  blueprintName: string;
+  copyStatus: {
+    entryId: string;
+    totalSections: number;
+    pendingSections: number;
+    draftSections: number;
+    clientReviewSections: number;
+    approvedSections: number;
+    revisionSections: number;
+    overallStatus: CopySectionStatus;
+    approvalPercentage: number;
+  };
+}
+
+export interface PublicClientCopySection {
+  id: string;
+  entryId: string;
+  sectionPlanItemId: string;
+  generatedCopy: string | null;
+  status: CopySectionStatus;
+  aiAnnotation: string | null;
+  clientSuggestions: ClientSuggestion[] | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const contentBriefs = {
   list: (wsId: string) =>
@@ -61,6 +92,17 @@ export const contentPosts = {
   update: (wsId: string, postId: string, body: Record<string, unknown>) =>
     patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`, body),
 
+  // W6.6 (Forward-planning calendar): set or clear a post's planned publish date.
+  // Pass an ISO string to schedule, or null to clear.
+  setPlannedDate: (wsId: string, postId: string, plannedPublishAt: string | null) =>
+    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/planned-date`, { plannedPublishAt }),
+
+  // W6.6: propose publish dates for the workspace's unscheduled drafts.
+  suggestDates: (wsId: string) =>
+    get<{ suggestions: Array<{ draftId: string; suggestedDate: string; reason: string; title: string }>; unscheduledCount: number }>(
+      `/api/content-posts/${wsId}/suggest-dates`,
+    ),
+
   remove: (wsId: string, postId: string) =>
     del(`/api/content-posts/${wsId}/${postId}`),
 
@@ -81,16 +123,21 @@ export const contentPosts = {
       `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
     ),
 
+  // W6.2: ai-review / ai-fix / score-voice now return 202 { jobId } and run on
+  // the background job platform. Consumers track the job via useBackgroundTasks
+  // and read the result off the terminal job (CONTENT_POST_REVIEW returns
+  // { review, evidence }; CONTENT_POST_FIX returns the AiFixResult; voice score
+  // returns { post }).
   aiReview: (wsId: string, postId: string) =>
-    post<AIReviewResponse>(
+    post<{ jobId: string }>(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
     ),
 
   scoreVoice: (wsId: string, postId: string) =>
-    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
 
   aifix: (wsId: string, postId: string, body: AiFixRequest) =>
-    post<AiFixResult>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
 
   // Send a generated post to the client for review (POST-C1). Distinct from the internal
   // "Review" status bump — this creates a client-facing content_request (post_review) that
@@ -148,6 +195,23 @@ export const publicContent = {
 
   briefPreview: (wsId: string, briefId: string) =>
     getOptional<unknown>(`/api/public/content-brief/${wsId}/${briefId}`),
+
+  exportBrief: (wsId: string, briefId: string) =>
+    getText(`/api/public/content-brief/${wsId}/${briefId}/export`),
+};
+
+export const publicCopyReview = {
+  entries: (wsId: string) =>
+    get<{ entries: PublicCopyEntryListItem[] }>(`/api/public/copy/${wsId}/entries`),
+
+  sections: (wsId: string, entryId: string) =>
+    get<{ sections: PublicClientCopySection[] }>(`/api/public/copy/${wsId}/entry/${entryId}/sections`),
+
+  approveSection: (wsId: string, sectionId: string) =>
+    post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/approve`),
+
+  suggestEdit: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) =>
+    post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, body),
 };
 
 // ── Public post-review actions (client portal) ────────────────
@@ -322,7 +386,12 @@ export const siteArchitecture = {
 // ── LLMs.txt Generator ──────────────────────────────────────────
 
 export const llmsTxt = {
+  /** Enqueue async generation. Returns { jobId }. */
   generate: (wsId: string) =>
+    post<{ jobId: string }>(`/api/llms-txt/${wsId}/generate`, {}),
+
+  /** Return last stored result without re-generating. */
+  getLast: (wsId: string) =>
     get<{ content: string; fullContent: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
 
   freshness: (wsId: string) =>

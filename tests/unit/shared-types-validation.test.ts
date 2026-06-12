@@ -220,10 +220,12 @@ describe('BACKGROUND_JOB_TYPES constants', () => {
     expect(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY).toBe('keyword-strategy');
     expect(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION).toBe('content-post-generation');
     expect(BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR).toBe('schema-generator');
+    expect(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION).toBe('schema-plan-generation');
     expect(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS).toBe('page-analysis');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE).toBe('seo-bulk-analyze');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE).toBe('seo-bulk-rewrite');
     expect(BACKGROUND_JOB_TYPES.SEO_BULK_ACCEPT_FIXES).toBe('seo-bulk-accept-fixes');
+    expect(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION).toBe('recommendations-generation');
   });
 });
 
@@ -255,6 +257,12 @@ describe('getBackgroundJobMetadata', () => {
     expect(meta?.cancellable).toBe(true);
   });
 
+  it('returns metadata for schema-plan-generation (cancellable: false)', () => {
+    const meta = getBackgroundJobMetadata(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION);
+    expect(meta?.cancellable).toBe(false);
+    expect(meta?.resultBehavior).toBe('domain-store');
+  });
+
   it('returns undefined for unknown type', () => {
     expect(getBackgroundJobMetadata('not-a-job')).toBeUndefined();
   });
@@ -265,6 +273,8 @@ describe('getBackgroundJobLabel', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe('SEO Audit');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe('Content Post Generation');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe('Schema Plan Generation');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe('Recommendations Generation');
   });
 
   it('falls back to the raw type string for unknown types', () => {
@@ -279,11 +289,13 @@ describe('isBackgroundJobCancellable', () => {
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE)).toBe(true);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH)).toBe(true);
   });
 
   it('returns false for non-cancellable jobs', () => {
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION)).toBe(false);
   });
 
@@ -321,16 +333,17 @@ import {
 
 describe('FEATURE_FLAGS constants', () => {
   it('all flags default to false', () => {
+    // keyword-hub was retired at the Phase C cutover (2026-06-11); every remaining
+    // flag is dark by default.
     for (const [key, value] of Object.entries(FEATURE_FLAGS)) {
-      expect(value, `flag "${key}" should default to false`).toBe(false);
+      expect(value, `flag "${key}" default`).toBe(false);
     }
   });
 
   it('contains expected flag keys', () => {
-    expect('copy-engine' in FEATURE_FLAGS).toBe(true);
-    expect('outcome-tracking' in FEATURE_FLAGS).toBe(true);
-    expect('new-inbox-ia' in FEATURE_FLAGS).toBe(true);
-    expect('local-seo-visibility' in FEATURE_FLAGS).toBe(true);
+    expect('keyword-universe-full' in FEATURE_FLAGS).toBe(true);
+    expect('white-label' in FEATURE_FLAGS).toBe(true);
+    expect('client-briefing-v2' in FEATURE_FLAGS).toBe(true);
   });
 });
 

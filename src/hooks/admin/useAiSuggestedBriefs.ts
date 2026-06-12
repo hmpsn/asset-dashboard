@@ -1,29 +1,55 @@
 /**
- * useAiSuggestedBriefs — React Query hook for AI-suggested briefs in the pipeline.
+ * useAiSuggestedBriefs — React Query hooks for AI-suggested briefs in the pipeline.
  *
- * Fetches suggested_brief and refresh_suggestion signals from the insight engine's
- * feedback loop. Used by the AiSuggested section in ContentPipeline.
+ * Data source: /api/suggested-briefs/:workspaceId (the persisted store, not the
+ * ephemeral insight-feedback signal path). The store is the single source of truth
+ * for dismiss/snooze lifecycle. Mutations broadcast SUGGESTED_BRIEF_UPDATED →
+ * wsInvalidation already re-fetches aiSuggestedBriefs on that event.
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { getSafe } from '../../api/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { suggestedBriefsApi } from '../../api/suggested-briefs.js';
 import { queryKeys } from '../../lib/queryKeys';
-import type { PipelineSignal } from '../../../shared/types/insights.js';
+import type { SuggestedBrief } from '../../api/suggested-briefs.js';
 
-interface SuggestedResponse {
-  signals: PipelineSignal[];
-}
+export type { SuggestedBrief };
 
 export function useAiSuggestedBriefs(workspaceId: string) {
   return useQuery({
     queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId),
-    queryFn: ({ signal }) =>
-      getSafe<SuggestedResponse>(
-        `/api/content-briefs/${workspaceId}/suggested`,
-        { signals: [] },
-        signal,
-      ),
+    queryFn: ({ signal }) => suggestedBriefsApi.list(workspaceId, false, signal),
     staleTime: 5 * 60 * 1000,
     enabled: !!workspaceId,
+  });
+}
+
+export function useDismissSuggestedBrief(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (briefId: string) => suggestedBriefsApi.dismiss(workspaceId, briefId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
+  });
+}
+
+export function useSnoozeSuggestedBrief(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ briefId, until }: { briefId: string; until: string }) =>
+      suggestedBriefsApi.snooze(workspaceId, briefId, until),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
+  });
+}
+
+export function useAcceptSuggestedBrief(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (briefId: string) => suggestedBriefsApi.update(workspaceId, briefId, 'accepted'),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
   });
 }

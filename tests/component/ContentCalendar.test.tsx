@@ -17,8 +17,24 @@ vi.mock('react-router-dom', async () => {
 });
 
 // ── Hook mock ─────────────────────────────────────────────────────────────────
+// W6.6: the rebuilt calendar also reads the admin posts list (for the
+// schedule-a-draft picker), so the barrel mock must expose useAdminPostsList too.
 vi.mock('../../src/hooks/admin', () => ({
   useContentCalendar: vi.fn(),
+  useAdminPostsList: vi.fn(),
+}));
+
+// ── Toast mock — the calendar surfaces schedule/suggest results via toast. ──────
+vi.mock('../../src/components/Toast', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+// ── Content API mock — schedule-a-draft + suggest-dates call these. ─────────────
+vi.mock('../../src/api/content', () => ({
+  contentPosts: {
+    setPlannedDate: vi.fn().mockResolvedValue(undefined),
+    suggestDates: vi.fn().mockResolvedValue({ suggestions: [] }),
+  },
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -42,14 +58,17 @@ function renderContentCalendar(workspaceId = 'ws1') {
 const today = new Date();
 const todayIso = today.toISOString();
 
+// W6.6: CalendarItem now carries a `kind` ('published' | 'planned' | 'created')
+// that drives the visual treatment. Fixtures mirror the real derived shape.
 const mockItems = [
   {
     id: 'brief-1',
     type: 'brief' as const,
     label: 'SEO Strategy Brief',
     sublabel: 'seo strategy',
-    status: 'draft',
+    status: 'created',
     date: todayIso,
+    kind: 'created' as const,
   },
   {
     id: 'post-1',
@@ -59,6 +78,7 @@ const mockItems = [
     status: 'approved',
     date: todayIso,
     publishedAt: todayIso,
+    kind: 'published' as const,
   },
   {
     id: 'req-1',
@@ -67,6 +87,7 @@ const mockItems = [
     sublabel: 'landing page seo',
     status: 'requested',
     date: todayIso,
+    kind: 'created' as const,
   },
   {
     id: 'mat-1',
@@ -75,6 +96,7 @@ const mockItems = [
     sublabel: '12 cells',
     status: 'published',
     date: todayIso,
+    kind: 'created' as const,
   },
 ];
 
@@ -91,6 +113,10 @@ describe('ContentCalendar', () => {
       data: mockItems,
       isLoading: false,
     } as ReturnType<typeof hooks.useContentCalendar>);
+    // Posts list backs the schedule-a-draft picker; empty by default.
+    vi.mocked(hooks.useAdminPostsList).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof hooks.useAdminPostsList>);
   });
 
   it('renders without crash', () => {
@@ -212,7 +238,9 @@ describe('ContentCalendar', () => {
     expect(screen.getByRole('button', { name: /create a brief/i })).toBeInTheDocument();
   });
 
-  it('navigates to seo-briefs when "Create a Brief" is clicked', async () => {
+  it('navigates to content-pipeline briefs tab when "Create a Brief" is clicked', async () => {
+    // W6.6 / D1 fold: seo-briefs is now a zombie redirect → content-pipeline?tab=briefs.
+    // The CTA targets the destination directly rather than bouncing through the redirect.
     const hooks = await getAdminHooks();
     vi.mocked(hooks.useContentCalendar).mockReturnValue({
       data: [],
@@ -220,7 +248,8 @@ describe('ContentCalendar', () => {
     } as ReturnType<typeof hooks.useContentCalendar>);
     renderContentCalendar();
     fireEvent.click(screen.getByRole('button', { name: /create a brief/i }));
-    expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('seo-briefs'));
+    expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('content-pipeline'));
+    expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('tab=briefs'));
   });
 
   it('shows selected day detail panel when a calendar day is clicked', () => {
@@ -243,5 +272,56 @@ describe('ContentCalendar', () => {
     fireEvent.click(cellWithItem!);
     const panels = screen.getAllByText('SEO Strategy Brief');
     expect(panels.length).toBeGreaterThan(0);
+  });
+
+  // ── FM-2: Error path behavioral tests ─────────────────────────────────────────
+
+  it('renders ErrorState when data load fails — not a silently empty calendar (FM-2)', async () => {
+    const hooks = await getAdminHooks();
+    // data: undefined models a first-load error with no cached data. ErrorState is
+    // only shown when there is no stale cache to fall back on (isError && !data).
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    // ErrorState title, not an empty calendar
+    expect(screen.getByText("Couldn't load calendar data")).toBeInTheDocument();
+    // Calendar grid should NOT render when in error state
+    expect(screen.queryByText('Content Calendar')).not.toBeInTheDocument();
+  });
+
+  it('ErrorState for calendar contains a Retry button that calls refetch (FM-2)', async () => {
+    const refetchMock = vi.fn().mockResolvedValue(undefined);
+    const hooks = await getAdminHooks();
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: refetchMock,
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    const retryBtn = screen.getByRole('button', { name: /retry/i });
+    expect(retryBtn).toBeInTheDocument();
+    fireEvent.click(retryBtn);
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it('keeps the calendar visible on a background refetch error when stale data is cached (FM-2)', async () => {
+    const hooks = await getAdminHooks();
+    // isError true but data present (stale cache from a prior successful fetch).
+    // The calendar must stay rendered rather than collapsing to ErrorState.
+    vi.mocked(hooks.useContentCalendar).mockReturnValue({
+      data: mockItems,
+      isLoading: false,
+      isError: true,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof hooks.useContentCalendar>);
+    renderContentCalendar();
+    // Calendar chrome is still present; ErrorState is NOT shown.
+    expect(screen.getByText('Content Calendar')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load calendar data")).not.toBeInTheDocument();
   });
 });

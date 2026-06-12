@@ -5,7 +5,6 @@
  * delete, and bulk update — verifying response shape, DB state,
  * activity log entries, and broadcast stubs at each step.
  *
- * The existing requests-routes.test.ts (port 13346) focuses on
  * validation failures. This file focuses on the happy-path lifecycle.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,12 +31,12 @@ vi.mock('../../server/email.js', async importOriginal => {
   };
 });
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 
-const ctx = createTestContext(13852); // port-ok: unique in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson, patchJson, del, api } = ctx;
 
 let workspaceId = '';
@@ -227,6 +226,27 @@ describe('PATCH /api/requests/:id — update', () => {
   it('returns 404 for unknown request id', async () => {
     const res = await patchJson('/api/requests/req_nonexistent_xyz', { status: 'in_review' });
     expect(res.status).toBe(404);
+  });
+
+  // M1: an illegal status transition (closed → new, the B24 bug) returns 409 with the machine's
+  // message — distinct from the 404 reserved for genuine not-found — and does NOT mutate the row.
+  it('returns 409 for an illegal status transition (closed → new)', async () => {
+    const seeded = createRequest(workspaceId, {
+      title: 'Illegal transition test',
+      description: 'closed is terminal',
+      category: 'seo',
+    });
+    // new → closed is legal
+    const closeRes = await patchJson(`/api/requests/${seeded.id}`, { status: 'closed' });
+    expect(closeRes.status).toBe(200);
+
+    // closed → new is illegal → 409
+    const res = await patchJson(`/api/requests/${seeded.id}`, { status: 'new' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/transition/i);
+
+    // Row stays closed — the illegal move did not partially apply.
+    expect(getRequest(seeded.id)?.status).toBe('closed');
   });
 
   it('logs activity when status transitions to completed', async () => {

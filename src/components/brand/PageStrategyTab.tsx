@@ -7,6 +7,8 @@ import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { EmptyState, SectionCard, Icon, Button, ConfirmDialog, FormInput } from '../ui';
+import { useJobProgress } from '../../hooks/useJobProgress';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 
 interface Props {
   workspaceId: string;
@@ -35,17 +37,16 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
     onError: () => toast('Failed to create blueprint', 'error'),
   });
 
-  const generateMutation = useMutation({
-    mutationFn: (input: BlueprintGenerationInput) =>
-      blueprintsApi.generate(workspaceId, input),
-    onSuccess: (bp: SiteBlueprint) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-      toast('Blueprint generated');
-      resetForm();
-      onSelectBlueprint(bp.id);
-    },
-    onError: () => toast('Failed to generate blueprint', 'error'),
-  });
+  // Blueprint generation is now async — enqueues a job and polls for result.
+  // On 'done', the blueprints list query is invalidated; user navigates on next list refresh.
+  const {
+    startJob: startGenerateJob,
+    isRunning: isGenerating,
+  } = useJobProgress(
+    BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION,
+    [queryKeys.admin.blueprints(workspaceId)],
+    workspaceId,
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (blueprintId: string) =>
@@ -72,14 +73,18 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
     createMutation.mutate({ name: name.trim(), industryType: industryType.trim() || undefined });
   }
 
-  function handleGenerateWithAI() {
+  async function handleGenerateWithAI() {
     if (!industryType.trim()) return;
-    generateMutation.mutate({
-      industryType: industryType.trim(),
-    });
+    const input: BlueprintGenerationInput = { industryType: industryType.trim() };
+    const jobId = await startGenerateJob(input as unknown as Record<string, unknown>);
+    if (jobId) {
+      toast('Generating blueprint — check Task Panel for progress');
+      resetForm();
+    } else {
+      toast('Failed to start blueprint generation', 'error');
+    }
   }
 
-  const isGenerating = generateMutation.isPending;
   const isCreating = createMutation.isPending;
 
   return (<>

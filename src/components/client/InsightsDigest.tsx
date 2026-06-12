@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2, Layers,
-  ArrowRight, ChevronDown, Activity, HeartPulse, AlertCircle, Clock, Trophy,
+  ArrowRight, ChevronDown, Activity, HeartPulse, AlertCircle, Clock, Trophy, MapPin,
   type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
@@ -382,7 +382,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   page_health: Activity,
   ranking_opportunity: Target,
   cannibalization: Layers,
-  keyword_cluster: Sparkles,
+  keyword_cluster: Layers, // grouped keywords — distinct from the Sparkles fallback (M4)
   competitor_gap: Users,
   conversion_attribution: Zap,
   serp_opportunity: Globe,
@@ -394,6 +394,8 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   competitor_alert: AlertCircle,
   freshness_alert: Clock,
   milestone_attribution: Trophy, // Phase 2.5c: brief crossed a traffic threshold
+  lost_visibility: TrendingDown, // G1: queries that dropped off GSC
+  local_visibility_shift: MapPin, // W5.3: local pack visibility transition / new competitor
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
@@ -427,6 +429,10 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   competitor_alert: { label: 'View analytics', tab: 'performance' },
   emerging_keyword: { label: 'View strategy', tab: 'strategy' },
   freshness_alert: { label: 'View strategy', tab: 'strategy' },
+  lost_visibility: { label: 'View search data', tab: 'performance' },
+  audit_finding: { label: 'View site health', tab: 'health' },
+  milestone_attribution: { label: 'View performance', tab: 'performance' },
+  local_visibility_shift: { label: 'View search data', tab: 'performance' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

@@ -15,18 +15,18 @@
  *   - analytics-event-trend: missing event query param (400)
  *   - analytics-landing-pages: organic=true flag still validates days/limit params
  *
- * Port: 13381 (unique)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { cleanSeedData } from '../global-setup.js';
-import { addMessage, FREE_CHAT_LIMIT } from '../../server/chat-memory.js';
+import { FREE_CHAT_LIMIT, addMessage, getSession } from '../../server/chat-memory.js';
+import { incrementUsage } from '../../server/usage-tracking.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13381);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Workspace with no credentials (GSC/GA4 unconfigured) — passwordless
@@ -107,43 +107,45 @@ afterAll(async () => {
 
 describe('Auth guard — 401 for password-protected workspace with no credentials', () => {
   it('GET /api/public/insights/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/insights/:workspaceId/narrative returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}/narrative`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}/narrative`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/insights/:workspaceId/digest returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/insights/${wsWithPasswordId}/digest`);
+    const res = await api(`/api/public/insights/${wsWithPasswordId}/digest`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/search-overview/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/search-overview/${wsWithPasswordId}`);
+    const res = await api(`/api/public/search-overview/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('GET /api/public/analytics-overview/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await api(`/api/public/analytics-overview/${wsWithPasswordId}`);
+    const res = await api(`/api/public/analytics-overview/${wsWithPasswordId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
 
   it('POST /api/public/search-chat/:workspaceId returns 401 when workspace has password and no auth cookie', async () => {
-    const res = await postJson(`/api/public/search-chat/${wsWithPasswordId}`, {
-      question: 'What is my traffic like?',
+    const res = await api(`/api/public/search-chat/${wsWithPasswordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({ question: 'What is my traffic like?' }),
     });
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -410,6 +412,20 @@ describe('Parameter edge cases — non-numeric and negative values', () => {
     expect(body).toMatchObject({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-overview rejects incomplete dateRange', async () => {
+    const res = await api(`/api/public/analytics-overview/${wsGa4OnlyId}?startDate=2025-01-01`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: 'Invalid date range' });
+  });
+
+  it('GET /api/public/search-overview rejects reversed dateRange', async () => {
+    const res = await api(`/api/public/search-overview/${wsGscOnlyId}?startDate=2025-02-01&endDate=2025-01-01`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: 'Invalid date range' });
+  });
+
   it('GET /api/public/search-countries rejects negative limit (-5)', async () => {
     const res = await api(`/api/public/search-countries/${wsGscOnlyId}?limit=-5`);
     expect(res.status).toBe(400);
@@ -465,11 +481,25 @@ describe('POST /api/public/search-chat — validation and guard branches', () =>
     expect(body.error).toBe('AI not configured');
   });
 
+  it('does not allow public search-chat to continue a non-client chat session', async () => {
+    addMessage(wsNoCredsId, 'admin-session-leak-check', 'admin', 'user', 'Internal admin context');
+
+    const res = await postJson(`/api/public/search-chat/${wsNoCredsId}`, {
+      question: 'Can you continue this?',
+      sessionId: 'admin-session-leak-check',
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Session not found');
+    expect(getSession(wsNoCredsId, 'admin-session-leak-check')?.channel).toBe('admin');
+    expect(getSession(wsNoCredsId, 'admin-session-leak-check')?.messages).toHaveLength(1);
+  });
+
   it('returns 429 when free tier has exhausted monthly chat limit', async () => {
-    // Exhaust the monthly conversation count for wsFreeId
-    // Each addMessage call on a new sessionId creates a new conversation
+    // Exhaust the monthly chat usage count for wsFreeId.
     for (let i = 0; i < FREE_CHAT_LIMIT; i++) {
-      addMessage(wsFreeId, `exhaust-session-${i}`, 'client', 'user', 'hello');
+      incrementUsage(wsFreeId, 'ai_chats');
     }
 
     // Now a NEW session should be rate-limited
@@ -481,9 +511,12 @@ describe('POST /api/public/search-chat — validation and guard branches', () =>
     const body = await res.json();
     expect(body).toHaveProperty('error');
     expect(body.error).toBe('Chat limit reached');
+    expect(body.code).toBe('usage_limit');
     expect(body).toHaveProperty('limit');
     expect(body).toHaveProperty('used');
     expect(body.limit).toBe(FREE_CHAT_LIMIT);
+    expect(body.remaining).toBe(0);
+    expect(body.tier).toBe('free');
   });
 
   it('returns 429 response body has correct shape (message, used, limit)', async () => {

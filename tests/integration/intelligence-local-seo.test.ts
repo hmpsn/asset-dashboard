@@ -15,14 +15,12 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_POSTURE } from '../../shared/types/local-seo.js';
 import { setBroadcast } from '../../server/broadcast.js';
-import { setFlagOverride } from '../../server/feature-flags.js';
 import { vi } from 'vitest';
 
 let workspaceId = '';
 
 beforeEach(() => {
   setBroadcast(vi.fn(), vi.fn());
-  setFlagOverride('local-seo-visibility', true);
   // Tables created on demand by other tests; reuse same schema.
   db.exec(`
     CREATE TABLE IF NOT EXISTS local_seo_workspace_settings (
@@ -83,7 +81,6 @@ beforeEach(() => {
 afterEach(() => {
   if (workspaceId) deleteWorkspace(workspaceId);
   workspaceId = '';
-  setFlagOverride('local-seo-visibility', null);
 });
 
 function seedWorkspaceWithMarkets(opts: { pages?: Array<{ primaryKeyword: string; pagePath: string; pageTitle: string; secondaryKeywords?: string[] }> } = {}) {

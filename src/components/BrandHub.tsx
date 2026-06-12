@@ -4,13 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
 import {
   Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map, MapPin, BrainCircuit, Building2,
+  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map, BrainCircuit, Building2,
 } from 'lucide-react';
 import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog, FormInput, FormSelect, FormTextarea } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { queryKeys } from '../lib/queryKeys';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
@@ -23,11 +22,11 @@ import { IdentityTab } from './brand/IdentityTab';
 import { PageStrategyTab } from './brand/PageStrategyTab';
 import { BlueprintDetail } from './brand/BlueprintDetail';
 import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
+import { BrandOverviewTab } from './brand/BrandOverviewTab';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { EeatAssetsTab } from './settings/EeatAssetsTab';
+import { BusinessFootprintTab } from './settings/BusinessFootprintTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
-import { LocationsTab } from './settings/LocationsTab';
-import { BusinessProfileTab } from './settings/BusinessProfileTab';
 
 interface WorkspaceData {
   id: string;
@@ -63,9 +62,13 @@ interface Props {
   webflowSiteId?: string;
 }
 
-type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-profile' | 'eeat-assets' | 'intelligence-profile' | 'locations';
-const BASE_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'brandscript', 'discovery', 'voice', 'identity', 'business-profile', 'eeat-assets', 'intelligence-profile'];
-const BRAND_TABS_WITH_LOCATIONS: readonly BrandHubTab[] = [...BASE_BRAND_TABS, 'locations'];
+type BrandHubLegacyTab = 'business-profile' | 'locations';
+type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-footprint' | 'eeat-assets' | 'intelligence-profile';
+const VALID_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'brandscript', 'discovery', 'voice', 'identity', 'business-footprint', 'eeat-assets', 'intelligence-profile'];
+const BRAND_TAB_ALIASES: Record<BrandHubLegacyTab, BrandHubTab> = {
+  'business-profile': 'business-footprint',
+  locations: 'business-footprint',
+};
 
 function contextJobStorageKey(workspaceId: string, type: string): string {
   return `brand-hub:${workspaceId}:${type}:jobId`;
@@ -231,13 +234,15 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const queryClient = useQueryClient();
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [searchParams] = useSearchParams();
-  const localSeoVisibilityEnabled = useFeatureFlag('local-seo-visibility');
-  const validBrandTabs = localSeoVisibilityEnabled ? BRAND_TABS_WITH_LOCATIONS : BASE_BRAND_TABS;
+  const rawTab = searchParams.get('tab');
+  const legacyBusinessFootprintSection: BrandHubLegacyTab | null =
+    rawTab === 'business-profile' || rawTab === 'locations' ? rawTab : null;
 
   // Active tab
-  const [activeTab, setActiveTab] = useState<BrandHubTab>(() => resolveTabSearchParam<BrandHubTab>(searchParams.get('tab'), {
-    validValues: validBrandTabs,
+  const [activeTab, setActiveTab] = useState<BrandHubTab>(() => resolveTabSearchParam<BrandHubTab>(rawTab, {
+    validValues: VALID_BRAND_TABS,
     fallback: 'overview',
+    legacyAliases: BRAND_TAB_ALIASES,
   }));
 
   // Workspace data (React Query)
@@ -325,11 +330,12 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   // Keep BrandHub in sync with ?tab= deep links.
   useEffect(() => {
     setActiveTab(resolveTabSearchParam<BrandHubTab>(searchParams.get('tab'), {
-      validValues: validBrandTabs,
+      validValues: VALID_BRAND_TABS,
       fallback: 'overview',
+      legacyAliases: BRAND_TAB_ALIASES,
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, localSeoVisibilityEnabled]);
+  }, [searchParams]);
 
   // effect-layout-ok: route changes swap the workspace whose draft job IDs we should recover.
   useEffect(() => {
@@ -502,10 +508,9 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           { id: 'discovery', label: 'Discovery', icon: Upload },
           { id: 'voice', label: 'Voice', icon: Mic },
           { id: 'identity', label: 'Identity', icon: Award },
-          { id: 'business-profile', label: 'Business Profile', icon: Building2 },
+          { id: 'business-footprint', label: 'Business Footprint', icon: Building2 },
           { id: 'eeat-assets', label: 'E-E-A-T Assets', icon: Map },
           { id: 'intelligence-profile', label: 'Intelligence Profile', icon: BrainCircuit },
-          ...(localSeoVisibilityEnabled ? [{ id: 'locations', label: 'Locations', icon: MapPin }] : []),
         ]}
       />
 
@@ -513,15 +518,18 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {activeTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
       {activeTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
       {activeTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
-      {activeTab === 'business-profile' && (
-        <BusinessProfileTab
+      {activeTab === 'business-footprint' && (
+        <BusinessFootprintTab
           workspaceId={workspaceId}
+          workspaceName={ws?.name || 'Workspace'}
+          liveDomain={ws?.liveDomain}
           businessProfile={ws?.businessProfile}
           businessContext={ws?.keywordStrategy?.businessContext}
           brandLogoUrl={ws?.brandLogoUrl}
           siteHasSearch={ws?.siteHasSearch}
+          legacySection={legacyBusinessFootprintSection}
           toast={toast}
-          onSave={() => {
+          onBusinessProfileSave={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
           }}
         />
@@ -537,17 +545,18 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           }}
         />
       )}
-      {activeTab === 'locations' && localSeoVisibilityEnabled && (
-        <LocationsTab
-          workspaceId={workspaceId}
-          workspaceName={ws?.name || 'Workspace'}
-          liveDomain={ws?.liveDomain}
-          businessProfile={ws?.businessProfile}
-          toast={toast}
-        />
-      )}
-
       {activeTab === 'overview' && <>
+      <BrandOverviewTab
+        workspaceId={workspaceId}
+        brandVoice={ws?.brandVoice}
+        knowledgeBase={ws?.knowledgeBase}
+        personasCount={ws?.personas?.length ?? 0}
+        businessContext={ws?.keywordStrategy?.businessContext}
+        intelligenceProfile={ws?.intelligenceProfile}
+        businessProfile={ws?.businessProfile}
+      />
+
+      <div id="brand-hub-current-context" className="space-y-8">
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard
         title="Brand Voice & Style"
@@ -997,6 +1006,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             The more context you provide, the more accurate and on-brand the AI outputs will be.
           </div>
         </div>
+      </div>
       </div>
       </>}
     </div>

@@ -12,8 +12,7 @@ import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
 import { WorkOrderPanel } from './admin/WorkOrderPanel';
-import { InsightsEngine } from './client/InsightsEngine';
-import { CartProvider } from './client/useCart';
+import { AdminRecommendationQueue } from './admin/AdminRecommendationQueue';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
@@ -59,6 +58,9 @@ type HomeTab = 'overview' | 'meeting-brief';
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // The standalone Rank Tracker folded into the Keyword Hub; rank-related
+  // drill-ins route to seo-keywords.
+  const ranksTab: Page = 'seo-keywords';
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
@@ -164,7 +166,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   // Action items — priority: 1=critical, 2=important, 3=setup suggestions
   type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string; onClick?: () => void };
   const actions: ActionItem[] = [];
-  if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
+  if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', queryString: 'tab=requests', priority: 1 });
   // Open orders = any non-terminal order (NOT closed/cancelled). Includes `completed`
   // so the operator can still reach the panel to reply or close out a fulfilled order
   // once nothing else is pending — `completed` is the exact state you close FROM.
@@ -204,7 +206,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   }
   if (pendingContent.length > 0) actions.push({ label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`, sub: 'Approve or edit briefs', color: 'amber', icon: FileText, tab: 'content-pipeline', priority: 2 });
   if (audit && audit.errors > 0) actions.push({ label: `${audit.errors} SEO error${audit.errors > 1 ? 's' : ''} found in audit`, sub: `${audit.warnings} warnings · Score ${audit.siteScore}`, color: audit.errors > 5 ? 'red' : 'amber', icon: AlertTriangle, tab: 'seo-audit', priority: 2 });
-  if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: 'seo-ranks', priority: 2 });
+  if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: ranksTab, priority: 2 });
   if (contentPipeline && contentPipeline.reviewCells > 0) actions.push({ label: `${contentPipeline.reviewCells} content plan page${contentPipeline.reviewCells > 1 ? 's' : ''} need${contentPipeline.reviewCells === 1 ? 's' : ''} review`, sub: 'Client flagged or awaiting approval', color: 'teal', icon: Layers, tab: 'content-pipeline', priority: 2 });
   if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings', priority: 3 });
   if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings', priority: 3 });
@@ -273,7 +275,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
       label: 'Content',
       percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
-      onClick: () => navigate(adminPath(workspaceId, 'content')),
+      onClick: () => navigate(adminPath(workspaceId, 'content-pipeline')),
     }] : []),
   ];
 
@@ -445,7 +447,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           icon={TrendingUp}
           iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : themeColor('#71717a', '#94a3b8')}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
-          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
+          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, ranksTab)) : undefined}
           size="hero"
           staggerIndex={3}
         />
@@ -485,7 +487,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               icon={Layers}
               iconColor={themeColor('#71717a', '#94a3b8')}
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
-              onClick={() => navigate(adminPath(workspaceId, 'content'))}
+              onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
               size="hero"
               staggerIndex={6}
             />
@@ -616,12 +618,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
       )}
 
-      {/* ── Action Plan (InsightsEngine) ── */}
+      {/* ── Recommendations queue (admin surface — full queue, dismissed view, OV breakdown) ── */}
       {workspaceId && (
-        <ErrorBoundary label="Action Plan">
-          <CartProvider>
-            <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
-          </CartProvider>
+        <ErrorBoundary label="Recommendations">
+          <AdminRecommendationQueue workspaceId={workspaceId} />
         </ErrorBoundary>
       )}
 

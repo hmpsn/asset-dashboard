@@ -41,7 +41,7 @@ export function StrategyDeclinedKeywordsSection({
 
       {expandedSections.has('declined-keywords') && (
         <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3">These keywords won't appear in future strategy recommendations. Click restore to bring them back.</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3">These keywords won't appear in future strategy recommendations. Changes apply the next time the strategy is regenerated. Click restore to bring them back.</p>
           <div className="flex flex-wrap gap-2">
             {declined.map(([kw]) => (
               <div key={kw} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">

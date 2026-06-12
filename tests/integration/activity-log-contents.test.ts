@@ -8,7 +8,6 @@
  * Each test performs an operation via HTTP, then directly queries the DB to
  * assert the resulting log entry shape.
  *
- * Port: 13856
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -49,6 +48,7 @@ vi.mock('../../server/email.js', () => ({
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createWorkOrder } from '../../server/work-orders.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -88,19 +88,19 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, {
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }));
 }
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
@@ -446,7 +446,8 @@ describe('Multiple workspaces isolation', () => {
       new Date().toISOString(),
     );
 
-    const res = await fetch(`${baseUrl}/api/public/activity/${wsId}`);
+    const path = `/api/public/activity/${wsId}`;
+    const res = await fetch(`${baseUrl}${path}`, withPublicTestAuth(path));
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ type: string; workspaceId: string }>;
     expect(Array.isArray(body)).toBe(true);

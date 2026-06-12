@@ -2,7 +2,7 @@ import React from 'react';
 import { Lock, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
-import { Badge, Button, FormInput, Icon, IconButton } from '../ui';
+import { Badge, Button, FormInput, Icon, IconButton, Popover } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
@@ -106,13 +106,43 @@ export function ClientHeader({
         <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap sm:justify-end">
           {/* Client user menu */}
           {clientUser && (
-            <div className="flex items-center gap-2 pr-2 border-r border-[var(--brand-border)]">
-              <div className="w-7 h-7 rounded-[var(--radius-pill)] bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
-                {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+            <Popover
+              placement="bottom-end"
+              trigger={(
+                <Button
+                  variant="ghost"
+                  aria-label={`${clientUser.name} account menu`}
+                  className="inline-flex items-center justify-start gap-2 min-h-[44px] px-2.5 py-2 pr-3 border-r border-[var(--brand-border)] rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-left hover:bg-[var(--surface-3)] transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-[var(--radius-pill)] bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
+                    {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div className="min-w-0 hidden sm:flex flex-col">
+                    <span className="t-caption text-[var(--brand-text-bright)] truncate">{clientUser.name}</span>
+                    <span className="t-micro text-[var(--brand-text-muted)] truncate">Account</span>
+                  </div>
+                </Button>
+              )}
+            >
+              <div className="px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-[var(--radius-pill)] bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
+                    {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{clientUser.name}</div>
+                    {clientUser.email && (
+                      <div className="t-micro text-[var(--brand-text-muted)] truncate">{clientUser.email}</div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <span className="t-caption text-[var(--brand-text-muted)] hidden sm:block">{clientUser.name}</span>
-              <IconButton icon={LogOut} label="Sign out" size="sm" onClick={handleClientLogout} />
-            </div>
+              <Popover.Separator />
+              <Popover.Item onClick={handleClientLogout} className="flex items-center gap-2">
+                <Icon as={LogOut} size="sm" />
+                Sign out
+              </Popover.Item>
+            </Popover>
           )}
           {!betaMode && <SeoCartButton />}
           <IconButton
@@ -144,6 +174,13 @@ export function ClientHeader({
               <Button
                 variant="ghost"
                 onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
+                aria-label={
+                  effectiveTier === 'free'
+                    ? 'Upgrade to Growth for custom date ranges'
+                    : customDateRange
+                      ? `Custom date range selected from ${new Date(customDateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${new Date(customDateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. Open date range picker.`
+                      : 'Open custom date range picker'
+                }
                 className={`px-2.5 py-1.5 rounded-[var(--radius-md)] t-ui font-medium ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
                 title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
               >

@@ -16,6 +16,7 @@ import type {
 import { createLogger } from './logger.js';
 import { PAGE_TYPE_SCHEMA_MAP, type SchemaPageType } from './schema-suggester.js';
 import { queueSchemaPreGeneration, markSchemaStale } from './schema-queue.js';
+import { validateTransition, MATRIX_CELL_TRANSITIONS } from './state-machines.js';
 
 /**
  * Resolve the combined primary + secondary Schema.org types for a template's pageType.
@@ -250,6 +251,19 @@ export function updateMatrix(
       return nc;
     });
   } else if (updates.cells) {
+    // I2: a wholesale cells rewrite (the PUT /api/content-matrices/:ws/:matrixId path, and the
+    // internal updateMatrixCell save) must not be allowed to bypass the cell state machine.
+    // Validate each incoming cell's status against its stored status — throws
+    // InvalidTransitionError for illegal moves (e.g. published→planned). Only changed statuses
+    // are validated: an unchanged status would otherwise fail its own (from===to) edge for
+    // terminal-ish states, and the internal updateMatrixCell path re-passes every cell.
+    const storedById = new Map(existing.cells.map(c => [c.id, c])); // map-dup-ok
+    for (const incoming of updates.cells) {
+      const stored = storedById.get(incoming.id);
+      if (stored && incoming.status !== stored.status) {
+        validateTransition('matrix_cell', MATRIX_CELL_TRANSITIONS, stored.status, incoming.status);
+      }
+    }
     cells = updates.cells;
   } else {
     cells = existing.cells;
@@ -300,8 +314,11 @@ export function updateMatrixCell(
 
   const cell = existing.cells[cellIdx];
 
-  // Record status transition in history
+  // Guard + record status transition in history
   if (updates.status && updates.status !== cell.status) {
+    // Throws InvalidTransitionError for illegal moves. The PATCH route maps it to a 409 via
+    // mapTransitionError (and the public flag route maps it to 409 too) — never a 500.
+    validateTransition('matrix_cell', MATRIX_CELL_TRANSITIONS, cell.status, updates.status);
     const history = cell.statusHistory || [];
     history.push({ from: cell.status, to: updates.status, at: new Date().toISOString() });
     updates = { ...updates, statusHistory: history } as typeof updates;

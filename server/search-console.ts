@@ -6,7 +6,10 @@
 import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { isProgrammingError } from './errors.js';
+import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
+import { normalizePageUrl } from '../shared/page-address-utils.js';
 
 
 const log = createLogger('search-console');
@@ -41,6 +44,12 @@ export function extractGscPagePathname(pageUrl: string): string | null {
   } catch (err) { // catch-ok: expected failure for non-URL strings (e.g. plain slugs)
     return pageUrl.startsWith('/') ? pageUrl : null;
   }
+}
+
+function normalizeGscPageForMatch(pageUrl: string): string | null {
+  const pathname = extractGscPagePathname(pageUrl);
+  if (!pathname) return null;
+  return normalizePageUrl(pathname);
 }
 
 /**
@@ -162,22 +171,19 @@ export interface PerformanceTrend {
 }
 
 async function gscFetch(endpoint: string, token: string, body?: unknown): Promise<unknown> {
-  const opts: RequestInit = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  };
-  if (body) {
-    opts.method = 'POST';
-    opts.body = JSON.stringify(body);
+  try {
+    return await googleJson({
+      endpoint,
+      source: 'gsc',
+      token,
+      body: body as Record<string, unknown> | undefined,
+    });
+  } catch (err) {
+    if (isGoogleProviderError(err)) {
+      throw new Error(`GSC API error (${err.status ?? err.kind}): ${err.body ?? ''}`);
+    }
+    throw err;
   }
-  const res = await fetch(endpoint, opts);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`GSC API error (${res.status}): ${err}`);
-  }
-  return res.json();
 }
 
 export async function listGscSites(siteId: string): Promise<Array<{ siteUrl: string; permissionLevel: string }>> {
@@ -193,25 +199,14 @@ export async function listGscSites(siteId: string): Promise<Array<{ siteUrl: str
 export async function getSearchOverview(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 28,
+  days: number = GSC_METRIC_WINDOW_DAYS,
   options: { queryLimit?: number; pageLimit?: number; startRow?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchOverview> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  let endDate: Date, startDate: Date;
-  if (dateRange) {
-    startDate = new Date(dateRange.startDate);
-    endDate = new Date(dateRange.endDate);
-  } else {
-    endDate = new Date();
-    endDate.setDate(endDate.getDate() - 3); // GSC data has ~3 day delay
-    startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - days);
-  }
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const searchType = options.searchType || 'web';
   const maxQueryRows = options.queryLimit || 500;
@@ -223,8 +218,8 @@ export async function getSearchOverview(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
+      startDate,
+      endDate,
       type: searchType,
     }
   ) as { rows?: SearchAnalyticsRow[] };
@@ -242,8 +237,8 @@ export async function getSearchOverview(
         `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
         token,
         {
-          startDate: fmt(startDate),
-          endDate: fmt(endDate),
+          startDate,
+          endDate,
           dimensions: ['query'],
           rowLimit,
           startRow: pageStartRow + startRow,
@@ -260,8 +255,8 @@ export async function getSearchOverview(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
+      startDate,
+      endDate,
       dimensions: ['page'],
       rowLimit: pageLimit,
       startRow: 0,
@@ -292,32 +287,21 @@ export async function getSearchOverview(
     avgPosition,
     topQueries,
     topPages,
-    dateRange: { start: fmt(startDate), end: fmt(endDate) },
+    dateRange: { start: startDate, end: endDate },
   };
 }
 
 export async function getSearchQueryObservations(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 28,
+  days: number = GSC_METRIC_WINDOW_DAYS,
   options: { maxRows?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchQueryObservation[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  let endDate: Date, startDate: Date;
-  if (dateRange) {
-    startDate = new Date(dateRange.startDate);
-    endDate = new Date(dateRange.endDate);
-  } else {
-    endDate = new Date();
-    endDate.setDate(endDate.getDate() - 3);
-    startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - days);
-  }
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const { startDate, endDate } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const searchType = options.searchType || 'web';
 
@@ -327,8 +311,8 @@ export async function getSearchQueryObservations(
         `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
         token,
         {
-          startDate: fmt(startDate),
-          endDate: fmt(endDate),
+          startDate,
+          endDate,
           dimensions: ['query', 'date'],
           rowLimit,
           startRow,
@@ -369,19 +353,7 @@ export async function getQueryPageData(
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  let startDate: Date;
-  let endDate: Date;
-  if (opts?.dateRange) {
-    startDate = new Date(opts.dateRange.startDate);
-    endDate = new Date(opts.dateRange.endDate);
-  } else {
-    endDate = new Date();
-    endDate.setDate(endDate.getDate() - 3);
-    startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - days);
-  }
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const { startDate, endDate } = gscDateRange(days, opts?.dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const maxRows = opts?.maxRows ?? 500;
@@ -394,8 +366,8 @@ export async function getQueryPageData(
           `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
           token,
           {
-            startDate: fmt(startDate),
-            endDate: fmt(endDate),
+            startDate,
+            endDate,
             dimensions: ['query', 'page'],
             rowLimit,
             startRow,
@@ -419,8 +391,8 @@ export async function getQueryPageData(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
+      startDate,
+      endDate,
       dimensions: ['query', 'page'],
       rowLimit: maxRows,
       type: 'web',
@@ -438,7 +410,7 @@ export async function getQueryPageData(
 }
 
 /**
- * Fetch ALL pages that GSC has data for (up to 1000).
+ * Fetch pages that GSC has data for.
  * Used by the redirect scanner to find "ghost URLs" — pages Google
  * is indexing/showing in search that may no longer exist on the site.
  */
@@ -447,6 +419,7 @@ export async function getAllGscPages(
   gscSiteUrl: string,
   days: number = 90,
   dateRange?: CustomDateRange,
+  opts?: { maxRows?: number },
 ): Promise<SearchPage[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
@@ -454,19 +427,26 @@ export async function getAllGscPages(
   const { startDate: start, endDate: end } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
-  const data = await gscFetch(
-    `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
-    token,
-    {
-      startDate: start,
-      endDate: end,
-      dimensions: ['page'],
-      rowLimit: 1000,
-      type: 'web',
-    }
-  ) as { rows?: SearchAnalyticsRow[] };
+  const rows = await paginateGscQuery(
+    async (startRow, rowLimit) => {
+      const data = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate: start,
+          endDate: end,
+          dimensions: ['page'],
+          rowLimit,
+          startRow,
+          type: 'web',
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return data.rows ?? [];
+    },
+    { maxRows: opts?.maxRows ?? 5000, pageSize: 1000 },
+  );
 
-  return (data.rows || []).map(r => ({
+  return rows.map(r => ({
     page: r.keys[0],
     clicks: r.clicks,
     impressions: r.impressions,
@@ -493,12 +473,7 @@ export async function getTopDroppedGscPage(
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
-
-  const prevEnd = new Date(curStart);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, days);
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const [curData, prevData] = await Promise.all([
@@ -506,7 +481,7 @@ export async function getTopDroppedGscPage(
       startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 
@@ -557,12 +532,7 @@ export async function getTopSpikedGscPage(
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
-
-  const prevEnd = new Date(curStart);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - days + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, days);
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
   const [curData, prevData] = await Promise.all([
@@ -570,7 +540,7 @@ export async function getTopSpikedGscPage(
       startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, dimensions: ['page'], rowLimit: 100, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 
@@ -644,33 +614,7 @@ export async function inspectUrlForRichResults(
   const token = await getValidToken(siteId);
   if (!token) return null;
 
-  const res = await fetch(
-    'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inspectionUrl: pageUrl, siteUrl }),
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    if (res.status === 429) {
-      log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
-      return null;
-    }
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(`GSC URL Inspection authentication error (${res.status}): ${errText.slice(0, 200)}`);
-    }
-    if (res.status >= 400 && res.status < 500) {
-      log.warn({ siteId, status: res.status }, 'GSC URL Inspection API client error — treating as no_gsc');
-      return null;
-    }
-    throw new Error(`GSC URL Inspection error (${res.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json() as {
+  let data: {
     inspectionResult?: {
       richResultsResult?: {
         detectedItems?: Array<{
@@ -686,6 +630,32 @@ export async function inspectUrlForRichResults(
       };
     };
   };
+
+  try {
+    data = await googleJson({
+      endpoint: 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+      source: 'gsc',
+      token,
+      body: { inspectionUrl: pageUrl, siteUrl },
+      timeoutMs: 15_000,
+    });
+  } catch (err) {
+    if (isGoogleProviderError(err) && err.status === 429) {
+      log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
+      return null;
+    }
+    if (isGoogleProviderError(err) && (err.status === 401 || err.status === 403)) {
+      throw new Error(`GSC URL Inspection authentication error (${err.status}): ${(err.body ?? '').slice(0, 200)}`);
+    }
+    if (isGoogleProviderError(err) && (err.status ?? 0) >= 400 && (err.status ?? 0) < 500) {
+      log.warn({ siteId, status: err.status }, 'GSC URL Inspection API client error — treating as no_gsc');
+      return null;
+    }
+    if (isGoogleProviderError(err)) {
+      throw new Error(`GSC URL Inspection error (${err.status ?? err.kind}): ${(err.body ?? '').slice(0, 200)}`);
+    }
+    throw err;
+  }
 
   const detectedItems = data.inspectionResult?.richResultsResult?.detectedItems ?? [];
   const issues: RichResultsIssue[] = [];
@@ -724,12 +694,37 @@ export function gscDateRange(days: number, dateRange?: CustomDateRange) {
       return { startDate: dateRange.startDate, endDate: dateRange.endDate };
     }
   }
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
+  const now = new Date();
+  const endDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 3,
+  ));
+  const startDate = new Date(Date.UTC(
+    endDate.getUTCFullYear(),
+    endDate.getUTCMonth(),
+    endDate.getUTCDate() - Math.max(1, days) + 1,
+  ));
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   return { startDate: fmt(startDate), endDate: fmt(endDate) };
+}
+
+function shiftIsoDateUtc(isoDate: string, dayDelta: number): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  const shifted = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate() + dayDelta,
+  ));
+  return shifted.toISOString().split('T')[0];
+}
+
+function getPreviousGscWindow(currentStartDate: string, periodDays: number) {
+  const safePeriodDays = Math.max(1, periodDays);
+  return {
+    startDate: shiftIsoDateUtc(currentStartDate, -safePeriodDays),
+    endDate: shiftIsoDateUtc(currentStartDate, -1),
+  };
 }
 
 export async function getPerformanceTrend(
@@ -799,12 +794,56 @@ export async function getPageTrend(
     }
   ) as { rows?: SearchAnalyticsRow[] };
 
-  return (data.rows || []).map(r => ({
-    date: r.keys[0],
-    clicks: r.clicks,
-    impressions: r.impressions,
-    ctr: +(r.ctr * 100).toFixed(1),
-    position: +r.position.toFixed(1),
+  const rows = data.rows ?? [];
+  if (rows.length > 0) {
+    return rows.map(r => ({
+      date: r.keys[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: +(r.ctr * 100).toFixed(1),
+      position: +r.position.toFixed(1),
+    }));
+  }
+
+  const targetPath = normalizeGscPageForMatch(pageUrl);
+  if (!targetPath) return [];
+
+  const fallbackRows = await paginateGscQuery(
+    async (startRow, rowLimit) => {
+      const fallbackData = await gscFetch(
+        `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        token,
+        {
+          startDate,
+          endDate,
+          dimensions: ['date', 'page'],
+          rowLimit,
+          startRow,
+          type: 'web',
+        },
+      ) as { rows?: SearchAnalyticsRow[] };
+      return fallbackData.rows ?? [];
+    },
+    { maxRows: 5000, pageSize: 1000 },
+  );
+
+  const matchingRows = fallbackRows.filter(row => normalizeGscPageForMatch(row.keys[1] ?? '') === targetPath);
+  const byDate = new Map<string, { clicks: number; impressions: number; weightedPosition: number }>();
+  for (const row of matchingRows) {
+    const date = row.keys[0];
+    const existing = byDate.get(date) ?? { clicks: 0, impressions: 0, weightedPosition: 0 };
+    existing.clicks += row.clicks;
+    existing.impressions += row.impressions;
+    existing.weightedPosition += row.position * row.impressions;
+    byDate.set(date, existing);
+  }
+
+  return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, row]) => ({
+    date,
+    clicks: row.clicks,
+    impressions: row.impressions,
+    ctr: row.impressions > 0 ? +((row.clicks / row.impressions) * 100).toFixed(1) : 0,
+    position: row.impressions > 0 ? +(row.weightedPosition / row.impressions).toFixed(1) : 0,
   }));
 }
 
@@ -928,7 +967,8 @@ export async function getSearchTypeBreakdown(
       }
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'search-console/getSearchTypeBreakdown: programming error');
-      // Some search types may not be available for all properties
+      if (err instanceof Error && /GSC API error \((401|403|429|5\d\d)\)/.test(err.message)) throw err;
+      // Some search types may not be available for all properties.
     }
   }
   return results;
@@ -964,20 +1004,14 @@ export async function getSearchPeriodComparison(
     ? Math.round((curEndDate.getTime() - curStartDate.getTime()) / MS_PER_DAY) + 1
     : days;
   const periodDays = Math.max(1, derivedPeriodDays);
-
-  // Previous period: shift by the actual current window length (custom ranges included).
-  const prevEnd = new Date(`${curStart}T00:00:00.000Z`);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setDate(prevStart.getDate() - periodDays + 1);
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const previousWindow = getPreviousGscWindow(curStart, periodDays);
 
   const [curData, prevData] = await Promise.all([
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
       startDate: curStart, endDate: curEnd, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
     gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
-      startDate: fmt(prevStart), endDate: fmt(prevEnd), type: 'web',
+      startDate: previousWindow.startDate, endDate: previousWindow.endDate, type: 'web',
     }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
   ]);
 

@@ -5,9 +5,9 @@
  * every publish/measure path that changes workspace SEO state calls
  * queueKeywordStrategyPostUpdateFollowOns so recommendations stay fresh.
  *
- * The debounce guard (recsInFlight Set in keyword-strategy-follow-ons.ts)
- * prevents N concurrent generateRecommendations calls when a bulk publish
- * touches N workspaces — this test confirms the guard is present.
+ * The shared recommendation regen scheduler prevents overlapping per-workspace
+ * generateRecommendations calls when bulk publish/measure flows touch the same
+ * workspace repeatedly — this test confirms the shared authority is present.
  */
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
@@ -46,30 +46,54 @@ describe('outcome-crons: measure/learnings enqueue rec regen', () => {
   });
 });
 
-describe('keyword-strategy-follow-ons: per-workspace debounce guard is present', () => {
+describe('keyword-strategy-follow-ons: per-workspace regen scheduler is present', () => {
   const followOnsSrc = readFileSync('server/keyword-strategy-follow-ons.ts', 'utf-8'); // readFile-ok - debounce contract
+  const schedulerSrc = readFileSync('server/recommendation-regen-scheduler.ts', 'utf-8'); // readFile-ok - debounce contract
 
-  it('uses a recsInFlight Set to prevent concurrent regen for the same workspace', () => {
-    expect(followOnsSrc).toContain('const recsInFlight = new Set<string>()');
-    expect(followOnsSrc).toContain('recsInFlight.has(workspaceId)');
-    expect(followOnsSrc).toContain('recsInFlight.add(workspaceId)');
-    expect(followOnsSrc).toContain('recsInFlight.delete(workspaceId)');
+  it('routes follow-ons through the shared delayed regen queue', () => {
+    expect(followOnsSrc).toContain("from './recommendation-regen-scheduler.js'");
+    expect(followOnsSrc).toContain("queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS)");
+  });
+
+  it('keeps a shared per-workspace single-flight guard in the scheduler', () => {
+    expect(schedulerSrc).toContain('const inflight = new Map<string, Promise<void>>()');
+    expect(schedulerSrc).toContain('const delayed = new Map<string, ReturnType<typeof setTimeout>>()');
+    expect(schedulerSrc).toContain('const existing = inflight.get(workspaceId)');
   });
 });
 
-describe('content-publish: publish path enqueues rec regen', () => {
-  const publishSrc = readFileSync('server/routes/content-publish.ts', 'utf-8'); // readFile-ok - wiring contract
+describe('publish service (C3): BOTH publish paths enqueue rec regen via the shared service', () => {
+  // C3 (audit item #12) extracted ONE publishPostToWebflow() service consumed by BOTH the manual
+  // publish route AND the auto-publish-on-approval job. The rec-regen follow-on lives inside that
+  // service so it fires on BOTH paths — before C3 the auto-publish path silently skipped it.
+  const serviceSrc = readFileSync('server/domains/content/publish-post-to-webflow.ts', 'utf-8'); // readFile-ok - wiring contract
+  const manualRouteSrc = readFileSync('server/routes/content-publish.ts', 'utf-8'); // readFile-ok - wiring contract
+  const autoRouteSrc = readFileSync('server/routes/content-posts.ts', 'utf-8'); // readFile-ok - wiring contract
+  const jobSrc = readFileSync('server/content-publish-job.ts', 'utf-8'); // readFile-ok - wiring contract
 
-  it('imports queueKeywordStrategyPostUpdateFollowOns at the top of content-publish.ts', () => {
-    const importIdx = publishSrc.indexOf("from '../keyword-strategy-follow-ons.js'");
-    expect(importIdx, 'import missing from content-publish.ts').toBeGreaterThan(0);
-    // Must appear before the router.post handler
-    const routerIdx = publishSrc.indexOf('router.post(');
-    expect(importIdx).toBeLessThan(routerIdx);
+  it('imports queueKeywordStrategyPostUpdateFollowOns at the top of the shared service', () => {
+    const importIdx = serviceSrc.indexOf("from '../../keyword-strategy-follow-ons.js'");
+    expect(importIdx, 'follow-ons import missing from publish service').toBeGreaterThan(0);
+    const fnIdx = serviceSrc.indexOf('export async function publishPostToWebflow');
+    expect(importIdx).toBeLessThan(fnIdx);
   });
 
-  it('calls queueKeywordStrategyPostUpdateFollowOns in the publish-to-webflow handler', () => {
-    expect(publishSrc).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId');
+  it('calls queueKeywordStrategyPostUpdateFollowOns inside the shared service (single site)', () => {
+    expect(serviceSrc).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId });');
+  });
+
+  it('the MANUAL publish route consumes the shared publishPostToWebflow service', () => {
+    expect(manualRouteSrc).toContain("from '../domains/content/publish-post-to-webflow.js'");
+    expect(manualRouteSrc).toContain('publishPostToWebflow(workspaceId, postId');
+  });
+
+  it('the AUTO-publish-on-approval path dispatches the CONTENT_PUBLISH job (which calls the service)', () => {
+    expect(autoRouteSrc).toContain("from '../content-publish-job.js'");
+    expect(autoRouteSrc).toContain('BACKGROUND_JOB_TYPES.CONTENT_PUBLISH');
+    expect(autoRouteSrc).toContain('runContentPublishJob({');
+    // The job runner is the bridge from the auto path to the shared service.
+    expect(jobSrc).toContain("from './domains/content/publish-post-to-webflow.js'");
+    expect(jobSrc).toContain('publishPostToWebflow(workspaceId, postId');
   });
 });
 

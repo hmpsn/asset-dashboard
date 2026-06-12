@@ -3,22 +3,35 @@
  */
 import { Router } from 'express';
 
-import { requireClientPortalAuth } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
-  generateRecommendations,
   loadRecommendations,
+  computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
+  recommendationOutcomeActionType,
 } from '../recommendations.js';
+import { createJob, hasActiveJob } from '../jobs.js';
+import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { addActivity } from '../activity-log.js';
+import {
+  RECOMMENDATION_TRANSITIONS,
+  validateTransition,
+  InvalidTransitionError,
+} from '../state-machines.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+import { computeImpactBand } from '../../shared/types/impact-band.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
@@ -55,8 +68,18 @@ function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
     const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
     const base: Recommendation = safeGain === r.estimatedGain ? r : { ...r, estimatedGain: safeGain };
     if (!base.opportunity) return base;
-    const { emvPerWeek: _emvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
-    return { ...base, opportunity: publicOpportunity as Recommendation['opportunity'] };
+    const { emvPerWeek: rawEmvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
+    // D-IMPACT: project the admin/AI-only weekly EMV into a client-safe banded
+    // monthly range BEFORE it is stripped. computeImpactBand returns undefined below
+    // the display floor (no impact line shown) — in that case we drop the key entirely.
+    const impactBand = computeImpactBand(rawEmvPerWeek);
+    const next: Recommendation = {
+      ...base,
+      opportunity: publicOpportunity as Recommendation['opportunity'],
+    };
+    if (impactBand) next.impactBand = impactBand;
+    else delete next.impactBand;
+    return next;
   });
 }
 
@@ -66,23 +89,59 @@ function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[
 }
 
 // ─── Recommendation Engine ─────────────────────────────────────────
-// Generate (or re-generate) prioritized recommendations for a workspace
-router.post('/api/public/recommendations/:workspaceId/generate', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+// Generate (or re-generate) prioritized recommendations for a workspace.
+// Soft-gated (requireClientPortalAuth): password-set workspaces require a
+// session; passwordless/demo portals pass through (the client calls this with a
+// cookie-only fetch). Matches the sibling PATCH/DELETE routes below.
+router.post('/api/public/recommendations/:workspaceId/generate', requireAuthenticatedClientPortalAuth(), async (req, res) => {
   try {
-    const set = await generateRecommendations(req.params.workspaceId);
-    res.json(toPublicRecommendationSet(set, set.recommendations));
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const active = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, workspaceId);
+    if (active) return res.json({ jobId: active.id, existing: true });
+
+    const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+      workspaceId,
+      message: 'Generating recommendations...',
+    });
+    res.json({ jobId: job.id });
+    setTimeout(() => {
+      void runRecommendationGenerationJob(job.id, workspaceId, 'explicit');
+    }, 100);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-// List current recommendations (returns cached set, or generates if none exist)
-router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // public-no-auth-ok: deferred to audit-drift-public-route-auth-sweep-followup
+// List current recommendations — returns the last-known/empty set.
+//
+// COST: this read path must NEVER run the heavy generateRecommendations()
+// pipeline inline (it holds the HTTP connection through a multi-step
+// audit/AI/store walk). The SEO_AUDIT background job already regenerates the
+// set post-audit (server/routes/jobs.ts), and POST .../generate is the explicit
+// regenerate path. On a cache-miss we return an empty set quickly; an unknown
+// workspace is an honest 404 (previously a 500 thrown from inline generation).
+//
+// Soft-gated (requireClientPortalAuth): password-set workspaces require a
+// session; passwordless/demo portals pass through so the client InsightsEngine /
+// useRecommendations hook keeps working without a token.
+router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth(), (req, res) => {
   try {
-    let set = loadRecommendations(req.params.workspaceId);
+    const { workspaceId } = req.params;
+    let set = loadRecommendations(workspaceId);
     if (!set) {
-      // Auto-generate on first request
-      set = await generateRecommendations(req.params.workspaceId);
+      // No cached set. Distinguish unknown workspace (honest 404) from a known
+      // workspace that simply hasn't generated yet (return an empty set — do NOT
+      // generate inline).
+      if (!getWorkspace(workspaceId)) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      set = {
+        workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [],
+        summary: computeRecommendationSummary([]),
+      };
     }
     // Filter by status if requested
     const status = req.query.status as string | undefined;
@@ -101,13 +160,18 @@ router.get('/api/public/recommendations/:workspaceId', async (req, res) => { // 
 // completed and mirrors the affected pages to live state. There is no separate
 // rec to resolve; resolving here would be circular.
 // rec-refresh-ok
-router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
+router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
   const { status } = req.body;
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
     return res.status(400).json({ error: 'Valid status required: pending, in_progress, completed, dismissed' });
   }
-  const rec = updateRecommendationStatus(workspaceId, recId, status);
+  let rec: Recommendation | null;
+  try {
+    rec = updateRecommendationStatus(workspaceId, recId, status);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   const updatedPageStateIds: string[] = [];
   // When recommendation is completed, mark affected pages as live
@@ -146,24 +210,32 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
       });
       updatedPageStateIds.push(resolvedPageId);
     }
-    // Record for outcome tracking — idempotent
+  }
+  // Record for outcome tracking — idempotent. This is intentionally outside the
+  // page-state block: strategy, keyword-gap, topic-cluster, and local recs can be
+  // completed without affectedPages but still need outcome-learning calibration.
+  if (status === 'completed') {
     try {
-      if (workspaceId && !getActionBySource('recommendation', recId)) recordAction({ // recordAction-ok: workspaceId guarded by if condition
-        workspaceId,
-        actionType: 'audit_fix_applied',
-        sourceType: 'recommendation',
-        sourceId: recId,
-        pageUrl: rec.affectedPages?.[0] ?? null,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-        },
-        // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
-        // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
-        // null when this rec carries no opportunity (legacy row / OV not yet attached).
-        predictedEmv: rec.opportunity?.predictedEmv ?? null,
-        attribution: 'platform_executed',
-      });
+      if (workspaceId && !getActionBySource('recommendation', recId)) {
+        const pageUrl = rec.affectedPages?.[0] ?? null;
+        const action = recordAction({ // recordAction-ok: workspaceId guarded by if condition
+          workspaceId,
+          actionType: recommendationOutcomeActionType(rec.type, rec.source),
+          sourceType: 'recommendation',
+          sourceId: recId,
+          pageUrl,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          // P4: snapshot the OV predicted EMV (CPC-proxy placeholder) onto the durable
+          // outcome row so the P6 realized-vs-predicted calibration loop has a pairing.
+          // null when this rec carries no opportunity (legacy row / OV not yet attached).
+          predictedEmv: rec.opportunity?.predictedEmv ?? null,
+          attribution: 'platform_executed',
+        });
+        if (pageUrl) void captureBaselineFromGsc(action.id, workspaceId, pageUrl);
+      }
     } catch (err) {
       log.warn({ err, recId }, 'Failed to record outcome action for recommendation completion');
     }
@@ -177,19 +249,112 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
     });
   }
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status });
+  if (status === 'dismissed') {
+    addActivity(
+      workspaceId,
+      'rec_dismissed',
+      `Recommendation dismissed: ${rec.title}`,
+      rec.description,
+    );
+  } else {
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Recommendation updated: ${rec.title}`,
+      `Status changed to "${status}"`,
+    );
+  }
   // Client-facing single-rec response — strip the admin/AI-only dollar figures
   // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
   res.json(stripEmvFromPublicRecs([rec])[0]);
 });
 
 // Dismiss a recommendation
-router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
+router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const { workspaceId, recId } = req.params;
-  const ok = dismissRecommendation(workspaceId, recId);
+  // Read before dismiss so we have context for the activity log.
+  const existing = loadRecommendations(workspaceId);
+  const recToLog = existing?.recommendations.find(r => r.id === recId) ?? null;
+  let ok: boolean;
+  try {
+    ok = dismissRecommendation(workspaceId, recId);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid status transition' });
+  }
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'dismissed', deleted: true });
+  addActivity(
+    workspaceId,
+    'rec_dismissed',
+    `Recommendation dismissed: ${recToLog?.title ?? recId}`,
+    recToLog?.description,
+  );
   res.json({ ok: true });
+});
+
+// ─── Admin endpoints ────────────────────────────────────────────────────────
+// These routes are NOT prefixed with /api/public/ so they are admin-only
+// (protected by the global APP_PASSWORD HMAC gate in app.ts). They return the
+// full rec data including the admin/AI-only dollar fields (emvPerWeek, etc.)
+// that are stripped on the public client-facing routes above.
+
+// Admin list — returns the full set for a workspace (all statuses, no EMV strip).
+// Supports ?status= and ?priority= filters.
+router.get('/api/recommendations/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => { // activity-ok: read-only
+  try {
+    const { workspaceId } = req.params;
+    const set = loadRecommendations(workspaceId);
+    if (!set) {
+      if (!getWorkspace(workspaceId)) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      return res.json({
+        workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [],
+        summary: computeRecommendationSummary([]),
+      });
+    }
+    const status = req.query.status as string | undefined;
+    const priority = req.query.priority as string | undefined;
+    let recs = set.recommendations;
+    if (status) recs = recs.filter(r => r.status === status);
+    if (priority) recs = recs.filter(r => r.priority === priority);
+    res.json({ ...set, recommendations: recs });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Admin un-dismiss — transitions a dismissed rec back to pending.
+// Uses validateTransition (dismissed → pending is a legal backward edge in
+// RECOMMENDATION_TRANSITIONS) so any future machine changes are honoured.
+router.patch('/api/recommendations/:workspaceId/:recId/undismiss', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  const set = loadRecommendations(workspaceId);
+  if (!set) return res.status(404).json({ error: 'Workspace has no recommendation set' });
+  const rec = set.recommendations.find(r => r.id === recId);
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  try {
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending');
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
+  const updated = updateRecommendationStatus(workspaceId, recId, 'pending');
+  if (!updated) return res.status(404).json({ error: 'Recommendation not found after transition' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: 'pending' });
+  addActivity(
+    workspaceId,
+    'rec_status_updated',
+    `Recommendation un-dismissed: ${rec.title}`,
+    `Status restored to "pending"`,
+  );
+  res.json(updated);
 });
 
 export default router;

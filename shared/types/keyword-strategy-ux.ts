@@ -3,6 +3,8 @@ import type {
   TrackedKeywordSource,
   TrackedKeywordStatus,
 } from './rank-tracking.js';
+import type { LocalStrategySyncStatus } from './local-seo.js';
+import type { OutcomeReadback } from './outcome-tracking.js';
 
 export type KeywordStrategyUxSurface = 'admin' | 'client';
 
@@ -56,6 +58,35 @@ export interface KeywordStrategyExplanation {
   opportunityScore?: number;
   rawEvidenceOnly?: boolean;
   nextAction: KeywordStrategyNextAction;
+  /**
+   * Plain-language reasons explaining the keyword's value score (Task 2.3).
+   * Populated server-side in buildKeywordStrategyUxPayload when the
+   * keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * keyword has no value signal (signal gate fails).
+   * Safe for all tiers (no $ amounts).
+   */
+  valueReasons?: string[];
+  /**
+   * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
+   * Computed server-side via the single keywordDollarValue helper (one $
+   * definition, identical to roi.ts trafficValue). Absent when cpc is unknown.
+   * Growth+ gated like ROIDashboard's realized $.
+   */
+  currentMonthly?: number;
+  /**
+   * Upside monthly dollar value if the keyword moved up (Task 3.3): impressions ×
+   * CTR uplift × cpc, from the same keywordDollarValue helper. Absent when no cpc.
+   */
+  upsideMonthly?: number;
+  /**
+   * W5.1: read-back outcome verdict for this keyword's tracked action — the latest
+   * conclusive measurement (baseline→current position + verdict). Populated
+   * server-side in buildKeywordStrategyUxPayload by joining the keyword's
+   * (pagePath, keyword) tracked action to its scored outcome. Absent when the
+   * keyword has no scored action yet. Position numbers are honest (lower=better);
+   * `direction` is pre-computed — never re-infer improvement from raw positions.
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface KeywordStrategyRefreshSummary {
@@ -76,6 +107,13 @@ export interface KeywordStrategyUxPayload {
   refreshSummary?: KeywordStrategyRefreshSummary;
   explanations: KeywordStrategyExplanation[];
   rawEvidenceNote?: string;
+  /**
+   * Bidirectional sync status between local SEO visibility data and the
+   * keyword strategy. Present on admin GET /api/webflow/keyword-strategy/:id
+   * in both the real branch (strategy blob) and the shell branch
+   * (page_keywords only). Absent on client-facing reads.
+   */
+  localSync?: LocalStrategySyncStatus;
 }
 
 export interface KeywordStrategyKeywordChange {

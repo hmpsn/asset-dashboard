@@ -1,9 +1,6 @@
 /**
- * Wave 9 — Outcomes routes extended coverage (port 13371)
  *
  * Covers paths NOT exercised by the two existing outcome test files:
- *   outcome-pipeline.test.ts      (port 13250)
- *   outcomes-client-routes.test.ts (port 13363)
  *
  * Routes / code paths targeted here:
  *   - POST /api/outcomes/:wsId/actions  — Zod validation failures
@@ -24,15 +21,12 @@
  *   - All valid actionType enum values accepted by POST
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-// Enable the feature flag before the server process starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
-const ctx = createTestContext(13371); // port-ok: unique, confirmed free
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);
@@ -707,13 +701,13 @@ describe('Suite 8: Public routes — 401/403 for password-protected workspace', 
   });
 
   it('GET /api/public/outcomes/:wsId/summary returns 401 without auth', async () => {
-    const res = await api(`/api/public/outcomes/${wsId}/summary`);
+    const res = await api(`/api/public/outcomes/${wsId}/summary`, { headers: { 'x-no-auto-public-auth': 'true' } });
     // requireClientPortalAuth() should block unauthenticated requests
     expect([401, 403]).toContain(res.status);
   });
 
   it('GET /api/public/outcomes/:wsId/wins returns 401 without auth', async () => {
-    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const res = await api(`/api/public/outcomes/${wsId}/wins`, { headers: { 'x-no-auto-public-auth': 'true' } });
     expect([401, 403]).toContain(res.status);
   });
 });

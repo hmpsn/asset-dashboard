@@ -5,7 +5,6 @@
  * verification, and workspace isolation.
  *
  * Complements:
- *  - content-matrices-routes.test.ts (port 13241) — general CRUD
  *  - content-matrices-read-routes.test.ts — read-path validation
  *
  * Uses in-process server with dynamic port so vi.mock works.

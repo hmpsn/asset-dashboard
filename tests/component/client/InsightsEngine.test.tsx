@@ -1,17 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InsightsEngine } from '../../../src/components/client/InsightsEngine';
 import type { RecommendationSet } from '../../../shared/types/recommendations';
 
+// NOTE: ToastProvider is NOT imported here. The client-portal mounts InsightsEngine
+// WITHOUT a ToastProvider — the three error-toast tests below assert the threaded
+// onNotify prop is called, which is the real production path for client mounts.
+// Wrapping in ToastProvider (the previous approach) masked the bug where toast()
+// silently no-oped in the client portal because ToastProvider is only on the admin route.
+
 const useQueryMock = vi.fn();
 const setQueryDataMock = vi.fn();
+const trackJobMock = vi.fn();
+const postMock = vi.fn();
+const patchMock = vi.fn();
+const delMock = vi.fn();
+let activeJobMock: Record<string, unknown> | undefined;
+let latestTerminalJobMock: Record<string, unknown> | undefined;
 
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
   return {
     ...actual,
     useQuery: (...args: unknown[]) => useQueryMock(...args),
-    useQueryClient: () => ({ setQueryData: setQueryDataMock }),
+    useQueryClient: () => ({ setQueryData: setQueryDataMock, invalidateQueries: vi.fn() }),
   };
 });
 
@@ -33,9 +45,17 @@ vi.mock('../../../src/components/client/useCart', () => ({
 
 vi.mock('../../../src/api/client', () => ({
   get: vi.fn(),
-  post: vi.fn(),
-  patch: vi.fn(),
-  del: vi.fn(),
+  post: (...args: unknown[]) => postMock(...args),
+  patch: (...args: unknown[]) => patchMock(...args),
+  del: (...args: unknown[]) => delMock(...args),
+}));
+
+vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({
+    findActiveJob: vi.fn(() => activeJobMock),
+    findLatestTerminalJob: vi.fn(() => latestTerminalJobMock),
+    trackJob: trackJobMock,
+  }),
 }));
 
 function makeSet(): RecommendationSet {
@@ -82,6 +102,12 @@ describe('InsightsEngine', () => {
   beforeEach(() => {
     useQueryMock.mockReset();
     setQueryDataMock.mockReset();
+    trackJobMock.mockReset();
+    postMock.mockReset();
+    patchMock.mockReset();
+    delMock.mockReset();
+    activeJobMock = undefined;
+    latestTerminalJobMock = undefined;
   });
 
   it('renders loading state', () => {
@@ -111,5 +137,110 @@ describe('InsightsEngine', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /fix/i }));
     expect(onNavigate).toHaveBeenCalledWith('seo-editor', { pageSlug: '', recType: 'metadata' });
+  });
+
+  it('shows recommendation job progress in the empty state', () => {
+    const set = makeSet();
+    set.recommendations = [];
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    activeJobMock = {
+      id: 'job-1',
+      type: 'recommendations-generation',
+      status: 'running',
+      message: 'Generating recommendations...',
+      createdAt: '2026-05-16T00:00:00.000Z',
+      updatedAt: '2026-05-16T00:00:00.000Z',
+      workspaceId: 'ws-test',
+    };
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+
+    expect(screen.getByText('Generating recommendations')).toBeInTheDocument();
+    expect(screen.getByText('Generating recommendations...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument();
+  });
+
+  it('tracks the public recommendation generation job when refresh starts', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    postMock.mockResolvedValue({ jobId: 'job-77' });
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" />);
+    fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
+
+    expect(postMock).toHaveBeenCalledWith('/api/public/recommendations/ws-test/generate');
+    await waitFor(() => {
+      expect(trackJobMock).toHaveBeenCalledWith('recommendations-generation', 'job-77', { workspaceId: 'ws-test' });
+    });
+  });
+
+  // ── Error toast tests — client-portal mount (no ToastProvider) ───────────
+  // These tests use the onNotify prop directly (the client-portal path) rather than
+  // wrapping in ToastProvider (which would mask the dead-code bug: without onNotify
+  // or ToastProvider, toast() silently no-ops in the client portal).
+
+  it('calls onNotify with error when handleRegenerate post() rejects', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    postMock.mockRejectedValue(new Error('Network error'));
+    const onNotify = vi.fn();
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" onNotify={onNotify} />);
+    fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
+
+    await waitFor(() => {
+      expect(onNotify).toHaveBeenCalledWith('Network error', 'error');
+    });
+  });
+
+  it('calls onNotify with error when handleStatusUpdate patch() rejects', async () => {
+    const set = makeSet();
+    // premium tier — renders "Start Working On This" button after rec is expanded
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    patchMock.mockRejectedValue(new Error('Status update failed'));
+    const onNotify = vi.fn();
+
+    render(<InsightsEngine workspaceId="ws-test" tier="premium" onNotify={onNotify} />);
+
+    // The fix_now priority group is expanded by default (see expandedPriorities initial state).
+    // Expand the first rec by clicking the chevron toggle.
+    const chevronBtns = screen.getAllByRole('button');
+    const toggleBtn = chevronBtns.find(b => b.className.includes('rounded-[var(--radius-sm)]') && b.className.includes('bg-[var(--surface-3)]'));
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn!);
+
+    // "Start Working On This" should now be present (rec expanded, status=pending, tier=premium)
+    const startBtn = await screen.findByRole('button', { name: /start working on this/i });
+    fireEvent.click(startBtn);
+
+    await waitFor(() => {
+      expect(onNotify).toHaveBeenCalledWith('Could not update recommendation', 'error');
+    });
+  }, 10000);
+
+  it('calls onNotify with error when handleDismiss del() rejects', async () => {
+    const set = makeSet();
+    useQueryMock.mockReturnValue({ data: set, isLoading: false, isError: false });
+    delMock.mockRejectedValue(new Error('Dismiss failed'));
+    const onNotify = vi.fn();
+
+    render(<InsightsEngine workspaceId="ws-test" tier="growth" onNotify={onNotify} />);
+
+    // Expand the rec to reveal the Dismiss button
+    const chevronBtns = screen.getAllByRole('button');
+    const toggleBtn = chevronBtns.find(b => b.className.includes('rounded-[var(--radius-sm)]') && b.className.includes('bg-[var(--surface-3)]'));
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn!);
+
+    // Now "Dismiss" button should appear
+    await waitFor(() => {
+      const dismissBtn = screen.queryByRole('button', { name: /^dismiss$/i });
+      expect(dismissBtn).toBeTruthy();
+      fireEvent.click(dismissBtn!);
+    });
+
+    await waitFor(() => {
+      expect(onNotify).toHaveBeenCalledWith('Could not dismiss recommendation', 'error');
+    });
   });
 });

@@ -5,18 +5,6 @@
  * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, page_edit_states, seo_changes, usage_tracking, activities, content_posts
  */
 import { Router } from 'express';
-import { broadcastToWorkspace } from '../broadcast.js';
-
-import fs from 'fs';
-import path from 'path';
-import { addActivity } from '../activity-log.js';
-import { recordSeoChange } from '../seo-change-tracker.js';
-import { generateAltText } from '../alttext.js';
-import { callCreativeAI } from '../content-posts-ai.js';
-import { getDataDir } from '../data-dir.js';
-import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
-import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
   updateJob,
@@ -24,42 +12,51 @@ import {
   listJobs,
   cancelJob,
   clearCompletedJobs,
+  getJobCancellationError,
   registerAbort,
   hasActiveJob,
+  type Job,
 } from '../jobs.js';
-import { APP_PASSWORD, signAdminToken } from '../middleware.js';
+import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
-import { generateRecommendations, loadRecommendations, resolveRecommendationsForPageIds } from '../recommendations.js';
+import { startLegacyJob } from '../legacy-jobs-runner-registry.js';
+import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
+import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
+import { startAiReviewJob, startAiFixJob, startVoiceScoreJob, aiFixRequestSchema } from '../content-posts-ai-jobs.js';
+import type { StandaloneContentBriefGenerationParams } from '../content-brief-generation-job.js';
+import { getContentRequest } from '../content-requests.js';
+import { getBlueprint, getEntry } from '../page-strategy.js';
 import {
   createContentPostGenerationJob,
   runContentPostGenerationJob,
 } from '../content-posts.js';
+import { getPost } from '../content-posts-db.js';
+import type { AiFixRequest } from '../../shared/types/content.js';
+import {
+  createCopyBatchGenerationJob,
+  runCopyBatchGenerationJob,
+} from '../copy-batch-jobs.js';
 import {
   generateKeywordStrategy,
   hasActiveKeywordStrategyGeneration,
   KeywordStrategyGenerationError,
   KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
-import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
-import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
-import { runSalesAudit } from '../sales-audit.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
-import { runSeoAudit } from '../seo-audit.js';
-import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
+import { runCopyEntryGenerationJob } from '../copy-entry-generation-job.js';
+import { runBlueprintGenerationJob } from '../blueprint-generation-job.js';
+import { runLlmsTxtGenerationJob } from '../llms-txt-generation-job.js';
+import { runAeoSiteReviewJob } from '../aeo-site-review-job.js';
+import type { BlueprintGenerationInput } from '../../shared/types/page-strategy.js';
 import {
-  updateAsset,
-  deleteAsset,
-  updatePageSeo,
-  uploadAsset,
-} from '../webflow.js';
+  schemaPlanGenerationErrorResponse,
+  startSchemaPlanGenerationJob,
+} from '../schema-plan-generation-job.js';
 import {
-  listWorkspaces,
   getWorkspace,
   getTokenForSite,
-  getClientPortalUrl,
-  updatePageState,
-  getBrandName,
 } from '../workspaces.js';
 import { runPageAnalysisJob } from '../page-analysis-job.js';
 import {
@@ -67,27 +64,20 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { createLogger } from '../logger.js';
-import { isFeatureEnabled } from '../feature-flags.js';
-import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
-import {
-  buildWorkspaceIntelligence,
-  formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt,
-  formatPersonasForPrompt,
-  invalidateIntelligenceCache,
-} from '../workspace-intelligence.js';
-import type { default as SharpConstructor } from 'sharp';
-import type * as SvgoMod from 'svgo';
+import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
+import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
+import type { ContentGenerationStyle } from '../../shared/types/content.js';
 import { isProgrammingError } from '../errors.js';
-import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('jobs');
 const router = Router();
+const CLIENT_VISIBLE_JOB_TYPES = new Set<string>([
+  BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+]);
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
@@ -100,7 +90,6 @@ const keywordStrategyStepLabels: Record<string, string> = {
   content: 'Fetching page content',
   search_data: 'Search Console data',
   'seo-data': 'Keyword intelligence',
-  semrush: 'Keyword intelligence',
   ai: 'AI analysis',
   enrichment: 'Enriching data',
   complete: 'Complete',
@@ -133,6 +122,16 @@ function keywordStrategyJobResultSummary(
   };
 }
 
+function isClientVisibleJob(job: Job, workspaceId: string): boolean {
+  return job.workspaceId === workspaceId && CLIENT_VISIBLE_JOB_TYPES.has(job.type);
+}
+
+function parseContentGenerationStyle(value: unknown): ContentGenerationStyle | undefined {
+  return typeof value === 'string' && CONTENT_GENERATION_STYLES.includes(value as ContentGenerationStyle)
+    ? value as ContentGenerationStyle
+    : undefined;
+}
+
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
   const wsId = _req.query.workspaceId as string | undefined;
@@ -151,6 +150,23 @@ router.get('/api/jobs/:id', (req, res) => {
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (job.workspaceId && !requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
   res.json(job);
+});
+
+router.get('/api/public/jobs/:workspaceId', requireClientPortalAuth(), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const jobs = listJobs(workspaceId)
+    .filter(job => isClientVisibleJob(job, workspaceId))
+    .map(toPublicBackgroundJob);
+  res.json(jobs);
+});
+
+router.get('/api/public/jobs/:workspaceId/:id', requireClientPortalAuth(), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const job = getJob(req.params.id);
+  if (!job || !isClientVisibleJob(job, workspaceId)) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  res.json(toPublicBackgroundJob(job));
 });
 
 router.delete('/api/jobs/completed', (_req, res) => {
@@ -174,6 +190,8 @@ router.delete('/api/jobs/:id', (req, res) => {
   const existing = getJob(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Job not found' });
   if (existing.workspaceId && !requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  const cancellationError = getJobCancellationError(existing);
+  if (cancellationError) return res.status(409).json({ error: cancellationError, jobId: existing.id });
   const job = cancelJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);
@@ -196,488 +214,15 @@ router.post('/api/jobs', async (req, res) => {
   }
 
   try {
+    const legacyStart = startLegacyJob(type, params, {
+      port: PORT,
+      internalHeaders: internalAdminHeaders(),
+    });
+    if (legacyStart) {
+      return res.status(legacyStart.status).json(legacyStart.body);
+    }
+
     switch (type) {
-      case 'seo-audit': {
-        const siteId = params.siteId as string;
-        if (!siteId) return res.status(400).json({ error: 'siteId required' });
-        const activeAudit = hasActiveJob('seo-audit', params.workspaceId as string);
-        if (activeAudit) return res.status(409).json({ error: 'An SEO audit is already running for this workspace', jobId: activeAudit.id });
-        const token = getTokenForSite(siteId) || undefined;
-        if (!token) return res.status(400).json({ error: 'No Webflow API token configured' });
-        const job = createJob('seo-audit', { message: 'Running SEO audit...', workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        // Fire and forget
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
-            const result = await runSeoAudit(siteId, token, params.workspaceId as string, params.skipLinkCheck === true);
-            // Auto-save snapshot so overview + client dashboard stay in sync
-            const ws = typeof params.workspaceId === 'string'
-              ? getWorkspace(params.workspaceId)
-              : listWorkspaces().find(w => w.webflowSiteId === siteId);
-            const siteName = getBrandName(ws) || siteId;
-            const snapshot = saveSnapshot(siteId, siteName, result);
-            const effectiveResult = getEffectiveAudit(result, ws?.auditSuppressions || []);
-            let effectivePreviousScore = snapshot.previousScore;
-            if (ws) {
-              effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
-              addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
-                `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
-                { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
-              handleOnDemandSeoAuditResult(ws, effectiveResult);
-              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
-            }
-            updateJob(job.id, {
-              status: 'done',
-              result: { ...effectiveResult, previousScore: effectivePreviousScore, snapshotId: snapshot.id },
-              message: `Audit complete — score ${effectiveResult.siteScore}`,
-            });
-            // Auto-regenerate recommendations after audit
-            if (ws) {
-              try {
-                await generateRecommendations(ws.id);
-                log.info(`Auto-regenerated recommendations for ${ws.id}`);
-                // Notify client that recommendations are ready
-                if (ws.clientEmail) {
-                  const dashUrl = getClientPortalUrl(ws);
-                  const recSet = loadRecommendations(ws.id);
-                  const recs = recSet?.recommendations || [];
-                  // SEO Generation Quality P2(f): the "recommendations ready for review"
-                  // headline counts only what the client will actually act on — ACTIVE recs
-                  // (exclude completed/dismissed carry-forwards) minus deterministic-backfill
-                  // recs (tagged at the source via Recommendation.backfilled). Flag-OFF has no
-                  // backfilled recs and no status pollution change, so the count is unchanged.
-                  const honestRecCount = recs.filter(
-                    r => r.status !== 'completed' && r.status !== 'dismissed' && !r.backfilled,
-                  ).length;
-                  if (honestRecCount > 0) {
-                    notifyClientRecommendationsReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id, recCount: honestRecCount, dashboardUrl: dashUrl });
-                  }
-                }
-              } catch (recErr) {
-                log.error({ err: recErr }, 'Failed to regenerate recommendations');
-              }
-              // Notify client of audit completion with suppressed data
-              if (ws.clientEmail) {
-                const dashUrl = getClientPortalUrl(ws);
-                // Collect issues from suppressed audit, sorted errors first
-                const allIssues: Array<{ message: string; severity: string }> = [];
-                for (const p of effectiveResult.pages) {
-                  for (const iss of p.issues) {
-                    if (iss.severity === 'error' || iss.severity === 'warning') {
-                      allIssues.push({ message: iss.message, severity: iss.severity });
-                    }
-                  }
-                }
-                // Deduplicate by message, keep highest severity
-                const seen = new Map<string, { message: string; severity: string }>();
-                for (const iss of allIssues) {
-                  const existing = seen.get(iss.message);
-                  if (!existing || (iss.severity === 'error' && existing.severity !== 'error')) {
-                    seen.set(iss.message, iss);
-                  }
-                }
-                const uniqueIssues = [...seen.values()];
-                uniqueIssues.sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1));
-                const topIssues = uniqueIssues.slice(0, 5);
-
-                // Compare suppressed versions for accurate fixed count
-                let fixedCount = 0;
-                if (effectivePreviousScore != null) {
-                  const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
-                  if (prev) {
-                    const prevAudit = getEffectiveAudit(prev.audit, ws.auditSuppressions || []);
-                    const prevIssueKeys = new Set<string>();
-                    for (const p of prevAudit.pages) {
-                      for (const iss of p.issues) prevIssueKeys.add(`${p.pageId}:${iss.check}`);
-                    }
-                    const curIssueKeys = new Set<string>();
-                    for (const p of effectiveResult.pages) {
-                      for (const iss of p.issues) curIssueKeys.add(`${p.pageId}:${iss.check}`);
-                    }
-                    for (const k of prevIssueKeys) {
-                      if (!curIssueKeys.has(k)) fixedCount++;
-                    }
-                  }
-                }
-
-                notifyClientAuditComplete({
-                  clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
-                  score: effectiveResult.siteScore, previousScore: effectivePreviousScore,
-                  totalPages: effectiveResult.totalPages, errors: effectiveResult.errors, warnings: effectiveResult.warnings,
-                  topIssues, fixedCount, dashboardUrl: dashUrl,
-                });
-              }
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: audit job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: audit job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'compress': {
-        const { assetId, imageUrl, siteId, altText, fileName } = params as { assetId: string; imageUrl: string; siteId: string; altText?: string; fileName?: string };
-        if (!assetId || !imageUrl || !siteId) return res.status(400).json({ error: 'assetId, imageUrl, siteId required' });
-        const compressToken = getTokenForSite(siteId) || undefined;
-        const job = createJob('compress', { message: `Compressing ${fileName || 'image'}...`, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running' });
-            const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
-            const response = await fetch(imageUrl);
-            const originalBuffer = Buffer.from(await response.arrayBuffer());
-            const originalSize = originalBuffer.length;
-            const ext = (fileName || imageUrl).split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
-            let compressed: Buffer;
-            let newFileName: string;
-            const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
-
-            if (ext === 'svg') {
-              const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
-              const svgString = originalBuffer.toString('utf-8');
-              const svgResult = svgo.optimize(svgString, { multipass: true, plugins: ['preset-default'] } as Parameters<typeof svgo.optimize>[1]);
-              compressed = Buffer.from(svgResult.data, 'utf-8');
-              newFileName = `${baseName}.svg`;
-            } else if (ext === 'jpg' || ext === 'jpeg') {
-              compressed = await sharp(originalBuffer).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
-              newFileName = `${baseName}.jpg`;
-            } else if (ext === 'png') {
-              const webpBuffer = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
-              const pngBuffer = await sharp(originalBuffer).png({ compressionLevel: 9, palette: true }).toBuffer();
-              if (webpBuffer.length < pngBuffer.length) { compressed = webpBuffer; newFileName = `${baseName}.webp`; }
-              else { compressed = pngBuffer; newFileName = `${baseName}.png`; }
-            } else {
-              compressed = await sharp(originalBuffer).webp({ quality: 80 }).toBuffer();
-              newFileName = `${baseName}.webp`;
-            }
-
-            const newSize = compressed.length;
-            const savings = originalSize - newSize;
-            const savingsPercent = Math.round((savings / originalSize) * 100);
-
-            if (savingsPercent < 3) {
-              updateJob(job.id, { status: 'done', result: { skipped: true, reason: `Already optimized (only ${savingsPercent}% savings)` }, message: 'Already optimized' });
-              return;
-            }
-
-            const tmpPath = `/tmp/compressed_${Date.now()}_${newFileName}`;
-            fs.writeFileSync(tmpPath, compressed);
-            const uploadResult = await uploadAsset(siteId, tmpPath, newFileName, altText, compressToken);
-            try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
-
-            if (!uploadResult.success) {
-              updateJob(job.id, { status: 'error', error: uploadResult.error, message: 'Upload failed' });
-              return;
-            }
-            await deleteAsset(assetId, compressToken);
-            updateJob(job.id, {
-              status: 'done',
-              result: { success: true, newAssetId: uploadResult.assetId, originalSize, newSize, savings, savingsPercent, newFileName },
-              message: `Saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
-            });
-            const singleCompressWsId = params.workspaceId as string;
-            if (singleCompressWsId) {
-              addActivity(singleCompressWsId, 'images_optimized',
-                `Image compressed: ${fileName || 'image'} — saved ${Math.round(savings / 1024)}KB (${savingsPercent}%)`,
-                undefined,
-                { originalSize, newSize, savings, savingsPercent }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: compress job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: compress job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Compression failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'bulk-compress': {
-        const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string; cmsUsages?: unknown[] }>; siteId: string };
-        if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
-        const activeBulkCompress = hasActiveJob('bulk-compress', params.workspaceId as string);
-        if (activeBulkCompress) return res.status(409).json({ error: 'A bulk compression is already running', jobId: activeBulkCompress.id });
-        const job = createJob('bulk-compress', { message: `Compressing ${assets.length} assets...`, total: assets.length, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            let totalSaved = 0;
-            const results: unknown[] = [];
-            for (let i = 0; i < assets.length; i++) {
-              const asset = assets[i];
-              try {
-                const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/${params.workspaceId}/compress/${asset.assetId}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', ...internalAdminHeaders() },
-                  body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName, cmsUsages: asset.cmsUsages }),
-                });
-                const r = await compressRes.json() as Record<string, unknown>;
-                results.push({ assetId: asset.assetId, ...r });
-                if (typeof r.savings === 'number') totalSaved += r.savings;
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-compress individual asset failed — skipping');
-                results.push({ assetId: asset.assetId, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Compressed ${i + 1}/${assets.length} (${Math.round(totalSaved / 1024)}KB saved)` });
-            }
-            updateJob(job.id, { status: 'done', result: { results, totalSaved }, progress: assets.length, message: `Done — saved ${Math.round(totalSaved / 1024)}KB total` });
-            const compressWsId = params.workspaceId as string;
-            if (compressWsId) {
-              addActivity(compressWsId, 'images_optimized',
-                `Bulk compression: ${assets.length} images processed, ${Math.round(totalSaved / 1024)}KB saved`,
-                undefined,
-                { processed: assets.length, totalSavedBytes: totalSaved }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-compress job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-compress job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk compress failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'bulk-alt': {
-        const { assets: altAssets, siteId: altSiteId } = params as { assets: Array<{ assetId: string; imageUrl: string }>; siteId?: string };
-        if (!altAssets?.length) return res.status(400).json({ error: 'assets required' });
-        const activeBulkAlt = hasActiveJob('bulk-alt', params.workspaceId as string);
-        if (activeBulkAlt) return res.status(409).json({ error: 'Bulk alt text generation is already running', jobId: activeBulkAlt.id });
-        const job = createJob('bulk-alt', { message: `Generating alt text for ${altAssets.length} images...`, total: altAssets.length, workspaceId: params.workspaceId as string });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            const token = altSiteId ? (getTokenForSite(altSiteId) || undefined) : undefined;
-            // Resolve workspace + intelligence ONCE per job (not per asset) — the context doesn't change across assets.
-            const jobWsId = params.workspaceId as string | undefined;
-            const jobWs = jobWsId ? getWorkspace(jobWsId) : (altSiteId ? listWorkspaces().find(w => w.webflowSiteId === altSiteId) : undefined);
-            let jobAltContext = '';
-            if (jobWs) {
-              const resolvedJobWsId = jobWsId || jobWs.id;
-              const jobIntel = await buildWorkspaceIntelligence(resolvedJobWsId, { slices: ['seoContext'] });
-              // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-              const bvBlock = jobIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
-              const parts: string[] = [];
-              if (jobWs.keywordStrategy?.siteKeywords?.length) parts.push(`Site keywords: ${jobWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
-              if (parts.length > 0) jobAltContext = parts.join('. ');
-              if (bvBlock) jobAltContext = jobAltContext ? `${jobAltContext}${bvBlock}` : bvBlock;
-            }
-            const results: Array<{ assetId: string; altText?: string; updated: boolean; error?: string }> = [];
-            for (let i = 0; i < altAssets.length; i++) {
-              const asset = altAssets[i];
-              try {
-                const imgRes = await fetch(asset.imageUrl);
-                if (!imgRes.ok) { results.push({ assetId: asset.assetId, updated: false, error: `Download failed: ${imgRes.status}` }); continue; }
-                const buffer = Buffer.from(await imgRes.arrayBuffer());
-                const imgExt = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
-                const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
-                fs.writeFileSync(tmpPath, buffer);
-                const altTextResult = await generateAltText(tmpPath, jobAltContext || undefined);
-                try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
-                if (altTextResult) {
-                  await updateAsset(asset.assetId, { altText: altTextResult }, token);
-                  results.push({ assetId: asset.assetId, altText: altTextResult, updated: true });
-                } else {
-                  results.push({ assetId: asset.assetId, updated: false, error: 'Generation returned null' });
-                }
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-alt-text individual asset failed — skipping');
-                results.push({ assetId: asset.assetId, updated: false, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Generated ${i + 1}/${altAssets.length} alt texts` });
-            }
-            updateJob(job.id, { status: 'done', result: results, progress: altAssets.length, message: `Done — ${results.filter(r => r.updated).length}/${altAssets.length} updated` });
-            if (jobWsId) {
-              addActivity(jobWsId, 'images_optimized',
-                `Bulk alt text: ${results.filter(r => r.updated).length} images updated`,
-                undefined,
-                { updated: results.filter(r => r.updated).length, total: altAssets.length }
-              );
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-alt-text job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-alt-text job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk alt text failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'bulk-seo-fix': {
-        // Callers MUST include `publishedPath` on each page for nested Webflow pages —
-        // without it, tryResolvePagePath falls back to the legacy slug path which is wrong for
-        // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
-        // in routes/webflow-seo-apply.ts accepts publishedPath; any frontend caller of this
-        // job type must mirror that contract.
-        const { siteId: seoSiteId, pages: rawPages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
-        const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
-        if (!seoSiteId || !pages.length || !field || !bwsId) return res.status(400).json({ error: 'siteId, workspaceId, pages, field required' });
-        const bulkWs = getWorkspace(bwsId);
-        const bulkSeoWorkspaceId = bwsId;
-        if (!bulkWs || bulkWs.webflowSiteId !== seoSiteId) {
-          return res.status(403).json({ error: 'You do not have access to this workspace' });
-        }
-        const activeBulkSeo = hasActiveJob('bulk-seo-fix', bulkSeoWorkspaceId);
-        if (activeBulkSeo) return res.status(409).json({ error: 'A bulk SEO fix is already running', jobId: activeBulkSeo.id });
-        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bulkSeoWorkspaceId });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', progress: 0 });
-            const openaiKey = process.env.OPENAI_API_KEY;
-            const token = getTokenForSite(seoSiteId) || undefined;
-            if (!openaiKey) { updateJob(job.id, { status: 'error', error: 'OPENAI_API_KEY not configured', message: 'Missing API key' }); return; }
-
-            // Resolve base URL for page content fetching
-            const bulkBaseUrl = await resolveBaseUrl({ liveDomain: bulkWs?.liveDomain, webflowSiteId: seoSiteId }, token);
-            const bulkBrandName = getBrandName(bulkWs);
-            const bwsIntel = await buildWorkspaceIntelligence(bulkSeoWorkspaceId, { slices: ['seoContext'] });
-            const bwsSeo = bwsIntel.seoContext;
-
-            const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
-            for (let i = 0; i < pages.length; i++) {
-              const page = pages[i];
-              try {
-                const bulkJobPagePath = tryResolvePagePath(page);
-                const pageSeo = bwsSeo ? { ...bwsSeo } : undefined;
-                if (pageSeo?.strategy?.pageMap?.length) {
-                  const pageKeywords = findPageMapEntryForPage(pageSeo.strategy.pageMap, page);
-                  if (pageKeywords) pageSeo.pageKeywords = pageKeywords;
-                }
-                const kwb = formatKeywordsForPrompt(pageSeo);
-                // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-                const bvb = pageSeo?.effectiveBrandVoiceBlock ?? '';
-                const personasBlock = formatPersonasForPrompt(pageSeo?.personas ?? []);
-                const knowledgeBlock = formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase);
-
-                // Fetch page content for context (best-effort)
-                let contentExcerpt = page.pageContent || '';
-                if (!contentExcerpt && bulkBaseUrl && bulkJobPagePath) {
-                  try {
-                    const htmlRes = await fetch(`${bulkBaseUrl}${bulkJobPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
-                    if (htmlRes.ok) {
-                      const html = await htmlRes.text();
-                      contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
-                    }
-                  } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
-                }
-                const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
-                const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
-                const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
-                const extraContext = [personasBlock, knowledgeBlock].filter(Boolean).join('');
-
-                const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
-                const aiText = await callCreativeAI({
-                  systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId, 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.'),
-                  userPrompt: prompt,
-                  maxTokens: 150,
-                  feature: 'job-bulk-seo-fix',
-                  workspaceId: bulkSeoWorkspaceId,
-                });
-                let text = aiText;
-                text = text.replace(/^["']|["']$/g, '');
-                const maxLen = field === 'description' ? 160 : 60;
-                if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }
-                if (text) {
-                  const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
-                  const seoResult = await updatePageSeo(page.pageId, seoFields, token);
-                  if (!seoResult.success) {
-                    results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error ?? 'Webflow API error' });
-                  } else {
-                    // Persist the page slug on the page-edit-state so the post-job
-                    // rec-resolve (which maps page IDs → slugs via getPageState) can
-                    // match recommendation.affectedPages (slugs). bulk-fixed pages may
-                    // have no prior audit-bridge row, so without writing the slug here
-                    // the resolve would silently no-op for them.
-                    const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
-                    updatePageState(bulkSeoWorkspaceId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system', ...(seoChangePagePath ? { slug: seoChangePagePath } : {}) });
-                    recordSeoChange(bulkSeoWorkspaceId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
-                    results.push({ pageId: page.pageId, text, applied: true });
-                  }
-                } else {
-                  results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
-                }
-              } catch (err) {
-                log.debug({ err }, 'jobs: bulk-seo-fix individual page failed — skipping');
-                results.push({ pageId: page.pageId, text: '', applied: false, error: String(err) });
-              }
-              updateJob(job.id, { progress: i + 1, message: `Fixed ${i + 1}/${pages.length} ${field}s` });
-            }
-            const appliedResults = results.filter(r => r.applied);
-            updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${appliedResults.length}/${pages.length} ${field}s updated` });
-            const appliedPageIds = appliedResults.map(r => r.pageId);
-            if (appliedPageIds.length > 0) {
-              broadcastToWorkspace(bulkSeoWorkspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
-                pageIds: appliedPageIds,
-                fields: [field],
-                source: 'bulk-fix',
-              });
-              // A bulk SEO write changes live page state, so the intelligence cache
-              // must be invalidated and any recommendation covering the fixed pages
-              // resolved (matching the work-order completion pattern). appliedPageIds
-              // are Webflow/page IDs (page_edit_states key) — the shared helper maps
-              // each to its slug before matching against recommendation.affectedPages
-              // (SLUGS). Guarded so a resolver failure can never abort the job's
-              // completion side-effects.
-              invalidateIntelligenceCache(bulkSeoWorkspaceId);
-              try {
-                resolveRecommendationsForPageIds(bulkSeoWorkspaceId, appliedPageIds); // rec-refresh-ok
-              } catch (err) {
-                log.warn({ err, jobId: job.id }, 'Failed to resolve recommendations after bulk-seo-fix');
-              }
-            }
-            addActivity(bulkSeoWorkspaceId, 'seo_updated',
-              `Bulk ${field} optimization: ${appliedResults.length} pages updated`,
-              `AI-generated ${field}s applied to ${appliedResults.length}/${pages.length} pages`,
-              { field, pagesUpdated: appliedResults.length, totalPages: pages.length, pageIds: appliedPageIds }
-            );
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-seo-fix job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: bulk-seo-fix job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk SEO fix failed' });
-          }
-        })();
-        break;
-      }
-
-      case 'sales-report': {
-        const { url, maxPages } = params as { url: string; maxPages?: number };
-        if (!url) return res.status(400).json({ error: 'url required' });
-        const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
-        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
-          return res.status(400).json({ error: 'maxPages must be a positive integer' });
-        }
-        if (requestedMaxPages > 100) {
-          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
-        }
-        const job = createJob('sales-report', { message: `Auditing ${url}...` });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Crawling site...' });
-            const result = await runSalesAudit(url, requestedMaxPages);
-            const reportsDir = getDataDir('sales-reports');
-            const reportId = `sr_${Date.now()}`;
-            const reportFile = path.join(reportsDir, `${reportId}.json`);
-            fs.writeFileSync(reportFile, JSON.stringify({ id: reportId, ...result, createdAt: new Date().toISOString() }));
-            updateJob(job.id, { status: 'done', result: { id: reportId, ...result }, message: `Audit complete — score ${result.siteScore}` });
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: sales-report job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: sales-report job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Sales report failed' });
-          }
-        })();
-        break;
-      }
-
       case BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
@@ -701,6 +246,86 @@ router.post('/api/jobs', async (req, res) => {
         break;
       }
 
+      case BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const requestId = typeof params.requestId === 'string' ? params.requestId.trim() : '';
+        const targetKeyword = typeof params.targetKeyword === 'string' ? params.targetKeyword.trim() : '';
+        const generationStyle = parseContentGenerationStyle(params.generationStyle);
+        if (params.generationStyle !== undefined && !generationStyle) {
+          return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
+        }
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, wsId);
+        if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
+        const ws = getWorkspace(wsId);
+        if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+        if (requestId) {
+          const request = getContentRequest(wsId, requestId);
+          if (!request) return res.status(404).json({ error: 'Request not found' });
+          const started = startContentBriefGenerationJob({
+            source: 'request',
+            workspaceId: wsId,
+            requestId,
+            generationStyle,
+          });
+          res.json(started);
+          break;
+        }
+
+        if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
+        const referenceUrls = Array.isArray(params.referenceUrls)
+          ? params.referenceUrls.filter((url): url is string => typeof url === 'string')
+          : undefined;
+        const started = startContentBriefGenerationJob({
+          source: 'standalone',
+          workspaceId: wsId,
+          targetKeyword,
+          businessContext: typeof params.businessContext === 'string' ? params.businessContext : undefined,
+          pageType: typeof params.pageType === 'string' ? params.pageType : undefined,
+          referenceUrls,
+          pageAnalysisContext: params.pageAnalysisContext && typeof params.pageAnalysisContext === 'object'
+            ? params.pageAnalysisContext as StandaloneContentBriefGenerationParams['pageAnalysisContext']
+            : undefined,
+          generationStyle,
+          // W2.5 Bug 1 fix: thread targetPageId/targetPageSlug for the Page Intelligence
+          // "Draft Brief" standalone flow so decay-query context can be injected.
+          targetPageId: typeof params.targetPageId === 'string' ? params.targetPageId : undefined,
+          targetPageSlug: typeof params.targetPageSlug === 'string' ? params.targetPageSlug : undefined,
+        });
+        res.json(started);
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const blueprintId = typeof params.blueprintId === 'string' ? params.blueprintId : '';
+        const entryIds = Array.isArray(params.entryIds) ? params.entryIds.filter((id): id is string => typeof id === 'string') : [];
+        const mode = typeof params.mode === 'string' ? params.mode : undefined;
+        const batchSize = typeof params.batchSize === 'number' ? params.batchSize : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!blueprintId) return res.status(400).json({ error: 'blueprintId required' });
+        if (entryIds.length === 0) return res.status(400).json({ error: 'entryIds required' });
+        const blueprint = getBlueprint(wsId, blueprintId);
+        if (!blueprint) return res.status(404).json({ error: 'Blueprint not found' });
+        const activeCopyBatchJob = hasActiveJob(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, wsId);
+        if (activeCopyBatchJob) return res.status(409).json({ error: 'Copy batch generation is already running for this workspace', jobId: activeCopyBatchJob.id });
+        try {
+          const started = createCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize });
+          res.json(started);
+          setTimeout(() => {
+            void runCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize, ...started });
+          }, 100);
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Blueprint not found') {
+            return res.status(404).json({ error: 'Blueprint not found' });
+          }
+          log.error({ err, workspaceId: wsId, blueprintId }, 'Failed to start copy batch job');
+          return res.status(500).json({ error: 'Failed to start copy batch job' });
+        }
+        break;
+      }
+
       case BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION:
       case BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION:
       case BACKGROUND_JOB_TYPES.PERSONA_GENERATION: {
@@ -712,6 +337,24 @@ router.post('/api/jobs', async (req, res) => {
           const response = workspaceContextJobErrorResponse(err);
           res.status(response.status).json(response.body);
         }
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const activeRecJob = hasActiveJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, wsId);
+        if (activeRecJob) return res.json({ jobId: activeRecJob.id, existing: true });
+        const recWs = getWorkspace(wsId);
+        if (!recWs) return res.status(404).json({ error: 'Workspace not found' });
+        const job = createJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, {
+          workspaceId: wsId,
+          message: 'Generating recommendations...',
+        });
+        res.json({ jobId: job.id });
+        setTimeout(() => {
+          void runRecommendationGenerationJob(job.id, wsId, 'explicit');
+        }, 100);
         break;
       }
 
@@ -742,7 +385,9 @@ router.post('/api/jobs', async (req, res) => {
               if (jobWasCancelled()) return;
               updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
               const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
-              const seoDataMode = (params.seoDataMode as string) || 'none';
+              // Pass absent through as undefined — generation promotes the absent case
+              // to 'quick' but must honor an explicit 'none' (no-spend contract).
+              const seoDataMode = typeof params.seoDataMode === 'string' ? params.seoDataMode : undefined;
               const seoDataProvider = typeof params.seoDataProvider === 'string' ? params.seoDataProvider : undefined;
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
@@ -802,6 +447,18 @@ router.post('/api/jobs', async (req, res) => {
         res.json({ jobId: job.id });
         break;
       }
+      case BACKGROUND_JOB_TYPES.SCHEMA_PLAN_GENERATION: {
+        const siteId = typeof params.siteId === 'string' ? params.siteId : '';
+        const workspaceId = typeof params.workspaceId === 'string' ? params.workspaceId : undefined;
+        try {
+          const started = startSchemaPlanGenerationJob(siteId, workspaceId);
+          res.json(started);
+        } catch (err) {
+          const response = schemaPlanGenerationErrorResponse(err);
+          res.status(response.status).json(response.body);
+        }
+        break;
+      }
       case 'schema-generator': {
         const schemaSiteId = params.siteId as string;
         if (!schemaSiteId) return res.status(400).json({ error: 'siteId required' });
@@ -852,8 +509,6 @@ router.post('/api/jobs', async (req, res) => {
         const insightId = params.insightId as string;
         if (!workspaceId || !insightId) return res.status(400).json({ error: 'workspaceId and insightId required' });
 
-        if (!isFeatureEnabled('deep-diagnostics')) return res.status(403).json({ error: 'Deep diagnostics feature not enabled' });
-
         const ws = getWorkspace(workspaceId);
         if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -881,6 +536,144 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'error', message: 'Deep diagnostic failed' });
           }
         })();
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const blueprintId = typeof params.blueprintId === 'string' ? params.blueprintId : '';
+        const entryId = typeof params.entryId === 'string' ? params.entryId : '';
+        const accumulatedSteering = Array.isArray(params.accumulatedSteering)
+          ? params.accumulatedSteering.filter((s): s is string => typeof s === 'string')
+          : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!blueprintId) return res.status(400).json({ error: 'blueprintId required' });
+        if (!entryId) return res.status(400).json({ error: 'entryId required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        if (!getEntry(wsId, blueprintId, entryId)) return res.status(404).json({ error: 'Entry not found' });
+        const copyJob = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: copyJob.id });
+        setImmediate(() => {
+          void runCopyEntryGenerationJob({ jobId: copyJob.id, workspaceId: wsId, blueprintId, entryId, accumulatedSteering });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const industryType = typeof params.industryType === 'string' ? params.industryType.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!industryType) return res.status(400).json({ error: 'industryType required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        const bpInput: BlueprintGenerationInput = {
+          industryType,
+          brandscriptId: typeof params.brandscriptId === 'string' ? params.brandscriptId : undefined,
+          domain: typeof params.domain === 'string' ? params.domain : undefined,
+          targetPageCount: typeof params.targetPageCount === 'number' ? params.targetPageCount : undefined,
+          includeContentPages: typeof params.includeContentPages === 'boolean' ? params.includeContentPages : undefined,
+          includeLocationPages: typeof params.includeLocationPages === 'boolean' ? params.includeLocationPages : undefined,
+          locationCount: typeof params.locationCount === 'number' ? params.locationCount : undefined,
+        };
+        const bpJob = createJob(BACKGROUND_JOB_TYPES.BLUEPRINT_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: bpJob.id });
+        setImmediate(() => {
+          void runBlueprintGenerationJob({ jobId: bpJob.id, workspaceId: wsId, input: bpInput });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        const llmsJob = createJob(BACKGROUND_JOB_TYPES.LLMS_TXT_GENERATION, { workspaceId: wsId });
+        res.json({ jobId: llmsJob.id });
+        setImmediate(() => {
+          void runLlmsTxtGenerationJob({ jobId: llmsJob.id, workspaceId: wsId });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const aeoWs = getWorkspace(wsId);
+        if (!aeoWs) return res.status(404).json({ error: 'Workspace not found' });
+        if (!aeoWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+        if (!aeoWs.liveDomain) return res.status(400).json({ error: 'No live domain configured for this workspace' });
+        const rawMaxPages = params.maxPages;
+        const requestedMaxPages = rawMaxPages == null ? 10 : Number(rawMaxPages);
+        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
+        if (requestedMaxPages > 25) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 25' });
+        }
+        const maxPages = Math.min(requestedMaxPages, 25);
+        const aeoJob = createJob(BACKGROUND_JOB_TYPES.AEO_SITE_REVIEW, { workspaceId: wsId });
+        res.json({ jobId: aeoJob.id });
+        setImmediate(() => {
+          void runAeoSiteReviewJob({ jobId: aeoJob.id, workspaceId: wsId, maxPages });
+        });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
+        const mode = params.mode === 'outline' ? 'outline' : 'regenerate';
+        const feedback = typeof params.feedback === 'string' ? params.feedback : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!briefId) return res.status(400).json({ error: 'briefId required' });
+        if (mode === 'regenerate' && !feedback) return res.status(400).json({ error: 'feedback required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        if (!getBrief(wsId, briefId)) return res.status(404).json({ error: 'Brief not found' });
+        const activeRegen = hasActiveBriefRegenerateJob(wsId);
+        if (activeRegen) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeRegen.id });
+        const started = mode === 'outline'
+          ? startContentBriefRegenerateJob({ mode: 'outline', workspaceId: wsId, briefId, feedback })
+          : startContentBriefRegenerateJob({ mode: 'regenerate', workspaceId: wsId, briefId, feedback: feedback as string });
+        res.status(202).json(started);
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
+        const activeReview = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, wsId);
+        if (activeReview) return res.status(409).json({ error: 'An AI review is already running for this workspace', jobId: activeReview.id });
+        res.status(202).json(startAiReviewJob({ workspaceId: wsId, postId }));
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_FIX: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
+        const fixParsed = aiFixRequestSchema.safeParse(params.body);
+        if (!fixParsed.success) return res.status(400).json({ error: 'Invalid ai-fix body' });
+        const activeFix = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, wsId);
+        if (activeFix) return res.status(409).json({ error: 'An AI fix is already running for this workspace', jobId: activeFix.id });
+        res.status(202).json(startAiFixJob({ workspaceId: wsId, postId, body: fixParsed.data as AiFixRequest }));
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        const vsPost = getPost(wsId, postId);
+        if (!vsPost) return res.status(404).json({ error: 'Post not found' });
+        if (!getBrief(wsId, vsPost.briefId)) return res.status(404).json({ error: 'Brief not found' });
+        const activeVoice = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, wsId);
+        if (activeVoice) return res.status(409).json({ error: 'Voice scoring is already running for this workspace', jobId: activeVoice.id });
+        res.status(202).json(startVoiceScoreJob({ workspaceId: wsId, postId }));
         break;
       }
 

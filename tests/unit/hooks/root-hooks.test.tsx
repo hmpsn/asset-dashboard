@@ -294,25 +294,19 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
   });
 
   it('returns the static default (false) for a known flag while loading', () => {
+    // Probe uses keyword-universe-full: keyword-hub flipped to default-true at the
+    // Phase B cutover (2026-06-11), so it no longer works as a false-default probe.
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
-    expect(result.current).toBe(FEATURE_FLAGS['copy-engine']);
+    expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
     expect(result.current).toBe(false);
   });
 
-  it('returns false for "new-inbox-ia" while loading', () => {
+  it('returns false for "white-label" while loading', () => {
     const { result } = renderHook(
-      () => useFeatureFlag('new-inbox-ia' as FeatureFlagKey),
-      { wrapper: makeWrapper() },
-    );
-    expect(result.current).toBe(false);
-  });
-
-  it('returns false for "outcome-tracking" while loading', () => {
-    const { result } = renderHook(
-      () => useFeatureFlag('outcome-tracking' as FeatureFlagKey),
+      () => useFeatureFlag('white-label' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
     expect(result.current).toBe(false);
@@ -328,29 +322,14 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
 });
 
 describe('useFeatureFlag — server response overrides defaults', () => {
-  // useFeatureFlag uses raw fetch(), not the api/client wrapper
-  let fetchSpy: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    fetchSpy = vi.fn();
-    vi.stubGlobal('fetch', fetchSpy);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('returns true for a flag the server has enabled', async () => {
     const serverFlags = Object.fromEntries(
-      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'copy-engine']),
+      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-universe-full']),
     ) as Record<FeatureFlagKey, boolean>;
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(serverFlags),
-    });
+    mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -361,13 +340,10 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     const serverFlags = Object.fromEntries(
       Object.keys(FEATURE_FLAGS).map(k => [k, false]),
     ) as Record<FeatureFlagKey, boolean>;
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(serverFlags),
-    });
+    mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('new-inbox-ia' as FeatureFlagKey),
+      () => useFeatureFlag('white-label' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -378,16 +354,16 @@ describe('useFeatureFlag — server response overrides defaults', () => {
   });
 
   it('falls back to static default when fetch fails', async () => {
-    fetchSpy.mockResolvedValue({ ok: false, status: 500 });
+    mockGet.mockRejectedValue(new Error('Failed to fetch feature flags'));
 
     const { result } = renderHook(
-      () => useFeatureFlag('copy-engine' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
     // Error path: no data → falls back to FEATURE_FLAGS default
     await waitFor(() => {
-      expect(result.current).toBe(FEATURE_FLAGS['copy-engine']);
+      expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
     });
   });
 });

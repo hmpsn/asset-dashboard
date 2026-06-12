@@ -42,51 +42,41 @@ describe('getProviderForCapability', () => {
     expect(provider).toBe(dfs);
   });
 
-  it('does not fall back to SEMRush when DataForSEO backlinks is disabled', () => {
+  it('ignores legacy backlinks disable flags and stays on DataForSEO', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
     const provider = getProviderForCapability('backlinks', 'dataforseo');
-    expect(provider).toBeNull();
+    expect(provider).toBe(dfs);
   });
 
-  it('returns null when the selected provider cannot serve the capability', () => {
+  it('keeps DataForSEO for backlinks even if a legacy disable flag exists', () => {
     const dfs = makeProvider('dataforseo');
-    const unconfiguredSemrush = makeProvider('semrush', false);
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', unconfiguredSemrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
     const provider = getProviderForCapability('backlinks', 'dataforseo');
-    expect(provider).toBeNull();
+    expect(provider).toBe(dfs);
   });
 
-  it('getBacklinksProvider returns null instead of falling back when selected provider cannot serve backlinks', () => {
+  it('getBacklinksProvider stays on DataForSEO instead of falling back', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
     const provider = getBacklinksProvider('dataforseo');
-    expect(provider).toBeNull();
+    expect(provider).toBe(dfs);
   });
 
-  it('uses SEMRush for backlinks when SEMRush is explicitly preferred', () => {
+  it('treats legacy semrush backlink preference as DataForSEO', () => {
     const dfs = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dfs);
-    registerProvider('semrush', semrush);
 
-    markCapabilityDisabled('dataforseo', 'backlinks');
-
-    const provider = getBacklinksProvider('semrush');
-    expect(provider).toBe(semrush);
+    const provider = getBacklinksProvider('semrush' as unknown as ProviderName);
+    expect(provider).toBe(dfs);
   });
 });
 
@@ -96,20 +86,16 @@ describe('getConfiguredProvider', () => {
   });
 
   it('defaults to DataForSEO when both providers are configured and no preference is supplied', () => {
-    const semrush = makeProvider('semrush');
     const dfs = makeProvider('dataforseo');
-    registerProvider('semrush', semrush);
     registerProvider('dataforseo', dfs);
 
     expect(getConfiguredProvider()).toBe(dfs);
   });
 
-  it('uses SEMRush only when it is explicitly preferred', () => {
-    const semrush = makeProvider('semrush');
+  it('treats legacy semrush preference as DataForSEO', () => {
     const dfs = makeProvider('dataforseo');
-    registerProvider('semrush', semrush);
     registerProvider('dataforseo', dfs);
 
-    expect(getConfiguredProvider('semrush')).toBe(semrush);
+    expect(getConfiguredProvider('semrush' as unknown as ProviderName)).toBe(dfs);
   });
 });

@@ -477,18 +477,21 @@ describe('lifecycleStatus', () => {
     expect(lifecycleStatus(row)).toBe(KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE);
   });
 
-  it('tracked keyword with STRATEGY_PRIMARY source → IN_STRATEGY', () => {
+  it('Wave 3d-ii: strategy-OWNED tracking (strategyOwned=true) → IN_STRATEGY', () => {
     const row = makeDraftRow({
-      tracking: makeTrackedKeyword({ source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY, status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      tracking: makeTrackedKeyword({ strategyOwned: true, status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     });
     expect(lifecycleStatus(row)).toBe(KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY);
   });
 
-  it('tracked keyword with STRATEGY_SITE_KEYWORD source → IN_STRATEGY', () => {
+  it('Wave 3d-ii: a STRATEGY_* source WITHOUT strategyOwned is NOT IN_STRATEGY (decoupled)', () => {
+    // Classification is decoupled from the source enum — a strategy-sourced row that
+    // reconcile does not currently own (strategyOwned undefined) falls through to
+    // TRACKED, not IN_STRATEGY.
     const row = makeDraftRow({
-      tracking: makeTrackedKeyword({ source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD, status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      tracking: makeTrackedKeyword({ source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY, status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     });
-    expect(lifecycleStatus(row)).toBe(KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY);
+    expect(lifecycleStatus(row)).toBe(KEYWORD_COMMAND_CENTER_STATUS.TRACKED);
   });
 
   it('active tracking with manual source → TRACKED', () => {
@@ -1259,11 +1262,12 @@ describe('buildFilterFacetsFromCounts', () => {
     declined: 5,
     retired: 2,
     lostVisibility: 9,
+    strikingDistance: 7,
   };
 
-  it('returns 18 filter facets', () => {
+  it('returns 19 filter facets', () => {
     const result = buildFilterFacetsFromCounts(counts);
-    expect(result).toHaveLength(18);
+    expect(result).toHaveLength(19);
   });
 
   it('ALL facet has correct count', () => {
@@ -1337,23 +1341,24 @@ describe('trackedKeywordMatchesFilter', () => {
     expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.RETIRED)).toBe(false);
   });
 
-  it('IN_STRATEGY filter: active + STRATEGY_PRIMARY source matches', () => {
+  it('Wave 3d-ii IN_STRATEGY filter: active + strategyOwned=true matches', () => {
     const kw = makeTrackedKeyword({
       status: TRACKED_KEYWORD_STATUS.ACTIVE,
-      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
     });
     expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)).toBe(true);
   });
 
-  it('IN_STRATEGY filter: active + STRATEGY_SITE_KEYWORD source matches', () => {
+  it('Wave 3d-ii IN_STRATEGY filter: active + STRATEGY_* source but NOT owned does not match (decoupled)', () => {
+    // The filter now keys on ownership, not the source enum.
     const kw = makeTrackedKeyword({
       status: TRACKED_KEYWORD_STATUS.ACTIVE,
       source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
     });
-    expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)).toBe(true);
+    expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)).toBe(false);
   });
 
-  it('IN_STRATEGY filter: active + MANUAL source does not match', () => {
+  it('Wave 3d-ii IN_STRATEGY filter: active + MANUAL source (not owned) does not match', () => {
     const kw = makeTrackedKeyword({
       status: TRACKED_KEYWORD_STATUS.ACTIVE,
       source: TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -1361,10 +1366,10 @@ describe('trackedKeywordMatchesFilter', () => {
     expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)).toBe(false);
   });
 
-  it('IN_STRATEGY filter: inactive + STRATEGY_PRIMARY does not match', () => {
+  it('Wave 3d-ii IN_STRATEGY filter: inactive + strategyOwned=true does not match (status gate)', () => {
     const kw = makeTrackedKeyword({
       status: TRACKED_KEYWORD_STATUS.PAUSED,
-      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      strategyOwned: true,
     });
     expect(trackedKeywordMatchesFilter(kw, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)).toBe(false);
   });

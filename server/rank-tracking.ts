@@ -1,7 +1,8 @@
-import db from './db/index.js';
-import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
-import { createStmtCache } from './db/stmt-cache.js';
 import { z } from 'zod';
+
+import db from './db/index.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -11,9 +12,11 @@ import {
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { listTrackedKeywordRows, replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
+  /** ctr is already a percentage from GSC (for example, 6.3 for 6.3%). Do NOT multiply by 100. */
   queries: { query: string; position: number; clicks: number; impressions: number; ctr: number }[];
 }
 
@@ -37,6 +40,11 @@ export interface AddTrackedKeywordOptions {
   baselineImpressions?: number;
   replacedBy?: string;
   deprecatedAt?: string;
+  /** Wave 3d-i ADDITIVE provenance — content-addressed gap key (see TrackedKeyword.sourceGapKey). */
+  sourceGapKey?: string;
+  /** Wave 3d-ii ownership flag — see TrackedKeyword.strategyOwned. Reconcile is the
+   *  SOLE writer of `true`; other callers leave it undefined (conservative default). */
+  strategyOwned?: boolean;
 }
 
 export interface GetTrackedKeywordsOptions {
@@ -44,11 +52,6 @@ export interface GetTrackedKeywordsOptions {
 }
 
 // ── SQLite row shapes ──
-
-interface ConfigRow {
-  workspace_id: string;
-  tracked_keywords: string;
-}
 
 interface SnapshotRow {
   id: number;
@@ -58,9 +61,11 @@ interface SnapshotRow {
 }
 
 const stmts = createStmtCache(() => ({
-  getConfig: db.prepare(
-    `SELECT * FROM rank_tracking_config WHERE workspace_id = ?`,
-  ),
+  // Wave 3c-iii-b: getConfig (the blob reader) was removed with readConfig — the
+  // tracked_keywords TABLE is the SOLE store and the only blob read remaining is the
+  // boot backfill's own SELECT in tracked-keywords-store.ts. upsertConfig stays:
+  // writeConfig keeps the config row alive by upserting `'[]'` (kept-but-empty for
+  // rollback safety; the column/table are NOT dropped).
   upsertConfig: db.prepare(
     `INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
          VALUES (@workspace_id, @tracked_keywords)
@@ -77,6 +82,9 @@ const stmts = createStmtCache(() => ({
          VALUES (@workspace_id, @date, @queries)
          ON CONFLICT(workspace_id, date) DO UPDATE SET queries = @queries`,
   ),
+  updateSnapshotQueries: db.prepare(
+    `UPDATE rank_snapshots SET queries = @queries WHERE workspace_id = @workspace_id AND date = @date`,
+  ),
   deleteOldSnapshots: db.prepare(
     `DELETE FROM rank_snapshots WHERE workspace_id = ? AND date NOT IN (
            SELECT date FROM rank_snapshots WHERE workspace_id = ? ORDER BY date DESC LIMIT 180
@@ -84,46 +92,34 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
-const trackedKeywordSchema = z.object({
-  query: z.string(),
-  pinned: z.boolean().default(false),
-  addedAt: z.string().default(''),
-  source: z.enum([
-    TRACKED_KEYWORD_SOURCE.MANUAL,
-    TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
-    TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
-    TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
-    TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
-    TRACKED_KEYWORD_SOURCE.RECOMMENDATION,
-    TRACKED_KEYWORD_SOURCE.UNKNOWN,
-  ]).optional(),
-  status: z.enum([
-    TRACKED_KEYWORD_STATUS.ACTIVE,
-    TRACKED_KEYWORD_STATUS.PAUSED,
-    TRACKED_KEYWORD_STATUS.DEPRECATED,
-    TRACKED_KEYWORD_STATUS.REPLACED,
-  ]).optional(),
-  pagePath: z.string().optional(),
-  pageTitle: z.string().optional(),
-  strategyGeneratedAt: z.string().optional(),
-  lastStrategySeenAt: z.string().optional(),
-  intent: z.string().optional(),
-  volume: z.number().optional(),
-  difficulty: z.number().optional(),
-  cpc: z.number().optional(),
-  authorityPosture: z.enum(['authority_unknown', 'within_current_authority_range', 'requires_authority_building']).optional(),
-  baselinePosition: z.number().optional(),
-  baselineClicks: z.number().optional(),
-  baselineImpressions: z.number().optional(),
-  replacedBy: z.string().optional(),
-  deprecatedAt: z.string().optional(),
+const rankSnapshotQuerySchema = z.object({
+  query: z.string().trim().min(1),
+  position: z.number().finite(),
+  clicks: z.number().finite().optional().default(0),
+  impressions: z.number().finite().optional().default(0),
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
+  ctr: z.number().finite().optional().default(0),
 });
+
+function readSnapshotQueries(raw: string, workspaceId: string): RankSnapshot['queries'] {
+  return parseJsonSafeArray(raw, rankSnapshotQuerySchema, {
+    workspaceId,
+    table: 'rank_snapshots',
+    field: 'queries',
+  }).map(query => ({
+    query: query.query,
+    position: query.position,
+    clicks: query.clicks ?? 0,
+    impressions: query.impressions ?? 0,
+    ctr: query.ctr ?? 0,
+  }));
+}
 
 function normalizeQuery(query: string): string {
   return keywordComparisonKey(query);
 }
 
-function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { query: string }>): TrackedKeyword[] {
+export function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { query: string }>): TrackedKeyword[] {
   const seen = new Set<string>();
   const normalized: TrackedKeyword[] = [];
   const now = new Date().toISOString();
@@ -144,54 +140,117 @@ function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword> & { qu
   return normalized;
 }
 
-function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } {
-  const row = stmts().getConfig.get(workspaceId) as ConfigRow | undefined;
-  return row
-    ? {
-        trackedKeywords: normalizeTrackedKeywords(parseJsonSafeArray(row.tracked_keywords, trackedKeywordSchema, {
-          workspaceId,
-          table: 'rank_tracking_config',
-          field: 'tracked_keywords',
-        })),
-      }
-    : { trackedKeywords: [] };
-}
-
-function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyword[] }) {
+function writeConfig(workspaceId: string) {
+  // Wave 3c-iii-b STRIP: the tracked_keywords row table is now the SOLE store. The
+  // blob is NO LONGER written as a data array — we write the clean empty sentinel
+  // `'[]'` (parseJsonSafeArray + migrate-json's `IS NOT NULL AND != ''` filter both
+  // tolerate it). The config row still UPSERTS so it exists (for rollback safety and
+  // so the column/table stay around), just with an empty array. The real keyword set
+  // is dual-written into the TABLE via replaceAllTrackedKeywordRows by
+  // withTrackedKeywordsTxn, which is the authoritative store — so writeConfig takes
+  // only the workspace id (it has nothing to serialize into the blob).
   stmts().upsertConfig.run({
     workspace_id: workspaceId,
-    tracked_keywords: JSON.stringify(config.trackedKeywords),
+    tracked_keywords: '[]',
   });
 }
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
   const rows = stmts().getSnapshots.all(workspaceId) as SnapshotRow[];
-  return rows.map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }));
+  return rows.map(r => ({
+    date: r.date,
+    queries: readSnapshotQueries(r.queries, workspaceId),
+  }));
 }
 
 function readRecentSnapshots(workspaceId: string, limit: number): RankSnapshot[] {
   const rows = stmts().getRecentSnapshots.all(workspaceId, limit) as SnapshotRow[];
   return rows
-    .map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }))
+    .map(r => ({
+      date: r.date,
+      queries: readSnapshotQueries(r.queries, workspaceId),
+    }))
     .reverse();
 }
 
 // --- Public API ---
 
 export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywordsOptions = {}): TrackedKeyword[] {
-  const keywords = readConfig(workspaceId).trackedKeywords;
+  // Wave 3c-iii-b TABLE-ONLY: resolve through the table-only resolver (resolve
+  // first, filter second). The resolver returns the table rows in sort_order, or an
+  // EMPTY array when the table is empty (no blob fallback). The includeInactive
+  // short-circuit + active-status filter below are UNCHANGED.
+  const keywords = resolveTrackedKeywords(workspaceId);
   if (options.includeInactive) return keywords;
   return keywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
+}
+
+/**
+ * Nesting-safe, BEGIN IMMEDIATE wrapper for tracked_keywords read→mutate→write.
+ *
+ * Every writer that touches the tracked_keywords JSON blob MUST go through this
+ * helper to prevent the lost-update race: two concurrent writers both reading the
+ * same blob, mutating independently, and last-write-wins silently dropping keywords.
+ *
+ * Nesting guard: better-sqlite3 WRAPPED transactions (db.transaction(fn)()) do NOT
+ * throw when nested — they downgrade to a SAVEPOINT and inherit the outer txn. (Only
+ * a raw `db.prepare('BEGIN IMMEDIATE').run()` throws "cannot start a transaction
+ * within a transaction".) So the db.inTransaction guard below is NOT a throw-avoider;
+ * it is an optimisation that skips a needless inner SAVEPOINT and lets nested callers
+ * inherit the outer txn's write lock directly. KCC wraps its outer action in
+ * db.transaction() before calling updateTrackedKeywords → upsertTrackedKeywordByKey
+ * → updateTrackedKeywords → withTrackedKeywordsTxn; the guard NO-OPs the inner BEGIN
+ * so those nested callers run under the outer txn's serialisation.
+ *
+ * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
+ * getTrackedKeywords() call (the "3×-parse fix").
+ */
+export function withTrackedKeywordsTxn(
+  workspaceId: string,
+  updater: (current: TrackedKeyword[]) => TrackedKeyword[],
+): TrackedKeyword[] {
+  function run(): TrackedKeyword[] {
+    // Wave 3c-iii-b TABLE-ONLY READ-SWITCH (ATOMIC PAIR with the writeConfig strip):
+    // the txn-start read is now a FULL-ROW TABLE read via listTrackedKeywordRows,
+    // which projects sourceGapKey + strategyOwned (full provenance — NOT the stripped
+    // public shape from resolveTrackedKeywords). This is load-bearing: writeConfig now
+    // writes `'[]'`, so if this still read the blob it would get [] and the updater
+    // would receive nothing → replaceAllTrackedKeywordRows([]) would WIPE the table.
+    //
+    // Because the read carries full provenance, the previous hydrateProvenanceFromTable
+    // step is REDUNDANT and removed. FILL-IF-EMPTY still holds: a status-only /
+    // reconcile updater copies the current rows through (preserving the read's
+    // sourceGapKey/strategyOwned), while a fresh same-write gap-approve (sourceGapKey)
+    // / reconcile (strategyOwned=true) sets the in-memory value directly — the only
+    // source of truth on reinsert, never clobbered by the read. replaceAllTrackedKeywordRows
+    // re-stamps sort_order from the new array position, so order survives too.
+    const trackedKeywords = normalizeTrackedKeywords(updater(listTrackedKeywordRows(workspaceId)));
+    // Wave 3c-iii-b: the blob is no longer a store — writeConfig writes `'[]'` (the
+    // config row is kept-but-empty for rollback safety). The AUTHORITATIVE write is
+    // replaceAllTrackedKeywordRows into the tracked_keywords TABLE below, which runs
+    // INSIDE the same txn (BEGIN IMMEDIATE here, or the KCC outer txn via the
+    // db.inTransaction guard — a wrapped db.transaction nests as a SAVEPOINT). The
+    // empty-clear case (replaceAll with []) clears the table.
+    writeConfig(workspaceId);
+    replaceAllTrackedKeywordRows(workspaceId, trackedKeywords);
+    return trackedKeywords;
+  }
+
+  // If we are already inside a transaction (e.g. KCC outer db.transaction()),
+  // run the read+write directly — the outer txn provides the lock.
+  if (db.inTransaction) {
+    return run();
+  }
+  // Otherwise, open a BEGIN IMMEDIATE transaction to acquire a write lock
+  // immediately, preventing concurrent readers from racing ahead of us.
+  return db.transaction(run).immediate();
 }
 
 export function updateTrackedKeywords(
   workspaceId: string,
   updater: (keywords: TrackedKeyword[]) => TrackedKeyword[],
 ): TrackedKeyword[] {
-  const config = readConfig(workspaceId);
-  config.trackedKeywords = normalizeTrackedKeywords(updater(config.trackedKeywords));
-  writeConfig(workspaceId, config);
-  return config.trackedKeywords;
+  return withTrackedKeywordsTxn(workspaceId, updater);
 }
 
 function addTrackedKeywordToConfig(
@@ -214,6 +273,10 @@ function addTrackedKeywordToConfig(
     const definedOptions = Object.fromEntries(
       Object.entries(options).filter(([, value]) => value !== undefined),
     ) as AddTrackedKeywordOptions;
+    // Wave 3d-i FILL-IF-EMPTY: never overwrite an existing non-empty sourceGapKey.
+    // (existing.sourceGapKey is already hydrated from the table by withTrackedKeywordsTxn.)
+    // Drop it from the blind spread; re-apply only when the row has none yet.
+    delete definedOptions.sourceGapKey;
     Object.assign(existing, {
       ...definedOptions,
       pinned: existing.pinned || Boolean(options.pinned),
@@ -222,6 +285,7 @@ function addTrackedKeywordToConfig(
       replacedBy: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : existing.replacedBy,
       deprecatedAt: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : existing.deprecatedAt,
     });
+    if (!existing.sourceGapKey && options.sourceGapKey) existing.sourceGapKey = options.sourceGapKey;
     return true;
   }
   config.trackedKeywords.push({
@@ -244,6 +308,8 @@ function addTrackedKeywordToConfig(
     baselineImpressions: options.baselineImpressions,
     replacedBy: options.replacedBy,
     deprecatedAt: options.deprecatedAt,
+    sourceGapKey: options.sourceGapKey, // Wave 3d-i ADDITIVE provenance (gap-approve path).
+    strategyOwned: options.strategyOwned, // Wave 3d-ii ownership (undefined unless reconcile sets it).
   });
   return true;
 }
@@ -256,39 +322,40 @@ export function addTrackedKeyword(
   const options: AddTrackedKeywordOptions = typeof pinnedOrOptions === 'boolean'
     ? { pinned: pinnedOrOptions, source: TRACKED_KEYWORD_SOURCE.MANUAL }
     : pinnedOrOptions;
-  const config = readConfig(workspaceId);
-  if (addTrackedKeywordToConfig(config, query, options)) writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const config = { trackedKeywords: existing };
+    addTrackedKeywordToConfig(config, query, options);
+    return config.trackedKeywords;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function addTrackedKeywords(
   workspaceId: string,
   entries: Array<{ query: string; options?: AddTrackedKeywordOptions }>,
 ): TrackedKeyword[] {
-  const config = readConfig(workspaceId);
-  let changed = false;
-  for (const entry of entries) {
-    changed = addTrackedKeywordToConfig(config, entry.query, entry.options ?? {}) || changed;
-  }
-  if (changed) writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const config = { trackedKeywords: existing };
+    for (const entry of entries) {
+      addTrackedKeywordToConfig(config, entry.query, entry.options ?? {});
+    }
+    return config.trackedKeywords;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function removeTrackedKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
-  const config = readConfig(workspaceId);
-  config.trackedKeywords = config.trackedKeywords.filter(k => normalizeQuery(k.query) !== normalizedQuery);
-  writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing =>
+    existing.filter(k => normalizeQuery(k.query) !== normalizedQuery),
+  ).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function togglePinKeyword(workspaceId: string, query: string): TrackedKeyword[] {
   const normalizedQuery = normalizeQuery(query);
-  const config = readConfig(workspaceId);
-  const kw = config.trackedKeywords.find(k => normalizeQuery(k.query) === normalizedQuery);
-  if (kw) kw.pinned = !kw.pinned;
-  writeConfig(workspaceId, config);
-  return getTrackedKeywords(workspaceId);
+  return withTrackedKeywordsTxn(workspaceId, existing => {
+    const kw = existing.find(k => normalizeQuery(k.query) === normalizedQuery);
+    if (kw) kw.pinned = !kw.pinned;
+    return existing;
+  }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
 export function storeRankSnapshot(
@@ -296,13 +363,41 @@ export function storeRankSnapshot(
   date: string,
   queries: { query: string; position: number; clicks: number; impressions: number; ctr: number }[]
 ): void {
+  const queriesByKey = new Map<string, { query: string; position: number; clicks: number; impressions: number; ctr: number }>();
+  for (const query of queries) {
+    const normalizedQuery = normalizeQuery(query.query);
+    if (!normalizedQuery) continue;
+    queriesByKey.set(normalizedQuery, query);
+  }
   stmts().upsertSnapshot.run({
     workspace_id: workspaceId,
     date,
-    queries: JSON.stringify(queries),
+    queries: JSON.stringify([...queriesByKey.values()]),
   });
   // Keep max 180 days of snapshots
   stmts().deleteOldSnapshots.run(workspaceId, workspaceId);
+}
+
+export function deleteKeywordRankHistory(workspaceId: string, query: string): number {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return 0;
+
+  const run = db.transaction(() => {
+    let changedSnapshots = 0;
+    const snapshots = readSnapshots(workspaceId);
+    for (const snapshot of snapshots) {
+      const filteredQueries = snapshot.queries.filter(entry => normalizeQuery(entry.query) !== normalizedQuery);
+      if (filteredQueries.length === snapshot.queries.length) continue;
+      changedSnapshots++;
+      stmts().updateSnapshotQueries.run({
+        workspace_id: workspaceId,
+        date: snapshot.date,
+        queries: JSON.stringify(filteredQueries),
+      });
+    }
+    return changedSnapshots;
+  });
+  return run();
 }
 
 export function getRankHistory(
@@ -312,12 +407,14 @@ export function getRankHistory(
 ): { date: string; positions: Record<string, number> }[] {
   const snapshots = readSnapshots(workspaceId);
   const recent = snapshots.slice(-limit);
-  const config = readConfig(workspaceId);
+  // Wave 3c-iii-b: read tracked keywords through the TABLE-ONLY resolver.
+  // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
+  const trackedKeywords = resolveTrackedKeywords(workspaceId);
   const tracked = queryFilter
     ? queryFilter
         .map(query => ({ lookup: normalizeQuery(query), output: query.trim() }))
         .filter(query => query.lookup && query.output)
-    : config.trackedKeywords
+    : trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
       .map(k => ({ lookup: normalizeQuery(k.query), output: k.query }));
 
@@ -342,10 +439,12 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
   const previousByQuery = new Map(
     (prev?.queries ?? []).map(query => [normalizeQuery(query.query), query]),
   );
-  const config = readConfig(workspaceId);
-  const hasConfiguredKeywords = config.trackedKeywords.length > 0;
+  // Wave 3c-iii-b: read tracked keywords through the TABLE-ONLY resolver.
+  // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
+  const trackedKeywords = resolveTrackedKeywords(workspaceId);
+  const hasConfiguredKeywords = trackedKeywords.length > 0;
   const trackedEntries = new Map(
-    config.trackedKeywords
+    trackedKeywords
       .filter(k => (k.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE)
       .map(k => [normalizeQuery(k.query), k]),
   );

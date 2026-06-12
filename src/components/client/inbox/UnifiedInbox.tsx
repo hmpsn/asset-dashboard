@@ -2,22 +2,25 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge } from '../../ui';
+import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge, Badge } from '../../ui';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
+import { RequestsTab } from '../RequestsTab';
 import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
 import { normalizeDeliverable, isProjectedDeliverable } from '../../../lib/decision-adapters';
 import { useUnifiedInbox, useRespondToDeliverable, useApplyDeliverable } from '../../../hooks/client/useUnifiedInbox';
 import { useClientWorkOrderComments, usePostClientWorkOrderComment } from '../../../hooks/client/useWorkOrderConversation';
 import { isClientApplyableDeliverableBatch } from '../../../../shared/applyability';
+import type { InboxFilter } from './inbox-filter';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../../lib/wsEvents';
-import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateWorkspaceEventQueries } from '../../../lib/wsInvalidation';
 import type { ContentTabProps } from '../ContentTab';
+import type { ClientRequest } from '../types';
 import type { ClientDeliverable, DeliverableKind, DeliverableType } from '../../../../shared/types/client-deliverable';
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 
@@ -36,12 +39,16 @@ export type UnifiedInboxContentTabProps = Omit<
 type UnifiedInboxProps = UnifiedInboxContentTabProps & {
   workspaceId: string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  initialFilter?: InboxFilter;
   /**
    * Item 1 — the logged-in client user (or null for password-only portals). Threaded so the
    * "Submit a request" chooser can pre-fill the submitter on the free-form request form (matching
    * the legacy RequestsTab behavior). Optional → password-only portals show the "Your Name" field.
    */
   clientUser?: { id: string; name: string; email: string; role: string } | null;
+  requests: ClientRequest[];
+  requestsLoading: boolean;
+  loadRequests: (wsId: string) => void;
 };
 
 /**
@@ -70,6 +77,17 @@ function sectionForKind(kind: DeliverableKind): { section: PriorityItem['section
     default:
       return { section: 'decisions', icon: ListChecks };
   }
+}
+
+function hasConversationNote(note: string | null | undefined): boolean {
+  return typeof note === 'string' && note.trim().length > 0;
+}
+
+function sectionForDeliverable(d: ClientDeliverable): PriorityItem['section'] {
+  if (d.kind === 'review') return 'reviews';
+  if (d.kind === 'notification') return 'conversations';
+  if (hasConversationNote(d.note)) return 'conversations';
+  return 'decisions';
 }
 
 /** Human "Sent N days ago" age from the staleness clock (sentAt). */
@@ -142,9 +160,8 @@ function workOrderIdFromSourceRef(sourceRef: string | null): string | null {
 }
 
 /**
- * WorkOrderTrackCard — one read-only "Work in progress" track-lane card PLUS the client↔team
- * conversation thread + comment input (DARK; only reachable when UnifiedInbox renders, gated on the
- * `unified-inbox` flag).
+ * WorkOrderTrackCard — one read-only "Work in progress" track-lane card plus the client↔team
+ * conversation thread + comment input.
  *
  * VERB-FREE by contract: a work order is NOT a decision. There is NO approve / decline / apply /
  * review affordance — the conversation + the status stepper are the only client affordances. The
@@ -167,6 +184,11 @@ function WorkOrderTrackCard({
   // Count-only page summary — NEVER render raw payload.pageIds (raw Webflow ids).
   const rawPageIds = (d.payload as { pageIds?: unknown }).pageIds;
   const pageCount = Array.isArray(rawPageIds) ? rawPageIds.length : 0;
+  const commentCount = typeof d.commentCount === 'number' ? d.commentCount : null;
+  const commentCountLabel =
+    commentCount === null
+      ? null
+      : `${commentCount} comment${commentCount === 1 ? '' : 's'}`;
 
   const orderId = workOrderIdFromSourceRef(d.sourceRef);
   // Closed orders leave the lane (mirror → cancelled), so this card never renders for `closed`;
@@ -190,13 +212,23 @@ function WorkOrderTrackCard({
       className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
       style={{ borderRadius: 'var(--radius-signature-lg)' }}
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
         <span
           className={`inline-flex items-center gap-1.5 t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] border ${chip.bg} ${chip.border} ${chip.color}`}
         >
           <ChipIcon className={`w-3 h-3 ${chip.spin ? 'animate-spin' : ''}`} />
           {chip.label}
         </span>
+        {commentCountLabel && (
+          <Badge
+            tone="blue"
+            variant="soft"
+            shape="pill"
+            icon={MessageSquare}
+            label={commentCountLabel}
+            ariaLabel={`${commentCountLabel} on this work order`}
+          />
+        )}
       </div>
       {/* duplicate-heading-ok -- distinct section: the work-order TRACK-lane card title mirrors the "Ready to publish" card title intentionally (two separate sections, same card grammar) */}
       <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>
@@ -290,17 +322,26 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
 }
 
 /**
- * UnifiedInbox — the PR-2a unified client inbox (DARK behind the `unified-inbox` flag).
+ * UnifiedInbox — the canonical client inbox.
  *
  * Mounts the previously-orphaned `PriorityStrip` as the single prioritized "Needs your attention"
  * list, backed by the unified deliverables read endpoint, and renders one `DecisionCard` per
  * deliverable with uniform Approve / Request changes (+note) / Decline verbs that call the REAL
  * PATCH /respond endpoint. Mobile-sane (stacked cards, no wide tables).
  *
- * This component is only rendered when the flag is ON (InboxTab branches on it); the hook is
- * additionally flag-gated so the fetch never fires with the flag off.
+ * This component is rendered by InboxTab as the canonical client inbox; the hook is
+ * additionally keyed so deep-links can bias the initial section ordering.
  */
-export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabProps }: UnifiedInboxProps) {
+export function UnifiedInbox({
+  workspaceId,
+  setToast,
+  clientUser,
+  initialFilter,
+  requests,
+  requestsLoading,
+  loadRequests,
+  ...contentTabProps
+}: UnifiedInboxProps) {
   const queryClient = useQueryClient();
   // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
   // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
@@ -336,39 +377,29 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
   // elsewhere (tests/integration/broadcast-handler-pairs.test.ts stays green).
   const wsHandlers = useMemo(
     () => {
-      const invalidateInbox = () =>
-        queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
+      const invalidateInbox = (eventName: typeof WS_EVENTS[keyof typeof WS_EVENTS], data?: unknown) =>
+        invalidateWorkspaceEventQueries(queryClient, eventName, workspaceId, data, 'client-unified-inbox');
       return {
         // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-        [WS_EVENTS.DELIVERABLE_SENT]: invalidateInbox,
+        [WS_EVENTS.DELIVERABLE_SENT]: () => invalidateInbox(WS_EVENTS.DELIVERABLE_SENT),
         // ws-invalidation-ok — client unified-inbox key differs from any admin deliverable key
-        [WS_EVENTS.DELIVERABLE_UPDATED]: invalidateInbox,
+        [WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateInbox(WS_EVENTS.DELIVERABLE_UPDATED),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.COPY_SECTION_UPDATED]: invalidateInbox,
+        [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateInbox(WS_EVENTS.COPY_SECTION_UPDATED),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateInbox,
+        [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => invalidateInbox(WS_EVENTS.CONTENT_REQUEST_UPDATE),
         // ws-invalidation-ok — client unified-inbox key differs from any admin copy/content key
-        [WS_EVENTS.POST_UPDATED]: invalidateInbox,
+        [WS_EVENTS.POST_UPDATED]: () => invalidateInbox(WS_EVENTS.POST_UPDATED),
         // Work-order status change: on close-out the PATCH→closed broadcasts WORK_ORDER_UPDATE
         // and the mirror flips the deliverable to `cancelled` → it leaves the inbox lane. Without
         // this the client card lingers until another event. The same broadcast also covers
         // mark-complete transitions that change the card's verbs.
         // ws-invalidation-ok — client unified-inbox key differs from any admin work-order key
-        [WS_EVENTS.WORK_ORDER_UPDATE]: invalidateInbox,
+        [WS_EVENTS.WORK_ORDER_UPDATE]: () => invalidateInbox(WS_EVENTS.WORK_ORDER_UPDATE),
         // Work-order conversation: a team reply (or the client's own post echoed) — refresh the
         // commented order's thread so the client sees replies live. The payload carries { id: orderId }.
         // ws-invalidation-ok — client work-order-comment thread key differs from any admin key
-        [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => {
-          const orderId = typeof data === 'object' && data !== null && 'id' in data
-            ? String((data as { id: unknown }).id)
-            : undefined;
-          if (orderId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderComments(workspaceId, orderId) });
-          } else {
-            queryClient.invalidateQueries({ queryKey: queryKeys.client.workOrderCommentsAll(workspaceId) });
-          }
-          invalidateInbox();
-        },
+        [WS_EVENTS.WORK_ORDER_COMMENT]: (data: unknown) => invalidateInbox(WS_EVENTS.WORK_ORDER_COMMENT, data),
       };
     },
     [queryClient, workspaceId],
@@ -407,6 +438,23 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
     [deliverables, detailId],
   );
 
+  const selectedFilter = initialFilter ?? 'all';
+  const sectionIsVisible = (section: InboxFilter) =>
+    selectedFilter === 'all' || selectedFilter === section;
+
+  const decisionDeliverables = useMemo(
+    () => actionable.filter((d) => sectionForDeliverable(d) === 'decisions'),
+    [actionable],
+  );
+  const reviewDeliverables = useMemo(
+    () => actionable.filter((d) => sectionForDeliverable(d) === 'reviews'),
+    [actionable],
+  );
+  const conversationDeliverables = useMemo(
+    () => actionable.filter((d) => sectionForDeliverable(d) === 'conversations'),
+    [actionable],
+  );
+
   const handleRespond = async (
     d: ClientDeliverable,
     decision: 'approved' | 'changes_requested' | 'declined',
@@ -424,7 +472,7 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           decision === 'approved'
             ? heldCount > 0
               ? `Approved. ${heldCount} item${heldCount === 1 ? '' : 's'} held for your team to review.`
-              : 'Approved. Your team will handle the rest.'
+              : "Approved. We're publishing this. Track it in your inbox."
             : decision === 'declined'
               ? 'Declined. Your team has been notified.'
               : 'Feedback sent to your team.',
@@ -482,7 +530,8 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
   };
 
   const priorityItems: PriorityItem[] = actionable.map((d) => {
-    const { section, icon } = sectionForKind(d.kind);
+    const { icon } = sectionForKind(d.kind);
+    const section = sectionForDeliverable(d);
     return {
       id: d.id,
       icon,
@@ -494,7 +543,53 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       },
     };
-  });
+  }).filter((item) => sectionIsVisible(item.section));
+
+  const renderActionableDeliverable = (d: ClientDeliverable) => {
+    const decision: NormalizedDecision = normalizeDeliverable(d);
+    const projected = isProjectedDeliverable(d.type);
+    const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
+
+    return (
+      <div key={d.id} id={`unified-decision-${d.id}`}>
+        {inlineApproval ? (
+          <InlineApprovalCard
+            decision={decision}
+            ageLabel={ageLabel(d.sentAt)}
+            submitting={submittingId === d.id}
+            editable={editable}
+            onApprove={(f, e) => void handleRespond(d, 'approved', undefined, f, e)}
+            onRequestChanges={(n) => void handleRespond(d, 'changes_requested', n || undefined)}
+            onDecline={(n) => void handleRespond(d, 'declined', n || undefined)}
+          />
+        ) : (
+          <DecisionCard
+            decision={decision}
+            uniformVerbs
+            submitting={submittingId === d.id}
+            ageLabel={ageLabel(d.sentAt)}
+            onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
+            onOpen={projected ? () => {} : () => setDetailId(d.id)}
+            onApprove={
+              projected || submittingId === d.id
+                ? undefined
+                : () => void handleRespond(d, 'approved')
+            }
+            onFlagWithNote={
+              projected || submittingId === d.id
+                ? undefined
+                : (note) => void handleRespond(d, 'changes_requested', note || undefined)
+            }
+            onDecline={
+              projected || submittingId === d.id
+                ? undefined
+                : (note) => void handleRespond(d, 'declined', note || undefined)
+            }
+          />
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return <LoadingState message="Loading your inbox items..." size="lg" />;
@@ -530,70 +625,41 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           queue with items in Ready-to-publish or Work-in-progress must NOT show the banner above them. */}
       <PriorityStrip
         items={priorityItems}
-        showAllCaughtUp={readyToApply.length === 0 && workOrders.length === 0}
+        showAllCaughtUp={
+          priorityItems.length === 0 &&
+          (!sectionIsVisible('decisions') || readyToApply.length === 0) &&
+          (!sectionIsVisible('decisions') || workOrders.length === 0) &&
+          (!sectionIsVisible('conversations') || requests.length === 0)
+        }
       />
 
-      {actionable.length > 0 && (
+      {sectionIsVisible('decisions') && decisionDeliverables.length > 0 && (
         <section aria-label="Decisions" className="space-y-3">
           <SectionHeading title="Decisions" subtitle="Items waiting on your decision" />
-          {actionable.map((d) => {
-            const decision: NormalizedDecision = normalizeDeliverable(d);
-            // Projected (copy_section / content_request): render a "Review →" CTA that opens the
-            // bespoke review surface IN-SHELL (ProjectedReviewModal) instead of the uniform write
-            // verbs (which /respond → PK lookup → 404 for a projected id). Respond goes through the
-            // bespoke copy-pipeline / content-request / posts routes the mounted surface calls; the
-            // unified /respond is never reached for projected items. Read `type`/`externalRef` off
-            // the RAW deliverable `d` — normalizeDeliverable drops both.
-            const projected = isProjectedDeliverable(d.type);
-            // ISSUE 1c — the approval family (typed items[]) renders its substance INLINE via
-            // InlineApprovalCard (no modal). This predicate captures EXACTLY that family: a
-            // non-projected batch-kind deliverable carrying typed items. It excludes client_action
-            // (empty d.items), content_decay (kind:'decision'), projected (copy/content_request), and
-            // schema_plan (kind:'review'). Those keep the DecisionCard path (uniformVerbs / onReview /
-            // onOpen→modal) unchanged.
-            const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
-            return (
-              <div key={d.id} id={`unified-decision-${d.id}`}>
-                {inlineApproval ? (
-                  <InlineApprovalCard
-                    decision={decision}
-                    ageLabel={ageLabel(d.sentAt)}
-                    submitting={submittingId === d.id}
-                    editable={editable}
-                    onApprove={(f, e) => void handleRespond(d, 'approved', undefined, f, e)}
-                    onRequestChanges={(n) => void handleRespond(d, 'changes_requested', n || undefined)}
-                    onDecline={(n) => void handleRespond(d, 'declined', n || undefined)}
-                  />
-                ) : (
-                  <DecisionCard
-                    decision={decision}
-                    uniformVerbs
-                    ageLabel={ageLabel(d.sentAt)}
-                    onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
-                    // "View N →" opens the detail modal (substance + per-item review). Projected
-                    // deliverables render the read-only "Review →" deep-link instead of "View N", so
-                    // this is never reached for them (no-op kept for the required prop contract).
-                    onOpen={projected ? () => {} : () => setDetailId(d.id)}
-                    onApprove={
-                      projected || submittingId === d.id
-                        ? undefined
-                        : () => void handleRespond(d, 'approved')
-                    }
-                    onFlagWithNote={
-                      projected || submittingId === d.id
-                        ? undefined
-                        : (note) => void handleRespond(d, 'changes_requested', note || undefined)
-                    }
-                    onDecline={
-                      projected || submittingId === d.id
-                        ? undefined
-                        : (note) => void handleRespond(d, 'declined', note || undefined)
-                    }
-                  />
-                )}
-              </div>
-            );
-          })}
+          {decisionDeliverables.map(renderActionableDeliverable)}
+        </section>
+      )}
+
+      {sectionIsVisible('reviews') && reviewDeliverables.length > 0 && (
+        <section aria-label="Reviews" className="space-y-3">
+          <SectionHeading title="Reviews" subtitle="Items ready for your review" />
+          {reviewDeliverables.map(renderActionableDeliverable)}
+        </section>
+      )}
+
+      {sectionIsVisible('conversations') && (conversationDeliverables.length > 0 || requests.length > 0 || requestsLoading) && (
+        <section aria-label="Conversations" className="space-y-3">
+          <SectionHeading title="Conversations" subtitle="Ongoing threads with your team" />
+          {conversationDeliverables.map(renderActionableDeliverable)}
+          <RequestsTab
+            embedded
+            workspaceId={workspaceId}
+            requests={requests}
+            requestsLoading={requestsLoading}
+            clientUser={clientUser ?? null}
+            loadRequests={loadRequests}
+            setToast={setToast}
+          />
         </section>
       )}
 
@@ -602,7 +668,9 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           actionable. Guard on the actionable queue, the order track lane, AND the "Ready to publish"
           lane being empty — matching the F2 PriorityStrip guard, so the line never renders above a
           populated "Ready to publish" section (same false-empty class). */}
-      {actionable.length === 0 && workOrders.length === 0 && readyToApply.length === 0 && (
+      {priorityItems.length === 0 &&
+        (!sectionIsVisible('conversations') || requests.length === 0) &&
+        (!sectionIsVisible('decisions') || (workOrders.length === 0 && readyToApply.length === 0)) && (
         <div className="flex items-center gap-3 px-4 py-3 t-caption text-[var(--brand-text-muted)]">
           <Inbox size={16} className="flex-shrink-0" />
           <span>Nothing needs your attention right now. New items will appear here.</span>
@@ -613,7 +681,7 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           "Apply to Website" step (a separate step AFTER approve — `approved` is NOT actionable so
           this is a distinct surface). Faithfully replicates the legacy ApprovalBatchCard footer
           (keep the approved card visible with an Apply button gated on the applyability predicate). */}
-      {readyToApply.length > 0 && (
+      {sectionIsVisible('decisions') && readyToApply.length > 0 && (
         <section aria-label="Ready to publish" className="space-y-3">
           <SectionHeading title="Ready to publish" subtitle="Approved — apply to your live site" />
           {readyToApply.map((d) => (
@@ -661,7 +729,7 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           Page targets are shown count-only — the raw payload.pageIds are raw Webflow ids and are never
           surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors the R3b "Ready to publish"
           container (surface-2 + brand signature radius). */}
-      {workOrders.length > 0 && (
+      {sectionIsVisible('decisions') && workOrders.length > 0 && (
         <section aria-label="Work in progress" className="space-y-3">
           <SectionHeading title="Work in progress" subtitle="Work your team is doing for you" />
           {workOrders.map((d) => (
@@ -733,6 +801,10 @@ export function UnifiedInbox({ workspaceId, setToast, clientUser, ...contentTabP
           onDismiss={() => setChooserOpen(false)}
           setPricingModal={contentTabProps.setPricingModal}
           pricingConfirming={contentTabProps.pricingConfirming}
+          briefPrice={contentTabProps.briefPrice}
+          fullPostPrice={contentTabProps.fullPostPrice}
+          fmtPrice={contentTabProps.fmtPrice}
+          hidePrices={contentTabProps.hidePrices}
         />
       )}
     </div>

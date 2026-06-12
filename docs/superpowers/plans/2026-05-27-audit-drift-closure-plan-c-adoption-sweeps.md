@@ -157,13 +157,13 @@ npx vitest run tests/unit/format*.test.ts tests/unit/timeago.test.ts tests/unit/
 
 **Owns:**
 
-- Retire `server/db/json-column.ts:parseJsonColumn` in favor of `server/db/json-validation.ts:parseJsonFallback`. Migrate any callers, delete the module.
-- Collapse `titleCaseWord` (`server/insight-enrichment.ts:37`), `capitalize` (`server/schema/data-sources.ts:146`), `capitalizeSlugSegment` (`server/schema/data-sources.ts:324`) into one `capitalizeWord` in `server/helpers.ts`.
-- Collapse `compact()` siblings in `server/keyword-strategy-context.ts:36` and `server/keyword-strategy-ux.ts:85` into `server/keyword-strategy-utils.ts` (new or existing).
+- Completed 2026-06-04: retire `server/db/json-column.ts` in favor of `server/db/json-validation.ts`.
+- Completed 2026-06-04: collapse title-casing helpers into `capitalizeWord` in `server/utils/strings.ts` and `src/utils/strings.ts`.
+- Completed 2026-06-04: collapse `compact()` siblings in `server/keyword-strategy-context.ts` and `server/keyword-strategy-ux.ts` into `server/utils/collections.ts:compactStrings`.
 - Migrate inline `setTimeout` debounces (`KeywordCommandCenter.tsx:116-131`, `useAutoSave.ts`, `ui/overlay/Tooltip.tsx:110`) onto `useDebouncedValue` from Task 1. Note `useAutoSave` may keep its own implementation if shared-timer contract differs — audit before migrating.
 - Add `daysSince(iso)` callers: `schema/SchemaPageCard.tsx:95`, `client/Briefing/WinsSurface.tsx:32`.
 - Parity-fix `quickWins` shape: `public-content.ts:216-221` should return the same fields the admin route does (or, if that's privacy-sensitive, document the deliberate omission and add a pr-check rule preventing accidental field bypasses).
-- Promote `sleep(ms)` to `server/helpers.ts` from `server/local-seo.ts:156`.
+- Completed 2026-06-04: promote `sleep(ms)` to `server/helpers.ts` from `server/local-seo.ts`.
 
 ---
 

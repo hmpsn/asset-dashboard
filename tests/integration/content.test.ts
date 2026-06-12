@@ -19,10 +19,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13203);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 const testWsId = 'ws_integ_content_' + Date.now();
@@ -261,6 +261,37 @@ describe('Content Posts API', () => {
     expect(body.status).toBe('review');
   });
 
+  it('PATCH /api/content-posts/:wsId/:postId preserves trusted admin TipTap HTML exactly', async () => {
+    const adminHtmlPostId = 'post_admin_tiptap_html_' + Date.now();
+    const adminHtmlBriefId = 'brief_admin_tiptap_html_' + Date.now();
+    seedBrief(adminHtmlBriefId);
+    seedPost(adminHtmlPostId, adminHtmlBriefId);
+
+    const introduction = '<p data-type="lead"><span style="color: #0f766e">Admin intro</span></p>';
+    const sectionContent = '<div data-node-view-wrapper=""><p><span style="font-weight: 700">Exact section</span></p></div>';
+    const conclusion = '<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">Exact outro</a></p>';
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${adminHtmlPostId}`, {
+      introduction,
+      sections: [
+        {
+          index: 0,
+          heading: '<strong>Plain Heading</strong>',
+          content: sectionContent,
+          wordCount: 2,
+        },
+      ],
+      conclusion,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.introduction).toBe(introduction);
+    expect(body.sections[0].content).toBe(sectionContent);
+    expect(body.sections[0].heading).toBe('Plain Heading');
+    expect(body.conclusion).toBe(conclusion);
+  });
+
   it('PATCH /api/content-posts/:wsId/:postId rejects arbitrary statuses without mutating', async () => {
     const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
     const before = await beforeRes.json();
@@ -477,7 +508,10 @@ describe('Content Posts API', () => {
     const res = await postJson(`/api/content-posts/${testWsId}/generate`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('briefId required');
+    // The validate() middleware prefixes the failing field path onto the message
+    // ("briefId: briefId required"). The 400-on-missing-briefId contract still stands;
+    // only the wording gained the field prefix.
+    expect(body.error).toBe('briefId: briefId required');
   });
 
   it('POST /api/content-posts/:wsId/generate rejects invalid generationStyle', async () => {

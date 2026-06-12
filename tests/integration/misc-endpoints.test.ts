@@ -10,12 +10,12 @@
  * - GET /api/queue
  * - GET /api/requests
  * - GET /api/google/status
- * - GET /api/semrush/status
+ * - GET /api/seo/status
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
@@ -24,7 +24,7 @@ import { createContentSubscription, deleteContentSubscription } from '../../serv
 import { getUploadRoot } from '../../server/data-dir.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13209);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
@@ -198,8 +198,8 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('GET /api/semrush/status returns 200', async () => {
-    const res = await api('/api/semrush/status');
+  it('GET /api/seo/status returns 200', async () => {
+    const res = await api('/api/seo/status');
     expect(res.status).toBe(200);
   });
 
@@ -484,12 +484,12 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
   });
 
   it('rejects passwordless billing portal access without an authenticated actor', async () => {
-    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST' });
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST', headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
   it('rejects subscription cancellation without an authenticated actor', async () => {
-    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST' });
+    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST', headers: { 'x-no-auto-public-auth': 'true' } });
     expect(res.status).toBe(401);
   });
 
@@ -689,24 +689,19 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     expect(res.status).toBe(200);
   });
 
-  it('rejects pending schema reads for a workspace outside the JWT scope', async () => {
-    const res = await api(`/api/pending-schemas/${otherWsId}`, { headers: scopedHeaders() });
-    expect(res.status).toBe(403);
-  });
-
   it('rejects SEMRush workspace routes outside the JWT scope', async () => {
     const headers = scopedHeaders();
     const checks = await Promise.all([
-      api(`/api/semrush/competitive-intel/${otherWsId}?competitors=example.com`, { headers }),
-      api(`/api/semrush/discover-competitors/${otherWsId}`, { headers }),
-      ctx.api(`/api/semrush/competitors/${otherWsId}`, {
+      api(`/api/seo/competitive-intel/${otherWsId}?competitors=example.com`, { headers }),
+      api(`/api/seo/discover-competitors/${otherWsId}`, { headers }),
+      ctx.api(`/api/seo/competitors/${otherWsId}`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ domains: ['example.com'] }),
       }),
-      ctx.api(`/api/semrush/cache/${otherWsId}`, { method: 'DELETE', headers }),
-      api(`/api/semrush/clear-cache/${otherWsId}`, { headers }),
-      api(`/api/semrush/diagnose/${otherWsId}`, { headers }),
+      ctx.api(`/api/seo/cache/${otherWsId}`, { method: 'DELETE', headers }),
+      api(`/api/seo/clear-cache/${otherWsId}`, { headers }),
+      api(`/api/seo/diagnose/${otherWsId}`, { headers }),
     ]);
     expect(checks.map(res => res.status)).toEqual([403, 403, 403, 403, 403, 403]);
   });

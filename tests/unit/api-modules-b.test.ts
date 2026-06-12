@@ -54,6 +54,7 @@ import {
   contentPosts,
   contentRequests,
   publicContent,
+  publicCopyReview,
   publicPostReview,
   contentTemplates,
   contentMatrices,
@@ -372,6 +373,51 @@ describe('publicContent.briefPreview', () => {
   });
 });
 
+describe('publicContent.exportBrief', () => {
+  it('calls getText with public content-brief export endpoint', async () => {
+    await publicContent.exportBrief('ws-1', 'brief-1');
+    expect(mockGetText).toHaveBeenCalledWith('/api/public/content-brief/ws-1/brief-1/export');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// src/api/content.ts — publicCopyReview
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('publicCopyReview.entries', () => {
+  it('calls GET with public copy entries endpoint', async () => {
+    await publicCopyReview.entries('ws-1');
+    expect(mockGet).toHaveBeenCalledWith('/api/public/copy/ws-1/entries');
+  });
+});
+
+describe('publicCopyReview.sections', () => {
+  it('calls GET with public copy sections endpoint', async () => {
+    await publicCopyReview.sections('ws-1', 'entry-1');
+    expect(mockGet).toHaveBeenCalledWith('/api/public/copy/ws-1/entry/entry-1/sections');
+  });
+});
+
+describe('publicCopyReview.approveSection', () => {
+  it('calls post with approve endpoint', async () => {
+    await publicCopyReview.approveSection('ws-1', 'section-1');
+    expect(mockPost).toHaveBeenCalledWith('/api/public/copy/ws-1/section/section-1/approve');
+  });
+});
+
+describe('publicCopyReview.suggestEdit', () => {
+  it('calls post with original and suggested text', async () => {
+    await publicCopyReview.suggestEdit('ws-1', 'section-1', {
+      originalText: 'Old text',
+      suggestedText: 'New text',
+    });
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/public/copy/ws-1/section/section-1/suggest',
+      { originalText: 'Old text', suggestedText: 'New text' },
+    );
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // src/api/content.ts — publicPostReview
 // ═══════════════════════════════════════════════════════════════════════════
@@ -635,8 +681,15 @@ describe('siteArchitecture.schemaCoverage', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('llmsTxt.generate', () => {
-  it('calls GET with workspaceId in path', async () => {
+  it('POSTs the async generate endpoint (C2 jobs migration; returns { jobId })', async () => {
     await llmsTxt.generate('ws-1');
+    expect(mockPost).toHaveBeenCalledWith('/api/llms-txt/ws-1/generate', {});
+  });
+});
+
+describe('llmsTxt.getLast', () => {
+  it('GETs the stored result without re-generating', async () => {
+    await llmsTxt.getLast('ws-1');
     expect(mockGet).toHaveBeenCalledWith('/api/llms-txt/ws-1');
   });
 });
@@ -1159,11 +1212,14 @@ describe('copyReview.sendEntryToClientReview', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('copyBatch.start', () => {
-  it('calls post on batch endpoint with entryIds', async () => {
+  it('starts a background copy batch job with entryIds', async () => {
     await copyBatch.start('ws-1', 'bp-1', { entryIds: ['e1', 'e2'], mode: 'full' });
     expect(mockPost).toHaveBeenCalledWith(
-      '/api/copy/ws-1/bp-1/batch',
-      { entryIds: ['e1', 'e2'], mode: 'full' },
+      '/api/jobs',
+      {
+        type: 'copy-batch-generation',
+        params: { workspaceId: 'ws-1', blueprintId: 'bp-1', entryIds: ['e1', 'e2'], mode: 'full' },
+      },
     );
   });
 });

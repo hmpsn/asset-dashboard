@@ -12,14 +12,14 @@
  * fetches it; the read itself is inert until cutover). It is exercised here with seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
-const ctx = createTestContext(13875); // port-ok: next free after 13874
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let pwless: SeededFullWorkspace;
 let pw: SeededFullWorkspace;
@@ -236,7 +236,9 @@ describe('GET /api/public/deliverables/:workspaceId — projected content_reques
 
 describe('GET /api/public/deliverables/:workspaceId — auth', () => {
   it('401s unauthenticated on a password-protected workspace', async () => {
-    const res = await ctx.api(listUrl(pw.workspaceId));
+    const res = await ctx.api(listUrl(pw.workspaceId), {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 });

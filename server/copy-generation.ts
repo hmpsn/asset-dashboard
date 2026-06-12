@@ -2,24 +2,20 @@
 // 8-layer context assembly and AI copy generation engine for the Copy Pipeline.
 
 import { createLogger } from './logger.js';
-import { stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listDeliverables } from './brand-identity.js';
 import { listBrandscripts } from './brandscript.js';
-import { generateBrief, getPageTypeConfig } from './content-brief.js';
+import { generateBrief, getBrief, getPageTypeConfig } from './content-brief.js';
 import { getBlueprint, getEntry, listBlueprints } from './page-strategy.js';
+import { buildSeoPromptBlocks } from './intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
-  formatKeywordsForPrompt,
-  formatPersonasForPrompt,
-  formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import { getActivePatterns } from './copy-intelligence.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';
 import { BRAND_CONTEXT_HIERARCHY, getPageTypeCopyContract } from './page-type-copy-contract.js';
-import { parseJsonFallback } from './db/json-validation.js';
 import db from './db/index.js';
 import {
   initializeSections,
@@ -28,7 +24,8 @@ import {
   addSteeringEntry,
   getSectionsForEntry,
 } from './copy-review.js';
-import type { CopySection, CopyMetadata, QualityFlag, GeneratedPageCopy } from '../shared/types/copy-pipeline.js';
+import { parseGeneratedPageCopy, parseRegeneratedSectionCopy } from './schemas/ai-copy-generation.js';
+import type { CopySection, CopyMetadata, QualityFlag } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem, SiteBlueprint, BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 import { isProgrammingError } from './errors.js';
@@ -104,6 +101,7 @@ ${context}`;
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAI({
+    operation: 'copy-generation',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     maxTokens: 8000,
@@ -113,14 +111,13 @@ ${context}`;
     workspaceId: wsId,
   });
 
-  // Parse response — callAnthropic returns { text, ... }
-  const cleaned = stripCodeFences(response.text).trim();
-  const generated = parseJsonFallback<GeneratedPageCopy | null>(cleaned, null);
-  if (!generated || !Array.isArray(generated.sections)) {
-    log.error({ entryId, blueprintId }, 'Failed to parse generation response');
+  let generated;
+  try {
+    generated = parseGeneratedPageCopy(response.text);
+  } catch (err) {
+    log.error({ err, entryId, blueprintId }, 'Failed to parse generation response');
     throw new Error('Copy generation failed: invalid AI response format');
   }
-
   // AI call succeeded — now initialize sections and save in a single transaction.
   // Deferred initialization prevents data loss: if the AI call above fails,
   // previously approved copy is preserved.
@@ -185,8 +182,9 @@ export async function regenerateSection(
     resultVersion: targetSection.version,
   });
 
-  // Build targeted regeneration prompt
-  const context = await buildCopyGenerationContext(wsId, blueprint, entry);
+  // Build targeted regeneration prompt — skip brief enrichment (a single-section
+  // steer doesn't need a full brief read/generation; the steering note is the context).
+  const context = await buildCopyGenerationContext(wsId, blueprint, entry, undefined, { skipBriefEnrichment: true });
   const baseInstructions = `You are regenerating a single section of website copy based on steering feedback.
 
 Section type: ${sectionPlanItem.sectionType}
@@ -205,6 +203,7 @@ ${context}`;
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAI({
+    operation: 'copy-regeneration',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     maxTokens: 2000,
@@ -214,13 +213,11 @@ ${context}`;
     workspaceId: wsId,
   });
 
-  const regenCleaned = stripCodeFences(response.text).trim();
-  const result = parseJsonFallback<{ copy: string; annotation: string; reasoning: string } | null>(
-    regenCleaned,
-    null,
-  );
-  if (!result || !result.copy) {
-    log.error({ sectionId }, 'Failed to parse regeneration response');
+  let result;
+  try {
+    result = parseRegeneratedSectionCopy(response.text);
+  } catch (err) {
+    log.error({ err, sectionId }, 'Failed to parse regeneration response');
     return null;
   }
 
@@ -354,6 +351,7 @@ export async function buildCopyGenerationContext(
   blueprint: SiteBlueprint,
   entry: BlueprintEntry,
   accumulatedSteering?: string[],
+  opts?: { skipBriefEnrichment?: boolean },
 ): Promise<string> {
   const parts: string[] = [];
 
@@ -435,11 +433,29 @@ export async function buildCopyGenerationContext(
   parts.push(`PAGE STRATEGY:\n${strategyParts.join('\n')}`);
 
   // ── Layer 4.5: Brief enrichment ──
-  if (entry.primaryKeyword) {
+  // Section regenerate (a ~150-word tweak steered by a note) skips this entirely —
+  // the steering note + section plan is sufficient context, and a full brief read/gen
+  // here is pure waste (2026-06-09 audit #6).
+  if (entry.primaryKeyword && !opts?.skipBriefEnrichment) {
     try {
-      const brief = await generateBrief(wsId, entry.primaryKeyword, {
-        pageType: entry.pageType,
-      }, { persist: false });
+      // Reuse the persisted brief the blueprint auto-brief step already created
+      // (entry.briefId → getBrief) instead of regenerating a 7000-token research-mode
+      // brief on every copy generation. Fall back to generation when the entry has no
+      // brief, the FK is stale, OR the brief was built for a DIFFERENT keyword — the
+      // entry-update route changes primary_keyword and brief_id independently, so a
+      // keyword edit leaves briefId pointing at a brief for the old keyword; reusing it
+      // would feed a mismatched brief into a prompt whose PAGE STRATEGY shows the new
+      // keyword (silently-wrong copy). The old path always regenerated for the current
+      // keyword, so this guard preserves that correctness. NOTE: reuse freezes
+      // enrichment at blueprint-creation time rather than copy time — the intended
+      // optimization tradeoff.
+      const persistedCandidate = entry.briefId ? getBrief(wsId, entry.briefId) : undefined;
+      const sameKeyword = persistedCandidate
+        && persistedCandidate.targetKeyword.trim().toLowerCase() === entry.primaryKeyword.trim().toLowerCase();
+      const brief = (sameKeyword ? persistedCandidate : undefined)
+        ?? await generateBrief(wsId, entry.primaryKeyword, {
+          pageType: entry.pageType,
+        }, { persist: false });
       const briefLines: string[] = [];
       if (brief.suggestedTitle) briefLines.push(`Suggested title: ${brief.suggestedTitle}`);
       if (brief.executiveSummary) briefLines.push(`Executive summary: ${brief.executiveSummary}`);
@@ -498,14 +514,12 @@ export async function buildCopyGenerationContext(
     const seoSlice = intel.seoContext;
     if (seoSlice) {
       const seoParts: string[] = [];
-      const keywordBlock = formatKeywordsForPrompt(seoSlice);
-      if (keywordBlock.trim()) seoParts.push(keywordBlock);
-      if (seoSlice.effectiveBrandVoiceBlock.trim()) seoParts.push(seoSlice.effectiveBrandVoiceBlock);
+      const seoBlocks = buildSeoPromptBlocks(seoSlice, { includePageMap: false });
+      if (seoBlocks.keywordBlock.trim()) seoParts.push(seoBlocks.keywordBlock);
+      if (seoBlocks.brandVoiceBlock.trim()) seoParts.push(seoBlocks.brandVoiceBlock);
       if (seoSlice.businessContext.trim()) seoParts.push(`Business context: ${seoSlice.businessContext}`);
-      const personasBlock = formatPersonasForPrompt(seoSlice.personas);
-      if (personasBlock.trim()) seoParts.push(personasBlock);
-      const knowledgeBlock = formatKnowledgeBaseForPrompt(seoSlice.knowledgeBase);
-      if (knowledgeBlock.trim()) seoParts.push(knowledgeBlock);
+      if (seoBlocks.personasBlock.trim()) seoParts.push(seoBlocks.personasBlock);
+      if (seoBlocks.knowledgeBlock.trim()) seoParts.push(seoBlocks.knowledgeBlock);
       if (seoParts.length > 0) {
         parts.push(`SEO INTELLIGENCE:\n${seoParts.join('\n\n')}`);
       }

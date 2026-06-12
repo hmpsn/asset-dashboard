@@ -41,7 +41,7 @@ import keywordStrategyRoutes from './routes/keyword-strategy.js';
 import keywordCommandCenterRoutes from './routes/keyword-command-center.js';
 import localSeoRoutes from './routes/local-seo.js';
 import eeatAssetsRoutes from './routes/eeat-assets.js';
-import semrushRoutes from './routes/semrush.js';
+import seoProviderRoutes from './routes/seo-provider.js';
 import approvalsRoutes from './routes/approvals.js';
 import requestsRoutes from './routes/requests.js';
 import activityRoutes from './routes/activity.js';
@@ -89,7 +89,6 @@ import copyPipelineRoutes from './routes/copy-pipeline.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
 import briefingRoutes from './routes/briefing.js';
 import { registerProvider } from './seo-data-provider.js';
-import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
 import { FakeSeoProvider } from './providers/fake-seo-provider.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
@@ -101,19 +100,12 @@ import mcpRouter from './mcp/index.js';
 // ─── Register SEO data providers ───
 if (isLocalFakeProviderModeEnabled()) {
   const fakeProvider = new FakeSeoProvider();
-  registerProvider('semrush', fakeProvider);
   registerProvider('dataforseo', fakeProvider);
   log.warn('LOCAL_FAKE_PROVIDERS enabled: registering fake SEO providers for local onboarding');
 } else {
-  registerProvider('semrush', new SemrushProvider());
   const dfsProv = new DataForSeoProvider();
   registerProvider('dataforseo', dfsProv);
-  // Skip the billable probe in test mode — integration tests that import app.ts must not
-  // trigger real API calls against DataForSEO even if CI env has DATAFORSEO_LOGIN set.
-  // Unit tests call provider.init() directly to exercise the probe logic with mocked fetch.
-  if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-    dfsProv.init().catch((err: unknown) => log.warn({ err }, 'DataForSEO capability probe failed'));
-  }
+  dfsProv.init?.().catch((err: unknown) => log.warn({ err }, 'DataForSEO init failed'));
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -274,6 +266,16 @@ export function createApp(): express.Express {
     const workspaceId = parts[4];
     if (!workspaceId) return next();
     const ws = getWorkspace(workspaceId);
+    if (ws?.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+      return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+    }
+    // Advance-only defense-in-depth: this global gate does NOT reject
+    // passwordless workspaces — it only advances them to the route. As of E3
+    // (passwordless portal closure) the per-route requireClientPortalAuth /
+    // requireAuthenticatedClientPortalAuth middleware is the real backstop and
+    // returns 401 for passwordless portals. Do NOT rely on this gate alone for a
+    // new public route — add a per-route guard (enforced by the pr-check rule
+    // "Public route under /api/public/ missing client-portal auth middleware").
     if (!ws || !ws.clientPassword) return next();
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();
@@ -307,7 +309,7 @@ export function createApp(): express.Express {
   app.use(keywordCommandCenterRoutes);
   app.use(localSeoRoutes);
   app.use(eeatAssetsRoutes);
-  app.use(semrushRoutes);
+  app.use(seoProviderRoutes);
   app.use(approvalsRoutes);
   registerPublicRoutes(app);
   app.use(requestsRoutes);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dedupeBy, dedupeByNormalizedKeyword, uniqStrings } from '../../server/utils/collections.js';
+import { compactStrings, dedupeBy, dedupeByNormalizedKeyword, uniqStrings } from '../../server/utils/collections.js';
 
 describe('dedupeBy', () => {
   it('removes duplicates by key', () => {
@@ -57,5 +57,15 @@ describe('uniqStrings', () => {
 
   it('returns empty array for empty input', () => {
     expect(uniqStrings([])).toEqual([]);
+  });
+});
+
+describe('compactStrings', () => {
+  it('trims strings and removes empty values', () => {
+    expect(compactStrings([' one ', '', '  ', 'two'])).toEqual(['one', 'two']);
+  });
+
+  it('drops nullish and false values', () => {
+    expect(compactStrings(['one', null, undefined, false, 'two'])).toEqual(['one', 'two']);
   });
 });

@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { post, getOptional, ApiError } from '../api/client';
+import type { ChatLimitErrorResponse, ChatUsageResponse, ClientSearchChatResponse } from '../../shared/types/usage';
 import type {
   SearchOverview, PerformanceTrend, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary,
@@ -7,6 +9,23 @@ import type {
   SearchComparison, GA4Comparison, GA4NewVsReturning, GA4OrganicOverview,
 } from '../components/client/types';
 import type { Tier } from '../components/ui';
+import { useClientChatUsage } from './client/useClientChatUsage';
+import { queryKeys } from '../lib/queryKeys';
+import type { ClientTab } from '../routes';
+
+/**
+ * Tab values the server chat endpoint accepts as the `currentTab` hint — a
+ * mirror of `CLIENT_CHAT_TAB_HINTS` in server/routes/public-analytics.ts. The
+ * server validates with `z.enum(...).optional()`, so a PRESENT-but-unknown
+ * value rejects the WHOLE request with a 400. This set is the two-halves
+ * contract's receiving guard: send `currentTab` only when it's a known hint,
+ * so a future ClientTab value not yet accepted by the server degrades to an
+ * omitted hint instead of breaking chat. Keep in sync with the server enum.
+ */
+const CHAT_TAB_HINTS = new Set<ClientTab>([
+  'overview', 'performance', 'search', 'health', 'strategy', 'analytics',
+  'inbox', 'approvals', 'requests', 'content', 'plans', 'roi', 'content-plan', 'brand',
+]);
 
 export interface ChatDeps {
   ws: { id: string; eventConfig?: Array<{ eventName: string; displayName: string; pinned: boolean; group?: string }> } | null;
@@ -33,6 +52,9 @@ export interface ChatDeps {
   requests: ClientRequest[];
   anomalies: Array<{ type: string; severity: string; title: string; description: string; source: string; changePct: number }>;
   days: number;
+  /** Which client dashboard tab the user is on — sent to the chat endpoint as a
+   *  size-capped hint (see CHAT_TAB_HINTS). Optional: omitted when unknown. */
+  currentTab?: ClientTab;
   betaMode: boolean;
   effectiveTier: Tier;
 }
@@ -45,9 +67,10 @@ export interface ChatState {
   chatLoading: boolean;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
   chatSessionId: string;
+  chatHasServerBackedSession: boolean;
   chatSessions: Array<{ id: string; title: string; messageCount: number; updatedAt: string }>;
   showChatHistory: boolean;
-  chatUsage: { allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null;
+  chatUsage: ChatUsageResponse | null;
   roiValue: number | null;
   /** Intent detected from the most recent AI response — drives CTA rendering */
   lastIntent: 'content_interest' | 'service_interest' | null;
@@ -60,17 +83,18 @@ export interface ChatActions {
   setChatInput: React.Dispatch<React.SetStateAction<string>>;
   setChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setChatSessionId: React.Dispatch<React.SetStateAction<string>>;
+  setChatHasServerBackedSession: React.Dispatch<React.SetStateAction<boolean>>;
   setChatSessions: React.Dispatch<React.SetStateAction<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>>;
   setShowChatHistory: React.Dispatch<React.SetStateAction<boolean>>;
-  setChatUsage: React.Dispatch<React.SetStateAction<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>>;
+  setChatUsage: React.Dispatch<React.SetStateAction<ChatUsageResponse | null>>;
 
   /** Clear lastIntent — call after CTA is actioned so it doesn't re-appear on next render */
   clearIntent: () => void;
   askAi: (question: string) => Promise<void>;
-  buildChatContext: () => Record<string, unknown>;
 }
 
 export function useChat(deps: ChatDeps): ChatState & ChatActions {
+  const queryClient = useQueryClient();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -79,122 +103,90 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const proactiveInsightSent = useRef(false);
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const [chatHasServerBackedSession, setChatHasServerBackedSession] = useState(false);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [chatUsage, setChatUsage] = useState<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>(null);
+  const [chatUsageOverride, setChatUsageOverride] = useState<ChatUsageResponse | null>(null);
   const [roiValue, setRoiValue] = useState<number | null>(null);
   const [lastIntent, setLastIntent] = useState<'content_interest' | 'service_interest' | null>(null);
+  const chatUsageQuery = useClientChatUsage(deps.ws?.id, chatOpen);
+  const fetchedChatUsage = chatUsageQuery.data ?? null;
+  const chatUsage = chatUsageOverride ?? fetchedChatUsage;
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  const buildChatContext = useCallback(() => {
-    const { overview, trend, ga4Overview, ga4Pages, ga4Sources, ga4Devices, ga4Events, ga4Conversions,
-      ga4Countries, searchComparison, ga4Comparison, ga4Organic, ga4NewVsReturning,
-      audit, auditDetail, strategyData, latestRanks, activityLog, annotations,
-      approvalBatches, requests, anomalies, days } = deps;
+  useEffect(() => {
+    if (fetchedChatUsage) setChatUsageOverride(null);
+  }, [fetchedChatUsage]);
 
-    const context: Record<string, unknown> = { days };
-    if (overview) {
-      context.search = {
-        dateRange: overview.dateRange, totalClicks: overview.totalClicks,
-        totalImpressions: overview.totalImpressions, avgCtr: overview.avgCtr,
-        avgPosition: overview.avgPosition, topQueries: overview.topQueries.slice(0, 15), topPages: overview.topPages.slice(0, 10),
-      };
+  const chatLimitMessage = useCallback((body: Partial<ChatLimitErrorResponse> | undefined): string => {
+    if (body?.message) return body.message;
+    const tier = body?.tier ?? chatUsage?.tier ?? deps.effectiveTier;
+    const upgradeTier = tier === 'growth' ? 'Premium' : 'Growth';
+    if (tier === 'free') {
+      const roiMsg = roiValue && roiValue > 0
+        ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
+        : ' Upgrade to Growth for more chat access.';
+      return `You've used all your free conversations this month.${roiMsg}`;
     }
-    if (trend.length > 1) {
-      context.searchTrend = { firstDay: trend[0], lastDay: trend[trend.length - 1], totalDays: trend.length };
-    }
-    if (ga4Overview) {
-      context.ga4 = {
-        overview: ga4Overview,
-        topPages: ga4Pages.slice(0, 10),
-        sources: ga4Sources.slice(0, 8),
-        devices: ga4Devices,
-        events: ga4Events.slice(0, 15),
-        conversions: ga4Conversions.slice(0, 10),
-        countries: ga4Countries.slice(0, 8),
-      };
-    }
-    if (searchComparison) context.searchComparison = searchComparison;
-    if (ga4Comparison) context.ga4Comparison = ga4Comparison;
-    if (ga4Organic) context.ga4Organic = ga4Organic;
-    if (ga4NewVsReturning && ga4NewVsReturning.length > 0) context.ga4NewVsReturning = ga4NewVsReturning;
-    if (audit) {
-      context.siteHealth = {
-        score: audit.siteScore, totalPages: audit.totalPages,
-        errors: audit.errors, warnings: audit.warnings,
-        previousScore: audit.previousScore,
-      };
-    }
-    if (auditDetail) {
-      context.siteHealthDetail = {
-        siteWideIssues: auditDetail.audit.siteWideIssues.slice(0, 10),
-        scoreHistory: auditDetail.scoreHistory?.slice(0, 5),
-        topIssuePages: auditDetail.audit.pages
-          .filter(p => p.issues.length > 0)
-          .sort((a, b) => b.issues.length - a.issues.length)
-          .slice(0, 5)
-          .map(p => ({ page: p.page, score: p.score, issueCount: p.issues.length, topIssues: p.issues.slice(0, 3).map(i => ({ check: i.check, severity: i.severity, message: i.message })) })),
-        cwvSummary: auditDetail.audit.cwvSummary,
-      };
-    }
-    if (strategyData) {
-      context.seoStrategy = {
-        pageMap: strategyData.pageMap?.slice(0, 10),
-        opportunities: strategyData.opportunities?.slice(0, 5),
-        contentGaps: strategyData.contentGaps?.slice(0, 5),
-        quickWins: strategyData.quickWins?.slice(0, 5),
-      };
-    }
-    if (latestRanks.length > 0) context.rankings = latestRanks.slice(0, 15);
-    if (activityLog.length > 0) context.recentActivity = activityLog.slice(0, 10);
-    if (annotations.length > 0) context.annotations = annotations.slice(0, 10);
-    if (approvalBatches.length > 0) {
-      const pending = approvalBatches.filter(b => b.status === 'pending');
-      if (pending.length > 0) context.pendingApprovals = pending.length;
-    }
-    if (requests.length > 0) {
-      const active = requests.filter(r => r.status !== 'closed');
-      if (active.length > 0) context.activeRequests = active.slice(0, 5).map(r => ({ title: r.title, category: r.category, status: r.status }));
-    }
-    if (anomalies.length > 0) {
-      context.detectedAnomalies = anomalies.map(a => ({ type: a.type, severity: a.severity, title: a.title, description: a.description, source: a.source, changePct: a.changePct }));
-    }
-    return context;
-  }, [deps]);
+    return `You've used all your ${tier} chat conversations this month. Upgrade to ${upgradeTier} for more chat access.`;
+  }, [chatUsage, deps.effectiveTier, roiValue]);
 
   const askAi = useCallback(async (question: string) => {
-    const { ws, overview, ga4Overview, betaMode } = deps;
+    const { ws, overview, ga4Overview, betaMode, days, currentTab } = deps;
     if (!question.trim() || !ws) return;
     if (!overview && !ga4Overview) return;
+    const limitBlocksNewSession = !betaMode
+      && chatUsage
+      && chatUsage.limit !== null
+      && !chatUsage.allowed
+      && !chatHasServerBackedSession;
+    if (limitBlocksNewSession) {
+      setChatMessages(prev => prev.length > 0 ? prev : [{ role: 'assistant', content: chatLimitMessage(chatUsage) }]);
+      return;
+    }
     setChatMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setChatInput('');
     setChatLoading(true);
     try {
-      const context = buildChatContext();
-      let data: { answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null };
+      // E4 (audit #17): grounding is assembled SERVER-SIDE. The frontend sends only
+      // size-capped hints — the date-range (`days`) and the current tab (only when
+      // it's a known server hint; an unknown value would 400 the request). The old
+      // verbatim `context` blob was a prompt-injection surface and is gone.
+      const payload: { question: string; days: number; sessionId: string; betaMode: boolean; currentTab?: ClientTab } = {
+        question: question.trim(), days, sessionId: chatSessionId, betaMode,
+      };
+      if (currentTab && CHAT_TAB_HINTS.has(currentTab)) payload.currentTab = currentTab;
+      let data: ClientSearchChatResponse;
       try {
-        data = await post<{ answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
+        data = await post<ClientSearchChatResponse>(`/api/public/search-chat/${ws.id}`, payload);
       } catch (err) {
         if (err instanceof ApiError && err.status === 429) {
-          const roiMsg = roiValue && roiValue > 0
-            ? ` You've already identified **$${Math.round(roiValue).toLocaleString()}** in organic traffic value this month — Growth ($249/mo) pays for itself.`
-            : ' Upgrade to Growth ($249/mo) for unlimited chat access.';
-          setChatMessages(prev => [...prev, { role: 'assistant', content: `You've used all your free conversations this month.${roiMsg}` }]);
-          setChatUsage(u => u ? { ...u, allowed: false, remaining: 0 } : u);
+          const body = err.body as Partial<ChatLimitErrorResponse> | undefined;
+          setChatMessages(prev => [...prev, { role: 'assistant', content: chatLimitMessage(body) }]);
+          setChatUsageOverride(u => ({
+            allowed: false,
+            used: body?.used ?? u?.used ?? chatUsage?.used ?? 0,
+            limit: body?.limit ?? u?.limit ?? chatUsage?.limit ?? null,
+            remaining: body?.remaining ?? 0,
+            tier: body?.tier ?? u?.tier ?? chatUsage?.tier ?? deps.effectiveTier,
+          }));
           setChatLoading(false);
           return;
         }
         throw err;
       }
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
+      setChatHasServerBackedSession(true);
       setLastIntent(data.detectedIntent || null);
-      if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.chatUsage(ws.id) }).catch((err) => {
+        console.error('useChat operation failed:', err);
+      });
     } catch (err) {
       console.error('useChat operation failed:', err);
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setChatLoading(false); }
-  }, [deps, buildChatContext, chatSessionId, roiValue]);
+  }, [chatHasServerBackedSession, chatLimitMessage, chatSessionId, chatUsage, deps, queryClient]);
 
   // Build a proactive greeting from already-loaded data (zero AI cost)
   const buildProactiveGreeting = useCallback((): string => {
@@ -277,10 +269,9 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     return `Here's what's happening with your site right now:\n\n${bullets.join('\n\n')}`;
   }, [deps]);
 
-  // Fetch chat usage and ROI data when chat opens
+  // Fetch ROI data when chat opens. Chat usage is fetched by React Query above.
   useEffect(() => {
     if (chatOpen && deps.ws) {
-      getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${deps.ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
       // Fetch ROI for upgrade prompts (best-effort, silent fail)
       if (roiValue === null) {
         getOptional<{ organicTrafficValue?: number }>(`/api/public/roi/${deps.ws.id}`).then(d => {
@@ -308,13 +299,13 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     chatLoading, setChatLoading,
     chatEndRef,
     chatSessionId, setChatSessionId,
+    chatHasServerBackedSession, setChatHasServerBackedSession,
     chatSessions, setChatSessions,
     showChatHistory, setShowChatHistory,
-    chatUsage, setChatUsage,
+    chatUsage, setChatUsage: setChatUsageOverride,
     roiValue,
     lastIntent,
     clearIntent: () => setLastIntent(null),
     askAi,
-    buildChatContext,
   };
 }

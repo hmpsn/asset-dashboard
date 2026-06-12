@@ -46,29 +46,26 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
-import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
 import {
-  adjustKdImpactScore,
   assessAuthorityFromBacklinks,
   kdClassificationNote,
 } from './authority-context.js';
-import { computeOpportunityValue, pickImpactScore } from './scoring/opportunity-value.js';
+import { computeOpportunityValue } from './scoring/opportunity-value.js';
+import { deriveValueIntent } from './scoring/keyword-value-score.js';
 import { computeTimingBoosts, maxBoostForPages } from './scoring/opportunity-timing.js';
 import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
-import { recordOvDivergence } from './ov-divergence.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet, OpportunityScore } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
-import type { LearningsSlice } from '../shared/types/intelligence.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 import {
   LOCAL_SEO_POSTURE,
@@ -135,11 +132,11 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
 // ─── SEO Gen-Quality P4 · one gain basis (Contract 3) ───────────────────────
 //
 // The legacy `estimatedGain` strings are static per-check constants (getRecoveryRate),
-// identical for every workspace/page, while ranking already reads the OV value — a live
-// client-facing incoherence. When `useGenQual` is ON, the gain string is derived from the
-// SAME OV figure (predictedEmv, the horizon-projected EMV that also feeds the served tier
-// and content_gaps.opportunity_score), so the client's stated gain, the queue order, and
-// the upsell badge all share ONE basis.
+// identical for every workspace/page, while ranking reads the OV value — a live
+// client-facing incoherence. The canonical gain string is derived from the SAME OV figure
+// (predictedEmv, the horizon-projected EMV that also feeds the served tier and
+// content_gaps.opportunity_score), so the client's stated gain, the queue order, and the
+// upsell badge all share ONE basis.
 //
 // CLIENT-SAFE FORM = NON-DOLLARIZED (owner constraint: clients never see a raw $/wk). We
 // render an outcome-oriented RELATIVE-MAGNITUDE phrase, NOT a dollar figure. The public
@@ -168,9 +165,8 @@ export function buildOvGainString(opportunity: OpportunityScore | undefined): st
   return 'Worthwhile opportunity — a steady expected organic gain once addressed';
 }
 
-/** Resolve the gain string for a rec given the P4 flag. Flag-OFF (or no OV) returns the
- *  legacy string unchanged (byte-identical). Flag-ON returns the OV-derived non-dollarized
- *  phrase. @internal exported for testing */
+/** Resolve the gain string for a rec. Canonical callers pass `true`; tests still exercise
+ *  the historical fallback contract by passing `false`. @internal exported for testing */
 export function resolveEstimatedGain(
   legacyGain: string,
   opportunity: OpportunityScore | undefined,
@@ -243,32 +239,6 @@ export function recommendationOutcomeActionType(type: RecType, source: string): 
       return 'audit_fix_applied';
     }
   }
-}
-
-function applyRecommendationOutcomeAdjustment(
-  baseScore: number,
-  type: RecType,
-  source: string,
-  learnings: LearningsSlice | null | undefined,
-  difficulty?: number | null,
-): number {
-  const adjustment = buildOutcomeAdjustment({
-    actionType: recommendationOutcomeActionType(type, source),
-    learnings,
-    difficulty,
-  });
-  return applyOutcomeAdjustmentScore(baseScore, adjustment);
-}
-
-/** Coerce a free-form search-intent string (PageKeywordMap.searchIntent) to the
- *  strict OpportunityInput.intent union, or null when it isn't one of the four
- *  recognised intents. Keeps the OV scorer's intent map total. */
-function toOpportunityIntent(
-  intent: string | null | undefined,
-): 'transactional' | 'commercial' | 'informational' | 'navigational' | null {
-  return intent === 'transactional' || intent === 'commercial' || intent === 'informational' || intent === 'navigational'
-    ? intent
-    : null;
 }
 
 // ─── Recommendation source keys ────────────────────────────────────
@@ -427,7 +397,7 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
     summary: parseJsonSafe(row.summary, recommendationSummarySchema, {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
-      estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+      totalOpportunityValue: 0, actionableOpportunityValue: 0,
       topRecommendationId: null,
     }, { table: 'recommendation_sets', field: 'summary', workspaceId }) as RecommendationSet['summary'],
   };
@@ -451,6 +421,9 @@ export function updateRecommendationStatus(
   if (!set) return null;
   const rec = set.recommendations.find(r => r.id === recId);
   if (!rec) return null;
+  if (rec.status !== status) {
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, status);
+  }
   rec.status = status;
   rec.updatedAt = new Date().toISOString();
   // Recompute the summary so topRecommendationId stays consistent after a
@@ -520,25 +493,21 @@ export function resolveRecommendationsForChange(
 
   if (resolved === 0) return 0;
 
-  // Recompute the summary so client-facing headline counts (fixNow/fixSoon/
-  // trafficAtRisk/estimatedRecoverable*) reflect the resolved recs — otherwise
-  // the rendered list drops the item but the numbers stay inflated until the
-  // next full regen.
+  // Recompute the summary so client-facing headline counts and Opportunity
+  // Value totals reflect the resolved recs — otherwise the rendered list drops
+  // the item but the numbers stay inflated until the next full regen.
   set.summary = computeRecommendationSummary(set.recommendations);
   saveRecommendations(set);
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
 
-  // ── PR7 · Spine B — reprioritize-on-apply tail (events flag, try/catch). ──
+  // ── PR7 · Spine B — reprioritize-on-apply tail (try/catch). ──
   // Completing a rec (e.g. the #1) frees its page; a debounced regen re-ranks the
-  // queue so the next-best opportunity is promoted with fresh timing boosts. Flag
-  // OFF → no event store touched and the bridge no-ops, so the legacy apply path
-  // (above) is byte-identical. Never let the regen trigger break the apply.
+  // queue so the next-best opportunity is promoted with fresh timing boosts.
+  // Never let the regen trigger break the apply.
   try {
-    if (isFeatureEnabled('opportunity-value-events')) {
-      triggerOpportunityRegen(workspaceId);
-    }
+    triggerOpportunityRegen(workspaceId);
   } catch (err) {
     log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'opportunity regen trigger failed on apply (non-fatal)');
   }
@@ -569,28 +538,68 @@ export function resolveRecommendationsForPageIds(
 }
 
 /**
- * Compute the RecommendationSet summary (active counts + weighted recoverable
- * traffic) from a rec list. Shared by the full regen (generateRecommendations)
- * and the in-place resolver (resolveRecommendationsForChange) so client-facing
- * headline numbers never drift from the rendered active list.
+ * D2 (audit #11) — resolve (complete) active content recommendations whose target keyword
+ * matches a just-published post. Called best-effort from the C3 publish domain service
+ * (`server/domains/content/publish-post-to-webflow.ts`) AFTER a successful publish, so the
+ * "create content for X" rec disappears the moment the content for X goes live — without
+ * waiting for the next full regen (which is GSC-lag-gated).
+ *
+ * Content-gap recs have `affectedPages: []` (the page doesn't exist until publish), so the
+ * page-intersection resolver (`resolveRecommendationsForChange`) can never match them —
+ * matching is by `rec.targetKeyword` via `keywordComparisonKey` (the same normalization the
+ * generation-time suppression and the contentPipeline slice use).
+ *
+ * Mirrors `resolveRecommendationsForChange`: validateTransition per rec, summary recompute,
+ * save, intelligence-cache invalidation, and a RECOMMENDATIONS_UPDATED broadcast — only when
+ * at least one rec changed. Deliberately does NOT call `triggerOpportunityRegen`: the publish
+ * service already enqueues `queueKeywordStrategyPostUpdateFollowOns`, which re-ranks the queue.
+ *
+ * @returns the number of recommendations transitioned to `completed`.
+ */
+export function resolveContentRecommendationsForPublishedPost(
+  workspaceId: string,
+  targetKeyword: string | null | undefined,
+): number {
+  const key = targetKeyword ? keywordComparisonKey(targetKeyword) : '';
+  if (!key) return 0;
+
+  const set = loadRecommendations(workspaceId);
+  if (!set) return 0;
+
+  let resolved = 0;
+  const now = new Date().toISOString();
+  for (const rec of set.recommendations) {
+    if (rec.status === 'completed' || rec.status === 'dismissed') continue;
+    if (rec.type !== 'content') continue;
+    if (!rec.targetKeyword || keywordComparisonKey(rec.targetKeyword) !== key) continue;
+    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
+    rec.status = 'completed';
+    rec.updatedAt = now;
+    resolved++;
+  }
+
+  if (resolved === 0) return 0;
+
+  // Recompute the summary so headline counts / OV totals drop the resolved recs
+  // immediately (same contract as resolveRecommendationsForChange).
+  set.summary = computeRecommendationSummary(set.recommendations);
+  saveRecommendations(set);
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
+  log.info(`Resolved ${resolved} content recommendation(s) for ${workspaceId} after publishing "${targetKeyword}"`);
+  return resolved;
+}
+
+/**
+ * Compute the RecommendationSet summary from a rec list. Shared by the full
+ * regen (generateRecommendations) and the in-place resolver
+ * (resolveRecommendationsForChange) so client-facing headline numbers never
+ * drift from the rendered active list.
  */
 export function computeRecommendationSummary(recs: Recommendation[]): RecommendationSet['summary'] {
   const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
   const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
-
-  // Weighted recovery: each rec contributes traffic × its issue-specific recovery rate.
-  let weightedRecoverableClicks = 0;
-  let weightedRecoverableImpressions = 0;
-  for (const r of actionableRecs) {
-    const checkName = r.source?.startsWith('audit:site-wide:')
-      ? r.source.replace('audit:site-wide:', '')
-      : r.source?.startsWith('audit:')
-        ? r.source.replace('audit:', '')
-        : '';
-    const rate = checkName ? getRecoveryRate(checkName) : DEFAULT_RECOVERY;
-    weightedRecoverableClicks += r.trafficAtRisk * rate.summary;
-    weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
-  }
+  const opportunityValue = (rec: Recommendation) => rec.opportunity?.value ?? rec.impactScore;
 
   // recs are already sorted by sortRecommendations (tier → impactScore → intent
   // alignment) before computeRecommendationSummary is called, so activeRecs[0]
@@ -598,16 +607,19 @@ export function computeRecommendationSummary(recs: Recommendation[]): Recommenda
   const topRec = activeRecs.length > 0 ? activeRecs[0] : null;
   const topRecommendationId = topRec?.id ?? null;
   const topOpportunityRationale = topRec ? buildTopOpportunityRationale(topRec) : undefined;
+  const totalOpportunityValue = activeRecs.reduce((s, r) => s + opportunityValue(r), 0);
+  const actionableOpportunityValue = actionableRecs.reduce((s, r) => s + opportunityValue(r), 0);
 
   return {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
     fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
     ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
-    totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
+    totalImpactScore: totalOpportunityValue,
     trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
-    estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
-    estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
+    totalOpportunityValue,
+    actionableOpportunityValue,
+    ...(topRec ? { topOpportunityValue: opportunityValue(topRec) } : {}),
     topRecommendationId,
     ...(topOpportunityRationale ? { topOpportunityRationale } : {}),
   };
@@ -697,16 +709,18 @@ export function isRecIntentAligned(
 
 /** Canonical recommendation ranking. Sorts `recs` in place:
  *   1. priority tier (fix_now > fix_soon > fix_later > ongoing) — PRIMARY
- *   2. impactScore (highest first) — SECONDARY
+ *   2. rank score override, then impactScore (highest first) — SECONDARY
  *   3. business-intent alignment (aligned first) — within-tier TIEBREAKER only
  *
  * Because intent is the LAST comparator, an intent-aligned rec can only outrank
- * another rec that is otherwise equal (same tier, same impactScore). A higher
- * tier or a higher impactScore always wins regardless of intent.
+ * another rec that is otherwise equal (same tier, same rank score). A higher
+ * tier or a higher rank score always wins regardless of intent. Rank score
+ * overrides are ephemeral; they do not change the persisted/public impactScore.
  * @internal exported for unit testing */
 export function sortRecommendations(
   recs: Recommendation[],
   effectiveBusinessPriorities: string[],
+  options: { rankScores?: Map<string, number> } = {},
 ): void {
   const priorityOrder: Record<RecPriority, number> = { fix_now: 0, fix_soon: 1, fix_later: 2, ongoing: 3 };
   // Memoise alignment so we don't re-tokenise per comparison.
@@ -722,7 +736,9 @@ export function sortRecommendations(
   recs.sort((a, b) => {
     const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
     if (pDiff !== 0) return pDiff;
-    const scoreDiff = b.impactScore - a.impactScore;
+    const scoreA = options.rankScores?.get(a.id) ?? a.impactScore;
+    const scoreB = options.rankScores?.get(b.id) ?? b.impactScore;
+    const scoreDiff = scoreB - scoreA;
     if (scoreDiff !== 0) return scoreDiff;
     // Equal tier and impact — let stated business intent break the tie.
     return Number(isAligned(b)) - Number(isAligned(a));
@@ -756,12 +772,9 @@ function checkNameFromSource(source: string | undefined): string {
 
 // ─── SEO Gen-Quality P4 · OV-derived priority tier (Contract 2) ─────────────
 //
-// When `useGenQual` is ON the served priority TIER is derived from the OV value
-// (which is a normalized read of the EMV/ROI economic quantity) via the bands below,
-// EXCEPT genuine CRITICAL_CHECKS which keep `fix_now` (a broken canonical/robots is
-// urgent regardless of modelled EMV). Flag-OFF this is a no-op — the legacy per-branch
-// tier survives and sortRecommendations/priorityOrder/computeRecommendationSummary are
-// byte-identical (they read rec.priority, which is only overwritten when the flag is on).
+// The served priority TIER is derived from the OV value (which is a normalized read of the
+// EMV/ROI economic quantity) via the bands below, EXCEPT genuine CRITICAL_CHECKS which keep
+// `fix_now` (a broken canonical/robots is urgent regardless of modelled EMV).
 //
 // ⚠️ OWNER-TUNABLE THRESHOLDS (NOT approved for a per-workspace flip in this PR).
 // The bands map the 0..100 OV `value` to a tier. They are deliberately conservative
@@ -792,6 +805,16 @@ export function deriveOvTier(rec: Pick<Recommendation, 'priority' | 'source' | '
   return 'ongoing';
 }
 
+function deriveCanonicalRecommendationFields(
+  source: string,
+  opportunity: OpportunityScore,
+): Pick<Recommendation, 'impactScore' | 'priority'> {
+  return {
+    impactScore: opportunity.value,
+    priority: deriveOvTier({ priority: 'ongoing', source, opportunity }),
+  };
+}
+
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const pagePath = normalizePageUrl(slug);
   const t = traffic[pagePath] || traffic[slug];
@@ -807,40 +830,6 @@ function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number;
   const pagePath = normalizePageUrl(slug);
   const t = traffic[pagePath] || traffic[slug] || { clicks: 0, impressions: 0 };
   return { clicks: t.clicks, impressions: t.impressions };
-}
-
-/** Compute a 0–100 impact score for a recommendation
- * @internal exported for unit testing
- */
-export function computeImpactScore(
-  severity: 'error' | 'warning' | 'info',
-  isCritical: boolean,
-  trafficScore: number,
-  maxTrafficScore: number,
-): number {
-  // Severity base: error=60, warning=35, info=15
-  const sevBase = severity === 'error' ? 60 : severity === 'warning' ? 35 : 15;
-  // Critical bonus: +20
-  const critBonus = isCritical ? 20 : 0;
-  // Traffic multiplier: 0–20 based on relative traffic
-  const trafficMultiplier = maxTrafficScore > 0
-    ? (trafficScore / maxTrafficScore) * 20
-    : 0;
-  return Math.min(100, Math.round(sevBase + critBonus + trafficMultiplier));
-}
-
-/** Determine priority tier from impact score and severity
- * @internal exported for unit testing
- */
-export function determinePriority(
-  impactScore: number,
-  severity: 'error' | 'warning' | 'info',
-  trafficScore: number,
-): RecPriority {
-  if (impactScore >= 70 || (severity === 'error' && trafficScore > 0)) return 'fix_now';
-  if (impactScore >= 45 || severity === 'error') return 'fix_soon';
-  if (impactScore >= 20) return 'fix_later';
-  return 'fix_later';
 }
 
 /**
@@ -937,10 +926,30 @@ export function checkToRecType(check: string, category?: string): RecType {
   return 'technical';
 }
 
+/** D2 (audit #11): content-gap recs route into the EXISTING brief-purchase flow.
+ * Brief product per suggested page type — productType values are real `ProductType`
+ * members (shared/types/payments.ts) accepted by /api/stripe/cart-checkout, and prices
+ * mirror PRODUCT_MAP in server/stripe.ts (the same hardcoded-mirror convention the other
+ * mapToProduct cases follow, e.g. schema_page $39).
+ */
+const BRIEF_PRODUCT_BY_PAGE_TYPE: Record<NonNullable<ContentGap['suggestedPageType']>, { productType: string; productPrice: number }> = {
+  blog:     { productType: 'brief_blog',     productPrice: 125 },
+  landing:  { productType: 'brief_landing',  productPrice: 150 },
+  service:  { productType: 'brief_service',  productPrice: 150 },
+  location: { productType: 'brief_location', productPrice: 150 },
+  product:  { productType: 'brief_product',  productPrice: 150 },
+  pillar:   { productType: 'brief_pillar',   productPrice: 200 },
+  resource: { productType: 'brief_resource', productPrice: 150 },
+};
+
 /** Map issue type to purchasable product
  * @internal exported for unit testing
  */
-export function mapToProduct(recType: RecType, pageCount: number): { productType?: string; productPrice?: number } {
+export function mapToProduct(
+  recType: RecType,
+  pageCount: number,
+  pageType?: ContentGap['suggestedPageType'],
+): { productType?: string; productPrice?: number } {
   switch (recType) {
     case 'metadata':
       return pageCount >= 10
@@ -952,14 +961,18 @@ export function mapToProduct(recType: RecType, pageCount: number): { productType
         : { productType: 'schema_page', productPrice: 39 };
     case 'accessibility':
       return { productType: 'fix_alt', productPrice: 50 };
-    case 'aeo':
-      return pageCount >= 5
-        ? { productType: 'aeo_site_review', productPrice: 499 }
-        : { productType: 'aeo_page_review', productPrice: 99 };
-    case 'content_refresh':
-      return pageCount >= 5
-        ? { productType: 'content_refresh_5', productPrice: 799 }
-        : { productType: 'content_refresh', productPrice: 199 };
+    // 'aeo' and 'content_refresh' deliberately fall through to the no-product
+    // default: the values this used to return (aeo_site_review/aeo_page_review/
+    // content_refresh/content_refresh_5) are NOT in the ProductType union or
+    // PRODUCT_MAP, so the CTA they produced was unsellable — createCartCheckoutSession
+    // throws "Unknown product type" on a phantom type before any Stripe session
+    // exists. Restore a case here ONLY together with real PRODUCT_MAP entries
+    // (displayName, price, Stripe env key, fulfillment) — the contract test in
+    // tests/unit/recommendations-pure-logic.test.ts pins every returned
+    // productType to isProductType (catalog membership).
+    case 'content':
+      // D2 (audit #11): brief-purchase product keyed by the gap's suggested page type.
+      return BRIEF_PRODUCT_BY_PAGE_TYPE[pageType ?? 'blog'];
     default:
       return {};
   }
@@ -1098,8 +1111,8 @@ function strategyInsight(type: 'content_gap' | 'quick_win' | 'keyword_gap', item
  * score, not a zero multiplier.
  *
  * API-credit note: the underlying `provider.getDomainOverview` call is cached
- * at the provider layer (SQLite with TTL — see `CACHE_TTL_DOMAIN_OVERVIEW` in
- * `server/semrush.ts`). First call per domain per TTL window costs ~10 credits;
+ * at the provider layer (SQLite with TTL in the active SEO provider). First
+ * call per domain per TTL window costs provider credits;
  * subsequent calls within the window cost 0. Isolating the call in this helper
  * means there is exactly one call site per rec-gen cycle, regardless of how
  * many individual recs consult `domainStrength`.
@@ -1127,32 +1140,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   const now = new Date().toISOString();
   const recs: Recommendation[] = [];
-  // Opportunity Value cutover flag. Resolved once per rec-gen cycle. When OFF
-  // (default), every rec keeps its legacy impactScore and the OV value is only
-  // attached (shadow). When ON, the single selector below the sort flips
-  // impactScore to opportunity.value — the entire cutover surface.
-  const useOv = isFeatureEnabled('opportunity-value-scorer');
-  // ── SEO Gen-Quality P4 cutover flag (per-workspace umbrella). ──
-  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled
-  // in loops — mirrors the P2/P3 relaxConservatism pattern). When OFF (umbrella OFF = all
-  // prod today) the OV-derived TIER, the OV-EMV estimatedGain basis, and the
-  // content_gaps.opportunity_score recompute are all NO-OPs, so generation is byte-identical
-  // to pre-P4 (proven by the flag-OFF snapshot test). NOT the global `opportunity-value-scorer`
-  // flag (that gates only impactScore via pickImpactScore — do NOT widen it).
-  const useGenQual = isFeatureEnabled('seo-generation-quality', ws.id);
-  // ── SEO Gen-Quality P7.1 · local-recs gate (three conjunctive conditions). ──
-  // Resolved ONCE per rec-gen cycle and threaded as a plain boolean (no isFeatureEnabled in
-  // loops, no posture re-reads). The THREE gates: (1) the umbrella gen-quality flag is on for
-  // this workspace, (2) the workspace posture is local OR hybrid (never non_local/unknown),
-  // and (3) the local-seo-visibility feature flag is on. When ANY gate is false, useLocalGenQual
-  // is false → the local rec branches are skipped entirely → ZERO local recs/sources are
-  // produced and the merge/auto-resolve loop sees exactly the pre-P7.1 source set, so generation
-  // is byte-identical to pre-P7.1 (proven by the posture-gated parity test). The scorer never
-  // reads local state — the local OV term is only fed from inside these gated branches.
+  // Opportunity Value scoring is canonical. Local recommendation minting remains
+  // posture-gated so non-local workspaces keep the existing non-local source set.
   const localPosture = getLocalSeoPosture(ws.id);
-  const useLocalGenQual = useGenQual
-    && (localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID)
-    && isFeatureEnabled('local-seo-visibility');
+  const useLocalGenQual = localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID;
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
@@ -1174,24 +1165,33 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // We consume it through the shared builder rather than a hand-rolled read so
     // intent stays sourced from the one blessed representation (CLAUDE.md
     // "AI/recommendation generation consumers must use shared intelligence context builders").
-    slices: ['learnings', 'seoContext', 'clientSignals'],
-    learningsDomain: 'all',
+    // `contentPipeline` (D2, audit #11) carries `inFlightTargetKeywords` — the
+    // comparison-keyed brief/post keywords used to suppress content-gap recs the
+    // pipeline is already producing.
+    slices: ['seoContext', 'clientSignals', 'learnings', 'contentPipeline'],
     verbosity: 'standard',
     tokenBudget: 800,
     enrichWithBacklinks: true,
   }).catch(err => {
-    log.warn({ err, workspaceId }, 'Recommendation learnings context unavailable — continuing without outcome adjustments');
+    log.warn({ err, workspaceId }, 'Recommendation context unavailable — continuing without backlinks and business-priority tie-breakers');
     return null;
   });
-  const outcomeLearnings = recommendationContext?.intelligence.learnings;
   const backlinkProfile = recommendationContext?.intelligence.seoContext?.backlinkProfile;
   // Resolved business priorities (client-entered first, admin-set as supplement).
   // Used only as a within-tier ranking tiebreaker below — never to change tiers.
   const effectiveBusinessPriorities = recommendationContext?.intelligence.clientSignals?.effectiveBusinessPriorities ?? [];
+  const outcomeLearnings = recommendationContext?.intelligence.learnings ?? null;
+  // D2 (audit #11): keywords the content pipeline is already producing (briefs +
+  // non-error posts), comparison-keyed at slice-assembly time. Suppression fails OPEN:
+  // when the slice/context is unavailable this set is empty and gaps mint as before —
+  // the safe direction (an extra rec, never a false resolution).
+  const inFlightContentKeywords = new Set(
+    recommendationContext?.intelligence.contentPipeline?.inFlightTargetKeywords ?? [],
+  );
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
-  // LEGACY-ONLY: this feeds adjustKdImpactScore / kdClassificationNote (the production
-  // impactScore). Untouched by PR5 to keep the flag-off path byte-identical.
+  // It now feeds recommendation copy/context only (KD notes / authority framing), while
+  // the canonical score itself comes solely from computeOpportunityValue().
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
 
   // ── PR5 · Spine C — self-calibrating OV inputs (OV path ONLY, dark/shadow). ──
@@ -1207,11 +1207,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // intelligence SEO-context path (enrichWithBacklinks) — no duplicate API call.
   const ovAuthority = resolveOvAuthorityStrength(workspaceId, backlinkProfile);
 
-  // ── PR7 · Spine B — decaying Timing boosts (OV path; dark behind the events flag). ──
+  // ── PR7 · Spine B — decaying Timing boosts (OV path). ──
   // Resolved ONCE per rec-gen cycle: Map<pageSlug, decaying boost> aggregated from the
-  // active opportunity-event ledger. When the `opportunity-value-events` flag is OFF this
-  // is an EMPTY map → maxBoostForPages() is 0 → timingBoost 0 → timing multiplier 1 →
-  // computeOpportunityValue output byte-identical to the pre-PR7 frozen snapshot.
+  // active opportunity-event ledger. When the ledger is empty this is an EMPTY map
+  // → maxBoostForPages() is 0 → timingBoost 0 → timing multiplier 1.
   const nowDate = new Date(now);
   const timingBoosts = computeTimingBoosts(workspaceId, nowDate);
 
@@ -1296,17 +1295,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // Create one recommendation per issue group
     for (const [, group] of issueGroups) {
       const isCrit = isCriticalCheck(group.check);
-      let impactScore = computeImpactScore(
-        group.severity,
-        isCrit,
-        group.totalTrafficScore,
-        maxTrafficScore * group.pages.length,
-      );
-      // Apply page importance: use max multiplier across affected pages
-      const maxMultiplier = group.pages.reduce((m, p) => Math.max(m, pageImportanceMultiplier(p.slug)), 1.0);
-      impactScore = Math.min(100, Math.round(impactScore * maxMultiplier));
-
-      const priority = determinePriority(impactScore, group.severity, group.totalTrafficScore);
       const recType = checkToRecType(group.check, group.category);
       const product = mapToProduct(recType, group.pages.length);
 
@@ -1316,7 +1304,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         .sort((a, b) => b.ts - a.ts);
 
       const impact: 'high' | 'medium' | 'low' =
-        impactScore >= 60 ? 'high' : impactScore >= 35 ? 'medium' : 'low';
+        group.severity === 'error' ? 'high' : group.severity === 'warning' ? 'medium' : 'low';
       const effort: 'low' | 'medium' | 'high' =
         recType === 'metadata' || recType === 'accessibility' ? 'low'
         : recType === 'schema' ? 'medium'
@@ -1328,32 +1316,29 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           ? `Fixing this could increase organic clicks by ${rate.perRec} on ${group.pages.length} affected page${group.pages.length !== 1 ? 's' : ''}`
           : `Improves SEO health score and search engine compatibility across ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`;
 
-      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-        impactScore,
-        recType,
-        RecSource.audit(group.check),
-        outcomeLearnings,
-      );
+      const source = RecSource.audit(group.check);
+      const opportunity = computeOpportunityValue({
+        branch: 'technical',
+        severity: group.severity,
+        isCritical: isCrit,
+        currentClicks: group.totalClicks,
+        authorityStrength: ovAuthority ?? null,
+        timingBoost: maxBoostForPages(timingBoosts, sortedPages.map(p => p.slug)),
+      }, { calibration: ovCalibration, weights: ovWeights });
+      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
-        priority,
+        priority: scoring.priority,
         type: recType,
         title: `${group.check.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`,
         description: sortedPages[0].recommendation,
         insight: auditInsight(group.check, group.severity, group.pages.length, group.totalClicks, sortedPages.map(p => p.slug)),
         impact,
         effort,
-        impactScore: adjustedImpactScore,
-        opportunity: computeOpportunityValue({
-          branch: 'technical',
-          severity: group.severity,
-          isCritical: isCrit,
-          currentClicks: group.totalClicks,
-          authorityStrength: ovAuthority ?? null,
-          timingBoost: maxBoostForPages(timingBoosts, sortedPages.map(p => p.slug)),
-        }, { calibration: ovCalibration, weights: ovWeights }),
-        source: RecSource.audit(group.check),
+        impactScore: scoring.impactScore,
+        opportunity,
+        source,
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
         impressionsAtRisk: group.totalImpressions,
@@ -1371,8 +1356,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // Site-wide issues as individual recommendations
     for (const issue of audit.audit.siteWideIssues) {
       const isCrit = isCriticalCheck(issue.check);
-      const impactScore = isCrit ? 80 : 50;
-      const priority: RecPriority = isCrit ? 'fix_now' : 'fix_soon';
 
       const pages = issue.affectedPages || [];
       const pageTraffic = pages.reduce((sum, slug) => {
@@ -1388,32 +1371,29 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         ? `Affects ${pages.length} page${pages.length !== 1 ? 's' : ''} on the site`
         : 'Affects the entire site';
 
-      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-        impactScore,
-        'technical',
-        RecSource.auditSiteWide(issue.check),
-        outcomeLearnings,
-      );
+      const source = RecSource.auditSiteWide(issue.check);
+      const opportunity = computeOpportunityValue({
+        branch: 'technical',
+        severity: isCrit ? 'error' : 'warning',
+        isCritical: isCrit,
+        currentClicks: pageTraffic,
+        authorityStrength: ovAuthority ?? null,
+        timingBoost: maxBoostForPages(timingBoosts, pages.map(p => p.replace(/^\//, ''))),
+      }, { calibration: ovCalibration, weights: ovWeights });
+      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
-        priority,
+        priority: scoring.priority,
         type: 'technical',
         title: `Site-Wide: ${issue.check.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
         description: issue.recommendation,
         insight: issue.message,
         impact: isCrit ? 'high' : 'medium',
         effort: 'low',
-        impactScore: adjustedImpactScore,
-        opportunity: computeOpportunityValue({
-          branch: 'technical',
-          severity: isCrit ? 'error' : 'warning',
-          isCritical: isCrit,
-          currentClicks: pageTraffic,
-          authorityStrength: ovAuthority ?? null,
-          timingBoost: maxBoostForPages(timingBoosts, pages.map(p => p.replace(/^\//, ''))),
-        }, { calibration: ovCalibration, weights: ovWeights }),
-        source: RecSource.auditSiteWide(issue.check),
+        impactScore: scoring.impactScore,
+        opportunity,
+        source,
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
         impressionsAtRisk: pageImpressions,
@@ -1434,9 +1414,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   );
 
   if (strategy) {
-    // Quick wins → fix_now or fix_soon
-    const strategyQuickWins = listQuickWins(workspaceId);
-    const quickWins = strategyQuickWins.length > 0 ? strategyQuickWins : (strategy.quickWins || []);
+    // Quick wins → fix_now or fix_soon (table-only; blob field stripped on every write + boot-migrated out)
+    const quickWins = listQuickWins(workspaceId);
     if (quickWins.length > 0) {
       for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined
@@ -1445,36 +1424,31 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const t = getTrafficForSlug(traffic, qw.pagePath.replace(/^\//, ''));
         // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
         const hasTraffic = t.clicks > 0 || t.impressions > 0;
-        const impactScore = qw.estimatedImpact === 'high' ? 75 : qw.estimatedImpact === 'medium' ? 55 : 35;
-        const pageMultiplier = pageImportanceMultiplier(qw.pagePath);
         const priority: RecPriority = !hasTraffic
           ? 'fix_later'
           : qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon';
-        const adjustedScore = applyRecommendationOutcomeAdjustment(
-          Math.min(100, Math.round(impactScore * pageMultiplier)),
-          'strategy',
-          RecSource.strategyQuickWin(),
-          outcomeLearnings,
-        );
+        const source = RecSource.strategyQuickWin();
+        const opportunity = computeOpportunityValue({
+          branch: 'quick_win',
+          roiScore: qw.roiScore ?? null,
+          llmLabel: qw.estimatedImpact,
+          authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, [qw.pagePath.replace(/^\//, '')]),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority,
+          priority: hasTraffic ? scoring.priority : priority,
           type: 'strategy',
           title: `Quick Win: ${qw.action}`,
           description: qw.rationale,
           insight: strategyInsight('quick_win', qw),
           impact: qw.estimatedImpact as 'high' | 'medium' | 'low',
           effort: 'low',
-          impactScore: adjustedScore,
-          opportunity: computeOpportunityValue({
-            branch: 'quick_win',
-            roiScore: qw.roiScore ?? null,
-            llmLabel: qw.estimatedImpact,
-            authorityStrength: ovAuthority ?? null,
-            timingBoost: maxBoostForPages(timingBoosts, [qw.pagePath.replace(/^\//, '')]),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.strategyQuickWin(),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: [qw.pagePath.replace(/^\//, '')],
           trafficAtRisk: t.clicks,
           impressionsAtRisk: t.impressions,
@@ -1497,23 +1471,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
 
-        let baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
-        // Apply authority-adjusted KD filtering
-        if (cg.difficulty != null) {
-          baseScore = adjustKdImpactScore(baseScore, cg.difficulty, domainStrength);
-        }
-        // Boost impact score based on actual volume data when available
-        const volumeBoost = cg.volume && cg.volume > 0
-          ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
-          : 0;
-        // Only apply the flat difficulty penalty when domain strength is unknown
-        // (adjustKdImpactScore already handled the penalty when domainStrength > 0)
-        const difficultyPenalty = !domainStrength && cg.difficulty && cg.difficulty > 60
-          ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
-          : 0;
-        const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
+        // D2 (audit #11): skip gaps the content pipeline is already producing (an
+        // in-flight brief/post targets this keyword). A previously-minted pending rec
+        // for this gap auto-resolves in the merge tail below — intended: the pipeline
+        // is handling it, and `completed → pending` revives it on a later regen if the
+        // brief is deleted without ever publishing.
+        if (cg.targetKeyword && inFlightContentKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
+
         // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
-        // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
+        // "within-reach" by kdClassificationNote.
         const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
         const authorityAssessment = assessAuthorityFromBacklinks(cg.difficulty ?? null, backlinkProfile);
         const story = buildRecommendationStory('content_gap', {
@@ -1525,44 +1491,44 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           kdNote,
           authorityContext: authorityAssessment.note,
         });
-        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-          impactScore,
-          'content',
-          RecSource.strategyContentGap(),
-          outcomeLearnings,
-          cg.difficulty ?? null,
-        );
+        const source = RecSource.strategyContentGap();
+        const opportunity = computeOpportunityValue({
+          branch: 'content_gap',
+          opportunityScore: cg.opportunityScore ?? null,
+          volume: cg.volume ?? null,
+          difficulty: cg.difficulty ?? null,
+          trendDirection: cg.trendDirection ?? null,
+          llmLabel: cg.priority,
+          intent: deriveValueIntent(cg.targetKeyword, cg.intent),
+          authorityStrength: ovAuthority ?? null,
+          ctrCurve: ovCtrCurve,
+          timingBoost: maxBoostForPages(timingBoosts, []),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
+        // D2 (audit #11): content recs route into the existing brief-purchase flow.
+        const product = mapToProduct('content', 1, cg.suggestedPageType);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority: cg.priority === 'high' ? 'fix_soon' : 'ongoing',
+          priority: scoring.priority,
           type: 'content',
           title: story.title,
           description: story.description,
           insight: story.insight,
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
-          impactScore: adjustedImpactScore,
-          opportunity: computeOpportunityValue({
-            branch: 'content_gap',
-            opportunityScore: cg.opportunityScore ?? null,
-            volume: cg.volume ?? null,
-            difficulty: cg.difficulty ?? null,
-            trendDirection: cg.trendDirection ?? null,
-            llmLabel: cg.priority,
-            intent: cg.intent ?? null,
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            // content_gap recs carry no affectedPages today → timingBoost is always 0
-            // (no page to key an event to); included for consistency/future-proofing.
-            timingBoost: maxBoostForPages(timingBoosts, []),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.strategyContentGap(),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
           estimatedGain: story.estimatedGain,
           actionType: 'content_creation',
+          ...product,
+          // D2: persisted so the publish-time resolver can match this rec against the
+          // published post's targetKeyword (content-gap recs have no affectedPages).
+          targetKeyword: cg.targetKeyword,
           status: 'pending',
           assignedTo,
           // Carry the gap's deterministic-backfill provenance onto the rec (only when
@@ -1585,9 +1551,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
         if (pm.currentPosition && pm.currentPosition > 3 && pm.currentPosition <= 20 && pm.impressions && pm.impressions > 100) {
           // Page ranking 4-20 with decent impressions — opportunity to push up
-          // 2D: apply page importance multiplier
-          const baseScore = pm.currentPosition <= 10 ? 60 : 40;
-          const impactScore = Math.min(100, Math.round(baseScore * pageImportanceMultiplier(pm.pagePath)));
           const authorityAssessment = assessAuthorityFromBacklinks(pm.difficulty ?? null, backlinkProfile);
           const story = buildRecommendationStory('ranking_opportunity', {
             keyword: pm.primaryKeyword,
@@ -1596,37 +1559,33 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             impressions: pm.impressions,
             authorityContext: authorityAssessment.note,
           });
-          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-            impactScore,
-            'strategy',
-            RecSource.strategyRankingOpp(),
-            outcomeLearnings,
-            pm.difficulty ?? null,
-          );
+          const source = RecSource.strategyRankingOpp();
+          const opportunity = computeOpportunityValue({
+            branch: 'ranking_opp',
+            volume: pm.volume ?? null,
+            currentPosition: pm.currentPosition ?? null,
+            difficulty: pm.difficulty ?? null,
+            impressions: pm.impressions ?? null,
+            cpc: pm.cpc ?? null,
+            intent: deriveValueIntent(pm.primaryKeyword, pm.searchIntent),
+            authorityStrength: ovAuthority ?? null,
+            ctrCurve: ovCtrCurve,
+            timingBoost: maxBoostForPages(timingBoosts, [pm.pagePath.replace(/^\//, '')]),
+          }, { calibration: ovCalibration, weights: ovWeights });
+          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
-            priority: pm.currentPosition <= 10 ? 'fix_soon' : 'ongoing',
+            priority: scoring.priority,
             type: 'strategy',
             title: story.title,
             description: story.description,
             insight: story.insight,
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
-            impactScore: adjustedImpactScore,
-            opportunity: computeOpportunityValue({
-              branch: 'ranking_opp',
-              volume: pm.volume ?? null,
-              currentPosition: pm.currentPosition ?? null,
-              difficulty: pm.difficulty ?? null,
-              impressions: pm.impressions ?? null,
-              cpc: pm.cpc ?? null,
-              intent: toOpportunityIntent(pm.searchIntent),
-              authorityStrength: ovAuthority ?? null,
-              ctrCurve: ovCtrCurve,
-              timingBoost: maxBoostForPages(timingBoosts, [pm.pagePath.replace(/^\//, '')]),
-            }, { calibration: ovCalibration, weights: ovWeights }),
-            source: RecSource.strategyRankingOpp(),
+            impactScore: scoring.impactScore,
+            opportunity,
+            source,
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
             impressionsAtRisk: pm.impressions || 0,
@@ -1657,36 +1616,33 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (!mismatch) continue;
       intentMismatchCount++;
       const pageSlug = toPageSlug(pk.pagePath);
-      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-        50,
-        'strategy',
-        RecSource.strategyIntentMismatch(pageSlug),
-        outcomeLearnings,
-      );
+      const source = RecSource.strategyIntentMismatch(pageSlug);
+      const opportunity = computeOpportunityValue({
+        branch: 'ranking_opp',
+        volume: pk.volume ?? null,
+        currentPosition: pk.currentPosition ?? null,
+        difficulty: pk.difficulty ?? null,
+        impressions: pk.impressions ?? null,
+        cpc: pk.cpc ?? null,
+        intent: deriveValueIntent(pk.primaryKeyword, pk.searchIntent),
+        authorityStrength: ovAuthority ?? null,
+        ctrCurve: ovCtrCurve,
+        timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
+      }, { calibration: ovCalibration, weights: ovWeights });
+      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
-        priority: 'fix_soon',
+        priority: scoring.priority,
         type: 'strategy',
         title: `Intent Mismatch: /${pageSlug} (${pageType} page targeting ${pk.searchIntent} keyword)`,
         description: reason,
         insight: `Pages rank better when page type matches search intent. ${reason}`,
         impact: 'medium',
         effort: 'medium',
-        impactScore: adjustedImpactScore,
-        opportunity: computeOpportunityValue({
-          branch: 'ranking_opp',
-          volume: pk.volume ?? null,
-          currentPosition: pk.currentPosition ?? null,
-          difficulty: pk.difficulty ?? null,
-          impressions: pk.impressions ?? null,
-          cpc: pk.cpc ?? null,
-          intent: toOpportunityIntent(pk.searchIntent),
-          authorityStrength: ovAuthority ?? null,
-          ctrCurve: ovCtrCurve,
-          timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
-        }, { calibration: ovCalibration, weights: ovWeights }),
-        source: RecSource.strategyIntentMismatch(pageSlug),
+        impactScore: scoring.impactScore,
+        opportunity,
+        source,
         affectedPages: [pageSlug],
         trafficAtRisk: 0,
         impressionsAtRisk: 0,
@@ -1699,53 +1655,41 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       });
     }
 
-    // ── 2b. SEO Gen-Quality P5 — first-class orphan-subsystem recs (flag-gated). ──
+    // ── 2b. First-class orphan-subsystem recs. ──
     // keyword_gaps / topic_clusters / cannibalization_issues are normalized tables that
-    // until now only surfaced in the intelligence slice + strategy UI, never as recs. We
-    // mint them as first-class recs ONLY when the umbrella flag is on, so flag-OFF (= all
-    // prod today) is byte-identical: no new recs/sources, and the merge/auto-resolve loop
-    // below sees exactly the pre-P5 source set. Each orphan read is in its OWN try/catch
+    // until recently only surfaced in the intelligence slice + strategy UI, never as recs.
+    // They are now canonical recommendation producers. Each orphan read is in its OWN try/catch
     // calling failedCategories.add(<category>) on catch — a transient empty read must NOT
     // drop the source from newSources and falsely bulk-auto-resolve prior recs (FM-2/G2).
-    if (useGenQual) {
       // keyword_gap → ranking_opp branch (competitor outranks us; close the gap).
       try {
         const keywordGaps = listKeywordGaps(workspaceId).slice(0, 10);
         for (const kg of keywordGaps) {
           if (declinedKeywords.has(keywordComparisonKey(kg.keyword))) continue;
-          const baseScore = adjustKdImpactScore(
-            kg.volume > 0 ? Math.min(70, 40 + Math.round((Math.log10(kg.volume) / 5) * 30)) : 40,
-            kg.difficulty,
-            domainStrength,
-          );
-          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-            Math.max(10, Math.min(100, baseScore)),
-            'keyword_gap',
-            RecSource.keywordGap(kg.keyword),
-            outcomeLearnings,
-            kg.difficulty,
-          );
+          const source = RecSource.keywordGap(kg.keyword);
+          const opportunity = computeOpportunityValue({
+            branch: 'ranking_opp',
+            volume: kg.volume,
+            difficulty: kg.difficulty,
+            currentPosition: kg.competitorPosition,
+            authorityStrength: ovAuthority ?? null,
+            ctrCurve: ovCtrCurve,
+            timingBoost: maxBoostForPages(timingBoosts, []),
+          }, { calibration: ovCalibration, weights: ovWeights });
+          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
-            priority: 'ongoing',
+            priority: scoring.priority,
             type: 'keyword_gap',
             title: `Keyword Gap: "${kg.keyword}"`,
             description: `${kg.competitorDomain} ranks #${kg.competitorPosition} for "${kg.keyword}" (volume ${kg.volume.toLocaleString()}, difficulty ${kg.difficulty}) — you don't. Targeting this term captures demand a competitor already owns.`,
             insight: `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${kg.keyword}" lets you compete for a term with proven search demand.`,
             impact: kg.volume > 1000 ? 'high' : kg.volume > 200 ? 'medium' : 'low',
             effort: 'high',
-            impactScore: adjustedImpactScore,
-            opportunity: computeOpportunityValue({
-              branch: 'ranking_opp',
-              volume: kg.volume,
-              difficulty: kg.difficulty,
-              currentPosition: kg.competitorPosition,
-              authorityStrength: ovAuthority ?? null,
-              ctrCurve: ovCtrCurve,
-              timingBoost: maxBoostForPages(timingBoosts, []),
-            }, { calibration: ovCalibration, weights: ovWeights }),
-            source: RecSource.keywordGap(kg.keyword),
+            impactScore: scoring.impactScore,
+            opportunity,
+            source,
             affectedPages: [],
             trafficAtRisk: 0,
             impressionsAtRisk: 0,
@@ -1770,32 +1714,29 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const cluster = clusters[0];
         if (cluster) {
           const opportunityScore = Math.max(0, Math.min(100, 100 - cluster.coveragePercent));
-          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-            Math.max(10, Math.min(100, Math.round(opportunityScore))),
-            'topic_cluster',
-            RecSource.topicCluster(cluster.topic),
-            outcomeLearnings,
-          );
+          const source = RecSource.topicCluster(cluster.topic);
+          const opportunity = computeOpportunityValue({
+            branch: 'content_gap',
+            opportunityScore,
+            authorityStrength: ovAuthority ?? null,
+            ctrCurve: ovCtrCurve,
+            timingBoost: maxBoostForPages(timingBoosts, []),
+          }, { calibration: ovCalibration, weights: ovWeights });
+          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
           const gapPreview = cluster.gap.slice(0, 5).join(', ');
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
-            priority: 'ongoing',
+            priority: scoring.priority,
             type: 'topic_cluster',
             title: `Build Topical Authority: "${cluster.topic}"`,
             description: `You cover ${Math.round(cluster.coveragePercent)}% of the "${cluster.topic}" cluster (${cluster.ownedCount}/${cluster.totalCount} keywords). Filling the gaps${gapPreview ? ` (${gapPreview})` : ''} builds the topical depth search engines reward.`,
             insight: `Topical authority compounds — covering a cluster comprehensively signals expertise and lifts every page in it. "${cluster.topic}" is your weakest cluster, so it has the most room to grow.`,
             impact: opportunityScore > 60 ? 'high' : opportunityScore > 30 ? 'medium' : 'low',
             effort: 'high',
-            impactScore: adjustedImpactScore,
-            opportunity: computeOpportunityValue({
-              branch: 'content_gap',
-              opportunityScore,
-              authorityStrength: ovAuthority ?? null,
-              ctrCurve: ovCtrCurve,
-              timingBoost: maxBoostForPages(timingBoosts, []),
-            }, { calibration: ovCalibration, weights: ovWeights }),
-            source: RecSource.topicCluster(cluster.topic),
+            impactScore: scoring.impactScore,
+            opportunity,
+            source,
             affectedPages: [],
             trafficAtRisk: 0,
             impressionsAtRisk: 0,
@@ -1849,34 +1790,29 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const severity: 'error' | 'warning' | 'info' =
             item.severity === 'high' ? 'error' : item.severity === 'medium' ? 'warning' : 'info';
           const currentClicks = item.pages.reduce((sum, p) => sum + (p.clicks ?? 0), 0);
-          const priority: RecPriority = item.severity === 'high' ? 'fix_soon' : 'fix_later';
-          const baseScore = item.severity === 'high' ? 65 : item.severity === 'medium' ? 45 : 30;
-          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-            baseScore,
-            'cannibalization',
-            RecSource.cannibalization(urlSetKey),
-            outcomeLearnings,
-          );
+          const source = RecSource.cannibalization(urlSetKey);
+          const opportunity = computeOpportunityValue({
+            branch: 'technical',
+            severity,
+            currentClicks,
+            authorityStrength: ovAuthority ?? null,
+            ctrCurve: ovCtrCurve,
+            timingBoost: maxBoostForPages(timingBoosts, item.pages.map(p => toPageSlug(p.path))),
+          }, { calibration: ovCalibration, weights: ovWeights });
+          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
-            priority,
+            priority: scoring.priority,
             type: 'cannibalization',
             title: `Keyword Cannibalization: "${item.keyword}"`,
             description: `${item.pages.length} pages compete for "${item.keyword}", splitting ranking signals. ${item.recommendation}`,
             insight: `When multiple pages target the same keyword, search engines struggle to pick a winner — diluting authority and capping rankings. Consolidating to one canonical page recovers the combined strength.`,
             impact: item.severity === 'high' ? 'high' : item.severity === 'medium' ? 'medium' : 'low',
             effort: 'medium',
-            impactScore: adjustedImpactScore,
-            opportunity: computeOpportunityValue({
-              branch: 'technical',
-              severity,
-              currentClicks,
-              authorityStrength: ovAuthority ?? null,
-              ctrCurve: ovCtrCurve,
-              timingBoost: maxBoostForPages(timingBoosts, item.pages.map(p => toPageSlug(p.path))),
-            }, { calibration: ovCalibration, weights: ovWeights }),
-            source: RecSource.cannibalization(urlSetKey),
+            impactScore: scoring.impactScore,
+            opportunity,
+            source,
             affectedPages: item.pages.map(p => p.path),
             trafficAtRisk: currentClicks,
             impressionsAtRisk: item.pages.reduce((sum, p) => sum + (p.impressions ?? 0), 0),
@@ -1892,14 +1828,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         failedCategories.add('cannibalization');
         log.warn({ err, workspaceId }, 'Cannibalization issues unavailable for recommendations');
       }
-    }
   }
 
-  // ── 2c. SEO Gen-Quality P7.1 — first-class local-visibility recs (posture-gated). ──
-  // Minted ONLY when useLocalGenQual (gen-quality flag ON + posture local/hybrid +
-  // local-seo-visibility flag ON). When OFF (non-local / flag-off / local-flag-off) this whole
-  // block is skipped → ZERO local recs/sources, so the merge/auto-resolve loop below sees
-  // exactly the pre-P7.1 source set and generation is byte-identical (posture-gated parity test).
+  // ── 2c. First-class local-visibility recs (posture-gated). ──
+  // Minted only when the canonical local-SEO posture gate is on. When OFF
+  // (non-local posture) this whole block is skipped → zero local recs/sources, so
+  // the merge/auto-resolve loop below sees the non-local source set.
   // NOT nested in `if (audit)` — local visibility is provider-snapshot-sourced, independent of the
   // Webflow audit. Each reader is in its OWN try/catch calling failedCategories.add(<category>)
   // on catch — a transient empty/throwing read must NOT drop the source from newSources and
@@ -1971,34 +1905,31 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           .map(kw => localVolumeByKeyword.get(keywordComparisonKey(kw)) ?? 0)
           .reduce((max, v) => Math.max(max, v), 0);
         const opportunityScore = 60; // grounded composite proxy for an untargeted local service
-        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-          Math.max(10, Math.min(100, opportunityScore)),
-          'local_service_gap',
-          RecSource.localServiceGap(gap.serviceId),
-          outcomeLearnings,
-        );
+        const source = RecSource.localServiceGap(gap.serviceId);
+        const opportunity = computeOpportunityValue({
+          branch: 'local',
+          volume: pooledVolume > 0 ? pooledVolume : null,
+          opportunityScore: pooledVolume > 0 ? null : opportunityScore,
+          intent: 'commercial',
+          authorityStrength: ovAuthority ?? null,
+          ctrCurve: ovCtrCurve,
+          timingBoost: maxBoostForPages(timingBoosts, []),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
         const starterPreview = gap.starterKeywords.slice(0, 3).join(', ');
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority: 'ongoing',
+          priority: scoring.priority,
           type: 'local_service_gap',
           title: `You're not targeting ${gap.serviceLabel} ${marketPhrase}`,
           description: `You're not targeting ${gap.serviceLabel} locally yet — you have no tracking keywords for it. A focused page plus local-intent terms${starterPreview ? ` (e.g. ${starterPreview})` : ''} captures local demand you're currently missing.`,
           insight: `Local customers search by service and city. When you don't target a service you actually offer, competitors capture those local searches by default. Claiming ${gap.serviceLabel} ${marketPhrase} puts you in front of ready-to-buy local intent.`,
           impact: pooledVolume > 200 ? 'high' : 'medium',
           effort: 'medium',
-          impactScore: adjustedImpactScore,
-          opportunity: computeOpportunityValue({
-            branch: 'local',
-            volume: pooledVolume > 0 ? pooledVolume : null,
-            opportunityScore: pooledVolume > 0 ? null : opportunityScore,
-            intent: 'commercial',
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, []),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.localServiceGap(gap.serviceId),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
@@ -2034,34 +1965,29 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           continue;
         }
         const marketList = comp.markets.slice(0, 3).join(', ');
-        const baseScore = Math.min(80, 40 + comp.winsAgainstClient * 8);
-        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-          Math.max(10, Math.min(100, baseScore)),
-          'local_visibility',
-          RecSource.localVisibility(marketKey),
-          outcomeLearnings,
-        );
+        const source = RecSource.localVisibility(marketKey);
+        const opportunity = computeOpportunityValue({
+          branch: 'local',
+          intent: 'transactional',
+          localVisibilitySignal: Math.min(1, comp.winsAgainstClient / 5),
+          authorityStrength: ovAuthority ?? null,
+          ctrCurve: ovCtrCurve,
+          timingBoost: maxBoostForPages(timingBoosts, []),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority: 'fix_soon',
+          priority: scoring.priority,
           type: 'local_visibility',
           title: `${comp.title} keeps winning the local pack you're absent from`,
           description: `${comp.title} appeared in the local pack ${comp.totalAppearances} time${comp.totalAppearances === 1 ? '' : 's'}${marketList ? ` across ${marketList}` : ''}, and in ${comp.winsAgainstClient} of those your business wasn't showing at all. Each time, that local customer saw them instead of you.`,
           insight: `When a competitor consistently shows in the local pack and you don't, you're invisible for exactly the searches that drive local calls and visits. Getting into the pack for these markets is the highest-leverage local move you can make.`,
           impact: comp.winsAgainstClient > 3 ? 'high' : 'medium',
           effort: 'high',
-          impactScore: adjustedImpactScore,
-          opportunity: computeOpportunityValue({
-            branch: 'local',
-            intent: 'transactional',
-            // Not visible in markets where the pack already shows = high-intent local miss.
-            localVisibilitySignal: Math.min(1, comp.winsAgainstClient / 5),
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, []),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.localVisibility(marketKey),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
@@ -2106,17 +2032,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const marketKey = `${entry.marketId}:${entry.normalizedKeyword}`;
           // LOCAL_PACK_PRESENT is a not-visible-class signal → strong (possible=false) variant.
           const possible = entry.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
-          const baseScore = possible ? 45 : 55;
-          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-            Math.max(10, Math.min(100, baseScore)),
-            'local_visibility',
-            RecSource.localVisibility(marketKey),
-            outcomeLearnings,
-          );
+          const source = RecSource.localVisibility(marketKey);
+          const opportunity = computeOpportunityValue({
+            branch: 'local',
+            intent: 'transactional',
+            // A not_visible posture is a present, high-intent local miss → max urgency; a
+            // possible_match is partially covered → lower urgency.
+            localVisibilitySignal: possible ? 0.4 : 1,
+            authorityStrength: ovAuthority ?? null,
+            ctrCurve: ovCtrCurve,
+            timingBoost: maxBoostForPages(timingBoosts, []),
+          }, { calibration: ovCalibration, weights: ovWeights });
+          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
-            priority: possible ? 'fix_later' : 'fix_soon',
+            priority: scoring.priority,
             type: 'local_visibility',
             title: possible
               ? `You might be in the local pack for "${entry.keyword}" in ${entry.marketLabel} — but it's not confirmed`
@@ -2129,18 +2060,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
               : `The local pack is the top of local search results. Not appearing there for a relevant local term means missing the customers most likely to call or visit. This is a direct, addressable local-visibility gap.`,
             impact: possible ? 'medium' : 'high',
             effort: 'high',
-            impactScore: adjustedImpactScore,
-            opportunity: computeOpportunityValue({
-              branch: 'local',
-              intent: 'transactional',
-              // A not_visible posture is a present, high-intent local miss → max urgency; a
-              // possible_match is partially covered → lower urgency.
-              localVisibilitySignal: possible ? 0.4 : 1,
-              authorityStrength: ovAuthority ?? null,
-              ctrCurve: ovCtrCurve,
-              timingBoost: maxBoostForPages(timingBoosts, []),
-            }, { calibration: ovCalibration, weights: ovWeights }),
-            source: RecSource.localVisibility(marketKey),
+            impactScore: scoring.impactScore,
+            opportunity,
+            source,
             affectedPages: [],
             trafficAtRisk: 0,
             impressionsAtRisk: 0,
@@ -2171,11 +2093,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       for (const dp of actionableDecay) {
         const pageSlug = toPageSlug(dp.page);
 
-        const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
-        const impactScore = dp.severity === 'critical'
-          ? Math.min(90, 60 + Math.round(dp.previousClicks / 50))
-          : Math.min(70, 40 + Math.round(dp.previousClicks / 100));
-
         const product = mapToProduct('content_refresh', 1);
         const story = buildRecommendationStory('content_decay', {
           pagePath: dp.page,
@@ -2188,34 +2105,30 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           previousPosition: dp.previousPosition,
           currentPosition: dp.currentPosition,
         });
-
-        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-          impactScore,
-          'content_refresh',
-          RecSource.decay(pageSlug),
-          outcomeLearnings,
-        );
+        const source = RecSource.decay(pageSlug);
+        const opportunity = computeOpportunityValue({
+          branch: 'decay',
+          previousClicks: dp.previousClicks,
+          currentClicks: dp.currentClicks,
+          currentPosition: dp.currentPosition,
+          isRepeatDecay: dp.isRepeatDecay ?? null,
+          authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority,
+          priority: scoring.priority,
           type: 'content_refresh',
           title: story.title,
           description: story.description,
           insight: story.insight,
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
-          impactScore: adjustedImpactScore,
-          opportunity: computeOpportunityValue({
-            branch: 'decay',
-            previousClicks: dp.previousClicks,
-            currentClicks: dp.currentClicks,
-            currentPosition: dp.currentPosition,
-            isRepeatDecay: dp.isRepeatDecay ?? null,
-            authorityStrength: ovAuthority ?? null,
-            timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.decay(pageSlug),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
           impressionsAtRisk: dp.previousImpressions,
@@ -2264,33 +2177,30 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         position: d.position ?? 0,
         gap,
       });
-      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-        Math.min(90, 40 + Math.round(gap / 2)),
-        'metadata',
-        RecSource.ctrOpportunity(pageSlug),
-        outcomeLearnings,
-      );
+      const source = RecSource.ctrOpportunity(pageSlug);
+      const opportunity = computeOpportunityValue({
+        branch: 'ranking_opp',
+        expectedClickGap: d.estimatedClickGap ?? null,
+        impressions: d.impressions ?? null,
+        currentPosition: d.position ?? null,
+        authorityStrength: ovAuthority ?? null,
+        ctrCurve: ovCtrCurve,
+        timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
+      }, { calibration: ovCalibration, weights: ovWeights });
+      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
-        priority: gap > 50 ? 'fix_now' : 'fix_soon',
+        priority: scoring.priority,
         type: 'metadata',
         title: story.title,
         description: story.description,
         insight: story.insight,
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
-        impactScore: adjustedImpactScore,
-        opportunity: computeOpportunityValue({
-          branch: 'ranking_opp',
-          expectedClickGap: d.estimatedClickGap ?? null,
-          impressions: d.impressions ?? null,
-          currentPosition: d.position ?? null,
-          authorityStrength: ovAuthority ?? null,
-          ctrCurve: ovCtrCurve,
-          timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
-        }, { calibration: ovCalibration, weights: ovWeights }),
-        source: RecSource.ctrOpportunity(pageSlug),
+        impactScore: scoring.impactScore,
+        opportunity,
+        source,
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
         impressionsAtRisk: d.impressions ?? 0,
@@ -2316,37 +2226,31 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       .filter(r => r.status === 'completed' && r.remediationActions?.length > 0)
       .slice(0, 3);
 
-    const diagPriorityMap: Record<string, RecPriority> = { P0: 'fix_now', P1: 'fix_now', P2: 'fix_soon', P3: 'fix_later' };
-    const diagImpactMap: Record<string, number> = { high: 75, medium: 55, low: 35 };
-
     for (const report of completedReports) {
       for (let actionIdx = 0; actionIdx < Math.min(report.remediationActions.length, 5); actionIdx++) {
         const action = report.remediationActions[actionIdx];
         const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
-        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-          diagImpactMap[action.impact] ?? 55,
-          recType,
-          RecSource.diagnostic(report.id, actionIdx, action.title),
-          outcomeLearnings,
-        );
+        const source = RecSource.diagnostic(report.id, actionIdx, action.title);
+        const opportunity = computeOpportunityValue({
+          branch: 'diagnostic',
+          llmLabel: action.impact,
+          authorityStrength: ovAuthority ?? null,
+          timingBoost: maxBoostForPages(timingBoosts, action.pageUrls?.map(toPageSlug) ?? []),
+        }, { calibration: ovCalibration, weights: ovWeights });
+        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority: diagPriorityMap[action.priority] ?? 'fix_soon',
+          priority: scoring.priority,
           type: recType,
           title: `Diagnostic: ${action.title}`,
           description: action.description,
           insight: `Identified by deep diagnostic investigation (report ${report.id.slice(0, 8)}). ${action.description}`,
           impact: action.impact,
           effort: action.effort,
-          impactScore: adjustedImpactScore,
-          opportunity: computeOpportunityValue({
-            branch: 'diagnostic',
-            llmLabel: action.impact,
-            authorityStrength: ovAuthority ?? null,
-            timingBoost: maxBoostForPages(timingBoosts, action.pageUrls?.map(toPageSlug) ?? []),
-          }, { calibration: ovCalibration, weights: ovWeights }),
-          source: RecSource.diagnostic(report.id, actionIdx, action.title),
+          impactScore: scoring.impactScore,
+          opportunity,
+          source,
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
@@ -2375,38 +2279,35 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     for (const insight of topFreshness) {
       const d = insight.data;
       const trafficAtRisk = d.impressions ?? 0;
-      const impactScore = Math.min(Math.round(trafficAtRisk / 50), 80);
       const product = mapToProduct('content_refresh', 1);
       const story = buildRecommendationStory('freshness_alert', {
         pagePath: d.pagePath,
         daysSinceLastAnalysis: d.daysSinceLastAnalysis,
         trafficAtRisk,
       });
-      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
-        impactScore,
-        'content_refresh',
-        RecSource.freshnessAlert(toPageSlug(d.pagePath)),
-        outcomeLearnings,
-      );
+      const pageSlug = toPageSlug(d.pagePath);
+      const source = RecSource.freshnessAlert(pageSlug);
+      const opportunity = computeOpportunityValue({
+        branch: 'freshness',
+        impressions: trafficAtRisk,
+        authorityStrength: ovAuthority ?? null,
+        timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
+      }, { calibration: ovCalibration, weights: ovWeights });
+      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
-        priority: d.daysSinceLastAnalysis > 180 ? 'fix_now' : 'fix_soon',
+        priority: scoring.priority,
         type: 'content_refresh',
         title: story.title,
         description: story.description,
         insight: story.insight,
         impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
         effort: 'medium',
-        impactScore: adjustedImpactScore,
-        opportunity: computeOpportunityValue({
-          branch: 'freshness',
-          impressions: trafficAtRisk,
-          authorityStrength: ovAuthority ?? null,
-          timingBoost: maxBoostForPages(timingBoosts, [toPageSlug(d.pagePath)]),
-        }, { calibration: ovCalibration, weights: ovWeights }),
-        source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
-        affectedPages: [toPageSlug(d.pagePath)],
+        impactScore: scoring.impactScore,
+        opportunity,
+        source,
+        affectedPages: [pageSlug],
         trafficAtRisk,
         impressionsAtRisk: trafficAtRisk,
         estimatedGain: story.estimatedGain,
@@ -2463,8 +2364,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       // Preserve status from existing rec if it was in_progress or completed
       const oldRec = existingByKey.get(key);
       if (oldRec) {
-        if (oldRec.status === 'in_progress' || oldRec.status === 'completed') {
+        if (oldRec.status === 'in_progress') {
           newRec.status = oldRec.status;
+          newRec.id = oldRec.id; // keep same ID for frontend continuity
+          newRec.createdAt = oldRec.createdAt;
+        } else if (oldRec.status === 'completed') {
+          validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, oldRec.status, 'pending');
+          newRec.status = 'pending';
           newRec.id = oldRec.id; // keep same ID for frontend continuity
           newRec.createdAt = oldRec.createdAt;
         } else if (oldRec.status === 'dismissed') {
@@ -2487,12 +2393,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
       if (!newSources.has(buildMergeKey(oldRec))) {
-        // Issue no longer detected — auto-resolve
+        // D2: a content-gap rec suppressed because the pipeline already has an in-flight
+        // brief/post for its keyword is NOT "no longer detected" — the gap still exists,
+        // we're just already working on it. Use truthful copy so the client doesn't read
+        // "done" as "my content is live". (Pre-D2 recs without targetKeyword fall through
+        // to the generic copy — forward-looking only.)
+        const suppressedByPipeline = Boolean(
+          oldRec.targetKeyword
+          && inFlightContentKeywords.has(keywordComparisonKey(oldRec.targetKeyword)),
+        );
         recs.push({
           ...oldRec,
           status: 'completed',
           updatedAt: now,
-          insight: `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
+          insight: suppressedByPipeline
+            ? `✓ Content for this is already in progress — it will be marked done when it publishes. ${oldRec.insight}`
+            : `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
         });
         autoResolved++;
         autoResolvedRecs.push(oldRec);
@@ -2526,39 +2442,30 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
-  // ── Shadow divergence log (PR4): record legacy-#1 vs OV-#1 BEFORE the selector
-  // overwrites impactScore (so legacy is intact + opportunity.value is the OV value).
-  // Always-on, dark; must never break generation. sortRecommendations is injected
-  // to avoid a circular import. ──
-  try {
-    recordOvDivergence(workspaceId, recs, effectiveBusinessPriorities, sortRecommendations, deriveOvTier);
-  } catch (err) {
-    log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'OV divergence logging failed (non-fatal)');
-  }
-
-  // ── Opportunity Value cutover (flag-gated, single application point). ──
-  // With the flag OFF this is a no-op and impactScore stays byte-identical to
-  // legacy. With it ON, the ranked impactScore reads from the attached OV value.
-  // Score ONLY — estimatedGain is untouched (client-facing, deferred to P5/P6).
-  for (const r of recs) r.impactScore = pickImpactScore(r, useOv);
-
-  // ── SEO Gen-Quality P4 · OV-derived tier + one gain basis chokepoint (flag-gated). ──
-  // AFTER pickImpactScore (so impactScore is final) and BEFORE sortRecommendations
-  // (which sorts by rec.priority first). Flag-OFF: NO-OP — the legacy per-branch tier AND
-  // the legacy getRecoveryRate estimatedGain strings survive untouched, so
-  // sortRecommendations / priorityOrder / computeRecommendationSummary AND every gain string
-  // are byte-identical to pre-P4. CRITICAL_CHECKS keep fix_now (handled inside deriveOvTier).
-  // Both the tier (Contract 2) and the gain string (Contract 3) derive from the one OV figure.
-  if (useGenQual) {
-    for (const r of recs) {
-      r.priority = deriveOvTier(r);
-      r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, useGenQual);
+  // ── Canonical OV scoring + one gain basis chokepoint. ──
+  // Keep one post-pass so every producer converges on the same final authority even if a
+  // future branch accidentally provides a placeholder priority/score during construction.
+  const outcomeRankScores = new Map<string, number>();
+  for (const r of recs) {
+    if (r.opportunity) {
+      const scoring = deriveCanonicalRecommendationFields(r.source, r.opportunity);
+      r.impactScore = scoring.impactScore;
+      r.priority = scoring.priority;
     }
+    const outcomeAdjustment = buildOutcomeAdjustment({
+      actionType: recommendationOutcomeActionType(r.type, r.source),
+      learnings: outcomeLearnings,
+    });
+    if (outcomeAdjustment.multiplier !== 1) {
+      outcomeRankScores.set(r.id, applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment));
+    }
+    r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, true);
   }
 
-  // ── Sort: tier PRIMARY, impactScore SECONDARY, business-intent alignment as
-  // the final within-tier tiebreaker (see sortRecommendations). ──
-  sortRecommendations(recs, effectiveBusinessPriorities);
+  // ── Sort: tier PRIMARY, learned rank score / impactScore SECONDARY, business-intent
+  // alignment as the final within-tier tiebreaker. Learning scores are rank-only so
+  // the public `impactScore === opportunity.value` contract stays intact.
+  sortRecommendations(recs, effectiveBusinessPriorities, { rankScores: outcomeRankScores });
 
   // ── Build summary (exclude auto-resolved from active counts) ──
   const summary = computeRecommendationSummary(recs);

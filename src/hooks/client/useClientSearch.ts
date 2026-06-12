@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
 import { gsc } from '../../api/analytics';
+import { useGSCBase } from '../shared/useGSCBase';
 import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 import type { SearchOverview, PerformanceTrend, SearchComparison } from '../../components/client/types';
 import type { SearchDeviceBreakdown } from '../../../shared/types/analytics';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
@@ -10,6 +11,17 @@ export interface ClientSearchData {
   trend: PerformanceTrend[];
   comparison: SearchComparison | null;
   devices: SearchDeviceBreakdown[];
+  dataUpdatedAt: number | null;
+}
+
+type FreshnessQuery = {
+  status: 'pending' | 'error' | 'success';
+  dataUpdatedAt: number;
+};
+
+function primaryDataUpdatedAt(query: FreshnessQuery, data: unknown): number | null {
+  if (!data || query.status !== 'success' || query.dataUpdatedAt <= 0) return null;
+  return query.dataUpdatedAt;
 }
 
 export function useClientSearch(
@@ -19,37 +31,32 @@ export function useClientSearch(
   enabled: boolean,
 ) {
   const dr = dateRange;
-
-  const overview = useQuery({
-    queryKey: queryKeys.client.gsc(wsId, 'overview', days, dr),
-    queryFn: () => gsc.overview(wsId, days, dr),
+  const {
+    overviewQ,
+    trendQ,
+    comparisonQ,
+    devicesQ,
+  } = useGSCBase({
     enabled,
+    makeKey: metric => queryKeys.client.gsc(wsId, metric, days, dr),
+    staleTime: STALE_TIMES.ANALYTICS,
+    api: {
+      overview: () => gsc.overview(wsId, days, dr),
+      trend: () => gsc.trend(wsId, days, dr),
+      comparison: () => gsc.comparison(wsId, days, dr),
+      devices: () => gsc.devices(wsId, days, dr),
+    },
   });
 
-  const trend = useQuery({
-    queryKey: queryKeys.client.gsc(wsId, 'trend', days, dr),
-    queryFn: () => gsc.trend(wsId, days, dr),
-    enabled,
-  });
-
-  const comparison = useQuery({
-    queryKey: queryKeys.client.gsc(wsId, 'comparison', days, dr),
-    queryFn: () => gsc.comparison(wsId, days, dr),
-    enabled,
-  });
-
-  const devices = useQuery({
-    queryKey: queryKeys.client.gsc(wsId, 'devices', days, dr),
-    queryFn: () => gsc.devices(wsId, days, dr),
-    enabled,
-  });
+  const overview = (overviewQ.data ?? null) as SearchOverview | null;
 
   return {
-    overview: (overview.data ?? null) as SearchOverview | null,
-    trend: trend.data ?? [],
-    comparison: (comparison.data ?? null) as SearchComparison | null,
-    devices: devices.data ?? [],
-    isLoading: overview.isLoading || trend.isLoading,
-    error: overview.error || trend.error || comparison.error || devices.error,
+    overview,
+    trend: trendQ.data ?? [],
+    comparison: (comparisonQ.data ?? null) as SearchComparison | null,
+    devices: devicesQ.data ?? [],
+    dataUpdatedAt: primaryDataUpdatedAt(overviewQ, overview),
+    isLoading: overviewQ.isLoading || trendQ.isLoading,
+    error: overviewQ.error || trendQ.error || comparisonQ.error || devicesQ.error,
   };
 }

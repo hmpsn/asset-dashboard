@@ -22,15 +22,16 @@ describe('inbox route-to-service extraction contract', () => {
   // respondToSource path both drive the SAME respondToApprovalBatch service (no divergence).
   it('keeps the public bulk-approve route delegated to respondToApprovalBatch', () => {
     const route = readSource('server/routes/approvals.ts'); // readFile-ok - contract guard for R2 route-to-service extraction.
-    expect(route).toContain("from '../domains/inbox/approval-batch-respond.js'");
+    expect(route).toContain("from '../domains/inbox/approval-batch-response-lifecycle.js'");
     expect(route).toContain('respondToApprovalBatch(');
+    expect(route).toContain('respondToApprovalBatchItem(');
   });
 
   // R2: the public schema-plan feedback route AND the unified-inbox respondToSource path both
   // drive the SAME respondToSchemaPlanFeedback service (no divergence).
   it('keeps the public schema-plan feedback route delegated to respondToSchemaPlanFeedback', () => {
     const route = readSource('server/routes/webflow-schema.ts'); // readFile-ok - contract guard for R2 route-to-service extraction.
-    expect(route).toContain("from '../domains/inbox/schema-plan-respond.js'");
+    expect(route).toContain("from '../domains/schema/schema-plan-lifecycle.js'");
     expect(route).toContain('respondToSchemaPlanFeedback(');
   });
 

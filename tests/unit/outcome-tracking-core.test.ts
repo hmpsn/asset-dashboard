@@ -74,7 +74,12 @@ function makeAction(id: string, overrides: Partial<TrackedAction> = {}): Tracked
       clicks: 10,
     },
     trailingHistory: { metric: '', dataPoints: [] },
-    attribution: 'not_acted_on',
+    // A1 (I1): default to an EXECUTED attribution. getTopWinsFromActions now excludes
+    // `not_acted_on` actions from every win surface (an unexecuted suggestion is not a
+    // win), so a `not_acted_on` default would silently drop every win in these
+    // sorting/limit/field-mapping tests. Attribution-specific behavior is covered by
+    // tests that pass an explicit override.
+    attribution: 'platform_executed',
     measurementWindow: 90,
     measurementComplete: false,
     sourceFlag: 'live',

@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import db from '../../server/db/index.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13727);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const UNKNOWN_WORKSPACE_ID = 'ws_fixture_public_business_priorities_missing';
 let authFixture: SeededAuth | null = null;
 
@@ -37,9 +37,9 @@ describe('Fixture public business priorities unknown workspace boundary', () => 
       }),
     });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
     const body = await res.json() as { error: string };
-    expect(body.error).toBe('Authentication required');
+    expect(body.error).toBe('Workspace not found');
   });
 
   it('POST /api/public/business-priorities/:workspaceId returns 404 after auth passes and workspace is missing', async () => {

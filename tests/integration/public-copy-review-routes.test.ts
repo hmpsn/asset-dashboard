@@ -15,9 +15,9 @@ import { createClientUser, deleteClientUser, signClientToken } from '../../serve
 import { addEntry, createBlueprint } from '../../server/page-strategy.js';
 import { updateWorkspace } from '../../server/workspaces.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13348); // port-ok: 13201-13347 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';
@@ -216,7 +216,7 @@ describe('Public copy review suggestions', () => {
 
     const res = await api(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ originalText: { text: 'Structured' } }),
     });
 

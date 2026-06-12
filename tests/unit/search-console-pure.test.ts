@@ -8,7 +8,7 @@
  *        but additional edge-case tests added here for completeness).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   formatGscCtr,
   formatGscPosition,
@@ -19,6 +19,10 @@ import {
   gscDateRange,
   paginateGscQuery,
 } from '../../server/search-console.js';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // ─── formatGscCtr ───────────────────────────────────────────────────────────
 
@@ -401,12 +405,12 @@ describe('gscDateRange', () => {
     expect(diff).toBeLessThanOrEqual(4);
   });
 
-  it('startDate is `days` days before endDate', () => {
+  it('startDate and endDate cover an inclusive `days` window', () => {
     const result = gscDateRange(28);
     const startDate = new Date(result.startDate);
     const endDate = new Date(result.endDate);
     const diff = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    expect(diff).toBe(28);
+    expect(diff).toBe(27);
   });
 
   it('respects different day counts', () => {
@@ -414,7 +418,19 @@ describe('gscDateRange', () => {
     const startDate = new Date(result90.startDate);
     const endDate = new Date(result90.endDate);
     const diff = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    expect(diff).toBe(90);
+    expect(diff).toBe(89);
+  });
+
+  it('preserves exact day spans across DST boundaries', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-12T12:00:00.000Z'));
+
+    const result = gscDateRange(90);
+    const startDate = new Date(`${result.startDate}T00:00:00.000Z`);
+    const endDate = new Date(`${result.endDate}T00:00:00.000Z`);
+    const diff = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    expect(diff).toBe(89);
   });
 
   it('startDate is before endDate', () => {

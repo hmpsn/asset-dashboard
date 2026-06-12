@@ -15,11 +15,11 @@
  * or are aware that the 6th+ call may return 429.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { createClientUser, createResetToken, deleteClientUser } from '../../server/client-users.js';
 
-const PORT = 13500;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Each describe block that calls rate-limited endpoints gets its own workspace
@@ -297,5 +297,33 @@ describe('POST /api/public/reset-password — complete password reset', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
     expect(body.error).toBeTruthy();
+  });
+
+  it('returns 403 when reset token belongs to a disabled client portal', async () => {
+    const ws = createWorkspace('PublicAuth-13500-ResetDisabled').id;
+    let clientUserId = '';
+    try {
+      const clientUser = await createClientUser(
+        'reset-disabled-client@test.local',
+        'ClientPass1!',
+        'Reset Disabled Client',
+        ws,
+      );
+      clientUserId = clientUser.id;
+      const resetToken = createResetToken(clientUser.email, ws);
+      updateWorkspace(ws, { clientPortalEnabled: false });
+
+      const res = await postJson('/api/public/reset-password', {
+        token: resetToken!.token,
+        newPassword: 'NewPass123!',
+      });
+
+      expect(res.status).toBe(403);
+      const body = await res.json() as { error: string };
+      expect(body.error).toMatch(/client portal is disabled/i);
+    } finally {
+      if (clientUserId) deleteClientUser(clientUserId, ws);
+      deleteWorkspace(ws);
+    }
   });
 });

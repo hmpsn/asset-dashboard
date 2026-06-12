@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Layers, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, Icon, Button, ClickableRow } from '../ui';
+import { SectionCard, Badge, EmptyState, Icon, Button } from '../ui';
 import { MatrixProgressView } from './MatrixProgressView';
 import { clientPath } from '../../routes';
 import { contentPlanReview } from '../../api/content';
@@ -46,21 +46,59 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
 
   const handleFlagCell = useCallback(async (cellId: string, comment: string) => {
     if (!selectedMatrixId) return;
+    const queryKey = queryKeys.client.contentPlan(workspaceId);
+    const previousPlans = queryClient.getQueryData<ContentMatrix[]>(queryKey);
+    const flaggedAt = new Date().toISOString();
+
+    queryClient.setQueryData<ContentMatrix[]>(
+      queryKey,
+      prev => (prev ?? []).map(plan => (
+        plan.id !== selectedMatrixId
+          ? plan
+          : {
+              ...plan,
+              cells: plan.cells.map(cell => (
+                cell.id !== cellId
+                  ? cell
+                  : {
+                      ...cell,
+                      status: 'flagged',
+                      clientFlag: comment,
+                      clientFlaggedAt: flaggedAt,
+                    }
+              )),
+            }
+      )),
+    );
+
     try {
       await contentPlanReview.flagCell(workspaceId, selectedMatrixId, cellId, comment);
-      setToast({ message: 'Feedback submitted', type: 'success' });
+      setToast({ message: 'Thanks - your feedback was sent to the team.', type: 'success' });
+    } catch (err) {
+      queryClient.setQueryData(queryKey, previousPlans);
+      setToast({
+        message: err instanceof Error ? err.message : 'We could not send that feedback. Please try again.',
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
       const updated = await contentPlanReview.getPlan(workspaceId, selectedMatrixId);
       queryClient.setQueryData<ContentMatrix[]>(
-        queryKeys.client.contentPlan(workspaceId),
+        queryKey,
         prev => (prev ?? []).map(p => p.id === selectedMatrixId ? updated as ContentMatrix : p),
       );
-    } catch (err) {
-      setToast({ message: err instanceof Error ? err.message : 'Failed to submit feedback', type: 'error' });
+    } catch {
+      // Keep the optimistic confirmation visible; the next successful query refresh will reconcile.
     }
   }, [workspaceId, selectedMatrixId, setToast, queryClient]);
 
-  const handleDownload = useCallback((format: 'docx' | 'pdf') => {
-    window.open(`/api/export/${workspaceId}/matrices?format=${format === 'docx' ? 'csv' : 'json'}`, '_blank');
+  // Honest format names: 'csv' and 'json' match what the endpoint actually delivers.
+  // Public route: client portal auth (cookie) — the admin /api/export/ path sits behind
+  // the global APP_PASSWORD gate and returns 401 for real client sessions.
+  const handleDownload = useCallback((format: 'csv' | 'json') => {
+    window.open(`/api/public/export/${workspaceId}/matrices?format=${format}`, '_blank');
   }, [workspaceId]);
 
   if (loading) {
@@ -134,41 +172,44 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
             const progress = total > 0 ? Math.round((published / total) * 100) : 0;
 
             return (
-              <ClickableRow
+              <div
                 key={plan.id}
-                onClick={() => setSelectedMatrixId(plan.id)}
                 className="flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 group"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  <div className="min-w-0">
-                    <span className="t-ui font-medium text-[var(--brand-text-bright)] transition-colors truncate block">
-                      {plan.name}
-                    </span>
-                    <span className="t-caption text-[var(--brand-text-muted)]">
-                      {total} pages · {progress}% complete
-                    </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedMatrixId(plan.id)}
+                  className="min-w-0 flex-1 justify-between gap-3 px-0 py-0 text-left hover:bg-transparent"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                    <div className="min-w-0">
+                      <span className="t-ui font-medium text-[var(--brand-text-bright)] transition-colors truncate block">
+                        {plan.name}
+                      </span>
+                      <span className="t-caption text-[var(--brand-text-muted)]">
+                        {total} pages · {progress}% complete
+                      </span>
+                    </div>
                   </div>
-                </div>
+                  <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden flex-shrink-0">
+                    <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </Button>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {inReview > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="px-0 py-0 hover:bg-transparent"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`);
-                      }}
+                      onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`)}
                     >
                       <Badge label={`${inReview} needs review`} tone="blue" />
                     </Button>
                   )}
-                  <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-                    <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />
-                  </div>
                 </div>
-              </ClickableRow>
+              </div>
             );
           })}
         </div>

@@ -10,9 +10,9 @@
  * - PATCH merges with existing profile (does not wipe unrelated fields)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13252);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 const CLIENT_PASSWORD = 'integration-test-pw';
@@ -75,7 +75,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
 
   it('returns 401 without a client session', async () => {
     // Use a raw fetch without the cookie jar
-    const res = await fetch(`http://localhost:${ctx.PORT}/api/public/workspaces/${workspaceId}/business-profile`, {
+    const res = await fetch(`${ctx.BASE}/api/public/workspaces/${workspaceId}/business-profile`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: '555-1234' }),
@@ -150,7 +150,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
     });
     const before = await getPublicBusinessProfile();
 
-    const res = await fetch(`http://localhost:${ctx.PORT}/api/public/workspaces/${workspaceId}/business-profile`, {
+    const res = await fetch(`${ctx.BASE}/api/public/workspaces/${workspaceId}/business-profile`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

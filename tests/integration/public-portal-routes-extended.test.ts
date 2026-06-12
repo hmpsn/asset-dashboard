@@ -2,8 +2,6 @@
  * Extended integration tests for server/routes/public-portal.ts
  *
  * Targets endpoints and branches NOT covered by the existing test files:
- *   - public-portal-routes.test.ts (port 13367)
- *   - public-portal-auth.test.ts   (port 13304)
  *
  * Focuses on:
  *   1. GET /api/public/pricing/:id
@@ -20,7 +18,7 @@
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
@@ -29,7 +27,7 @@ import { updateWorkspace } from '../../server/workspaces.js';
 import { initializeSections, saveGeneratedCopy } from '../../server/copy-review.js';
 import { createBlueprint, addEntry } from '../../server/page-strategy.js';
 
-const ctx = createTestContext(13380); // port-ok: 13380
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────
@@ -275,7 +273,7 @@ describe('GET /api/public/audit-traffic/:workspaceId', () => {
   it('returns 401 for a workspace with no clientPassword set (authenticated-portal gate)', async () => {
     const noIntWs = seedWorkspace({ clientPassword: '', gscPropertyUrl: undefined, ga4PropertyId: undefined });
     try {
-      const res = await api(`/api/public/audit-traffic/${noIntWs.workspaceId}`);
+      const res = await api(`/api/public/audit-traffic/${noIntWs.workspaceId}`, { headers: { 'x-no-auto-public-auth': 'true' } });
       expect(res.status).toBe(401);
     } finally {
       noIntWs.cleanup();
@@ -308,7 +306,7 @@ describe('POST /api/public/onboarding/:id — authentication', () => {
   it('returns 401 without auth cookies', async () => {
     const res = await api(`/api/public/onboarding/${wsA.workspaceId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
       body: JSON.stringify({ business: { businessName: 'Acme Inc.' } }),
     });
     expect(res.status).toBe(401);
@@ -646,7 +644,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
   it('returns 401 without auth', async () => {
     const res = await api(
       `/api/public/copy/${approveWs.workspaceId}/section/fake-section-id/approve`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' }, body: '{}' },
     );
     expect(res.status).toBe(401);
   });
@@ -815,7 +813,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       `/api/public/copy/${suggestWs.workspaceId}/section/fake-section-id/suggest`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
         body: JSON.stringify({ originalText: 'old', suggestedText: 'new' }),
       },
     );

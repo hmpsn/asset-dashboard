@@ -10,18 +10,12 @@ import path from 'path';
 import { broadcast } from '../broadcast.js';
 import type * as OpenAIMod from 'openai';
 import type { default as SharpConstructor } from 'sharp';
-import type { execFileSync as ExecFileSyncFn } from 'child_process';
 import { getUploadRoot } from '../data-dir.js';
 import { getAuditTrafficForWorkspace } from '../helpers.js';
 import { upload, moveUploadedFiles, requireClientPortalAuth } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
 import { listSites, getPageDom } from '../webflow.js';
-import {
-  listWorkspaces,
-  getWorkspace,
-  getTokenForSite,
-  getAllPageStates,
-} from '../workspaces.js';
+import { getAllPageStates, getTokenForSite, getWorkspace, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
@@ -77,8 +71,7 @@ router.post('/api/upload/:workspaceId/meta', requireWorkspaceAccess('workspaceId
 // --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
 router.get('/api/audit-traffic/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
-    const allWs = listWorkspaces();
-    const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
+    const ws = getWorkspaceBySiteId(req.params.siteId);
     if (!ws) return res.json({});
     const trafficMap = await getAuditTrafficForWorkspace(ws);
     return res.json(trafficMap);
@@ -117,7 +110,7 @@ router.post('/api/smart-name', requireWorkspaceSiteAccess({
 
         // Scan pages to find where this asset is used
         if (assetId || imageUrl) {
-          const smartNameWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+          const smartNameWs = getWorkspaceBySiteId(siteId);
           const pages = smartNameWs ? await getWorkspacePages(smartNameWs.id, siteId) : [];
           const usedOnPages: string[] = [];
           for (const page of pages.slice(0, 15)) {
@@ -218,8 +211,9 @@ router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('worksp
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file' });
 
-  const workspaces = listWorkspaces();
-  const wsMatch = workspaces.find(w => w.id === req.params.workspaceId || w.folder === req.params.workspaceId);
+  // id → single-row helper; folder fallback has no index helper.
+  const wsMatch = getWorkspace(req.params.workspaceId)
+    ?? listWorkspaces().find(w => w.folder === req.params.workspaceId); // list-workspaces-find-ok: folder has no index; id path is the helper above
   const destFolder = wsMatch ? path.join(getUploadRoot(), wsMatch.folder) : path.join(getUploadRoot(), '_unsorted');
   fs.mkdirSync(destFolder, { recursive: true });
 
@@ -229,21 +223,18 @@ router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('worksp
 
   try {
     // Resize to 2x for HDPI: halve dimensions so it's crisp at 2x
-    const { execFileSync }: { execFileSync: typeof ExecFileSyncFn } = await import('child_process'); // dynamic-import-ok
-    // Get current dimensions
-    const sipsInfo = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', file.path], { encoding: 'utf-8' });
-    const widthMatch = sipsInfo.match(/pixelWidth:\s*(\d+)/);
-    const heightMatch = sipsInfo.match(/pixelHeight:\s*(\d+)/);
-
-    if (widthMatch && heightMatch) {
-      const w = Math.round(parseInt(widthMatch[1]) / 2);
-      const h = Math.round(parseInt(heightMatch[1]) / 2);
-      execFileSync('sips', ['-z', String(h), String(w), file.path, '--out', targetPath], { stdio: 'pipe' });
+    const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
+    const image = sharp(file.path);
+    const metadata = await image.metadata();
+    if (metadata.width && metadata.height) {
+      await image
+        .resize(Math.round(metadata.width / 2), Math.round(metadata.height / 2), { fit: 'inside', withoutEnlargement: true })
+        .toFile(targetPath);
     } else {
       fs.renameSync(file.path, targetPath);
     }
   } catch (err) {
-    log.debug({ err }, 'misc: image resize via sips failed, falling back to move without resize');
+    log.debug({ err }, 'misc: clipboard image resize failed, falling back to move without resize');
     fs.renameSync(file.path, targetPath);
   }
 

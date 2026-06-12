@@ -8,23 +8,21 @@
  * (organic) gap does NOT carry the flag. This catches a regression in the
  * whitelist that would silently drop the field (the lockstep gap P2 closes).
  *
- * Port: 13879 (exclusive to this file; range 13201–13899).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertContentGap } from '../../server/content-gaps.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
 
-const PORT = 13879;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
-  wsId = createWorkspace(`P2 Backfilled Read ${PORT}`).id;
+  wsId = createWorkspace(`P2 Backfilled Read ${ctx.PORT}`).id;
 
   const organic: ContentGap = {
     topic: 'Organic strong idea',

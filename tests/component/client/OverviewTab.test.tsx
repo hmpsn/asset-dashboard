@@ -87,6 +87,8 @@ const baseProps = {
   ga4Organic: null,
   ga4Conversions: [],
   ga4NewVsReturning: [],
+  searchDataUpdatedAt: null,
+  ga4DataUpdatedAt: null,
   audit: null,
   auditDetail: null,
   strategyData: null,
@@ -104,6 +106,26 @@ const baseProps = {
   onOpenChat: vi.fn(),
   clientUser: null,
   contentPlanSummary: null,
+};
+
+const searchOverview = {
+  totalClicks: 125,
+  totalImpressions: 2400,
+  avgCtr: 5.2,
+  avgPosition: 8.4,
+  topQueries: [],
+  topPages: [],
+  dateRange: { start: '2026-06-01', end: '2026-06-11' },
+};
+
+const ga4Overview = {
+  totalUsers: 320,
+  totalSessions: 440,
+  totalPageviews: 980,
+  avgSessionDuration: 72,
+  bounceRate: 42,
+  newUserPercentage: 64,
+  dateRange: { start: '2026-06-01', end: '2026-06-11' },
 };
 
 beforeEach(() => {
@@ -140,6 +162,42 @@ describe('OverviewTab — basic rendering', () => {
   it('renders HealthScoreCard (always present)', () => {
     render(<OverviewTab {...baseProps} />);
     expect(screen.getByTestId('health-score-card')).toBeInTheDocument();
+  });
+
+  it('renders source-specific freshness stamps for blended overview metrics', () => {
+    render(
+      <OverviewTab
+        {...baseProps}
+        overview={searchOverview}
+        ga4Overview={ga4Overview}
+        searchDataUpdatedAt={new Date('2026-06-11T15:30:00.000Z').getTime()}
+        ga4DataUpdatedAt={new Date('2026-06-11T16:45:00.000Z').getTime()}
+      />,
+    );
+
+    expect(screen.getByText(/Search data as of/i)).toBeInTheDocument();
+    expect(screen.getByText(/Analytics data as of/i)).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => {
+      return element?.tagName.toLowerCase() === 'time'
+        && element.getAttribute('dateTime') === '2026-06-11T15:30:00.000Z';
+    })).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => {
+      return element?.tagName.toLowerCase() === 'time'
+        && element.getAttribute('dateTime') === '2026-06-11T16:45:00.000Z';
+    })).toBeInTheDocument();
+  });
+
+  it('does not show freshness stamps when source metrics are missing', () => {
+    render(
+      <OverviewTab
+        {...baseProps}
+        searchDataUpdatedAt={new Date('2026-06-11T15:30:00.000Z').getTime()}
+        ga4DataUpdatedAt={new Date('2026-06-11T16:45:00.000Z').getTime()}
+      />,
+    );
+
+    expect(screen.queryByText(/Search data as of/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Analytics data as of/i)).not.toBeInTheDocument();
   });
 
   it('renders InsightsDigest', () => {

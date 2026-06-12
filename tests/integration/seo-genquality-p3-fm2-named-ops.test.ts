@@ -170,13 +170,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setWorkspaceFlagOverride('seo-generation-quality', seeded.workspaceId, null);
   deleteWorkspace(seeded.workspaceId);
 });
 
-describe('P3 FM-2 — malformed AI on the flag-ON path is never-empty (retry → backfill)', () => {
-  it('flag-ON: malformed assignment + synthesis → retry → deterministic backfill → NON-EMPTY contentGaps', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', seeded.workspaceId, true);
+describe('P3 FM-2 — malformed AI is never-empty (retry → backfill)', () => {
+  it('malformed assignment + synthesis → retry → deterministic backfill → NON-EMPTY contentGaps', async () => {
     aiState.mode = 'malformed';
 
     const mockCallAI = vi.mocked(callAI);
@@ -201,21 +199,8 @@ describe('P3 FM-2 — malformed AI on the flag-ON path is never-empty (retry →
     expect(siteSynthesisCalls.length).toBeGreaterThanOrEqual(2);
   });
 });
-
-describe('P3 FM-2 — malformed AI on the flag-OFF path still THROWS (legacy parity)', () => {
-  // Evidence token (ai-reliability-registry `seo-gen-quality-malformed-ai-throws`):
-  // on the flag-OFF legacy path a malformed AI synthesis response makes generation THROW.
-  it('flag-OFF: malformed master synthesis response makes generation THROW', async () => {
-    // Flag left OFF (default).
-    aiState.mode = 'malformed';
-    await expect(synthesizeKeywordStrategy(buildOptions(seeded.workspaceId)))
-      .rejects.toBeInstanceOf(KeywordStrategySynthesisError);
-  });
-});
-
-describe('P3 I1 — closed-set membership (flag-ON): hallucinated id/keyword is rejected', () => {
+describe('P3 I1 — closed-set membership: hallucinated id/keyword is rejected', () => {
   it('an out-of-set sourceId/keyword is NOT admitted and does not override a valid in-set keyword', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', seeded.workspaceId, true);
     aiState.mode = 'out-of-set';
 
     const result = await synthesizeKeywordStrategy(buildOptions(seeded.workspaceId));
@@ -243,9 +228,8 @@ describe('P3 I1 — closed-set membership (flag-ON): hallucinated id/keyword is 
   });
 });
 
-describe('P3 client-signal contract (flag-ON)', () => {
+describe('P3 client-signal contract', () => {
   it('a requested keyword the AI omits is re-added as a content gap; a declined keyword never appears', async () => {
-    setWorkspaceFlagOverride('seo-generation-quality', seeded.workspaceId, true);
     aiState.mode = 'requested-omitted';
 
     // Client requested a keyword the AI never returns; client declined another.

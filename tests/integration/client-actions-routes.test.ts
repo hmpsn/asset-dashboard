@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 
-const ctx = createTestContext(13332); // port-ok: 13201-13331 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, clearCookies } = ctx;
 
 let wsId = '';
@@ -397,7 +397,9 @@ describe('client action routes', () => {
   });
 
   it('requires client auth for password-protected public action reads', async () => {
-    const res = await api(`/api/public/client-actions/${privateWsId}`);
+    const res = await api(`/api/public/client-actions/${privateWsId}`, {
+      headers: { 'x-no-auto-public-auth': 'true' },
+    });
     expect(res.status).toBe(401);
   });
 
@@ -411,9 +413,13 @@ describe('client action routes', () => {
     const created = await createRes.json();
 
     clearCookies();
-    const unauthenticatedRes = await patchJson(`/api/public/client-actions/${privateWsId}/${created.id}/respond`, {
-      status: 'approved',
-      clientNote: 'This should not be saved.',
+    const unauthenticatedRes = await api(`/api/public/client-actions/${privateWsId}/${created.id}/respond`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
+      body: JSON.stringify({
+        status: 'approved',
+        clientNote: 'This should not be saved.',
+      }),
     });
     expect(unauthenticatedRes.status).toBe(401);
 

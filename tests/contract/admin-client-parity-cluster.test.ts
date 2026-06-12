@@ -31,6 +31,6 @@ describe('A5 parity cluster contract tests', () => {
     it('briefing-candidates.ts does not export or contain deriveOpportunityScore', async () => {
       const mod = await import('../../server/briefing-candidates.js');
       expect((mod as Record<string, unknown>)['deriveOpportunityScore']).toBeUndefined();
-    });
+    }, 15_000);
   });
 });

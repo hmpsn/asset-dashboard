@@ -4,7 +4,7 @@
 // Design rules: no purple, teal for CTAs, blue for data, shared UI primitives.
 
 import { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Check, MessageSquare, ChevronDown, ChevronUp,
   AlertCircle, PenLine, FileCheck,
@@ -15,62 +15,13 @@ import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton, SectionCardSkeleton } from '../ui/Skeleton';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { useClientCopyEntryList, useClientCopySections } from '../../hooks/client/useClientQueries';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
+import { publicCopyReview, type PublicClientCopySection, type PublicCopyEntryListItem } from '../../api/content';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
 import { queryKeys } from '../../lib/queryKeys';
-import { get, post } from '../../api/client';
-import type { CopySectionStatus, ClientSuggestion } from '../../../shared/types/copy-pipeline';
-
-// ── API helpers (inline to avoid modifying brand-engine.ts) ──
-
-interface CopyEntryListItem {
-  id: string;
-  name: string;
-  pageType: string;
-  blueprintId: string;
-  blueprintName: string;
-  copyStatus: {
-    entryId: string;
-    totalSections: number;
-    pendingSections: number;
-    draftSections: number;
-    clientReviewSections: number;
-    approvedSections: number;
-    revisionSections: number;
-    overallStatus: CopySectionStatus;
-    approvalPercentage: number;
-  };
-}
-
-interface ClientCopySection {
-  id: string;
-  entryId: string;
-  sectionPlanItemId: string;
-  generatedCopy: string | null;
-  status: CopySectionStatus;
-  aiAnnotation: string | null;
-  clientSuggestions: ClientSuggestion[] | null;
-  version: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function fetchCopyEntries(wsId: string) {
-  return get<{ entries: CopyEntryListItem[] }>(`/api/public/copy/${wsId}/entries`);
-}
-
-function fetchCopySections(wsId: string, entryId: string) {
-  return get<{ sections: ClientCopySection[] }>(`/api/public/copy/${wsId}/entry/${entryId}/sections`);
-}
-
-function approveSection(wsId: string, sectionId: string) {
-  return post<{ section: ClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/approve`);
-}
-
-function suggestEdit(wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) {
-  return post<{ section: ClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, body);
-}
+import { invalidateWorkspaceEventQueries } from '../../lib/wsInvalidation';
 
 // ── Human-friendly labels ──
 
@@ -150,9 +101,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryI
   const wsHandlers = useMemo(() => ({
     // ws-invalidation-ok — client keys (copyEntries, copySectionsAll) differ from admin keys in central hook
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySectionsAll(workspaceId) });
+      invalidateWorkspaceEventQueries(queryClient, WS_EVENTS.COPY_SECTION_UPDATED, workspaceId, undefined, 'client-copy-review');
     },
   }), [queryClient, workspaceId]);
 
@@ -164,11 +113,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryI
     isLoading: entriesLoading,
     error: entriesError,
     refetch: refetchEntries,
-  } = useQuery({
-    queryKey: queryKeys.client.copyEntries(workspaceId),
-    queryFn: () => fetchCopyEntries(workspaceId),
-    enabled: !!workspaceId,
-  });
+  } = useClientCopyEntryList(workspaceId, !!workspaceId);
 
   const entries = entriesData?.entries ?? [];
 
@@ -232,7 +177,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryI
   }
 
   // ── Group entries by blueprint ──
-  const grouped = visibleEntries.reduce<Record<string, { blueprintName: string; items: CopyEntryListItem[] }>>((acc, entry) => {
+  const grouped = visibleEntries.reduce<Record<string, { blueprintName: string; items: PublicCopyEntryListItem[] }>>((acc, entry) => {
     if (!acc[entry.blueprintId]) {
       acc[entry.blueprintId] = { blueprintName: entry.blueprintName, items: [] };
     }
@@ -289,7 +234,7 @@ function ClientCopyReviewInner({ workspaceId, initialExpandedEntryId, soloEntryI
 // ── Entry card ──
 
 interface EntryCardProps {
-  entry: CopyEntryListItem;
+  entry: PublicCopyEntryListItem;
   workspaceId: string;
   isExpanded: boolean;
   onToggle: () => void;
@@ -365,11 +310,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
     isLoading,
     error,
     refetch,
-  } = useQuery({
-    queryKey: queryKeys.client.copySections(workspaceId, entryId),
-    queryFn: () => fetchCopySections(workspaceId, entryId),
-    enabled: !!(workspaceId && entryId),
-  });
+  } = useClientCopySections(workspaceId, entryId, !!(workspaceId && entryId));
 
   const sections = sectionsData?.sections ?? [];
 
@@ -377,7 +318,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 
   // ── Approve mutation ──
   const approveMutation = useMutation({
-    mutationFn: (sectionId: string) => approveSection(workspaceId, sectionId),
+    mutationFn: (sectionId: string) => publicCopyReview.approveSection(workspaceId, sectionId),
     onSuccess: () => {
       setMutationError(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
@@ -392,7 +333,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   // ── Suggest mutation ──
   const suggestMutation = useMutation({
     mutationFn: (args: { sectionId: string; originalText: string; suggestedText: string }) =>
-      suggestEdit(workspaceId, args.sectionId, {
+      publicCopyReview.suggestEdit(workspaceId, args.sectionId, {
         originalText: args.originalText,
         suggestedText: args.suggestedText,
       }),
@@ -472,7 +413,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 // ── Individual section review card ──
 
 interface SectionReviewCardProps {
-  section: ClientCopySection;
+  section: PublicClientCopySection;
   onApprove: () => void;
   onSuggest: (originalText: string, suggestedText: string) => void;
   isApproving: boolean;

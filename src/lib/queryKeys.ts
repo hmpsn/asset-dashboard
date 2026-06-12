@@ -14,6 +14,8 @@
  *  client-search → ['client-search', wsId, metric, days, dr] similarly
  */
 
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
+
 export type DateRange = AnalyticsDateRange;
 
 export const queryKeys = {
@@ -28,6 +30,7 @@ export const queryKeys = {
     gsc: (siteId: string, url: string, metric: string, days: number) =>
       ['admin-gsc', siteId, url, metric, days] as const,
     gscAll: (siteId: string) => ['admin-gsc', siteId] as const,
+    gscAny: () => ['admin-gsc'] as const,
 
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
@@ -58,8 +61,11 @@ export const queryKeys = {
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
+    auditTrafficAll: () => ['admin-audit-traffic'] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
+    schemaPlan: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-plan', siteId, wsId] as const : ['admin-schema-plan', siteId] as const,
     schemaSnapshot: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-snapshot', siteId, wsId] as const : ['admin-schema-snapshot', siteId] as const,
     schemaValidations: (siteId: string, wsId?: string) =>
@@ -69,6 +75,7 @@ export const queryKeys = {
     schemaCmsFieldMappings: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-cms-field-mappings', siteId, wsId] as const : ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,
+    llmsTxtResult: (wsId: string) => ['admin-llms-txt-result', wsId] as const,
     webflowPages: (siteId: string, wsId?: string) =>
       wsId ? ['admin-webflow-pages', siteId, wsId] as const : ['admin-webflow-pages', siteId] as const,
     webflowAssets: (siteId: string, wsId?: string) =>
@@ -87,10 +94,11 @@ export const queryKeys = {
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
+    localSeoVariant: (wsId: string, includeSnapshots: boolean) =>
+      ['admin-local-seo', wsId, includeSnapshots ? 'with-snapshots' : 'summary'] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
     eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
-    rankTrackingKeywordRows: (wsId: string) => ['admin-rank-tracking-keyword-rows', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
     rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
     rankTrackingHistoryQueries: (wsId: string, queries: string[]) =>
@@ -107,6 +115,7 @@ export const queryKeys = {
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
     actionQueue: (wsId: string) => ['admin-action-queue', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
+    recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
 
     // Brand Engine — Brandscripts
     brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
@@ -123,7 +132,9 @@ export const queryKeys = {
 
     // Brand Engine — Page Strategy
     blueprints: (wsId: string) => ['admin-blueprints', wsId] as const,
+    blueprintAll: (wsId: string) => ['admin-blueprint', wsId] as const,
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
+    blueprintVersionsAll: (wsId: string) => ['admin-blueprint-versions', wsId] as const,
     blueprintVersions: (wsId: string, blueprintId: string) => ['admin-blueprint-versions', wsId, blueprintId] as const,
 
     // Copy Pipeline
@@ -161,11 +172,15 @@ export const queryKeys = {
     workspaces: () => ['admin-workspaces'] as const,
     workspaceDetail: (wsId: string) => ['admin-workspace-detail', wsId] as const,
     integrationHealth: (wsId: string) => ['admin-integration-health', wsId] as const,
+    workspaceBadges: (wsId: string) => ['admin-workspace-badges', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     health: () => ['admin-health'] as const,
     queue: () => ['admin-queue'] as const,
     outcomeActions: (wsId: string) => ['admin-outcome-actions', wsId] as const,
+    outcomeActionsFiltered: (wsId: string, type?: string, score?: string) =>
+      ['admin-outcome-actions', wsId, type ?? '', score ?? ''] as const,
+    outcomeAction: (wsId: string, actionId: string) => ['admin-outcome-actions', wsId, actionId] as const,
     outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
     outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
     outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
@@ -203,7 +218,21 @@ export const queryKeys = {
 
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
+    /**
+     * R2-B agency "work feed" activity. DISTINCT from `activity` above: the work
+     * feed query (`useClientActivityFeed`) fetches a different shape
+     * (`ClientActivityEntry[]` via `fetchClientActivityFeed`) than `useClientActivity`
+     * (`ActivityLogItem[]` via `/api/public/activity`). Sharing one key would cause
+     * last-resolver-wins cache corruption when both hooks mount. Both keys are
+     * invalidated together on ACTIVITY_NEW (see wsInvalidation.ts).
+     */
+    workFeedActivity: (wsId: string) => ['client-work-feed-activity', wsId] as const,
     rankHistory: (wsId: string) => ['client-rank-history', wsId] as const,
+    // A4 (audit #15): 180-day rank series for client-requested keywords (Strategy tab trend card).
+    requestedKeywordTrend: (wsId: string, keywords: string[]) =>
+      ['client-requested-keyword-trend', wsId, ...keywords] as const,
+    /** Workspace-prefix key for invalidating every requestedKeywordTrend variant. */
+    requestedKeywordTrendAll: (wsId: string) => ['client-requested-keyword-trend', wsId] as const,
     latestRanks: (wsId: string) => ['client-latest-ranks', wsId] as const,
     annotations: (wsId: string) => ['client-annotations', wsId] as const,
     anomalies: (wsId: string) => ['client-anomalies', wsId] as const,
@@ -221,16 +250,20 @@ export const queryKeys = {
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,
     schemaSnapshot: (wsId: string) => ['client-schema-snapshot', wsId] as const,
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
+    strategyGuidance: (wsId: string) => ['client-strategy-guidance', wsId] as const,
     roi: (wsId: string) => ['client-roi', wsId] as const,
     keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
+    trackedKeywords: (wsId: string) => ['client-tracked-keywords', wsId] as const,
     pageKeywords: (wsId: string) => ['client-page-keywords', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
     briefing: (wsId: string) => ['client-briefing', wsId] as const,
+    competitorGaps: (wsId: string) => ['client-competitor-gaps', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
+    chatUsage: (wsId: string) => ['client-chat-usage', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
     intelligence: (wsId: string) => ['client-intelligence', wsId] as const,
@@ -246,7 +279,10 @@ export const queryKeys = {
     copyEntriesCount: (wsId: string) => ['client-copy-entries-count', wsId] as const,
     copySections: (wsId: string, entryId: string) => ['client-copy-sections', wsId, entryId] as const,
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
+    postPreviewAll: (wsId: string) => ['client', 'post-preview', wsId] as const,
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
+    /** Active background jobs visible to this workspace's client portal. */
+    jobs: (wsId: string) => ['client-jobs', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────
@@ -259,4 +295,3 @@ export const queryKeys = {
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;
-import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';

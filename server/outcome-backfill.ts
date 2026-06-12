@@ -7,7 +7,9 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
-import { recordAction, getActionBySource } from './outcome-tracking.js';
+import { recordAction, getActionBySource, fillPredictedEmvIfNull } from './outcome-tracking.js';
+import { recommendationOutcomeActionType } from './recommendations.js';
+import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-backfill');
 
@@ -41,9 +43,40 @@ interface Recommendation {
   id: string;
   status: string;
   affectedPages?: string[];
+  /** Optional on legacy/regenerated rows: drives the outcome ActionType mapping (A1). */
+  type?: string;
+  source?: string;
+  /** A5 (audit #20): only the predictedEmv field of the OV breakdown is read here —
+   *  it is snapshotted onto the tracked action so the P6 realized-vs-predicted
+   *  calibration has a pairing. Absent on legacy/opportunity-less rows. */
+  opportunity?: { predictedEmv?: number | null };
 }
 
 // ─── Prepared statement cache ────────────────────────────────────────────────
+
+// Shared rec-blob item schema for the completed-recommendations pass AND the A5
+// predictedEmv repair pass. parseJsonSafeArray validates items individually, so one
+// malformed rec never drops the rest; `.catch(undefined)` on `opportunity` means a
+// malformed OV breakdown degrades to "no prediction" instead of dropping the rec item.
+const recommendationSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  affectedPages: z.array(z.string()).optional(),
+  // type/source drive the outcome ActionType mapping (A1). Optional because legacy /
+  // regenerated rows may omit them — those fall back to audit_fix_applied below.
+  type: z.string().optional(),
+  source: z.string().optional(),
+  // A5 (audit #20): the OV predictedEmv to snapshot onto the tracked action.
+  opportunity: z.object({ predictedEmv: z.number().nullable().optional() }).optional().catch(undefined),
+});
+
+function parseRecommendationBlob(raw: string): Recommendation[] {
+  return parseJsonSafeArray(
+    raw,
+    recommendationSchema,
+    { field: 'recommendations', table: 'recommendation_sets' },
+  ) as Recommendation[];
+}
 
 const stmts = createStmtCache(() => ({
   allWorkspaceIds: db.prepare(`SELECT id FROM workspaces`),
@@ -61,6 +94,13 @@ const stmts = createStmtCache(() => ({
     SELECT workspace_id, recommendations
     FROM recommendation_sets
     WHERE workspace_id = ?
+  `),
+  // A5 repair pass: recommendation-sourced actions that never captured a predictedEmv
+  // snapshot (pre-A5 backfill rows + live completions of opportunity-less recs).
+  nullEmvRecActions: db.prepare(`
+    SELECT id, source_id
+    FROM tracked_actions
+    WHERE workspace_id = ? AND source_type = 'recommendation' AND predicted_emv IS NULL
   `),
 }));
 
@@ -159,16 +199,7 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
   const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
   if (!row) return 0;
 
-  const recommendationSchema = z.object({
-    id: z.string(),
-    status: z.string(),
-    affectedPages: z.array(z.string()).optional(),
-  });
-  const recommendations = parseJsonSafeArray(
-    row.recommendations,
-    recommendationSchema,
-    { field: 'recommendations', table: 'recommendation_sets' },
-  ) as Recommendation[];
+  const recommendations = parseRecommendationBlob(row.recommendations);
 
   const completed = recommendations.filter(r => r.status === 'completed');
   let count = 0;
@@ -191,10 +222,18 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
         ? rec.affectedPages.find((page): page is string => typeof page === 'string' && page.trim().length > 0) ?? null
         : null;
 
+      // A1: attribute each completed rec to its mapped ActionType instead of
+      // hardcoding audit_fix_applied. recommendationOutcomeActionType is exhaustive
+      // over RecType and falls through to audit_fix_applied for unknown/legacy values,
+      // so a regenerated row that dropped `type` lands on the historical default.
+      const actionType = typeof rec.type === 'string' && rec.type.length > 0
+        ? recommendationOutcomeActionType(rec.type as RecType, rec.source ?? '')
+        : 'audit_fix_applied';
+
       if (workspaceId) {
         recordAction({ // recordAction-ok: workspaceId guarded by if (workspaceId)
           workspaceId,
-          actionType: 'audit_fix_applied',
+          actionType,
           sourceType: 'recommendation',
           sourceId: recId,
           pageUrl: firstAffectedPage,
@@ -204,10 +243,13 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           },
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
-          // P4: the backfill path reconstructs historical completed recs and CANNOT read
-          // the (regenerated, opportunity-less) rec object, so there is no predicted EMV to
-          // snapshot — explicitly null. Documented: historical rows have no OV pairing.
-          predictedEmv: null,
+          // A5 (audit #20): snapshot the rec's OV predictedEmv from the blob — the same
+          // field the live PATCH-completion route snapshots (routes/recommendations.ts).
+          // Pre-A5 this was hardcoded null, so every rec completed via the in-place
+          // resolver (resolveRecommendationsForChange records no action; this weekly
+          // pass is its catch-up) lost the P6 realized-vs-predicted pairing. Honest
+          // null when the rec carries no opportunity (legacy row / OV not attached).
+          predictedEmv: rec.opportunity?.predictedEmv ?? null,
           attribution: 'platform_executed',
         });
         count++;
@@ -222,6 +264,60 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
 
   log.info({ workspaceId, count }, 'backfillCompletedRecommendations complete');
   return count;
+}
+
+/**
+ * A5 (audit #20) repair pass: fill MISSING predictedEmv snapshots on existing
+ * recommendation-sourced tracked actions from the current rec blob.
+ *
+ * Why these rows exist: (a) every pre-A5 backfill row hardcoded predicted_emv = NULL,
+ * and (b) live completions of recs that had no opportunity attached at completion time
+ * stored an honest NULL even though a later regen may have attached one.
+ *
+ * Best-effort semantics, documented: the blob's predictedEmv is the rec's CURRENT
+ * prediction, which can postdate action time for regenerated sets — an acceptable
+ * estimate for the P6 calibration pairing, far better than no pairing. Three guards
+ * keep it honest:
+ *  - never overwrites: fillPredictedEmvIfNull is gated on `predicted_emv IS NULL`;
+ *  - never fills from a 0/absent prediction (0 is the legacy zod round-trip default,
+ *    meaning "unknown", and a 0 denominator is useless to the ratio calibration);
+ *  - actions whose rec no longer exists are left NULL (no oracle to consult).
+ *
+ * Idempotent by construction: filled rows stop matching the `predicted_emv IS NULL`
+ * candidate query, so a second run is a natural no-op.
+ */
+export function backfillPredictedEmvSnapshots(workspaceId: string): number {
+  const candidates = stmts().nullEmvRecActions.all(workspaceId) as Array<{ id: string; source_id: string | null }>;
+  if (candidates.length === 0) return 0;
+
+  const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
+  if (!row) return 0;
+
+  const emvByRecId = new Map<string, number>();
+  for (const rec of parseRecommendationBlob(row.recommendations)) {
+    const emv = rec.opportunity?.predictedEmv;
+    if (rec.id && typeof emv === 'number' && Number.isFinite(emv) && emv > 0) {
+      emvByRecId.set(rec.id, emv);
+    }
+  }
+  if (emvByRecId.size === 0) return 0;
+
+  let filled = 0;
+  const run = db.transaction(() => {
+    for (const action of candidates) {
+      const recId = action.source_id?.trim();
+      if (!recId) continue;
+      const emv = emvByRecId.get(recId);
+      if (emv == null) continue;
+      if (fillPredictedEmvIfNull(action.id, workspaceId, emv)) filled++;
+    }
+  });
+  run();
+
+  if (filled > 0) {
+    log.info({ workspaceId, filled, candidates: candidates.length }, 'backfillPredictedEmvSnapshots complete');
+  }
+  return filled;
 }
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
@@ -251,8 +347,12 @@ export function runBackfill(workspaceId?: string): BackfillResult {
       const posts = backfillPublishedContent(wsId);
       const insights = backfillResolvedInsights(wsId);
       const recs = backfillCompletedRecommendations(wsId);
+      // A5: runs AFTER the rec pass so newly created actions are already snapshotted
+      // (they no longer match the NULL candidate query) and only genuine pre-A5 /
+      // opportunity-less-at-completion rows get the best-effort fill.
+      const emvFills = backfillPredictedEmvSnapshots(wsId);
       backfilledCount += posts + insights + recs;
-      log.info({ workspaceId: wsId, posts, insights, recs }, 'Workspace backfill complete');
+      log.info({ workspaceId: wsId, posts, insights, recs, emvFills }, 'Workspace backfill complete');
     } catch (err) {
       errors++;
       log.error({ err, workspaceId: wsId }, 'Workspace backfill failed — skipping');

@@ -3,11 +3,11 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, type ProviderName } from './seo-data-provider.js';
+import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, normalizeRuntimeSeoDataProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
-import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
+import type { PageKeywordMap, KeywordStrategy, SeoDataStatus } from '../shared/types/workspace.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
 import { discoverKeywordStrategyPages } from './keyword-strategy-pages.js';
 import { fetchKeywordStrategySearchData } from './keyword-strategy-search-data.js';
@@ -18,6 +18,7 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
 import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
+import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from './keyword-strategy-sanitizer.js';
 import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords, workspaceHasStrategyOwnedRankTracking } from './keyword-strategy-follow-ons.js';
 import { listContentGaps } from './content-gaps.js';
@@ -27,8 +28,8 @@ import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
+import { recordGenerationQuality } from './generation-quality-store.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
 
 // Re-exported for backward compatibility with existing callers.
@@ -88,12 +89,55 @@ export function hasActiveKeywordStrategyGeneration(workspaceId: string): boolean
   return activeGenerations.has(workspaceId);
 }
 
-function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'none' {
-  return mode === 'quick' || mode === 'full' ? mode : 'none';
+/**
+ * Resolve the effective SEO-data mode, preserving the absent-vs-explicit distinction.
+ * Only an ABSENT mode (the MCP/chat path, which passes a provider but no seoDataMode)
+ * is promoted to 'quick'. An explicit 'none' is a user no-spend choice — the admin UI
+ * promises "No DataForSEO credits used" — and must yield zero provider calls.
+ * Unrecognized strings are treated as an explicit 'none' (never auto-spend on garbage).
+ */
+export function resolveEffectiveSeoDataMode(
+  requested: string | undefined,
+  providerConfigured: boolean,
+): 'quick' | 'full' | 'none' {
+  if (requested === undefined) return providerConfigured ? 'quick' : 'none';
+  return requested === 'quick' || requested === 'full' ? requested : 'none';
 }
 
 function normalizeSeoDataProvider(provider: string | undefined): ProviderName | undefined {
-  return provider === 'dataforseo' || provider === 'semrush' ? provider : undefined;
+  return provider ? normalizeRuntimeSeoDataProvider(provider) : undefined;
+}
+
+function hasProviderBackedKeywordPoolData(
+  keywordPool: Map<string, { source: string }>,
+): boolean {
+  for (const metric of keywordPool.values()) {
+    if (metric.source !== 'client' && metric.source !== 'gsc' && metric.source !== 'local') {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function reconcileSeoDataStatusAfterCanonicalDiscovery(
+  seoDataStatus: SeoDataStatus | undefined,
+  keywordPool: Map<string, { source: string }>,
+): SeoDataStatus | undefined {
+  if (!seoDataStatus) return seoDataStatus;
+  if (
+    seoDataStatus.status !== 'degraded'
+    || !seoDataStatus.reasons?.includes('provider_returned_no_keyword_data')
+    || !hasProviderBackedKeywordPoolData(keywordPool)
+  ) {
+    return seoDataStatus;
+  }
+
+  const reasons = seoDataStatus.reasons.filter(reason => reason !== 'provider_returned_no_keyword_data');
+  return {
+    ...seoDataStatus,
+    status: reasons.length > 0 ? 'degraded' : 'available',
+    reasons,
+  };
 }
 
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
@@ -122,21 +166,15 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   }
 
   const providerPreference = normalizeSeoDataProvider(options.seoDataProvider)
-    ?? ws.seoDataProvider
+    ?? normalizeSeoDataProvider(ws.seoDataProvider)
     ?? DEFAULT_SEO_DATA_PROVIDER;
   const provider = getConfiguredProvider(providerPreference);
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const requestedSeoDataMode = normalizeSeoDataMode(options.seoDataMode);
-  // MCP-seed (G/P1 #8): the MCP/chat path passes a provider but no seoDataMode, so
-  // it collapses to 'none' and discovery is starved. On the flag-ON path, treat
-  // "provider present" as "build a real universe" — promote the collapsed 'none'
-  // to 'quick' so seo-data fetches domain/competitor seeds and the assembler has a
-  // populated pool. Flag-OFF is unchanged (byte-identical).
-  const seoDataMode = (requestedSeoDataMode === 'none' && provider && isFeatureEnabled('seo-generation-quality', ws.id))
-    ? 'quick'
-    : requestedSeoDataMode;
+  // Promote ONLY the absent case (MCP/chat path) to 'quick'; an explicit 'none' is
+  // honored end-to-end with zero provider calls (see resolveEffectiveSeoDataMode).
+  const seoDataMode = resolveEffectiveSeoDataMode(options.seoDataMode, !!provider);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
@@ -251,6 +289,10 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       provider,
       sendProgress,
     });
+    const reconciledSeoDataStatus = reconcileSeoDataStatusAfterCanonicalDiscovery(seoDataStatus, synthesis.keywordPool);
+    if (reconciledSeoDataStatus) {
+      seoDataStatus = reconciledSeoDataStatus;
+    }
 
     if (synthesis.upToDate) {
       const noOpStrategy = (synthesis.strategy ?? { pageMap: [] }) as StrategyOutput;
@@ -304,7 +346,13 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           pagesToAnalyze: [],
           extraPagePaths: noOpUpdatedPagePaths,
           removedPagePaths: noOpRemovedPagePaths,
-          siteKeywordMetrics: existingStrategy?.siteKeywordMetrics ?? [],
+          // Wave 3b-ii strip (table-as-truth): `existingStrategy` is `ws.keywordStrategy`,
+          // a RAW blob read (workspaces.ts rowToWorkspace → parseJsonSafe of keyword_strategy).
+          // The blob no longer carries siteKeywordMetrics, so reading it off `existingStrategy`
+          // would carry forward an empty array and silently drop the metrics on every
+          // incremental no-op re-persist. Source from the table — the sole store — instead,
+          // so the closed loop survives.
+          siteKeywordMetrics: resolveSiteKeywordMetrics(ws.id),
           keywordGaps: sanitizedNoOpKeywordGaps,
           competitorKeywordData: existingStrategy?.competitorKeywordData ?? competitorKeywordData,
           topicClusters: listTopicClusters(ws.id),
@@ -333,6 +381,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         });
         clearKeepalive();
         activeGenerations.delete(ws.id);
+        // The sanitizer-only re-persist performed ZERO AI synthesis (upToDate fired
+        // before any AI batch), so it must meter like the pure no-op exit below —
+        // refund the pre-reserved slot rather than billing a cleanup pass.
+        try {
+          decrementUsage(ws.id, 'strategy_generations');
+        } catch (err) {
+          log.warn({ err, workspaceId: ws.id }, 'Failed to refund strategy generation usage after sanitizer-only no-op');
+        }
         responseSent = true;
         queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
         return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] }, upToDate: false, freshPageCount: synthesis.freshPageCount };
@@ -383,11 +439,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       throw new KeywordStrategyGenerationError(500, { error: 'Strategy generation produced no valid page keyword assignments' });
     }
 
-    // SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace):
-    // compute ONCE here and thread the boolean into enrichment (token-subset prune)
-    // and the deterministic backfill floor below. Do NOT scatter isFeatureEnabled
-    // into hot loops. Flag-OFF (false) keeps pruning/backfill byte-identical.
-    const relaxConservatism = isFeatureEnabled('seo-generation-quality', ws.id);
+    // The generation-quality enrichment path is now canonical.
+    const relaxConservatism = true;
 
     let {
       siteKeywordMetrics,
@@ -548,6 +601,14 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       floorHit,
     };
     log.info({ generationQuality }, 'keyword-strategy/generation-quality');
+    // F1 (#7a): persist the quality record (one row per run, workspace-scoped). This is
+    // a durable side-effect after the strategy is already persisted — a store failure
+    // must never break a successful generation, so log + swallow.
+    try {
+      recordGenerationQuality(generationQuality);
+    } catch (persistErr) {
+      log.warn({ workspaceId: ws.id, detail: persistErr instanceof Error ? persistErr.message : String(persistErr) }, 'Failed to persist generation-quality row (non-fatal)');
+    }
 
     queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
     activeGenerations.delete(ws.id);

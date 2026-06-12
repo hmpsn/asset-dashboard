@@ -9,20 +9,19 @@
  * - Invalid admin transitions (completed → pending) are rejected with 409
  * - Approved actions appear in the admin list
  *
- * Port: 13353
  *
  * NOTE: The public respond endpoint is accessible without auth for workspaces
  * that do not have a clientPassword set. The existing auth-guard tests
  * are covered in client-actions-routes.test.ts (password-protected workspace).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 import type { Job } from '../../server/jobs.js';
 
-const ctx = createTestContext(13353); // port-ok: 13201-13352 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

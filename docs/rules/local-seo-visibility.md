@@ -1,12 +1,16 @@
 # Local SEO Visibility
 
-Local SEO visibility is a market-specific evidence layer for service-area and physical-location businesses. It complements the keyword operating loop; it does not replace Rank Tracker, Keyword Strategy, Page Intelligence, or the Keyword Command Center.
+> Rollout note: the `local-seo-visibility` feature flag has been retired. Local SEO
+> behavior described here is now canonical runtime behavior; historical flag references
+> elsewhere in this document are archival rollout context only.
+
+Local SEO visibility is a market-specific evidence layer for service-area and physical-location businesses. It complements the keyword operating loop; it does not replace the Keyword Hub, Keyword Strategy, or Page Intelligence.
 
 ## Product Boundary
 
 - **Local SEO owns market-specific visibility evidence:** local pack presence, possible business appearance, market identity, local competitors, and local-intent keyword posture.
-- **Rank Tracker remains GSC measurement:** query positions, clicks, impressions, CTR, and snapshots from Search Console stay separate from map/local-pack visibility.
-- **Keyword Command Center remains lifecycle management:** track, retire, decline, restore, and promote keywords there; local visibility can annotate rows but should not become a second keyword manager.
+- **The Keyword Hub owns GSC measurement:** query positions, clicks, impressions, CTR, and snapshots from Search Console stay separate from map/local-pack visibility (surfaced in the Hub's detail drawer since the Rank Tracker fold-in).
+- **The Keyword Hub owns lifecycle management:** track, retire, decline, restore, and promote keywords there; local visibility can annotate rows but should not become a second keyword manager.
 - **Strategy remains generation/explanation:** local visibility can influence future strategy posture, but strategy generation must not run provider-heavy local checks inline.
 - **Schema remains structured data delivery:** LocalBusiness schema can provide verified contact/location evidence, but local SEO should not publish or mutate schema automatically.
 
@@ -61,7 +65,7 @@ If local visibility feeds prompts, recommendations, or strategy scoring, add a `
 
 Local SEO reporting should annotate the existing keyword operating loop instead of creating a second lifecycle manager.
 
-- **Keyword Command Center:** primary admin surface for keyword-level local visibility, local evidence posture, and safe actions.
+- **Keyword Hub:** primary admin surface for keyword-level local visibility, local evidence posture, and safe actions.
 - **Keyword Strategy:** may show market visibility summaries, but must not imply local visibility changes the selected strategy unless a later scoring PR explicitly does that work.
 - **Page Intelligence:** may annotate local-intent page keywords with local visibility evidence when stored snapshots exist.
 - **Rank Tracker:** should explain that GSC query measurement and local pack visibility are separate evidence layers.

@@ -37,7 +37,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
+import { normalizeProviderDate } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
 
@@ -156,52 +156,6 @@ function markCreditsExhausted(): void {
 
 function areCreditsExhausted(): boolean {
   return Date.now() < creditExhaustedUntil;
-}
-
-// ── Backlinks subscription detection ──
-// DataForSEO backlinks is a separate paid subscription (error 40204).
-// Once detected, we mark the capability disabled on the registry (with a 24h TTL)
-// so optional backlink enrichment can degrade without spending provider credits.
-// The registry itself handles TTL expiry and auto-re-enables the capability.
-
-const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-function markBacklinksDisabled(): void {
-  markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
-}
-
-// ── Probe result persistence (avoids billable probe on every server restart) ──
-// The in-memory registry's 24h capability TTL resets on restart. Frequently-restarting
-// deploys (rolling updates, dev reloads) would otherwise consume a probe credit per restart.
-// Cache the probe outcome to disk with the same 24h TTL; refresh only when stale or absent.
-
-interface ProbeResult {
-  /** 'backlinks-disabled' | 'backlinks-available' */
-  outcome: 'backlinks-disabled' | 'backlinks-available';
-  probedAt: string;
-}
-
-function getProbeCachePath(): string {
-  return path.join(CREDIT_DIR, 'probe-result.json');
-}
-
-function readProbeCache(): ProbeResult | null {
-  try {
-    const raw = fs.readFileSync(getProbeCachePath(), 'utf-8');
-    const parsed = JSON.parse(raw) as ProbeResult;
-    const age = Date.now() - new Date(parsed.probedAt).getTime();
-    if (age > BACKLINK_COOLDOWN_MS) return null;
-    return parsed;
-  } catch { return null; }
-}
-
-function writeProbeCache(outcome: ProbeResult['outcome']): void {
-  try {
-    fs.writeFileSync(
-      getProbeCachePath(),
-      JSON.stringify({ outcome, probedAt: new Date().toISOString() } satisfies ProbeResult, null, 2),
-    );
-  } catch (err) { log.warn({ err }, 'Failed to persist DataForSEO probe result'); }
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -492,6 +446,87 @@ function getTaskCost(json: DataForSeoResponse): number {
   return json.tasks?.[0]?.cost ?? 0;
 }
 
+interface DataForSeoOperationMapped<T> {
+  value: T;
+  rowsReturned?: number;
+  cacheable?: boolean;
+  logCreditUsage?: boolean;
+}
+
+interface DataForSeoOperationOptions<T> {
+  workspaceId: string;
+  cacheKey: string;
+  cacheTtlHours: number;
+  endpointLabel: string;
+  query: string;
+  emptyValue: T;
+  endpoint: string;
+  body: unknown[];
+  mapResult: (json: DataForSeoResponse) => DataForSeoOperationMapped<T>;
+  handleError: (err: unknown) => T;
+  afterNetworkSuccess?: (value: T) => void;
+}
+
+function rowsReturnedForValue(value: unknown): number {
+  if (Array.isArray(value)) return value.length;
+  return value == null ? 0 : 1;
+}
+
+async function runDataForSeoOperation<T>({
+  workspaceId,
+  cacheKey,
+  cacheTtlHours,
+  endpointLabel,
+  query,
+  emptyValue,
+  endpoint,
+  body,
+  mapResult,
+  handleError,
+  afterNetworkSuccess,
+}: DataForSeoOperationOptions<T>): Promise<T> {
+  const cached = readCache<T>(workspaceId, cacheKey, cacheTtlHours);
+  if (cached) {
+    logCreditUsage({
+      credits: 0,
+      endpoint: endpointLabel,
+      query,
+      rowsReturned: rowsReturnedForValue(cached),
+      workspaceId,
+      cached: true,
+    });
+    return cached;
+  }
+
+  if (areCreditsExhausted()) return emptyValue;
+
+  try {
+    const json = await apiCall(endpoint, body, workspaceId);
+    const cost = getTaskCost(json);
+    const mapped = mapResult(json);
+
+    if (mapped.logCreditUsage !== false) {
+      logCreditUsage({
+        credits: cost,
+        endpoint: endpointLabel,
+        query,
+        rowsReturned: mapped.rowsReturned ?? rowsReturnedForValue(mapped.value),
+        workspaceId,
+        cached: false,
+      });
+    }
+
+    if (mapped.cacheable !== false) {
+      writeCache(workspaceId, cacheKey, mapped.value);
+    }
+
+    afterNetworkSuccess?.(mapped.value);
+    return mapped.value;
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
 function normalizeMonthlyTrend(kwInfo: Record<string, unknown> | undefined): number[] | undefined {
   const monthlies = kwInfo?.monthly_searches as Array<{ search_volume?: number }> | undefined;
   return monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined;
@@ -701,32 +736,7 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   async init(): Promise<void> {
-    if (!this.isConfigured()) return;
-
-    // Reuse a recent probe result from disk so rolling restarts don't spend a credit per boot.
-    const cached = readProbeCache();
-    if (cached) {
-      if (cached.outcome === 'backlinks-disabled') {
-        markBacklinksDisabled();
-        log.info({ probedAt: cached.probedAt }, 'DataForSEO backlinks disabled (cached probe)');
-      }
-      return;
-    }
-
-    try {
-      await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
-      writeProbeCache('backlinks-available');
-    } catch (err) {
-      // Only 40204 is a reliable signal in the cold-start probe context
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (errMsg.includes('40204')) {
-        markBacklinksDisabled();
-        writeProbeCache('backlinks-disabled');
-        log.info('DataForSEO backlinks subscription not available — backlink enrichment disabled');
-      }
-      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
-      // handles them, and we deliberately don't cache them so transient issues get retried next boot.
-    }
+    return;
   }
 
   // ── getKeywordMetrics → search_volume ──
@@ -889,46 +899,42 @@ export class DataForSeoProvider implements SeoDataProvider {
     const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     const cacheKey = `related_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
-    const cached = readCache<RelatedKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'related_keywords', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/related_keywords/live', [{
+    return runDataForSeoOperation<RelatedKeyword[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_RELATED,
+      endpointLabel: 'related_keywords',
+      query: keyword,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/related_keywords/live',
+      body: [{
         keyword,
         location_code: resolvedLocationCode,
         language_code: lang,
         limit,
         depth: 1,
         include_seed_keyword: false,
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-
-      const results: RelatedKeyword[] = items.map(item => {
-        const kwData = item.keyword_data as Record<string, unknown> | undefined;
-        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
-        return {
-          keyword: (kwData?.keyword as string) ?? '',
-          volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
-          cpc: (kwInfo?.cpc as number) ?? 0,
-        };
-      });
-
-      logCreditUsage({ credits: cost, endpoint: 'related_keywords', query: keyword, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO related_keywords error for "${keyword}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results: RelatedKeyword[] = items.map(item => {
+          const kwData = item.keyword_data as Record<string, unknown> | undefined;
+          const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+          return {
+            keyword: (kwData?.keyword as string) ?? '',
+            volume: (kwInfo?.search_volume as number) ?? 0,
+            difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+            cpc: (kwInfo?.cpc as number) ?? 0,
+          };
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO related_keywords error for "${keyword}"`);
+        return [];
+      },
+    });
   }
 
   // ── getQuestionKeywords → keyword_suggestions (filtered) ──
@@ -936,45 +942,41 @@ export class DataForSeoProvider implements SeoDataProvider {
     const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     const cacheKey = `questions_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${keyword.toLowerCase().replace(/\s+/g, '_')}_${limit}`;
-    const cached = readCache<QuestionKeyword[]>(workspaceId, cacheKey, CACHE_TTL_RELATED);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions', query: keyword, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
+    return runDataForSeoOperation<QuestionKeyword[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_RELATED,
+      endpointLabel: 'keyword_suggestions',
+      query: keyword,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/keyword_suggestions/live',
+      body: [{
         keyword,
         location_code: resolvedLocationCode,
         language_code: lang,
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-
-      const results: QuestionKeyword[] = items.map(item => {
-        const kwData = item.keyword_data as Record<string, unknown> | undefined;
-        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
-        return {
-          keyword: (kwData?.keyword as string) ?? '',
-          volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
-          cpc: (kwInfo?.cpc as number) ?? 0,
-        };
-      });
-
-      logCreditUsage({ credits: cost, endpoint: 'keyword_suggestions', query: keyword, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO keyword_suggestions error for "${keyword}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results: QuestionKeyword[] = items.map(item => {
+          const kwData = item.keyword_data as Record<string, unknown> | undefined;
+          const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+          return {
+            keyword: (kwData?.keyword as string) ?? '',
+            volume: (kwInfo?.search_volume as number) ?? 0,
+            difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+            cpc: (kwInfo?.cpc as number) ?? 0,
+          };
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO keyword_suggestions error for "${keyword}"`);
+        return [];
+      },
+    });
   }
 
   async getKeywordSuggestions(keyword: string, workspaceId: string, limit = 25, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
@@ -984,37 +986,36 @@ export class DataForSeoProvider implements SeoDataProvider {
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 100);
     const cacheKey = `discovery_suggestions_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(seed)}_${cappedLimit}`;
-    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
+    return runDataForSeoOperation<KeywordSourceEvidence[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DISCOVERY,
+      endpointLabel: 'keyword_suggestions_general',
+      query: seed,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/keyword_suggestions/live',
+      body: [{
         keyword: seed,
         location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
-      }], workspaceId);
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-      const results = evidenceFromKeywordDataItems(items, {
-        provider: this.name,
-        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_SUGGESTIONS,
-        seed,
-        confidence: 'medium',
-      });
-      logCreditUsage({ credits: cost, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO keyword_suggestions discovery error for "${seed}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results = evidenceFromKeywordDataItems(items, {
+          provider: this.name,
+          sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_SUGGESTIONS,
+          seed,
+          confidence: 'medium',
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO keyword_suggestions discovery error for "${seed}"`);
+        return [];
+      },
+    });
   }
 
   async getKeywordIdeas(keywords: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
@@ -1024,37 +1025,37 @@ export class DataForSeoProvider implements SeoDataProvider {
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
     const cacheKey = `discovery_ideas_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
-    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/keyword_ideas/live', [{
+    const query = seeds.join(',').slice(0, 100);
+    return runDataForSeoOperation<KeywordSourceEvidence[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DISCOVERY,
+      endpointLabel: 'keyword_ideas',
+      query,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/keyword_ideas/live',
+      body: [{
         keywords: seeds,
         location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
-      }], workspaceId);
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-      const results = evidenceFromKeywordDataItems(items, {
-        provider: this.name,
-        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_IDEAS,
-        seed: seeds.join(', '),
-        confidence: 'medium',
-      });
-      logCreditUsage({ credits: cost, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO keyword_ideas error for "${seeds.join(', ')}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results = evidenceFromKeywordDataItems(items, {
+          provider: this.name,
+          sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_IDEAS,
+          seed: seeds.join(', '),
+          confidence: 'medium',
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO keyword_ideas error for "${seeds.join(', ')}"`);
+        return [];
+      },
+    });
   }
 
   async getKeywordsForSite(target: string, workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
@@ -1064,37 +1065,36 @@ export class DataForSeoProvider implements SeoDataProvider {
     const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
     const cacheKey = `discovery_site_${cacheRegionToken(discoveryGeoToken(database, locationCode), lang)}_${cacheKeyPart(cleanTarget)}_${cappedLimit}`;
-    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/keywords_for_site/live', [{
+    return runDataForSeoOperation<KeywordSourceEvidence[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DISCOVERY,
+      endpointLabel: 'keywords_for_site',
+      query: cleanTarget,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/keywords_for_site/live',
+      body: [{
         target: cleanTarget,
         location_code: resolvedLocationCode,
         language_code: lang,
         limit: cappedLimit,
-      }], workspaceId);
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-      const results = evidenceFromKeywordDataItems(items, {
-        provider: this.name,
-        sourceKind: KEYWORD_SOURCE_KIND.KEYWORDS_FOR_SITE,
-        sourceTarget: cleanTarget,
-        confidence: 'high',
-      });
-      logCreditUsage({ credits: cost, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO keywords_for_site error for "${cleanTarget}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results = evidenceFromKeywordDataItems(items, {
+          provider: this.name,
+          sourceKind: KEYWORD_SOURCE_KIND.KEYWORDS_FOR_SITE,
+          sourceTarget: cleanTarget,
+          confidence: 'high',
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO keywords_for_site error for "${cleanTarget}"`);
+        return [];
+      },
+    });
   }
 
   async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
@@ -1102,47 +1102,47 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (seeds.length === 0) return [];
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
     const cacheKey = `google_ads_keywords_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
-    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('keywords_data/google_ads/keywords_for_keywords/live', [{
+    const query = seeds.join(',').slice(0, 100);
+    return runDataForSeoOperation<KeywordSourceEvidence[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DISCOVERY,
+      endpointLabel: 'keywords_for_keywords',
+      query,
+      emptyValue: [],
+      endpoint: 'keywords_data/google_ads/keywords_for_keywords/live',
+      body: [{
         keywords: seeds,
         location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         sort_by: 'relevance',
-      }], workspaceId);
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const rawItems = taskResults[0]?.items as Array<Record<string, unknown>> | undefined;
-      const items = rawItems ?? taskResults;
-      const seen = new Set<string>();
-      const results: KeywordSourceEvidence[] = [];
-      for (const item of items.slice(0, cappedLimit)) {
-        const evidence = evidenceFromGoogleAdsKeywordItem(item, {
-          provider: this.name,
-          sourceKind: KEYWORD_SOURCE_KIND.GOOGLE_ADS_KEYWORDS_FOR_KEYWORDS,
-          seed: seeds.join(', '),
-          confidence: 'medium',
-        });
-        if (!evidence) continue;
-        const normalized = evidence.keyword.toLowerCase();
-        if (seen.has(normalized)) continue;
-        seen.add(normalized);
-        results.push(evidence);
-      }
-      logCreditUsage({ credits: cost, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO keywords_for_keywords error for "${seeds.join(', ')}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const rawItems = taskResults[0]?.items as Array<Record<string, unknown>> | undefined;
+        const items = rawItems ?? taskResults;
+        const seen = new Set<string>();
+        const results: KeywordSourceEvidence[] = [];
+        for (const item of items.slice(0, cappedLimit)) {
+          const evidence = evidenceFromGoogleAdsKeywordItem(item, {
+            provider: this.name,
+            sourceKind: KEYWORD_SOURCE_KIND.GOOGLE_ADS_KEYWORDS_FOR_KEYWORDS,
+            seed: seeds.join(', '),
+            confidence: 'medium',
+          });
+          if (!evidence) continue;
+          const normalized = evidence.keyword.toLowerCase();
+          if (seen.has(normalized)) continue;
+          seen.add(normalized);
+          results.push(evidence);
+        }
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO keywords_for_keywords error for "${seeds.join(', ')}"`);
+        return [];
+      },
+    });
   }
 
   async resolveLocalSeoLocation(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse> {
@@ -1289,248 +1289,221 @@ export class DataForSeoProvider implements SeoDataProvider {
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
     const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
-    const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'ranked_keywords', query: target, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      // NOTE: `dataforseo_labs/google/ranked_keywords/live` does NOT accept an `item_types`
-      // parameter. Including it returns error 40501 "Invalid Field: 'item_types'". The endpoint
-      // returns all ranked keyword types by default; the SERP feature type is read per-item from
-      // `ranked_serp_element.serp_item.type` in the dedupe loop below.
-      const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
+    return runDataForSeoOperation<DomainKeyword[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DOMAIN_ORGANIC,
+      endpointLabel: 'ranked_keywords',
+      query: target,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/ranked_keywords/live',
+      body: [{
         target,
         location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-
-      // Collect SERP feature types per keyword (keywords may appear multiple times with different item types)
-      const serpFeaturesMap = new Map<string, Set<string>>();
-      for (const item of items) {
-        const kwData = item.keyword_data as Record<string, unknown> | undefined;
-        const keyword = (kwData?.keyword as string) ?? '';
-        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
-        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
-        const itemType = (serpItem?.type as string) ?? 'organic';
-        if (keyword && itemType !== 'organic') {
-          if (!serpFeaturesMap.has(keyword)) serpFeaturesMap.set(keyword, new Set());
-          const normalizedType = itemType === 'videos' ? 'video' : itemType;
-          serpFeaturesMap.get(keyword)!.add(normalizedType);
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const serpFeaturesMap = new Map<string, Set<string>>();
+        for (const item of items) {
+          const kwData = item.keyword_data as Record<string, unknown> | undefined;
+          const keyword = (kwData?.keyword as string) ?? '';
+          const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+          const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+          const itemType = (serpItem?.type as string) ?? 'organic';
+          if (keyword && itemType !== 'organic') {
+            if (!serpFeaturesMap.has(keyword)) serpFeaturesMap.set(keyword, new Set());
+            const normalizedType = itemType === 'videos' ? 'video' : itemType;
+            serpFeaturesMap.get(keyword)!.add(normalizedType);
+          }
         }
-      }
 
-      // Deduplicate: keep only the organic entry per keyword (with SERP features attached)
-      const seen = new Set<string>();
-      const results: DomainKeyword[] = [];
-      for (const item of items) {
-        const kwData = item.keyword_data as Record<string, unknown> | undefined;
-        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
-        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
-        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
-        const itemType = (serpItem?.type as string) ?? 'organic';
-        const keyword = (kwData?.keyword as string) ?? '';
+        const seen = new Set<string>();
+        const results: DomainKeyword[] = [];
+        for (const item of items) {
+          const kwData = item.keyword_data as Record<string, unknown> | undefined;
+          const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+          const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+          const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+          const itemType = (serpItem?.type as string) ?? 'organic';
+          const keyword = (kwData?.keyword as string) ?? '';
+          if (itemType !== 'organic' || seen.has(keyword)) continue;
+          seen.add(keyword);
 
-        // Only include organic results (skip duplicate featured_snippet/local_pack entries)
-        if (itemType !== 'organic') continue;
-        if (seen.has(keyword)) continue;
-        seen.add(keyword);
-
-        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
-        const features = serpFeaturesMap.get(keyword);
-
-        results.push({
-          keyword,
-          position: (serpItem?.rank_group as number) ?? 0,
-          volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
-          cpc: (kwInfo?.cpc as number) ?? 0,
-          url: (serpItem?.url as string) ?? '',
-          traffic: (serpItem?.etv as number) ?? 0,
-          trafficPercent: 0,
-          trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
-          serpFeatures: features ? [...features].join(',') : undefined,
-        });
-      }
-
-      logCreditUsage({ credits: cost, endpoint: 'ranked_keywords', query: target, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO ranked_keywords error for "${target}"`);
-      return [];
-    }
+          const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+          const features = serpFeaturesMap.get(keyword);
+          results.push({
+            keyword,
+            position: (serpItem?.rank_group as number) ?? 0,
+            volume: (kwInfo?.search_volume as number) ?? 0,
+            difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+            cpc: (kwInfo?.cpc as number) ?? 0,
+            url: (serpItem?.url as string) ?? '',
+            traffic: (serpItem?.etv as number) ?? 0,
+            trafficPercent: 0,
+            trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+            serpFeatures: features ? [...features].join(',') : undefined,
+          });
+        }
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO ranked_keywords error for "${target}"`);
+        return [];
+      },
+    });
   }
 
   async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanUrlTarget(url);
     const cacheKey = `url_ranked_${database}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
-    const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'ranked_keywords_url', query: target, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
+    return runDataForSeoOperation<DomainKeyword[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DOMAIN_ORGANIC,
+      endpointLabel: 'ranked_keywords_url',
+      query: target,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/ranked_keywords/live',
+      body: [{
         target,
         location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-      const results: DomainKeyword[] = [];
-      const seen = new Set<string>();
-      for (const item of items) {
-        const kwData = item.keyword_data as Record<string, unknown> | undefined;
-        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
-        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
-        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
-        const itemType = (serpItem?.type as string) ?? 'organic';
-        const keyword = (kwData?.keyword as string) ?? '';
-        if (itemType !== 'organic' || !keyword || seen.has(keyword)) continue;
-        seen.add(keyword);
-        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
-        results.push({
-          keyword,
-          position: (serpItem?.rank_group as number) ?? 0,
-          volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
-          cpc: (kwInfo?.cpc as number) ?? 0,
-          url: (serpItem?.url as string) ?? target,
-          traffic: (serpItem?.etv as number) ?? 0,
-          trafficPercent: 0,
-          trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
-        });
-      }
-
-      logCreditUsage({ credits: cost, endpoint: 'ranked_keywords_url', query: target, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO URL ranked_keywords error for "${target}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results: DomainKeyword[] = [];
+        const seen = new Set<string>();
+        for (const item of items) {
+          const kwData = item.keyword_data as Record<string, unknown> | undefined;
+          const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+          const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+          const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+          const itemType = (serpItem?.type as string) ?? 'organic';
+          const keyword = (kwData?.keyword as string) ?? '';
+          if (itemType !== 'organic' || !keyword || seen.has(keyword)) continue;
+          seen.add(keyword);
+          const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+          results.push({
+            keyword,
+            position: (serpItem?.rank_group as number) ?? 0,
+            volume: (kwInfo?.search_volume as number) ?? 0,
+            difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+            cpc: (kwInfo?.cpc as number) ?? 0,
+            url: (serpItem?.url as string) ?? target,
+            traffic: (serpItem?.etv as number) ?? 0,
+            trafficPercent: 0,
+            trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+          });
+        }
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO URL ranked_keywords error for "${target}"`);
+        return [];
+      },
+    });
   }
 
   // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
     const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
-    const cached = readCache<DomainOverview>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_OVERVIEW);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'ranked_keywords_overview', query: target, rowsReturned: 1, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return null;
-
-    try {
-      // NOTE: See getDomainKeywords above — `ranked_keywords/live` rejects `item_types`
-      // with error 40501. We only read `resultObj.metrics.organic`, which the endpoint
-      // aggregates across all types regardless of what's returned in `items`.
-      const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
+    return runDataForSeoOperation<DomainOverview | null>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_DOMAIN_OVERVIEW,
+      endpointLabel: 'ranked_keywords_overview',
+      query: target,
+      emptyValue: null,
+      endpoint: 'dataforseo_labs/google/ranked_keywords/live',
+      body: [{
         target,
         location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit: 1,
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const resultObj = taskResults[0] ?? {};
-      const metrics = resultObj.metrics as Record<string, Record<string, number>> | undefined;
-      const organic = metrics?.organic;
-
-      if (!organic) {
-        log.info(`No domain overview data for "${target}"`);
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const resultObj = taskResults[0] ?? {};
+        const metrics = resultObj.metrics as Record<string, Record<string, number>> | undefined;
+        const organic = metrics?.organic;
+        if (!organic) {
+          log.info(`No domain overview data for "${target}"`);
+          return { value: null, cacheable: false, logCreditUsage: false };
+        }
+        const overview: DomainOverview = {
+          domain: target,
+          organicKeywords: organic.count ?? 0,
+          organicTraffic: Math.round(organic.etv ?? 0),
+          organicCost: organic.estimated_paid_traffic_cost ?? 0,
+          paidKeywords: metrics?.paid?.count ?? 0,
+          paidTraffic: Math.round(metrics?.paid?.etv ?? 0),
+          paidCost: metrics?.paid?.estimated_paid_traffic_cost ?? 0,
+        };
+        return { value: overview, rowsReturned: 1 };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO domain overview error for "${target}"`);
         return null;
-      }
-
-      const overview: DomainOverview = {
-        domain: target,
-        organicKeywords: organic.count ?? 0,
-        organicTraffic: Math.round(organic.etv ?? 0),
-        organicCost: organic.estimated_paid_traffic_cost ?? 0,
-        paidKeywords: metrics?.paid?.count ?? 0,
-        paidTraffic: Math.round(metrics?.paid?.etv ?? 0),
-        paidCost: metrics?.paid?.estimated_paid_traffic_cost ?? 0,
-      };
-
-      logCreditUsage({ credits: cost, endpoint: 'ranked_keywords_overview', query: target, rowsReturned: 1, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, overview);
-      return overview;
-    } catch (err) {
-      log.error({ err }, `DataForSEO domain overview error for "${target}"`);
-      return null;
-    }
+      },
+    });
   }
 
   // ── getCompetitors → competitors_domain ──
   async getCompetitors(domain: string, workspaceId: string, limit = 10, database = 'us'): Promise<OrganicCompetitor[]> {
     const target = cleanDomain(domain);
     const cacheKey = `competitors_${database}_${target.replace(/\./g, '_')}_${limit}`;
-    const cached = readCache<OrganicCompetitor[]>(workspaceId, cacheKey, CACHE_TTL_COMPETITORS);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'competitors_domain', query: target, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('dataforseo_labs/google/competitors_domain/live', [{
+    return runDataForSeoOperation<OrganicCompetitor[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_COMPETITORS,
+      endpointLabel: 'competitors_domain',
+      query: target,
+      emptyValue: [],
+      endpoint: 'dataforseo_labs/google/competitors_domain/live',
+      body: [{
         target,
         location_code: locationCodeFromDatabase(database),
         language_code: 'en',
         limit,
         item_types: ['organic'],
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-
-      const results: OrganicCompetitor[] = items.map(item => {
-        const fullMetrics = item.full_domain_metrics as Record<string, Record<string, number>> | undefined;
-        const organic = fullMetrics?.organic;
-        const avgPos = (item.avg_position as number) ?? 50;
-        // Invert avg_position: lower avg = more relevant. Map to 0-100 scale.
-        const relevance = Math.max(0, Math.min(100, Math.round(100 - avgPos)));
-
-        return {
-          domain: (item.domain as string) ?? '',
-          competitorRelevance: relevance,
-          commonKeywords: (item.intersections as number) ?? 0,
-          organicKeywords: organic?.count ?? 0,
-          organicTraffic: Math.round(organic?.etv ?? 0),
-          organicCost: organic?.estimated_paid_traffic_cost ?? 0,
-        };
-      }).filter(r => r.domain);
-
-      logCreditUsage({ credits: cost, endpoint: 'competitors_domain', query: target, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      log.info(`Found ${results.length} competitors for "${target}"`);
-      return results;
-    } catch (err) {
-      log.error({ err }, `DataForSEO competitors_domain error for "${target}"`);
-      return [];
-    }
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results: OrganicCompetitor[] = items.map(item => {
+          const fullMetrics = item.full_domain_metrics as Record<string, Record<string, number>> | undefined;
+          const organic = fullMetrics?.organic;
+          const avgPos = (item.avg_position as number) ?? 50;
+          const relevance = Math.max(0, Math.min(100, Math.round(100 - avgPos)));
+          return {
+            domain: (item.domain as string) ?? '',
+            competitorRelevance: relevance,
+            commonKeywords: (item.intersections as number) ?? 0,
+            organicKeywords: organic?.count ?? 0,
+            organicTraffic: Math.round(organic?.etv ?? 0),
+            organicCost: organic?.estimated_paid_traffic_cost ?? 0,
+          };
+        }).filter(r => r.domain);
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err }, `DataForSEO competitors_domain error for "${target}"`);
+        return [];
+      },
+      afterNetworkSuccess: (results) => {
+        if (results.length > 0) {
+          log.info(`Found ${results.length} competitors for "${target}"`);
+        }
+      },
+    });
   }
 
   // ── getKeywordGap — same approach as semrush: compare domain keywords ──
@@ -1591,104 +1564,95 @@ export class DataForSeoProvider implements SeoDataProvider {
   async getBacklinksOverview(domain: string, workspaceId: string, _database = 'us'): Promise<BacklinksOverview | null> {
     const target = cleanDomain(domain);
     const cacheKey = `backlinks_overview_${target.replace(/\./g, '_')}`;
-    const cached = readCache<BacklinksOverview>(workspaceId, cacheKey, CACHE_TTL_BACKLINKS);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'backlinks_summary', query: target, rowsReturned: 1, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return null;
-
-    try {
-      const json = await apiCall('backlinks/summary/live', [{
+    return runDataForSeoOperation<BacklinksOverview | null>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_BACKLINKS,
+      endpointLabel: 'backlinks_summary',
+      query: target,
+      emptyValue: null,
+      endpoint: 'backlinks/summary/live',
+      body: [{
         target,
         include_subdomains: true,
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const data = taskResults[0] as Record<string, unknown> | undefined;
-
-      if (!data) {
-        log.info(`No backlink data for "${target}"`);
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const data = taskResults[0] as Record<string, unknown> | undefined;
+        if (!data) {
+          log.info(`No backlink data for "${target}"`);
+          return { value: null, cacheable: false, logCreditUsage: false };
+        }
+        const totalBacklinks = (data.backlinks as number) ?? 0;
+        const refLinksTypes = data.referring_links_types as Record<string, number> | undefined;
+        const nofollowLinks = (data.referring_pages_nofollow as number | undefined)
+          ?? (data.referring_domains_nofollow as number | undefined)
+          ?? 0;
+        const overview: BacklinksOverview = {
+          totalBacklinks,
+          referringDomains: (data.referring_domains as number) ?? 0,
+          followLinks: Math.max(0, totalBacklinks - nofollowLinks),
+          nofollowLinks,
+          textLinks: refLinksTypes?.anchor ?? 0,
+          imageLinks: refLinksTypes?.image ?? 0,
+          formLinks: refLinksTypes?.form ?? 0,
+          frameLinks: refLinksTypes?.frame ?? 0,
+        };
+        return { value: overview, rowsReturned: 1 };
+      },
+      handleError: (err) => {
+        if (isSubscriptionError(err)) {
+          log.warn({ err }, `DataForSEO backlinks summary unavailable for "${target}"`);
+          return null;
+        }
+        log.error({ err }, `DataForSEO backlinks summary error for "${target}"`);
         return null;
-      }
-
-      const totalBacklinks = (data.backlinks as number) ?? 0;
-      const refLinksAttrs = data.referring_links_attributes as Record<string, number> | undefined;
-      const nofollowLinks = refLinksAttrs?.nofollow ?? 0;
-
-      const overview: BacklinksOverview = {
-        totalBacklinks,
-        referringDomains: (data.referring_domains as number) ?? 0,
-        followLinks: totalBacklinks - nofollowLinks,
-        nofollowLinks,
-        textLinks: 0, // Not directly provided by DataForSEO summary
-        imageLinks: 0,
-        formLinks: 0,
-        frameLinks: 0,
-      };
-
-      logCreditUsage({ credits: cost, endpoint: 'backlinks_summary', query: target, rowsReturned: 1, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, overview);
-      return overview;
-    } catch (err) {
-      if (isSubscriptionError(err)) {
-        markBacklinksDisabled();
-        return null;
-      }
-      log.error({ err }, `DataForSEO backlinks summary error for "${target}"`);
-      return null;
-    }
+      },
+    });
   }
 
   // ── getReferringDomains → backlinks/referring_domains ──
   async getReferringDomains(domain: string, workspaceId: string, limit = 20, _database = 'us'): Promise<ReferringDomain[]> {
     const target = cleanDomain(domain);
     const cacheKey = `backlinks_refdomains_${target.replace(/\./g, '_')}_${limit}`;
-    const cached = readCache<ReferringDomain[]>(workspaceId, cacheKey, CACHE_TTL_BACKLINKS);
-    if (cached) {
-      logCreditUsage({ credits: 0, endpoint: 'backlinks_referring_domains', query: target, rowsReturned: cached.length, workspaceId, cached: true });
-      return cached;
-    }
-
-    if (areCreditsExhausted()) return [];
-
-    try {
-      const json = await apiCall('backlinks/referring_domains/live', [{
+    return runDataForSeoOperation<ReferringDomain[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_BACKLINKS,
+      endpointLabel: 'backlinks_referring_domains',
+      query: target,
+      emptyValue: [],
+      endpoint: 'backlinks/referring_domains/live',
+      body: [{
         target,
         limit,
         include_subdomains: true,
         order_by: ['rank,desc'],
-      }], workspaceId);
-
-      const taskResults = getTaskResult(json);
-      const cost = getTaskCost(json);
-      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
-
-      const results: ReferringDomain[] = items.map(item => {
-        const lastVisited = item.last_visited as string | undefined;
-        const firstSeen = item.first_seen as string | undefined;
-        return {
-          domain: (item.domain as string) ?? '',
-          backlinksCount: (item.backlinks as number) ?? 0,
-          firstSeen: normalizeProviderDate(firstSeen ?? ''),
-          // Empty string (not 'N/A') so the frontend falsy-check renders '—' instead of 'Invalid Date'
-          lastSeen: normalizeProviderDate(lastVisited ?? firstSeen ?? ''),
-        };
-      });
-
-      logCreditUsage({ credits: cost, endpoint: 'backlinks_referring_domains', query: target, rowsReturned: results.length, workspaceId, cached: false });
-      writeCache(workspaceId, cacheKey, results);
-      return results;
-    } catch (err) {
-      if (isSubscriptionError(err)) {
-        markBacklinksDisabled();
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results: ReferringDomain[] = items.map(item => {
+          const lastVisited = item.last_visited as string | undefined;
+          const firstSeen = item.first_seen as string | undefined;
+          return {
+            domain: (item.domain as string) ?? '',
+            backlinksCount: (item.backlinks as number) ?? 0,
+            firstSeen: normalizeProviderDate(firstSeen ?? ''),
+            lastSeen: normalizeProviderDate(lastVisited ?? firstSeen ?? ''),
+          };
+        });
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        if (isSubscriptionError(err)) {
+          log.warn({ err }, `DataForSEO referring domains unavailable for "${target}"`);
+          return [];
+        }
+        log.error({ err }, `DataForSEO referring domains error for "${target}"`);
         return [];
-      }
-      log.error({ err }, `DataForSEO referring domains error for "${target}"`);
-      return [];
-    }
+      },
+    });
   }
 }
 

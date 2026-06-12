@@ -1,7 +1,6 @@
 /**
  * Integration tests for Outcome Intelligence Engine — client-facing and admin aggregate routes.
  *
- * Covers routes NOT tested by outcome-pipeline.test.ts (port 13250):
  *   - GET /api/public/outcomes/:wsId/summary  (client portal summary)
  *   - GET /api/public/outcomes/:wsId/wins     ("We Called It" client wins)
  *   - GET /api/outcomes/overview              (multi-workspace admin overview)
@@ -10,19 +9,14 @@
  *   - Rate denominator consistency (overallWinRate uses scored denominator, totalTracked ≠ totalScored)
  *   - Trend computation (recentWinRate vs overallWinRate overlap)
  *
- * NOTE: Port 13357 was already allocated to admin-chat-route-validation.test.ts.
- * This file uses port 13386 (next available after 13385).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-// Enable outcome tracking feature flag before server starts
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
-const ctx = createTestContext(13386); // port-ok: next free after 13385
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 const RUN_ID = Date.now().toString(36);

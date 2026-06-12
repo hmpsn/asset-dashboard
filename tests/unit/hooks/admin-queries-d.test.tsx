@@ -49,16 +49,8 @@ const mockDel = vi.mocked(del);
 
 // ── Mock: src/api/analytics (for useAnalyticsOverview sub-hooks) ─────────────
 
-vi.mock('../../../src/api/analytics', () => ({
-  gscAdmin: {
-    overview: vi.fn(),
-    trend: vi.fn(),
-    devices: vi.fn(),
-    countries: vi.fn(),
-    searchTypes: vi.fn(),
-    comparison: vi.fn(),
-  },
-  ga4: {
+vi.mock('../../../src/api/analytics', () => {
+  const ga4Api = {
     overview: vi.fn(),
     trend: vi.fn(),
     topPages: vi.fn(),
@@ -71,9 +63,21 @@ vi.mock('../../../src/api/analytics', () => ({
     landingPages: vi.fn(),
     conversions: vi.fn(),
     events: vi.fn(),
-  },
-  fetchClientIntelligence: vi.fn(),
-}));
+  };
+  return {
+    gscAdmin: {
+      overview: vi.fn(),
+      trend: vi.fn(),
+      devices: vi.fn(),
+      countries: vi.fn(),
+      searchTypes: vi.fn(),
+      comparison: vi.fn(),
+    },
+    ga4: ga4Api,
+    ga4Admin: ga4Api,
+    fetchClientIntelligence: vi.fn(),
+  };
+});
 
 import { gscAdmin, ga4 } from '../../../src/api/analytics';
 const mockGscOverview = vi.mocked(gscAdmin.overview);

@@ -1,7 +1,6 @@
 /**
  * Integration tests for public-portal READ paths — audit summary and detail.
  *
- * Port: 13601
  *
  * Covers:
  * - GET /api/public/audit-summary/:workspaceId  — 404 unknown, 400 no-site, 200/null for linked site
@@ -12,12 +11,12 @@
  * no snapshots, they return null (200). Webflow API is NOT called — these are read-only DB paths.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13601);
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 const UNKNOWN = 'nonexistent-ws-audit-99999';

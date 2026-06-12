@@ -25,26 +25,11 @@ interface FeatureUsage {
   provider: string;
 }
 
-interface SemrushUsage {
-  totalCredits: number;
-  totalCalls: number;
-  cachedCalls: number;
-}
-
-interface SemrushDailyUsage {
-  date: string;
-  credits: number;
-  calls: number;
-  cachedCalls: number;
-}
-
 interface AIUsageData {
   totalTokens: number;
   estimatedCost: number;
   daily: DailyUsage[];
   byFeature: FeatureUsage[];
-  semrush: SemrushUsage;
-  semrushDaily: SemrushDailyUsage[];
 }
 
 export function AIUsageSection() {
@@ -57,8 +42,7 @@ export function AIUsageSection() {
       .catch((err) => { console.error('WorkspaceOverview operation failed:', err); });
   }, [days]);
 
-  const hasSemrush = data?.semrush && data.semrush.totalCredits > 0;
-  if (!data || (data.totalTokens === 0 && data.daily.every(d => d.calls === 0) && !hasSemrush)) return null;
+  if (!data || (data.totalTokens === 0 && data.daily.every(d => d.calls === 0))) return null;
 
   const totalCost = data.estimatedCost;
   const totalCalls = data.daily.reduce((s, d) => s + d.calls, 0);
@@ -113,7 +97,7 @@ export function AIUsageSection() {
       }
     >
       {/* Stat cards */}
-      <div className={`grid grid-cols-2 ${hasSemrush ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mb-4`}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">AI Cost</div>
           <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{fmtCost(totalCost)}</div>
@@ -130,13 +114,6 @@ export function AIUsageSection() {
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Anthropic</div>
           <div className="text-sm font-semibold text-orange-400">{fmtCost(anthropicCost)}</div>
         </div>
-        {hasSemrush && (
-          <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">SEMRush Credits</div>
-            <div className="text-sm font-semibold text-blue-400">{data.semrush.totalCredits.toLocaleString()}</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
-          </div>
-        )}
       </div>
 
       {/* Stacked bar chart — daily cost by provider */}

@@ -29,7 +29,7 @@ export interface ClientChatWidgetProps {
   /**
    * Override the default quick-question buttons shown in the empty chat state.
    * When omitted, the widget falls back to `QUICK_QUESTIONS` from `./types`.
-   * Set by `<InsightsBriefingPage>` (Phase 2 of client-briefing-v2) so the
+   * Set by `<InsightsBriefingPage>` so the
    * briefing-era home page can route its sidebar quick questions through the
    * floating chat widget instead of a separate sidebar.
    */
@@ -63,6 +63,7 @@ export function ClientChatWidget({
     chatLoading,
     chatEndRef,
     chatSessionId, setChatSessionId,
+    chatHasServerBackedSession, setChatHasServerBackedSession,
     chatSessions, setChatSessions,
     showChatHistory, setShowChatHistory,
     chatUsage,
@@ -89,6 +90,10 @@ export function ClientChatWidget({
   const { overview, audit, ga4Overview } = chatDeps;
   if (!overview && !audit && !ga4Overview) return null;
 
+  const showChatCounter = !betaMode && chatUsage && chatUsage.limit !== null && (chatUsage.tier === 'free' || chatUsage.tier === 'growth');
+  const chatLimitBlocksNewConversation = !!(showChatCounter && !chatUsage.allowed && !chatHasServerBackedSession);
+  const upgradeTier = chatUsage?.tier === 'growth' ? 'Premium' : 'Growth';
+
   return (
     <>
       {!chatOpen && (
@@ -108,9 +113,9 @@ export function ClientChatWidget({
             <div className="flex items-center gap-2">
               <Icon as={Sparkles} size="md" className="text-accent-brand" />
               <span className="t-ui font-medium text-[var(--brand-text-bright)]">SEO Advisor</span>
-              {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
-                  {chatUsage.remaining}/{chatUsage.limit} left
+              {showChatCounter ? (
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium', (chatUsage.remaining ?? 0) > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
+                  {chatUsage.remaining ?? 0}/{chatUsage.limit} left
                 </span>
               ) : (
                 <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded-[var(--radius-sm)]">by {STUDIO_NAME}</span>
@@ -124,6 +129,7 @@ export function ClientChatWidget({
                   size="sm"
                   onClick={() => {
                     setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+                    setChatHasServerBackedSession(false);
                     setChatMessages([]);
                     clearIntent();
                     setShowChatHistory(false);
@@ -175,6 +181,7 @@ export function ClientChatWidget({
                     key={s.id}
                     onClick={() => {
                       setChatSessionId(s.id);
+                      setChatHasServerBackedSession(true);
                       setShowChatHistory(false);
                       if (ws) {
                         getOptional<{ messages?: Array<{ role: string; content: string }> }>(
@@ -209,6 +216,7 @@ export function ClientChatWidget({
                         <ClickableRow
                           key={i}
                           onClick={() => askAi(q)}
+                          disabled={chatLimitBlocksNewConversation}
                           className="px-3.5 py-3 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]"
                         >
                           <Icon as={MessageSquare} size="sm" className="text-accent-brand mb-1" />{q}
@@ -221,6 +229,7 @@ export function ClientChatWidget({
                         <ClickableRow
                           key={`learn-${i}`}
                           onClick={() => askAi(q)}
+                          disabled={chatLimitBlocksNewConversation}
                           className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
                         >
                           💡 {q}
@@ -277,6 +286,7 @@ export function ClientChatWidget({
                           <ClickableRow
                             key={i}
                             onClick={() => askAi(q)}
+                            disabled={chatLimitBlocksNewConversation}
                             className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 border border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
                           >
                             {q}
@@ -287,6 +297,7 @@ export function ClientChatWidget({
                           <ClickableRow
                             key={`learn-${i}`}
                             onClick={() => askAi(q)}
+                            disabled={chatLimitBlocksNewConversation}
                             className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
                           >
                             💡 {q}
@@ -302,14 +313,14 @@ export function ClientChatWidget({
           </div>
 
           {/* Footer: free-tier lock OR input */}
-          {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
+          {chatLimitBlocksNewConversation ? (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/20">
                 <Icon as={Lock} size="sm" className="text-accent-warning flex-shrink-0" />
                 <p className="t-caption-sm text-accent-warning flex-1">
-                  {roiValue && roiValue > 0
+                  {chatUsage.tier === 'free' && roiValue && roiValue > 0
                     ? <>Your organic traffic is worth <span className="font-semibold text-accent-success">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>
-                    : <>You've used all {chatUsage.limit} free conversations this month. Upgrade to Growth for unlimited access.</>}
+                    : <>You've used all {chatUsage.limit} {chatUsage.tier} conversations this month. Upgrade to {upgradeTier} for more chat access.</>}
                 </p>
               </div>
             </div>

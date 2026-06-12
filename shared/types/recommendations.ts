@@ -1,5 +1,7 @@
 // ── Recommendation domain types ─────────────────────────────────
 
+import type { ImpactBand } from './impact-band.js';
+
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
 export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
@@ -27,7 +29,18 @@ export interface Recommendation {
   actionType: RecActionType;
   productType?: string;      // for purchasable fix upsell
   productPrice?: number;
+  /** D2 (audit #11): the keyword this rec targets (set on content-gap recs at mint).
+   *  Matched via keywordComparisonKey against in-flight briefs/posts (generation
+   *  suppression) and against the published post's targetKeyword (publish-time
+   *  resolution in publishPostToWebflow). Absent on legacy rows and non-content recs. */
+  targetKeyword?: string;
   status: RecStatus;
+  /** Client-safe banded monthly impact (D-IMPACT). Set ONLY on the public projection
+   *  (server/routes/recommendations.ts stripEmvFromPublicRecs), derived from the
+   *  admin/AI-only opportunity.emvPerWeek which is stripped in the same pass. Absent on
+   *  admin-facing payloads (they carry the raw opportunity instead) and when the projected
+   *  monthly value is below the display floor. NEVER populated from raw emv client-side. */
+  impactBand?: ImpactBand;
   assignedTo?: 'team' | 'client'; // premium → team, growth/free → client
   /** SEO Gen-Quality P2: true when this rec comes from a deterministic-backfill content
    *  gap (re-admitted to meet the >=6 floor), so headline counts / "ready for review"
@@ -49,8 +62,16 @@ export interface RecommendationSet {
     ongoing: number;
     totalImpactScore: number;
     trafficAtRisk: number;
-    estimatedRecoverableClicks: number;     // conservative 12% recovery of trafficAtRisk
-    estimatedRecoverableImpressions: number;
+    /** Sum of active recommendations' canonical Opportunity Value scores. */
+    totalOpportunityValue?: number;
+    /** Sum of fix-now/fix-soon recommendations' canonical Opportunity Value scores. */
+    actionableOpportunityValue?: number;
+    /** Canonical Opportunity Value score for the top active recommendation. */
+    topOpportunityValue?: number;
+    /** @deprecated Legacy recovery-rate summary fields retained only for historical persisted rows. */
+    estimatedRecoverableClicks?: number;
+    /** @deprecated Legacy recovery-rate summary fields retained only for historical persisted rows. */
+    estimatedRecoverableImpressions?: number;
     /** The id of the highest-ranked active (non-completed, non-dismissed) recommendation,
      *  or null when no active recs exist. Set from the already-sorted recs array so it
      *  always agrees with the Health tab's ordering. */

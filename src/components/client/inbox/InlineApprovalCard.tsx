@@ -1,7 +1,7 @@
 // src/components/client/inbox/InlineApprovalCard.tsx
 //
-// ISSUE 1 — Inline approval-review card (DARK; mounted ONLY from UnifiedInbox behind the
-// `unified-inbox` flag). SEO/approval-family deliverables (typed items[]) previously hid their
+// ISSUE 1 — Inline approval-review card, mounted from UnifiedInbox. SEO/approval-family
+// deliverables (typed items[]) previously hid their
 // current→proposed substance behind the full-screen DeliverableDetailModal ("View N →"). This card
 // renders that substance INLINE so the client can quick-approve in place — no modal.
 //
@@ -12,7 +12,7 @@
 import { useState, useCallback } from 'react';
 import { Button, FormInput } from '../../ui';
 import { ItemDiffRow } from '../decision-renderers';
-import { approveCtaLabel } from '../../../lib/decision-adapters';
+import { approveCtaLabel, humanizeFieldLabel } from '../../../lib/decision-adapters';
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 import type { ClientDeliverableItem } from '../../../../shared/types/client-deliverable';
 
@@ -160,7 +160,7 @@ export function InlineApprovalCard({
                 // every row. Pass a field-only label (the field as the label, no `field` suffix) so
                 // the row reads just "seoTitle" under its page-group header. Single-page mode keeps
                 // the combined "Page — field" label (no group header to de-duplicate against).
-                label={isMultiPage ? (item.field ?? 'Item') : itemPageLabel(item)}
+                label={isMultiPage ? (humanizeFieldLabel(item.field) ?? 'Item') : itemPageLabel(item)}
                 field={isMultiPage ? null : item.field}
                 currentValue={item.currentValue}
                 proposedValue={item.proposedValue}

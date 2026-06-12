@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
@@ -10,12 +10,15 @@ import {
 import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.ts';
 import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
-import { fmtMoneyFull } from '../../utils/formatNumbers';
+import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
+import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { useToast } from '../Toast';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -24,6 +27,11 @@ interface InsightsEngineProps {
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
   onNavigate?: (tab: string, context?: { pageSlug?: string; recType?: string }) => void;
+  /** Optional notification callback for client-portal mounts where no ToastProvider is
+   *  present. When absent the component falls back to the context-based toast (admin
+   *  mounts have ToastProvider; client mounts thread this from ClientDashboard's
+   *  local setToast). Signature mirrors the context toast so both paths look the same. */
+  onNotify?: (message: string, type: 'error' | 'success' | 'info') => void;
 }
 
 // Map recommendation types to the admin dashboard tab that handles them
@@ -48,7 +56,9 @@ const REC_TYPE_TAB: Record<RecType, string> = {
 
 const fmt = fmtMoneyFull;
 
-const num = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+// Wave 2 T2: num was a lowercase-k dup. Now delegating to the canonical UPPERCASE-K fmtNum.
+// Visible change: "8.6k" → "8.6K" (reviewed cosmetic — uppercase is canonical).
+const num = fmtNum;
 
 const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; color: string; bg: string; border: string; description: string }> = {
   fix_now: {
@@ -116,12 +126,28 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
+export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotify }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
-  const [regenerating, setRegenerating] = useState(false);
+  const { toast: ctxToast } = useToast();
+  // Prefer the threaded onNotify prop (client-portal mount has no ToastProvider);
+  // fall back to the context toast (admin mount has ToastProvider).
+  const toast = (msg: string, type: 'error' | 'success' | 'info' = 'success') =>
+    onNotify ? onNotify(msg, type) : ctxToast(msg, type);
+  const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
+  const [startingRegeneration, setStartingRegeneration] = useState(false);
+  const lastObservedRecommendationJobId = useRef<string | null>(null);
   const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
   const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
+  const activeRecommendationJob = findActiveJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const latestRecommendationJob = findLatestTerminalJob({
+    type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
+    workspaceId,
+  });
+  const regenerating = startingRegeneration || Boolean(activeRecommendationJob);
 
   const isPremium = tier === 'premium';
 
@@ -137,13 +163,36 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   // Re-generate
   const handleRegenerate = async () => {
-    setRegenerating(true);
+    if (regenerating) return;
+    setStartingRegeneration(true);
     try {
-      const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
-      qc.setQueryData(queryKeys.shared.recommendations(workspaceId), set);
-    } catch { /* silently fail — button stops spinning; user can retry */ }
-    setRegenerating(false);
+      const result = await post<{ jobId?: string }>(`/api/public/recommendations/${workspaceId}/generate`);
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, result.jobId, { workspaceId });
+      }
+    } catch (err) {
+      if (err instanceof Error && 'status' in err && 'body' in err) {
+        const body = (err as { body?: unknown }).body;
+        if (body && typeof body === 'object' && 'jobId' in body && typeof (body as { jobId?: unknown }).jobId === 'string') {
+          trackJob(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION, (body as { jobId: string }).jobId, { workspaceId });
+          setStartingRegeneration(false);
+          return;
+        }
+      }
+      const msg = err instanceof Error ? err.message : 'Failed to refresh recommendations';
+      toast(msg, 'error');
+    }
+    setStartingRegeneration(false);
   };
+
+  useEffect(() => {
+    if (!latestRecommendationJob) return;
+    if (lastObservedRecommendationJobId.current === latestRecommendationJob.id) return;
+    lastObservedRecommendationJobId.current = latestRecommendationJob.id;
+    if (latestRecommendationJob.status === 'done') {
+      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+    }
+  }, [latestRecommendationJob, qc, workspaceId]);
 
   // Update status (on success)
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {
@@ -153,7 +202,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status, updatedAt: new Date().toISOString() } : r) };
       });
-    } catch (err) { console.error('InsightsEngine operation failed:', err); }
+    } catch (err) {
+      console.error('InsightsEngine operation failed:', err);
+      toast('Could not update recommendation', 'error');
+    }
   };
 
   // Dismiss (on success)
@@ -164,7 +216,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status: 'dismissed' as RecStatus } : r) };
       });
-    } catch (err) { console.error('InsightsEngine operation failed:', err); }
+    } catch (err) {
+      console.error('InsightsEngine operation failed:', err);
+      toast('Could not dismiss recommendation', 'error');
+    }
   };
 
   const togglePriority = (p: RecPriority) =>
@@ -218,12 +273,34 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   }
 
   if (!data || data.recommendations.length === 0) {
+    const emptyStateTitle = activeRecommendationJob
+      ? 'Generating recommendations'
+      : latestRecommendationJob?.status === 'error'
+        ? 'Recommendation refresh failed'
+        : 'No recommendations yet';
+    const emptyStateBody = activeRecommendationJob?.message
+      ?? latestRecommendationJob?.error
+      ?? latestRecommendationJob?.message
+      ?? 'Run a site audit to generate prioritized recommendations.';
     return (
       // pr-check-disable-next-line -- InsightsEngine empty state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <Icon as={Shield} size="2xl" className="text-accent-brand mx-auto mb-3" />
-        <p className="t-body font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
-        <p className="t-caption text-[var(--brand-text-muted)] mt-1">Run a site audit to generate prioritized recommendations.</p>
+        <Icon as={activeRecommendationJob ? Loader2 : latestRecommendationJob?.status === 'error' ? XCircle : Shield} size="2xl" className={`mx-auto mb-3 ${activeRecommendationJob ? 'text-accent-brand animate-spin' : latestRecommendationJob?.status === 'error' ? 'text-accent-danger' : 'text-accent-brand'}`} />
+        <p className="t-body font-medium text-[var(--brand-text-bright)]">{emptyStateTitle}</p>
+        <p className="t-caption text-[var(--brand-text-muted)] mt-1">{emptyStateBody}</p>
+        {!activeRecommendationJob && (
+          <Button
+            onClick={handleRegenerate}
+            loading={startingRegeneration}
+            disabled={regenerating}
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            className="mt-4 t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border-0"
+          >
+            Refresh
+          </Button>
+        )}
       </div>
     );
   }
@@ -246,9 +323,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           {data.summary.trafficAtRisk > 0 && (
             <p className="t-caption text-[var(--brand-text)] mt-1">
               <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
-              {data.summary.estimatedRecoverableClicks > 0 && (
-                <span className="ml-1 text-accent-brand">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
-              )}
+              <span className="ml-1 text-accent-brand">· prioritized by Opportunity Value</span>
             </p>
           )}
         </div>
@@ -344,6 +419,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
             <Button
               onClick={handleRegenerate}
               loading={regenerating}
+              disabled={regenerating}
               variant="secondary"
               size="sm"
               icon={RefreshCw}
@@ -362,7 +438,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
             We've analyzed your audit, traffic, and SEO strategy to create a prioritized action plan.
             {data.summary.trafficAtRisk > 0 && (
-              <> <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
+              <> <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues. Top items are ranked by Opportunity Value.</>
             )}
           </p>
         )}
@@ -569,7 +645,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                       size="sm"
                                       icon={ShoppingCart}
                                     >
-                                      Let Us Fix This — {fmt(rec.productPrice)}
+                                      {/* D2 (audit #11): content recs carry a brief product — label the CTA
+                                          as a brief order so it reads as the brief-purchase flow it routes to. */}
+                                      {rec.type === 'content'
+                                        ? <>Order Content Brief — {fmt(rec.productPrice)}</>
+                                        : <>Let Us Fix This — {fmt(rec.productPrice)}</>}
                                     </Button>
                                   ) : inCart ? (
                                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] badge-span-ok t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">

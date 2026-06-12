@@ -31,7 +31,10 @@ vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadc
 vi.mock('../../server/schema-generation-context.js', () => ({
   prepareBulkSchemaGenerationContext: mocks.prepareBulkSchemaGenerationContext,
 }));
-vi.mock('../../server/schema-store.js', () => ({ saveSchemaSnapshot: mocks.saveSchemaSnapshot }));
+vi.mock('../../server/schema-store.js', () => ({
+  saveSchemaSnapshot: mocks.saveSchemaSnapshot,
+  pruneSchemaSnapshotOrphans: vi.fn().mockReturnValue(0), // W6.3: pruning hook added at job completion
+}));
 vi.mock('../../server/schema-suggester.js', () => ({
   generateSchemaSuggestions: mocks.generateSchemaSuggestions,
 }));
@@ -87,6 +90,11 @@ describe('runSchemaGenerationJob', () => {
     });
     expect(mocks.saveSchemaSnapshot).toHaveBeenNthCalledWith(1, 'site-1', 'ws-1', partialResult);
     expect(mocks.saveSchemaSnapshot).toHaveBeenNthCalledWith(2, 'site-1', 'ws-1', finalResult);
+    expect(mocks.broadcastToWorkspace).toHaveBeenNthCalledWith(1, 'ws-1', WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+      siteId: 'site-1',
+      action: 'partial_saved',
+      pageCount: 1,
+    });
     expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws-1', WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
       siteId: 'site-1',
       action: 'generated',

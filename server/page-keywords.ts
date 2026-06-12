@@ -74,6 +74,7 @@ interface PageKeywordLiteRow {
   clicks: number | null;
   volume: number | null;
   difficulty: number | null;
+  cpc: number | null;
 }
 
 interface PageKeywordScoreHistoryRow {
@@ -243,7 +244,12 @@ function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisF
 
 const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
-    'SELECT * FROM page_keywords WHERE workspace_id = ?',
+    // ORDER BY parity with listByWsPaged — unpaged and paged reads must return
+    // rows in the same order (page_path ASC) so callers see a stable order.
+    'SELECT * FROM page_keywords WHERE workspace_id = ? ORDER BY page_path ASC',
+  ),
+  listByWsPaged: db.prepare<[workspaceId: string, limit: number, offset: number]>(
+    'SELECT * FROM page_keywords WHERE workspace_id = ? ORDER BY page_path ASC LIMIT ? OFFSET ?',
   ),
   listLiteByWs: db.prepare<[workspaceId: string]>(`
     SELECT
@@ -256,7 +262,8 @@ const stmts = createStmtCache(() => ({
       impressions,
       clicks,
       volume,
-      difficulty
+      difficulty,
+      cpc
     FROM page_keywords
     WHERE workspace_id = ?
   `),
@@ -421,6 +428,19 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
   return grouped;
 }
 
+/** Fetch score histories only for the given normalized page paths (for paged reads). */
+function groupScoreHistoryForPaths(
+  workspaceId: string,
+  normalizedPaths: string[],
+): Map<string, PageOptimizationScoreSnapshot[]> {
+  const grouped = new Map<string, PageOptimizationScoreSnapshot[]>();
+  for (const path of normalizedPaths) {
+    const historyRows = stmts().scoreHistoryByPage.all(workspaceId, path, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
+    grouped.set(path, historyRows.map(rowToScoreHistory));
+  }
+  return grouped;
+}
+
 function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): void {
   if (entry.optimizationScore == null) return;
   const pagePath = normalizePageUrl(entry.pagePath);
@@ -459,6 +479,34 @@ export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   return rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? []));
 }
 
+export interface ListPageKeywordsPagedResult {
+  items: PageKeywordMap[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+/** Paginated variant — only fetches the score histories for the returned page slice. */
+export function listPageKeywordsPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListPageKeywordsPagedResult {
+  const countRow = stmts().countByWs.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().listByWsPaged.all(workspaceId, limit, offset) as PageKeywordRow[];
+  // Only fetch score histories for the returned page slice to keep memory low.
+  const histories = groupScoreHistoryForPaths(workspaceId, rows.map(r => normalizePageUrl(r.page_path).toLowerCase()));
+  return {
+    items: rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? [])),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
+}
+
 function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
   const model: PageKeywordMap = {
     pagePath: row.page_path,
@@ -471,6 +519,8 @@ function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
   if (row.clicks != null) model.clicks = row.clicks;
   if (row.volume != null) model.volume = row.volume;
   if (row.difficulty != null) model.difficulty = row.difficulty;
+  // Task 3.2: cpc is the realized-$ input the Keyword Hub + strategy drawer need.
+  if (row.cpc != null) model.cpc = row.cpc;
   return model;
 }
 
@@ -535,11 +585,13 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
     }
     const normalizedPaths = entries.map(e => normalizePageUrl(e.pagePath));
     const placeholders = normalizedPaths.map(() => '?').join(', ');
+    // I1: exempt /planned/ rows from NOT IN cleanup — they are written by ADD_TO_STRATEGY
+    // and survive full strategy regeneration. They are only removed on explicit DECLINE.
     db.prepare(
-      `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+      `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders}) AND page_path NOT LIKE '/planned/%'`
     ).run(workspaceId, ...normalizedPaths);
     db.prepare(
-      `DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+      `DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path NOT IN (${placeholders}) AND page_path NOT LIKE '/planned/%'`
     ).run(workspaceId, ...normalizedPaths);
   });
   run.immediate();
@@ -557,6 +609,88 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
     }
   });
   run();
+}
+
+/** M7: Maximum secondary keywords per page (prevents unbounded array growth in JSON column). */
+export const MAX_SECONDARY_KEYWORDS = 20;
+
+/**
+ * M4: Derive a human-readable page title from a path or full URL.
+ * Never returns a raw URL — falls back to a cleaned slug-based title.
+ */
+export function pageTitleFromPath(pathOrUrl: string): string {
+  try {
+    let pathname = pathOrUrl;
+    if (pathname.startsWith('http://') || pathname.startsWith('https://')) {
+      pathname = new URL(pathname).pathname;
+    }
+    pathname = pathname.replace(/\/$/, '');
+    if (!pathname || pathname === '/') return 'Home';
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return 'Home';
+    const slug = segments[segments.length - 1] ?? '';
+    return slug
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(w => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+      .join(' ');
+  } catch (_err) { // catch-ok: URL parsing failure — fall back to raw path
+    return pathOrUrl;
+  }
+}
+
+/**
+ * M3: Shared helper — add a keyword to a page's entry (inside an existing transaction).
+ * Use this variant when called from within a `db.transaction()` block (e.g. keyword-command-center.ts).
+ * - If the page already exists: merges as secondary (capped at MAX_SECONDARY_KEYWORDS, deduplicated).
+ * - If the page does not exist: creates a new row with a clean title (pageTitleFromPath or titleOverride).
+ */
+export function addKeywordToPageInTxn(
+  workspaceId: string,
+  pagePath: string,
+  keyword: string,
+  titleOverride?: string,
+): void {
+  const existing = stmts().getOne.get(workspaceId, normalizePageUrl(pagePath)) as PageKeywordRow | undefined;
+  if (existing) {
+    const model = rowToModel(existing);
+    const secondaryLower = model.secondaryKeywords.map(k => k.toLowerCase());
+    if (
+      model.primaryKeyword.toLowerCase() !== keyword.toLowerCase()
+      && !secondaryLower.includes(keyword.toLowerCase())
+      && model.secondaryKeywords.length < MAX_SECONDARY_KEYWORDS
+    ) {
+      model.secondaryKeywords = [...model.secondaryKeywords, keyword];
+      const preserveAnalysisFields = preparePrimaryKeywordUpdate(workspaceId, model);
+      stmts().upsert.run(modelToParams(workspaceId, model, preserveAnalysisFields));
+    }
+  } else {
+    const title = titleOverride ?? pageTitleFromPath(pagePath);
+    const newEntry: PageKeywordMap = {
+      pagePath: normalizePageUrl(pagePath),
+      pageTitle: title,
+      primaryKeyword: keyword,
+      secondaryKeywords: [],
+    };
+    stmts().upsert.run(modelToParams(workspaceId, newEntry));
+  }
+}
+
+/**
+ * M3: Shared helper — add a keyword to a page's entry (runs its own transaction).
+ * Use this variant for standalone calls (e.g. MCP tools, one-off writes).
+ * Delegates to addKeywordToPageInTxn inside a run.immediate() transaction.
+ */
+export function addKeywordToPage(
+  workspaceId: string,
+  pagePath: string,
+  keyword: string,
+  titleOverride?: string,
+): void {
+  const run = db.transaction(() => {
+    addKeywordToPageInTxn(workspaceId, pagePath, keyword, titleOverride);
+  });
+  run.immediate();
 }
 
 /** Delete a single page keyword entry. */

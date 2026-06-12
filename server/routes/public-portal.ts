@@ -12,7 +12,7 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth, verifyClientSession } from '../middleware.js';
+import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
@@ -31,10 +31,14 @@ import { listBlueprints } from '../page-strategy.js';
 import {
   clearKeywordFeedback,
   listPublicKeywordFeedback,
+  listPublicKeywordFeedbackPaged,
   notifyKeywordFeedbackChanged,
   saveBulkKeywordFeedback,
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
+import { parsePaginationParams } from '../pagination.js';
+import { listKeywordGaps } from '../keyword-gaps.js';
+import { projectCompetitorGaps } from '../competitor-gaps-projection.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -56,25 +60,30 @@ import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
+import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
+import { buildMatricesExportRows, MATRICES_EXPORT_HEADERS, sendExport } from './data-export.js';
+import type {
+  BusinessPrioritiesConflictResponse,
+  BusinessPrioritiesResponse,
+  BusinessPrioritiesSaveResponse,
+} from '../../shared/types/business-priorities.js';
 
 const log = createLogger('public-portal');
 
-const requireClientStrategyMutationAuth: RequestHandler = (req, res, next) => {
+const attachClientEmail: RequestHandler = (req, res, next) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
   const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
   const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  res.locals.clientEmail = clientPayload?.email;
+  if (clientPayload?.workspaceId === wsId) res.locals.clientEmail = clientPayload.email;
   next();
 };
+const requireClientStrategyMutationAuth = [
+  requireAuthenticatedClientPortalAuth('workspaceId'),
+  attachClientEmail,
+];
 
 // --- Public Client Dashboard API (no auth required) ---
-router.get('/api/public/workspace/:id', (req, res) => {
+router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
@@ -86,20 +95,10 @@ router.get('/api/public/workspace/:id', (req, res) => {
 });
 
 // Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
-router.post('/api/public/onboarding/:id', async (req, res) => {
+router.post('/api/public/onboarding/:id', requireAuthenticatedClientPortalAuth('id'), async (req, res) => {
   try {
     const ws = getWorkspace(req.params.id);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-    // Require a valid client session or client user JWT
-    const wsId = req.params.id;
-    const sessionToken = req.cookies?.[`client_session_${wsId}`];
-    const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-    const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-    const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-    if (!hasSession && !hasClientUserAuth) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
 
     const { business, audience, brand, competitors } = req.body;
 
@@ -197,7 +196,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
     updateWorkspace(req.params.id, updates);
 
     // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
-    addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
+    addActivity(ws.id, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
     log.error({ err: err }, 'Error saving responses');
@@ -206,7 +205,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
 });
 
 // Public tier endpoint — returns effective tier for a workspace
-router.get('/api/public/tier/:id', (req, res) => {
+router.get('/api/public/tier/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -223,7 +222,7 @@ router.get('/api/public/tier/:id', (req, res) => {
 });
 
 // Public pricing endpoint — returns product prices for a workspace
-router.get('/api/public/pricing/:id', (req, res) => {
+router.get('/api/public/pricing/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const products = listProducts();
@@ -249,7 +248,7 @@ router.get('/api/public/pricing/:id', (req, res) => {
   res.json({ products: priceMap, bundles, currency: pricing?.currency || 'USD', stripeEnabled: isStripeConfigured() });
 });
 
-router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
+router.get('/api/public/audit-summary/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
@@ -299,6 +298,10 @@ router.get('/api/public/audit-detail/:workspaceId', requireClientPortalAuth(), (
     }
   }
 
+  // Safety cap: scoreHistory is fetched unbounded from DB and can grow indefinitely
+  // (one row per audit run). Cap at 50 most-recent entries — the chart only renders
+  // ~12–24 meaningful data points and the full unbounded list can exceed 200KB.
+  const SCORE_HISTORY_CAP = 50;
   res.json({
     id: latest.id,
     createdAt: latest.createdAt,
@@ -306,7 +309,7 @@ router.get('/api/public/audit-detail/:workspaceId', requireClientPortalAuth(), (
     logoUrl: latest.logoUrl,
     previousScore,
     audit: filtered,
-    scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore, errors: h.errors, warnings: h.warnings })),
+    scoreHistory: history.slice(0, SCORE_HISTORY_CAP).map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore, errors: h.errors, warnings: h.warnings })),
     auditDiff,
   });
 });
@@ -324,21 +327,32 @@ router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientP
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
     else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    sendSanitizedProviderError(res, {
+      source: 'provider',
+      fallback: 'Traffic data is temporarily unavailable. Please try again.',
+    });
   }
 });
 
 // ── Client Keyword Feedback ──────────────────────────
 
 // Client: list their keyword feedback
-router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+router.get('/api/public/keyword-feedback/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  res.json(listPublicKeywordFeedback(ws.id));
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json(listPublicKeywordFeedback(ws.id));
+  }
+  const paged = listPublicKeywordFeedbackPaged(ws.id, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items,
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // Client: submit keyword feedback (approve/decline)
-router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMutationAuth, validate(keywordFeedbackSchema), (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, validate(keywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -374,7 +388,7 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
 });
 
 // Client: bulk feedback
-router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrategyMutationAuth, validate(bulkKeywordFeedbackSchema), (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId/bulk', ...requireClientStrategyMutationAuth, validate(bulkKeywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -402,16 +416,8 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
 // broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
-router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+router.delete('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -441,15 +447,16 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
 // ── Client Business Priorities ──────────────────────────
 // Clients can share their business priorities which get injected into future strategy generations
 
-router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
-  const wsId = req.params.workspaceId;
-  const ws = getWorkspace(wsId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+interface ClientBusinessPrioritiesRow {
+  priorities: string;
+  updated_at: string;
+}
 
-  // Load from db
-  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
-  if (!row) return res.json({ priorities: [], updatedAt: null });
-
+function normalizeClientBusinessPrioritiesRow(
+  wsId: string,
+  row: ClientBusinessPrioritiesRow | undefined,
+): BusinessPrioritiesResponse {
+  if (!row) return { priorities: [], updatedAt: null };
   const priorities = parseJsonSafeArray(
     row.priorities,
     clientBusinessPrioritySchema,
@@ -463,28 +470,48 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
       category: priority.category?.trim() || 'other',
     };
   }).filter(priority => priority.text.length > 0);
-  res.json({ priorities, updatedAt: row.updated_at });
-});
+  return { priorities, updatedAt: row.updated_at };
+}
 
-router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
+router.get('/api/public/business-priorities/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { priorities } = req.body as ClientBusinessPrioritiesBody;
+  const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  res.json(normalizeClientBusinessPrioritiesRow(wsId, row));
+});
+
+router.post('/api/public/business-priorities/:workspaceId', ...requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { priorities, expectedUpdatedAt } = req.body as ClientBusinessPrioritiesBody;
+  const existingRow = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as ClientBusinessPrioritiesRow | undefined;
+  const existing = normalizeClientBusinessPrioritiesRow(wsId, existingRow);
+  if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updatedAt) {
+    const response: BusinessPrioritiesConflictResponse = {
+      error: 'Business priorities changed. Please refresh and try again.',
+      priorities: existing.priorities,
+      updatedAt: existing.updatedAt,
+    };
+    return res.status(409).json(response);
+  }
   const clean = priorities.map(p => ({
     text: p.text,
     category: p.category,
   }));
+  const updatedAt = new Date().toISOString();
 
   // Upsert into db
   db.prepare(`
     INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
-    VALUES (?, ?, datetime('now'))
+    VALUES (?, ?, ?)
     ON CONFLICT(workspace_id) DO UPDATE SET
       priorities = excluded.priorities,
-      updated_at = datetime('now')
-  `).run(wsId, JSON.stringify(clean));
+      updated_at = excluded.updated_at
+  `).run(wsId, JSON.stringify(clean), updatedAt);
 
   // Also inject a summary into workspace businessContext so it's available for AI prompts
   if (ws.keywordStrategy) {
@@ -498,19 +525,23 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
       : base;
 
     updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
-    // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-    invalidateIntelligenceCache(wsId);
-    debouncedStrategyInvalidate(wsId, () => {
-      invalidateIntelligenceCache(wsId);
-      invalidateSubCachePrefix(wsId, 'slice:seoContext');
-    });
   }
+  // Bridge #3: business priorities updated — immediate flush + debounced
+  // defense-in-depth. Priorities are also read directly by clientSignals, so
+  // this must run even before a workspace has a keywordStrategy blob.
+  invalidateIntelligenceCache(wsId);
+  debouncedStrategyInvalidate(wsId, () => {
+    invalidateIntelligenceCache(wsId);
+    invalidateSubCachePrefix(wsId, 'slice:seoContext');
+    invalidateSubCachePrefix(wsId, 'slice:clientSignals');
+  });
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
   broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });
   // client-visibility-ok: business-priority edits are internal strategy signals, not client timeline content.
   addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
-  res.json({ saved: clean.length });
+  const response: BusinessPrioritiesSaveResponse = { saved: clean.length, priorities: clean, updatedAt };
+  res.json(response);
 });
 
 // ── Business Profile (client-facing PATCH) ─────────────────────
@@ -532,15 +563,8 @@ const clientBusinessProfileSchema = z.object({
   numberOfEmployees: z.string().max(50).optional(),
 });
 
-router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
+router.patch('/api/public/workspaces/:id/business-profile', requireAuthenticatedClientPortalAuth('id'), (req, res) => {
   const wsId = req.params.id;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && (verifyClientToken(clientUserToken)?.workspaceId === wsId);
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
 
   const parsed = clientBusinessProfileSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -576,7 +600,7 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
 // ── Content Gap Voting ──────────────────────────
 // Clients can upvote content gaps to signal priority
 
-router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMutationAuth, validate(contentGapVoteSchema), (req, res) => {
+router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrategyMutationAuth, validate(contentGapVoteSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -612,7 +636,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMu
   res.json({ ok: true });
 });
 
-router.get('/api/public/content-gap-votes/:workspaceId', (req, res) => {
+router.get('/api/public/content-gap-votes/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -647,17 +671,7 @@ const copySuggestionSchema = z.object({
   suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
 }).strict();
 
-const requireClientCopyReviewAuth: RequestHandler = (req, res, next) => {
-  const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  next();
-};
+const requireClientCopyReviewAuth = requireAuthenticatedClientPortalAuth('workspaceId');
 
 // List blueprint entries with their copy status
 router.get('/api/public/copy/:workspaceId/entries', requireClientPortalAuth(), (req, res) => {
@@ -801,6 +815,57 @@ router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req,
 
   const briefing = buildBriefingClientView(ws.id);
   res.json({ briefing });
+});
+
+// GET /api/public/competitor-gaps/:workspaceId — client-safe competitor keyword
+// gaps (keywords a named competitor ranks for that the workspace is missing).
+// Premium-exclusive surface (Client Revenue R2 §3 / §4a): free + growth → 402.
+//
+// The projection (server/competitor-gaps-projection.ts) is the single
+// enforcement point — raw provider volume/difficulty and any money/EMV field
+// are stripped; only banded/labeled value + you-vs-them narrative reach the
+// client. Optional pagination via the shared helper (the gap list can be large).
+router.get('/api/public/competitor-gaps/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+    return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+  }
+
+  // Premium-exclusive — trial-aware effective tier promotes free trials to growth,
+  // which still does NOT meet premium, so trials are correctly gated out too.
+  if (computeEffectiveTier(ws) !== 'premium') {
+    return res.status(402).json({ error: 'Competitor benchmarking requires the Premium plan' });
+  }
+
+  const projected = projectCompetitorGaps(listKeywordGaps(req.params.workspaceId));
+  const total = projected.length;
+
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json({ gaps: projected, total });
+  }
+  const page = projected.slice(pagination.offset, pagination.offset + pagination.limit);
+  return res.json({
+    gaps: page,
+    total,
+    pageInfo: {
+      total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+      hasMore: pagination.offset + page.length < total,
+    },
+  });
+});
+
+// --- Public Content Matrices Export ---
+// Mirrors /api/export/:workspaceId/matrices but honoring client portal auth so real
+// clients can download their content plan as CSV/JSON without the APP_PASSWORD gate.
+router.get('/api/public/export/:workspaceId/matrices', requireClientPortalAuth('workspaceId'), (req, res) => { // activity-ok — read-only download, no meaningful state change to log
+  const { format = 'csv' } = req.query as { format?: string };
+  const rows = buildMatricesExportRows(req.params.workspaceId);
+  log.info(`PUBLIC EXPORT matrices ${req.params.workspaceId}: ${rows.length} cells as ${format}`);
+  sendExport(res, rows, [...MATRICES_EXPORT_HEADERS], `matrices-${req.params.workspaceId}`, format);
 });
 
 export default router;

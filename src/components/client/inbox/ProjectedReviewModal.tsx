@@ -1,6 +1,6 @@
 // src/components/client/inbox/ProjectedReviewModal.tsx
 //
-// R4 — in-shell projected review (DARK, only reachable behind the `unified-inbox` flag).
+// R4 — in-shell projected review.
 //
 // The two PROJECTED unified-deliverable types — `copy_section` and `content_request` — have NO
 // physical `client_deliverable` row and 404 on the uniform `/respond` verbs. Instead of deep-linking

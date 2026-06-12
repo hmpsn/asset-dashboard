@@ -3,24 +3,21 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { hasStrategyOwnedTrackedKeywords, reconcileStrategyRankTracking, summarizeStrategyRankTrackingChangeSet } from './rank-tracking-reconciliation.js';
 import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
-import { generateRecommendations } from './recommendations.js';
+import { queueDelayedRecommendationRegen, RECOMMENDATION_REFRESH_DELAY_MS } from './recommendation-regen-scheduler.js';
 import { createLogger } from './logger.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
 
 const log = createLogger('keyword-strategy:follow-ons');
-const RECOMMENDATION_REFRESH_DELAY_MS = 30_000;
-
-// Dedup guard: prevents concurrent background recommendation runs for the same workspace
-// (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
-// avoids wasted work and redundant broadcasts.
-const recsInFlight = new Set<string>();
 
 export interface SeedKeywordStrategyTrackedKeywordsOptions {
   workspaceId: string;
   workspaceName: string;
-  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'siteKeywordMetrics' | 'generatedAt'>;
+  // Wave 3b-ii strip (table-as-truth): siteKeywordMetrics is no longer read here — it
+  // forwards to reconcileStrategyRankTracking, whose Pick is ('siteKeywords' |
+  // 'generatedAt'); reconcile self-sources metrics from the site_keyword_metrics table.
+  keywordStrategy: Pick<KeywordStrategy, 'siteKeywords' | 'generatedAt'>;
   pageMap: PageKeywordMap[];
 }
 
@@ -77,12 +74,5 @@ export function queueKeywordStrategyPostUpdateFollowOns(options: QueueKeywordStr
   // Refresh recommendations after the strategy response settles. Keeping this
   // out of the same resource spike as provider-backed strategy generation makes
   // staging less likely to restart under peak load; recommendations are best-effort.
-  if (!recsInFlight.has(workspaceId)) {
-    recsInFlight.add(workspaceId);
-    setTimeout(() => {
-      generateRecommendations(workspaceId)
-        .catch(err => log.warn({ err, workspaceId }, 'Failed to refresh recommendations after strategy update'))
-        .finally(() => recsInFlight.delete(workspaceId));
-    }, RECOMMENDATION_REFRESH_DELAY_MS);
-  }
+  queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS);
 }

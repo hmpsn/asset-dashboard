@@ -58,9 +58,7 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
 
   it('marks empty provider responses as degraded and records alternate provider availability', async () => {
     const dataForSeo = makeProvider('dataforseo');
-    const semrush = makeProvider('semrush');
     registerProvider('dataforseo', dataForSeo);
-    registerProvider('semrush', semrush);
 
     const result = await fetchAndCacheKeywordStrategySeoData({
       ws: makeWorkspace(),
@@ -74,11 +72,11 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
 
     expect(result.seoDataStatus.status).toBe('degraded');
     expect(result.seoDataStatus.provider).toBe('dataforseo');
-    expect(result.seoDataStatus.fallbackProviderAvailable).toBe(true);
+    expect(result.seoDataStatus.fallbackProviderAvailable).toBe(false);
     expect(result.seoDataStatus.reasons).toContain('provider_returned_no_keyword_data');
   });
 
-  it('adds site discovery keywords when domain ranked keywords are thin', async () => {
+  it('skips legacy discovery prefetch because the keyword universe owns provider discovery', async () => {
     const getKeywordsForKeywords = vi.fn(async () => [
       {
         keyword: 'planner grouped dental term',
@@ -90,8 +88,7 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
         seed: 'dentist',
       },
     ]);
-    const provider = makeProvider('dataforseo', {
-      getKeywordsForSite: vi.fn(async () => [
+    const getKeywordsForSite = vi.fn(async () => [
         {
           keyword: 'austin dental implants',
           volume: 900,
@@ -102,7 +99,9 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
           sourceTarget: 'example.com',
           confidence: 'high',
         },
-      ]),
+      ]);
+    const provider = makeProvider('dataforseo', {
+      getKeywordsForSite,
       getKeywordsForKeywords,
     });
 
@@ -116,17 +115,11 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
       sendProgress: vi.fn(),
     });
 
-    expect(result.discoveryKeywords).toEqual([
-      expect.objectContaining({
-        keyword: 'austin dental implants',
-        sourceKind: 'keywords_for_site',
-      }),
-    ]);
-    expect(result.seoContext).toContain('SEO PROVIDER DISCOVERY KEYWORDS');
-    expect(result.seoDataStatus.status).toBe('available');
+    expect(result.discoveryKeywords).toEqual([]);
+    expect(result.seoContext).not.toContain('SEO PROVIDER DISCOVERY KEYWORDS');
+    expect(result.seoDataStatus.status).toBe('degraded');
+    expect(result.seoDataStatus.reasons).toContain('provider_returned_no_keyword_data');
+    expect(getKeywordsForSite).not.toHaveBeenCalled();
     expect(getKeywordsForKeywords).not.toHaveBeenCalled();
-    expect(result.discoveryKeywords).not.toContainEqual(expect.objectContaining({
-      sourceKind: 'google_ads_keywords_for_keywords',
-    }));
   });
 });

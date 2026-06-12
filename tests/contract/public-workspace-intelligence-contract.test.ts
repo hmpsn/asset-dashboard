@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from '../integration/helpers.js';
+import { createEphemeralTestContext } from '../integration/helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser } from '../../server/client-users.js';
 import { updateWorkspace } from '../../server/workspaces.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 
-const ctx = createTestContext(13225);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

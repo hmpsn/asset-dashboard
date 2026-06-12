@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  isFeatureEnabled: vi.fn(),
   invalidateIntelligenceCache: vi.fn(),
   getWorkspaceHealthScore: vi.fn(),
   measurePendingOutcomes: vi.fn(),
@@ -19,7 +18,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
-vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: mocks.isFeatureEnabled }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
   getWorkspaceHealthScore: mocks.getWorkspaceHealthScore,
@@ -56,12 +54,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-05-25T12:00:00.000Z'));
 
-  mocks.isFeatureEnabled.mockImplementation((flag: string) => (
-    flag === 'outcome-tracking' ||
-    flag === 'outcome-external-detection' ||
-    flag === 'outcome-playbooks'
-  ));
-
   mocks.getWorkspaceHealthScore.mockReturnValue(40);
   mocks.measurePendingOutcomes.mockResolvedValue({ workspaceIds: ['ws_1', 'ws_2'] });
 
@@ -88,18 +80,6 @@ function buildPendingActions(workspaceId: string, count: number, createdAt: stri
 }
 
 describe('outcome crons', () => {
-  it('does not register jobs when outcome tracking is disabled', async () => {
-    mocks.isFeatureEnabled.mockImplementation((flag: string) => flag !== 'outcome-tracking');
-
-    startOutcomeCrons();
-    await vi.advanceTimersByTimeAsync(36_000);
-
-    expect(mocks.measurePendingOutcomes).not.toHaveBeenCalled();
-    expect(mocks.recomputeAllWorkspaceLearnings).not.toHaveBeenCalled();
-    expect(mocks.detectExternalExecutions).not.toHaveBeenCalled();
-    expect(mocks.archiveOldActions).not.toHaveBeenCalled();
-  });
-
   it('is idempotent when started more than once', async () => {
     startOutcomeCrons();
     startOutcomeCrons();
@@ -197,32 +177,6 @@ describe('outcome crons', () => {
     expect(mocks.detectExternalExecutions).toHaveBeenCalledTimes(1);
     expect(mocks.detectAllWorkspacePlaybooks).toHaveBeenCalledTimes(1);
     expect(mocks.archiveOldActions).toHaveBeenCalledTimes(1);
-  });
-
-  it('honors per-job feature flags for external detection and playbooks', async () => {
-    mocks.isFeatureEnabled.mockImplementation((flag: string) => flag === 'outcome-tracking');
-
-    startOutcomeCrons();
-    await vi.advanceTimersByTimeAsync(36_000);
-
-    expect(mocks.measurePendingOutcomes).toHaveBeenCalledTimes(1);
-    expect(mocks.recomputeAllWorkspaceLearnings).toHaveBeenCalledTimes(1);
-    expect(mocks.detectExternalExecutions).not.toHaveBeenCalled();
-    expect(mocks.detectAllWorkspacePlaybooks).not.toHaveBeenCalled();
-    expect(mocks.archiveOldActions).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not run detection/playbook jobs when those feature flags are disabled', async () => {
-    mocks.isFeatureEnabled.mockImplementation((flag: string) => flag === 'outcome-tracking');
-
-    startOutcomeCrons();
-    await vi.advanceTimersByTimeAsync(36_000);
-
-    expect(mocks.measurePendingOutcomes).toHaveBeenCalledTimes(1);
-    expect(mocks.recomputeAllWorkspaceLearnings).toHaveBeenCalledTimes(1);
-    expect(mocks.archiveOldActions).toHaveBeenCalledTimes(1);
-    expect(mocks.detectExternalExecutions).not.toHaveBeenCalled();
-    expect(mocks.detectAllWorkspacePlaybooks).not.toHaveBeenCalled();
   });
 
   it('suppresses duplicate backlog activity alerts when a recent alert already exists', async () => {

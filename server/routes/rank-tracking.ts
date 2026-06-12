@@ -10,7 +10,6 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import {
   getTrackedKeywords,
   addTrackedKeyword,
-  removeTrackedKeyword,
   togglePinKeyword,
   storeRankSnapshot,
   getRankHistory,
@@ -21,6 +20,7 @@ import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window.js';
 
 const router = Router();
 
@@ -37,6 +37,25 @@ function normalizeKeywordQuery(query: string): string {
 
 function sameKeyword(a: string, b: string): boolean {
   return normalizeKeywordQuery(a) === normalizeKeywordQuery(b);
+}
+
+function collectQueryParamValues(rawValue: unknown): string[] {
+  if (typeof rawValue === 'string') return [rawValue];
+  if (Array.isArray(rawValue)) return rawValue.flatMap(collectQueryParamValues);
+  return [];
+}
+
+function parseHistoryQueryFilters(query: Record<string, unknown>): string[] | undefined {
+  const repeatedQueries = collectQueryParamValues(query.query)
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (repeatedQueries.length > 0) return repeatedQueries;
+
+  const legacyQueries = collectQueryParamValues(query.queries)
+    .flatMap(value => value.split(','))
+    .map(value => value.trim())
+    .filter(Boolean);
+  return legacyQueries.length > 0 ? legacyQueries : undefined;
 }
 
 // --- Rank Tracking ---
@@ -64,18 +83,6 @@ router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('
 });
 
 // Remove a tracked keyword
-router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const query = decodeURIComponent(req.params.query);
-  const normalizedQuery = normalizeKeywordQuery(query);
-  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
-  const keywords = removeTrackedKeyword(req.params.workspaceId, query);
-  if (wasTracked) {
-    addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword removed', `"${normalizedQuery}" removed from rank tracking`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: normalizedQuery, action: 'removed', source: 'manual' });
-  }
-  res.json(keywords);
-});
-
 // Toggle pin on a tracked keyword
 router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const query = decodeURIComponent(req.params.query);
@@ -95,7 +102,11 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property linked' });
     if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked — connect a site in Workspace Settings to enable rank tracking' });
-    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 7);
+    // Use the SAME window as the daily scheduler (GSC_METRIC_WINDOW_DAYS) so a
+    // manual capture cannot silently swing the displayed clicks/impressions vs
+    // the scheduled snapshot — both UPSERT into rank_snapshots under the same
+    // date key (kills the ~4× swing the 7-vs-28 mismatch caused).
+    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS);
     const date = new Date().toISOString().split('T')[0];
     const queries = overview.topQueries.map(q => ({
       query: q.query, position: q.position, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr,
@@ -113,7 +124,7 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
 router.get('/api/rank-tracking/:workspaceId/history', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const limit = parseHistoryLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
-  const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
+  const queries = parseHistoryQueryFilters(req.query);
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
 
@@ -129,7 +140,7 @@ router.get('/api/rank-tracking/:workspaceId/latest', requireWorkspaceAccess('wor
 router.get('/api/public/rank-tracking/:workspaceId/history', requireAuthenticatedClientPortalAuth(), (req, res) => {
   const limit = parseHistoryLimit(req.query.limit);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
-  const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
+  const queries = parseHistoryQueryFilters(req.query);
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
 

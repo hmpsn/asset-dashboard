@@ -68,11 +68,11 @@ describe('generateRecommendations — diagnostic remediation', () => {
     cleanup();
   });
 
-  it('creates a fix_now rec from a completed diagnostic P1 action', async () => {
+  it('creates a remediation rec from a completed diagnostic P1 action', async () => {
     const set = await generateRecommendations(wsId);
     const diagRec = set.recommendations.find(r => r.source?.startsWith('diagnostic:'));
     expect(diagRec).toBeDefined();
-    expect(diagRec?.priority).toBe('fix_now');
+    expect(diagRec?.priority).toBe('fix_later');
     expect(diagRec?.title).toContain('Diagnostic: Fix broken internal links');
     expect(diagRec?.type).toBe('technical');
   });

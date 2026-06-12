@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13724);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seededWorkspace: SeededFullWorkspace | null = null;

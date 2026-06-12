@@ -20,16 +20,27 @@
  * isFeatureEnabled(flag, workspaceId), so this exercises the real resolution path.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
-const FLAG = 'seo-generation-quality';
+// Probe flag must default to false: keyword-hub was retired at the Phase C cutover.
+const FLAG = 'keyword-universe-full';
+const RETIRED_PRODUCT_UI_FLAGS = [
+  'copy-engine',
+  'copy-engine-voice',
+  'copy-engine-pipeline',
+  'deep-diagnostics',
+  'client-brand-section',
+] as const;
+const RETIRED_SEO_RUNTIME_FLAGS = [
+  'local-seo-visibility',
+  'schema-ai-element-classifier',
+  'seo-generation-quality',
+] as const;
 
 // ── Main flow (auth disabled — APP_PASSWORD='' default → requireAdminAuth passes through) ──
-// Ports 13884/13885: next free slots in the 13201–13899 range (13880 is a P4 doc
-// slot, 13881 is owned by seo-genquality-p5).
-const ctx = createTestContext(13884);
+const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'main' });
 const { api, authApi } = ctx;
 
 let wsA: SeededFullWorkspace;
@@ -73,7 +84,7 @@ describe('GET /api/admin/workspaces/:id/feature-flags', () => {
     expect(flag.inheritedEnabled).toBe(false);
     expect(flag.inheritedSource).toBe('default');
     expect(typeof flag.label).toBe('string');
-    expect(flag.group).toBe('SEO Generation Quality');
+    expect(flag.group).toBe('Keyword Hub');
   });
 
   it('returns 404 for a non-existent workspace', async () => {
@@ -94,6 +105,32 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('Unknown feature flag');
+  });
+
+  it('returns 400 for retired product/UI flag keys', async () => {
+    for (const key of RETIRED_PRODUCT_UI_FLAGS) {
+      const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
+  });
+
+  it('returns 400 for retired SEO/runtime flag keys', async () => {
+    for (const key of RETIRED_SEO_RUNTIME_FLAGS) {
+      const res = await authApi(`/api/admin/workspaces/${wsA.workspaceId}/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
   });
 
   it('returns 400 when enabled field is missing', async () => {
@@ -205,7 +242,10 @@ describe('PUT /api/admin/workspaces/:id/feature-flags/:key', () => {
 });
 
 // ── Auth rejection (APP_PASSWORD set → admin gate active) ──
-const authCtx = createTestContext(13885, { env: { APP_PASSWORD: 'secret-test-pw' } });
+const authCtx = createEphemeralTestContext(import.meta.url, {
+  contextName: 'auth-gated',
+  env: { APP_PASSWORD: 'secret-test-pw' },
+});
 
 describe('per-workspace feature-flag routes reject unauthenticated calls', () => {
   beforeAll(async () => {

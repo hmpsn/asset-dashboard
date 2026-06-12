@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import {
   Search, Target, Shield, TrendingDown, AlertTriangle,
-  ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
+  Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
-import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button } from '../ui';
+import { KeywordTable, RankTrackingSection } from '../shared/RankTable';
+import type { KeywordTableRow } from '../shared/RankTable';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button, FreshnessStamp, type Tier } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
+import { CompetitorGapsSection } from './CompetitorGapsSection';
 import { Explainer } from './SeoGlossary';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison, SortKey,
 } from './types';
-import { capitalize } from '../../utils/strings';
 import { normalizePageUrl } from '../../lib/pathUtils';
 
 interface SearchInsights {
@@ -30,6 +31,10 @@ interface SearchTabProps {
   rankHistory: { date: string; positions: Record<string, number> }[];
   latestRanks: { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[];
   insights: SearchInsights | null;
+  dataUpdatedAt?: number | null;
+  /** For the Premium competitor-gap section (self-fetching, tier-gated). */
+  workspaceId?: string;
+  tier?: Tier;
 }
 
 function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | null, insights: SearchInsights | null): string {
@@ -51,7 +56,8 @@ function buildTakeaway(overview: SearchOverview, comparison: SearchComparison | 
 
 export function SearchTab({
   overview, searchComparison, trend, annotations,
-  rankHistory, latestRanks, insights,
+  rankHistory, latestRanks, insights, dataUpdatedAt,
+  workspaceId, tier,
 }: SearchTabProps) {
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
@@ -80,7 +86,10 @@ export function SearchTab({
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
-    <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
+      <FreshnessStamp value={dataUpdatedAt} />
+    </div>
 
     {/* AI-style takeaway */}
     <SectionCard variant="subtle" noPadding>
@@ -149,6 +158,12 @@ export function SearchTab({
     {/* Rank Tracking */}
     <RankTrackingSection rankHistory={rankHistory} latestRanks={latestRanks} />
 
+    {/* Competitor keyword gaps — Premium-exclusive benchmarking (R2-A).
+        Self-fetching + tier-gated; Growth/free see a soft-gate upsell. */}
+    {workspaceId && tier && (
+      <CompetitorGapsSection workspaceId={workspaceId} tier={tier} />
+    )}
+
     {/* Timeline notes (read-only, managed by your team) */}
     {annotations.length > 0 && (
       <SectionCard title="Timeline Notes" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
@@ -169,6 +184,10 @@ export function SearchTab({
     )}
 
     {/* Detailed keyword/page tables — collapsible, secondary */}
+    {/* Wave 2b B2 (fixed): raw table → KeywordTable.
+        - position is a first-class sortable column via positionFormat="raw"
+        - Explainer header tooltips restored via headerTooltips prop
+        - Empty query/page table now shows EmptyState (improvement over silent empty tbody) */}
     <SectionCard noPadding>
       <ClickableRow
         onClick={() => setShowRawData(!showRawData)}
@@ -181,61 +200,79 @@ export function SearchTab({
       </ClickableRow>
       {showRawData && (
         <>
-          <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
-            {(['queries', 'pages'] as const).map(st => (
-              <Button
-                key={st}
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchSubTab(st)}
-                className={`rounded-[var(--radius-md)] t-ui font-medium ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
-              >
-                {st === 'queries' ? 'Queries' : 'Pages'}
-              </Button>
-            ))}
+          <div className="border-t border-[var(--brand-border)]">
+            {/* Tracked-vs-all distinction: this table shows all queries from GSC for the selected period.
+                The Keyword Rank Tracking section above tracks a curated set of keywords over time. */}
+            <p className="t-caption-sm text-[var(--brand-text-muted)] px-4 pt-2 pb-0">
+              All queries this period from Search Console — different from the tracked keywords above.
+            </p>
+            <div className="flex items-center gap-1 px-4 pb-1 pt-1">
+              {(['queries', 'pages'] as const).map(st => (
+                <Button
+                  key={st}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchSubTab(st)}
+                  className={`rounded-[var(--radius-md)] t-ui font-medium ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+                >
+                  {st === 'queries' ? 'Queries' : 'Pages'}
+                </Button>
+              ))}
+            </div>
           </div>
-          <table className="w-full t-caption">
-            <thead><tr className="border-b border-[var(--brand-border)]">
-              <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
-              {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
-                <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort(key)}
-                    className="ml-auto px-0 py-0 hover:bg-transparent hover:text-[var(--brand-text)]"
-                  >
-                    {key === 'ctr' ? 'CTR' : capitalize(key)}
-                    <Explainer term={key === 'ctr' ? 'ctr' : key} />
-                    {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                  </Button>
-                </th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
-                <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
-                  <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium">{q.query}</td>
-                  <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{q.clicks}</td>
-                  <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{q.impressions.toLocaleString()}</td>
-                  <td className="py-2.5 px-3 text-right text-accent-success">{q.ctr}%</td>
-                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-accent-success' : q.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{q.position}</span></td>
-                </tr>
-              ))}
-              {searchSubTab === 'pages' && sortedPages().map((p, i) => {
-                const pagePath = normalizePageUrl(p.page);
-                return (
-                  <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
-                    <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium max-w-xs truncate">{pagePath}</td>
-                    <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{p.clicks}</td>
-                    <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{p.impressions.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-accent-success">{p.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-accent-success' : p.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{p.position}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {searchSubTab === 'queries' && (
+            <KeywordTable<KeywordTableRow>
+              rows={sortedQueries().map(q => ({
+                query: q.query,
+                position: q.position,
+                clicks: q.clicks,
+                impressions: q.impressions,
+                ctr: q.ctr,
+              }))}
+              columns={['clicks', 'impressions', 'ctr', 'position']}
+              positionFormat="raw"
+              sort={{
+                key: sortKey,
+                direction: sortAsc ? 'asc' : 'desc',
+                onSort: (k) => handleSort(k as SortKey),
+              }}
+              headerTooltips={{
+                clicks: <Explainer term="clicks" />,
+                impressions: <Explainer term="impressions" />,
+                ctr: <Explainer term="ctr" />,
+                position: <Explainer term="position" />,
+              }}
+              emptyState={{ icon: Search, title: 'No queries data', description: 'No search query data available for this period.' }}
+              className="rounded-none border-x-0 border-b-0"
+            />
+          )}
+          {searchSubTab === 'pages' && (
+            <KeywordTable<KeywordTableRow>
+              rows={sortedPages().map(p => ({
+                query: normalizePageUrl(p.page),
+                position: p.position,
+                clicks: p.clicks,
+                impressions: p.impressions,
+                ctr: p.ctr,
+                pagePath: p.page,
+              }))}
+              columns={['clicks', 'impressions', 'ctr', 'position']}
+              positionFormat="raw"
+              sort={{
+                key: sortKey,
+                direction: sortAsc ? 'asc' : 'desc',
+                onSort: (k) => handleSort(k as SortKey),
+              }}
+              headerTooltips={{
+                clicks: <Explainer term="clicks" />,
+                impressions: <Explainer term="impressions" />,
+                ctr: <Explainer term="ctr" />,
+                position: <Explainer term="position" />,
+              }}
+              emptyState={{ icon: Search, title: 'No pages data', description: 'No page data available for this period.' }}
+              className="rounded-none border-x-0 border-b-0"
+            />
+          )}
         </>
       )}
     </SectionCard>

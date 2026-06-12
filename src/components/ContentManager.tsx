@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, EmptyState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
+import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput, OutcomeReadbackChip } from './ui';
+import type { OutcomeReadback } from '../../shared/types/outcome-tracking';
 import { formatDate } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
 import {
@@ -12,6 +14,9 @@ import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
 import { useAdminPostsList, usePublishTarget, useSendPostToClient } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
+import { useToast } from './Toast';
+import { useBackgroundTasks, isTerminalJobStatus, type BackgroundJob } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 interface PostSummary {
   id: string;
@@ -28,6 +33,8 @@ interface PostSummary {
   sections: { heading: string; wordCount: number; status: string }[];
   voiceScore?: number;
   voiceFeedback?: string;
+  /** W5.1: read-back outcome verdict for published posts (90-day clicks/position delta). */
+  outcome?: OutcomeReadback;
 }
 
 type SortField = 'date' | 'title' | 'status' | 'words';
@@ -43,12 +50,46 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
+  // W6.2: score-voice now runs on the background job platform (returns { jobId }).
+  const tasks = useBackgroundTasks();
+  const tasksJobsRef = useRef<BackgroundJob[]>(tasks.jobs);
+  useEffect(() => { tasksJobsRef.current = tasks.jobs; }, [tasks.jobs]);
+  const awaitVoiceJob = (jobId: string, timeoutMs = 150_000): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const tick = () => {
+        const job = tasksJobsRef.current.find(j => j.id === jobId);
+        if (job && isTerminalJobStatus(job.status)) {
+          if (job.status === 'done') return resolve();
+          return reject(new Error(job.error || 'Voice scoring failed'));
+        }
+        if (Date.now() > deadline) return reject(new Error('Timed out waiting for voice scoring'));
+        window.setTimeout(tick, 400);
+      };
+      tick();
+    });
+  };
   const postsQ = useAdminPostsList(workspaceId);
   const posts = (postsQ.data ?? []) as PostSummary[];
   const loading = postsQ.isLoading;
   const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
+  const { toast } = useToast();
 
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  // W6.6: deep-link receiver — `?post=<id>` (e.g. from the Content Calendar) opens
+  // that post in the editor on mount. The param is consumed once into local state;
+  // the close handler clears it so a manual close doesn't reopen on re-render.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activePostId, setActivePostId] = useState<string | null>(() => searchParams.get('post'));
+
+  const closePostEditor = () => {
+    setActivePostId(null);
+    invalidatePosts();
+    if (searchParams.get('post')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('post');
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortAsc, setSortAsc] = useState(false);
@@ -67,8 +108,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     setPublishingPost(postId);
     try {
       const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
-      if (result.success) invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+      if (result.success) {
+        invalidatePosts();
+      } else {
+        toast(result.error || 'Publish failed', 'error');
+      }
+    } catch (err) {
+      console.error('ContentManager publish failed:', err);
+      toast(err instanceof Error ? err.message : 'Publish failed', 'error');
+    }
     setPublishingPost(null);
   };
 
@@ -77,7 +125,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     try {
       await contentPosts.update(workspaceId, postId, { status });
       invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+    } catch (err) {
+      console.error('ContentManager status update failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to update status', 'error');
+    }
     setUpdatingStatus(null);
   };
 
@@ -98,15 +149,23 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       await contentPosts.remove(workspaceId, postId);
       invalidatePosts();
       setDeleteConfirm(null);
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+    } catch (err) {
+      console.error('ContentManager delete failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
+    }
   };
 
   const scoreVoice = async (postId: string) => {
     setScoringVoice(postId);
     try {
-      const result = await contentPosts.scoreVoice(workspaceId, postId);
-      if (result) invalidatePosts();
-    } catch (err) { console.error('ContentManager operation failed:', err); }
+      const { jobId } = await contentPosts.scoreVoice(workspaceId, postId);
+      tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, jobId, { workspaceId });
+      await awaitVoiceJob(jobId);
+      invalidatePosts();
+    } catch (err) {
+      console.error('ContentManager voice score failed:', err);
+      toast(err instanceof Error ? err.message : 'Voice scoring failed', 'error');
+    }
     setScoringVoice(null);
   };
 
@@ -147,7 +206,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
     return (
       <div className="space-y-8">
         <Button
-          onClick={() => { setActivePostId(null); invalidatePosts(); }}
+          onClick={closePostEditor}
           variant="link"
           size="sm"
           className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
@@ -156,10 +215,11 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
         </Button>
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <PostEditor
+            key={activePostId}
             workspaceId={workspaceId}
             postId={activePostId}
-            onClose={() => { setActivePostId(null); invalidatePosts(); }}
-            onDelete={() => { setActivePostId(null); invalidatePosts(); }}
+            onClose={closePostEditor}
+            onDelete={closePostEditor}
           />
         </div>
       </div>
@@ -171,6 +231,22 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center justify-center py-24">
         <Icon as={Loader2} size="lg" className="animate-spin text-[var(--brand-text-muted)]" />
       </div>
+    );
+  }
+
+  // Only surface the full-screen error when there is no cached data to fall back on.
+  // A background refetch failure with stale data present should keep the list visible.
+  if (postsQ.isError && !postsQ.data) {
+    return (
+      <ErrorState
+        title="Couldn't load content posts"
+        message="Content post data failed to load. Try reloading."
+        actions={[
+          { label: 'Retry', onClick: () => { void postsQ.refetch(); } },
+          { label: 'Refresh page', onClick: () => window.location.reload(), variant: 'secondary' },
+        ]}
+        type="data"
+      />
     );
   }
 
@@ -320,6 +396,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                             <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
                             <span className="t-caption-sm text-accent-info font-medium">Voice {post.voiceScore}</span>
                           </Button>
+                        </>
+                      )}
+                      {/* W5.1: closed-loop outcome badge — 90-day clicks/position delta +
+                          verdict for this published post. Only present on published posts
+                          with a scored action; honest about direction. */}
+                      {post.outcome && (
+                        <>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+                          <OutcomeReadbackChip outcome={post.outcome} />
                         </>
                       )}
                     </div>

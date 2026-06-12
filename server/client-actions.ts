@@ -43,6 +43,23 @@ const stmts = createStmtCache(() => ({
       END,
       created_at DESC
   `),
+  selectByWorkspacePaged: db.prepare(`
+    SELECT * FROM client_actions
+    WHERE workspace_id = ?
+    ORDER BY
+      CASE status
+        WHEN 'pending' THEN 0
+        WHEN 'changes_requested' THEN 1
+        WHEN 'approved' THEN 2
+        WHEN 'completed' THEN 3
+        ELSE 4
+      END,
+      created_at DESC
+    LIMIT ? OFFSET ?
+  `),
+  countByWorkspace: db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS cnt FROM client_actions WHERE workspace_id = ?
+  `),
   selectById: db.prepare(`
     SELECT * FROM client_actions
     WHERE workspace_id = ? AND id = ?
@@ -200,6 +217,31 @@ export function getActiveClientActionBySource(
 export function listClientActions(workspaceId: string): ClientAction[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as ClientActionRow[];
   return rows.map(rowToAction);
+}
+
+export interface ListClientActionsPagedResult {
+  items: ClientAction[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export function listClientActionsPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListClientActionsPagedResult {
+  const countRow = stmts().countByWorkspace.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().selectByWorkspacePaged.all(workspaceId, limit, offset) as ClientActionRow[];
+  return {
+    items: rows.map(rowToAction),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
 }
 
 export function getClientAction(workspaceId: string, actionId: string): ClientAction | null {

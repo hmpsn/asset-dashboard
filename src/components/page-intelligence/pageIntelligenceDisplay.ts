@@ -1,14 +1,5 @@
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
 
-export function positionColor(pos?: number): string {
-  // Search positions are 1-based; 0 and undefined both mean no ranking data in this view.
-  if (!pos) return 'text-[var(--brand-text-muted)]';
-  if (pos <= 3) return 'text-accent-success';
-  if (pos <= 10) return 'text-accent-brand';
-  if (pos <= 20) return 'text-accent-warning';
-  return 'text-accent-danger';
-}
-
 export function kdColor(kd?: number): string {
   if (kd === undefined) return 'text-[var(--brand-text-muted)]';
   if (kd <= 30) return 'text-accent-success';

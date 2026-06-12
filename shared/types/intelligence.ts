@@ -228,11 +228,51 @@ export interface SeoContextSlice {
 }
 
 export interface InsightsSlice {
+  /** Top 100 by impactScore — the prompt-facing bound. Full-iteration consumers read this. */
   all: AnalyticsInsight[];
+  /**
+   * Top 25 per type ordered by impactScore desc (G3 cap — prompt-size guard).
+   * NEVER compute counts or totals from these lists: use `countsByType` instead.
+   */
   byType: Partial<Record<InsightType, AnalyticsInsight[]>>;
+  /**
+   * Full PRE-cap insight counts per type, computed from the complete workspace set
+   * before the `byType` 25-per-type cap is applied. The authoritative source for
+   * any "how many insights of type X" read.
+   */
+  countsByType: Partial<Record<InsightType, number>>;
+  /**
+   * Full PRE-cap type×severity count matrix (same complete-set basis as
+   * `countsByType`). For consumers that need jointly-filtered totals — e.g. the
+   * client portal summary excludes admin-only types AND positive severity, which
+   * neither `countsByType` nor `bySeverity` alone can express.
+   */
+  countsByTypeBySeverity: Partial<Record<InsightType, Record<InsightSeverity, number>>>;
+  /** Full PRE-cap severity counts, computed from the complete workspace set. */
   bySeverity: Record<InsightSeverity, number>;
   topByImpact: AnalyticsInsight[];
   forPage?: AnalyticsInsight[];
+}
+
+/**
+ * A6 (audit #22): one anonymized cross-workspace win-rate prior, aggregated across
+ * ALL workspaces on the platform for a single action type. Published only above the
+ * cohort + sample floors (see server/platform-learnings-priors.ts) so a single
+ * workspace's history can never be reverse-identified from it.
+ *
+ * HONESTY CONTRACT: this is a PLATFORM benchmark, never the workspace's own result.
+ * Any surface that renders it MUST label it as cross-workspace ("across all clients
+ * on the platform"), never as "your" win rate. Consumed only as the no_data/degraded
+ * FALLBACK tier — a workspace with `availability: 'ready'` keeps its own learnings.
+ */
+export interface PlatformPriorEntry {
+  actionType: string;
+  /** Win rate (0..1) across all contributing workspaces for this action type. */
+  winRate: number;
+  /** Distinct workspaces that contributed scored outcomes (>= cohort floor). */
+  contributingWorkspaces: number;
+  /** Total scored actions behind the rate (>= sample floor). */
+  scoredActions: number;
 }
 
 export interface LearningsSlice {
@@ -252,6 +292,14 @@ export interface LearningsSlice {
   // New in 3A
   topWins?: TopWin[];
   winRateByActionType?: Record<string, number>;
+  /**
+   * A6 (audit #22): anonymized cross-workspace win-rate priors, populated by the
+   * assembler ONLY when this workspace's own `availability` is `no_data` or
+   * `degraded` (the fallback tier). Absent/undefined when availability is `ready`
+   * (own learnings win) or `disabled`. Each entry is a labeled platform benchmark —
+   * never present these as the workspace's own results. See PlatformPriorEntry.
+   */
+  platformPriors?: PlatformPriorEntry[];
   roiAttribution?: ROIAttribution[];
   weCalledIt?: WeCalledItEntry[];
   scoringConfig?: Partial<Record<string, {
@@ -306,6 +354,16 @@ export interface ContentPipelineSlice {
   decayAlerts?: DecayAlert[];
   suggestedBriefs?: number;
   copyPipeline?: CopyPipelineSummary;
+  /**
+   * D2 (audit #11): comparison-keyed (`keywordComparisonKey` from
+   * shared/keyword-normalization.ts — already normalized, do NOT re-normalize for
+   * comparison; apply the same function to the candidate keyword) target keywords of
+   * briefs + non-error posts currently in the pipeline. Consumed by the recommendation
+   * engine to suppress content-gap recs the pipeline is already producing. Optional —
+   * degrades to absent/[] when the content stores are unavailable (suppression fails
+   * open: recs are minted, never falsely resolved).
+   */
+  inFlightTargetKeywords?: string[];
   contentPricing?: {
     briefPrice: number;
     fullPostPrice: number;
@@ -393,6 +451,8 @@ export interface ClientSignalsSlice {
   roi?: { organicValue: number; growth: number; period: string } | null;
   engagement?: EngagementMetrics;
   compositeHealthScore?: number | null;
+  /** Client-safe explanation of the weighted composite health score. No raw churn risk or internal diagnostics. */
+  compositeHealthBreakdown?: ClientCompositeHealthBreakdown | null;
   serviceRequests?: { pending: number; total: number };
   /** Intent signals detected in client chat (service_interest / content_interest) */
   intentSignals?: {
@@ -503,7 +563,7 @@ export interface LocalSeoSlice {
     stateOrRegion?: string;
     pageTargetPath?: string;
   }>;
-  /** Whether the local-seo-visibility feature flag is enabled. */
+  /** Whether local SEO is active for this workspace read model. */
   enabled: boolean;
   /** Configured local markets and their status. Not capped. */
   markets: ReadonlyArray<{
@@ -612,6 +672,32 @@ export interface ClientSiteHealthSummary {
   deadLinks: number;
 }
 
+export type ClientCompositeHealthComponentId = 'retention' | 'roi' | 'engagement';
+
+export interface ClientCompositeHealthBreakdownRow {
+  id: ClientCompositeHealthComponentId;
+  label: string;
+  /** 0-100 component score after the component's own bucket logic is applied. */
+  score: number;
+  /** Effective display weight as a percentage. Missing components are omitted and weights are normalized server-side. */
+  weight: number;
+  description: string;
+}
+
+export interface ClientCompositeHealthBreakdown {
+  rows: ClientCompositeHealthBreakdownRow[];
+}
+
+export interface ClientKeywordFeedbackSummary {
+  approvedCount: number;
+  rejectedCount: number;
+  /** Decimal fraction (0.91 for 91%). Multiply by 100 for display. */
+  approveRate: number;
+  approvedSamples: string[];
+  rejectedSamples: string[];
+  rejectionReasons: string[];
+}
+
 export interface ClientIntelligence {
   workspaceId: string;
   assembledAt: string;
@@ -627,6 +713,10 @@ export interface ClientIntelligence {
   serpOpportunities?: number | null;
   /** Composite health score (0-100). Weighted: 40% churn + 30% ROI + 30% engagement. */
   compositeHealthScore?: number | null;
+  /** Client-safe component breakdown for the composite health score. */
+  compositeHealthBreakdown?: ClientCompositeHealthBreakdown | null;
+  /** Client-safe summary of keyword approve/decline feedback. */
+  keywordFeedbackSummary?: ClientKeywordFeedbackSummary | null;
   /** Predictions that came true — strongest wins from outcome tracking. */
   weCalledIt?: WeCalledItEntry[];
   copyPipelineStatus?: ClientCopyPipelineStatus | null;
@@ -733,6 +823,7 @@ export interface ROIAttribution {
 export interface WeCalledItEntry {
   actionId: string;
   prediction: string;
+  /** Client-readable outcome sentence. Machine score stays in `score`. */
   outcome: string;
   score: string;
   pageUrl: string;
@@ -776,6 +867,29 @@ export interface CannibalizationWarning {
   keyword: string;
   pages: string[];
   severity: 'low' | 'medium' | 'high';
+}
+
+/**
+ * Superset normalized type for the unified CannibalizationAlert component (Wave 2 T5).
+ *
+ * Subsumes both `CannibalizationItem` (strategy, object pages) and `CannibalizationWarning`
+ * (admin pipeline, string pages). Admin string-path entries map via `{ path }`.
+ * `CannibalizationItem` / `CannibalizationWarning` are NOT deleted — server and other
+ * consumers still reference them directly. This type is additive.
+ */
+export interface CannibalizationEntry {
+  keyword: string;
+  severity: 'high' | 'medium' | 'low';
+  pages: {
+    path: string;
+    position?: number;
+    impressions?: number;
+    clicks?: number;
+    source?: 'keyword_map' | 'gsc';
+  }[];
+  recommendation?: string;
+  action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
+  canonicalPath?: string;
 }
 
 export interface RedirectDetail {

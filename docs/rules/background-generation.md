@@ -5,8 +5,8 @@ Long-running admin generation uses the existing background job platform:
 - `server/jobs.ts` owns durable job state.
 - `server/routes/jobs.ts` owns the central `/api/jobs` dispatcher.
 - Dedicated `server/*-job.ts` worker modules own crawl-heavy or AI-heavy job bodies.
-- `src/hooks/useBackgroundTasks.tsx` owns admin job state on the frontend.
-- `src/components/TaskPanel.tsx` owns the floating task surface.
+- `src/hooks/useBackgroundTasks.tsx` owns frontend job state and rediscovery.
+- `src/components/NotificationBell.tsx` owns the production task surface in the admin shell (TaskPanel was retired).
 - `shared/types/background-jobs.ts` owns job type metadata, labels, and cancellation semantics.
 
 Do not add a new queue, ad hoc progress channel, or anonymous fire-and-forget promise for long-running admin generation.
@@ -67,7 +67,7 @@ from a worker.
 
 ## Frontend Contract
 
-Admin generation UI must use `useBackgroundTasks()` for job start, progress, cancel, and rediscovery. Feature surfaces may show inline progress, but the inline state should derive from the same job object shown by `TaskPanel`.
+Admin generation UI must use `useBackgroundTasks()` for job start, progress, cancel, and rediscovery. Feature surfaces may show inline progress, but the inline state should derive from the same job object surfaced through the Notification Hub / `NotificationBell` task feed.
 
 Every new job type must be added to `shared/types/background-jobs.ts` with:
 

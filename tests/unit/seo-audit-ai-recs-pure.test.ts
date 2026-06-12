@@ -68,6 +68,8 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
 vi.mock('../../server/workspaces.js', () => ({
   listWorkspaces: mocks.listWorkspaces,
   getBrandName: mocks.getBrandName,
+  getWorkspaceBySiteId: vi.fn((siteId: string) => mocks.listWorkspaces().find((w: { webflowSiteId?: string }) => w.webflowSiteId === siteId)),
+  getWorkspace: vi.fn((id: string) => mocks.listWorkspaces().find((w: { id: string }) => w.id === id)),
 }));
 vi.mock('../../server/logger.js', () => ({
   createLogger: mocks.createLogger,

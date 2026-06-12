@@ -201,7 +201,7 @@ export function OvDivergencePanel({ workspaceId, defaultCollapsed = true }: Prop
 
   return (
     <SectionCard
-      title="OV Divergence (shadow)"
+      title="OV Divergence (historical shadow)"
       titleIcon={<Activity className="w-4 h-4 text-blue-400" aria-hidden="true" />}
       titleExtra={
         stats.total > 0 ? (

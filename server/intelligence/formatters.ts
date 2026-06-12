@@ -5,16 +5,17 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
-  ContentPipelineSlice,
-  SiteHealthSlice,
   ClientSignalsSlice,
-  OperationalSlice,
   PageProfileSlice,
   LocalSeoSlice,
   EeatAssetsSlice,
 } from '../../shared/types/intelligence.js';
 import type { AudiencePersona } from '../../shared/types/workspace.js';
 import { matchPagePath } from '../helpers.js';
+import { formatContentPipelineSection } from './formatter-content-pipeline.js';
+import { formatOperationalSection } from './formatter-operational.js';
+import { pct } from './formatter-shared.js';
+import { formatSiteHealthSection } from './formatter-site-health.js';
 import { formatPageElementsSection } from './page-elements-slice.js';
 
 export function formatForPrompt(
@@ -278,11 +279,6 @@ function applyFilteredTokenBudget(
     content = content.slice(0, -1);
   }
   return render(content);
-}
-
-function pct(rate: number | null | undefined): string {
-  if (rate == null || isNaN(rate)) return 'n/a';
-  return `${Math.round(rate * 100)}%`;
 }
 
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
@@ -614,7 +610,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
     if (learnings.weCalledIt && learnings.weCalledIt.length > 0) {
       lines.push('Proven predictions:');
       for (const entry of learnings.weCalledIt.slice(0, verbosity === 'detailed' ? 5 : 3)) {
-        lines.push(`  - ${entry.prediction} → ${entry.score}${entry.pageUrl ? ` (${entry.pageUrl})` : ''}`);
+        lines.push(`  - ${entry.prediction} → ${entry.outcome}${entry.pageUrl ? ` (${entry.pageUrl})` : ''}`);
       }
     }
 
@@ -662,167 +658,6 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   return lines.join('\n');
 }
 
-function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity: PromptVerbosity): string {
-  const lines: string[] = ['## Content Pipeline'];
-
-  lines.push(`Briefs: ${pipeline.briefs.total}, Posts: ${pipeline.posts.total}, Matrices: ${pipeline.matrices.total}`);
-
-  if (verbosity !== 'compact') {
-    if (pipeline.coverageGaps.length > 0) {
-      lines.push(`Coverage gaps: ${pipeline.coverageGaps.slice(0, 5).join(', ')}`);
-    }
-    if (pipeline.decayAlerts && pipeline.decayAlerts.length > 0) {
-      lines.push(`Decay alerts: ${pipeline.decayAlerts.length} pages declining`);
-    }
-    if (pipeline.subscriptions) {
-      lines.push(`Subscriptions: ${pipeline.subscriptions.active} active, ${pipeline.subscriptions.totalPages} pages`);
-    }
-    if (pipeline.requests && (pipeline.requests.pending > 0 || pipeline.requests.inProgress > 0)) {
-      lines.push(`Content requests: ${pipeline.requests.pending} pending, ${pipeline.requests.inProgress} in progress`);
-    }
-    if (pipeline.workOrders?.active > 0) {
-      lines.push(`Work orders: ${pipeline.workOrders.active} active`);
-    }
-    if (pipeline.seoEdits && (pipeline.seoEdits.pending > 0 || pipeline.seoEdits.applied > 0)) {
-      lines.push(`SEO edits: ${pipeline.seoEdits.pending} pending, ${pipeline.seoEdits.applied} applied`);
-    }
-    if (pipeline.contentPricing && (pipeline.contentPricing.briefPrice > 0 || pipeline.contentPricing.fullPostPrice > 0)) {
-      const cp = pipeline.contentPricing;
-      lines.push(
-        `Content pricing: ${cp.briefLabel ?? 'Brief'} ${cp.currency} ${cp.briefPrice}, ` +
-        `${cp.fullPostLabel ?? 'Full post'} ${cp.currency} ${cp.fullPostPrice}`
-      );
-    }
-  }
-
-  // Suggested briefs count — standard and detailed
-  if (verbosity !== 'compact' && pipeline.suggestedBriefs != null && pipeline.suggestedBriefs > 0) {
-    lines.push(`Suggested briefs: ${pipeline.suggestedBriefs} pending topics identified`);
-  }
-
-  if (verbosity === 'detailed') {
-    const bs = pipeline.briefs.byStatus;
-    lines.push(`Brief status: ${Object.entries(bs).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
-    const ps = pipeline.posts.byStatus;
-    lines.push(`Post status: ${Object.entries(ps).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
-    lines.push(`Matrix: ${pipeline.matrices.cellsPublished}/${pipeline.matrices.cellsPlanned} cells published`);
-    if (pipeline.schemaDeployment) {
-      lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
-    }
-
-    // Rewrite playbook patterns — detailed only
-    if (pipeline.rewritePlaybook?.patterns && pipeline.rewritePlaybook.patterns.length > 0) {
-      lines.push(`Rewrite playbook: ${pipeline.rewritePlaybook.patterns.length} learned patterns`);
-      for (const pattern of pipeline.rewritePlaybook.patterns.slice(0, 5)) {
-        lines.push(`  - ${pattern}`);
-      }
-    }
-    if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
-      lines.push('Keyword cannibalization:');
-      for (const cw of pipeline.cannibalizationWarnings.slice(0, 5)) {
-        lines.push(`  - "${cw.keyword}" [${cw.severity}]: ${cw.pages.join(', ')}`);
-      }
-    }
-    if (pipeline.decayAlerts && pipeline.decayAlerts.length > 0) {
-      lines.push('Decay alert details:');
-      for (const da of pipeline.decayAlerts.slice(0, 5)) {
-        lines.push(`  - ${da.pageUrl}: -${da.clickDrop}% clicks${da.isRepeatDecay ? ' (repeat decay)' : ''}`);
-      }
-    }
-  }
-
-  // Copy pipeline sub-section
-  if (pipeline.copyPipeline) {
-    const cp = pipeline.copyPipeline;
-    lines.push(`Copy: ${cp.totalSections} sections (${cp.approvedSections} approved, ${cp.draftSections} draft, ${cp.clientReviewSections} in review)`);
-    lines.push(`Copy approval rate: ${cp.approvalRate}%, first-try: ${cp.firstTryApprovalRate}%`);
-    if (cp.entriesWithCompleteCopy > 0 || cp.entriesWithPendingCopy > 0) {
-      lines.push(`Pages: ${cp.entriesWithCompleteCopy} complete, ${cp.entriesWithPendingCopy} pending`);
-    }
-    if (verbosity !== 'compact') {
-      if (cp.activePatternsCount > 0) {
-        lines.push(`Learned copy patterns: ${cp.activePatternsCount} active`);
-      }
-      if (cp.lastBatchJob) {
-        lines.push(`Last batch: ${cp.lastBatchJob.status}, ${cp.lastBatchJob.completionRate}% complete`);
-      }
-    }
-  }
-
-  return lines.join('\n');
-}
-
-function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbosity): string {
-  const lines: string[] = ['## Site Health'];
-
-  lines.push(`Audit score: ${health.auditScore ?? 'n/a'}${health.auditScoreDelta != null ? ` (${health.auditScoreDelta >= 0 ? '+' : ''}${health.auditScoreDelta})` : ''}`);
-  if (health.anomalyCount != null && health.anomalyCount > 0) {
-    lines.push(`Critical issues: ${health.anomalyCount} anomalies`);
-  }
-
-  if (verbosity !== 'compact') {
-    if (health.performanceSummary?.score != null) {
-      lines.push(`Performance: ${health.performanceSummary.score}/100`);
-    }
-    lines.push(`Links: ${health.deadLinks} dead, ${health.redirectChains} redirect chains, ${health.orphanPages} orphan pages`);
-    if (health.anomalyTypes && health.anomalyTypes.length > 0) {
-      lines.push(`Anomaly types: ${health.anomalyTypes.join(', ')}`);
-    }
-    if (health.aeoReadiness) {
-      lines.push(
-        `AEO readiness: ${health.aeoReadiness.pagesChecked} pages checked, ${pct(health.aeoReadiness.passingRate)} passing`
-      );
-    }
-    // Weekly metrics trend (Task 4.2b)
-    if (health.weeklyMetricsTrend) {
-      const t = health.weeklyMetricsTrend;
-      const w = t.latestWeek;
-      const parts: string[] = [];
-      if (w.totalClicks != null) parts.push(`${w.totalClicks} clicks`);
-      if (w.auditScore != null) parts.push(`audit ${w.auditScore}`);
-      if (w.organicTrafficValue != null) parts.push(`$${Math.round(w.organicTrafficValue)} traffic value`);
-      if (parts.length > 0) {
-        lines.push(`Latest week (${w.snapshotDate}): ${parts.join(', ')} — based on ${t.snapshotCount} snapshot${t.snapshotCount === 1 ? '' : 's'}`);
-      }
-    }
-  }
-
-  if (verbosity === 'detailed') {
-    if (health.recentDiagnostics && health.recentDiagnostics.length > 0) {
-      const diagLines = health.recentDiagnostics.map(d => {
-        const pages = d.affectedPages.length > 0 ? ` on ${d.affectedPages.join(', ')}` : '';
-        const causes = d.rootCauseTitles && d.rootCauseTitles.length > 0
-          ? ` → ${d.rootCauseTitles.join('; ')}`
-          : '';
-        return `  ${d.anomalyType} [${d.status}]${pages}${causes}`;
-      });
-      lines.push(`Recent diagnostics:\n${diagLines.join('\n')}`);
-    }
-    if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
-    if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
-    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${pct(health.cwvPassRate.mobile)}, desktop ${health.cwvPassRate.desktop != null ? pct(health.cwvPassRate.desktop) : 'n/a'}`);
-    if (health.schemaValidation) {
-      lines.push(`Schema validation: ${health.schemaValidation.valid} valid, ${health.schemaValidation.warnings} warnings, ${health.schemaValidation.errors} errors`);
-    }
-    if (health.performanceSummary) {
-      const perfParts: string[] = [];
-      if (health.performanceSummary.avgLcp != null) perfParts.push(`LCP: ${(health.performanceSummary.avgLcp / 1000).toFixed(1)}s`);
-      const interactionMs = health.performanceSummary.avgInp ?? health.performanceSummary.avgFid;
-      if (interactionMs != null) perfParts.push(`INP: ${Math.round(interactionMs)}ms`);
-      if (health.performanceSummary.avgCls != null) perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
-      if (perfParts.length > 0) lines.push(`Core Web Vitals: ${perfParts.join(', ')}`);
-    }
-    if (health.redirectDetails && health.redirectDetails.length > 0) {
-      lines.push('Redirect chain details:');
-      for (const rd of health.redirectDetails.slice(0, 5)) {
-        lines.push(`  - ${rd.url} → ${rd.target} (${rd.chainDepth} hops, status ${rd.status})`);
-      }
-    }
-  }
-
-  return lines.join('\n');
-}
-
 function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## Client Signals'];
 
@@ -832,6 +667,13 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
   }
   if (signals.compositeHealthScore != null) {
     lines.push(`Health score: ${signals.compositeHealthScore}/100`);
+  }
+  if (signals.compositeHealthBreakdown?.rows.length) {
+    lines.push(
+      `Health score breakdown: ${signals.compositeHealthBreakdown.rows
+        .map(row => `${row.label} ${row.score}/100 (${row.weight}% weight)`)
+        .join('; ')}`,
+    );
   }
   if (signals.latestBriefing) {
     const b = signals.latestBriefing;
@@ -889,83 +731,6 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     }
     if (signals.contentGapVotes.length > 0) {
       lines.push(`Content gap votes: ${signals.contentGapVotes.slice(0, 5).map(v => `${v.topic} (${v.votes})`).join(', ')}`);
-    }
-  }
-
-  return lines.join('\n');
-}
-
-function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbosity): string {
-  const lines: string[] = ['## Operational'];
-
-  const approvals = ops.approvalQueue?.pending ?? 0;
-  const clientActions = ops.clientActionQueue?.pending ?? 0;
-  const actions = ops.actionBacklog?.pendingMeasurement ?? 0;
-  const recs = (ops.recommendationQueue?.fixNow ?? 0) + (ops.recommendationQueue?.fixSoon ?? 0) + (ops.recommendationQueue?.fixLater ?? 0);
-  lines.push(`Pending: ${approvals} approvals, ${clientActions} client actions, ${actions} actions awaiting measurement, ${recs} recommendations`);
-
-  if (verbosity !== 'compact') {
-    if (ops.recommendationQueue) {
-      lines.push(`Recommendations: ${ops.recommendationQueue.fixNow} fix now, ${ops.recommendationQueue.fixSoon} fix soon, ${ops.recommendationQueue.fixLater} fix later`);
-    }
-    if (ops.recentActivity.length > 0) {
-      lines.push(`Recent: ${ops.recentActivity.slice(0, 3).map(a => a.description).join('; ')}`);
-    }
-    if (ops.timeSaved) {
-      lines.push(`Time saved: ${ops.timeSaved.totalMinutes} minutes`);
-    }
-    if (ops.pendingJobs > 0) {
-      lines.push(`Background jobs: ${ops.pendingJobs} pending`);
-    }
-    if (ops.workOrders) {
-      lines.push(`Work orders: ${ops.workOrders.active} active, ${ops.workOrders.pending} pending`);
-    }
-    if (ops.clientActionQueue) {
-      lines.push(`Client action queue: ${ops.clientActionQueue.pending} pending${ops.clientActionQueue.oldestAge !== null ? `, oldest ${ops.clientActionQueue.oldestAge}h` : ''}`);
-    }
-  }
-
-  if (verbosity !== 'compact') {
-    // Tier + usage remaining (Task 4.2d)
-    if (ops.effectiveTier) {
-      lines.push(`Subscription tier: ${ops.effectiveTier}`);
-    }
-    if (ops.usageRemaining) {
-      const usageParts = Object.entries(ops.usageRemaining)
-        .filter(([, v]) => v != null && v !== Infinity)
-        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v} remaining`)
-        .slice(0, 5);
-      if (usageParts.length > 0) {
-        lines.push(`Usage remaining: ${usageParts.join(', ')}`);
-      }
-    }
-    // Page edit state summary (Task 4.2a)
-    if (ops.pageEditStateSummary && ops.pageEditStateSummary.total > 0) {
-      const statusParts = Object.entries(ops.pageEditStateSummary.byStatus)
-        .map(([s, n]) => `${n} ${s}`)
-        .join(', ');
-      lines.push(`Page states (${ops.pageEditStateSummary.total} total): ${statusParts}`);
-    }
-  }
-
-  if (verbosity === 'detailed') {
-    if (ops.detectedPlaybooks && ops.detectedPlaybooks.length > 0) {
-      lines.push(`Detected playbooks: ${ops.detectedPlaybooks.slice(0, 3).join(', ')}`);
-    }
-    if (ops.timeSaved?.byFeature) {
-      lines.push('Time saved by feature:');
-      for (const [feature, minutes] of Object.entries(ops.timeSaved.byFeature).slice(0, 5)) {
-        lines.push(`  ${feature}: ${minutes} min`);
-      }
-    }
-    if (ops.annotations.length > 0) {
-      lines.push('Timeline annotations:');
-      for (const a of ops.annotations.slice(0, 5)) {
-        lines.push(`  - ${a.date}: ${a.label}`);
-      }
-    }
-    if (ops.insightAcceptanceRate) {
-      lines.push(`Insight acceptance rate: ${pct(ops.insightAcceptanceRate.rate)} (${ops.insightAcceptanceRate.confirmed}/${ops.insightAcceptanceRate.totalShown})`);
     }
   }
 

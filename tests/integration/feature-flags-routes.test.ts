@@ -9,10 +9,23 @@
  *   - PUT /api/admin/feature-flags/:key with valid key and enabled=true → 200
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13400);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, authApi } = ctx;
+
+const RETIRED_PRODUCT_UI_FLAGS = [
+  'copy-engine',
+  'copy-engine-voice',
+  'copy-engine-pipeline',
+  'deep-diagnostics',
+  'client-brand-section',
+] as const;
+const RETIRED_SEO_RUNTIME_FLAGS = [
+  'local-seo-visibility',
+  'schema-ai-element-classifier',
+  'seo-generation-quality',
+] as const;
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -64,6 +77,32 @@ describe('PUT /api/admin/feature-flags/:key', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
     expect(body.error).toContain('Unknown feature flag');
+  });
+
+  it('returns 400 for retired product/UI flag keys', async () => {
+    for (const key of RETIRED_PRODUCT_UI_FLAGS) {
+      const res = await authApi(`/api/admin/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
+  });
+
+  it('returns 400 for retired SEO/runtime flag keys', async () => {
+    for (const key of RETIRED_SEO_RUNTIME_FLAGS) {
+      const res = await authApi(`/api/admin/feature-flags/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toContain('Unknown feature flag');
+    }
   });
 
   it('returns 400 when enabled field is missing', async () => {

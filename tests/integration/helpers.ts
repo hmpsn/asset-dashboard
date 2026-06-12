@@ -1,13 +1,19 @@
 /**
  * Shared test helpers for integration tests.
  *
- * Provides a factory function `createTestContext(port)` that returns
- * isolated server + HTTP helpers per test file, allowing parallel execution
- * on different ports.
+ * Provides two factories:
+ * - `createEphemeralTestContext(import.meta.url)` as the default for test files
+ * - `createTestContext(port)` as the low-level fixed-port primitive used by this helper
  */
 import { spawn, type ChildProcess } from 'child_process';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  isIntegrationTestPortReserved,
+  releaseIntegrationTestPort,
+  reserveIntegrationTestPort,
+} from '../helpers/ports.js';
 import { ensureIsolatedTestDataDir } from '../test-data-dir.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,10 +40,29 @@ export interface TestContext {
 /**
  * Create an isolated test context bound to a specific port.
  * Each test file should call this with a unique port number.
+ *
+ * E3 (passwordless-closure): autoPublicAuth defaults to true so that fixed-port
+ * integration/contract tests automatically get the admin HMAC token injected on
+ * /api/public/ calls, matching the createEphemeralTestContext default. Tests that
+ * deliberately check unauthenticated behaviour must pass
+ * `{ headers: { 'x-no-auto-public-auth': 'true' } }` to suppress injection for
+ * those individual calls.
  */
-export function createTestContext(port: number, options?: { env?: Record<string, string>; startupTimeoutMs?: number }): TestContext {
+interface TestContextOptions {
+  env?: Record<string, string>;
+  startupTimeoutMs?: number;
+  autoPublicAuth?: boolean;
+}
+
+interface EphemeralTestContextOptions extends TestContextOptions {
+  contextName?: string;
+}
+
+export function createTestContext(port: number, options?: TestContextOptions): TestContext {
   const BASE = `http://localhost:${port}`;
   const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
+  const sessionSecret = options?.env?.SESSION_SECRET ?? process.env.SESSION_SECRET ?? 'asset-dashboard-test-session-secret';
+  const testAdminToken = crypto.createHmac('sha256', sessionSecret).update('admin').digest('hex');
   let proc: ChildProcess | null = null;
   const cookieJar: Record<string, string> = {};
   let authToken = '';
@@ -82,6 +107,7 @@ export function createTestContext(port: number, options?: { env?: Record<string,
         // gate ACTIVE (e.g. to assert 401 on unauthenticated admin routes) can pass
         // options.env.APP_PASSWORD to override this default.
         APP_PASSWORD: options?.env?.APP_PASSWORD ?? '',
+        SESSION_SECRET: sessionSecret,
         DATA_DIR: dataDir,
         // startServer watches stdout for the "running on" readiness line. The
         // child stdout is not echoed, so this keeps readiness detection working
@@ -144,6 +170,23 @@ export function createTestContext(port: number, options?: { env?: Record<string,
     const headers: Record<string, string> = {
       ...(opts?.headers as Record<string, string> || {}),
     };
+    const skipAutoPublicAuth = headers['x-no-auto-public-auth'] === 'true';
+    delete headers['x-no-auto-public-auth'];
+    // Default autoPublicAuth to true (E3: portals are closed until configured).
+    // Explicit false opts out; undefined is treated as true.
+    const autoPublicAuth = options?.autoPublicAuth !== false;
+    if (
+      autoPublicAuth
+      && !skipAutoPublicAuth
+      && urlPath.startsWith('/api/public/')
+      && !headers['x-auth-token']
+      && !headers['X-Auth-Token']
+      && !headers.Authorization
+      && !headers.authorization
+      && !headers.Cookie
+    ) {
+      headers['x-auth-token'] = testAdminToken;
+    }
     const cookies = cookieHeader();
     if (cookies) {
       headers['Cookie'] = cookies;
@@ -231,6 +274,48 @@ export function createTestContext(port: number, options?: { env?: Record<string,
     authPostJson,
     authPatchJson,
     authDel,
+  };
+}
+
+/**
+ * Allocate a unique integration-test port from the shared lock-backed range.
+ * Callers should pass a stable file identifier such as `import.meta.url`.
+ *
+ * E3 (passwordless-closure): autoPublicAuth defaults to true so that all
+ * ephemeral-context integration tests automatically get the admin HMAC token
+ * injected on /api/public/ calls. Tests that deliberately check unauthenticated
+ * behaviour must pass `{ headers: { 'x-no-auto-public-auth': 'true' } }` to
+ * suppress injection for those individual calls.
+ */
+export function createEphemeralTestContext(
+  testFileUrl: string,
+  options?: EphemeralTestContextOptions,
+): TestContext {
+  if (!testFileUrl.startsWith('file://')) {
+    throw new Error('createEphemeralTestContext() requires import.meta.url as its first argument');
+  }
+  const { contextName = 'default', ...contextOptions } = options ?? {};
+  const reservationId = `${fileURLToPath(testFileUrl)}#${contextName}`;
+  if (isIntegrationTestPortReserved(reservationId)) {
+    throw new Error(
+      `Only one createEphemeralTestContext(import.meta.url) context named "${contextName}" is allowed per test file`,
+    );
+  }
+
+  const port = reserveIntegrationTestPort(reservationId);
+  // Default autoPublicAuth to true (E3: portals are closed until configured).
+  const ctx = createTestContext(port, { ...contextOptions, autoPublicAuth: contextOptions.autoPublicAuth ?? true });
+  const baseStopServer = ctx.stopServer;
+
+  return {
+    ...ctx,
+    stopServer: async () => {
+      try {
+        await baseStopServer();
+      } finally {
+        releaseIntegrationTestPort(reservationId);
+      }
+    },
   };
 }
 

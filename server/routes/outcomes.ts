@@ -5,7 +5,6 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { withWorkspaceLock } from '../bridge-infrastructure.js';
@@ -23,9 +22,17 @@ import {
   recordAction,
   updateActionContext,
   WIN_SCORES,
+  getOverviewStats,
+  getActionIdsByWorkspace,
+  getWinRateForActionIds,
 } from '../outcome-tracking.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
+import { loadRecommendations } from '../recommendations.js';
+import { getClientAction } from '../client-actions.js';
+import { getBrief } from '../content-brief.js';
+import { getPost } from '../content-posts-db.js';
+import { getContentRequest } from '../content-requests.js';
 import type {
   ActionType,
   ActionPlaybook,
@@ -34,23 +41,15 @@ import type {
   OutcomeWinEntry,
   LearningsTrend,
   TrackedAction,
+  TopWin,
 } from '../../shared/types/outcome-tracking.js';
+import type { RecommendationSet } from '../../shared/types/recommendations.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('outcomes');
 
 const router = Router();
-
-// ── Feature flag guard ──
-router.use('/api/outcomes', (_req, res, next) => {
-  if (!isFeatureEnabled('outcome-tracking')) return res.status(404).json({ error: 'Not found' });
-  next();
-});
-router.use('/api/public/outcomes', (_req, res, next) => {
-  if (!isFeatureEnabled('outcome-tracking')) return res.status(404).json({ error: 'Not found' });
-  next();
-});
 
 // ── Helpers ──
 
@@ -153,43 +152,63 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
 
 // GET /api/outcomes/overview — Multi-workspace overview
 // LITERAL route — must come BEFORE param routes to avoid shadowing
-router.get('/api/outcomes/overview', async (_req, res) => {
+//
+// A2 (audit #10): replaced the O(W×A) per-action loops with 4 aggregate queries
+// per workspace. Behavioral parity contract:
+//   - winRate / trend / totalScored / totalWins: match computeScorecard() loop semantics
+//     (not_acted_on NOT filtered — computeScorecard includes them)
+//   - scoredLast30d: distinct actions with ANY outcome measured in last 30d (any score)
+//   - topWin: uses getTopWinsForWorkspace which filters not_acted_on (A1 exclusion)
+//   - activeActions: getWorkspaceCounts().pending = COUNT WHERE measurement_complete=0
+// See docs/superpowers/plans/2026-06-10-a2-outcomes-overview-sql.md.
+router.get('/api/outcomes/overview', (_req, res) => {
   try {
     const workspaces = listWorkspaces();
     const overviews: WorkspaceOutcomeOverview[] = [];
 
     for (const ws of workspaces) {
-      const counts = getWorkspaceCounts(ws.id);
-      const topWins = getTopWinsForWorkspace(ws.id, 1);
-      const scorecard = computeScorecard(ws.id);
+      // Single aggregate query replaces getWorkspaceCounts + the scoredLast30d loop
+      const stats = getOverviewStats(ws.id);
 
-      // Determine if attention is needed
-      let attentionNeeded = false;
-      let attentionReason: string | undefined;
-      if (counts.pending > 10) {
-        attentionNeeded = true;
-        attentionReason = `${counts.pending} actions awaiting measurement`;
-      } else if (scorecard.trend === 'declining') {
-        attentionNeeded = true;
-        attentionReason = 'Win rate is declining';
+      // Trend computation: split action IDs into recent/older halves and compare
+      // win rates — matches the computeScorecard() split-half trend logic exactly.
+      // getActionIdsByWorkspace returns IDs in created_at DESC order (same as getByWorkspace).
+      const allIds = getActionIdsByWorkspace(ws.id);
+      const splitIdx = Math.ceil(allIds.length / 2);
+      const recentIds = allIds.slice(0, splitIdx);
+      const olderIds = allIds.slice(splitIdx);
+      const recentRate = getWinRateForActionIds(recentIds);
+      const olderRate = getWinRateForActionIds(olderIds);
+      const overallWinRate = stats.totalScored > 0 ? stats.totalWins / stats.totalScored : 0;
+      let trend: LearningsTrend = 'stable';
+      if (recentRate.scored >= 3 && olderRate.scored > 0) {
+        const recentWinRate = recentRate.wins / recentRate.scored;
+        const olderWinRate = olderRate.wins / olderRate.scored;
+        if (recentWinRate > olderWinRate + 0.1) trend = 'improving';
+        else if (recentWinRate < olderWinRate - 0.1) trend = 'declining';
       }
 
-      // Count actions scored in last 30 days
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const recentActions = getActionsByWorkspace(ws.id);
-      let scoredLast30d = 0;
-      for (const a of recentActions) {
-        const outcomes = getOutcomesForAction(a.id);
-        if (outcomes.some(o => o.measuredAt >= thirtyDaysAgo)) scoredLast30d++;
+      // topWin uses the existing prepared query which applies the A1 not_acted_on exclusion
+      const topWins = getTopWinsForWorkspace(ws.id, 1);
+
+      // Determine if attention is needed (same thresholds as the loop version)
+      let attentionNeeded = false;
+      let attentionReason: string | undefined;
+      if (stats.pendingCount > 10) {
+        attentionNeeded = true;
+        attentionReason = `${stats.pendingCount} actions awaiting measurement`;
+      } else if (trend === 'declining') {
+        attentionNeeded = true;
+        attentionReason = 'Win rate is declining';
       }
 
       overviews.push({
         workspaceId: ws.id,
         workspaceName: ws.name,
-        winRate: scorecard.overallWinRate,
-        trend: scorecard.trend,
-        activeActions: counts.pending,
-        scoredLast30d,
+        winRate: overallWinRate,
+        trend,
+        activeActions: stats.pendingCount,
+        scoredLast30d: stats.scoredLast30d,
         topWin: topWins[0] ?? null,
         attentionNeeded,
         attentionReason,
@@ -378,34 +397,103 @@ router.post(
 // GET /api/public/outcomes/:workspaceId/summary — Tiered summary (scorecard)
 router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(), (req, res) => {
   try {
+    // Full OutcomeScorecard serialization (E5): the client OutcomeSummary component
+    // renders strongWinRate and pendingMeasurement — omitting them produced NaN%.
+    // Nothing here is admin-sensitive (aggregate win-rate stats only; no $ values).
     const scorecard = computeScorecard(req.params.workspaceId);
-    // Simplified view for clients
-    res.json({
-      overallWinRate: scorecard.overallWinRate,
-      totalTracked: scorecard.totalTracked,
-      totalScored: scorecard.totalScored,
-      trend: scorecard.trend,
-      byCategory: scorecard.byCategory,
-    });
+    res.json(scorecard);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client summary');
     res.status(500).json({ error: 'Failed to get outcome summary' });
   }
 });
 
+// Honest generic per-action-type labels for win entries whose source title cannot be
+// resolved (E5, audit #5). Replaces the fabricated `"<action_type> action"` string,
+// which implied a recommendation title that never existed. Record<ActionType, string>
+// keeps this exhaustive — adding an ActionType without a label is a compile error.
+const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
+  insight_acted_on: 'Acted on a site insight',
+  content_published: 'Published new content',
+  brief_created: 'Created a content brief',
+  strategy_keyword_added: 'Added a keyword to the strategy',
+  schema_deployed: 'Deployed structured data',
+  audit_fix_applied: 'Applied a technical fix',
+  content_refreshed: 'Refreshed existing content',
+  internal_link_added: 'Added internal links',
+  meta_updated: 'Updated page metadata',
+  voice_calibrated: 'Calibrated brand voice',
+  competitor_gap_closed: 'Closed a competitor keyword gap',
+  cluster_published: 'Filled a topic cluster',
+  cannibalization_resolved: 'Resolved keyword cannibalization',
+  local_visibility_won: 'Won local pack visibility',
+  local_service_added: 'Started targeting a local service',
+};
+
+/**
+ * Resolve the REAL source title for a win entry via sourceType/sourceId.
+ * Falls back to an honest generic action label when the source has no title
+ * or no longer exists. `recSet` is lazily loaded once per request by the caller
+ * so a 10-win response doesn't re-read the recommendation set 10 times.
+ */
+function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => RecommendationSet | null): string {
+  const fallback = WIN_FALLBACK_LABELS[win.actionType] ?? win.actionType.replace(/_/g, ' ');
+  if (!win.sourceId) return fallback;
+  try {
+    switch (win.sourceType) {
+      case 'recommendation': {
+        const rec = getRecSet()?.recommendations.find(r => r.id === win.sourceId);
+        return rec?.title || fallback;
+      }
+      case 'client_action': {
+        const action = getClientAction(workspaceId, win.sourceId);
+        return action?.title || fallback;
+      }
+      case 'post':
+      case 'content_post': {
+        const post = getPost(workspaceId, win.sourceId);
+        return post?.title || fallback;
+      }
+      case 'brief':
+      case 'content_brief': {
+        const brief = getBrief(workspaceId, win.sourceId);
+        return brief?.suggestedTitle || fallback;
+      }
+      case 'content_request': {
+        const request = getContentRequest(workspaceId, win.sourceId);
+        return request?.topic || fallback;
+      }
+      default:
+        return fallback;
+    }
+  } catch (err) {
+    // Title resolution is best-effort display enrichment — never fail the wins read.
+    log.warn({ err, workspaceId, sourceType: win.sourceType, sourceId: win.sourceId }, 'Failed to resolve win source title');
+    return fallback;
+  }
+}
+
 // GET /api/public/outcomes/:workspaceId/wins — "We Called It" entries
 router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), (req, res) => {
   try {
-    const wins = getTopWinsForWorkspace(req.params.workspaceId, 10);
+    const workspaceId = req.params.workspaceId;
+    const wins = getTopWinsForWorkspace(workspaceId, 10);
+    // Lazy once-per-request recommendation set for title resolution
+    let recSet: RecommendationSet | null | undefined;
+    const getRecSet = () => {
+      if (recSet === undefined) recSet = loadRecommendations(workspaceId);
+      return recSet;
+    };
     // Transform to OutcomeWinEntry shape for client view
     const entries: OutcomeWinEntry[] = wins.map(w => ({
       actionId: w.actionId,
       actionType: w.actionType,
       pageUrl: w.pageUrl,
       targetKeyword: w.targetKeyword,
-      recommendation: `${w.actionType.replace(/_/g, ' ')} action`,
+      recommendation: resolveWinTitle(workspaceId, w, getRecSet),
       delta: w.delta,
       score: w.score,
+      attributedValue: w.attributedValue,
       detectedAt: w.scoredAt,
     }));
     res.json(entries);
@@ -484,7 +572,7 @@ router.get('/api/outcomes/:workspaceId/diagnostics', requireWorkspaceAccess('wor
 
     res.json({
       workspaceId: wsId,
-      featureEnabled: isFeatureEnabled('outcome-tracking'),
+      featureEnabled: true,
       tableCounts: {
         trackedActions: counts.total,
         scored: counts.scored,

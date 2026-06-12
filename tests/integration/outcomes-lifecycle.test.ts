@@ -19,9 +19,6 @@
  * - Type filter on /actions list
  */
 
-// ─── Feature flag (must be set before app import) ────────────────────────────
-process.env.FEATURE_OUTCOME_TRACKING = 'true';
-
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
@@ -45,6 +42,7 @@ vi.mock('../../server/email.js', () => ({ sendEmail: vi.fn() }));
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 let server: http.Server | null = null;
@@ -69,7 +67,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 function postJson(path: string, body: unknown): Promise<Response> {
@@ -582,7 +580,9 @@ describe('GET /api/public/outcomes/:workspaceId/summary — public endpoint', ()
       protectedWs.id,
     );
     try {
-      const res = await api(`/api/public/outcomes/${protectedWs.id}/summary`);
+      const res = await api(`/api/public/outcomes/${protectedWs.id}/summary`, {
+        headers: { 'x-no-auto-public-auth': 'true' },
+      });
       expect(res.status).toBe(401);
     } finally {
       deleteWorkspace(protectedWs.id);

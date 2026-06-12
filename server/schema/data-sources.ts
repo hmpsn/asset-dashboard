@@ -14,6 +14,7 @@ import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
 import { EEAT_ASSET_TYPE, type EeatAsset } from '../../shared/types/eeat-assets.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { capitalizeWord } from '../utils/strings.js';
 
 export interface PageMetaInput {
   title: string;
@@ -145,10 +146,6 @@ function metaContent($: cheerio.CheerioAPI, selector: string): string | undefine
   return v && v.trim().length > 0 ? v.trim() : undefined;
 }
 
-function capitalize(s: string): string {
-  return s.replace(/\b\w/g, c => c.toUpperCase());
-}
-
 function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: string, canonicalUrl?: string): BreadcrumbItem[] {
   let pathForCrumbs = publishedPath;
   let leafUrl = '';
@@ -166,8 +163,9 @@ function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: stri
   let acc = baseUrl;
   segs.forEach((s, i) => {
     acc = `${acc}/${s}`;
+    const segmentName = s.replace(/-/g, ' ').replace(/\b\w+\b/g, word => capitalizeWord(word));
     items.push({
-      name: i === segs.length - 1 ? leafName : capitalize(s.replace(/-/g, ' ')),
+      name: i === segs.length - 1 ? leafName : segmentName,
       url: i === segs.length - 1 && leafUrl ? leafUrl : acc,
     });
   });
@@ -200,7 +198,7 @@ function safeHttpUrl(candidate: string | null | undefined): string | undefined {
 function deriveArticleSection(publishedPath: string): string | undefined {
   const segs = publishedPath.replace(/^\//, '').split('/').filter(Boolean);
   if (segs.length < 2) return undefined; // root or single-segment paths have no section
-  return capitalize(segs[0].replace(/-/g, ' '));
+  return segs[0].replace(/-/g, ' ').replace(/\b\w+\b/g, word => capitalizeWord(word));
 }
 
 function pickCmsFieldWithSlug(fieldData: Record<string, unknown> | null | undefined, slugs: string[]): { value: string; slug: string } | undefined {
@@ -435,13 +433,6 @@ function countVisibleWords($: cheerio.CheerioAPI): number | undefined {
   return words && words.length > 0 ? words.length : undefined;
 }
 
-/** Capitalize a slug segment for human-readable output. */
-function capitalizeSlugSegment(slug: string): string {
-  return slug
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
-
 /** Derive the leaf URL slug (e.g. "/services/development" → "development"). */
 function leafSlug(publishedPath: string): string | undefined {
   const segs = publishedPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
@@ -489,7 +480,7 @@ function cleanServiceSlug(slug: string, workspaceName: string): string | undefin
       return true;
     });
   if (parts.length === 0) return undefined;
-  return parts.map(part => part[0].toUpperCase() + part.slice(1)).join(' ');
+  return parts.map(part => capitalizeWord(part)).join(' ');
 }
 
 function serviceTypeFromTitleCandidate(candidate: string | undefined): string | undefined {
@@ -651,10 +642,13 @@ export function extractPageData(input: ExtractInput): PageData {
 
   // Derive Service labels from mapped profile (authoritative), then visible/CMS title, then cleaned slug.
   const slug = leafSlug(input.pageMeta.publishedPath);
+  const fallbackServiceLabel = slug
+    ? cleanServiceSlug(slug, input.workspace.name) || slug.replace(/-/g, ' ').replace(/\b\w+\b/g, word => capitalizeWord(word))
+    : undefined;
   const derivedServiceLabel = serviceTypeFromTitleCandidate(input.pageMeta.serviceProfile?.serviceName)
     || serviceTypeFromTitleCandidate(cleanTitle)
     || serviceTypeFromTitleCandidate(title)
-    || (slug ? cleanServiceSlug(slug, input.workspace.name) || capitalizeSlugSegment(slug) : undefined);
+    || fallbackServiceLabel;
   const serviceType = input.pageMeta.serviceProfile?.serviceType || derivedServiceLabel;
   const serviceName = input.pageMeta.serviceProfile?.serviceName || derivedServiceLabel;
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;

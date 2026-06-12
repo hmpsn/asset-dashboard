@@ -1,6 +1,5 @@
 /**
  * Integration tests for content decay detection and refresh lifecycle.
- * port-ok: unique in integration suite (13867)
  *
  * Architecture: in-process server (vi.mock works for broadcast capture).
  *
@@ -85,6 +84,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { DecayAnalysis, DecayingPage } from '../../server/content-decay.js';
+import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
 // ── In-process server ─────────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ async function stopTestServer(): Promise<void> {
 }
 
 async function api(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(`${baseUrl}${path}`, opts);
+  return fetch(`${baseUrl}${path}`, withPublicTestAuth(path, opts));
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {

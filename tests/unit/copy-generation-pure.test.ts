@@ -47,7 +47,9 @@ vi.mock('../../server/content-brief.js', () => ({
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn().mockResolvedValue({ seoContext: null }),
+  formatForPrompt: vi.fn().mockReturnValue(''),
   formatKeywordsForPrompt: vi.fn().mockReturnValue(''),
+  formatPageMapForPrompt: vi.fn().mockReturnValue(''),
   formatPersonasForPrompt: vi.fn().mockReturnValue(''),
   formatKnowledgeBaseForPrompt: vi.fn().mockReturnValue(''),
 }));
@@ -717,6 +719,39 @@ describe('buildCopyGenerationContext — graceful degradation', () => {
 // ── buildCopyGenerationContext — brand layers ─────────────────────────────────
 
 describe('buildCopyGenerationContext — brand layers', () => {
+  it('preserves shared SEO sub-block ordering around business context', async () => {
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValueOnce({
+      seoContext: {
+        strategy: null,
+        brandVoice: 'legacy voice',
+        effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE:\nVoice wins',
+        businessContext: 'Business context sentence.',
+        personas: [{ id: 'persona-1', name: 'Ops Lead', description: 'Leads delivery.' }],
+        knowledgeBase: 'Knowledge base details.',
+        pageKeywords: null,
+      },
+    } as Awaited<ReturnType<typeof buildWorkspaceIntelligence>>);
+    vi.mocked(formatKeywordsForPrompt).mockReturnValueOnce('\n\nTARGET KEYWORDS:\n- seo reporting');
+    vi.mocked(formatPersonasForPrompt).mockReturnValueOnce('\n\nTARGET AUDIENCE PERSONAS:\n- Ops Lead');
+    vi.mocked(formatKnowledgeBaseForPrompt).mockReturnValueOnce('\n\nKNOWLEDGE BASE:\nKnowledge base details.');
+
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
+
+    const seoSection = ctx.slice(
+      ctx.indexOf('SEO INTELLIGENCE:'),
+      ctx.indexOf('COPY INTELLIGENCE PATTERNS') === -1 ? undefined : ctx.indexOf('COPY INTELLIGENCE PATTERNS'),
+    );
+    expect(seoSection).toContain('TARGET KEYWORDS:\n- seo reporting');
+    expect(seoSection).toContain('BRAND VOICE & STYLE:\nVoice wins');
+    expect(seoSection).toContain('Business context: Business context sentence.');
+    expect(seoSection).toContain('TARGET AUDIENCE PERSONAS:\n- Ops Lead');
+    expect(seoSection).toContain('KNOWLEDGE BASE:\nKnowledge base details.');
+    expect(seoSection.indexOf('TARGET KEYWORDS')).toBeLessThan(seoSection.indexOf('BRAND VOICE & STYLE'));
+    expect(seoSection.indexOf('BRAND VOICE & STYLE')).toBeLessThan(seoSection.indexOf('Business context: Business context sentence.'));
+    expect(seoSection.indexOf('Business context: Business context sentence.')).toBeLessThan(seoSection.indexOf('TARGET AUDIENCE PERSONAS'));
+    expect(seoSection.indexOf('TARGET AUDIENCE PERSONAS')).toBeLessThan(seoSection.indexOf('KNOWLEDGE BASE'));
+  });
+
   it('includes brand foundation when brandscripts have filled sections', async () => {
     vi.mocked(listBrandscripts).mockReturnValueOnce([
       {

@@ -7,7 +7,7 @@ import path from 'path';
 import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
-import { listWorkspaces } from './workspaces.js';
+import { getWorkspaceBySiteId } from './workspaces.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
 import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../shared/types/page-address.js';
@@ -34,6 +34,10 @@ import {
 
 
 const log = createLogger('helpers');
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // ── HTML Utilities ──
 
@@ -258,6 +262,15 @@ export function parseDateRange(query: Record<string, unknown>): CustomDateRange 
   return { startDate: s, endDate: e };
 }
 
+export function parseDateRangeStrict(query: Record<string, unknown>): { dateRange?: CustomDateRange; error?: string } {
+  const startRaw = query.startDate;
+  const endRaw = query.endDate;
+  if (startRaw === undefined && endRaw === undefined) return {};
+  if (typeof startRaw !== 'string' || typeof endRaw !== 'string') return { error: 'Invalid date range' };
+  const parsed = parseDateRange({ startDate: startRaw, endDate: endRaw });
+  return parsed ? { dateRange: parsed } : { error: 'Invalid date range' };
+}
+
 function isCanonicalDateOnly(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [yearRaw, monthRaw, dayRaw] = value.split('-');
@@ -381,8 +394,7 @@ export async function buildSchemaContext(
 ): Promise<{
   ctx: SchemaContext;
 }> {
-  const allWs = listWorkspaces();
-  const ws = allWs.find(w => w.webflowSiteId === siteId);
+  const ws = getWorkspaceBySiteId(siteId);
   const ctx: SchemaContext = {};
   let schemaIntel: Awaited<ReturnType<typeof buildSchemaIntelligence>> | null = null;
   if (ws) {

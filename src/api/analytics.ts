@@ -1,5 +1,5 @@
 // ── Analytics API (GA4 + GSC) ──────────────────────────────────────
-import { post, getSafe, getOptional } from './client';
+import { get, post, getOptional } from './client';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   SearchDeviceBreakdown, SearchCountryBreakdown, SearchTypeBreakdown,
@@ -23,13 +23,13 @@ export const gsc = {
     getOptional<SearchOverview>(`/api/public/search-overview/${wsId}${qs(days, dateRange)}`),
 
   trend: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<PerformanceTrend[]>(`/api/public/performance-trend/${wsId}${qs(days, dateRange)}`, []),
+    get<PerformanceTrend[]>(`/api/public/performance-trend/${wsId}${qs(days, dateRange)}`),
 
   comparison: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<SearchComparison | null>(`/api/public/search-comparison/${wsId}${qs(days, dateRange)}`, null),
+    getOptional<SearchComparison>(`/api/public/search-comparison/${wsId}${qs(days, dateRange)}`),
 
   devices: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<SearchDeviceBreakdown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`, []),
+    get<SearchDeviceBreakdown[]>(`/api/public/search-devices/${wsId}${qs(days, dateRange)}`),
 };
 
 // ── Google Analytics 4 (GA4) ───────────────────────────────────────
@@ -38,46 +38,86 @@ export const ga4 = {
     getOptional<GA4Overview>(`/api/public/analytics-overview/${wsId}${qs(days, dateRange)}`),
 
   trend: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4DailyTrend[]>(`/api/public/analytics-trend/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4DailyTrend[]>(`/api/public/analytics-trend/${wsId}${qs(days, dateRange)}`),
 
   topPages: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4TopPage[]>(`/api/public/analytics-top-pages/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4TopPage[]>(`/api/public/analytics-top-pages/${wsId}${qs(days, dateRange)}`),
 
   sources: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4TopSource[]>(`/api/public/analytics-sources/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4TopSource[]>(`/api/public/analytics-sources/${wsId}${qs(days, dateRange)}`),
 
   devices: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4DeviceBreakdown[]>(`/api/public/analytics-devices/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4DeviceBreakdown[]>(`/api/public/analytics-devices/${wsId}${qs(days, dateRange)}`),
 
   countries: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4CountryBreakdown[]>(`/api/public/analytics-countries/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4CountryBreakdown[]>(`/api/public/analytics-countries/${wsId}${qs(days, dateRange)}`),
 
   events: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4Event[]>(`/api/public/analytics-events/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4Event[]>(`/api/public/analytics-events/${wsId}${qs(days, dateRange)}`),
 
-  eventTrend: (wsId: string, eventName: string, days: number) =>
-    getSafe<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`, []),
+  eventTrend: (wsId: string, eventName: string, days: number, dateRange?: AnalyticsDateRange) =>
+    get<GA4EventTrend[]>(`/api/public/analytics-event-trend/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}${dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : ''}`),
 
-  eventPages: (wsId: string, eventName: string, days: number) =>
-    getSafe<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}`, []),
+  eventPages: (wsId: string, eventName: string, days: number, dateRange?: AnalyticsDateRange) =>
+    get<GA4EventPageBreakdown[]>(`/api/public/analytics-event-explorer/${wsId}?event=${encodeURIComponent(eventName)}&days=${days}${dateRange ? `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}` : ''}`),
 
   conversions: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4ConversionSummary[]>(`/api/public/analytics-conversions/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4ConversionSummary[]>(`/api/public/analytics-conversions/${wsId}${qs(days, dateRange)}`),
 
   comparison: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4Comparison | null>(`/api/public/analytics-comparison/${wsId}${qs(days, dateRange)}`, null),
+    getOptional<GA4Comparison>(`/api/public/analytics-comparison/${wsId}${qs(days, dateRange)}`),
 
   newVsReturning: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4NewVsReturning[]>(`/api/public/analytics-new-vs-returning/${wsId}${qs(days, dateRange)}`, []),
+    get<GA4NewVsReturning[]>(`/api/public/analytics-new-vs-returning/${wsId}${qs(days, dateRange)}`),
 
   organic: (wsId: string, days: number, dateRange?: AnalyticsDateRange) =>
-    getSafe<GA4OrganicOverview | null>(`/api/public/analytics-organic/${wsId}${qs(days, dateRange)}`, null),
+    getOptional<GA4OrganicOverview>(`/api/public/analytics-organic/${wsId}${qs(days, dateRange)}`),
 
   landingPages: (wsId: string, days: number, opts?: { dateRange?: AnalyticsDateRange; organic?: boolean; limit?: number }) => {
     let url = `/api/public/analytics-landing-pages/${wsId}${qs(days, opts?.dateRange)}`;
     if (opts?.organic) url += '&organic=true';
     if (opts?.limit) url += `&limit=${opts.limit}`;
-    return getSafe<GA4LandingPage[]>(url, []);
+    return get<GA4LandingPage[]>(url);
+  },
+};
+
+// ── Admin GA4 endpoints (admin auth, independent of client portal visibility) ──
+export const ga4Admin = {
+  overview: (wsId: string, days: number) =>
+    getOptional<GA4Overview>(`/api/google/analytics-overview/${wsId}?days=${days}`),
+
+  trend: (wsId: string, days: number) =>
+    get<GA4DailyTrend[]>(`/api/google/analytics-trend/${wsId}?days=${days}`),
+
+  topPages: (wsId: string, days: number) =>
+    get<GA4TopPage[]>(`/api/google/analytics-top-pages/${wsId}?days=${days}`),
+
+  sources: (wsId: string, days: number) =>
+    get<GA4TopSource[]>(`/api/google/analytics-sources/${wsId}?days=${days}`),
+
+  devices: (wsId: string, days: number) =>
+    get<GA4DeviceBreakdown[]>(`/api/google/analytics-devices/${wsId}?days=${days}`),
+
+  countries: (wsId: string, days: number) =>
+    get<GA4CountryBreakdown[]>(`/api/google/analytics-countries/${wsId}?days=${days}`),
+
+  conversions: (wsId: string, days: number) =>
+    get<GA4ConversionSummary[]>(`/api/google/analytics-conversions/${wsId}?days=${days}`),
+
+  comparison: (wsId: string, days: number) =>
+    getOptional<GA4Comparison>(`/api/google/analytics-comparison/${wsId}?days=${days}`),
+
+  newVsReturning: (wsId: string, days: number) =>
+    get<GA4NewVsReturning[]>(`/api/google/analytics-new-vs-returning/${wsId}?days=${days}`),
+
+  organic: (wsId: string, days: number) =>
+    getOptional<GA4OrganicOverview>(`/api/google/analytics-organic/${wsId}?days=${days}`),
+
+  landingPages: (wsId: string, days: number, opts?: { organic?: boolean; limit?: number }) => {
+    let url = `/api/google/analytics-landing-pages/${wsId}?days=${days}`;
+    if (opts?.organic) url += '&organic=true';
+    if (opts?.limit) url += `&limit=${opts.limit}`;
+    return get<GA4LandingPage[]>(url);
   },
 };
 
@@ -91,19 +131,19 @@ export const gscAdmin = {
     getOptional<SearchOverview>(`/api/google/search-overview/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   trend: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
+    get<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   devices: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchDeviceBreakdown[]>(`/api/google/search-devices/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
+    get<SearchDeviceBreakdown[]>(`/api/google/search-devices/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   countries: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchCountryBreakdown[]>(`/api/google/search-countries/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
+    get<SearchCountryBreakdown[]>(`/api/google/search-countries/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   searchTypes: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchTypeBreakdown[]>(`/api/google/search-types/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
+    get<SearchTypeBreakdown[]>(`/api/google/search-types/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   comparison: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchComparison | null>(`/api/google/search-comparison/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, null),
+    getOptional<SearchComparison>(`/api/google/search-comparison/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
   chat: (workspaceId: string, siteId: string, body: { question: string; context: Record<string, unknown> }) =>
     post<{ answer: string }>(`/api/google/search-chat/${siteId}`, { ...body, workspaceId }),
@@ -111,14 +151,41 @@ export const gscAdmin = {
 
 // ── Client Intelligence ────────────────────────────────────────────
 export async function fetchClientIntelligence(workspaceId: string): Promise<ClientIntelligence> {
-  return getSafe<ClientIntelligence>(
-    `/api/public/intelligence/${workspaceId}`,
-    {
-      workspaceId,
-      assembledAt: new Date().toISOString(),
-      tier: 'free',
-      insightsSummary: null,
-      pipelineStatus: null,
-    },
+  return get<ClientIntelligence>(`/api/public/intelligence/${workspaceId}`);
+}
+
+// ── Agency Work Feed ───────────────────────────────────────────────
+export interface ClientActivityEntry {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  actorName?: string;
+  createdAt: string;
+}
+
+export interface ClientJobEntry {
+  id: string;
+  type: string;
+  status: string;
+  progress?: number;
+  total?: number;
+  message?: string;
+  createdAt: string;
+  updatedAt: string;
+  workspaceId?: string;
+}
+
+export async function fetchClientActivityFeed(
+  workspaceId: string,
+  limit = 30,
+  offset = 0,
+): Promise<ClientActivityEntry[]> {
+  return get<ClientActivityEntry[]>(
+    `/api/public/activity/${workspaceId}?limit=${limit}&offset=${offset}`,
   );
+}
+
+export async function fetchClientJobs(workspaceId: string): Promise<ClientJobEntry[]> {
+  return get<ClientJobEntry[]>(`/api/public/jobs/${workspaceId}`);
 }

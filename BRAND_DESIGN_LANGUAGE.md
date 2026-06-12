@@ -125,6 +125,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **SectionCard** | `SectionCard.tsx` | `bg-[var(--surface-2)] border-[var(--brand-border)]` | Header row optional; title: `.t-body font-semibold text-[var(--brand-text-bright)]` |
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-[var(--brand-border)]`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), `.t-ui` inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature card radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
+| **FreshnessStamp** | `FreshnessStamp.tsx` | `text-[var(--brand-text-muted)]` + muted clock icon | Compact metadata stamp for real data recency ("Data as of ..."). Renders nothing when the timestamp is missing or invalid so unavailable data never looks current. |
 | **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
 | **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, keyword-command-center, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
@@ -155,8 +156,6 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
 | **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Sizes preserve hierarchy: `.t-caption-sm` / `.t-caption` / `.t-body`. Spinner replaces icon while `loading`. `link` variant skips size padding. |
 | **IconButton** | `ui/IconButton.tsx` | Ghost: `text-zinc-400 hover:text-zinc-200`; solid: `bg-zinc-800` | Icon-only with required `label` for ARIA. 3 sizes (sm/md/lg), 2 variants (ghost/solid). |
-| **ActionPill** | `ui/ActionPill.tsx` | start: teal tint; approve: emerald tint; decline: red tint; send: blue tint; request-changes: amber tint | Compact tinted pill for workflow action buttons. Each variant maps to the status-color family (Law 1/success/error/data/warning). |
-| **SegmentedControl** | `ui/SegmentedControl.tsx` | Active: `bg-zinc-700 text-white`; inactive: `text-zinc-400`; container: `bg-zinc-900 border-zinc-800` | WAI-ARIA radiogroup. Roving tabIndex (selected=0, others=-1). Arrow-key navigation (Left/Right + Home/End). Fallback tab stop on first non-disabled option when `value` matches none. 2 sizes (sm/md). |
 | **Row** | `ui/layout/Row.tsx` | No color — structural only | `flex flex-row`. Props: `gap` (xs–xl), `align` (start/center/end/baseline, default: center), `justify` (start/center/end/between/around), `wrap` (bool). `forwardRef`. |
 | **Stack** | `ui/layout/Stack.tsx` | No color — structural only | `flex flex-col` (or `flex-row` with `dir="row"`). Props: `gap`, `align` (start/center/end/stretch), `dir`. `forwardRef`. |
 | **Column** | `ui/layout/Column.tsx` | No color — structural only | Strict `flex flex-col` — never `flex-row`. Convenience alias for vertical stacks. Props: `gap`, `align`, `className`. `forwardRef`. |
@@ -211,10 +210,12 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Content request "client" chat bubbles | `bg-blue-500/10 text-blue-300` | Client = blue (read-only context) |
 | Clicks metric | `text-blue-400` | Blue = data metric |
 | Sessions metric | `text-blue-400` | Blue = data metric |
+| AnalyticsTab tracked-action conversion rate | `text-accent-success` ≥5%, `text-accent-warning` 2-4.9%, `text-accent-danger` <2% | Conversion rate is a performance judgment, not raw data; the underlying event count remains neutral metric text. Rates are already display percentages — do not multiply by 100. |
 | Approval batch "applied" badge | `bg-blue-500/10 text-blue-400` | Info state |
 | Request status badge | `StatusBadge domain="request"` (`teal` awaiting/team-replied, `amber` in progress, `emerald` resolved) | Canonical request lifecycle semantics |
 | Unified inbox work-order TRACK chip (R5, `unified-inbox`) | `ordered` = amber (`text-accent-warning bg-amber-500/10 border-amber-500/20`, `Clock`); `in_progress` = blue (`text-accent-info bg-blue-500/10 border-blue-500/20`, `Loader2` + `animate-spin`); `completed` = emerald (`text-accent-success bg-emerald-500/10 border-emerald-500/20`, `CheckCircle2`) | Read-only order-progress chip in the "Work in progress" track lane (`UnifiedInbox.tsx`). Mirrors the legacy `OrderStatus.tsx` STATUS_BADGE tokens. NEVER teal for the chip (teal = actions; the track lane has no action). The `OrderTrackStepper` completed-step dots/connectors MAY use teal — they mark completed PROGRESS, a data affordance consistent with the legacy `OrderStatus` stepper. |
 | Unified inbox work-order conversation — client's own bubble (`unified-inbox`) | `bg-blue-500/10 border-blue-500/30` (SG-2) | Client context = blue (read-only data per Law 2); teal is reserved for actions. The team bubble stays neutral (`--surface-3`). Mirrors the content-request client-bubble rule above. |
+| Unified inbox work-order comment-count badge (`unified-inbox`) | `<Badge tone="blue" variant="soft" shape="pill" icon={MessageSquare}>` | Comment count is read-only conversation data, not an action. Rendered on Work in progress cards for 0/1/plural counts. |
 | Unified inbox "Ready to publish" approved pill (`unified-inbox`) | `<StatusBadge domain="approval" status="approved" />` → emerald (SG-1) | Success state reads as emerald (Law 3), not a neutral zinc pill. |
 | Informational intent badge | `text-blue-400 bg-blue-500/10` | Intent = info |
 | Full Post service badge | `bg-teal-500/10 text-teal-300` | Brand accent (was blue, fixed) |
@@ -251,9 +252,9 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
 
-#### Client Inbox IA — 3-Section Layout (`new-inbox-ia` flag)
+#### Client Inbox IA — 3-Section Layout
 
-When the `new-inbox-ia` feature flag is on, InboxTab renders three named sections. Section headers use existing design system patterns — no new color families introduced.
+InboxTab renders three named sections in the canonical client inbox routing model. Section headers use existing design system patterns — no new color families introduced.
 
 | Element | Color | Rationale |
 |---------|-------|-----------|
@@ -264,7 +265,7 @@ When the `new-inbox-ia` feature flag is on, InboxTab renders three named section
 | **SchemaReviewModal / ClientActionDetailModal** backdrop | `bg-[var(--brand-overlay)]` | Token-only — no raw `bg-black/X` |
 | Modal close ("✕") | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` | Standard muted-to-default step |
 
-**Flag-off:** Legacy single-list InboxTab renders unchanged. No color changes in the flag-off path.
+The legacy single-list fallback and the `new-inbox-ia` rollout flag are retired.
 
 ##### Phase 2.5b — investor-briefing reading rhythm
 
@@ -333,6 +334,7 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | **SchemaSuggester.tsx** | CMS template badge | `purple-500/15 text-purple-400` | Technical admin badge |
 | **ContentBriefs.tsx** | Full Post badge, brief toggle, word count badge | `blue-500/10 text-blue-400` | Data/info context on admin side |
 | **KeywordStrategy.tsx** | Page type badge, content gap cards | `teal` | Matches design system |
+| **StrategyRequestedKeywordTrendSection.tsx** | Section icon chip, chart series | `bg-blue-500/20 text-blue-400`, `CHART_SERIES_ORDER` | Rank data = blue / chart tokens (read-only, client-facing, no purple) |
 | **WorkspaceOverview.tsx** | Tier badges on workspace cards | `teal-500/15 text-teal-400` | Unified |
 | **WorkspaceSettings.tsx** | Knowledge base icon, client users icon, avatar gradient | `teal` | Unified |
 | **OnboardingChecklist.tsx** | Progress bar | `bg-blue-500` | Data metric — tracks setup completion |
@@ -382,6 +384,8 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | Confidence badges: low | `bg-red-500/10 text-red-400` | Low confidence = red |
 | Outcome CTAs (admin) | `from-teal-600 to-emerald-600` | Standard CTA gradient |
 | Client "We Called It" highlight | `bg-teal-600/20 border-teal-500/30 text-teal-300` | Soft teal — client-facing positive signal |
+| Attributed dollar value (admin Top Wins + client WinsSurface) | `text-accent-info` (blue) | Realized $ attribution is a read-only data metric — blue, never teal/emerald |
+| Client "Your results" scorecard (`OutcomeSummary`, client Overview) | Win-rate stats: emerald ≥60% / amber ≥40% / red <40% via local `winRateColor()`; trend arrows emerald/red/neutral | Tiered via `<TierGate>` (free teaser → growth scorecard → premium breakdown); no purple |
 
 ### Diagnostic Report (`DiagnosticReport/`)
 
@@ -439,9 +443,9 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 - Volume → audience size label (e.g. "~2.4K searches/mo")
 - Trend → "Interest growing / steady / declining"
 
-### Keyword Command Center (`KeywordCommandCenter.tsx`)
+### Keyword Hub (`KeywordHub.tsx`)
 
-The admin Keywords surface uses a full-width dense table with overlay detail, not a persistent side column.
+The admin Keywords surface (the Keyword Hub, the sole keyword surface after the 2026-06-11 cutover) uses a full-width dense table with overlay detail, not a persistent side column.
 
 | Element | Color | Rationale |
 |---------|-------|-----------|
@@ -456,6 +460,8 @@ The admin Keywords surface uses a full-width dense table with overlay detail, no
 | Detail drawer | Fixed right slide-over desktop, bottom sheet mobile; `bg-[var(--surface-2)]`, token z-index, token shadow | Matches StrategyKeywordDrawer pattern while preserving table width |
 | Drawer mini-panels | `KeywordDetailPanel` local helper with tokenized surface/border variants | Prevents repeated hand-rolled panel classes inside the drawer |
 | Metric values | Blue for volume/CTR, neutral for rank | Blue = read-only demand/performance data |
+| Value reasons | `text-[var(--brand-text-muted)]` with blue metric accents | Reasons explain read-only scoring inputs; blue only for data values such as CPC/search volume |
+| Revenue potential / realized keyword value | `text-emerald-400` | Dollar value is positive outcome potential/success, not an action |
 | Awaiting-data copy | Muted text inside tracking-state block | New tracking entries should not look like an error |
 | Source badges | Badge primitive, wrapping cluster | Prevents long source labels from overflowing the drawer |
 
@@ -484,6 +490,19 @@ The admin Keywords surface uses a full-width dense table with overlay detail, no
 - `informational` → `text-accent-success bg-emerald-500/10 border-emerald-500/20`
 - `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
 - `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
+
+### Keyword Hub action affordances (`KeywordActionMenu.tsx`)
+
+The Keyword Hub (Wave 4) introduces a deliberate **action-tone reconciliation** that frees **red exclusively for the one irreversible affordance — permanent Delete.** The shared server `buildNextActions` still emits `tone:'red'` for retire/decline; the Hub remaps those to amber locally in `KeywordActionMenu` rather than changing the server. (Post-cutover the `keyword-hub` flag is retired and the Hub is the only renderer — there is no longer a flag-OFF legacy path.)
+
+| Affordance | Tone | Rationale |
+|------------|------|-----------|
+| Track / Add to strategy / Restore | **Teal** | Constructive lifecycle actions (Law 1 — teal for actions) |
+| View rankings (navigation) | **Blue** | Read-only data surface (Law 2) |
+| **Retire / Decline** | **Amber** | Reversible removal (rank history preserved, restorable) — caution, NOT danger. Remapped from the server's flag-OFF red. |
+| **Delete permanently** | **Red** (`IconButton variant="danger"`, `Trash2`) | The ONLY red affordance in the Hub. Visually separated (divider + icon button), gated by `ConfirmDialog variant="destructive"` with explicit copy ("This permanently deletes `<kw>` and its rank history. This cannot be undone."), and rendered ONLY when the client eligibility predicate (`canHardDelete`: MANUAL, unpinned, no gap/client provenance) is true. Ineligible rows hide Delete — retire is their only remove. |
+
+This is the canonical example of the Four Laws' "red = irreversible/destructive only" discipline: soft retire (reversible) is amber; hard delete (irreversible, drops rank history) is red.
 
 ### Stripe Checkout
 
@@ -608,6 +627,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/SectionCard.tsx` | Standard card container |
 | `src/components/ui/ChartCard.tsx` | SectionCard variant for charts (tighter padding, inline title+trend) |
 | `src/components/ui/TrendBadge.tsx` | Canonical directional delta indicator (emerald/red/zinc) |
+| `src/components/ui/FreshnessStamp.tsx` | Canonical real-data recency stamp; renders nothing without a valid timestamp |
 | `src/components/ui/PageHeader.tsx` | Consistent page header |
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |
@@ -739,6 +759,14 @@ When shipping UI changes that affect color or design patterns:
 | 2026-06-02 | **Work-Order Conversation + Close Panel** (`feat/work-order-conversation-close`): no new tokens or hues. **Admin** `WorkOrderPanel.tsx` (PRODUCTION) is a focused full-screen modal following the canonical shell contract (`fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-modal`, `aria-labelledby` → `<h2>`, `autoFocus` on close, Escape dismiss). It is an admin work-order surface, NOT an AI feature → **no purple**: status chips use the Four Laws (`in_progress`=amber, `completed`=emerald, `closed`=blue, `cancelled`=red, `pending`=zinc surface), the team-reply `Send` is the teal primary `Button` (Law 1), and the destructive "Close out" uses the `ConfirmDialog` `variant="destructive"`. **Client** conversation thread (DARK behind `unified-inbox`, inside the "Work in progress" `WorkOrderTrackCard`): message bubbles align the client's own messages right with a teal tint (`bg-teal-500/10 border-teal-500/30`) and the team's left on `--surface-3`/`--surface-2`; the comment `textarea` + teal `Send` are the ONLY interactive elements (the lane stays verb-free — no approve/decline/apply). No purple in any client component (verified via `grep -rn "purple-|violet|indigo" src/components/client/` — clean). |
 | 2026-06-02 | **Unified Inbox Finalize UX** (`unified-inbox`, dark): no new tokens or hues — reuses existing primitives + Four Laws colors. New `InlineApprovalCard.tsx` (mounted only from `UnifiedInbox`) renders the approval family inline using the same card grammar as `DecisionCard`/`ApprovalBatchCard` (`bg-[var(--surface-2)]` + `--radius-signature-lg` with the per-site `pr-check-disable-next-line` brand-radius hatch) and the shared presentational `ItemDiffRow`; teal Approve CTA (Law 1), no purple (verified via `grep -rn "purple-|violet|indigo"` — clean). `ItemDiffRow` gained an additive `expandable` prop: when on, long `field:'schema'` values get a teal "Show full ↓ / Show less ↑" toggle that swaps `line-clamp-2` for `overflow-y-auto max-h-[200px] font-mono` (mirrors the legacy schema preview, 200px); default off keeps the existing 2-line clamp byte-identical. `DeliverableDetailModal` schema_plan branch renders read-only page-roles + canonical-entity chips mirroring `SchemaReviewTab` (accent-brand mono `@type`, no new colors). `ProjectedReviewModal` solo panel narrowed `max-w-5xl` → `max-w-3xl` (single-item review removes the wide pipeline chrome; matches `DeliverableDetailModal`). Failed inbox fetch now renders the shared `ErrorState` (Law 4 empathetic + Retry) instead of the green all-caught-up empty state. |
 | 2026-06-02 | **Unified Inbox UX Batch** (`unified-inbox`, dark): no new tokens or hues. **Centered review-modal pattern** — `DeliverableDetailModal`, `ProjectedReviewModal`, and the new `SubmitRequestChooserModal` all use a centered dialog shell instead of full-bleed: outer `fixed inset-0 z-[var(--z-modal-fullscreen)] flex items-center justify-center p-4`, backdrop `bg-[var(--brand-overlay)] backdrop-blur-sm` (SG-3, replaces raw `bg-black/80`), panel `relative z-[var(--z-sticky)] flex flex-col w-[90vw] sm:w-[75vw] max-w-[1200px] max-h-[90vh] bg-[var(--surface-1)] shadow-2xl overflow-hidden rounded-[var(--radius-xl)]` (the inline bottom-only radius is dropped). Backdrop-click + Escape (with the `isContentEditable` guard) unchanged. The legacy `DecisionDetailModal`/`SchemaReviewModal`/`ClientActionDetailModal` full-screen takeovers are deliberately NOT changed. **Submit-a-request** — a teal primary `Button` (`icon={Plus}`, "Submit a request", Law 1) at the top of `UnifiedInbox` opens the chooser (two `variant="secondary"` option cards: Sparkles "Ask for content" + MessageSquare "Send a request", both with `text-accent-brand` icons). **SG-1**: the Ready-to-publish "Approved" pill → `<StatusBadge domain="approval" status="approved" />` (emerald success, was neutral zinc). **SG-2**: the client's own work-order chat bubble → `bg-blue-500/10 border-blue-500/30` (client context = data per Law 2; was teal). **Edit-before-approve** — `ItemDiffRow` Proposed cell gains an inline "Edit" (Pencil icon, teal "Save edit", `text-accent-info "· edited"` marker) for `seoTitle`/`seoDescription` only, behind the non-free tier; teal/blue only, no new hues. **Polish** — `ItemDiffRow` diff grid `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`; per-item Flag toggle `aria-pressed`; one canonical approve CTA "Looks good — implement N →" (`approveCtaLabel()`); the actionable section gained a visible `t-label` "Decisions" heading + muted subtitle (shared `SectionHeading`), reconciling the PriorityStrip chip vocab with the section it scrolls to. The extracted `SubmitRequestForm` keeps `RequestsTab` byte-identical. No purple (verified clean). |
+| 2026-06-08 | **Keyword value dollarization docs sync**: documented the recent Growth+ keyword value surfaces. Value reasons remain muted prose with blue accents for read-only CPC/volume data (Law 2). Per-keyword realized value, upside potential, and ROI Dashboard "Revenue at stake" use emerald for positive outcome value (Law 3). No new hues or tokens. |
+| 2026-06-11 | **Client outcome scorecard + wins ledger on Overview (core-features E5)**: no new tokens or hues. `OutcomeSummary` ("Your results") and `WinsSurface` ("What we shipped") now mount on the legacy client Overview, each in an `ErrorBoundary`, tier passed as `(betaMode ? 'premium' : ws.tier) \|\| 'free'`. Win-rate stats use emerald/amber/red bands; gating via `<TierGate>` (Law 1 teal CTAs come from the gate itself). New attributed-dollar-value line in admin `OutcomeTopWins` and client `WinsSurface` uses `text-accent-info` — realized $ attribution is a data metric (Law 2), not a success badge. No purple in client components (grep verified). |
+| 2026-06-11 | **Client Dashboard QW2 PR2 — Analytics takeaway**: no new tokens or hues. `AnalyticsTab` now includes a deterministic takeaway section and tracked-action conversion-rate badges use judgment bands: emerald ≥5%, amber 2-4.9%, red <2%. Conversion rates are already percentages; counts remain neutral/read-only data text. |
+| 2026-06-11 | **Client Dashboard QW2 PR3 — Workflow confirmations**: no new tokens or hues. Unified inbox approval toasts reuse the existing client toast shell. Content Plan flagging reuses the existing amber flagged-cell state and success/error toast colors; the plan-list review shortcut is a sibling button beside the row selector, avoiding nested interactive controls while preserving the blue data badge. |
+| 2026-06-11 | **Client Dashboard QW2 PR4 — ROI methodology explainer**: no new tokens or hues. `ROIDashboard` now includes an expandable methodology disclosure. The trigger uses teal as an interactive affordance, the informational shell uses blue, and the dollar metrics keep existing emerald/data coloring. |
+| 2026-06-11 | **Client Dashboard QW2 PR5 — Composite health breakdown**: no new tokens or hues. `HealthScoreCard` now includes an expandable component breakdown inside the existing card. The disclosure trigger uses teal as the interactive affordance, component score text/bars use `scoreColor()`/`scoreColorClass()` judgment bands, and component weights use blue as read-only data. No client-facing purple. |
+| 2026-06-11 | **Client Dashboard QW2 PR6 — Work-order comment-count badges**: no new tokens or hues. `UnifiedInbox` work-order cards use the canonical blue `Badge` for conversation counts because counts are read-only data; the existing teal `Send` button remains the only action in the thread. No client-facing purple. |
+| 2026-06-11 | **Client Dashboard QW2 PR7 — Strategy feedback stories**: no new tokens or hues. `StrategyKeywordFeedbackSummaryCard` uses blue for keyword approve-rate data, samples, and progress because it is read-only feedback history. `PredictionShowcaseCard` uses emerald for recorded strong wins, blue for other recorded outcomes, and muted metadata for page/date context. No client-facing purple. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
 
@@ -747,3 +775,21 @@ When shipping UI changes that affect color or design patterns:
 - **Blue** remains the data/observability hue for the module icon and quota-detail chips (`bg-blue-500/10 text-blue-400`).
 - Integration state badges follow semantic status mapping: **emerald** (`configured/healthy`), **amber** (`degraded`), **red** (`missing/error`).
 - No purple usage; the surface is admin operational telemetry, not admin AI interaction.
+
+### ContentCalendar (W6.6 planning semantics)
+- `kind: 'planned'` items: `bg-teal-500/15 text-accent-brand border border-teal-500/30 border-dashed` — teal = scheduling intent (actionable), dashed = intent-not-outcome
+- `kind: 'published'` items: existing solid post treatment
+- `kind: 'created'` items: muted fallback
+- "Planned" badge: `<Badge tone="teal">`; schedule-a-draft + suggest-dates controls: soft teal CTA (`bg-teal-500/10 text-accent-brand hover:bg-teal-500/20`)
+
+### Health Tab purchase surface (Client Revenue R1)
+- "Fix this — $X" CTA: teal Button (Law 1); "In cart" state chip: soft teal outline span (hatched one-off)
+- Impact lines: blue data text (Law 2) with conservative ranges + (i) methodology popover (ROI pattern)
+- Sticky cart summary: `--z-sticky`, teal accents for actions, fmtMoneyFull for all currency
+- Premium / external-billing variants render zero prices — hours-covered / included-in-service framing
+
+### Client Revenue R2 surfaces
+- AgencyWorkFeed: teal live-pulse dot (`--radius-pill`), narrative activity labels, job progress in blue
+- CompetitorGapsSection: Premium chip in teal (confirmed-access, never amber); banded chips only
+- StrategyPageRankStoriesSection: ranked chips blue (data), gap chips amber/10 pill ("worth adding" = attention semantics)
+- Cart content items: strikethrough original + discounted price for Premium (MONETIZATION §261 pattern)

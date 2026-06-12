@@ -10,9 +10,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13470, { env: { OPENAI_API_KEY: '' } }); // port-ok: assigned range 13470-13484
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
 const { postJson } = ctx;
 
 let workspaceId = '';
@@ -61,7 +61,7 @@ describe('POST /api/webflow/keyword-analysis', () => {
 
   it('reaches OPENAI_API_KEY check when pageTitle is present (500 in test env)', async () => {
     // pageTitle present → passes field guard, then hits OPENAI_API_KEY check
-    // createTestContext clears OPENAI_API_KEY for the child server so local
+    // createEphemeralTestContext clears OPENAI_API_KEY for the child server so local
     // developer env vars cannot make this validation test perform a real provider call.
     const res = await postJson('/api/webflow/keyword-analysis', {
       workspaceId,

@@ -15,14 +15,14 @@ describe('keyword strategy follow-ons split', () => {
 
     expect(followOnsSrc).toContain("from './rank-tracking-reconciliation.js'");
     expect(followOnsSrc).toContain("import { queueLlmsTxtRegeneration } from './llms-txt-generator.js'");
-    expect(followOnsSrc).toContain("import { generateRecommendations } from './recommendations.js'");
+    expect(followOnsSrc).toContain("from './recommendation-regen-scheduler.js'");
     expect(followOnsSrc).toContain('reconcileStrategyRankTracking({');
     expect(followOnsSrc).toContain('const structuralChanged = summary.added + summary.reassigned + summary.deprecated + summary.replaced');
     expect(followOnsSrc).toContain('const touched = structuralChanged + summary.retained');
     expect(followOnsSrc).toContain('if (touched > 0)');
     expect(followOnsSrc).toContain('WS_EVENTS.RANK_TRACKING_UPDATED');
     expect(followOnsSrc).toContain("queueLlmsTxtRegeneration(workspaceId, 'keyword_strategy_updated')");
-    expect(followOnsSrc).toContain('generateRecommendations(workspaceId)');
+    expect(followOnsSrc).toContain("queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS)");
   });
 
   it('queues asynchronous follow-ons only after the route/job response strategy is assembled', () => {

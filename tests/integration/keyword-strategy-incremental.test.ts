@@ -14,7 +14,7 @@
  *   - Full mode must analyze all pages regardless of analysis_generated_at
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -31,7 +31,7 @@ import type { PageKeywordMap } from '../../shared/types/workspace.js';
 import { shouldFetchCompetitorData } from '../../server/routes/keyword-strategy.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
-const ctx = createTestContext(13315);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let workspaceId = '';
 

@@ -128,10 +128,22 @@ export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 // importers of this file don't need to change their import paths.
 export type { ClientTab } from '../../routes';
 
+/** R2-D: per-page rank story card — what a page ranks for + nearby gap keywords. */
+export interface PageRankStoryItem {
+  pagePath: string;
+  pageTitle: string;
+  /** Ranked keywords with banded position label — never raw integer positions. */
+  rankedKeywords: { keyword: string; positionLabel: string }[];
+  /** Gap keywords relevant to the page — volume-labeled, never raw counts. */
+  gapKeywords: { keyword: string; volumeLabel: string }[];
+  /** Single narrative sentence for the card. */
+  narrative: string;
+}
+
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
+  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; cpc?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
   opportunities: string[];
   contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number; competitorProof?: string; trendDirection?: 'rising' | 'declining' | 'stable'; serpFeatures?: string[]; questionKeywords?: string[]; opportunityScore?: number; /** SEO Generation Quality P2 — re-admitted by the deterministic backfill floor (sorted after organically-strong gaps). */ backfilled?: boolean }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string; roiScore?: number }[];
@@ -142,6 +154,8 @@ export interface ClientKeywordStrategy {
   strategyUx?: KeywordStrategyUxPayload;
   businessContext?: string;
   generatedAt: string | null;
+  /** R2-D: per-page keyword story cards — pages with ranked keywords + nearby gap keywords. */
+  pageRankStories?: PageRankStoryItem[];
 }
 
 export const SEV = {

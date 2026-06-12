@@ -53,6 +53,8 @@ interface IntelResponse {
   domains: DomainData[];
   keywordGaps: KeywordGap[];
   fetchedAt: string;
+  degraded?: boolean;
+  providerFailures?: Array<{ area: string; provider: string; domain?: string }>;
 }
 
 interface Props {
@@ -94,7 +96,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
 
   const { data, isLoading, error, refetch } = useQuery<IntelResponse>({
     queryKey: queryKeys.admin.competitorIntel(workspaceId, competitorKey),
-    queryFn: () => get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
+    queryFn: () => get<IntelResponse>(`/api/seo/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
     enabled: competitors.length > 0 && seoDataAvailable,
     staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
     retry: 1,
@@ -108,8 +110,8 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-body text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure SEMRush or DataForSEO in Settings to unlock this feature.</p>
+            <p className="t-body text-[var(--brand-text)]">Competitive Intelligence requires DataForSEO</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure DataForSEO to unlock live domain, keyword, and backlink comparisons.</p>
           </div>
         </div>
       </SectionCard>
@@ -295,14 +297,16 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       )}
 
       <div className="flex items-center justify-between">
-        {errorMsg && effectiveGaps.length > 0 && (
+        {(errorMsg && effectiveGaps.length > 0) || data?.degraded ? (
           <p className="t-caption-sm text-amber-500/70">
-            Live fetch failed — showing cached data.{' '}
+            {data?.degraded
+              ? 'Some live provider data is unavailable — showing the metrics that loaded.'
+              : 'Live fetch failed — showing cached data.'}{' '}
             <Button onClick={() => refetch()} variant="ghost" size="sm" className="text-teal-400 hover:underline px-0 py-0 h-auto">
               Retry
             </Button>
           </p>
-        )}
+        ) : null}
         <p className="t-caption-sm text-[var(--brand-text-muted)] text-right ml-auto">
           Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'

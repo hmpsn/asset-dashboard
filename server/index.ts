@@ -26,7 +26,6 @@ import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { flushToDisk as flushOpenAIUsage } from './openai-helpers.js';
-import { flushCreditsToDisk as flushSemrushCredits } from './semrush.js';
 import { flushAll as flushEmailQueue } from './email-queue.js';
 import { listJobs, markRunningJobsInterrupted } from './jobs.js';
 import { setShuttingDown } from './routes/health.js';
@@ -66,6 +65,34 @@ migrateTopicClustersFromJsonBlob();
 // cannibalization_issues table (idempotent)
 import { migrateFromJsonBlob as migrateCannibalizationFromJsonBlob } from './cannibalization-issues.js';
 migrateCannibalizationFromJsonBlob();
+
+// Backfill keywordStrategy.siteKeywordMetrics from workspace JSON blobs into the
+// site_keyword_metrics table (idempotent, CAS-guarded). Wave 3b-ii has LANDED: the
+// blob strip is done — the table is now the sole store and every write path forces
+// keywordStrategy.siteKeywordMetrics undefined. This startup backfill therefore only
+// protects LEGACY workspaces whose blob predates the strip and has not yet been
+// re-persisted (a re-persist clears the blob array and seeds the table); once every
+// workspace has regenerated, this backfill is a no-op and can be retired.
+import { migrateSiteKeywordMetricsFromBlob } from './site-keyword-metrics.js';
+migrateSiteKeywordMetricsFromBlob();
+
+// Backfill rank_tracking_config.tracked_keywords blobs into the tracked_keywords
+// row table (idempotent, CAS-guarded). Wave 3c-i ADDITIVE SHADOW: this only
+// POPULATES the table — it does NOT strip the blob and does NOT switch any read
+// (reads stay on the blob). The source stamper recovers provenance for legacy
+// UNKNOWN-source rows once via the canonical inference ladder (injected from KCC
+// to avoid a static import cycle). The read-switch + strip are later PRs (3c-ii).
+import { migrateTrackedKeywordsFromConfigBlob } from './tracked-keywords-store.js';
+import { inferTrackedKeywordSourcesForWorkspace } from './keyword-command-center.js';
+migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
+
+// One-time historical outcome-pollution remediation (A1 audit #1): relabel
+// recommendation-sourced actions the pre-A1 backfill hardcoded to audit_fix_applied,
+// and re-mark phantom-metric neutral/loss outcomes as inconclusive. Idempotent by
+// construction — a second run is a natural no-op (relabeled/re-marked rows no longer
+// match). Can be retired once every environment has run it post-A1.
+import { runOutcomeRemediation } from './outcome-remediation.js';
+runOutcomeRemediation();
 
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
@@ -128,7 +155,6 @@ function gracefulShutdown(signal: string) {
 
     // 5. Flush pending data to disk
     try { flushOpenAIUsage(); } catch (err) { log.error({ err }, 'Failed to flush OpenAI usage during shutdown'); }
-    try { flushSemrushCredits(); } catch (err) { log.error({ err }, 'Failed to flush SEMRush credits during shutdown'); }
     try { await flushEmailQueue(); } catch (err) { log.error({ err }, 'Failed to flush email queue during shutdown'); }
 
     // 6. Close SQLite database (flushes WAL)

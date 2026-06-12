@@ -44,6 +44,31 @@ Env vars still work as fallback — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - Prices from admin UI config → env var fallback → empty (product disabled)
 - Workspace ID + content request ID passed as `metadata` on every session
 
+### Trust boundary: live-Stripe price drift
+
+The catalog↔code parity test (`tests/contract/fix-catalog-checkout-parity.test.ts`)
+pins `FIX_CATALOG` to `PRODUCT_MAP` **in code**, but it cannot see the
+env/admin-configured Stripe **Price objects**. If a Stripe Price drifts (e.g.
+edited in the Stripe dashboard), the client button says "$20" while Stripe
+charges "$25" — a silent revenue/UX bug the code-only test never catches.
+
+`scripts/verify-stripe-prices.ts` (`npm run verify:stripe-prices`) closes this
+gap: it fetches each configured fix Price's `unit_amount` via the Stripe SDK and
+compares it to the expected whole-USD price in `FIX_CATALOG`, exiting non-zero on
+drift. Without `STRIPE_SECRET_KEY` it skips gracefully (exit 0), so local/dev and
+keyless CI are not blocked. Run it as a pre-release / staging check whenever
+Stripe Prices may have changed.
+
+### Cart-checkout out-of-band persistence
+
+Stripe checkout-session metadata values cap at **500 chars**. A large fix cart's
+normalized line items (with all merged pageIds) would exceed that, so the full
+SERVER-AUTHORITATIVE cart is persisted on the payment record (`payments.cart_items`,
+migration 137) keyed by session id; metadata keeps only a compact reference
+(`cartItemCount`, `productTypes`). The webhook reads the persisted cart
+(`getCartItemsBySession`) for work-order fulfillment, falling back to legacy
+in-metadata carts only for in-flight pre-137 sessions.
+
 ### Product Types (14)
 ```
 brief_blog, brief_landing, brief_service, brief_location,
@@ -139,6 +164,7 @@ Stripe config stored encrypted on disk at `~/.asset-dashboard/config/stripe.json
 - [ ] Cancel redirect returns to content tab cleanly
 - [ ] Admin can view payment history via API
 - [ ] Products can be enabled/disabled individually in admin UI
+- [ ] `npm run verify:stripe-prices` passes (no live-Stripe price drift) before release
 
 ---
 

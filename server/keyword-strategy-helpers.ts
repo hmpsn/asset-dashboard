@@ -47,22 +47,22 @@ export function upsertKeywordPoolCandidate(
 
 /**
  * Volume floor for admitting a KD-0 (zero-difficulty) discovery long-tail keyword
- * on the SEO Generation Quality P2 flag-ON path. Mirrors the existing
+ * on the canonical SEO generation-quality path. Mirrors the existing
  * `shouldIncludeKeywordCandidate` provider-volume threshold (>= 10) so a real
  * low-competition long-tail survives but barely-measurable noise does not.
  */
 export const STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR = 10;
 
 /**
- * @param relaxConservatism SEO Generation Quality P2(c) (flag `seo-generation-quality`).
- *   Flag-OFF (default false): legacy gate `difficulty > 0` — byte-identical to today.
- *   Flag-ON: `difficulty >= 0` so KD-0 long-tail survives, behind a volume floor
+ * @param relaxConservatism Enables the canonical generation-quality relaxation.
+ *   `false`: legacy gate `difficulty > 0`.
+ *   `true`: `difficulty >= 0` so KD-0 long-tail survives, behind a volume floor
  *   (`STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR`) so real low-competition long-tail is kept.
  */
 export function isStrategyQualityDiscoveryKeyword(keyword: KeywordSourceEvidence, relaxConservatism = false): boolean {
   if (keyword.keyword.trim().length === 0 || keyword.volume <= 0) return false;
   if (keyword.difficulty > 0) return true;
-  // difficulty === 0 (or negative, defensively): legacy path rejects; flag-ON admits
+  // difficulty === 0 (or negative, defensively): legacy path rejects; relaxed mode admits
   // when the keyword clears the volume floor.
   return relaxConservatism && keyword.difficulty >= 0 && keyword.volume >= STRATEGY_QUALITY_KD_ZERO_VOLUME_FLOOR;
 }

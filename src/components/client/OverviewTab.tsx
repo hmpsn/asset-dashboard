@@ -6,11 +6,13 @@ import { MonthlyDigest } from './MonthlyDigest';
 import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
 import { HealthScoreCard } from './HealthScoreCard';
 import { PredictionShowcaseCard } from './PredictionShowcaseCard';
+import OutcomeSummary from './OutcomeSummary';
+import { WinsSurface } from './Briefing/WinsSurface';
 import { useClientIntelligence } from '../../hooks/client';
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge, FreshnessStamp } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -19,6 +21,7 @@ import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
+import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
@@ -49,6 +52,8 @@ interface OverviewTabProps {
   ga4Organic: GA4OrganicOverview | null;
   ga4Conversions: GA4ConversionSummary[];
   ga4NewVsReturning: GA4NewVsReturning[];
+  searchDataUpdatedAt?: number | null;
+  ga4DataUpdatedAt?: number | null;
   audit: AuditSummary | null;
   auditDetail: AuditDetail | null;
   strategyData: ClientKeywordStrategy | null;
@@ -78,6 +83,7 @@ export function OverviewTab({
   ws,
   overview, searchComparison,
   ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
+  searchDataUpdatedAt, ga4DataUpdatedAt,
   audit, auditDetail, strategyData, insights,
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
@@ -109,13 +115,11 @@ export function OverviewTab({
   // flag can be flipped per-workspace without touching anything below this
   // block. When OFF (default), the original overview body renders unchanged.
   const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  const workFeedEnabled = useFeatureFlag('client-work-feed');
   if (briefingV2Enabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
     const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
-    // Wrap in ErrorBoundary to match the rest of OverviewTab's section-level
-    // resilience: a hook failure inside InsightsBriefingPage (GA4/GSC/audit)
-    // shouldn't bring down the whole client portal.
     return (
       <ErrorBoundary>
         <InsightsBriefingPage
@@ -153,13 +157,26 @@ export function OverviewTab({
     }
     return 'Here are your latest insights';
   })();
+  const showSearchFreshness = Boolean(overview && searchDataUpdatedAt);
+  const showGa4Freshness = Boolean(ga4Overview && ga4DataUpdatedAt);
+
   return (<>
     <p className="t-body text-[var(--brand-text-muted)]">
       Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}. {dynamicSubtitle}
     </p>
+    {(showSearchFreshness || showGa4Freshness) && (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 -mt-1">
+        {showSearchFreshness && <FreshnessStamp value={searchDataUpdatedAt} label="Search data as of" />}
+        {showGa4Freshness && <FreshnessStamp value={ga4DataUpdatedAt} label="Analytics data as of" />}
+      </div>
+    )}
 
     {/* Headline health score */}
-    <HealthScoreCard score={clientIntel?.compositeHealthScore} workspaceId={workspaceId} />
+    <HealthScoreCard
+      score={clientIntel?.compositeHealthScore}
+      workspaceId={workspaceId}
+      breakdown={clientIntel?.compositeHealthBreakdown}
+    />
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
@@ -283,10 +300,10 @@ export function OverviewTab({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="t-caption-sm font-semibold text-accent-danger uppercase tracking-wider">Your #1 priority</span>
-              {/* Relative ROI badge — opportunity.value (0-100). Blue = data per the Four Laws.
-                  NEVER show emvPerWeek (admin/AI-only; stripped at the public boundary). */}
+              {/* Opportunity score badge — opportunity.value is a 0-100 composite score, not an ROI.
+                  Blue = data per the Four Laws. NEVER show emvPerWeek (admin/AI-only; stripped at the public boundary). */}
               {topRec.opportunity && (
-                <Badge label={`ROI ${Math.round(topRec.opportunity.value)}`} tone="blue" variant="outline" shape="pill" />
+                <Badge label={`Score ${Math.round(topRec.opportunity.value)}`} tone="blue" variant="outline" shape="pill" />
               )}
             </div>
             <div className="t-page font-medium text-[var(--brand-text-bright)] truncate">{topRec.title}</div>
@@ -417,6 +434,18 @@ export function OverviewTab({
       <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
     )}
+
+    {/* Outcome scorecard — measured win rates of the work we shipped (E5, audit #5).
+        Shows its own empty state until the first outcomes are scored. */}
+    <ErrorBoundary label="Your Results">
+      <OutcomeSummary workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+
+    {/* Wins ledger — backported from the briefing-v2 layout per owner decision #23.
+        Renders nothing until there are real measured wins. */}
+    <ErrorBoundary label="Wins">
+      <WinsSurface workspaceId={workspaceId} effectiveTier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
 
     {/* Predictions that came true — only render when wins surface is off AND server has populated the field (growth+) */}
           {/* prediction-showcase-ungated-ok: wins surface flag is sunset and promoted by Wave 5. */}
@@ -549,8 +578,15 @@ export function OverviewTab({
           );
         })()}
 
-        {/* Activity timeline — only real team work, no system/anomaly entries */}
-        {(() => {
+        {/* Agency work feed (R2-B) — live jobs + narrative activity history */}
+        {workFeedEnabled && (
+          <ErrorBoundary label="Agency Work Feed">
+            <AgencyWorkFeed workspaceId={workspaceId} />
+          </ErrorBoundary>
+        )}
+
+        {/* Legacy activity timeline — shown only when client-work-feed flag is off */}
+        {!workFeedEnabled && (() => {
           const WORK_TYPES = new Set(['audit_completed', 'request_resolved', 'approval_applied', 'seo_updated', 'images_optimized', 'links_fixed', 'content_updated']);
           const workEntries = activityLog.filter(e => WORK_TYPES.has(e.type)).slice(0, 5);
           if (workEntries.length === 0) return null;

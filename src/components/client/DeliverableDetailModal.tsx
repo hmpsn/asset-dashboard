@@ -1,7 +1,7 @@
 // src/components/client/DeliverableDetailModal.tsx
 //
-// R3a — the unified deliverable detail + per-item review surface (DARK, only reachable behind the
-// `unified-inbox` flag). Renders the SUBSTANCE of a batch-kind deliverable (the current→proposed
+// R3a — the unified deliverable detail + per-item review surface. Renders the substance of a
+// batch-kind deliverable (the current→proposed
 // diffs, the redirect/internal-link/AEO sub-items) by REUSING the proven renderers in
 // decision-renderers.tsx, fed from the unified deliverable's carried data:
 //

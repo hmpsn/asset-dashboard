@@ -12,6 +12,8 @@ import type {
   EmergingKeywordData,
   FreshnessAlertData,
   InsightType,
+  LocalVisibilityShiftData,
+  LostVisibilityData,
   MilestoneAttributionData,
   QuickWinData,
   SiteHealthInsightData,
@@ -31,6 +33,7 @@ import { buildStoryFromInsight as contentDecay } from './briefing-templates/cont
 import { buildStoryFromInsight as ctrOpportunity } from './briefing-templates/ctr-opportunity.js';
 import { buildStoryFromInsight as freshnessAlert } from './briefing-templates/freshness-alert.js';
 import { buildStoryFromInsight as milestoneAttribution } from './briefing-templates/milestone-attribution.js';
+import { buildStoryFromInsight as lostVisibility } from './briefing-templates/lost-visibility.js';
 import { buildStoryFromInsight as pageHealth } from './briefing-templates/page-health.js';
 import { buildStoryFromInsight as rankingMover } from './briefing-templates/ranking-mover.js';
 import { buildStoryFromInsight as rankingOpportunity } from './briefing-templates/ranking-opportunity.js';
@@ -289,6 +292,41 @@ const clientInsightStories: Partial<Record<InsightType, ClientInsightProjector>>
       impact: `${formatValueCurrency(data.trafficValue)} in monthly organic value after ${data.daysSinceDelivery} days`,
     };
   },
+  lost_visibility: (insight) => {
+    const data = insight.data as LostVisibilityData;
+    const lostCount = data.lostCount ?? 0;
+    return {
+      headline: `${lostCount} search quer${lostCount === 1 ? 'y' : 'ies'} dropped out of Google results`,
+      narrative: `Google stopped returning impression data for ${lostCount} quer${lostCount === 1 ? 'y' : 'ies'} that had established presence. We're tracking this and will recommend content refreshes to reclaim that visibility.`,
+      impact: lostCount >= 5 ? `${lostCount} queries affected — worth addressing in the next sprint` : undefined,
+    };
+  },
+  local_visibility_shift: (insight) => {
+    const data = insight.data as LocalVisibilityShiftData;
+    const market = data.marketLabel || 'your local market';
+    const keyword = data.keyword ? `"${data.keyword}"` : 'a local search';
+    if (data.direction === 'win') {
+      return {
+        headline: `You're now showing up in ${market} local results`,
+        narrative: `Your business started appearing in the local map results for ${keyword} in ${market}. That's prime visibility for nearby customers searching for what you offer.`,
+        impact: typeof data.currentRank === 'number' ? `Currently appearing around position ${data.currentRank} in the local pack` : undefined,
+      };
+    }
+    if (data.direction === 'competitor') {
+      const competitor = data.competitorName || 'A new competitor';
+      const appearances = data.competitorAppearances ?? 0;
+      return {
+        headline: `A new competitor is showing up in ${market} local results`,
+        narrative: `${competitor} has started appearing in the local map results across ${market}. We're watching this and will factor it into your local strategy.`,
+        impact: appearances > 1 ? `Appearing across ${appearances} of your local searches` : undefined,
+      };
+    }
+    return {
+      headline: `We noticed a drop in your ${market} local visibility`,
+      narrative: `Your business stopped appearing in the local map results for ${keyword} in ${market}. We're reviewing what changed and will recommend steps to recover that visibility.`,
+      impact: typeof data.previousRank === 'number' ? `Previously appearing around position ${data.previousRank} locally` : undefined,
+    };
+  },
 };
 
 export const CLIENT_INSIGHT_STORY_TYPES = Object.keys(clientInsightStories) as InsightType[];
@@ -418,6 +456,7 @@ const briefingInsightStories: Partial<Record<InsightType, BriefingInsightProject
   competitor_alert: competitorAlert as BriefingInsightProjector,
   page_health: pageHealth as BriefingInsightProjector,
   milestone_attribution: milestoneAttribution as BriefingInsightProjector,
+  lost_visibility: lostVisibility as BriefingInsightProjector,
 };
 
 export const SUPPORTED_BRIEFING_INSIGHT_TYPES = Object.keys(briefingInsightStories) as InsightType[];

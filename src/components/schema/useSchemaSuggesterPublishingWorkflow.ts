@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { post, put } from '../../api/client';
 import { schema as schemaApi } from '../../api/schema';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
@@ -42,8 +42,34 @@ export function useSchemaSuggesterPublishingWorkflow({
   const [schemaParseError, setSchemaParseError] = useState<Record<string, string>>({});
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
+  const [sendToClientError, setSendToClientError] = useState<string | null>(null);
+  const [sendPageErrors, setSendPageErrors] = useState<Record<string, string>>({});
 
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
+
+  // Seed the published Set from each page's lastPublishedAt so the Published badge,
+  // Retract CTA, and Publish All count survive reload. Without this the Set starts
+  // empty on every mount: previously-published pages would show the Publish CTA again
+  // and Publish All would over-count + re-publish already-live pages.
+  //
+  // Merge semantics: we ADD pages that the server reports as published, but never
+  // REMOVE in-session state. Pages the user retracted this session (retractedPages)
+  // are excluded so a stale lastPublishedAt cannot resurrect a just-retracted page.
+  useEffect(() => { // effect-layout-ok: snapshot data (with lastPublishedAt) arrives asynchronously from React Query.
+    if (!data) return;
+    const serverPublished = data
+      .filter(page => !!page.lastPublishedAt && !retractedPages.has(page.pageId))
+      .map(page => page.pageId);
+    if (serverPublished.length === 0) return;
+    setPublished(prev => {
+      const missing = serverPublished.filter(id => !prev.has(id));
+      if (missing.length === 0) return prev; // no change — avoid re-render churn
+      const next = new Set(prev);
+      for (const id of missing) next.add(id);
+      return next;
+    });
+  }, [data, retractedPages]);
 
   const getEffectiveSchema = useCallback((pageId: string, original: Record<string, unknown>): Record<string, unknown> => {
     if (editedSchemaJson[pageId]) {
@@ -55,6 +81,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   const sendSchemasToClient = useCallback(async (note?: string) => {
     if (!data || !workspaceId) return;
     setSendingToClient(true);
+    setSendToClientError(null);
     try {
       const items = data.map(page => ({
         pageId: page.pageId,
@@ -70,7 +97,7 @@ export function useSchemaSuggesterPublishingWorkflow({
       refreshStates();
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setSendToClientError(err instanceof Error ? err.message : 'Failed to send schemas to client. Please try again.');
     } finally {
       setSendingToClient(false);
     }
@@ -162,6 +189,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion, note?: string) => {
     if (!workspaceId) return;
     setSendingPage(prev => new Set(prev).add(page.pageId));
+    setSendPageErrors(prev => { const n = { ...prev }; delete n[page.pageId]; return n; });
     try {
       const items = [{
         pageId: page.pageId,
@@ -176,7 +204,7 @@ export function useSchemaSuggesterPublishingWorkflow({
       setSentPages(prev => new Set(prev).add(page.pageId));
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setSendPageErrors(prev => ({ ...prev, [page.pageId]: err instanceof Error ? err.message : 'Failed to send to client. Please try again.' }));
     } finally {
       setSendingPage(prev => {
         const next = new Set(prev);
@@ -197,12 +225,13 @@ export function useSchemaSuggesterPublishingWorkflow({
     if (!orgNode) return;
     const websiteNode = wsNode || { '@type': 'WebSite', '@id': `${orgNode['url']}/#website`, 'url': orgNode['url'], 'name': orgNode['name'], 'publisher': { '@id': `${orgNode['url']}/#organization` } };
     setSavingTemplate(true);
+    setTemplateSaveError(null);
     try {
       await put(`/api/webflow/schema-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { organizationNode: orgNode, websiteNode });
       setTemplateSaved(true);
       setTimeout(() => setTemplateSaved(false), 3000);
     } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
+      setTemplateSaveError(err instanceof Error ? err.message : 'Failed to save template. Please try again.');
     } finally {
       setSavingTemplate(false);
     }
@@ -211,7 +240,12 @@ export function useSchemaSuggesterPublishingWorkflow({
   const publishAllToWebflow = useCallback(async () => {
     if (bulkPublishBlocked) return;
     if (!data) return;
-    const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
+    // Include static pages unconditionally; include CMS pages only when cmsDeliveryStatus === 'ready'.
+    const publishable = data.filter(p => {
+      if (published.has(p.pageId) || !p.suggestedSchemas[0]?.template) return false;
+      if (p.pageId.startsWith('cms-')) return p.cmsDeliveryStatus?.status === 'ready';
+      return true;
+    });
     if (publishable.length === 0) return;
     setBulkPublishing(true);
     setBulkProgress({ done: 0, total: publishable.length });
@@ -274,7 +308,45 @@ export function useSchemaSuggesterPublishingWorkflow({
     });
   }, []);
 
-  const unpublishedCount = data?.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template).length ?? 0;
+  // Clear a single page's stale manual JSON edit (+ parse error + open editor) when its
+  // schema is regenerated. getEffectiveSchema prefers editedSchemaJson[pageId], so an
+  // un-cleared edit silently overrides the freshly-regenerated schema in preview, Publish,
+  // Copy, and send-to-client — stale schema could ship to a client. Clearing makes the
+  // regenerated schema authoritative.
+  const clearManualEditForPage = useCallback((pageId: string) => {
+    setEditedSchemaJson(prev => {
+      if (!(pageId in prev)) return prev;
+      const next = { ...prev };
+      delete next[pageId];
+      return next;
+    });
+    setSchemaParseError(prev => {
+      if (!(pageId in prev)) return prev;
+      const next = { ...prev };
+      delete next[pageId];
+      return next;
+    });
+    setEditingSchema(prev => {
+      if (!prev.has(pageId)) return prev;
+      const next = new Set(prev);
+      next.delete(pageId);
+      return next;
+    });
+  }, []);
+
+  // Clear ALL manual JSON edits — used on full re-scan (every page is regenerated).
+  const clearAllManualEdits = useCallback(() => {
+    setEditedSchemaJson(prev => (Object.keys(prev).length === 0 ? prev : {}));
+    setSchemaParseError(prev => (Object.keys(prev).length === 0 ? prev : {}));
+    setEditingSchema(prev => (prev.size === 0 ? prev : new Set()));
+  }, []);
+
+  // Mirrors the publishAllToWebflow filter: static pages count always; CMS pages count only when ready.
+  const unpublishedCount = data?.filter(p => {
+    if (published.has(p.pageId) || !p.suggestedSchemas[0]?.template) return false;
+    if (p.pageId.startsWith('cms-')) return p.cmsDeliveryStatus?.status === 'ready';
+    return true;
+  }).length ?? 0;
 
   return {
     copiedId,
@@ -286,10 +358,13 @@ export function useSchemaSuggesterPublishingWorkflow({
     setConfirmPublish,
     sendingToClient,
     sentToClient,
+    sendToClientError,
+    setSendToClientError,
     approvalRefreshKey,
     setApprovalRefreshKey,
     sendingPage,
     sentPages,
+    sendPageErrors,
     retractingPages,
     retractedPages,
     bulkPublishing,
@@ -300,6 +375,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     schemaParseError,
     savingTemplate,
     templateSaved,
+    templateSaveError,
     getState,
     summary,
     unpublishedCount,
@@ -317,5 +393,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
+    clearManualEditForPage,
+    clearAllManualEdits,
   };
 }

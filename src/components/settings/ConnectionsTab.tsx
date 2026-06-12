@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import {
   Globe, Search, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink, Server, AlertTriangle, Clock3,
+  Eye, EyeOff,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
-import { Badge, SectionCard, Icon, Button, IconButton, FormInput, type BadgeTone } from '../ui';
+import { Badge, SectionCard, Icon, Button, IconButton, FormInput, ClickableRow, type BadgeTone } from '../ui';
 import { useIntegrationHealth } from '../../hooks/admin/useIntegrationHealth';
+import { useLinkSiteFlow } from '../../hooks/useLinkSiteFlow';
+import { useLinkSite } from '../../hooks/admin/useWorkspaces';
 import type { IntegrationHealthItem } from '../../../shared/types/integration-health';
 
 interface GscSite { siteUrl: string; permissionLevel: string; }
@@ -29,17 +32,39 @@ interface ConnectionsTabProps {
   saveGscProperty: (url: string) => void;
   saveGa4Property: (id: string) => void;
   saveLiveDomain: (domain: string) => void;
+  onSiteLinked?: () => void;
 }
 
 export function ConnectionsTab({
   workspaceId, webflowSiteId, webflowSiteName, googleStatus, gscSites, ga4Properties,
   loadingGoogle, ws, connectGoogle, disconnectGoogle, saveGscProperty, saveGa4Property, saveLiveDomain,
+  onSiteLinked,
 }: ConnectionsTabProps) {
   const currentDomain = (ws?.liveDomain as string) || '';
   const [domainDraft, setDomainDraft] = useState('');
   const [domainEditing, setDomainEditing] = useState(false);
+  // Track the specific site being linked so the spinner + disabled state apply
+  // only to the clicked row (not every row), and surface link failures inline.
+  const [linkingSiteId, setLinkingSiteId] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const handleLinkSite = async (siteId: string, siteName: string) => {
+    setLinkingSiteId(siteId);
+    setLinkError(null);
+    try {
+      await linkSiteMutation.mutateAsync({ workspaceId, siteId, siteName, token: flow.token.trim() });
+      flow.reset();
+      onSiteLinked?.();
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Failed to link site. Please try again.');
+    } finally {
+      setLinkingSiteId(null);
+    }
+  };
   const integrationHealthQuery = useIntegrationHealth(workspaceId);
   const integrationHealth = integrationHealthQuery.data;
+  const linkSiteMutation = useLinkSite();
+  const flow = useLinkSiteFlow();
 
   const handleDomainSave = () => {
     const clean = domainDraft.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
@@ -77,7 +102,9 @@ export function ConnectionsTab({
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow Site</h3>
-            <p className="t-caption text-[var(--brand-text-muted)]">Linked via workspace dropdown</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">
+              {webflowSiteId ? 'Connected via Webflow API token' : 'Paste a Webflow API token to link a site'}
+            </p>
           </div>
           {webflowSiteId ? (
             <Badge label={webflowSiteName ?? 'Connected'} tone="emerald" variant="soft" shape="pill" size="md" icon={Check} />
@@ -85,6 +112,70 @@ export function ConnectionsTab({
             <Badge label="Not linked" tone="zinc" variant="soft" shape="pill" size="md" icon={Unplug} />
           )}
         </div>
+        {!webflowSiteId && (
+          <div className="px-5 py-4 space-y-3">
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Generate a site token at{' '}
+              <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-accent-brand hover:underline inline-flex items-center gap-0.5">
+                webflow.com/dashboard <Icon as={ExternalLink} size="xs" />
+              </a>
+              , then paste it below to link your site.
+            </p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <FormInput
+                  ref={flow.tokenInputRef}
+                  type={flow.showToken ? 'text' : 'password'}
+                  value={flow.token}
+                  onChange={flow.setToken}
+                  onKeyDown={(e) => e.key === 'Enter' && flow.fetchSites(flow.token)}
+                  placeholder="Paste Webflow API token..."
+                  className="w-full px-3 py-2 pr-9 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
+                />
+                <IconButton
+                  onClick={() => flow.setShowToken(!flow.showToken)}
+                  icon={flow.showToken ? EyeOff : Eye}
+                  label={flow.showToken ? 'Hide token' : 'Show token'}
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+                />
+              </div>
+              <Button
+                onClick={() => flow.fetchSites(flow.token)}
+                disabled={!flow.token.trim() || flow.loadingSites}
+                variant="primary"
+                size="sm"
+                className="bg-teal-600 text-white hover:bg-teal-500 whitespace-nowrap"
+              >
+                {flow.loadingSites ? (
+                  <><Icon as={Loader2} size="sm" className="animate-spin" /> Loading...</>
+                ) : (
+                  'Find sites'
+                )}
+              </Button>
+            </div>
+            {flow.tokenError && <p className="t-caption-sm text-accent-danger">{flow.tokenError}</p>}
+            {flow.sites.length > 0 && (
+              <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden">
+                <p className="px-3 py-2 t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-b border-[var(--brand-border)]">Select a site to link:</p>
+                {flow.sites.map(site => (
+                  <ClickableRow
+                    key={site.id}
+                    disabled={linkingSiteId != null}
+                    onClick={() => handleLinkSite(site.id, site.displayName)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-[var(--surface-3)] t-caption"
+                  >
+                    <Icon as={Globe} size="sm" className="text-accent-brand shrink-0" />
+                    <span className="flex-1 truncate">{site.displayName}</span>
+                    {linkingSiteId === site.id && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
+                  </ClickableRow>
+                ))}
+              </div>
+            )}
+            {linkError && <p className="t-caption-sm text-accent-danger">{linkError}</p>}
+          </div>
+        )}
         {webflowSiteId && (
           <div className="px-5 py-3 flex items-center gap-3">
             <Icon as={ExternalLink} size="md" className="text-[var(--brand-text-muted)]" />
@@ -227,7 +318,7 @@ export function ConnectionsTab({
                         value={ws?.gscPropertyUrl || ''}
                         onChange={saveGscProperty}
                         placeholder="Search properties..."
-                        emptyLabel="— None —"
+                        emptyLabel="--- None ---"
                         className="min-w-[220px]"
                         size="md"
                       />
@@ -245,7 +336,7 @@ export function ConnectionsTab({
                         value={ws?.ga4PropertyId || ''}
                         onChange={saveGa4Property}
                         placeholder="Search properties..."
-                        emptyLabel="— None —"
+                        emptyLabel="--- None ---"
                         className="min-w-[220px]"
                         size="md"
                       />

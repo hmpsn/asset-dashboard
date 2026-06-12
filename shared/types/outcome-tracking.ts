@@ -121,9 +121,11 @@ export interface TrackedAction {
   context: ActionContext;
   /** SEO Gen-Quality P4: OV `predictedEmv` snapshotted at recordAction time (CPC-proxy
    *  placeholder, NOT real money — see OpportunityScore.predictedEmv). Admin/AI-only,
-   *  never client-facing. null when no opportunity was available at record time (e.g.
-   *  the outcome-backfill path, which cannot read the rec's opportunity object). Feeds
-   *  the P6 realized-vs-predicted calibration loop. */
+   *  never client-facing. Since A5 (audit #20) BOTH recommendation-completion paths
+   *  snapshot it (live PATCH route AND the outcome-backfill rec pass, which reads it
+   *  from the rec blob). null when the source carries no rec opportunity (posts,
+   *  insights, legacy rows). Feeds the P6 realized-vs-predicted calibration loop
+   *  (server/outcome-emv-calibration.ts). */
   predictedEmv?: number | null;
   createdAt: string;
   updatedAt: string;
@@ -246,24 +248,74 @@ export interface OutcomeScorecard {
 export interface TopWin {
   actionId: string;
   actionType: ActionType;
+  /** Source system the action originated from (e.g. 'recommendation', 'insight', 'post'). */
+  sourceType: string;
+  /** Id within the source system; used to resolve the real source title for client display. */
+  sourceId: string | null;
   pageUrl: string | null;
   targetKeyword: string | null;
   delta: DeltaSummary;
   score: OutcomeScore;
+  /** Realized dollar value of the win outcome (action_outcomes.attributed_value). NULL when no CPC data was available. */
+  attributedValue: number | null;
   createdAt: string;
   scoredAt: string;
 }
 
-/** Client-facing "we called it" win entry for outcome API routes and WeCalledIt component. */
+/** Client-facing "we called it" win entry for outcome API routes and the WinsSurface component. */
 export interface OutcomeWinEntry {
   actionId: string;
   actionType: ActionType;
   pageUrl: string | null;
   targetKeyword: string | null;
+  /** Real source title (recommendation/post/brief/etc.) when resolvable; otherwise an honest generic action label. */
   recommendation: string;
   delta: DeltaSummary;
   score: OutcomeScore;
+  /** Realized dollar value of the win outcome. NULL when no CPC data was available. */
+  attributedValue: number | null;
   detectedAt: string;
+}
+
+/**
+ * Compact, read-back outcome verdict for admin surfaces that close the outcome
+ * loop (W5.1): Strategy tab keyword rows, Keyword Hub drawer, Posts/Briefs badges.
+ *
+ * Built server-side from the LATEST conclusive `action_outcomes` row of a tracked
+ * action (highest checkpoint, score not 'insufficient_data'/'inconclusive'). It
+ * surfaces the baseline→current movement and the verdict so a UI can render a
+ * single chip ("#14→#6 · Win") without re-deriving direction.
+ *
+ * Position semantics: `baselinePosition`/`currentPosition` are GSC/rank positions
+ * where LOWER is better. `direction` is already position-aware (computed by
+ * computeDelta), so consumers must NOT re-infer improvement from raw numbers —
+ * trust `direction`.
+ */
+export interface OutcomeReadback {
+  actionId: string;
+  actionType: ActionType;
+  /** Verdict for the latest conclusive checkpoint. */
+  score: OutcomeScore;
+  /** Checkpoint (days) the verdict was measured at (7/30/60/90). */
+  checkpointDays: 7 | 30 | 60 | 90;
+  /** Primary metric the verdict scored on (e.g. 'position', 'clicks'). */
+  primaryMetric: string;
+  /** Position-aware movement direction. Trust this over raw position math. */
+  direction: DeltaDirection;
+  /** Baseline metric value at action time (e.g. starting position). */
+  baselineValue: number;
+  /** Current metric value at the measured checkpoint. */
+  currentValue: number;
+  /** Baseline GSC/rank position when the primary metric is position-based; else null. */
+  baselinePosition: number | null;
+  /** Current GSC/rank position when the primary metric is position-based; else null. */
+  currentPosition: number | null;
+  /** Baseline 90-day clicks when captured; else null. */
+  baselineClicks: number | null;
+  /** Current clicks at the measured checkpoint; else null. */
+  currentClicks: number | null;
+  /** ISO timestamp the verdict was measured. */
+  measuredAt: string;
 }
 
 export interface WorkspaceOutcomeOverview {

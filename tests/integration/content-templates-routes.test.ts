@@ -10,10 +10,10 @@
  * - DELETE /api/content-templates/:workspaceId/:templateId (delete)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13240);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, del } = ctx;
 
 let testWsId = '';

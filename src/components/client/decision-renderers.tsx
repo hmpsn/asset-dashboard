@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import { Flag, Pencil } from 'lucide-react';
 import { Button, FormInput, FormTextarea, Icon } from '../ui';
+import { humanizeFieldLabel } from '../../lib/decision-adapters';
 import type { ApprovalItem } from '../../../shared/types/approvals';
 import type {
   AeoChangePayload,
@@ -125,7 +126,8 @@ export function ItemDiffRow({
         <div className="flex-1 min-w-0">
           <p className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-0.5">
             {label}
-            {field ? ` — ${field}` : ''}
+            {/* Raw payload identifiers (seoTitle) must never reach the client DOM. */}
+            {field ? ` — ${humanizeFieldLabel(field)}` : ''}
           </p>
           {/* Mobile diff — stack Current/Proposed on phones (item 5 cheap polish, pairs with the
               responsive modal). grid-cols-1 sm:grid-cols-2. */}
@@ -163,7 +165,7 @@ export function ItemDiffRow({
                       rows={3}
                       maxLength={5000}
                       autoFocus
-                      aria-label={`Edit proposed ${field}`}
+                      aria-label={`Edit proposed ${humanizeFieldLabel(field) ?? 'value'}`}
                     />
                   ) : (
                     <FormInput
@@ -172,7 +174,7 @@ export function ItemDiffRow({
                       onChange={setDraft}
                       maxLength={5000}
                       autoFocus
-                      aria-label={`Edit proposed ${field}`}
+                      aria-label={`Edit proposed ${humanizeFieldLabel(field) ?? 'value'}`}
                       className="t-caption"
                     />
                   )}

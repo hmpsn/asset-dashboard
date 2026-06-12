@@ -6,15 +6,13 @@
  * debounced rec regen so the queue re-ranks. The detector bodies live here (not
  * inline in the crons) so they are directly unit-testable without fake timers.
  *
- * ═══ NO-OP WHEN THE EVENTS FLAG IS OFF ═══
- * Every detector returns early (writing nothing, triggering nothing) when the
- * `opportunity-value-events` flag is OFF. The crons call these on their normal
- * cadence; the flag gate + try/catch isolation here is the single source of truth.
+ * Opportunity-event detectors are default-on. The crons call these on their
+ * normal cadence; per-workspace try/catch isolation keeps detector failures
+ * from breaking the scheduler.
  *
  * CYCLE NOTE: imports the event store + timing defaults + the (dynamic-import-based)
  * regen helper. None of these value-import recommendations.ts, so no cycle.
  */
-import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { listWorkspaces } from '../workspaces.js';
 import { loadDecayAnalysis } from '../content-decay.js';
@@ -31,8 +29,6 @@ export interface DetectorRunResult {
   totalEvents: number;
 }
 
-const EMPTY_RESULT: DetectorRunResult = { workspacesWithEvents: 0, totalEvents: 0 };
-
 /**
  * A tracked keyword whose position number rose (= dropped in the SERP) by at least
  * this many places since the prior snapshot is a meaningful rank-drop "crossing".
@@ -43,12 +39,10 @@ export const RANK_DROP_MIN_DELTA = 3;
 /**
  * Decay → opportunity-event detector. Reads the PERSISTED decay analysis (no
  * crawl) and emits a DECAYING `decay` event for each critical / repeat-decay page,
- * then enqueues a debounced regen per affected workspace. Flag-gated + per-workspace
- * try/catch — flag OFF is a pure no-op.
+ * then enqueues a debounced regen per affected workspace. Per-workspace try/catch
+ * keeps failures isolated.
  */
 export function runDecayDetector(): DetectorRunResult {
-  if (!isFeatureEnabled('opportunity-value-events')) return EMPTY_RESULT;
-
   const { boost: decayBoost, halfLifeDays: decayHalfLife } = EVENT_BOOST_DEFAULTS.decay;
   let workspacesWithEvents = 0;
   let totalEvents = 0;
@@ -108,11 +102,9 @@ export function runDecayDetector(): DetectorRunResult {
  * already-persisted rank snapshots (no crawl): for each tracked keyword whose
  * position number rose (dropped in SERP) by ≥ RANK_DROP_MIN_DELTA since the prior
  * snapshot, emit a DECAYING `rank_drop` event keyed to the keyword's page, then
- * enqueue a debounced regen. Flag-gated + per-workspace try/catch — flag OFF no-op.
+ * enqueue a debounced regen. Per-workspace try/catch keeps failures isolated.
  */
 export function runRankDeclineDetector(): DetectorRunResult {
-  if (!isFeatureEnabled('opportunity-value-events')) return EMPTY_RESULT;
-
   const { boost: rankBoost, halfLifeDays: rankHalfLife } = EVENT_BOOST_DEFAULTS.rank_drop;
   let workspacesWithEvents = 0;
   let totalEvents = 0;

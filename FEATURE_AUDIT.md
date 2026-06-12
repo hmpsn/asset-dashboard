@@ -1,10 +1,351 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **471 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **502 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 502. Client Revenue R2 — Competitor Gaps, Agency-at-Work Feed, Striking Distance, Page Stories, Content in the Cart
+
+**What it does:** Five client-value features in one wave. (1) Premium competitor keyword gaps on Performance→Search — client-safe banded projection (opportunityBand/demandLabel; raw volume/difficulty/EMV stripped + leak-tested), server-enforced 402 below Premium with a soft-gate upsell. (2) "Agency at work" feed on Overview (dark behind `client-work-feed`): narrative-framed client-visible activity + running jobs with human labels. (3) A striking-distance segment in the Keyword Hub — positions 11–20, value-ranked, count and rows sharing one predicate. (4) "You rank for X, missing Y" per-page story cards on the client Strategy tab with stopword-guarded pairing and banded labels only. (5) Briefs/posts join the cart: distinct content items beside R1's merging fix items, a Premium 10% content discount as a single config constant (tier rediscussion can re-map), dual-family webhook fulfillment (work orders + content requests) with per-family failure isolation and orphan cleanup on checkout failure.
+
+**Agency value:** The upsell ladder gets its Premium anchor (competitor gaps), retention gets visible work, and mixed baskets raise order value.
+
+**Client value:** Honest, narrative, price-transparent surfaces — and the easy-wins lists agencies are loved for.
+
+**Mutual:** Round 2 of converting platform capability into perceived and billed value.
+
+**Files:** see PR; highlights: `server/competitor-gaps-projection.ts`, `src/components/client/AgencyWorkFeed.tsx`, `server/page-rank-stories.ts`, `shared/pricing.ts`, the striking_distance KCC filter, `useCart` content items.
+
+---
+
+### 501. Health Tab Revenue Surface — "Fix this ($X)" Cart, Impact Estimates, Bundle Pricing
+
+**What it does:** Turns the client Health tab into a purchase surface. Fixable issue rows carry a price-tagged teal CTA ("Fix this — $20") wired to the cart, with conservative banded impact estimates ("Est. ~$80–$160/mo at stake", floor $25/mo, cap $2k/mo, ROI-style methodology popover) projected server-side from emvPerWeek without ever exposing the raw figure. A sticky in-tab cart summary shows totals, pack suggestions at the 10-page threshold, and the combined impact estimate. Bundle math is server-authoritative (packs + remainder; client-constructed cart splits are re-normalized so a cheaper-than-correct cart is impossible); carts persist out-of-band of Stripe metadata (migration 137) so large multi-page purchases don't hit Stripe's limits. Premium clients see "Covered by your implementation hours — request fix" with zero prices; externally-billed clients see neutral request framing. A live-Stripe price-drift check (`npm run verify:stripe-prices`) guards the catalog↔Stripe trust boundary. Six unbounded client list endpoints also gained additive pagination.
+
+**Agency value:** Every client health report is now a transaction surface using prices that already existed in MONETIZATION.md — the audit's highest revenue-per-effort unlock.
+
+**Client value:** Clear inline prices (never a surprise at checkout), honest impact ranges, pack savings surfaced automatically.
+
+**Mutual:** The monetization ladder made tangible: free data → priced fixes → Premium hours.
+
+**Files:** `shared/types/fix-catalog.ts`, `server/payments/fix-bundle-pricing.ts`, `server/stripe.ts`, `src/components/client/health-tab/*`, `src/components/client/useCart.tsx`, `server/pagination.ts`, migration 137.
+
+---
+
+### 500. W6 Final Audit Wave — Calendar Planning v1, Suggested-Brief Lifecycle, AI Ops on Jobs, De-biased Local Classifiers
+
+**What it does:** Four shipped capabilities from the audit's final wave. (1) Forward-planning Content Calendar v1: posts gain `plannedPublishAt` (migration 136); planned drafts plot on future days with a dashed-teal intent treatment; day rows are clickable and open their artifact; a schedule-a-draft picker assigns dates from the calendar; `suggestPublishDates` finally has a consumer via the suggest-dates flow (noon-UTC anchored). (2) The AI Suggested panel now reads the persistent suggested-briefs store — dismiss/snooze/accept lifecycle with SHA dedup, ranking-opportunity signals seeded on the real read path with a TTL guard, decay suggestions surfacing. (3) Five heavyweight AI operations (brief regenerate/outline, ai-review, ai-fix, voice scoring) moved onto the background job platform — 202 jobId, 409 dedupe, progress in the bell, no more 30–120s open HTTP holds. (4) Local SEO candidate classifiers are workspace-derived (markets + business profile + industry taxonomy + strategy keywords with a stopword filter) — the founding client's Texas/dental vocabulary no longer biases every other workspace.
+
+**Agency value:** Content scheduling becomes plannable instead of retrospective; suggestions gain memory; long AI operations stop dying with the browser tab; every new local-SEO client gets classifiers fit to their market.
+
+**Client value:** Better local candidates and steadier content cadence flow downstream into client-facing recommendations.
+
+**Mutual:** This closes the 2026-06-11 admin surface audit — every wave (W1–W6) shipped.
+
+**Files:** see PR; highlights: `server/content-posts-ai-jobs.ts`, `server/content-brief-regenerate-job.ts`, `src/components/ContentCalendar.tsx`, `src/components/pipeline/AiSuggested.tsx`, `server/local-seo.ts` classifiers, migration 136.
+
+---
+
+### 499. Keyword Hub Cutover — single keyword surface (KCC + Rank Tracker consolidation)
+
+**What it does:** Completes the multi-phase consolidation of the admin Keyword Command Center (`seo-keywords`) and the standalone Rank Tracker (`seo-ranks`) into one keyword-first **Keyword Hub**. Phase B flipped the `keyword-hub` flag default to true; Phase C stripped the legacy stack: the `KeywordCommandCenter` renderer, KCC-only subcomponents, and `RankTracker` were deleted, `seo-ranks` folded into the Hub (transitional redirect retained), and the `keyword-hub` umbrella flag was fully retired (catalog/groups + migration 135 dropping its production override). The RankTracker-only untrack endpoint (`DELETE /api/rank-tracking/:workspaceId/keywords/:query`) was removed; the pin endpoint survives (the Hub drawer's pin toggle uses it). The Hub absorbed everything the legacy surfaces offered: the local-SEO panel + market-setup drawer, KPI summary cards, the detail drawer's pin toggle / outcome chips / replaced-by navigation / multi-keyword rank-history chart. Two anti-reintroduction pr-check rules (retired flag key, retired `seo-ranks` literal) plus a deprecation-lifecycle `removed` registry entry per retired surface keep the cleanup from silently reversing.
+
+**Agency value:** One surface to manage the full keyword lifecycle and rank measurement instead of three drifting admin views; less duplicated UI to maintain and fewer places for keyword state to disagree.
+
+**Client value:** Indirect — a more reliable, consistent keyword operating layer means the strategy and rank stories clients see are backed by a single source of truth.
+
+**Mutual:** Removes ~1,200+ lines of legacy frontend stack and a dead route, lowering the platform's maintenance surface while preserving every keyword lifecycle action, rank history, snapshot capture, pinned trend, and local-SEO segment.
+
+**Files (server/flag/docs lane):** `server/routes/rank-tracking.ts` (untrack route removed), `shared/types/feature-flags.ts` (`keyword-hub` retired), `server/db/migrations/135-retire-keyword-hub-feature-flag.sql`, `scripts/pr-check.ts` (two new rules), `scripts/deprecation-lifecycle.ts` (three `removed` entries + one `hidden`), `docs/rules/keyword-hub.md` (renamed from `keyword-command-center.md`), `docs/rules/route-removal-checklist.md`, `BRAND_DESIGN_LANGUAGE.md`, `CLAUDE.md`. Tests: `tests/integration/rank-tracking-routes.test.ts`, `tests/integration/rank-tracking-lifecycle.test.ts`, `tests/unit/feature-flags.test.ts`, `tests/unit/feature-flags-keyword-hub.test.ts`, `tests/pr-check.test.ts`, `tests/unit/deprecation-lifecycle.test.ts`. Note: the server full-model read path is retained — it is live via the Hub's `local_candidates` advanced filter (see `docs/rules/keyword-hub.md`).
+### 498. Client Dashboard QW2 PR8 — Inline Checkout Prices
+
+**What it does:** Adds price-forward copy to the client purchase path before Stripe redirect. Content service choosers in the Content tab and unified inbox now show the configured brief and full-post prices, the selected submit-request CTA carries that price, and Plans tab upgrade/subscription CTAs include monthly prices. External-billing workspaces continue to hide platform prices and route billing actions to contact/chat instead of Stripe checkout, with a server guard on content subscription checkout.
+
+**Agency value:** Reduces price surprise and support follow-up by making the purchase commitment visible before a client opens checkout.
+
+**Client value:** Clients can compare content and plan options directly inside the portal before they commit to the next step.
+
+**Mutual:** Turns pricing from a hidden redirect detail into an explicit conversion signal while preserving external-billing account handling.
+
+**Files:** `src/components/client/ContentTab.tsx`, `src/components/client/inbox/SubmitRequestChooserModal.tsx`, `src/components/client/inbox/UnifiedInbox.tsx`, `src/components/client/PlansTab.tsx`, `src/components/ClientDashboard.tsx`, `server/routes/content-subscriptions.ts`. Tests: `tests/component/client/ContentTab.test.tsx`, `tests/component/InboxTabUnified.test.tsx`, `tests/component/client/PlansTab.test.tsx`, `tests/integration/stripe-admin-boundary-enforcement.test.ts`.
+
+---
+
+### 497. Client Dashboard QW2 PR7 — Strategy Feedback Stories
+
+**What it does:** Turns two existing feedback loops into visible client stories. Growth+ client intelligence now exposes a sanitized `keywordFeedbackSummary` projection with approved/rejected keyword counts, approve rate, display samples, and top rejection reasons from the client-signals slice. The Strategy tab renders that summary in a blue data-oriented `SectionCard`. The "Predictions That Came True" card now frames each recorded outcome as a Before/After story with the stored score, page, and confirmation date, without inventing narrative fields.
+
+**Agency value:** Gives account teams proof that client keyword feedback is shaping strategy and makes outcome tracking easier to explain without opening admin-only diagnostics.
+
+**Client value:** Clients can see that their keyword decisions were heard and can understand the before/after result behind platform predictions in plain language.
+
+**Mutual:** Strengthens the dashboard's trust loop: client feedback becomes visible strategy context, and successful predictions become reusable proof of impact.
+
+**Files:** `shared/types/intelligence.ts`, `server/routes/client-intelligence.ts`, `server/intelligence/learnings-slice.ts`, `server/intelligence/formatters.ts`, `src/components/client/StrategyTab.tsx`, `src/components/client/strategy/StrategyKeywordFeedbackSummaryCard.tsx`, `src/components/client/PredictionShowcaseCard.tsx`. Tests: `tests/component/client/StrategyKeywordFeedbackSummaryCard.test.tsx`, `tests/component/client/PredictionShowcaseCard.test.tsx`, `tests/component/client/StrategyTab.test.tsx`, `tests/client-intelligence-types.test.ts`, `tests/integration/client-intelligence-endpoint.test.ts`, `tests/unit/learnings-slice.test.ts`, `tests/unit/learnings-slice-assembly.test.ts`, `tests/format-for-prompt.test.ts`.
+
+---
+
+### 496. Client Dashboard QW2 PR6 — Work-Order Comment Count Badges
+
+**What it does:** Adds list-side conversation counts to client work-order deliverables. The unified inbox read now batches `work_order_comments` counts for all visible work-order rows and serializes `commentCount` on the shared `ClientDeliverable` contract, including `0` for empty threads. The "Work in progress" client cards render a blue comment-count badge for zero, singular, and plural counts without deriving badge state from per-thread fetches.
+
+**Agency value:** Makes paid work-order conversations easier to scan and reduces missed replies in the client portal without adding another admin workflow.
+
+**Client value:** Clients can immediately see whether a work-order thread has activity before reading the conversation, making the "Work in progress" lane feel more responsive and transparent.
+
+**Mutual:** Turns work-order conversation activity into a lightweight, tested data signal while preserving the existing verb-free order lane and client/team comment flow.
+
+**Files:** `shared/types/client-deliverable.ts`, `server/work-order-comments.ts`, `server/domains/inbox/unified-inbox-read.ts`, `server/routes/deliverables.ts`, `src/components/client/inbox/UnifiedInbox.tsx`. Tests: `tests/unit/work-order-comments.test.ts`, `tests/integration/work-order-track-lane-read.test.ts`, `tests/component/InboxTabUnified.test.tsx`.
+
+---
+
+### 495. Client Dashboard QW2 PR5 — Composite Health Breakdown
+
+**What it does:** Adds an expandable "What makes up this score" breakdown to the existing client SEO Health Score card. Growth+ client intelligence now projects a sanitized component breakdown for retention signals, ROI momentum, and portal engagement, using the same weighted score buckets as the server composite health calculation.
+
+**Agency value:** Gives account teams a clearer way to explain why the health ring moved without exposing internal churn diagnostics or asking the client to infer meaning from a single number.
+
+**Client value:** Clients can see the three inputs behind their health score and which area needs attention, in plain language.
+
+**Mutual:** Makes the score easier to trust while preserving the existing intelligence endpoint, tier gates, and client-safe scrub rules.
+
+**Files:** `shared/types/intelligence.ts`, `server/intelligence/client-signals-slice.ts`, `server/routes/client-intelligence.ts`, `src/components/client/HealthScoreCard.tsx`, `src/components/client/OverviewTab.tsx`. Tests: `tests/component/HealthScoreCard.test.tsx`, `tests/unit/client-signals-slice-assembly.test.ts`, `tests/unit/client-signals-slice.test.ts`, `tests/integration/client-intelligence-endpoint.test.ts`.
+
+---
+
+### 494. Outcome Read-Back Chips — Strategy, Keyword Hub, Posts (W5.1)
+
+**What it does:** Closes the outcome loop on three admin surfaces. A shared reader (`getScoredOutcomeReadbacks`, one indexed query per workspace, latest-conclusive-verdict-per-action) joins scored outcome measurements back to the surfaces that initiated the work: Strategy pageMap rows, the Keyword Hub drawer detail, and published posts in the content list each render an `OutcomeReadbackChip` ("#14 → #6 · Win · 30d") with server-computed direction. Newly scored outcomes refresh live via the OUTCOME_SCORED broadcast (central mapping added).
+
+**Agency value:** The platform was already recording baselines and scoring outcomes — now the admin sees proof of impact exactly where the work happens, without opening the Outcomes tab.
+
+**Client value:** Indirect — better-informed prioritization; the same readbacks feed the learnings the generators consume.
+
+**Mutual:** Measurement that nobody reads is cost; measurement read at the point of action is leverage.
+
+**Files:** `server/outcome-tracking.ts`, `server/keyword-strategy-ux.ts`, `server/keyword-command-center.ts`, `server/content-posts-db.ts`, `src/components/ui/OutcomeReadbackChip.tsx`, consumers in Strategy/keyword-hub/ContentManager. Tests: `server/__tests__/outcome-readback*.test.ts`, `tests/component/OutcomeReadbackChip.test.tsx`.
+
+---
+
+### 493. Local Visibility Trend + Shift Insights (W5.3)
+
+**What it does:** Reads the (previously write-only) local visibility snapshot time series two ways: a per-market visibility sparkline on the Local SEO panel (day-bucketed over the 180-day raw retention window, blue data styling), and an insight bridge that diffs each refresh against the previous latest state to mint `local_visibility_shift` insights — lost local-pack visibility (risk), regained visibility (win), and new repeat competitors — with edge-triggered dedup, degraded-snapshot exclusion, and client-safe narrative framing.
+
+**Agency value:** Local pack movements surface proactively in the insights digest instead of requiring a manual panel check after every refresh.
+
+**Client value:** Local visibility wins and risks flow into the client inbox/digest with plain-language stories.
+
+**Mutual:** The D4 retention policy preserved this history specifically so it could be read — this is the read half.
+
+**Files:** `server/bridge-local-visibility-shift.ts`, `server/local-seo.ts` (trend aggregate), `shared/types/analytics.ts`, `server/schemas/insight-schemas.ts`, `src/components/local-seo/LocalSeoVisibilityTrend.tsx`, renderer cases in `useInsightFeed`/`InsightsDigest`. Tests: `tests/integration/local-visibility-shift-bridge.test.ts`, `tests/unit/local-seo-visibility-trend.test.ts`.
+
+---
+
+### 492. CMS-Field Schema Publishing UI + AI-Suggested Brief Prefill (W3.2 + W3.1)
+
+**What it does:** Unlocks the previously unreachable CMS-field schema delivery pipeline: CMS pages with a ready field mapping get a working Publish action (status-aware UI with honest reasons when blocked; Publish-All counts respect readiness; retract/restore honestly gated where no CMS server path exists). Separately, the AI Suggested "Create Brief" action now actually carries the suggestion's keyword and page into the brief generator via the fixContext prefill (it previously discarded both), and refresh_suggestion signals gain a "Refresh brief" action.
+
+**Agency value:** Hundreds of CMS-item pages become one-click schema-publishable; the flagship insight→action flow in the content pipeline stops being a dead end.
+
+**Client value:** Faster structured-data coverage on collection pages; suggested content turns into targeted briefs without manual re-entry.
+
+**Mutual:** Both are pure unlocks of already-built server capability.
+
+**Files:** `src/components/schema/*` (status-aware publish UI), `src/components/ContentPipeline.tsx`, `src/components/pipeline/AiSuggested.tsx`. Tests: `tests/unit/schema-cms-delivery-ui.test.tsx`, `tests/integration/webflow-schema-cms-delivery-serialization.test.ts`, `tests/component/AiSuggested-brief-handoff.test.tsx`.
+
+---
+
+### 491. Client Dashboard QW2 PR4 — ROI Methodology Explainer
+
+**What it does:** Adds an expandable "How we calculate this" explanation to the client ROI Dashboard. The disclosure explains organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and the conservative assumption that the model does not multiply by lead value, close rate, or lifetime value.
+
+**Agency value:** Gives account teams a ready-made answer to skeptical ROI questions inside the dashboard itself, without changing the formula or adding review work.
+
+**Client value:** Clients can see what inputs drive the dollar figures and why the numbers should be treated as directional traffic value rather than guaranteed booked revenue.
+
+**Mutual:** Makes the ROI tab more transparent and easier to trust while staying copy-only: no new endpoints, no duplicate dollar engine, and no new feature flags.
+
+**Files:** `src/components/client/ROIDashboard.tsx`. Tests: `tests/component/client/ROIDashboard.test.tsx`.
+
+---
+
+### 490. Client Dashboard QW2 PR3 — Workflow Confirmations
+
+**What it does:** Adds explicit feedback-loop confirmation to two client dashboard workflows. Unified inbox approvals now show a next-step toast after a successful approve, including inline approval cards. Content Plan cell flagging now optimistically marks the visible cell as flagged with the submitted note, confirms success with a toast, reconciles from the server, and rolls back the visible state if the API rejects.
+
+**Agency value:** Reduces follow-up questions after clients approve or flag work because the portal immediately confirms what happened and where the work goes next.
+
+**Client value:** Clients get immediate proof that their approval or feedback was received instead of watching the item disappear or remain visually unchanged.
+
+**Mutual:** Makes client decision workflows feel acknowledged and trustworthy without adding new routes, AI calls, or feature flags.
+
+**Files:** `src/components/client/inbox/UnifiedInbox.tsx`, `src/components/client/ContentPlanTab.tsx`, `src/components/client/MatrixProgressView.tsx`. Tests: `tests/component/InboxTabUnified.test.tsx`, `tests/component/client/ContentPlanTab.test.tsx`.
+
+---
+
+### 489. Client Dashboard QW2 PR2 — Analytics Takeaway
+
+**What it does:** Adds a deterministic "Analytics takeaway" section to the client Analytics tab. The summary explains traffic movement, top source/page, and the top tracked action using existing GA4 metrics only, with no AI call. Conversion-rate badges on tracked action cards now use judgment colors while preserving the existing percentage contract.
+
+**Agency value:** Gives client-facing GA4 reporting an interpretation layer without adding review burden or model cost. The deterministic copy makes the tab easier to trust in demos and recurring reporting.
+
+**Client value:** Clients no longer have to infer the story from raw users, sessions, sources, and event cards. Conversion rates now visually separate strong, watch, and weak signals.
+
+**Mutual:** Turns the Analytics tab from a data dump into a concise explanation while keeping counts blue/neutral and reserving emerald, amber, and red for actual performance judgments.
+
+**Files:** `src/components/client/AnalyticsTab.tsx`. Tests: `tests/component/client/AnalyticsTab.test.tsx`.
+
+---
+
+### 488. Client Dashboard QW2 PR1 — Data Freshness Stamps
+
+**What it does:** Adds visible "Data as of ..." freshness stamps to the client dashboard's blended Overview metrics and dedicated Performance > Search / Analytics surfaces. Client GA4 and GSC hooks now expose `dataUpdatedAt` from the real React Query child queries, and the shared `FreshnessStamp` primitive renders nothing when freshness is missing or invalid. The client intelligence API wrapper now fails through React Query instead of returning a fabricated `assembledAt: now` fallback, preventing failed intelligence reads from looking freshly assembled.
+
+**Agency value:** Reduces "is this dashboard current?" support loops without adding new data contracts or backend work. The UI now distinguishes real loaded freshness from unavailable data.
+
+**Client value:** Clients can see when the metrics on the page were last loaded, which makes search and analytics reporting feel more transparent and trustworthy.
+
+**Mutual:** Turns data recency from an implicit cache detail into a visible, tested client trust cue while preserving error honesty for intelligence.
+
+**Files:** `src/components/ui/FreshnessStamp.tsx`, `src/components/ui/index.ts`, `src/hooks/client/useClientGA4.ts`, `src/hooks/client/useClientSearch.ts`, `src/api/analytics.ts`, `src/components/ClientDashboard.tsx`, `src/components/client/OverviewTab.tsx`, `src/components/client/PerformanceTab.tsx`, `src/components/client/SearchTab.tsx`, `src/components/client/AnalyticsTab.tsx`. Tests: `tests/component/FreshnessStamp.test.tsx`, `tests/component/SearchTab.test.tsx`, `tests/component/client/AnalyticsTab.test.tsx`, `tests/component/client/OverviewTab.test.tsx`, `tests/unit/hooks/client-hooks-extended.test.tsx`, `tests/unit/api-modules-a.test.ts`, `tests/unit/src-api-modules-pure.test.ts`.
+
+---
+
+### 487. Client Dashboard Quick Wins 1 — Stop the Leaks
+
+**What it does:** Closes the first wave of client-dashboard leakage found in the 2026-06 audit. Client GA4/GSC React Query hooks now use a 15-minute analytics stale time so tab focus no longer fans out repeated Google reads, while admin analytics keeps its existing freshness behavior. Critical client inbox/decision hooks now throw through React Query instead of returning silent empty arrays on endpoint failure. ClientDashboard subscribes to confirmed client-visible workspace broadcasts for brief updates and outcome-learning changes, invalidating content requests, content plan, unified inbox, outcome summary, and intelligence caches. Monetization leaks are tightened in two paths: the existing trial banner now appears only in the final 1-5 active trial days with per-trial dismissal and a Plans CTA, and the Day-10 warning email is formalized as the 4-days-remaining reminder for the 14-day trial model. Chat usage now has a shared typed response contract, React Query usage hook/key, Free/Growth counters, Premium unlimited treatment, typed `usage_limit` 429s, Growth 50-chat enforcement, trial-as-Growth enforcement, existing-session continuation, and failed-AI usage refunds. Hygiene fixes remove a bare hook-deps suppression, make the client account menu keyboard/menu-semantic, label the custom date trigger, and pin DecisionDetailModal dialog semantics.
+
+**Agency value:** Reduces support-driving ambiguity: endpoint failures visibly error, client caches refresh when backend work lands, trial conversion prompts happen before expiry, and chat limits are enforced before AI spend instead of counted after the fact. The analytics stale time trims avoidable quota burn without changing admin workflows.
+
+**Client value:** The portal feels more trustworthy and current: inbox sections no longer masquerade outages as "nothing to do," client-visible updates arrive without a manual refresh, trial prompts are timely and dismissible, and chat usage is visible before a limit surprises the user.
+
+**Mutual:** Converts several silent failure modes into explicit, tested contracts across API, React Query, WebSocket invalidation, billing lifecycle, and accessibility. The sprint keeps the fixes small while making the client dashboard harder to misread.
+
+**Files:** `src/lib/queryClient.ts`, `src/hooks/shared/useGA4Base.ts`, `src/hooks/shared/useGSCBase.ts`, `src/hooks/client/useClientGA4.ts`, `src/hooks/client/useClientSearch.ts`, `src/hooks/client/useClientQueries.ts`, `src/lib/wsInvalidation.ts`, `src/components/ClientDashboard.tsx`, `shared/types/usage.ts`, `src/hooks/client/useClientChatUsage.ts`, `src/hooks/useChat.ts`, `src/components/client/ClientChatWidget.tsx`, `server/chat-memory.ts`, `server/routes/public-chat.ts`, `server/routes/public-analytics.ts`, `server/trial-reminders.ts`, `src/components/client/ClientHeader.tsx`, `src/components/client/client-dashboard/useClientWorkspaceBootstrap.ts`. Tests: `tests/unit/hooks/analytics-stale-time.test.tsx`, `tests/unit/hooks/client-queries.test.tsx`, `tests/unit/wsInvalidationRegistry.test.ts`, `tests/unit/client-dashboard-invalidation-keys.test.ts`, `tests/component/ClientDashboard.test.tsx`, `tests/unit/public-chat-pure.test.ts`, `tests/unit/hooks/useChat.test.ts`, `tests/component/client/ClientChatWidget.risky.test.tsx`, `tests/integration/tier-gate-enforcement.test.ts`, `tests/integration/billing-tier-downgrade.test.ts`, `tests/integration/public-analytics-extended.test.ts`, `tests/unit/trial-reminders.test.ts`, `tests/component/client/ClientHeader.test.tsx`, `tests/unit/DecisionDetailModal.test.tsx`.
+
+---
+
+### 486. Cross-workspace platform_learnings priors — anonymized win-rate fallback tier (A6, audit #22)
+
+**What it does:** Gives a workspace with no measured outcomes of its own a real signal instead of nothing. A new platform-level store (`platform_learnings_priors`, migration 133) aggregates a single win rate per `actionType` across *every* workspace, computed from the same `tracked_actions` + `action_outcomes` join the per-workspace learnings engine reads (latest qualifying 30/60/90-day conclusive outcome per action; `not_acted_on` excluded per A1). It is anonymized **by construction** — the stored row holds only `(action_type, win_rate, contributing_workspaces, scored_actions, computed_at)`, with no workspace id, page URL, title, or keyword, mirroring the `keyword_metrics_cache` precedent. Two privacy/honesty floors gate publication: a **cohort floor** of ≥3 distinct contributing workspaces (below which a single workspace's data could be reverse-identified) and a **sample floor** of ≥5 scored actions; a type that clears neither is simply absent (FM-2 — never a fabricated baseline). The fallback seam lives in `server/outcome-learning-default-path.ts`: a new `buildPlatformPriorAdjustment()` applies a deliberately *smaller* score nudge than own-history, and `buildOutcomeLearningStatusNote()` appends a clearly-labeled cross-workspace benchmark line — but **only** when the workspace's own `LearningsSlice.availability` is `no_data` or `degraded`. The availability switch stays authoritative: a `ready` workspace keeps its own learnings and never sees a prior, and an admin-`disabled` workspace suppresses priors too. The intelligence slice populates `LearningsSlice.platformPriors` on the same fallback condition, and a weekly cron (`server/outcome-crons.ts`, mirroring A5's EMV calibration block) recomputes the aggregate.
+
+**Agency value:** A brand-new client — or one whose learnings subsystem hiccuped on a run — no longer falls back to pure generic best practices. Keyword recommendation prompts (the first wired consumer — `server/keyword-recommendations.ts` threads `LearningsSlice.platformPriors` through `buildOutcomeLearningStatusNote`) get a measured, clearly-labeled platform-wide prior for each action type as a stopgap until the workspace accrues its own history, all without any per-workspace privacy exposure. The remaining `buildOutcomeLearningStatusNote` callers (content-brief, content-decay, keyword-strategy-ai-synthesis) and the score-adjustment helper are wired as follow-ups on the same contract.
+
+**Client value:** Recommendations for a new account are informed by what has actually worked across the agency's whole book of business, presented honestly as a cross-workspace benchmark — never dressed up as that client's own results.
+
+**Mutual:** Establishes a privacy-safe cross-workspace learning tier (aggregates-only, cohort-floored) that any future consumer can read, with the anonymization contract pinned by a schema-level test and the honesty labeling pinned in the prompt-note helper.
+
+**Files:** `server/db/migrations/133-platform-learnings-priors.sql`, `server/platform-learnings-priors.ts` (store + recompute + floors), `server/outcome-learning-default-path.ts` (`buildPlatformPriorAdjustment`, `buildPlatformPriorPromptNote`, extended status note), `shared/types/intelligence.ts` (`PlatformPriorEntry` + `LearningsSlice.platformPriors`), `server/intelligence/learnings-slice.ts` (fallback-tier population), `server/outcome-crons.ts` (weekly cron), `scripts/pr-check.ts` (KNOWN_UNRENDERED_FIELDS). Tests: `tests/integration/a6-platform-learnings-priors.test.ts`.
+
+---
+
+### 485. InsightsSlice byType cap + pre-cap countsByType rollup (G3, audit 7b)
+
+**What it does:** Bounds the last unbounded payload in the workspace-intelligence bundle. `InsightsSlice.byType` is now capped at the top 25 insights per type ordered by `impactScore` (previously it carried *every* stored insight per type — on a 400-insight workspace the insights slice alone was ~443 KB, dominating AdminChat context, MCP `get_workspace_intelligence` responses, and generation-context payloads). Two new required pre-cap rollups keep count consumers honest: `countsByType` (full per-type totals) and `countsByTypeBySeverity` (full type×severity matrix for jointly-filtered totals). Every `byType` reader was redirected *before* the cap landed: `listAllInsightsFromSlice` now reads the `all` list (top 100 by impact — AdminChat, diagnostic context inherit), meeting-brief metrics/cache-key counts read `countsByType`, the client intelligence summary derives its counts from the matrix (exact admin-only-type + positive-severity exclusion at any workspace size — both pinned contracts hold beyond the 100-cap), and monthly-digest's deterministic wins/resolved rollups read the store directly (documented `intel-builder-ok` exception — full iteration is no longer slice-backed). Measured on a seeded 400-insight workspace: insights slice JSON 452,896 → 213,435 bytes (−52.9%); the byType portion 353,622 → 114,161 bytes (−67.7%).
+
+**Agency value:** AdminChat and AI generation prompts stop dragging hundreds of duplicate insight objects through every assembly; MCP consumers get a bounded, predictable payload. Counts shown in meeting briefs and digests remain exact pre-cap totals.
+
+**Client value:** Indirect — faster intelligence-backed surfaces and unchanged (still exact) client portal insight counts.
+
+**Mutual:** The prompt-size guard and the count-honesty contract now coexist explicitly: lists are bounded, counts are authoritative, and the contract test pins both so no future consumer silently under-reports from a capped list.
+
+**Files:** `shared/types/intelligence.ts` (`InsightsSlice.countsByType` + cap JSDoc), `server/intelligence/insights-slice.ts` (cap + rollup + helper redirect), `server/meeting-brief-generator.ts`, `server/routes/client-intelligence.ts`, `server/monthly-digest.ts`, `scripts/pr-check.ts` (KNOWN_UNRENDERED_FIELDS), `docs/rules/workspace-intelligence.md`. Tests: `tests/unit/insights-slice.test.ts`, `tests/integration/g3-insights-bytype-cap.test.ts`, `tests/contract/intelligence-slice-population.test.ts`, `tests/unit/workspace-intelligence-extended.test.ts`.
+
+---
+
+### 484. Keyword-Level Outcome Bridge + Client Requested-Keyword Rank Trend (A4, audit #15)
+
+**What it does:** Closes the keyword-level outcome loop in three pieces. (1) **Hub actions enter outcome tracking** — Keyword Hub track / promote / add-to-strategy actions (single, bulk, route, and MCP paths, all via B2's `applyKeywordCommandCenterAction` contract point) now record a tracked outcome action through the new `recordKeywordTrackingAction()` (`server/outcome-measurement-keywords.ts`), reusing A3's `strategy_page_keyword` sourceType + `strategyPageKeywordSourceId()` idempotency key so the Hub and strategy-regeneration writers share one dedup space (re-track / decline→re-add never duplicates). Baselines capture the keyword's current position from the freshest rank snapshot (`exact`), or an honestly-empty `estimated` baseline when none exists. (2) **Keyword-level scoring** — the measurement cron scores `strategy_keyword_added` actions that carry a `targetKeyword` against `rank_snapshots` (keyword-level position, ≤14-day freshness via `readKeywordRankSnapshot`) instead of page-aggregate GSC, matching the keyword-level baselines; missing/stale snapshots score `inconclusive`, never fabricated (FM-2). Two inherited A3-review fixes shipped here: a search-metric action whose baseline lacks the PRIMARY metric now scores `inconclusive` (previously a missing baseline position was read as 0, fabricating a loss), and permanently-unmeasurable strategy-level actions (no pageUrl, no targetKeyword, metrics-empty baseline) exit the measurement queue at their first due checkpoint instead of emitting inconclusive noise until day 90. (3) **Client trend card** — the client Strategy tab shows a 180-day rank-trend `ChartCard` for the keywords the client requested themselves (`StrategyRequestedKeywordTrendSection` + `useRequestedKeywordRankTrend`, growth-gated inside the no-keywords check so free-tier clients never see an irrelevant upsell, live-refreshed on `RANK_TRACKING_UPDATED`).
+
+**Agency value:** Keyword work done in the Hub finally feeds the learnings engine — wins and losses on tracked keywords accrue to the same outcome dataset that calibrates recommendations — and the measurement queue stops carrying permanently-dead actions or fabricating losses from partial baselines.
+
+**Client value:** "Add a keyword you care about" now has a visible payoff: a live 180-day ranking trend of exactly the keywords they requested, refreshed as new rank snapshots land.
+
+---
+
+### 483. Server-side grounding for client chat — kill the verbatim-context prompt-injection / token-sink surface (E4, audit #17)
+
+**What it does:** Hardens the public client chat endpoint (`POST /api/public/search-chat/:workspaceId`). Previously the endpoint accepted `context: z.record(z.unknown())` and serialized it VERBATIM into the system prompt (`JSON.stringify(context)`), so any client could inject arbitrary JSON below the guardrails (prompt injection) and there was no size cap (unbounded token sink). Now: (1) the opaque `context` field is removed from the Zod schema — Zod's default strip means the existing frontend keeps working but its `context` payload never reaches the prompt; (2) client input is limited to enum/size-capped HINTS only (`currentTab` from a fixed `ClientTab`-mirrored union, `days` bounded 1–366, plus the already-capped `question`/`sessionId`/`betaMode`); (3) the model's view of workspace data is now SERVER-ASSEMBLED — the data-inventory flags and the grounding block are derived from intelligence slices (`buildSeoPromptContext` with the client-safe slice set `seoContext`/`insights`/`siteHealth`/`learnings`) plus server-owned reads (search/GA4 headline overviews re-fetched server-side, audit-traffic, content plan, approval/request counts read from the DB — never client-claimed). The grounding deliberately EXCLUDES the agency-only `clientSignals` slice (churn risk, intent signals, approval rate) per the D1/EMV precedent, and the standard formatter path already omits admin-only fields like `emvPerWeek`. Slice failure degrades to minimal grounding and still returns 200 (FM-2), never 500. Response shape `{ answer, sessionId, detectedIntent }` is unchanged for the frontend. Reuses the existing `client-search-chat` named operation in the AI operation registry (prose output — no new registry entry needed).
+
+**Agency value:** Closes a real security hole on a public, client-facing endpoint — clients can no longer steer the advisor with injected instructions or poison its answers with fabricated metrics, and can no longer blow up token spend by posting megabytes of "context." The agency, not the browser, now decides exactly what the model sees, scoped to the workspace.
+
+**Client value:** The advisor's answers are grounded in authoritative, server-verified workspace data rather than whatever the browser happened to send, so its numbers are trustworthy and consistent. No behavior change in the chat UI.
+
+**Mutual:** A safer, more predictable advisor that can't be manipulated or made to leak agency-only intelligence, with answer quality preserved via real slice-derived grounding.
+
+**Files:** `server/routes/public-analytics.ts` (`chatSchema` hardened, `CLIENT_CHAT_TAB_HINTS`, server-side grounding + headline-overview re-fetch + approval/request reads, verbatim-context removal). Tests: `tests/integration/client-chat-grounding.test.ts` (injection-never-in-prompt via mocked `callAI` capture, oversized-context drop, client-safe slice set, enum-hint accept + invalid-enum 400, FM-2 minimal-grounding 200, response-shape preservation, 401-without-auth).
+
+---
+
+### 482. Persisted AI review verdicts + scraped source evidence (audit #16)
+
+**What it does:** Makes content QA durable in two places that previously evaporated. (1) AI review verdicts: the post AI-review run (`POST /api/content-posts/:wsId/:postId/ai-review`) now persists its full verdict pack (`StoredAIReview` — the post-provenance-marking review map, evidence snapshot, `reviewedAt`, model) on a new `content_posts.ai_review` column, so verdicts survive editor close and are retrievable on any fresh post GET. Provenance-sensitive items (`factual_accuracy`, `no_hallucinations`) are only ever stored `pass=false` + `humanReviewRequired` — the grounding contract is preserved at the storage layer, not just the response. (2) Scraped source text: the brief generation job now persists C1's enrichment output (`BriefSourceEvidence` on `content_briefs.source_evidence`) — scraped reference-page `bodyText`, real SERP result snippets (previously dropped at the `generateBrief` boundary), fetch timestamps, and style-example pages. Regenerating a brief carries the evidence forward. Both fields are admin-internal and stripped from public client brief/post responses.
+
+**Agency value:** Reviewers stop re-running AI reviews because the verdicts vanished with the editor session, and the saved source pack means a future claim can be checked against the *actual text* that grounded the brief — not just URLs. This is the storage prerequisite for the real-text evidence ledger (#27).
+
+**Client value:** Indirect — stronger, auditable human-verification workflow behind delivered content, with zero new client-facing payload (the scraped competitor text never leaves the admin boundary).
+
+**Mutual:** One review run now produces a durable QA artifact tied to the post, and one scrape now produces a durable evidence pack tied to the brief — both reusable by future features without re-fetching or re-paying for the work.
+
+**Files:** `server/db/migrations/132-c4-persist-review-results.sql`, `shared/types/content.ts` (`StoredAIReview`, `BriefSourceEvidence`, `BriefScrapedSource`), `server/schemas/content-schemas.ts`, `server/content-posts-db.ts`, `server/content-brief.ts`, `server/routes/content-posts.ts` (review seam + activity + broadcast), `server/content-brief-generation-job.ts` (persistence seam), `server/routes/public-content.ts` (client-boundary strips), `server/activity-log.ts` (`post_ai_review`). Tests: `tests/integration/c4-persist-review-results.test.ts`.
+
+---
+
+### 481. Recommendations ↔ Content Pipeline Reconciliation (D2, audit #11)
+
+**What it does:** Closes the loop between the recommendation engine and the content pipeline in three directions. (1) **Generation suppression** — `generateRecommendations` now includes the `contentPipeline` intelligence slice (via the shared `buildRecommendationGenerationContext` builder) and skips content-gap recs whose target keyword already has an in-flight brief or post (new comparison-keyed `ContentPipelineSlice.inFlightTargetKeywords`, populated in `assembleContentPipeline`). Suppression fails open: if the slice degrades, recs mint as before — never a false resolution. (2) **Publish-time resolution** — the C3 publish domain service (`publishPostToWebflow`) makes one best-effort call to the new `resolveContentRecommendationsForPublishedPost()` after a successful publish, completing active content recs whose persisted `targetKeyword` (new optional `Recommendation` field, set at content-gap mint) matches the published post's keyword — with `validateTransition`, summary recompute, intelligence-cache invalidation, and a `RECOMMENDATIONS_UPDATED` broadcast. A resolution failure never fails a publish; a failed publish never resolves a rec. (3) **CTA → brief purchase** — `mapToProduct('content', …)` no longer returns `{}`: content recs carry the real brief-purchase product keyed by the gap's suggested page type (`brief_blog` $125 … `brief_pillar` $200, mirroring `PRODUCT_MAP`), so the client rec card's purchase CTA ("Order Content Brief — $X") routes into the existing cart → `/api/stripe/cart-checkout` brief-purchase flow.
+
+**Agency value:** The rec queue and the content pipeline can no longer contradict each other — the team never sees (and the client is never sold) a "create content for X" rec while a brief or post for X is already in flight, and a publish clears its rec immediately instead of waiting for the GSC-lag-gated regen.
+
+**Client value:** The priority list stays honest: recommendations disappear the moment the work is actually underway or live, and content recommendations finally have a one-click purchase path instead of a dead-end "we should create this" card.
+
+**Mutual:** Suppression + resolution prevent double-selling content the client already paid for; the CTA turns the highest-intent moment (a data-grounded content gap) into a frictionless brief order on existing payment rails.
+
+**Files:** `server/recommendations.ts` (slice in builder call, suppression, `BRIEF_PRODUCT_BY_PAGE_TYPE`, `mapToProduct` pageType param, `resolveContentRecommendationsForPublishedPost`), `server/domains/content/publish-post-to-webflow.ts` (one best-effort hook), `server/intelligence/content-pipeline-slice.ts` + `shared/types/intelligence.ts` (`inFlightTargetKeywords`), `shared/types/recommendations.ts` + `server/schemas/workspace-schemas.ts` (`targetKeyword`), `src/components/client/InsightsEngine.tsx` (CTA label). Tests: `tests/integration/recommendations-content-reconciliation.test.ts` (suppression, publish resolution, FM-2 both directions), `tests/unit/recommendations-pure-logic.test.ts` (brief-product mapping).
+
+---
+
+### 480. Legible + dollarized keyword value — plain-language reasons + per-keyword $/mo + portfolio "Revenue at stake" (PR 1–3)
+
+**What it does:** Makes the consolidated keyword value score legible and dollarized on the surfaces clients and the agency already use, with ONE reasons definition and ONE dollar definition. PR 1 (`kwv-real-cpc`) adds a `cpc` column to `content_gaps` (migration + mapper + enrichment populate) so content-gap value scores reflect real CPC instead of the `CPC_UNKNOWN` 0.5 proxy. PR 2 (`kwv-value-breakdown`) adds the `keywordValueReasons` helper (server-computed plain-language reasons from the Layer-1 components — "Commercial intent · $9 CPC", "Winnable · KD 24", "Strong demand · 2,400/mo", "Local boost ×1.5"), serialized as `valueReasons` onto both the admin KCC row and the client strategy explanation, rendered in both keyword drawers (flag-gated on `keyword-value-scoring`, blue = data). PR 3 (`kwv-dollar-value`) adds the single `keywordDollarValue` helper (`server/scoring/keyword-value-money.ts`): `currentMonthly = clicks × cpc` (identical to `roi.ts` `trafficValue` — enforced by a cross-module equivalence test) and `upsideMonthly = impressions × CTR-uplift × cpc` (realized $ only, no intent weight). `cpc` is joined from `page_keywords` onto both keyword builders; a per-keyword "Revenue potential" $ block renders on both drawers (emerald = success/$), and a portfolio "Revenue at stake" (Σ `upsideMonthly`) is a 4th hero `StatCard` on `ROIDashboard`, computed in `computeROI` by reusing the same helper.
+
+**Agency value:** One reasons formula and one dollar formula across every surface — the Hub, the client strategy drawer, and the ROI dashboard can never show a contradictory "why" or a contradictory "$" for the same keyword. The realized-$ equivalence (`currentMonthly == roi.ts trafficValue`) is locked by test, so there is no second dollar engine to drift. Real CPC on content gaps makes the value score honest before it propagates.
+
+**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across tracked keywords with position upside — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
+
+**Mutual:** Pure reuse — no new endpoint, no new client keyword tab, no second dollar engine. Rides the existing `/api/public/roi` query + the keyword-strategy / KCC serialization. The dollar helper floors to 0 when CPC is unknown (drawers hide the block), so CPC sparsity degrades gracefully.
+
+**Files:** `server/db/migrations/*-content-gap-cpc.sql`, `server/content-gaps.ts`, `server/keyword-strategy-enrichment.ts` (PR 1); `server/scoring/keyword-value-score.ts` (`keywordValueReasons`), `server/keyword-command-center.ts`, `server/keyword-strategy-ux.ts`, `src/components/client/strategy/StrategyKeywordDrawer.tsx`, `src/components/keyword-command-center/KeywordDetailDrawer.tsx` (PR 2); `server/scoring/keyword-value-money.ts` (`keywordDollarValue`), `server/roi.ts` + `shared/types/roi.ts` (`revenueAtStake`), `server/page-keywords.ts` (lite-reader cpc), `src/components/client/ROIDashboard.tsx`, both drawers (PR 3). Tests: `tests/unit/keyword-value-money.test.ts` (incl. the equivalence test), `tests/component/keyword-dollar-value-drawer.test.tsx`, `tests/integration/roi-attribution.test.ts` (`revenueAtStake`), `tests/integration/keyword-strategy-assembler-public-read.test.ts` (cpc + serialized $).
+
+---
+
+### 479. Keyword value score consolidation — one intent classifier + Layer-1 component interface (PR 1 + PR 2)
+
+**What it does:** Establishes the keystone foundation for the `kwv-one-score-everywhere` sprint. PR 1 makes `deriveValueIntent` (`server/scoring/keyword-value-score.ts`) the single keyword intent classifier for both Layer 1 (Hub value score) and Layer 2 (recommendation OV scorer), retiring `toOpportunityIntent` and the inline copy in `keyword-strategy-enrichment.ts`. Closes the `comparison`-intent drift: a `comparison` keyword was weighted 0.7 in the Hub but 0.5 in recs — both now map to `commercial` (0.7) via the shared classifier. PR 2 (this entry) adds `computeKeywordValueComponents(input, ctx): { score, components }` — a sibling to `computeKeywordValueScore` that exposes the internal `KeywordValueComponents` interface (`commercialValue / demand / winnability / localMultiplier / intent`). `computeKeywordValueScore` becomes a thin wrapper (`.score`) so the 4 existing scalar callers are byte-identical. Signal-gate parity is hard: a gated-out input returns `{ score: undefined, components: undefined }` — locked by test.
+
+**Agency value:** One intent classifier means the Hub and recommendation scorer can never disagree on a keyword's value tier again. The component interface gives the upcoming `kwv-value-breakdown` render layer one vocabulary to work from instead of reverse-engineering the scorer's internal math.
+
+**Client value:** Indirect — the comparison-intent correction ensures a keyword like "invisalign vs braces" scores with commercial weight on both the Hub and recommendation surfaces, so high-intent comparison searches surface correctly in prioritized recommendations.
+
+**Mutual:** Purely additive / output-neutral in PR 2. Provides the shared input-resolution seam that `kwv-real-cpc`, `kwv-value-breakdown`, and the surface re-ranking (`kwv-one-score-everywhere`) will build on. No render change; no flag.
+
+**Files (PR 2):** `server/scoring/keyword-value-score.ts` (`KeywordValueComponents` interface + `computeKeywordValueComponents` sibling + thin `computeKeywordValueScore` wrapper), `tests/unit/keyword-value-score.test.ts` (3 new component-interface tests incl. gated-undefined parity).
+
+---
+
+### 478. Tracked-keyword gap provenance pointer (`sourceGapKey`) — Wave 3d-i (ADDITIVE, behavior-preserving)
+
+**What it does:** Persists a content-addressed provenance pointer, `sourceGapKey`, on tracked keywords so the platform can answer *which content-gap / keyword-gap a tracked keyword was approved from*. When a keyword is approved from a `content_gap` / `keyword_gap` feedback surface, the approve path stamps `sourceGapKey = keywordComparisonKey(displayKeyword)` (matching the `content_gaps` PK `(workspace_id, target_keyword)`) in the in-memory mutator that builds the `TrackedKeyword`. The pointer is written to the additive nullable `tracked_keywords.source_gap_key` column (migration 118 — no new migration) and projected by `rowToTrackedKeyword`, so the admin/provenance-bearing read (`listTrackedKeywordRows`, Keyword Command Center) surfaces it. **Behavior-preserving:** the general read path (`getTrackedKeywords`) and every public serializer stay byte-identical to before — the table-first resolver and the blob writer both STRIP `sourceGapKey`, so provenance never leaks into `GET /api/public/tracked-keywords/:id` or the SEO-strategy payload. **FILL-IF-EMPTY:** `replaceAllTrackedKeywordRows` is delete-then-reinsert, so the in-memory value is the only source of truth on reinsert; `withTrackedKeywordsTxn` hydrates `sourceGapKey` from the table before the updater runs, so a later status-only / reconcile write preserves an existing pointer instead of nulling it, and never overwrites a non-empty one. The sibling `sourcePageId` is DEFERRED — `page_keywords` has no stable surrogate id (its PK is the mutable `page_path`, migration 024), so its column is written NULL and intentionally not projected pending a stable page id.
+
+**Agency value:** Strategists get a stable back-reference from a tracked keyword to the gap that produced it, without any change to existing read surfaces or client output — provenance is admin-only and additive.
+
+**Client value:** None directly — the client read path and public endpoints are byte-identical to before (no provenance exposure).
+
+**Mutual:** Lays the provenance foundation for later keyword-explainability waves (the laundering remap, `inferTrackedKeywordSources`, reconcile auto-deprecation, and `strategyOwned` are 3d-ii) while keeping the 3c-i (shadow) + 3c-ii (read-switch) parity invariants green and unchanged.
+
+**Files:** `shared/types/rank-tracking.ts` (`sourceGapKey?` on `TrackedKeyword`), `server/rank-tracking.ts` (Zod `.optional()` field, `AddTrackedKeywordOptions`, blob strip on write, table hydrate in `withTrackedKeywordsTxn`, fill-if-empty in `addTrackedKeywordToConfig`), `server/tracked-keywords-store.ts` (project `source_gap_key`, persist it in `keywordToParams`, resolver provenance strip), `server/keyword-feedback.ts` (`sourceGapKeyForFeedback` on single + bulk approve), `server/keyword-command-center.ts` (`mergeTrackedKeywordProvenance` + tracking-row whitelist), `shared/types/keyword-command-center.ts` (`sourceGapKey?` on the tracking state), `tests/integration/tracked-keywords-row-table.test.ts` (round-trip / fill-if-empty / strip-no-leak / admin-sees-it).
 
 ### 469. Unified Client Inbox — PriorityStrip + uniform Approve / Request changes / Decline (built dark — `unified-inbox` flag)
 
@@ -126,17 +467,19 @@ A comprehensive value assessment of every feature in the platform — **471 feat
 
 ---
 
-### 468. Unified Opportunity Value Recommendation Model (built dark — pending owner-gated flip)
+### 468. Unified Opportunity Value Recommendation Model
 
-**What it does:** Replaces the recommendation engine's per-producer magic-constant scores (severity 60/35/15, quick-win 75/55/35, ranking-opp flat 60/40, `impressions/50`, …) with one shared, data-grounded `computeOpportunityValue()` (`server/scoring/`) that every producer branch calls — technical, quick-win, content-gap, striking-distance, decay, freshness, diagnostic. Each rec gets a commensurable Opportunity Value: expected-value-grounded (demand × winnability-vs-authority × commercial intent ÷ effort), confidence-discounted so an ungrounded LLM "high" can never outrank a grounded opportunity, per-workspace outcome-calibrated (realized `attributed_value`), and lifted by a decaying timing boost when an opportunity event fires (competitor overtake, content decay, rank decline). Surfaced coherently to the AI advisor, the client `#1` card (relative ROI badge + a "why this is #1" component breakdown — **never raw dollars**, owner decision), and the public payloads. Built across 7 phase PRs (#1001–#1007): the pure scorer + CTR-curve, persistence (Zod lockstep), Spine-A wiring behind a flag-off selector, shadow divergence logging (`ov_divergence`: legacy-#1 vs OV-#1), real referring-domains authority + outcome calibration + calibrated weights (migrations 108/109), advisor+client coherence, and the `opportunity_events` ledger + detectors (migration 110). Ships behind three default-OFF flags (`opportunity-value-scorer`, `-calibration`, `-events`).
+**What it does:** Replaces the recommendation engine's per-producer magic-constant scores (severity 60/35/15, quick-win 75/55/35, ranking-opp flat 60/40, `impressions/50`, …) with one shared, data-grounded `computeOpportunityValue()` (`server/scoring/`) that every producer branch calls — technical, quick-win, content-gap, striking-distance, decay, freshness, diagnostic. Each rec gets a commensurable Opportunity Value: expected-value-grounded (demand × winnability-vs-authority × commercial intent ÷ effort), confidence-discounted so an ungrounded LLM "high" can never outrank a grounded opportunity, per-workspace outcome-calibrated (realized `attributed_value`), and lifted by a decaying timing boost when an opportunity event fires (competitor overtake, content decay, rank decline). Surfaced coherently to the AI advisor, the client `#1` card (relative ROI badge + a "why this is #1" component breakdown — **never raw dollars**, owner decision), and the public payloads. Built across 7 phase PRs (#1001–#1007): the pure scorer + CTR-curve, persistence (Zod lockstep), Spine-A wiring behind a temporary legacy↔OV selector, shadow divergence logging (`ov_divergence`: legacy-#1 vs OV-#1), real referring-domains authority + outcome calibration + calibrated weights (migrations 108/109), advisor+client coherence, and the `opportunity_events` ledger + detectors (migration 110). The temporary rollout flags were retired in Feature Audit #452 on 2026-06-04, so Opportunity Value and timing events are now part of the canonical runtime path.
 
 **Agency value:** The ranked queue stops surfacing plausible LLM/heuristic guesses and orders by grounded expected value that re-prioritizes when the world changes — and every `#1` is explainable to the client with the exact drivers.
 
 **Client value:** The single "do this next" reflects real winnability + demand + commercial intent + timing with a transparent ROI rationale — not a title fix on a dead page.
 
-**Mutual:** One scoring spine the dashboard, the advisor, and the client all read, self-correcting from real outcomes. **Currently dark** (flags off); the production cutover is owner-gated on a shadow-divergence review — see roadmap `ov-flag-flip-cutover` and `docs/designs/2026-05-31-opportunity-value-model.md`.
+**Mutual:** One scoring spine the dashboard, the advisor, and the client all read, self-correcting from real outcomes. The shadow-divergence log remains as a historical validation/debugging surface, but the runtime cutover is complete and no longer waits on a feature-flag flip.
 
-**OV Divergence Dashboard (2026-06-02):** The shadow-divergence review that gates the flag flip now has a UI. `OvDivergencePanel` (`src/components/admin/OvDivergencePanel.tsx`) is an admin-only, per-workspace diagnostic mounted as a collapsible (default-collapsed) section at the bottom of the Meeting Brief (`MeetingBrief/MeetingBriefPage.tsx`, which receives `workspaceId`). It reads the `ov_divergence` shadow log via `useOvDivergence` → `ovDivergenceApi.list(workspaceId, 50)` (query key `admin.ovDivergence`; admin endpoint `GET /api/ov-divergence/:workspaceId` under the global APP_PASSWORD gate). Headline (decision-support): the **agree rate** ("OV agrees with legacy in X of N recent generations (Y%)" — colored emerald ≥80% / amber ≥50% / red below) plus two red-flag counts — `invariantHeld === false` (grounded-beats-ungrounded invariant broken) and `ovTopRecId === null` (OV produced no pick), both shown via `CompactStatBar`. Below it, a disagreement list (rows where `agree === false`) showing legacy #1 vs OV #1 with the OV pick's confidence / EMV / grounded-spine (blue data badges) and an invariant indicator; each row expands (`ClickableRow`) to reveal the legacy top-3 vs OV top-3 side by side plus the per-rec `legacy → OV` score deltas. Loading/error/empty via `LoadingState`/`ErrorState`/`EmptyState`. Read-only, no client exposure, no feature flag (shadow data is always collected). v1 is per-workspace; a cross-workspace aggregate rollup would need a new endpoint (out of scope).
+**Event regen single-flight hardening (2026-06-05):** Opportunity-event timing regens and delayed keyword-strategy follow-ons now share one per-workspace runtime authority via `server/recommendation-regen-scheduler.ts`. The 90s `triggerOpportunityRegen()` debounce still collapses event bursts, but its execution now routes through the same single-flight path the follow-on queue uses, preventing overlapping `generateRecommendations()` runs for the same workspace when event bursts and post-update refreshes collide. This is cleanup/hardening only: no public API or UI change, no new recommendation minting, and no feature-flag reintroduction.
+
+**OV Divergence Dashboard (2026-06-02):** The shadow-divergence review that gated the flag flip has a UI. `OvDivergencePanel` (`src/components/admin/OvDivergencePanel.tsx`) is an admin-only, per-workspace diagnostic mounted as a collapsible (default-collapsed) section at the bottom of the Meeting Brief (`MeetingBrief/MeetingBriefPage.tsx`, which receives `workspaceId`). It reads the `ov_divergence` shadow log via `useOvDivergence` → `ovDivergenceApi.list(workspaceId, 50)` (query key `admin.ovDivergence`; admin endpoint `GET /api/ov-divergence/:workspaceId` under the global APP_PASSWORD gate). Headline (decision-support): the **agree rate** ("OV agrees with legacy in X of N recent generations (Y%)" — colored emerald ≥80% / amber ≥50% / red below) plus two red-flag counts — `invariantHeld === false` (grounded-beats-ungrounded invariant broken) and `ovTopRecId === null` (OV produced no pick), both shown via `CompactStatBar`. Below it, a disagreement list (rows where `agree === false`) showing legacy #1 vs OV #1 with the OV pick's confidence / EMV / grounded-spine (blue data badges) and an invariant indicator; each row expands (`ClickableRow`) to reveal the legacy top-3 vs OV top-3 side by side plus the per-rec `legacy → OV` score deltas. Loading/error/empty via `LoadingState`/`ErrorState`/`EmptyState`. Read-only, no client exposure, no feature flag. Historical rows remain available for debugging/review; new runtime rows are no longer written now that legacy scoring has been removed. v1 is per-workspace; a cross-workspace aggregate rollup would need a new endpoint (out of scope).
 
 ---
 
@@ -429,7 +772,7 @@ The rollout remains intentionally orchestration-light: no server-side AI rewrite
 
 ### 446. Multi-Location Local SEO Business Match
 
-**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer links directly to `?tab=locations` and summarizes configured/needs-review locations.
+**What it does:** Matches local visibility results against multiple client-owned physical locations and gives admins a dedicated management UI. Workspaces can store `client_locations` with branch names, domains, phone numbers, addresses, status, and future per-location strategy fields. Local visibility snapshots record the matched location ID/name, match evaluation checks every configured location, client-owned branches are scrubbed from `top_competitors`, and a background job recalculates historical snapshots after location changes. Workspace Settings now includes a Locations tab for CRUD, seed-from-business-profile confirmation, review/confirm flows, and delete confirmation. The Local SEO setup drawer now links directly to the Brand Hub `business-footprint` surface and summarizes configured/needs-review locations.
 
 **Agency value:** Fixes the credibility gap where a client’s own branch listings could appear as competitors. Strategists get cleaner local pack reporting, a backfill path for historical snapshots, and a low-friction settings surface for keeping branch identity data accurate.
 
@@ -679,6 +1022,8 @@ Reference docs:
 
 **Mutual:** A typed contract keeps admin and client analytics interpretation aligned.
 
+**Hardening update (2026-06-08):** GA4/GSC provider and route contracts now normalize GA4 rate metrics to display percentages, use GA4 `keyEvents` for conversion summaries, carry top-page `sessions` through shared types, use inclusive GSC date windows, paginate page-level GSC reads, validate public analytics date ranges strictly, expose admin GA4 reads independent of client-portal visibility, and invalidate GA4/GSC analytics caches after workspace integration updates.
+
 ---
 
 ### 364. Shared URL/Tab Search Param Helper
@@ -866,7 +1211,7 @@ Reference docs:
 ---
 
 ### 8. Content Brief Generator
-**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word. **Audit Fix→ pre-fill**: when arriving from the Site Health Audit Fix→ button for thin content issues, the keyword field is automatically pre-filled with the page name (hyphens converted to spaces) so the user can immediately generate a brief. **Page-type briefs**: 7 page types (blog, landing, service, location, product, pillar, resource) with type-specific AI prompt instructions — each type gets tailored guidance for word count, structure, schema, CTAs, outline format, and content approach. `pageType` stored on both `ContentBrief` and `ContentTopicRequest` models. Page type selector in pricing modal and topic submission form. Brief generation endpoint passes `pageType` to the AI prompt. Content request cards show page type badges. **Enhanced AI context pipeline**: brief generation now enriches prompts with multiple data sources run in parallel — knowledge base (`buildKnowledgeBase`), keyword map context (`buildKeywordMapContext`), audience personas (`buildPersonasContext`), reference URL scraping (up to 5 competitor/inspiration URLs scraped and summarized via `web-scraper.ts`), real Google SERP data (top results + People Also Ask questions scraped for the target keyword via `scrapeSerpData`), and GA4 top-performing page content as style examples (highest-engagement pages scraped for tone/structure reference). All new context blocks are injected into the AI prompt for dramatically improved brief relevance and quality. **Reference URLs input**: Advanced Options panel in the generator form accepts competitor/inspiration URLs (one per line) — scraped content informs the AI about existing high-quality content on the topic. **Audience Personas**: workspace-level persona definitions (name, description, pain points, goals, objections, buying stage, preferred content format) managed in Workspace Settings → Features; injected into both brief generation and full post generation prompts so content speaks directly to defined audience segments. **Prompt standardization (April 2026):** Brief generation adds workspace learnings block (`getWorkspaceLearnings` → `formatLearningsForPrompt`, gated on `outcome-ai-injection` flag). Prompt restructured from single user message to system + user pair; system message uses `buildSystemPrompt()` for voice DNA + custom notes. `responseFormat: { type: 'json_object' }` added for JSON output reliability. **Template cross-reference hardening (May 2026):** keyword-triggered matrix matches now surface the owning template in the brief generator UI, prefer custom cell keywords over target keywords, auto-fill page type when blank, and inject matched template sections/style/title/meta patterns into brief generation.
+**What it does:** AI-generates full content briefs from keyword strategy data — suggested titles, outlines, word count targets, internal linking opportunities, competitor analysis, E-E-A-T guidelines, content checklists, and schema recommendations. Supports **Brief vs. Full Post** service tiers with configurable pricing. Branded HTML export and AI tool export formats. Full client approval workflow: submit topic → generate brief → client reviews → approve/decline/request changes → upgrade to full post. **SEMRush enrichment**: when configured, briefs include real keyword volume, difficulty, CPC, competition data, and related keywords from SEMRush instead of AI-estimated values. **Inline editing**: all key brief fields (title, meta, summary, outline headings/notes/word counts, audience, tone, CTAs, competitor insights, word count target, intent, format) are editable in-place with auto-save on blur. **Improved GSC filtering**: related queries now match any significant keyword word (length > 2) instead of only the first word. **Audit Fix→ pre-fill**: when arriving from the Site Health Audit Fix→ button for thin content issues, the keyword field is automatically pre-filled with the page name (hyphens converted to spaces) so the user can immediately generate a brief. **Page-type briefs**: 7 page types (blog, landing, service, location, product, pillar, resource) with type-specific AI prompt instructions — each type gets tailored guidance for word count, structure, schema, CTAs, outline format, and content approach. `pageType` stored on both `ContentBrief` and `ContentTopicRequest` models. Page type selector in pricing modal and topic submission form. Brief generation endpoint passes `pageType` to the AI prompt. Content request cards show page type badges. **Enhanced AI context pipeline**: brief generation now enriches prompts with multiple data sources run in parallel — knowledge base (`buildKnowledgeBase`), keyword map context (`buildKeywordMapContext`), audience personas (`buildPersonasContext`), reference URL scraping (up to 5 competitor/inspiration URLs scraped and summarized via `web-scraper.ts`), real Google SERP data (top results + People Also Ask questions scraped for the target keyword via `scrapeSerpData`), and GA4 top-performing page content as style examples (highest-engagement pages scraped for tone/structure reference). All new context blocks are injected into the AI prompt for dramatically improved brief relevance and quality. **Reference URLs input**: Advanced Options panel in the generator form accepts competitor/inspiration URLs (one per line) — scraped content informs the AI about existing high-quality content on the topic. **Audience Personas**: workspace-level persona definitions (name, description, pain points, goals, objections, buying stage, preferred content format) managed in Workspace Settings → Features; injected into both brief generation and full post generation prompts so content speaks directly to defined audience segments. **Prompt standardization (April 2026):** Brief generation adds a workspace learnings block (`getWorkspaceLearnings` → `formatLearningsForPrompt`); the former `outcome-ai-injection` gate was retired in the Outcome Feature Flag Retirement PR1 so learnings now resolve through the default availability path. Prompt restructured from single user message to system + user pair; system message uses `buildSystemPrompt()` for voice DNA + custom notes. `responseFormat: { type: 'json_object' }` added for JSON output reliability. **Template cross-reference hardening (May 2026):** keyword-triggered matrix matches now surface the owning template in the brief generator UI, prefer custom cell keywords over target keywords, auto-fill page type when blank, and inject matched template sections/style/title/meta patterns into brief generation.
 
 **Agency value:** Briefs that used to take 1-2 hours each are generated in under a minute with real search data baked in. Service tier pricing built in. Inline editing lets the team refine AI output without regenerating. The enriched context pipeline means briefs now incorporate knowledge base, competitor content analysis, real SERP data, audience personas, and top-performing content patterns — producing briefs that rival human strategist output. Quality guardrails ensure briefs avoid corporate buzzwords, provide proper H3 substructure, and use the full sitemap for link suggestions.
 
@@ -1482,7 +1827,7 @@ Reference docs:
 ---
 
 ### 52. AI Recommendations Engine
-**What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. Client-facing `FixRecommendations.tsx` surfaces recommendations with severity badges and "Fix →" routing to appropriate tools. `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook. Site-wide issues (duplicate titles, orphan pages, etc.) now list specific affected pages with traffic data instead of generic "affects all pages" messaging.
+**What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. (The original client surface `FixRecommendations.tsx` was removed as dead code 2026-06-10 / H1 sweep — client recommendations render via the client dashboard recommendations card.) `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook. Site-wide issues (duplicate titles, orphan pages, etc.) now list specific affected pages with traffic data instead of generic "affects all pages" messaging.
 
 **Tier 1 recommendation intelligence enhancements (April 2026):**
 - **(Item 2) Conversion-weighted traffic scoring**: `getTrafficScore()` now accepts an optional `conversionRate` parameter. Pages with CVR > 2% receive up to a 1.5x traffic score boost (proportional to CVR, capped at 1.5x), ensuring high-converting pages are prioritized even with moderate traffic. Conversion rates sourced from `conversion_attribution` insights.
@@ -1490,6 +1835,8 @@ Reference docs:
 - **(Item 1) CTR gap metadata recommendations**: Pulls `ctr_opportunity` insights from the insight store and creates `metadata` type recommendations for pages underperforming their expected CTR for their SERP position. Click gaps >50 → `fix_now`; >30 → `fix_soon`. Up to 10 per run sorted by click gap.
 - **(Item 5) Search intent mismatch detection**: `inferPageType()` classifies pages from slug patterns; `isIntentMismatch()` flags mismatches (service page targeting informational keyword, blog targeting transactional) and emits `strategy` type `fix_soon` recommendations. Capped at 10 per run.
 - **(Item 6) Diagnostic remediation auto-creation**: Completed diagnostic reports with P0/P1 remediation actions auto-generate `fix_now` `technical` or `content` recommendations. Up to 3 reports × 5 actions each per run.
+
+**Public read-path hardening (Task #13, June 2026):** `GET /api/public/recommendations/:wsId` no longer auto-generates inline on a cache-miss (the heavy `generateRecommendations()` pipeline was holding the HTTP connection through a multi-step audit/AI/store walk on every cold read). The read path now returns the last-known set, or an empty set for a known-but-ungenerated workspace, or an honest `404` for an unknown workspace — generation stays on its two real triggers (the post-audit `SEO_AUDIT` job and the explicit `POST .../generate`). Both public routes (GET + `POST .../generate`) are now soft-gated with `requireClientPortalAuth()` (matches the sibling PATCH/DELETE): password-set workspaces require a session, passwordless/demo portals pass through so the client `useRecommendations`/`InsightsEngine` token-less fetch keeps working. The `// public-no-auth-ok` inline hatches were removed.
 
 **Agency value:** Automatically identifies the highest-impact SEO actions after every audit. No manual analysis needed — recommendations are prioritized by traffic impact, domain authority, and diagnostic findings.
 
@@ -1500,7 +1847,7 @@ Reference docs:
 ---
 
 ### 53. SEO Self-Service Cart & Checkout
-**What it does:** Client-facing `SeoCart.tsx` and `useCart.tsx` enable clients to add recommended fixes to a cart (meta fixes, schema pages, redirect fixes) and checkout via Stripe. Cart items carry `pageIds` through to Stripe metadata, which flows into work order creation on payment. `FixRecommendations.tsx` surfaces purchasable fix actions based on audit findings.
+**What it does:** Client-facing `SeoCart.tsx` and `useCart.tsx` enable clients to add recommended fixes to a cart (meta fixes, schema pages, redirect fixes) and checkout via Stripe. Cart items carry `pageIds` through to Stripe metadata, which flows into work order creation on payment. (`FixRecommendations.tsx`, which surfaced purchasable fix actions, was removed as dead code 2026-06-10 / H1 sweep.)
 
 **Agency value:** Revenue from fix services without manual quoting or invoicing. Clients self-serve the purchase flow.
 
@@ -1592,6 +1939,8 @@ Reference docs:
 
 **Agency value:** Eliminates the manual copy-paste step between content generation and CMS publishing. One-click (or zero-click with auto-publish) from approved content to live site. AI field mapping means no manual configuration for each Webflow collection schema. GPT Image featured images remove the need for stock photo sourcing.
 
+**Update (2026-06-10, C3 / audit item #12 — publish service extraction):** Both publish paths now route through ONE shared domain service, `server/domains/content/publish-post-to-webflow.ts` (`publishPostToWebflow()`), consumed by the manual route AND the auto-publish path. This closed three drifts: (a) auto-publish-on-approval was a **silent fire-and-forget** detached promise whose failures only `log.warn`-ed — it now runs as a background `CONTENT_PUBLISH` job (`server/content-publish-job.ts`) so failures surface as job `error` + activity and the editor gets progress/failure UX via `useJobProgress` + the `CONTENT_PUBLISHED` broadcast; (b) auto-publish wrote a **strict subset** of the field map (missing `summary` from the brief and `featuredImage`) — both paths now build the identical superset field map (field-map parity contract test); (c) the rec-regen follow-on `queueKeywordStrategyPostUpdateFollowOns` was **skipped on the approval path** — it now lives inside the shared service so it fires on BOTH paths. Manual publish stays synchronous (single foreground Webflow round-trip, UI expects the inline `{ success, post }` result); only auto-publish became a job. Post status `approved` remains TERMINAL — publishing is a side effect via `webflowItemId`/`publishedAt`/`publishedSlug`, not a status transition. Outcome `recordAction` keeps its `getActionByWorkspaceAndSource` dedup guard so job retries never double-record.
+
 **Client value:** Approved content goes live immediately — no waiting for the agency to manually publish. The approval workflow becomes the publish trigger, giving clients direct control over when content appears on their site.
 
 **Mutual:** Transforms the content pipeline from brief → AI generation → approval → manual publish into a fully automated flow. Reduces time-to-publish from hours to seconds. The field mapping AI adapts to any Webflow CMS structure, making onboarding new clients trivial.
@@ -1628,6 +1977,17 @@ Reference docs:
 **Client value:** Content that speaks to their actual audience segments from day one. Each persona's pain points and goals are addressed naturally in generated content.
 
 **Mutual:** Transforms audience research from a multi-hour workshop exercise into a one-click starting point. Generated personas can be refined, but the initial set is specific enough to dramatically improve content targeting.
+
+---
+
+### 66a. Brand & AI Business Footprint Consolidation
+**What it does:** Reorganizes Brand Hub IA so Business Profile and Locations are edited together in a single `business-footprint` tab while preserving their separate storage authorities. `workspace.businessProfile` remains the schema/contact source of truth, `client_locations` remains the local-SEO operational source of truth, and `workspace.intelligenceProfile` remains a separate strategic AI context editor. Brand Hub now treats `business-footprint` as the canonical deep-link target, while legacy `?tab=business-profile` and `?tab=locations` URLs still resolve through alias handling. Overview now opens with compact snapshot cards for Current Context, Intelligence Profile, Business Profile, and Locations before the richer current-context editing sections below.
+
+**Agency value:** Reduces navigation churn in Brand & AI by grouping the two admin surfaces that are most often reviewed together without introducing a risky data-model merge. Schema and local-SEO workflows now point to one canonical destination.
+
+**Client value:** Indirect. The agency has a clearer, faster setup flow for business identity and local footprint data, which improves schema quality and local SEO matching reliability.
+
+**Mutual:** The platform now has one stable Brand Hub destination for business-footprint fixes, while still honoring old bookmarks and helper links. This lowers future UX drift and keeps schema/local-SEO guidance aligned.
 
 ---
 
@@ -3850,7 +4210,11 @@ When the user asks to update this document with recent features, follow this pro
 ## Outcome Intelligence
 
 ### 189. Outcome Intelligence Engine
-**What it does:** Platform-wide action tracking and outcome measurement system. Records actions from 10+ systems (content publishing, SEO fixes, schema changes, strategy updates, brief generation, keyword mapping, redirects, performance work, approvals, annotation events), then measures results at 7/30/60/90-day checkpoints using GSC clicks/impressions and GA4 sessions/conversions. Each action is scored as `strong_win`, `win`, `neutral`, `loss`, or `inconclusive` based on traffic delta thresholds. Feature flagged: `outcome-tracking`.
+**What it does:** Platform-wide action tracking and outcome measurement system. Records actions from 10+ systems (content publishing, SEO fixes, schema changes, strategy updates, brief generation, keyword mapping, redirects, performance work, approvals, annotation events), then measures results at 7/30/60/90-day checkpoints using GSC clicks/impressions and GA4 sessions/conversions. Each action is scored as `strong_win`, `win`, `neutral`, `loss`, or `inconclusive` based on traffic delta thresholds. Default-on; the former `outcome-tracking` flag was retired in PR1 of the feature-flag retirement epic.
+
+**2026-06-10 strategy outcome visibility (A3, audit #14):** Keyword strategy work is now fully visible to outcome tracking. (1) Dropped the once-ever guard in `server/keyword-strategy-persistence.ts` — every regeneration records a NEW strategy-level action (`sourceType: 'strategy'`) instead of being suppressed forever after the first. (2) Net-new pageMap primaries now record per-keyword actions (`sourceType: 'strategy_page_keyword'`, exported as `STRATEGY_PAGE_KEYWORD_SOURCE_TYPE`) with a real normalized `pageUrl` + `targetKeyword` and a baseline seeded from the entry's GSC metrics, so the measurement cron can score them at the 7/30/60/90-day checkpoints. Idempotency is DB-backed via the deterministic `strategyPageKeywordSourceId(pagePath, primaryKeyword)` key in `server/outcome-tracking.ts` (self-normalizing; checked through `getActionByWorkspaceAndSource`), so re-running regeneration — or a pair removed and later re-added — never duplicates an action. B2's `/planned/<slug>` placeholder paths are skipped (not live URLs, nothing to measure); A4's Hub track/promote seam is expected to reuse the same key shape to share the dedup space. Tests: `tests/integration/a3-strategy-outcome-visibility.test.ts`.
+
+**2026-06-11 predictedEmv snapshots + effort priors + P6 calibration cron (A5, audit #20):** Every recommendation-completion path now snapshots the rec's OV `predictedEmv` onto the tracked action. The live PATCH route already did; `backfillCompletedRecommendations` (the weekly catch-up for recs completed in-place by `resolveRecommendationsForChange`, which records no action itself) previously hardcoded `predictedEmv: null` — it now reads `opportunity.predictedEmv` from the rec blob. A new repair pass (`backfillPredictedEmvSnapshots` in `server/outcome-backfill.ts`) best-effort fills pre-A5 NULL snapshots from the current blob via `fillPredictedEmvIfNull` (`server/outcome-tracking.ts` — gated on `predicted_emv IS NULL`, so a captured snapshot is immutable; 0/absent predictions never fill). New weekly cron `server/outcome-emv-calibration.ts` (registered in `server/outcome-crons.ts`, migration 131 `outcome_emv_calibration`) recomputes per (workspace, actionType): (1) the P6 realized-vs-predicted pairing — `median(attributed_value / predicted_emv)` over conclusive executed outcomes, `conclusive` only at ≥5 pairs, honest `inconclusive` with NULL ratio below the floor (FM-2); (2) effort priors — median days from rec creation to completion over live platform-executed actions (backfill rows excluded; ≥3 samples), exposed via `getEffortPriorDays()` as the calibration path for `DEFAULT_EFFORT_DAYS` in the OV scorer. `not_acted_on` actions contribute to neither signal (A1 semantics). Consumers (the `computeOvCalibration` basis flip, OV effortDays threading) are deliberate follow-ups — see `data/roadmap.json:ov-calibration-realized-vs-predicted-emv`. Tests: `tests/integration/a5-predicted-emv-snapshots.test.ts`.
 
 **Agency value:** Closes the loop on every recommendation and execution — the platform answers "did that work?" with real data, not gut feel. Demonstrates ROI on every action taken inside the dashboard.
 
@@ -3861,7 +4225,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 190. Workspace Learnings
-**What it does:** AI feedback loop that aggregates outcome data into structured learnings injected into all AI prompts. After measuring outcomes, the system identifies patterns — what works, what doesn't, which pages respond to which action types — and surfaces them as structured `WorkspaceLearning` objects. Confidence thresholds: high (25+ scored outcomes), medium (10–24), low (<10). Learnings are injected into schema generation, content brief, strategy, and chat advisor prompts. Feature flagged: `outcome-ai-injection`.
+**What it does:** AI feedback loop that aggregates outcome data into structured learnings injected into all AI prompts. After measuring outcomes, the system identifies patterns — what works, what doesn't, which pages respond to which action types — and surfaces them as structured `WorkspaceLearning` objects. Confidence thresholds: high (25+ scored outcomes), medium (10–24), low (<10). Learnings are injected into schema generation, content brief, strategy, and chat advisor prompts. Default-on; the former `outcome-ai-injection` flag was retired in PR1 of the feature-flag retirement epic.
 
 **Agency value:** The AI gets smarter about each client over time. Recommendations are grounded in what has actually worked for that specific workspace — not generic best practices.
 
@@ -3872,7 +4236,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 191. Outcomes Dashboard (Admin)
-**What it does:** Admin dashboard with a win-rate scorecard, chronological action feed, top wins panel, and learnings summary panel. 4-tab layout (Overview, Actions, Wins, Learnings) with filterable views by action type and time range. Win rate ring uses `scoreColor()` scale (green ≥70, amber 40–69, red <40). Score badges: green = strong_win/win, amber = neutral, red = loss, zinc = insufficient_data/inconclusive. Feature flagged: `outcome-dashboard`.
+**What it does:** Admin dashboard with a win-rate scorecard, chronological action feed, top wins panel, and learnings summary panel. 4-tab layout (Overview, Actions, Wins, Learnings) with filterable views by action type and time range. Win rate ring uses `scoreColor()` scale (green ≥70, amber 40–69, red <40). Score badges: green = strong_win/win, amber = neutral, red = loss, zinc = insufficient_data/inconclusive. Default-on; the former `outcome-dashboard` flag was retired in PR1 of the feature-flag retirement epic.
 
 **Agency value:** One screen answers "what are we winning at, what's not working, and what has the AI learned?" Filterable action feed makes account reviews faster. Win rate ring provides instant portfolio health signal.
 
@@ -3883,7 +4247,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 192. Client Outcome Reporting
-**What it does:** Tiered client views showing outcome results with tone and depth matched to plan tier. Free tier: top 3 wins only. Growth tier: full scorecard with win rate ring and action summary. Premium tier: detailed breakdown with action-by-action results, delta indicators, and trend charts. Includes the "We Called It" feature for wins on externally detected recommendations — surfaces in the client dashboard when GSC/GA4 improvement is detected on a page that had an unimplemented recommendation. Feature flagged: `outcome-client-reporting`.
+**What it does:** Tiered client views showing outcome results with tone and depth matched to plan tier. Free tier: top 3 wins only. Growth tier: full scorecard with win rate ring and action summary. Premium tier: detailed breakdown with action-by-action results, delta indicators, and trend charts. Includes the "We Called It" feature for wins on externally detected recommendations — surfaces in the client dashboard when GSC/GA4 improvement is detected on a page that had an unimplemented recommendation. Default-on; the former `outcome-client-reporting` flag was retired in PR1 of the feature-flag retirement epic. **Live on the client Overview (June 2026, core-features E5 / audit #5):** `OutcomeSummary` ("Your results" scorecard — TierGate-tiered free/growth/premium, empty state until the first outcomes are scored) and the `WinsSurface` wins ledger (backported from the briefing-v2 layout per owner decision #23) now mount on the legacy client Overview tab. The public summary endpoint serializes the full scorecard (`strongWinRate` + `pendingMeasurement` included — previously omitted, which rendered NaN% in the component). Win entries resolve the REAL source title via `sourceType`/`sourceId` (recommendation → rec title, client action → title, post → title, brief → suggested title, content request → topic) with an honest generic per-action-type fallback — the fabricated `"<action_type> action"` recommendation string is gone. Realized dollar attribution (`action_outcomes.attributed_value`) now rides `TopWin`/`OutcomeWinEntry` and renders formatted in the admin Top Wins tab and the client wins ledger (blue = data per the Four Laws).
 
 **Agency value:** Outcome reporting becomes a retention and upsell tool. Free-tier clients see the value; Growth/Premium clients get full transparency.
 
@@ -3894,7 +4258,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 193. External Execution Detection
-**What it does:** Detects when recommendations are implemented outside the platform (e.g., client or developer acts on a recommendation without using the dashboard). Compares GSC/GA4 performance against pages with open recommendations. Triggers a confirmation window requiring 2 consecutive detection cycles before marking as externally executed — prevents false positives from normal ranking volatility. Creates a `platform_action` record with source `external_detection` when confirmed. Feature flagged: `outcome-external-detection`.
+**What it does:** Detects when recommendations are implemented outside the platform (e.g., client or developer acts on a recommendation without using the dashboard). Compares GSC/GA4 performance against pages with open recommendations. Triggers a confirmation window requiring 2 consecutive detection cycles before marking as externally executed — prevents false positives from normal ranking volatility. Creates a `platform_action` record with source `external_detection` when confirmed. Default-on; the former `outcome-external-detection` flag was retired in PR1 of the feature-flag retirement epic.
 
 **Agency value:** Captures credit for recommendations that were acted on outside the tool. Win rate stays accurate even when clients implement changes manually.
 
@@ -3905,7 +4269,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 194. Multi-Workspace Outcomes Overview
-**What it does:** Cross-workspace table in the admin Command Center showing win rates, recent trends, outcome counts, and attention flags for every workspace. Aggregate stats bar shows platform-wide totals (total actions, total wins, average win rate). Sortable by win rate, trend direction, and total actions. Workspaces with declining win rates or low outcome counts are flagged for attention. Part of `outcome-dashboard` feature flag.
+**What it does:** Cross-workspace table in the admin Command Center showing win rates, recent trends, outcome counts, and attention flags for every workspace. Aggregate stats bar shows platform-wide totals (total actions, total wins, average win rate). Sortable by win rate, trend direction, and total actions. Workspaces with declining win rates or low outcome counts are flagged for attention. Default-on as part of the Outcomes Dashboard.
 
 **Agency value:** Portfolio-level outcome visibility in one screen. Quickly identifies which clients are seeing wins and which need strategy adjustments. Outcome trends surface account health proactively.
 
@@ -3916,7 +4280,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 195. Action Playbooks
-**What it does:** Pattern detection from multi-action pages. Analyzes pages where 3+ actions were executed and discovers reusable action sequences with historical win rates. A playbook captures the ordered sequence of action types, the average traffic delta achieved, and the number of times that sequence has been executed. Playbooks are surfaced in the admin Outcomes Dashboard and can be referenced by the AI advisor when making recommendations for similar page types. Feature flagged: `outcome-playbooks`.
+**What it does:** Pattern detection from multi-action pages. Analyzes pages where 3+ actions were executed and discovers reusable action sequences with historical win rates. A playbook captures the ordered sequence of action types, the average traffic delta achieved, and the number of times that sequence has been executed. Playbooks are surfaced in the admin Outcomes Dashboard and can be referenced by the AI advisor when making recommendations for similar page types. Default-on; the former `outcome-playbooks` flag was retired in PR1 of the feature-flag retirement epic.
 
 **Agency value:** Converts tacit knowledge ("what we usually do for service pages") into explicit, measurable playbooks. Replicates winning sequences across the portfolio.
 
@@ -3927,7 +4291,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 196. Backfill Engine
-**What it does:** Retroactive action creation from historical platform data. On first run, scans `generated_posts`, `analytics_insights`, and `recommendation_sets` tables and creates `platform_action` records for past activity — so the outcome measurement system has historical data to measure from day one. Designed to run once and be idempotent (safe to re-run without creating duplicates). Uses a `backfill_completed` flag to skip on subsequent runs. Part of `outcome-tracking` feature flag.
+**What it does:** Retroactive action creation from historical platform data. On first run, scans `generated_posts`, `analytics_insights`, and `recommendation_sets` tables and creates `platform_action` records for past activity — so the outcome measurement system has historical data to measure from day one. Designed to run once and be idempotent (safe to re-run without creating duplicates). Uses a `backfill_completed` flag to skip on subsequent runs. Default-on as part of the Outcome Intelligence Engine.
 
 **Agency value:** New workspaces don't start from zero. Historical content, insights, and recommendations are immediately enrolled in outcome measurement — giving the system data to learn from on day one.
 
@@ -3940,7 +4304,7 @@ When the user asks to update this document with recent features, follow this pro
 ## Unified Workspace Intelligence
 
 ### 197. Unified Workspace Intelligence Layer — Phase 1 (Foundation)
-**What it does:** Shadow infrastructure layer that unifies workspace context (SEO data, insights, learnings, page profiles) into a single cached intelligence object. Three-layer architecture: shared data accessors (cached Webflow page data with workspace-scoped token resolution), intelligence core assembler (`buildWorkspaceIntelligence()` with per-slice graceful degradation, LRU cache, single-flight dedup), and API/frontend surface (`GET /api/intelligence/:workspaceId`, React Query hook). Migrates all 20 `listPages()` callers to centralized `getWorkspacePages()`/`getWorkspaceAllPages()` accessors with 10-minute caching. Shadow-mode comparison in `buildSeoContext()` validates new layer against existing code behind `intelligence-shadow-mode` feature flag. Two-view page cache: published pages (no CMS templates) for HTML scanning, all live pages (including CMS templates, excluding drafts/archived) for collection item enumeration.
+**What it does:** Infrastructure layer that unifies workspace context (SEO data, insights, learnings, page profiles) into a single cached intelligence object. Three-layer architecture: shared data accessors (cached Webflow page data with workspace-scoped token resolution), intelligence core assembler (`buildWorkspaceIntelligence()` with per-slice graceful degradation, LRU cache, single-flight dedup), and API/frontend surface (`GET /api/intelligence/:workspaceId`, React Query hook). Migrates all 20 `listPages()` callers to centralized `getWorkspacePages()`/`getWorkspaceAllPages()` accessors with 10-minute caching. The original rollout used shadow comparison in `buildSeoContext()` behind `intelligence-shadow-mode`; that rollout flag was retired in Feature Audit #452 once the unified path became the canonical runtime. Two-view page cache: published pages (no CMS templates) for HTML scanning, all live pages (including CMS templates, excluding drafts/archived) for collection item enumeration.
 
 **Files:** `shared/types/intelligence.ts` (type definitions), `server/workspace-intelligence.ts` (core assembler + formatter), `server/workspace-data.ts` (cached page accessors), `server/intelligence-cache.ts` (LRU cache + single-flight), `server/routes/intelligence.ts` (API endpoint + health), `src/hooks/admin/useWorkspaceIntelligence.ts` (React Query hook), `src/api/intelligence.ts` (API client), `server/db/migrations/043-intelligence-caching-layer.sql` (DB tables), `server/seo-context.ts` (shadow-mode delegation), 20+ server files migrated from `listPages()` to shared accessors
 
@@ -4306,10 +4670,12 @@ Current feature count: **329**. Last updated: May 2026.
 
 ---
 
-### 287. Voice Feedback Loop
-**What it does:** Classifies steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback is detected, generates voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions are flagged for review — never auto-applied.
+### 287. Voice Feedback Loop — REMOVED 2026-06-10 (H1 dead-code sweep)
+**Status:** Module deleted — `server/copy-voice-feedback.ts` was never wired into any production path (test-only references). The voice-guardrail learning loop concept remains a candidate in the 2026-06-10 audit's data-leverage findings if revived.
 
-**Files:** `server/copy-voice-feedback.ts`
+**What it did:** Classified steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback was detected, generated voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions were flagged for review — never auto-applied.
+
+**Files:** `server/copy-voice-feedback.ts` (REMOVED)
 
 **Agency value:** Steering feedback naturally informs voice profile evolution. Voice-related feedback is surfaced as actionable profile updates instead of being lost in steering history.
 
@@ -4419,7 +4785,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 **Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`
 
-**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. Dark-launched behind `deep-diagnostics` feature flag.
+**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. The diagnostics workflow is now canonical and no longer gated by a rollout flag.
 
 ---
 
@@ -4708,7 +5074,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 **Phase 1a (PR #367, foundation, merged):** Migration `077-briefing-drafts.sql` + 3 new `workspaces` columns (`auto_publish_briefings`, `auto_publish_after_hours`, `last_briefing_run_week_of`); shared types (`BriefingStory`, `BriefingDraft`, `BriefingSummary`, `BriefingCategory`, `ExplorePage`, `PublishedBriefingResponse`); feature flag `client-briefing-v2`; 4 activity types (`briefing_generated`, `briefing_published`, `briefing_skipped`, `briefing_auto_published` — last two client-visible); `WS_EVENTS.BRIEFING_GENERATED` + `BRIEFING_PUBLISHED`; `Workspace` type extension + DB row mapping; admin/client query keys.
 
-**Phase 1b checkpoint #1 (PR #369, pipeline backend, merged):** `server/briefing-store.ts` (DB layer with state-machine `BRIEFING_DRAFT_TRANSITIONS` + workspaceId-scoped mutations + `parseJsonSafeArray`); `server/briefing-prompt.ts` (briefing instructions + Zod-validated AI response schema enforcing 3-5 stories with exactly 1 headline); `server/briefing-candidates.ts` (3 collectors — analytics_insights, recommendations, audit deltas — with materiality scoring `impact × decay × actionability`, no `weCalledIt` per audit decision); `server/briefing-cron.ts` (Monday 14:00 UTC orchestrator with pre-flight freshness check, 3-deferral cap, soft-degrade on `outcome-ai-injection=false`, `runningBriefings` mutex, trial-aware tier resolution via `computeEffectiveTier`); admin routes (`/api/briefing/:wsId/{drafts,...}`); public read endpoint (`GET /api/public/briefing/:wsId`, free → 402, trial-promoted to growth); audit-completion bridge (`bridge-briefing-candidate-refresh`); email helper (`notifyClientBriefingReady`) + render template; `computeEffectiveTier(ws)` extracted to `server/workspaces.ts`.
+**Phase 1b checkpoint #1 (PR #369, pipeline backend, merged):** `server/briefing-store.ts` (DB layer with state-machine `BRIEFING_DRAFT_TRANSITIONS` + workspaceId-scoped mutations + `parseJsonSafeArray`); `server/briefing-prompt.ts` (briefing instructions + Zod-validated AI response schema enforcing 3-5 stories with exactly 1 headline); `server/briefing-candidates.ts` (3 collectors — analytics_insights, recommendations, audit deltas — with materiality scoring `impact × decay × actionability`, no `weCalledIt` per audit decision); `server/briefing-cron.ts` (Monday 14:00 UTC orchestrator with pre-flight freshness check, 3-deferral cap, soft-degrade when outcome learnings are unavailable, `runningBriefings` mutex, trial-aware tier resolution via `computeEffectiveTier`); admin routes (`/api/briefing/:wsId/{drafts,...}`); public read endpoint (`GET /api/public/briefing/:wsId`, free → 402, trial-promoted to growth); audit-completion bridge (`bridge-briefing-candidate-refresh`); email helper (`notifyClientBriefingReady`) + render template; `computeEffectiveTier(ws)` extracted to `server/workspaces.ts`.
 
 **Phase 1b checkpoint #2 (this PR, admin UI):** `src/api/briefing.ts` (typed admin + client wrappers); `src/hooks/admin/useBriefingDrafts.ts` (5 mutations + 1 query, all invalidating `queryKeys.admin.briefingDrafts`); `src/components/admin/BriefingReviewQueue.tsx` (status-badged draft list with expand/collapse, approve/publish/skip + "Generate now" actions, `<Modal>`-based skip confirmation with required note); `src/hooks/useWsInvalidation.ts` registers `BRIEFING_GENERATED` + `BRIEFING_PUBLISHED` handlers; `<BriefingReviewQueue>` rendered on `WorkspaceHome.tsx` next to AnomalyAlerts. Test exemptions removed from contract suites (broadcasts + handlers now both exist).
 
@@ -6217,14 +6583,14 @@ Bug hardening included:
 
 **PR:** #663
 
-### 399. Client Inbox IA Redesign — 3-Section Layout (`new-inbox-ia` flag)
-**What it does:** Restructures InboxTab into three named sections (Decisions / Reviews / Conversations) behind the `new-inbox-ia` feature flag. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where client left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The old single-list layout renders when flag is off. SchemaReviewModal and ClientActionDetailModal are exposed within this layout.
+### 399. Client Inbox IA Redesign — 3-Section Layout
+**What it does:** Establishes the canonical client inbox routing model around Decisions / Reviews / Conversations. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where the client or team left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The pre-cutover fallback layout and the `new-inbox-ia` rollout flag have been retired; `InboxTab` now delegates directly to the unified inbox flow while preserving deep-link aliases.
 
 **Agency value:** Clearer signal routing — each inbox section maps to a distinct client workflow, reducing context-switching in account management.
 
 **Client value:** Simplified navigation — clients see three clear buckets instead of a mixed action queue; section headers communicate what kind of response is expected.
 
-**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab.
+**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab; pr-check rule `Retired unified inbox feature flag key used in flag API` prevents the retired rollout keys from being reintroduced.
 
 **Files:** `src/components/client/InboxTab.tsx`; `shared/types/client-inbox.ts`; `shared/types/routes.ts` (InboxFilter type, CLIENT_INBOX_ALIASES); `tests/unit/inbox-filter-values.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`.
 
@@ -6243,8 +6609,10 @@ Bug hardening included:
 
 **PR:** #662
 
-### 401. ClientActionDetailModal
-**What it does:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
+### 401. ClientActionDetailModal — REMOVED 2026-06-10 (H1 dead-code sweep)
+**Status:** Component deleted with zero production callers — InboxTab no longer mounted it; complex-payload review flows through `DecisionDetailModal`. Entry retained for history.
+
+**What it did:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
 
 **Agency value:** Complex structured-data action reviews now have a dedicated reading surface instead of cramped inline cards.
 
@@ -6823,6 +7191,8 @@ Bug hardening included:
 
 **May 2026 row expansion + localCandidates count fix:** Filtered tabs on staging were inflating beyond their badge counts (Tracked badge 235 / table 275; Visible Locally 1 / table showed many `—` rows). Root cause was `pageMatchesKeys` letting pages survive whole if ANY of their primary/secondary keywords was selected, then `populateDraftRows` materializing a row per page keyword. Replaced with `restrictPageToKeys`, a transformer that trims each surviving page's keywords to only those in the selected key set (and drops pages with nothing left). Added post-materialization filter validation in the skinny rows path with a `rowsDropped` diagnostic in the structured log so future drift surfaces in staging logs. Also fixed `localCandidates: 0` hardcoded in the skinny summary so the badge reflects the bounded candidate generator output. Six regression tests cover tracked sibling pollution, empty-tracking pages, visible_locally / possible_match posture matching, all-count alignment with summary, and the localCandidates badge.
 
+**2026-06-10 client keyword loop closure (B2):** Fixed the ADD_TO_STRATEGY phantom — the action previously wrote `feedback.status='approved'` and a `tracked_keyword` row (causing an IN_STRATEGY lifecycle label) but never wrote to `page_keywords`. The fix adds a `upsertPageKeyword` call inside the same `db.transaction()` block: if the target page already has a strategy entry the keyword is appended as a secondary (with case-insensitive deduplication against the primary and existing secondaries); if no entry exists a new planned page entry is created. Admin `KeywordStrategy.tsx` now shows client-requested keywords with one-click "Add to Strategy" buttons above the declined list. A feedback-since-last-generation amber nudge banner appears when any feedback row is newer than `strategy.generatedAt`. The client-facing `StrategyDeclinedKeywordsSection` now includes an "applies at next update" note. A4 contract: `applyKeywordCommandCenterAction(wsId, { action: 'add_to_strategy', ... })` now guarantees a `page_keywords` write. Tests: 6 new assertions in `tests/integration/b2-client-keyword-loop.test.ts`.
+
 **Agency value:** Gives admins one place to answer the operational keyword questions that were previously scattered: what keywords exist, what state each keyword is in, where it came from, whether it is tracked/retired/declined/raw evidence, and what action is safe next.
 
 **Client value:** Improves the quality and consistency of downstream client-facing strategy because keyword lifecycle decisions are easier for admins to manage intentionally instead of leaking through Rank Tracker, Strategy, and Page Intelligence in slightly different states.
@@ -7000,7 +7370,7 @@ Admins can set a market as primary from `LocalSeoMarketSetupDrawer`, and Keyword
 
 **Scope D (regen-on-local-refresh, `server/local-seo.ts` `runLocalSeoRefreshJob`):** after `refresh_completed` + `addActivity` and before `updateJob(done)`, recompute `useLocalGenQual` and call `generateRecommendations(workspaceId)` in its own try/catch (dynamic import breaks the `recommendations.ts ↔ local-seo.ts` cycle — readers are imported statically the other way). No manual broadcast (generateRecommendations broadcasts + invalidates internally — Bridge rule #3); a regen failure never fails the refresh job; flag-OFF/non-local → complete no-op.
 
-**Full ripple lockstep (one commit):** compile-enforced — `RecType` union + `recommendationOutcomeActionType` exhaustive `never` switch (+2 cases → new ActionTypes, NOT `audit_fix_applied`) + `ActionType` union + `DEFAULT_SCORING_CONFIG` (`Record<ActionType,…>`) +2 entries + the `OpportunityInput.branch` switch + `DEFAULT_EFFORT_DAYS` + **`recommendationSchema.type` enum** (CRITICAL — without it the new recs are silently Zod-dropped on every reload, P5's lesson) + the 3 frontend label maps (`outcomeConstants.ts`, `OutcomeSummary.tsx`, `WinsSurface.tsx`, all `Record<ActionType,…>`) + `REC_TYPE_TAB`/`TYPE_ICONS` (`InsightsEngine.tsx`, `Record<RecType,…>`). pr-check-enforced (`new-rec-type-source-needs-category-and-action-type`) — `RecSourceCategory` union + `REC_SOURCE_CATEGORIES` array +2 + `RecSource.localVisibility`/`localServiceGap` builders. grep-only — `FixRecommendations.tsx` `typeConfig` +2 explicit entries (no fallback-to-technical).
+**Full ripple lockstep (one commit):** compile-enforced — `RecType` union + `recommendationOutcomeActionType` exhaustive `never` switch (+2 cases → new ActionTypes, NOT `audit_fix_applied`) + `ActionType` union + `DEFAULT_SCORING_CONFIG` (`Record<ActionType,…>`) +2 entries + the `OpportunityInput.branch` switch + `DEFAULT_EFFORT_DAYS` + **`recommendationSchema.type` enum** (CRITICAL — without it the new recs are silently Zod-dropped on every reload, P5's lesson) + the 3 frontend label maps (`outcomeConstants.ts`, `OutcomeSummary.tsx`, `WinsSurface.tsx`, all `Record<ActionType,…>`) + `REC_TYPE_TAB`/`TYPE_ICONS` (`InsightsEngine.tsx`, `Record<RecType,…>`). pr-check-enforced (`new-rec-type-source-needs-category-and-action-type`) — `RecSourceCategory` union + `REC_SOURCE_CATEGORIES` array +2 + `RecSource.localVisibility`/`localServiceGap` builders. grep-only — (historical: `FixRecommendations.tsx` `typeConfig` step — file removed 2026-06-10 / H1 sweep, no longer applies).
 
 **Intelligence slice (Data-Flow #6):** `LocalSeoSlice` (`shared/types/intelligence.ts`) gains `serviceGaps[]` + `competitorBrands[]`; `assembleLocalSeo` (`local-seo-slice.ts`) populates them (best-effort, degrade-to-empty) AND `renderLocalSeoBlock` renders them into `effectiveLocalSeoBlock` (the field `formatLocalSeoSection` emits) so AdminChat sees them.
 
@@ -7265,10 +7635,10 @@ Service and location page brief defaults are now shorter and more conversion-den
 
 **What it does:** Makes the recommendation surface internally coherent — the served priority tier, the client-facing gain string, the content-gap ordering (recs + briefing-candidates + upsell badge), and the meeting-brief cache all derive from ONE Opportunity Value / EMV basis instead of divergent magic constants. Adds a durable `predictedEmv` outcome snapshot so the P6 realized-vs-predicted calibration loop has data even while OV ranking is dark.
 
-- **Flag layering (the safety crux).** `useGenQual = isFeatureEnabled('seo-generation-quality', ws.id)` is resolved ONCE per rec-gen cycle next to `useOv` and threaded as a plain boolean (no `isFeatureEnabled` in loops). It is NOT the global `opportunity-value-scorer` flag (that gates only `impactScore` via `pickImpactScore`). Always-on: `predictedEmv` compute/persist/schema/strip + the divergence `ovClone` re-tier. `useGenQual`-gated: served TIER, `estimatedGain` basis, `content_gaps.opportunity_score` recompute.
+- **Canonical runtime scoring (post-cleanup).** The rollout booleans described in the original Phase 4 ship note have now been retired from `server/recommendations.ts`: recommendation runtime scoring is always OV-backed. `impactScore` is written from `opportunity.value`, `priority` is derived from `deriveOvTier(rec)`, and `estimatedGain` is resolved from the same `predictedEmv` basis in one canonical post-pass. Always-on/admin-only remains unchanged: `predictedEmv` compute/persist/schema/strip + the divergence `ovClone` re-tier.
 - **Part C — `predictedEmv` end-to-end (6-leg lockstep, one commit).** `OpportunityScore.predictedEmv` (CPC-proxy placeholder JSDoc) → `computeOpportunityValue` returns `Math.round(emvPerWeek × HORIZON_WEEKS)` (always-on, `HORIZON_WEEKS` stays module-private) → `opportunityScoreSchema.predictedEmv: z.number()` (CLOSED schema, survives reload) → `stripEmvFromPublicRecs` strips it (+ sanitizes `estimatedGain`) → migration **116** (`tracked_actions.predicted_emv` + `tracked_actions_archive.predicted_emv`) + `TrackedActionRow`/`rowToTrackedAction` + `TrackedAction.predictedEmv?` + `recordAction` insert col-list/VALUES/payload + `RecordActionParams.predictedEmv?` + write site 1 (`routes/recommendations.ts`: `rec.opportunity?.predictedEmv ?? null`) + write site 2 (`outcome-backfill.ts`: `null`, documented — can't read opportunity) + `getCalibrationOutcomes` SELECT `ta.predicted_emv` + `CalibrationOutcome.predictedEmv` → `ov-calibration.ts` swap-site doc updated (P4 carries the field; P6 changes the basis).
 - **Archive bug found + fixed.** `archiveOld` was a positional `INSERT … SELECT *, datetime('now')`. ALTER appends `predicted_emv` after `updated_at` on the source but after `archived_at` on the archive (created in migration 041), so `SELECT *` mapped `predicted_emv → archived_at` and `datetime('now') → predicted_emv` (silent corruption on the first 24-month sweep). Converted `archiveOld` to an EXPLICIT column list (order-independent), the same fix migration 106 applied to `archiveOldOutcomes`. Pinned by an archive round-trip test.
-- **Part D — OV-derived tier (Contract 2, `useGenQual`).** `deriveOvTier(rec)` chokepoint AFTER `pickImpactScore` and BEFORE `sortRecommendations` overwrites `rec.priority` from `OV_TIER_BANDS` (value ≥ 70 → fix_now, ≥ 45 → fix_soon, ≥ 20 → fix_later, else ongoing) EXCEPT genuine `CRITICAL_CHECKS` (kept fix_now). Flag-OFF is a NO-OP, so `sortRecommendations`/`priorityOrder`/`computeRecommendationSummary` are byte-identical. **Thresholds are OWNER-TUNABLE and NOT flipped per-workspace in this PR** (owner approves thresholds + canary cohort first). **ovClone tier fix (always-on, G1):** `recordOvDivergence` takes an injected `deriveTier` (no cycle); the OV clone re-tiers before sorting; `Top3Entry.priority` added (+ Zod schema, JSON-blob round-trip, `top3` builder); `OvDivergencePanel` surfaces a per-entry tier badge + a cross-tier `tier X → Y` badge on the #1 disagreement.
+- **Part D — OV-derived tier (Contract 2).** `deriveCanonicalRecommendationFields()` now writes `impactScore` from `opportunity.value` and `priority` from `deriveOvTier(rec)` before `sortRecommendations`, so the live queue has one scoring authority. Genuine `CRITICAL_CHECKS` still keep `fix_now`; the same `OV_TIER_BANDS` thresholds apply (value ≥ 70 → fix_now, ≥ 45 → fix_soon, ≥ 20 → fix_later, else ongoing). **Thresholds are OWNER-TUNABLE**. **ovClone tier fix (always-on, G1):** `recordOvDivergence` takes an injected `deriveTier` (no cycle); the OV clone re-tiers before sorting; `Top3Entry.priority` added (+ Zod schema, JSON-blob round-trip, `top3` builder); `OvDivergencePanel` surfaces a per-entry tier badge + a cross-tier `tier X → Y` badge on the #1 disagreement.
 - **Part E — one gain basis (Contract 3, `useGenQual`).** `buildOvGainString` = a NON-DOLLARIZED outcome-magnitude phrase keyed on `predictedEmv` (bands high ≥ 600 / med ≥ 150 / low ≥ 1). `resolveEstimatedGain` overwrites all 10 `estimatedGain` sites in ONE post-pass chokepoint when `useGenQual` (flag-OFF keeps the legacy `getRecoveryRate` strings). `content_gaps.opportunity_score` recomputed in `keyword-strategy-enrichment.ts` from the OV `value` (0..100, EMV-derived) when `relaxConservatism` — stored as the OV value (NOT raw EMV) so the rec content_gap branch's `cg.opportunityScore/100` spine math stays valid while briefing-candidates + upsell + recs share one basis. `estimatedGain` added to `stripEmvFromPublicRecs` (always-on safety — sanitizes any `$` exposure; it renders live at `InsightsEngine.tsx`). **Gain renderers:** `FixRecommendations.tsx` switched from its hand-duplicated `ServerRecommendation` to the shared `Recommendation` type; `RecommendedForYou.tsx` killed its independent `volume × 0.103` "est. clicks at rank #3" estimate + relabeled the `/100` badge to `Opportunity NN` (now OV-derived).
 - **Part F — brief cache (G8): HASH-FIX ONLY.** `buildPromptHash` now keys on a tier-aware `BriefRecSignal` (`topRecommendationId` + `topTier`) read from the CACHED rec set, so a re-tier busts the brief cache. Did NOT surface the engine's #1 into the brief prompt (the brief is a distinct insight-sourced narrative surface; threading the rec set in is disproportionate) — documented in `docs/rules/seo-generation-quality.md`.
 
@@ -7337,3 +7707,147 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** `tests/integration/workspace-feature-flag-overrides.test.ts` (NEW, ports 13884/13885) — per-workspace GET returns resolved value + source; PUT `{enabled:true}` makes the flag resolve ON for THAT workspace only (global + a second workspace unaffected); PUT `{enabled:null}` clears → reverts to inherited; unknown-key/missing-field → 400; `requireAdminAuth` rejects unauthenticated GET + PUT (401) via an `APP_PASSWORD`-active context. `tests/unit/feature-flags.test.ts` (extended) — `getWorkspaceFlagsWithMeta` source attribution (`workspace`/`db`/`default`, inherited fields). `tests/component/WorkspaceFeatureFlagOverrides.test.tsx` (NEW) — render, source badge + inherited hint, toggle fires the mutation, error state. Helper change: `createTestContext` now lets `options.env.APP_PASSWORD` override the default `''` so the admin gate can be exercised.
 
 **Files:** `shared/types/feature-flags.ts`; `server/feature-flags.ts`; `server/routes/features.ts`; `src/api/platform.ts`; `src/lib/queryKeys.ts`; `src/hooks/admin/useWorkspaceFeatureFlags.ts` (NEW); `src/hooks/admin/index.ts`; `src/components/settings/WorkspaceFeatureFlagOverrides.tsx` (NEW); `src/components/WorkspaceSettings.tsx`; `tests/integration/helpers.ts`; `tests/integration/workspace-feature-flag-overrides.test.ts` (NEW); `tests/unit/feature-flags.test.ts`; `tests/component/WorkspaceFeatureFlagOverrides.test.tsx` (NEW); `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 448. DataForSEO-Primary SEO Provider Runtime
+**What it does:** Makes DataForSEO the canonical runtime SEO provider across strategy generation, competitor intelligence, backlinks, MCP keyword actions, local SEO provider resolution, and workspace/provider update seams. Runtime registration now omits `SemrushProvider`, stored or incoming `seoDataProvider: 'semrush'` values normalize to `dataforseo`, and the old DataForSEO backlinks subscription-disable probe/cache is removed so newly ungated backlinks stay live. The historical `/api/semrush/*` URLs remain as compatibility aliases in PR1, but their live data paths now resolve through the DataForSEO-backed provider abstraction instead of SEMRush credits. The admin Strategy UI no longer offers SEMRush as a selectable provider and now presents DataForSEO as the primary provider with updated backlink/competitive-intel/provider messaging.
+
+**Agency value:** Prevents dead SEMRush credits from being referenced anywhere in active SEO runtime paths and simplifies provider behavior to one supported source of truth. This lowers accidental cost leakage, removes stale provider branching, and makes the next backlink-intelligence and SEMRush-removal phases much lower risk.
+
+**Client value:** Strategy, backlink profile, and competitive intelligence surfaces now behave consistently against the same live provider, with clearer messaging when DataForSEO credentials are missing.
+
+**Boundaries:** PR1 intentionally keeps SEMRush implementation files, tests, and `/api/semrush/*` aliases for compatibility and staged cleanup. It does not remove SEMRush from historical audits, old feature notes, or legacy implementation modules yet.
+
+**Tests:** Updated provider-routing, MCP keyword-action, API-wrapper, and admin-query hook tests to assert that legacy SEMRush preferences normalize to DataForSEO and no runtime selection path falls back to SEMRush. Added `pr-check` guardrails blocking new `SemrushProvider` imports and `registerProvider('semrush', ...)` calls outside the legacy allowlist.
+
+**Files:** `server/seo-data-provider.ts`; `server/app.ts`; `server/providers/dataforseo-provider.ts`; `server/routes/semrush.ts`; `server/routes/backlinks.ts`; `server/routes/health.ts`; `server/routes/ai.ts`; `server/routes/keyword-strategy.ts`; `server/routes/content-briefs.ts`; `server/routes/content-requests.ts`; `server/routes/webflow-keywords.ts`; `server/workspaces.ts`; `server/keyword-strategy-generation.ts`; `server/mcp/tools/keyword-actions.ts`; `server/mcp/tools/workspaces.ts`; `server/local-seo.ts`; `server/db/migrations/120-dataforseo-primary-provider.sql` (NEW); `src/components/KeywordStrategy.tsx`; `src/components/strategy/BacklinkProfile.tsx`; `src/components/strategy/CompetitiveIntel.tsx`; `src/components/AIUsageSection.tsx`; `src/api/seo.ts`; `tests/unit/seo-provider-routing.test.ts`; `tests/unit/mcp-tools-keyword-actions.test.ts`; `tests/unit/src-api-seo.test.ts`; `tests/unit/hooks/admin-queries-c.test.tsx`; `scripts/pr-check.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 449. SEMRush Runtime Removal + Provider-Neutral SEO Routes
+**What it does:** Completes the PR2 cleanup after the DataForSEO-primary cutover. The inert SEMRush runtime modules (`server/semrush.ts`, `server/providers/semrush-provider.ts`, and related mocks/tests) are removed, app startup keeps only the DataForSEO runtime provider, and the old `/api/semrush/*` compatibility surface is renamed to provider-neutral `/api/seo/*` routes for provider status, competitor discovery/storage, competitive intelligence, cache management, and diagnostics. Live admin/provider messaging is cleaned up to be DataForSEO-first in AI context health, page-intelligence guidance, keyword-validation copy, observability syncs, and brief/provider fallback labels. Historical provider/source provenance values are intentionally preserved where they describe stored data history rather than active runtime routing.
+
+**Agency value:** Shrinks the SEO integration surface to one supported live runtime, removes dead code and misleading route names, and lowers the chance of future regressions or accidental SEMRush reintroduction during strategy/backlink work.
+
+**Client value:** Provider-facing UI copy is clearer and more consistent. Competitive intelligence, page intelligence, and brief-generation messaging no longer reference an unavailable vendor while still preserving existing strategy/history data.
+
+**Boundaries:** This PR removes active SEMRush runtime code and provider-facing routes, but it does not rewrite every historical audit note, provenance enum, or legacy source label embedded in past stored data. Those remain where they describe historical keyword/backlink origins rather than live provider selection.
+
+**Tests:** Updated contract, routing, API-wrapper, AI-context, observability, and strategy/provider tests to cover the provider-neutral route surface and the absence of SEMRush runtime modules. Focused Vitest batches passed for the touched provider/route/UI areas. A broad full-suite run surfaced unrelated ambient test instability after progressing well past the migration-specific assertions, so this PR relies on targeted green coverage plus `typecheck`, `vite build`, `pr-check`, feature-flag verification, and coverage-ratchet verification.
+
+**Files:** `server/app.ts`; `server/routes/seo-provider.ts` (NEW); `server/routes/ai.ts`; `server/routes/jobs.ts`; `server/seo-data-provider.ts`; `server/storage-stats.ts`; `server/ai-context-check.ts`; `server/platform-observability-report.ts`; `server/content-brief.ts`; `server/intelligence/seo-context-slice.ts`; `server/keyword-strategy-seo-data.ts`; `server/seo-provider-signals.ts`; `server/keyword-metrics-cache.ts`; `server/recommendations.ts`; `shared/types/integration-health.ts`; `shared/types/mcp-action-schemas.ts`; `shared/types/workspace.ts`; `shared/demo-workspace-scenarios.ts`; `src/api/seo.ts`; `src/components/ContentPipelineGuide.tsx`; `src/components/PageIntelligenceGuide.tsx`; `src/components/strategy/CompetitiveIntel.tsx`; `src/components/ui/AIContextIndicator.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `src/components/matrix/CellDetailPanel.tsx`; `src/hooks/admin/useKeywordStrategy.ts`; `tests/contract/seo-provider-boundary.test.ts`; `tests/integration/semrush-routes.test.ts`; `tests/integration/semrush-status-routes.test.ts`; `tests/integration/misc-endpoints.test.ts`; `tests/smoke.test.ts`; `tests/unit/ai-context-check-pure.test.ts`; `tests/unit/content-brief-provider-label.test.ts`; `tests/unit/platform-observability-report-runtime.test.ts`; `tests/unit/seo-provider-routing.test.ts`; `tests/unit/src-api-seo.test.ts`; `scripts/pr-check.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 450. Audit Drift P3 Residual Consolidation
+**What it does:** Closes the low-risk P3 helper tail from the 2026-05-27 platform audit. The legacy `server/db/json-column.ts` shim is removed, so JSON-column reads stay on the schema-aware `server/db/json-validation.ts` helpers. Keyword strategy source-evidence cleanup now uses shared `compactStrings`, insight/schema title casing uses shared `capitalizeWord`, and Local SEO refresh yielding uses shared `sleep(ms)` from `server/helpers.ts`. The admin insight feed also adopts the frontend `capitalizeWord` helper so acronym-safe title formatting no longer has a one-off `titleCaseWord` implementation. Verification also removed the clipboard-upload `sips` shellout in favor of existing `sharp` resizing, eliminating native macOS crashes when invalid image bytes hit the path-safety tests.
+
+**Agency value:** Reduces helper drift in high-churn SEO/intelligence code and removes a deprecated JSON parsing facade before it can be reused by future migrations.
+
+**Boundaries:** No schema, storage, provider, or client-facing behavior changes intended. Existing `capitalize()` utilities remain where they intentionally uppercase only the first character for UI labels. The `/api/upload/:workspaceId/clipboard` route still keeps the same response contract and fallback behavior; only the resize implementation changed from shelling out to `sips` to using the existing `sharp` dependency.
+
+**Tests:** Added helper coverage for `compactStrings` and server `capitalizeWord`; removed obsolete `json-column` shim tests. Extended schema data-source coverage for acronym-safe service slugs and reran clipboard-upload path-safety coverage to confirm the `sips` crash path is gone. Focused verification covers JSON validation, collection/string helpers, keyword-strategy context/UX, schema data-sources, insight enrichment, Local SEO pure tests, frontend insight-feed title casing, and misc clipboard uploads.
+
+**Files:** `server/db/json-column.ts` (REMOVED); `server/db/json-validation.ts`; `server/utils/collections.ts`; `server/utils/strings.ts` (NEW); `server/helpers.ts`; `server/local-seo.ts`; `server/keyword-strategy-context.ts`; `server/keyword-strategy-ux.ts`; `server/insight-enrichment.ts`; `server/schema/data-sources.ts`; `server/routes/misc.ts`; `src/utils/strings.ts`; `src/hooks/admin/useInsightFeed.ts`; `tests/unit/json-column.test.ts` (REMOVED); `tests/unit/json-column-helpers-pure.test.ts`; `tests/unit/server-collections.test.ts`; `tests/unit/server-strings.test.ts` (NEW); `tests/unit/schema/data-sources.test.ts`; `tests/integration/misc-endpoints.test.ts`; `scripts/pr-check.ts`; `docs/testing-plan.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 451. Outcome Feature Flag Retirement — PR1
+**What it does:** Retires the fully enabled Outcome Intelligence rollout flags from runtime and admin flag surfaces. Outcome tracking routes, outcome crons, admin outcome dashboard/overview, client outcome reporting, external detection, playbook detection, predictive outcome plumbing, and outcome-learnings prompt context now follow the canonical default-on path without checking `outcome-tracking`, `outcome-dashboard`, `outcome-playbooks`, `outcome-external-detection`, `outcome-client-reporting`, `outcome-ai-injection`, or `outcome-predictive` feature flags. A DB migration removes stale global and per-workspace override rows for the retired keys.
+
+**Agency value:** Shrinks the rollout matrix for Outcomes/ROI work, removes stale disabled-path UX, and prevents operators from seeing obsolete outcome toggles in admin flag controls.
+
+**Client value:** Results, win reporting, and outcome-informed narratives are consistently available according to tier/data availability rather than hidden behind retired rollout flags.
+
+**Boundaries:** Feature flag infrastructure remains for active flags. Historical module/file names such as `outcome-tracking.ts` and historical docs remain when they describe the subsystem rather than a runtime flag. Later epic PRs retire bridge/opportunity, Inbox, product-surface, Local SEO, and SEO generation-quality flags.
+
+**Tests:** Updated outcome cron, intelligence prompt, client intelligence, feature flag shared-type, FeatureFlag primitive, and admin flag-settings tests to assert default-on behavior or to avoid retired keys. Added a `pr-check` guard that blocks retired outcome flag keys from being used through `isFeatureEnabled`, `useFeatureFlag`, `<FeatureFlag>`, or flag override APIs.
+
+**Files:** `shared/types/feature-flags.ts`; `server/routes/outcomes.ts`; `server/outcome-crons.ts`; `server/intelligence/learnings-slice.ts`; `server/monthly-digest.ts`; `server/db/migrations/122-retire-outcome-feature-flags.sql` (NEW); `src/components/admin/outcomes/OutcomeDashboard.tsx`; `src/components/admin/outcomes/OutcomesOverview.tsx`; `src/components/client/OutcomeSummary.tsx`; `src/components/client/WeCalledIt.tsx`; `scripts/pr-check.ts`; tests and docs updated alongside the retirement.
+
+### 452. Bridge + Opportunity Feature Flag Retirement — PR2
+**What it does:** Retires the remaining rollout flags that previously kept the unified workspace-intelligence shadow path, Opportunity Value scorer/calibration/event timing, and bridge-triggered recommendation/intelligence wiring behind staged cutovers. Runtime now treats Opportunity Value as the canonical impact-score path, event-driven timing as default-on, and bridge execution as always active for registered sources. `getBridgeFlags()` remains as an admin/debug health surface, but it now reflects permanent source availability rather than mutable rollout toggles. A DB migration removes stale global and per-workspace override rows for `intelligence-shadow-mode`, `opportunity-value-scorer`, `opportunity-value-calibration`, `opportunity-value-events`, and the retired `bridge-*` rollout keys.
+
+**Agency value:** Collapses one of the largest remaining rollout matrices in the platform, reduces stale operational toggles, and makes recommendation/intelligence behavior match the production architecture we already trust in staging and review.
+
+**Client value:** Recommendation prioritization, event-driven urgency adjustments, and downstream bridge behaviors are now consistent by default instead of depending on hidden rollout state.
+
+**Boundaries:** Bridge source identifiers remain as operational strings (`fireBridge`, `debounceBridge`, `bridgeSource`) because they label mutation provenance and debounce lanes; only their use as feature-flag keys was retired. Historical docs/design notes still mention the old flags when describing how the rollout originally shipped.
+
+**Tests:** Rewrote bridge/opportunity/anomaly timing tests from flag-on/flag-off matrices to canonical default-on behavior, updated source-level wiring contracts, added a `pr-check` guard that blocks retired bridge/opportunity keys from being reintroduced through flag APIs, and verified the new rule through fixture coverage plus the verified-clean allowlist.
+
+**Files:** `shared/types/feature-flags.ts`; `server/bridge-infrastructure.ts`; `server/recommendations.ts`; `server/intelligence-crons.ts`; `server/reports.ts`; `server/anomaly-detection.ts`; `server/scoring/opportunity-detectors.ts`; `server/scoring/opportunity-timing.ts`; `server/scoring/ov-calibration.ts`; `server/scoring/opportunity-regen.ts`; `server/opportunity-events.ts`; `server/workspace-authority.ts`; `server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql` (NEW); `scripts/pr-check.ts`; targeted bridge/opportunity/anomaly tests; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 454. Keyword Value Scoring — Value-First, Posture-Driven Opportunity Score (Phase 2: Content-Gap Spine Swap)
+**What it does:** Phase 2 of the keyword-value-scoring feature gates the content-gap opportunity score in `server/keyword-strategy-enrichment.ts` behind the `keyword-value-scoring` flag. When the flag is ON, a value-first `computeKeywordValueScore` base score replaces `computeOpportunityScore(cg)` at all three call sites in the per-gap loop: (1) the P4-ON grounded spine fed into `computeOpportunityValue`, (2) the P4-ON `ov.value > 0 ? ov.value : base` OV fallback, and (3) the P4-OFF direct write to `cg.opportunityScore`. The `ScoringContext` is built once per enrichment run from `getLocalSeoPosture + listLocalSeoMarkets + workspace.businessProfile.address`; no per-gap DB reads. When the flag is OFF, `base = computeOpportunityScore(cg)` at every site — byte-identical to before regardless of the P4 (`relaxConservatism`) state. Phases 0–2 together: Phase 0 (flag + pure scoring module), Phase 1 (Hub sort wiring with precomputed valueScore, parity probe), Phase 2 (content-gap spine). All shipped DARK.
+
+**Agency value:** Aligns content-gap opportunity scoring with the Hub sort: transactional/local keywords with commercial intent rank above high-volume informational national keywords for local clients. The same definition of "valuable" now flows into strategy, recommendations, and briefing — no divergence between the Hub and enrichment.
+
+**Client value:** Content-gap recommendations order by business value (commercial intent × CPC × local relevance) rather than raw volume × ease. A local dental client no longer sees "what causes bad breath" (22k vol, informational) outranking "teeth cleaning sarasota" (480 vol, transactional) in their content gap list.
+
+**Boundaries:** The `relaxConservatism`/P4 control flow and `computeOpportunityValue` code path are unchanged — only the score VALUE fed as spine changes. The `?? computeOpportunityScore(gap)` fallback sites in `briefing-candidates.ts`, `briefing-client-projection.ts`, `server/routes/public-content.ts`, and `keyword-strategy-helpers.ts` are intentionally left as-is (they fire only for pre-migration gap rows). Flag OFF = byte-identical. Owner-gated: per-workspace flag flip on staging to verify ordering, then staging→main.
+
+**Tests:** `tests/integration/keyword-value-scoring-content-gaps.test.ts` (NEW) — flag OFF + P4 OFF: `opportunityScore` byte-identical to legacy `computeOpportunityScore`; flag OFF + P4 ON: informational still leads (volume dominance confirmed); flag ON + P4 OFF: transactional gap score > informational; flag ON + P4 ON: scores differ from flag-OFF P4-ON (value-first spine fed to OV); flag ON: the `opportunityScore` field is value-first (txn > info) independent of final volume-based array sort. All 2012 tests green; typecheck 0; pr-check 0.
+
+**Files:** `server/keyword-strategy-enrichment.ts`; `tests/integration/keyword-value-scoring-content-gaps.test.ts` (NEW); `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 453. SEO Runtime Feature Flag Retirement — PR5
+**What it does:** Retires `local-seo-visibility`, `schema-ai-element-classifier`, and `seo-generation-quality` by making their enabled behavior unconditional and deleting the runtime/admin-flag pathways that previously toggled them. Local SEO routes, Keyword Command Center local annotations, Brand Hub locations, Rank Tracker local guidance, the local SEO intelligence slice, schema AI page-element extraction budget, SEO generation-quality strategy assembly, recommendation scoring, briefing OV rendering, and local-refresh recommendation regeneration now follow the canonical live path without checking retired flag state. A cleanup migration removes stale global and per-workspace override rows for the three retired keys, and admin feature-flag endpoints now reject them as unknown keys.
+
+**Agency value:** Removes one of the last major rollout matrices from SEO/runtime work, lowers operator confusion in workspace flag controls, and prevents future regressions where tests or runtime code accidentally depend on a dead flag state.
+
+**Client value:** Local SEO and generation-quality improvements now show up consistently based on workspace posture/data availability rather than hidden rollout state. Schema element classification likewise stays available without requiring an operator flip.
+
+**Boundaries:** Feature-flag infrastructure remains for active flags such as `keyword-hub` and `client-briefing-v2`. Historical rollout docs and roadmap notes still mention the retired keys where they describe how the feature originally shipped.
+
+**Tests:** Rewrote local SEO and SEO-generation-quality suites from flag matrices to canonical/default behavior plus posture-based negative coverage, updated workspace/global feature-flag admin tests to assert retired SEO/runtime keys return the existing unknown-flag error, and added a `pr-check` guard blocking retired SEO/runtime keys from being reintroduced through feature-flag APIs.
+
+**Files:** `shared/types/feature-flags.ts`; `shared/types/briefing.ts`; `shared/types/intelligence.ts`; `server/routes/local-seo.ts`; `server/routes/keyword-command-center.ts`; `server/intelligence/local-seo-slice.ts`; `server/local-seo.ts`; `server/recommendations.ts`; `server/briefing-client-projection.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-seo-data.ts`; `server/schema-suggester.ts`; `server/schema/extractors/page-elements/image-ai-classifier.ts`; `server/schema/extractors/page-elements/howto-ai-fallback.ts`; `server/db/migrations/126-retire-seo-runtime-feature-flags.sql` (NEW); `src/components/KeywordHub.tsx`; `src/components/BrandHub.tsx`; `src/components/RankTracker.tsx`; `src/components/client/Briefing/RecommendedForYou.tsx`; `scripts/pr-check.ts`; `tests/integration/feature-flags-routes.test.ts`; `tests/integration/workspace-feature-flag-overrides.test.ts`; local SEO + SEO generation-quality test suites; `docs/rules/local-seo-visibility.md`; `docs/rules/seo-generation-quality.md`; `FEATURE_AUDIT.md`.
+
+### 455. Schema Plan Durable Generation + Realtime Invalidation Hardening
+**What it does:** Moves the last inline schema-plan AI path onto the shared background-job platform. Schema plan generation now has a first-class durable job type (`schema-plan-generation`) with duplicate-active attachment, a worker-owned orchestration path in `server/schema-plan-generation-job.ts`, and a compatibility wrapper for the legacy `POST /api/webflow/schema-plan/:siteId` route that now returns `{ jobId, deprecated: true }` instead of a fully generated plan. The admin `SchemaPlanPanel` now reads the stored plan through React Query, starts regeneration through `useBackgroundTasks`, and refreshes from the persisted plan when the job completes. A new workspace event, `SCHEMA_PLAN_UPDATED`, keeps schema-plan mutations aligned across admin/client caches and intelligence readers for generation, save, send-to-client, activate, delete, and client-feedback transitions.
+
+**Agency value:** Aligns schema planning with the same durable-job and realtime contracts already used for recommendations, page analysis, Local SEO, and other long-running admin workflows. That removes a restart-on-navigation failure mode, gives operators duplicate-run protection, and keeps background-task observability honest.
+
+**Client value:** Client schema review remains on the same public plan endpoint, but schema-plan status changes now propagate more reliably. Admin-side regenerate/save/send flows no longer depend on a single long-lived request staying open.
+
+**Boundaries:** This PR does not change the underlying schema-plan AI contract in `server/schema-plan.ts`, and it does not add a new client-facing schema workflow. The legacy route remains available as a job-start compatibility surface so existing callers do not break during the migration.
+
+**Tests:** Added lifecycle coverage for the new schema-plan job path, including `/api/jobs`, the legacy compatibility wrapper, duplicate-active attachment, background-job metadata/coverage contracts, and schema-plan websocket invalidation contracts. Updated the client workflow smoke path to wait for the persisted plan after starting generation.
+
+**Files:** `server/schema-plan-generation-job.ts` (NEW); `server/routes/jobs.ts`; `server/routes/webflow-schema.ts`; `server/domains/inbox/schema-plan-respond.ts`; `server/ws-events.ts`; `shared/types/background-jobs.ts`; `shared/types/schema-plan.ts`; `src/api/schema.ts`; `src/components/schema/SchemaPlanPanel.tsx`; `src/hooks/useWsInvalidation.ts`; `src/lib/queryKeys.ts`; `src/lib/wsEvents.ts`; `tests/integration/schema-plan-generation-job-mutation-safety.test.ts` (NEW); `tests/contract/background-job-coverage-contract.test.ts`; `tests/contract/mutation-safety-route-matrix.test.ts`; `tests/contract/schema-snapshot-invalidation.test.ts`; `tests/unit/background-jobs.test.ts`; `tests/unit/shared-types-validation.test.ts`; `tests/e2e/client-workflow-smoke.spec.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 457. C2: Sync AI Routes → Background Job Platform (Review-Pass Fix)
+
+**What it does:** Closes four code-review findings on the C2 migration (PR core-c2-sync-ai-to-jobs):
+
+- **C-1 (CRITICAL):** Added the four missing `switch` cases to `POST /api/jobs` dispatcher (`copy-entry-generation`, `blueprint-generation`, `llms-txt-generation`, `aeo-site-review`). The route-specific `/generate` endpoints already worked, but `useBackgroundTasks.startJob()` posts to `/api/jobs` — these types fell through to the default 400. Now the generic dispatcher delegates to the same job runners. Integration tests added that drive all four types via `/api/jobs` (the real frontend path).
+
+- **I-1 (IMPORTANT):** Implemented the stored-read path for LLMs.txt GET routes. Added migration `130-llms-txt-stored-result` (new `llms_txt_stored_result` table), `storeResult()`/`getStoredResult()` functions, and persistence in the job runner. GET routes now serve the stored blob (returning 404 when none exists) instead of calling `generateLlmsTxt()` inline and triggering a full Webflow crawl on every tab visit.
+
+- **I-2 (IMPORTANT):** Dropped the two unused WS broadcasts (`LLMS_TXT_GENERATED`, `AEO_SITE_REVIEW_COMPLETE`) from their job runners. `useJobProgress` already handles UI refresh via React Query invalidation on job completion; the broadcasts had no frontend consumers.
+
+- **M-1:** Added pr-check rule `C2-migrated generators must not be called synchronously in route handlers` that flags direct calls to `generateLlmsTxt`, `generateBlueprint`, `generateCopyForEntry`, or `reviewSitePages` inside `server/routes/` files. Prevents regression to the sync-AI pattern.
+
+**Boundaries:** No new client-facing surfaces. Migration 130 is additive (no existing rows touched). The AEO GET route (`GET /api/aeo-review/:workspaceId`) is unchanged — it already loads from disk.
+
+**Files:** `server/routes/jobs.ts`; `server/legacy-jobs-runner-registry.ts`; `server/llms-txt-generation-job.ts`; `server/aeo-site-review-job.ts`; `server/llms-txt-generator.ts`; `server/routes/llms-txt.ts`; `server/db/migrations/130-llms-txt-stored-result.sql` (NEW); `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `tests/integration/c2-ai-to-jobs.test.ts`; `FEATURE_AUDIT.md`.
+
+### 456. Keyword Strategy Generation-Quality Telemetry Persistence
+**What it does:** Persists the `GenerationQuality` telemetry computed on every keyword-strategy generation run (pool size, AI-returned count, suppressed count, backfilled count, deterministic-floor hit) into a new workspace-scoped `generation_quality` table (migration 129) via `server/generation-quality-store.ts` — previously log-only, so generation-health history evaporated. Also upgrades the `keyword-site-synthesis` operation (the platform's highest-leverage AI call) from `gpt-5.4-mini`/3000 tokens to `gpt-5.4`/4500 tokens, and re-attaches `siteKeywordMetrics` in the admin strategy GET (paid metrics had silently vanished from the admin UI after the table-strip migration; the guard test now uses divergent fixtures so the omission can never mask again).
+
+**Agency value:** Generation health is now queryable per workspace (was: grep the logs). Silent quality degradation — e.g. the AI returning few keywords and the deterministic floor backfilling the rest — becomes visible and trendable. Strategy synthesis quality rises with the model upgrade.
+
+**Boundaries:** Internal telemetry only — no client-facing surface, no public-portal serialization. Intelligence-slice wiring (Data Flow Rule 6) is deliberately deferred and tracked in `data/roadmap.json:generation-quality-intelligence-wiring`.
+
+**Files:** `server/ai-operation-registry.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/keyword-strategy-generation.ts`; `server/generation-quality-store.ts` (NEW); `server/db/migrations/129-generation-quality.sql` (NEW); `server/routes/keyword-strategy.ts`; `shared/types/` (StoredGenerationQuality); `tests/contract/keyword-site-synthesis-operation.test.ts` (NEW); `tests/integration/generation-quality-persistence.test.ts` (NEW); `tests/integration/keyword-strategy-admin-assembler.test.ts`.
+
+**PR:** core-features remediation F1 (audit #6 + #7).
+
+### 457. Admin Recommendations Surface (D1 — audit #19)
+**What it does:** Replaces the borrowed client `InsightsEngine` component (mounted with `tier="premium"` hardcoded) in `WorkspaceHome` with a purpose-built `AdminRecommendationQueue`. The new admin surface shows: (1) full rec queue across all statuses (pending/in_progress/completed/dismissed) with priority grouping and OV-score sorting; (2) a Dismissed tab with per-rec Un-dismiss action (uses `validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending')` — the `dismissed → pending` backward edge was already defined in the state machine); (3) full OV breakdown per rec including `emvPerWeek` and confidence (admin-only fields stripped on client routes); (4) activity logging on client PATCH/DELETE (`rec_status_updated` / `rec_dismissed`) so admins can see client triage in the activity feed. New admin API endpoints: `GET /api/recommendations/:workspaceId` (full set, all statuses) and `PATCH /api/recommendations/:workspaceId/:recId/undismiss`.
+
+**Agency value:** Admins now see the actual full recommendation queue — including what clients have dismissed — and can restore dismissed items without touching the client portal. The OV breakdown and EMV data help prioritize conversations with clients about which items to act on.
+
+**Client value:** None directly — this is an admin-only surface. Indirectly, admins who can see and act on dismissed recs can have more informed conversations with clients.
+
+**Files:** `src/components/admin/AdminRecommendationQueue.tsx` (NEW); `src/hooks/admin/useAdminRecommendations.ts` (NEW); `src/components/WorkspaceHome.tsx` (mount swap); `server/routes/recommendations.ts` (activity logging + admin endpoints); `server/activity-log.ts` (ActivityType: `rec_status_updated`, `rec_dismissed`); `src/lib/queryKeys.ts` (`admin.recommendations`); `src/lib/wsInvalidation.ts` (RECOMMENDATIONS_UPDATED → admin key); `tests/integration/admin-recommendations-surface.test.ts` (NEW); `docs/superpowers/plans/2026-06-10-d1-admin-recs-surface.md` (NEW).
+
+**PR:** core-features remediation D1 (audit #19).

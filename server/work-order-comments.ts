@@ -24,6 +24,11 @@ interface CommentRow {
   read_at: string | null;
 }
 
+interface CommentCountRow {
+  work_order_id: string;
+  count: number;
+}
+
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
     `INSERT INTO work_order_comments (id, work_order_id, workspace_id, author, content, created_at, read_at)
@@ -65,6 +70,34 @@ export function listWorkOrderComments(
 ): WorkOrderComment[] {
   const rows = stmts().selectByOrder.all(workspaceId, workOrderId) as CommentRow[];
   return rows.map(rowToComment);
+}
+
+/**
+ * Count comments for many work orders in one query. Missing order ids are returned as zero so
+ * client-facing order rows can serialize a stable count without per-row reads.
+ */
+export function countWorkOrderCommentsByOrderIds(
+  workspaceId: string,
+  workOrderIds: readonly string[],
+): Map<string, number> {
+  const uniqueIds = [...new Set(workOrderIds.filter((id) => id.length > 0))];
+  const counts = new Map<string, number>(uniqueIds.map((id) => [id, 0]));
+  if (uniqueIds.length === 0) return counts;
+
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const rows = db
+    .prepare(
+      `SELECT work_order_id, COALESCE(COUNT(*), 0) AS count
+       FROM work_order_comments
+       WHERE workspace_id = ? AND work_order_id IN (${placeholders})
+       GROUP BY work_order_id`,
+    )
+    .all(workspaceId, ...uniqueIds) as CommentCountRow[];
+
+  for (const row of rows) {
+    counts.set(row.work_order_id, Number(row.count) || 0);
+  }
+  return counts;
 }
 
 /**

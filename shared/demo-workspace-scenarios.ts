@@ -18,7 +18,7 @@ export interface DemoWorkspaceScenario {
     webflowSiteName: string | null;
     gscPropertyUrl: string | null;
     ga4PropertyId: string | null;
-    seoDataProvider: 'dataforseo' | 'semrush';
+    seoDataProvider: 'dataforseo';
   };
 }
 
@@ -95,7 +95,7 @@ export const DEMO_WORKSPACE_SCENARIOS: DemoWorkspaceScenario[] = [
       webflowSiteName: null,
       gscPropertyUrl: null,
       ga4PropertyId: null,
-      seoDataProvider: 'semrush',
+      seoDataProvider: 'dataforseo',
     },
   },
   {

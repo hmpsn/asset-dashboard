@@ -2,9 +2,8 @@
  * Unit tests for server/scoring/ov-calibration.ts (PR5 · Spine C / §4 Spine E).
  *
  * Covers the identity-safe contract + the win-rate-derived calibration basis:
- *  - flag OFF                → 1.0 (identity), even with many seeded outcomes
- *  - flag ON, < MIN_OUTCOMES → 1.0 (identity)
- *  - flag ON, >= MIN_OUTCOMES→ clamp(0.75, 1.25, 0.75 + 0.5*winRate), shifts with data
+ *  - < MIN_OUTCOMES          → 1.0 (identity)
+ *  - >= MIN_OUTCOMES         → clamp(0.75, 1.25, 0.75 + 0.5*winRate), shifts with data
  *  - failure                 → 1.0 (try/catch safety)
  *
  * Seeds REAL tracked_actions + action_outcomes rows (FK off in tests) so the
@@ -14,12 +13,6 @@ import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }),
-}));
-
-// Controllable flag — the only environmental input to computeOvCalibration.
-const isFeatureEnabled = vi.fn<(flag: string) => boolean>(() => false);
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: (flag: string) => isFeatureEnabled(flag),
 }));
 
 import db from '../../server/db/index.js';
@@ -47,40 +40,28 @@ function seedOutcome(workspaceId: string, score: string, attributedValue: number
 
 beforeEach(() => {
   cleanup();
-  isFeatureEnabled.mockReset();
-  isFeatureEnabled.mockReturnValue(false);
   seq = 0;
 });
 
 afterAll(cleanup);
 
 describe('computeOvCalibration — identity-safe gates', () => {
-  it('returns 1.0 when the calibration flag is OFF, even with many winning outcomes', () => {
-    isFeatureEnabled.mockReturnValue(false);
-    for (let i = 0; i < MIN_OUTCOMES + 5; i++) seedOutcome(WS, 'strong_win', 100);
+  it('returns 1.0 when there are zero outcomes', () => {
     expect(computeOvCalibration(WS)).toBe(1.0);
   });
 
-  it('returns 1.0 when the flag is ON but there are zero outcomes', () => {
-    isFeatureEnabled.mockReturnValue(true);
-    expect(computeOvCalibration(WS)).toBe(1.0);
-  });
-
-  it('returns 1.0 when the flag is ON but fewer than MIN_OUTCOMES qualify', () => {
-    isFeatureEnabled.mockReturnValue(true);
+  it('returns 1.0 when fewer than MIN_OUTCOMES qualify', () => {
     for (let i = 0; i < MIN_OUTCOMES - 1; i++) seedOutcome(WS, 'win', 50);
     expect(computeOvCalibration(WS)).toBe(1.0);
   });
 
   it('ignores outcomes with null attributed_value toward the MIN_OUTCOMES threshold', () => {
-    isFeatureEnabled.mockReturnValue(true);
     // MIN_OUTCOMES winning outcomes but all with null value → not counted → identity.
     for (let i = 0; i < MIN_OUTCOMES; i++) seedOutcome(WS, 'win', null);
     expect(computeOvCalibration(WS)).toBe(1.0);
   });
 
   it('ignores inconclusive/insufficient_data scores toward the threshold', () => {
-    isFeatureEnabled.mockReturnValue(true);
     for (let i = 0; i < MIN_OUTCOMES; i++) seedOutcome(WS, 'inconclusive', 100);
     expect(computeOvCalibration(WS)).toBe(1.0);
   });
@@ -88,19 +69,16 @@ describe('computeOvCalibration — identity-safe gates', () => {
 
 describe('computeOvCalibration — win-rate-derived shift (clamped 0.75..1.25)', () => {
   it('all wins → ceiling 1.25', () => {
-    isFeatureEnabled.mockReturnValue(true);
     for (let i = 0; i < MIN_OUTCOMES + 1; i++) seedOutcome(WS, 'strong_win', 100);
     expect(computeOvCalibration(WS)).toBe(1.25);
   });
 
   it('no wins (all losses) → floor 0.75', () => {
-    isFeatureEnabled.mockReturnValue(true);
     for (let i = 0; i < MIN_OUTCOMES + 1; i++) seedOutcome(WS, 'loss', 5);
     expect(computeOvCalibration(WS)).toBe(0.75);
   });
 
   it('half wins → ~1.0 neutral', () => {
-    isFeatureEnabled.mockReturnValue(true);
     // 4 wins + 4 losses = 8 qualifying, winRate 0.5 → 0.75 + 0.25 = 1.0
     for (let i = 0; i < 4; i++) seedOutcome(WS, 'win', 80);
     for (let i = 0; i < 4; i++) seedOutcome(WS, 'loss', 10);
@@ -108,7 +86,6 @@ describe('computeOvCalibration — win-rate-derived shift (clamped 0.75..1.25)',
   });
 
   it('result is always within the [0.75, 1.25] band', () => {
-    isFeatureEnabled.mockReturnValue(true);
     for (let i = 0; i < 3; i++) seedOutcome(WS, 'strong_win', 200);
     for (let i = 0; i < 3; i++) seedOutcome(WS, 'neutral', 20);
     const c = computeOvCalibration(WS);
@@ -117,7 +94,6 @@ describe('computeOvCalibration — win-rate-derived shift (clamped 0.75..1.25)',
   });
 
   it('all-neutral → 1.0 identity (neutral is a modest realized gain, not a loss — must NOT drag to the 0.75 floor)', () => {
-    isFeatureEnabled.mockReturnValue(true);
     for (let i = 0; i < MIN_OUTCOMES + 1; i++) seedOutcome(WS, 'neutral', 30);
     // realization = 0.5 → 0.75 + 0.5*0.5 = 1.0 (PR5-review fix; previously 0.75)
     expect(computeOvCalibration(WS)).toBeCloseTo(1.0, 5);

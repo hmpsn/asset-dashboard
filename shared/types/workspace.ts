@@ -93,6 +93,8 @@ export interface ContentGap {
   questionKeywords?: string[];
   // SERP feature targeting recommendations
   serpTargeting?: string[];
+  // Cost-per-click from SEO provider (feeds commercialValue in the value scorer)
+  cpc?: number;
   // Composite opportunity score (0–100): volume × ease × GSC signal × trend
   opportunityScore?: number;
   /**
@@ -339,7 +341,7 @@ export interface Workspace {
     fullPostDescription?: string;
   };
   // SEO data provider preference
-  seoDataProvider?: 'semrush' | 'dataforseo';
+  seoDataProvider?: 'dataforseo';
   // Verified business contact info for schema generation (bypasses page-content verification)
   businessProfile?: BusinessProfileContact | null;
   /**
@@ -407,7 +409,7 @@ export interface AdminWorkspaceView {
   pageEditStates?: Record<string, PageEditState>;
   publishTarget?: Workspace['publishTarget'];
   contentPricing?: Workspace['contentPricing'];
-  seoDataProvider?: 'semrush' | 'dataforseo';
+  seoDataProvider?: 'dataforseo';
   businessProfile?: BusinessProfileContact | null;
   businessPriorities?: string[];
   customPromptNotes?: string;

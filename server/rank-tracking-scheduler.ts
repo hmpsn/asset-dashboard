@@ -11,11 +11,16 @@ import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { getSearchOverview, getSearchQueryObservations } from './search-console.js';
 import { storeRankSnapshot } from './rank-tracking.js';
+import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 import {
   detectLostVisibility,
   upsertDiscoveredQueries,
   type DiscoveredQueryObservation,
 } from './client-discovered-queries.js';
+import { fireBridge } from './bridge-infrastructure.js';
+import { runLostVisibilityBridge } from './bridge-lost-visibility.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('rank-tracking-scheduler');
 
@@ -41,8 +46,8 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
 
     try {
       const [overview, observedQueries] = await Promise.all([
-        getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28, { queryLimit: 5000 }),
-        getSearchQueryObservations(ws.webflowSiteId, ws.gscPropertyUrl, 28, { maxRows: 5000 }),
+        getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS, { queryLimit: 5000 }),
+        getSearchQueryObservations(ws.webflowSiteId, ws.gscPropertyUrl, GSC_METRIC_WINDOW_DAYS, { maxRows: 5000 }),
       ]);
       const date = new Date().toISOString().split('T')[0];
       const queries = overview.topQueries.map(q => ({
@@ -74,6 +79,15 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
       }
       detectLostVisibility(ws.id, date);
+      fireBridge('bridge-lost-visibility', ws.id, async () => runLostVisibilityBridge(ws.id));
+      // A4 review I2: new daily positions must reach open dashboards live — the
+      // requested-keyword trend card (and any rank-history consumer) invalidates
+      // on this event. Without it, cron-written snapshots only appeared on refetch.
+      broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
+        source: 'rank_snapshot_cron',
+        date,
+        queryCount: queries.length,
+      });
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to capture rank snapshot — skipping workspace');

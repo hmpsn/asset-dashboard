@@ -19,6 +19,8 @@ interface RankingsSnapshotProps {
 
 export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className }: RankingsSnapshotProps) {
   const navigate = useNavigate();
+  // The standalone Rank Tracker folded into the Keyword Hub; "View All" routes
+  // to the unified keyword surface.
   return (
     <SectionCard
       title="Top Rankings"
@@ -27,7 +29,7 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
         <Button
           variant="link"
           size="sm"
-          onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))}
+          onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
           className="no-underline text-teal-400 hover:text-teal-300"
         >
           View All →

@@ -8,26 +8,24 @@ import { getBrief } from '../content-brief.js';
 import { renderBriefHTML } from '../brief-export-html.js';
 import {
   listContentRequests,
+  listContentRequestsPaged,
   getContentRequest,
   createContentRequest,
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
+import { parsePaginationParams } from '../pagination.js';
 import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested, notifyTeamWorkOrderComment } from '../email.js';
 import { getWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
+import { normalizePageUrl, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
-import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
-import { listContentGaps } from '../content-gaps.js';
-import { listQuickWins } from '../quick-wins.js';
-import { listKeywordGaps } from '../keyword-gaps.js';
-import { listTopicClusters } from '../topic-clusters.js';
-import { listCannibalizationIssues } from '../cannibalization-issues.js';
-import { getClientActor, requireClientPortalAuth } from '../middleware.js';
+import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page-keywords.js';
+import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
+import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
@@ -41,6 +39,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import { computeOpportunityScore } from './keyword-strategy.js';
 import { buildKeywordStrategyUxPayload, buildLatestKeywordStrategyRefreshSummary } from '../keyword-strategy-ux.js';
+import { buildPageRankStories } from '../page-rank-stories.js';
 import {
   createContentRequestSchema,
   submitContentRequestSchema,
@@ -63,6 +62,7 @@ const log = createLogger('public-content');
 const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
+const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -70,6 +70,11 @@ function activityCommentPreview(content: string): string {
   return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
     ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
     : content;
+}
+
+function sanitizePublicPlainText(val: unknown, maxLen = 500): string {
+  if (typeof val !== 'string') return '';
+  return sanitizePlainText(val).trim().slice(0, maxLen).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
 function recordTrackedKeywordActivity(
@@ -127,42 +132,22 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const strategy = ws.keywordStrategy;
-    // Reassemble pageMap from page_keywords table
-    const fullPageMap = listPageKeywords(ws.id);
-    // Reassemble contentGaps from content_gaps table (post-#365 normalization)
-    const contentGapsList = listContentGaps(ws.id);
-    const contentGaps = contentGapsList.length > 0 ? contentGapsList : (strategy?.contentGaps || []);
-    // Reassemble quickWins from quick_wins table (post-#367 normalization).
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const quickWinsList = listQuickWins(ws.id);
-    const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy?.quickWins || []);
-    // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const keywordGapsList = listKeywordGaps(ws.id);
-    const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy?.keywordGaps || []);
-    // Reassemble topicClusters and cannibalization from normalized tables.
-    // Fallback to blob data for legacy workspaces that have not been migrated yet.
-    const topicClustersList = listTopicClusters(ws.id);
-    const topicClusters = topicClustersList.length > 0 ? topicClustersList : (strategy?.topicClusters || []);
-    const cannibalizationList = listCannibalizationIssues(ws.id);
-    const cannibalization = cannibalizationList.length > 0 ? cannibalizationList : (strategy?.cannibalization || []);
-    if (
-      !strategy
-      && fullPageMap.length === 0
-      && contentGaps.length === 0
-      && quickWins.length === 0
-      && keywordGaps.length === 0
-      && topicClusters.length === 0
-      && cannibalization.length === 0
-    ) {
-      return res.json(null);
-    }
+    // Single read-path assembler (#2): table-as-truth + table-or-blob fallback for
+    // each array, returning null on the existing short-circuit (no blob + all
+    // tables empty). The client-safe whitelist projection below is unchanged — the
+    // assembler returns the full internal shape and the whitelist trims it.
+    const assembled = assembleStoredKeywordStrategy(ws.id);
+    if (!assembled) return res.json(null);
+    const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
     // Return client-safe subset (no SEO data mode/provider internals)
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
     const strategyUx = await buildKeywordStrategyUxPayload({
       workspaceId: ws.id,
       workspaceName: ws.name,
       strategy,
+      // Bug 1 fix: pass table-backed siteKeywordMetrics so client explanations
+      // include real metric data (strategy blob has this stripped — always undefined).
+      siteKeywordMetrics: siteKeywordMetrics ?? undefined,
       pageMap: fullPageMap,
       contentGaps,
       keywordGaps,
@@ -182,7 +167,8 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     });
     res.json({
       siteKeywords: strategy?.siteKeywords || [],
-      siteKeywordMetrics: strategy?.siteKeywordMetrics || undefined,
+      // #19b dual-read: table-first via the assembler, blob fallback. Strip is 3b-ii.
+      siteKeywordMetrics: siteKeywordMetrics && siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       pageMap: fullPageMap.map(p => ({
         pagePath: p.pagePath,
         pageTitle: p.pageTitle,
@@ -195,6 +181,11 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         clicks: p.clicks,
         volume: p.volume,
         difficulty: p.difficulty,
+        // Task 3.2: cpc is the realized-$ input for the per-keyword "Revenue
+        // potential" block on the (Growth+ gated) strategy drawer. It is the same
+        // clicks×cpc realized value ROIDashboard already shows Growth+ clients —
+        // exposed alongside the other raw pageMap metrics (clicks/impressions/volume).
+        cpc: p.cpc,
         metricsSource: p.metricsSource,
         validated: p.validated,
         gscKeywords: p.gscKeywords || [],
@@ -215,6 +206,9 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         competitorProof: g.competitorProof,
         questionKeywords: g.questionKeywords,
         opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
+        // kwv-real-cpc: cpc is intentionally score-only (not raw-exposed). The
+        // opportunityScore already reflects real CPC via commercialValue. Raw CPC
+        // is admin/scoring-internal only — do NOT add it to this public list.
         // SEO Generation Quality P2 — surface the honesty flag through the explicit
         // public whitelist so the client renderer can sort/label backfilled gaps.
         backfilled: g.backfilled,
@@ -262,6 +256,10 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
       strategyUx,
       businessContext: strategy?.businessContext || '',
       generatedAt: strategy?.generatedAt ?? null,
+      // R2-D: per-page keyword story cards — ranked keywords a page holds +
+      // nearby gap keywords worth adding. Value is banded/labeled (never raw
+      // integers or EMV). Empty array when no page has both ranked + gap signals.
+      pageRankStories: buildPageRankStories(fullPageMap, keywordGaps),
     });
   } catch (err) {
     next(err);
@@ -274,29 +272,37 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
 router.get('/api/public/page-keywords/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const entries = listPageKeywords(ws.id);
-  res.json(entries.map(p => ({
+  const pagination = parsePaginationParams(req.query);
+  const toClientView = (p: ReturnType<typeof listPageKeywords>[number]) => ({
     pagePath: p.pagePath,
     primaryKeyword: p.primaryKeyword,
     secondaryKeywords: p.secondaryKeywords ?? [],
-  })));
+  });
+  if (!pagination) {
+    return res.json(listPageKeywords(ws.id).map(toClientView));
+  }
+  const paged = listPageKeywordsPaged(ws.id, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items.map(toClientView),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // --- Public Content Topic Requests (client picks topics from strategy) ---
-router.post('/api/public/content-request/:workspaceId', validate(createContentRequestSchema), (req, res) => {
+router.post('/api/public/content-request/:workspaceId', requirePublicContentWriteAuth, validate(createContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const topic = sanitizeString(req.body.topic, 200);
-  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
-  const intent = sanitizeString(req.body.intent, 50);
+  const topic = sanitizePublicPlainText(req.body.topic, 200);
+  const targetKeyword = sanitizePublicPlainText(req.body.targetKeyword, 200);
+  const intent = sanitizePublicPlainText(req.body.intent, 50);
   const priority = validateEnum(req.body.priority, ['low', 'medium', 'high', 'critical'], 'medium');
-  const rationale = sanitizeString(req.body.rationale, 1000);
-  const clientNote = sanitizeString(req.body.clientNote, 1000);
+  const rationale = sanitizePublicPlainText(req.body.rationale, 1000);
+  const clientNote = sanitizePublicPlainText(req.body.clientNote, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
-  const targetPageId = sanitizeString(req.body.targetPageId, 100);
-  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
+  const targetPageId = sanitizePublicPlainText(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizePublicPlainText(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
   const actor = getClientActor(req, req.params.workspaceId);
@@ -310,8 +316,8 @@ router.post('/api/public/content-request/:workspaceId', validate(createContentRe
 router.get('/api/public/content-requests/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const requests = listContentRequests(req.params.workspaceId);
-  res.json(requests.map(r => ({
+  const pagination = parsePaginationParams(req.query);
+  const toClientView = (r: ReturnType<typeof listContentRequests>[number]) => ({
     id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
     priority: r.priority, status: r.status, source: r.source,
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
@@ -323,21 +329,29 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     // Include postId only when post is ready for client review or beyond
     postId: ['post_review', 'delivered', 'published'].includes(r.status) || (r.status === 'changes_requested' && r.serviceType === 'full_post') ? r.postId : undefined,
     clientFeedback: r.clientFeedback,
-  })));
+  });
+  if (!pagination) {
+    return res.json(listContentRequests(req.params.workspaceId).map(toClientView));
+  }
+  const paged = listContentRequestsPaged(req.params.workspaceId, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items.map(toClientView),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // Client submits their own topic request
-router.post('/api/public/content-request/:workspaceId/submit', validate(submitContentRequestSchema), (req, res) => {
+router.post('/api/public/content-request/:workspaceId/submit', requirePublicContentWriteAuth, validate(submitContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const topic = sanitizeString(req.body.topic, 200);
-  const targetKeyword = sanitizeString(req.body.targetKeyword, 200);
-  const notes = sanitizeString(req.body.notes, 1000);
+  const topic = sanitizePublicPlainText(req.body.topic, 200);
+  const targetKeyword = sanitizePublicPlainText(req.body.targetKeyword, 200);
+  const notes = sanitizePublicPlainText(req.body.notes, 1000);
   const serviceType = validateEnum(req.body.serviceType, ['brief_only', 'full_post'], 'brief_only');
   const pageType = validateEnum(req.body.pageType, ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'], 'blog');
   const initialStatus = req.body.initialStatus === 'pending_payment' ? 'pending_payment' as const : undefined;
-  const targetPageId = sanitizeString(req.body.targetPageId, 100);
-  const targetPageSlug = sanitizeString(req.body.targetPageSlug, 200);
+  const targetPageId = sanitizePublicPlainText(req.body.targetPageId, 100);
+  const targetPageSlug = sanitizePublicPlainText(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, {
     topic, targetKeyword, intent: 'informational', priority: 'medium',
@@ -353,8 +367,8 @@ router.post('/api/public/content-request/:workspaceId/submit', validate(submitCo
 });
 
 // Client declines a recommended topic
-router.post('/api/public/content-request/:workspaceId/:id/decline', validate(declineContentRequestSchema), (req, res, next) => {
-  const reason = sanitizeString(req.body.reason, 1000);
+router.post('/api/public/content-request/:workspaceId/:id/decline', requirePublicContentWriteAuth, validate(declineContentRequestSchema), (req, res, next) => {
+  const reason = sanitizePublicPlainText(req.body.reason, 1000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -374,7 +388,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
 });
 
 // Client approves a brief
-router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve', requirePublicContentWriteAuth, validate(approveContentRequestSchema), (req, res, next) => {
   if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
@@ -401,9 +415,9 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
 });
 
 // Client requests changes on a brief
-router.post('/api/public/content-request/:workspaceId/:id/request-changes', validate(requestChangesSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-changes', requirePublicContentWriteAuth, validate(requestChangesSchema), (req, res, next) => {
   if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
-  const feedback = sanitizeString(req.body.feedback, 2000);
+  const feedback = sanitizePublicPlainText(req.body.feedback, 2000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -431,7 +445,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', requirePublicContentWriteAuth, validate(upgradeContentRequestSchema), (req, res, next) => {
   if (!assertUpgradeableBriefRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
@@ -454,8 +468,8 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upg
 });
 
 // Client or team adds a comment
-router.post('/api/public/content-request/:workspaceId/:id/comment', validate(addCommentSchema), (req, res) => {
-  const content = sanitizeString(req.body.content, 2000);
+router.post('/api/public/content-request/:workspaceId/:id/comment', requirePublicContentWriteAuth, validate(addCommentSchema), (req, res) => {
+  const content = sanitizePublicPlainText(req.body.content, 2000);
   const author = 'client' as const; // public unauthenticated endpoint — always 'client', never trust req.body
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
@@ -475,10 +489,10 @@ router.get('/api/public/work-order/:workspaceId/:orderId/comments', (req, res) =
 // NEVER trust req.body (mirrors the content-request comment route; unauthenticated-shape
 // public endpoint behind the router-level requireClientPortalAuth gate). Rejected with 409
 // once the order is closed (the conversation is over).
-router.post('/api/public/work-order/:workspaceId/:orderId/comment', validate(workOrderCommentSchema), (req, res) => {
+router.post('/api/public/work-order/:workspaceId/:orderId/comment', requirePublicContentWriteAuth, validate(workOrderCommentSchema), (req, res) => {
   const wsId = req.params.workspaceId;
   const orderId = req.params.orderId;
-  const content = sanitizeString(req.body.content, 2000);
+  const content = sanitizePublicPlainText(req.body.content, 2000);
   if (!content) return res.status(400).json({ error: 'content is required' });
 
   const order = getWorkOrder(wsId, orderId);
@@ -514,8 +528,10 @@ router.post('/api/public/work-order/:workspaceId/:orderId/comment', validate(wor
 router.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
-  // Return client-safe view (exclude internal fields if any)
-  res.json(brief);
+  // Return client-safe view — sourceEvidence (C4) is admin-internal scraped
+  // source text (~25 KB of competitor bodyText); never serve it to clients.
+  const { sourceEvidence: _sourceEvidence, ...clientBrief } = brief;
+  res.json(clientBrief);
 });
 
 // Client can download a brief as branded HTML
@@ -568,13 +584,13 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
 });
 
 // --- Pre-populate content request from audit issues ---
-router.post('/api/public/content-request/:workspaceId/from-audit', validate(fromAuditSchema), async (req, res) => {
+router.post('/api/public/content-request/:workspaceId/from-audit', requirePublicContentWriteAuth, validate(fromAuditSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const pageSlug = sanitizeString(req.body.pageSlug, 200);
-  const pageName = sanitizeString(req.body.pageName, 200);
-  const issues = Array.isArray(req.body.issues) ? req.body.issues.map((i: string) => sanitizeString(i, 300)).filter(Boolean) : [];
+  const pageSlug = sanitizePublicPlainText(req.body.pageSlug, 200);
+  const pageName = sanitizePublicPlainText(req.body.pageName, 200);
+  const issues = Array.isArray(req.body.issues) ? req.body.issues.map((i: string) => sanitizePublicPlainText(i, 300)).filter(Boolean) : [];
   const wordCount = typeof req.body.wordCount === 'number' ? req.body.wordCount : undefined;
 
   if (!pageSlug || !pageName) return res.status(400).json({ error: 'pageSlug and pageName are required' });
@@ -640,10 +656,10 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords: getTrackedKeywords(ws.id) });
 });
 
-router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), async (req, res) => {
+router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(addTrackedKeywordSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  const keyword = sanitizePublicPlainText(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
   const actor = getClientActor(req, ws.id);
@@ -674,10 +690,10 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   }
 });
 
-router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTrackedKeywordSchema), (req, res) => {
+router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentWriteAuth, validate(removeTrackedKeywordSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
+  const keyword = sanitizePublicPlainText(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
   const existingKeywords = getTrackedKeywords(ws.id);
   const wasTracked = existingKeywords.some(k => k.query === keyword);
@@ -704,11 +720,13 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
 
-  res.json(post);
+  // aiReview (C4) is the admin QA verdict pack — admin-internal; never serve to clients.
+  const { aiReview: _aiReview, ...clientPost } = post;
+  res.json(clientPost);
 });
 
 // Client approves a post — transitions request to 'delivered'
-router.post('/api/public/content-request/:workspaceId/:id/approve-post', validate(approvePostSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve-post', requirePublicContentWriteAuth, validate(approvePostSchema), (req, res, next) => {
   // Explicit status guard: the state machine allows in_progress → delivered, so we must
   // enforce post_review here to prevent an unauthenticated caller from bypassing review.
   const existing = getContentRequest(req.params.workspaceId, req.params.id);
@@ -741,7 +759,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', validat
 });
 
 // Client requests changes on a post
-router.post('/api/public/content-request/:workspaceId/:id/request-post-changes', validate(requestPostChangesSchema), (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-post-changes', requirePublicContentWriteAuth, validate(requestPostChangesSchema), (req, res, next) => {
   // Explicit status guard: client_review → changes_requested is a valid state machine
   // transition (brief review phase), so we must enforce post_review here to prevent
   // post-changes feedback being applied to a brief-review request.
@@ -750,7 +768,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   if (existing.status !== 'post_review') {
     return res.status(400).json({ error: 'Request must be in post_review status to request post changes' });
   }
-  const feedback = sanitizeString(req.body.feedback, 2000);
+  const feedback = sanitizePublicPlainText(req.body.feedback, 2000);
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -781,7 +799,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
 // title/metaDescription are plain text; introduction/conclusion/section.content are
 // rich text (TipTap HTML) — both paths are sanitized via the shared allowlist
 // rather than stripped, so client formatting (bold, italic, headings, links) survives.
-router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', validate(clientPostEditSchema), (req, res, next) => {
+router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requirePublicContentWriteAuth, validate(clientPostEditSchema), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -862,7 +880,9 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   }
   invalidateContentPipelineIntelligence(req.params.workspaceId);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
-  res.json(updated);
+  // aiReview (C4) is admin-internal — strip from the client-edit response too.
+  const { aiReview: _aiReview, ...clientPost } = updated;
+  res.json(clientPost);
 });
 
 export default router;

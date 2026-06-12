@@ -13,6 +13,7 @@ import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
 import { normalizePageUrl } from './helpers.js';
+import { keywordDollarValue } from './scoring/keyword-value-money.js';
 
 
 const log = createLogger('roi');
@@ -85,6 +86,12 @@ export interface ROIData {
   adSpendEquivalent: number;
   /** Month-over-month growth in traffic value (percentage) */
   growthPercent: number | null;
+  /**
+   * Portfolio "Revenue at stake" (Task 3.4): Σ keywordDollarValue(kw).upsideMonthly
+   * over the page_keywords already loaded here — the monthly $ unlocked if tracked
+   * keywords move toward stronger positions. Reuses the single keywordDollarValue helper (no second $ math).
+   */
+  revenueAtStake?: number;
   /** Breakdown by page */
   pageBreakdown: PageROI[];
   /** Summary stats */
@@ -151,6 +158,9 @@ export function computeROI(workspaceId: string): ROIData | null {
   let totalImpressions = 0;
   let totalCPCWeighted = 0;
   let totalValue = 0;
+  // Task 3.4: portfolio "Revenue at stake" = Σ upsideMonthly over the same pages,
+  // via the single keywordDollarValue helper (one $ definition — no second $ math).
+  let revenueAtStake = 0;
 
   for (const page of pages) {
     const clicks = page.clicks || 0;
@@ -164,6 +174,14 @@ export function computeROI(workspaceId: string): ROIData | null {
     if (cpc > 0) {
       totalCPCWeighted += cpc * clicks;
     }
+
+    revenueAtStake += keywordDollarValue({
+      clicks,
+      cpc,
+      currentPosition: page.currentPosition ?? null,
+      impressions,
+      ctrCurve: null,
+    }).upsideMonthly;
 
     if (clicks > 0 || cpc > 0) {
       pageBreakdown.push({
@@ -295,6 +313,7 @@ export function computeROI(workspaceId: string): ROIData | null {
     organicTrafficValue: Math.round(totalValue * 100) / 100,
     adSpendEquivalent: Math.round(adSpendEquivalent * 100) / 100,
     growthPercent: computeGrowthPercent(workspaceId, Math.round(totalValue * 100) / 100),
+    revenueAtStake: Math.round(revenueAtStake * 100) / 100,
     pageBreakdown,
     totalClicks,
     totalImpressions,
