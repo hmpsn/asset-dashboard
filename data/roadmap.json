@@ -210,9 +210,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.4",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Surface the three weighted components on hover/expand. Data already assembled server-side; read via existing intelligence projection, no new route reads."
+          "notes": "Shipped in PR 5. Client intelligence now projects a sanitized composite health breakdown for Growth+ workspaces, and the existing HealthScoreCard renders an expandable component view for retention signals, ROI momentum, and portal engagement without exposing raw churnRisk or adding route reads."
         },
         {
           "id": "cda-qw2-post-approval-toast",

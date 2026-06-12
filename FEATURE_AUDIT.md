@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **494 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **495 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 495. Client Dashboard QW2 PR5 — Composite Health Breakdown
+
+**What it does:** Adds an expandable "What makes up this score" breakdown to the existing client SEO Health Score card. Growth+ client intelligence now projects a sanitized component breakdown for retention signals, ROI momentum, and portal engagement, using the same weighted score buckets as the server composite health calculation.
+
+**Agency value:** Gives account teams a clearer way to explain why the health ring moved without exposing internal churn diagnostics or asking the client to infer meaning from a single number.
+
+**Client value:** Clients can see the three inputs behind their health score and which area needs attention, in plain language.
+
+**Mutual:** Makes the score easier to trust while preserving the existing intelligence endpoint, tier gates, and client-safe scrub rules.
+
+**Files:** `shared/types/intelligence.ts`, `server/intelligence/client-signals-slice.ts`, `server/routes/client-intelligence.ts`, `src/components/client/HealthScoreCard.tsx`, `src/components/client/OverviewTab.tsx`. Tests: `tests/component/HealthScoreCard.test.tsx`, `tests/unit/client-signals-slice-assembly.test.ts`, `tests/unit/client-signals-slice.test.ts`, `tests/integration/client-intelligence-endpoint.test.ts`.
 
 ---
 
@@ -45,6 +59,9 @@ A comprehensive value assessment of every feature in the platform — **494 feat
 **Mutual:** Both are pure unlocks of already-built server capability.
 
 **Files:** `src/components/schema/*` (status-aware publish UI), `src/components/ContentPipeline.tsx`, `src/components/pipeline/AiSuggested.tsx`. Tests: `tests/unit/schema-cms-delivery-ui.test.tsx`, `tests/integration/webflow-schema-cms-delivery-serialization.test.ts`, `tests/component/AiSuggested-brief-handoff.test.tsx`.
+
+---
+
 ### 491. Client Dashboard QW2 PR4 — ROI Methodology Explainer
 
 **What it does:** Adds an expandable "How we calculate this" explanation to the client ROI Dashboard. The disclosure explains organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and the conservative assumption that the model does not multiply by lead value, close rate, or lifetime value.

@@ -1684,6 +1684,40 @@ describe('formatForPrompt — clientSignals section', () => {
     expect(result).toContain('+12%');
   });
 
+  it('shows composite health breakdown rows when present', () => {
+    const intel = makeIntelligence({
+      seoContext: makeSeoContext({ businessContext: 'Dental' }),
+      clientSignals: makeClientSignalsSlice({
+        churnRisk: 'low',
+        compositeHealthScore: 77,
+        compositeHealthBreakdown: {
+          rows: [
+            {
+              id: 'retention',
+              label: 'Retention signals',
+              score: 60,
+              weight: 40,
+              description: 'Recent account signals show room to strengthen the client relationship.',
+            },
+            {
+              id: 'engagement',
+              label: 'Portal engagement',
+              score: 100,
+              weight: 30,
+              description: 'Portal activity shows strong engagement with the work in progress.',
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = formatForPrompt(intel);
+
+    expect(result).toContain('Health score breakdown');
+    expect(result).toContain('Retention signals 60/100 (40% weight)');
+    expect(result).toContain('Portal engagement 100/100 (30% weight)');
+  });
+
   it('includes approval rate in standard verbosity when > 0', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({ businessContext: 'Dental' }),

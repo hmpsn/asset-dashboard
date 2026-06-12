@@ -668,6 +668,13 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
   if (signals.compositeHealthScore != null) {
     lines.push(`Health score: ${signals.compositeHealthScore}/100`);
   }
+  if (signals.compositeHealthBreakdown?.rows.length) {
+    lines.push(
+      `Health score breakdown: ${signals.compositeHealthBreakdown.rows
+        .map(row => `${row.label} ${row.score}/100 (${row.weight}% weight)`)
+        .join('; ')}`,
+    );
+  }
   if (signals.latestBriefing) {
     const b = signals.latestBriefing;
     lines.push(

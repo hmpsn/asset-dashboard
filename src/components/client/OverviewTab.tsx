@@ -170,7 +170,11 @@ export function OverviewTab({
     )}
 
     {/* Headline health score */}
-    <HealthScoreCard score={clientIntel?.compositeHealthScore} workspaceId={workspaceId} />
+    <HealthScoreCard
+      score={clientIntel?.compositeHealthScore}
+      workspaceId={workspaceId}
+      breakdown={clientIntel?.compositeHealthBreakdown}
+    />
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
