@@ -34,7 +34,7 @@ export const FEATURE_FLAGS = {
   // flag and is flipped only at the P5 cutover (owner-gated). P0 ships behavior-preserving
   // foundation (table-renderer migration + additive strategyOwned exposure) with the flag
   // OFF. See docs/superpowers/plans/2026-06-04-keyword-hub.md.
-  'keyword-hub': false,
+  'keyword-hub': true,
   // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
   // include every GSC-clicked/impressed query (full ranking coverage), keep all
   // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
@@ -225,8 +225,8 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       // literal commit day, so the pinned-`asOf` lifecycle audit never reads these as
       // future. The Wave 4 plan + spec carry the 2026-06-04 authoring date.
       createdAt: '2026-06-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the Keyword Hub is validated on staging, flipped at the P5 cutover, and becomes the only keyword surface (seo-ranks folded in, no flag-off legacy KCC/Rank Tracker path).',
+      rolloutTarget: 'all-clients',
+      removalCondition: 'Remove after the Keyword Hub is validated on staging, flipped at the P5 cutover, and becomes the only keyword surface (seo-ranks folded in, no flag-off legacy KCC/Rank Tracker path). Default flipped to true 2026-06-11 (Phase B) — matches the production DB override in place since ~2026-06-10; the override is now redundant.',
       linkedRoadmapItemId: 'keyword-hub-wave4',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-02',

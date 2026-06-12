@@ -294,11 +294,13 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
   });
 
   it('returns the static default (false) for a known flag while loading', () => {
+    // Probe uses keyword-universe-full: keyword-hub flipped to default-true at the
+    // Phase B cutover (2026-06-11), so it no longer works as a false-default probe.
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
-    expect(result.current).toBe(FEATURE_FLAGS['keyword-hub']);
+    expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
     expect(result.current).toBe(false);
   });
 

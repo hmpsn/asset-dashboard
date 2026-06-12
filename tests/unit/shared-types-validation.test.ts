@@ -332,9 +332,11 @@ import {
 } from '../../shared/types/feature-flags.js';
 
 describe('FEATURE_FLAGS constants', () => {
-  it('all flags default to false', () => {
+  it('all flags default to false (except shipped cutover flags)', () => {
+    // keyword-hub flipped to true at the Phase B cutover (2026-06-11).
+    const SHIPPED_DEFAULT_TRUE = new Set(['keyword-hub']);
     for (const [key, value] of Object.entries(FEATURE_FLAGS)) {
-      expect(value, `flag "${key}" should default to false`).toBe(false);
+      expect(value, `flag "${key}" default`).toBe(SHIPPED_DEFAULT_TRUE.has(key));
     }
   });
 
