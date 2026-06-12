@@ -11,6 +11,12 @@
       "reason": "Wave 11 stacked commit hash is not patch-equivalent in staging history; later wave promotions landed the enforcement contract directly on staging.",
       "addedAt": "2026-05-17",
       "expiresAt": "2026-09-30"
+    },
+    {
+      "pr": 1217,
+      "reason": "Ephemeral-test-ports migration content landed in staging via commit 33335aa03 (PR #1218 W6 snapshot) due to shared-checkout overlap between sessions; #1217 then merged into the already-superseded fix/admin-surfaces-w6-final branch, stranding its commit hashes. Content verified fully present on staging (228 files on createEphemeralTestContext, pr-check rule, docs).",
+      "addedAt": "2026-06-12",
+      "expiresAt": "2026-12-31"
     }
   ]
 }
