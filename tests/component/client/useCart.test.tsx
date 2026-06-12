@@ -133,3 +133,70 @@ describe('useCart.addItem — per-page add without pageIds (fallback)', () => {
     expect(result.current.items[0].quantity).toBe(2);
   });
 });
+
+describe('useCart — content items (R2-E)', () => {
+  const brief = (topic: string) => ({
+    kind: 'content' as const,
+    productType: 'brief_blog' as const,
+    displayName: 'Content Brief',
+    priceUsd: 125,
+    content: {
+      topic,
+      targetKeyword: `${topic} kw`,
+      serviceType: 'brief_only' as const,
+      pageType: 'blog' as const,
+      source: 'strategy' as const,
+    },
+  });
+
+  it('content items NEVER merge — each distinct topic is its own row', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+    act(() => { result.current.addItem(brief('Topic A')); });
+    act(() => { result.current.addItem(brief('Topic B')); });
+
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items.map(i => i.content?.topic)).toEqual(['Topic A', 'Topic B']);
+  });
+
+  it('two content items with the SAME productType still create two distinct rows', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+    act(() => { result.current.addItem(brief('Same')); });
+    act(() => { result.current.addItem(brief('Same')); });
+
+    expect(result.current.items).toHaveLength(2);
+    // Distinct row identities so the cart can remove one without the other.
+    expect(result.current.items[0].cartItemId).not.toBe(result.current.items[1].cartItemId);
+  });
+
+  it('removeItem targets a single content row by cartItemId', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+    act(() => { result.current.addItem(brief('Keep')); });
+    act(() => { result.current.addItem(brief('Drop')); });
+    const dropId = result.current.items.find(i => i.content?.topic === 'Drop')!.cartItemId;
+
+    act(() => { result.current.removeItem(dropId); });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].content?.topic).toBe('Keep');
+  });
+
+  it('content and fix items coexist; a fix item still merges by productType', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+    act(() => { result.current.addItem({ productType: 'fix_meta', displayName: 'Metadata', priceUsd: 20, pageIds: ['p1'] }); });
+    act(() => { result.current.addItem(brief('Topic A')); });
+    act(() => { result.current.addItem({ productType: 'fix_meta', displayName: 'Metadata', priceUsd: 20, pageIds: ['p2'] }); });
+
+    // 1 merged fix row + 1 content row.
+    expect(result.current.items).toHaveLength(2);
+    const fix = result.current.items.find(i => i.kind !== 'content')!;
+    expect(fix.pageIds).toEqual(['p1', 'p2']);
+    const content = result.current.items.find(i => i.kind === 'content')!;
+    expect(content.content?.topic).toBe('Topic A');
+  });
+
+  it('fix items get cartItemId === productType (back-compat with R1 callers)', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+    act(() => { result.current.addItem({ productType: 'fix_meta', displayName: 'Metadata', priceUsd: 20, pageIds: ['p1'] }); });
+    expect(result.current.items[0].cartItemId).toBe('fix_meta');
+  });
+});

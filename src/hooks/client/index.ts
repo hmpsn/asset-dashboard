@@ -4,6 +4,7 @@ export { useClientInsights } from './useClientInsights';
 export { useUnifiedInbox, useRespondToDeliverable } from './useUnifiedInbox';
 export { useClientIntelligence } from './useClientIntelligence.js';
 export { useMonthlyDigest } from './useMonthlyDigest';
+export { useClientCompetitorGaps } from './useClientCompetitorGaps';
 export {
   useClientActivity,
   useClientRankHistory,

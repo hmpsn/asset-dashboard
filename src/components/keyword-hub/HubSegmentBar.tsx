@@ -1,15 +1,16 @@
 /**
- * HubSegmentBar — the six primary segment pills for the Keyword Hub.
+ * HubSegmentBar — the seven primary segment pills for the Keyword Hub.
  *
- * Segments (in order): All · In Strategy · Tracked · Needs Review · Retired · Local.
+ * Segments (in order): All · Striking Distance · In Strategy · Tracked · Needs Review · Retired · Local.
  * - Active pill uses teal styling (Four Laws: teal for actions/active state).
  * - Counts shown as <Badge>; shows <Skeleton> while loading; "—" when undefined.
  * - Local segment shows a MapPin icon when active.
+ * - Striking Distance shows a TrendingUp icon when active (easy-wins indicator).
  * - No violet/indigo/rose/pink; no green-* success colors — emerald only.
  *
  * Owned by P1-T2. Must NOT touch KeywordHub.tsx or useKeywordHubState.ts.
  */
-import { MapPin } from 'lucide-react';
+import { MapPin, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a segment-pill nav icon for the Striking Distance filter, not a directional metric trend badge
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
@@ -41,9 +42,10 @@ interface HubSegmentBarProps {
 // Static segment definitions (canonical order per plan P1-T2 contract)
 // ---------------------------------------------------------------------------
 
-/** The six primary Hub segments in display order. */
+/** The seven primary Hub segments in display order. */
 export const HUB_SEGMENT_METAS: HubSegmentMeta[] = [
   { id: 'all', label: 'All', count: undefined },
+  { id: 'striking_distance', label: 'Striking Distance', count: undefined, icon: TrendingUp },
   { id: 'in_strategy', label: 'In Strategy', count: undefined },
   { id: 'tracked', label: 'Tracked', count: undefined },
   { id: 'needs_review', label: 'Needs Review', count: undefined },

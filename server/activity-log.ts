@@ -240,7 +240,7 @@ const stmts = createStmtCache(() => ({
     'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
   ),
   selectClientVisible: db.prepare(
-    `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
+    `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
   ),
   hasRecent: db.prepare(
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
@@ -318,8 +318,8 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   return rows.map(rowToEntry);
 }
 
-export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
-  const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
+export function listClientActivity(workspaceId: string, limit = 50, offset = 0): ActivityEntry[] {
+  const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit, offset) as ActivityRow[];
   return rows.map(rowToEntry);
 }
 

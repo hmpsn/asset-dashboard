@@ -128,6 +128,8 @@ function segmentCount(
       return counts.retired;
     case 'local':
       return counts.local;
+    case 'striking_distance':
+      return counts.strikingDistance;
     default:
       return undefined;
   }

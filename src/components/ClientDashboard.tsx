@@ -415,6 +415,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.SCHEMA_PLAN_UPDATED]: () => invalidateClientEvent(WS_EVENTS.SCHEMA_PLAN_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: () => invalidateClientEvent(WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED),
+    // ws-invalidation-ok — R2-B agency work feed: job events refresh the live-now jobs section
+    [WS_EVENTS.JOB_CREATED]: () => invalidateClientEvent(WS_EVENTS.JOB_CREATED),
+    // ws-invalidation-ok — R2-B agency work feed: job events refresh the live-now jobs section
+    [WS_EVENTS.JOB_UPDATED]: () => invalidateClientEvent(WS_EVENTS.JOB_UPDATED),
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──

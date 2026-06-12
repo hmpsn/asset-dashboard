@@ -188,4 +188,66 @@ describe('Keyword Hub list — real KCC rows read path', () => {
     expect(summary.counts.retired).toBeGreaterThan(0);
     expect(Array.isArray(summary.filters)).toBe(true);
   });
+
+  // ── Striking Distance filter (positions 11–20) ─────────────────────────────
+
+  it('filter=striking_distance returns only rows with position 11–20', async () => {
+    // Seeded rank snapshot: alpha=3.2, beta=11.5, gamma=27.8
+    // Only "hub track beta" (position 11.5) qualifies.
+    const body = await fetchRows('filter=striking_distance&page=1&pageSize=50');
+    // Must return ≥1 row (hub track beta at 11.5).
+    expect(body.rows.length).toBeGreaterThan(0);
+    // Every returned row must have currentPosition in [11, 20] inclusive.
+    for (const row of body.rows) {
+      const pos = row.metrics.currentPosition;
+      expect(pos).toBeDefined();
+      expect(pos).toBeGreaterThanOrEqual(11);
+      expect(pos).toBeLessThanOrEqual(20);
+    }
+    // hub track alpha (pos 3.2) must NOT appear.
+    expect(body.rows.some(r => r.keyword === 'hub track alpha')).toBe(false);
+    // hub track gamma (pos 27.8) must NOT appear.
+    expect(body.rows.some(r => r.keyword === 'hub track gamma')).toBe(false);
+  });
+
+  it('filter=striking_distance rows are value-ranked (opportunity desc) by default', async () => {
+    // When multiple striking-distance rows exist, default sort is opportunity desc.
+    // With only one qualifying row in the seed data, we can only assert no crash + shape.
+    const body = await fetchRows('filter=striking_distance&sort=opportunity&direction=desc&page=1&pageSize=50');
+    expect(body.pageInfo).toEqual(expect.objectContaining({ page: 1 }));
+    expect(Array.isArray(body.rows)).toBe(true);
+  });
+
+  it('summary strikingDistance count matches at least 1 (hub track beta at 11.5)', async () => {
+    const res = await api(`${base()}/summary`);
+    const summary = (await res.json()) as KeywordCommandCenterSummaryResponse;
+    // The rank snapshot seeds beta at position 11.5 → at least 1 striking-distance keyword.
+    expect(typeof summary.counts.strikingDistance).toBe('number');
+    expect(summary.counts.strikingDistance).toBeGreaterThanOrEqual(1);
+  });
+
+  it('summary.filters includes a STRIKING_DISTANCE facet', async () => {
+    const res = await api(`${base()}/summary`);
+    const summary = (await res.json()) as KeywordCommandCenterSummaryResponse;
+    const sdFacet = summary.filters.find(f => f.id === 'striking_distance');
+    expect(sdFacet).toBeDefined();
+    expect(sdFacet?.label).toBe('Striking Distance');
+    expect(typeof sdFacet?.count).toBe('number');
+  });
+
+  it('filter=striking_distance boundary: position exactly 10 excluded, exactly 20 included', async () => {
+    // Verify that a second snapshot with boundary positions is correctly filtered.
+    // Inject additional rank data for boundary testing.
+    storeRankSnapshot(workspaceId, '2026-06-01', [
+      { query: 'hub boundary pos10', position: 10, clicks: 5, impressions: 200, ctr: 2.5 },
+      { query: 'hub boundary pos20', position: 20, clicks: 2, impressions: 100, ctr: 2.0 },
+      { query: 'hub boundary pos21', position: 21, clicks: 1, impressions: 80, ctr: 1.25 },
+    ]);
+    const body = await fetchRows('filter=striking_distance&page=1&pageSize=50');
+    // pos20 must be present; pos10 and pos21 must be absent.
+    const keywords = body.rows.map(r => r.keyword);
+    expect(keywords).toContain('hub boundary pos20');
+    expect(keywords).not.toContain('hub boundary pos10');
+    expect(keywords).not.toContain('hub boundary pos21');
+  });
 });

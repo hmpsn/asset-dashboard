@@ -171,9 +171,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4 + §3",
           "est": "4-6d",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Competitor snapshots already collected server-side (seo-context-slice), never shown to clients. Premium section showing keywords competitors rank for that the client doesn't, fed via a ClientIntelligence projection."
+          "notes": "Done in feat/client-revenue-r2. Premium-gated (server 402 + thin TierGate per tier-rediscussion coupling note), banded projection + leak test, R1 pagination."
         },
         {
           "id": "cda-sc4-implementation-hours",
@@ -193,7 +193,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products."
+          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products. | ABSORBED into cda-content-in-cart (round 2) — implemented there as cart-aware checkout config."
         },
         {
           "id": "cda-sc4-post-purchase-onboarding",
@@ -211,9 +211,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1",
           "est": "4-6d",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Curated projection of process activity ('Audit of 47 pages running…', 'Generating 3 briefs…') + completed work with why-it-was-done framing. Server: new ClientIntelligence projection over activity log + jobs. Client: feed surface on Overview (placement per the 02 doc design)."
+          "notes": "Done. Dark behind client-work-feed flag — flip after owner eyeballs staging. CLIENT_VISIBLE_TYPES in SQL, job labels via helper, distinct workFeedActivity query key (review-critical collision fix)."
         },
         {
           "id": "cda-sc5-outcome-scorecard",
@@ -293,6 +293,36 @@
           "status": "pending",
           "createdAt": "2026-05-11",
           "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts.\n[Platform health recommendation pass 2026-05-26: promoted as the next ClientSignalsSlice expansion to avoid bespoke win-signal paths outside workspace intelligence.]"
+        },
+        {
+          "id": "cda-content-in-cart",
+          "title": "Briefs/posts join the cart — mixed baskets + Premium 10% content discount (absorbs cda-sc4-content-discount)",
+          "source": "Owner request 2026-06-12 + client dashboard audit (sc4)",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-12",
+          "notes": "Done. cartItemId/kind model (content never merges; R1 fix semantics intact); PREMIUM_CONTENT_DISCOUNT config constant; dual-family webhook with per-family FM-2 + CONTENT_REQUEST_UPDATE broadcast; orphan cleanup on session-create failure; drift guard covers billable content."
+        },
+        {
+          "id": "tier-model-rediscussion",
+          "title": "[BRAINSTORM FIRST — owner session] Revisit and update the tier model (beta learnings)",
+          "source": "Owner request 2026-06-12",
+          "est": "discussion + doc updates + config changes",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-12",
+          "notes": "OWNER: the model has shifted during beta; wants an in-depth discussion before changes. Requires a dedicated brainstorming session (superpowers:brainstorming) covering: tier boundaries (Free/Growth/Premium), what hours cover vs what is purchased, fix vs content pricing asymmetry, discount structure, trial mechanics. Outputs: updated MONETIZATION.md + TierGate mappings + Stripe product/price adjustments + FEATURE_AUDIT. DO NOT implement tier changes piecemeal before this session. Note: competitor-gaps gating + content discount (round 2) deliberately built thin/config-level so this session can re-map them cheaply."
+        },
+        {
+          "id": "public-strategy-raw-gap-fields",
+          "title": "[OWNER CALL] /api/public/seo-strategy serves RAW keyword_gaps volume+difficulty to all tiers — band or gate?",
+          "source": "R2 review finding (pre-existing)",
+          "est": "S",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-12",
+          "notes": "public-content.ts ~:201-228 serves raw gap volume/difficulty to every tier while the new Premium competitor-gaps projection deliberately bands/strips the same data. Inconsistent exposure. Decide: band these fields (client display changes) or accept as the free-data tier. Couple with the tier-model-rediscussion session."
         }
       ]
     },
@@ -431,8 +461,8 @@
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
           "est": "medium",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Wave 3. 'You have 14 keywords ranking #11-20 — one push moves them to page 1.' Highest-conviction SEO move; nothing names them today (data in getLatestRanks, value via in-hand valueScore). Surface in Hub, recommendations (which mint ZERO recs from rank_tracking today), and the client briefing. Distinct from the GSC-query-derived rankingOpportunities (this is rank_tracking-backed + value-ranked, survives into recs + client). || PLACEMENT [exists]: ranking_opportunity insight (pos 4-20, value-ranked) + SearchTab 'Low-Hanging Fruit' + PageKeywordMap 'Ranking' filter already cover this. NEW = at most a position-band (#11-20) filter/view in the admin Hub (none today). Reuse the insight; relabel/filter, do not add an InsightType."
+          "status": "done",
+          "notes": "Done. striking_distance Hub segment, positions 11-20 inclusive, value-ranked; count/rows/prefilter unified on one predicate (review fix)."
         },
         {
           "id": "kwv-momentum-and-rank-recs",
@@ -449,8 +479,8 @@
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
           "est": "medium",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Wave 4 (client display). Per important page: 'Your Teeth Whitening page ranks #4 for \"teeth whitening\" (320 visits/mo) — but you're invisible for \"teeth whitening cost\", which 1,200 people search every month.' Joins persisted PageKeywordMap primaryKeyword+position+clicks with the per-page ContentGap the page is NOT ranking for. Both sides exist; never paired per-page on a client surface. || PLACEMENT [fold-in]: 'rank for X' already in PageKeywordMapContent (per-page primary kw + GSC rank/impr/clicks); 'missing Y' is the existing competitor_gap insight. Add a per-page gap badge/row INSIDE PageKeywordMapContent, do not build a new client view."
+          "status": "done",
+          "notes": "Done. Per-page story cards on client Strategy via the existing public payload; token pairing with generic-token denylist + anchor requirement (review fix); banded labels only, leak-tested on the real read path."
         },
         {
           "id": "kwv-intent-branded-split",

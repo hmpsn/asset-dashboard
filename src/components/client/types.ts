@@ -128,6 +128,18 @@ export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 // importers of this file don't need to change their import paths.
 export type { ClientTab } from '../../routes';
 
+/** R2-D: per-page rank story card — what a page ranks for + nearby gap keywords. */
+export interface PageRankStoryItem {
+  pagePath: string;
+  pageTitle: string;
+  /** Ranked keywords with banded position label — never raw integer positions. */
+  rankedKeywords: { keyword: string; positionLabel: string }[];
+  /** Gap keywords relevant to the page — volume-labeled, never raw counts. */
+  gapKeywords: { keyword: string; volumeLabel: string }[];
+  /** Single narrative sentence for the card. */
+  narrative: string;
+}
+
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
@@ -142,6 +154,8 @@ export interface ClientKeywordStrategy {
   strategyUx?: KeywordStrategyUxPayload;
   businessContext?: string;
   generatedAt: string | null;
+  /** R2-D: per-page keyword story cards — pages with ranked keywords + nearby gap keywords. */
+  pageRankStories?: PageRankStoryItem[];
 }
 
 export const SEV = {

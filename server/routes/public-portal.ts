@@ -37,6 +37,8 @@ import {
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
 import { parsePaginationParams } from '../pagination.js';
+import { listKeywordGaps } from '../keyword-gaps.js';
+import { projectCompetitorGaps } from '../competitor-gaps-projection.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -813,6 +815,47 @@ router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req,
 
   const briefing = buildBriefingClientView(ws.id);
   res.json({ briefing });
+});
+
+// GET /api/public/competitor-gaps/:workspaceId — client-safe competitor keyword
+// gaps (keywords a named competitor ranks for that the workspace is missing).
+// Premium-exclusive surface (Client Revenue R2 §3 / §4a): free + growth → 402.
+//
+// The projection (server/competitor-gaps-projection.ts) is the single
+// enforcement point — raw provider volume/difficulty and any money/EMV field
+// are stripped; only banded/labeled value + you-vs-them narrative reach the
+// client. Optional pagination via the shared helper (the gap list can be large).
+router.get('/api/public/competitor-gaps/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+    return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+  }
+
+  // Premium-exclusive — trial-aware effective tier promotes free trials to growth,
+  // which still does NOT meet premium, so trials are correctly gated out too.
+  if (computeEffectiveTier(ws) !== 'premium') {
+    return res.status(402).json({ error: 'Competitor benchmarking requires the Premium plan' });
+  }
+
+  const projected = projectCompetitorGaps(listKeywordGaps(req.params.workspaceId));
+  const total = projected.length;
+
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json({ gaps: projected, total });
+  }
+  const page = projected.slice(pagination.offset, pagination.offset + pagination.limit);
+  return res.json({
+    gaps: page,
+    total,
+    pageInfo: {
+      total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+      hasMore: pagination.offset + page.length < total,
+    },
+  });
 });
 
 // --- Public Content Matrices Export ---

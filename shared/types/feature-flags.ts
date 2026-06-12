@@ -27,6 +27,8 @@ export const FEATURE_FLAGS = {
   'client-briefing-v2': false,
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,
+  // R2-B: Agency-at-work transparency feed (live jobs + recent activity with narrative labels).
+  'client-work-feed': false,
 
   // Keyword Hub (Wave 4). The `keyword-hub` umbrella flag was RETIRED at the Phase C
   // cutover (2026-06-11): the Hub is now the only keyword surface (KCC + Rank Tracker
@@ -213,6 +215,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
+  'client-work-feed': {
+    label: 'Client dashboard — agency-at-work transparency feed',
+    group: 'Client Insights Briefing',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-12',
+      rolloutTarget: 'tiered-client-rollout',
+      removalCondition: 'Remove once agency work feed is validated on staging and shipped as default client overview experience.',
+      linkedRoadmapItemId: 'cda-sc5-work-feed',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-12',
+    },
+  },
   'keyword-universe-full': {
     label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
     group: 'Keyword Hub',
@@ -260,7 +275,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Client Insights Briefing',
-    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
+    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish', 'client-work-feed'],
   },
   {
     label: 'Keyword Hub',

@@ -19,7 +19,7 @@ import {
   type BundleFamily,
   type FixType,
 } from '../../shared/types/fix-catalog.js';
-import type { ProductType } from '../../shared/types/payments.js';
+import type { ProductType, ContentCartContext } from '../../shared/types/payments.js';
 
 /** Reverse map: a bundle family back to its catalog FixType key. */
 const FAMILY_TO_FIX_TYPE: Record<BundleFamily, FixType> = {
@@ -121,6 +121,10 @@ export interface IncomingCartItem {
   quantity: number;
   pageIds?: string[];
   issueChecks?: string[];
+  /** Per-item content context (briefs/posts). Non-fix; passes through normalization untouched. */
+  content?: ContentCartContext;
+  /** Set on content items after the server creates the backing content request. */
+  contentRequestId?: string;
 }
 
 /** A normalized cart item the server will actually bill + fulfill. */
@@ -129,6 +133,10 @@ export interface NormalizedCartItem {
   quantity: number;
   pageIds?: string[];
   issueChecks?: string[];
+  /** Per-item content context (briefs/posts), preserved through normalization. */
+  content?: ContentCartContext;
+  /** The content request this item fulfills (created at checkout-build time). */
+  contentRequestId?: string;
 }
 
 /**

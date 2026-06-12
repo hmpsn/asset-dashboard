@@ -763,6 +763,90 @@ describe('GET /api/public/seo-strategy — brand keyword filtering', () => {
   });
 });
 
+// ── R2-D: pageRankStories on the public read path ──────────────────────────
+
+describe('GET /api/public/seo-strategy — pageRankStories (R2-D)', () => {
+  let storyWsId = '';
+
+  beforeAll(() => {
+    const ws = createWorkspace('Page Rank Stories Test');
+    storyWsId = ws.id;
+    updateWorkspace(storyWsId, {
+      seoClientView: true,
+      keywordStrategy: { siteKeywords: [], opportunities: [], generatedAt: new Date().toISOString() } as KeywordStrategy,
+    });
+
+    // A page that RANKS (currentPosition set) for "invisalign treatment" — a
+    // non-generic anchor. The gap "invisalign cost" shares the "invisalign" anchor
+    // → valid single-anchor pair. A second unrelated gap shares only the generic
+    // "best" token and must NOT pair.
+    upsertPageKeyword(storyWsId, {
+      pagePath: '/invisalign',
+      pageTitle: 'Invisalign Treatment',
+      primaryKeyword: 'invisalign treatment',
+      secondaryKeywords: ['best invisalign provider'],
+      currentPosition: 14,
+    } as PageKeywordMap);
+
+    replaceAllKeywordGaps(storyWsId, [
+      { keyword: 'invisalign cost', volume: 2200, difficulty: 30, competitorPosition: 4, competitorDomain: 'rival.com' },
+      { keyword: 'best coffee shop', volume: 9000, difficulty: 20, competitorPosition: 2, competitorDomain: 'rival.com' },
+    ]);
+  });
+
+  afterAll(() => {
+    deleteAllKeywordGaps(storyWsId);
+    db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(storyWsId);
+    deleteWorkspace(storyWsId);
+  });
+
+  it('pageRankStories is present on the read-path response with a paired story', async () => {
+    const res = await api(`/api/public/seo-strategy/${storyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.pageRankStories)).toBe(true);
+    const story = body.pageRankStories.find((s: { pagePath: string }) => s.pagePath === '/invisalign');
+    expect(story).toBeDefined();
+    // The non-generic anchor "invisalign" pairs; the generic-only "best coffee shop"
+    // does NOT (false-positive pairing guard).
+    expect(story.gapKeywords.some((g: { keyword: string }) => g.keyword === 'invisalign cost')).toBe(true);
+    expect(story.gapKeywords.every((g: { keyword: string }) => g.keyword !== 'best coffee shop')).toBe(true); // every-ok — some() on the previous line asserts gapKeywords is non-empty
+  });
+
+  it('pageRankStories leaks NO raw volume/difficulty/EMV/opportunityScore — only banded labels', async () => {
+    const res = await api(`/api/public/seo-strategy/${storyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const stories = body.pageRankStories as Array<Record<string, unknown>>;
+    expect(stories.length).toBeGreaterThan(0);
+    const POSITION_BANDS = ['Top 3', 'Page 1', 'Page 2', 'Page 3+'];
+    const VOLUME_BANDS = ['High demand', 'Good demand', 'Growing', 'Niche'];
+    for (const story of stories) {
+      // No forbidden fields at the story level.
+      expect(story.opportunityScore).toBeUndefined();
+      expect(story.emv).toBeUndefined();
+      expect(story.cpc).toBeUndefined();
+      expect(story.competitorDomain).toBeUndefined();
+      expect(story.competitorPosition).toBeUndefined();
+
+      for (const rk of story.rankedKeywords as Array<Record<string, unknown>>) {
+        // Banded position label only — never a raw integer position.
+        expect(POSITION_BANDS).toContain(rk.positionLabel);
+        expect(rk.position).toBeUndefined();
+        expect(rk.pos).toBeUndefined();
+      }
+      for (const gk of story.gapKeywords as Array<Record<string, unknown>>) {
+        // Banded demand label only — never raw volume/difficulty.
+        expect(VOLUME_BANDS).toContain(gk.volumeLabel);
+        expect(gk.volume).toBeUndefined();
+        expect(gk.difficulty).toBeUndefined();
+        expect(gk.competitorPosition).toBeUndefined();
+        expect(gk.competitorDomain).toBeUndefined();
+      }
+    }
+  });
+});
+
 // ── GET /api/public/keyword-feedback — list (no auth required) ──────────────
 
 describe('GET /api/public/keyword-feedback — list feedback', () => {

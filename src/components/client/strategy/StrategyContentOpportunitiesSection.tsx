@@ -1,10 +1,12 @@
 import type { RefObject } from 'react';
-import { Ban, CheckCircle2, ChevronDown, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronDown, FileText, Layers, Sparkles, ShoppingCart, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
 import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, type BadgeTone, type Tier } from '../../ui';
 import { ContentGapRow } from '../../shared/ContentGapRow';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
 import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { useCart } from '../useCart';
+import { contentProductType } from '../../../../shared/types/payments';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];
 type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
@@ -107,6 +109,30 @@ function ContentGapCard({
   const alreadyRequested = isContentGapAlreadyRequested(contentRequests, requestedTopics, gap.targetKeyword);
   const planStatus = contentPlanKeywords?.get(targetKeywordKey);
   const pageType = gap.suggestedPageType || 'blog';
+  const { addItem, openCart } = useCart();
+
+  // Add-to-cart is ADDITIVE next to Buy-now — same payload, no extra step on the
+  // Buy-now path. The cart applies the Premium discount at display + checkout.
+  const addContentToCart = (serviceType: 'brief_only' | 'full_post') => {
+    const price = serviceType === 'full_post' ? fullPostPrice : briefPrice;
+    addItem({
+      kind: 'content',
+      productType: contentProductType(serviceType),
+      displayName: serviceType === 'full_post' ? 'Full Blog Post' : 'Content Brief',
+      priceUsd: price ?? 0,
+      content: {
+        topic: gap.topic,
+        targetKeyword: gap.targetKeyword,
+        serviceType,
+        pageType,
+        source: 'strategy',
+        intent: gap.intent,
+        priority: gap.priority,
+        rationale: gap.rationale,
+      },
+    });
+    openCart();
+  };
 
   // Header-right widget after the shared intent badge: page-type badge (strategy-tab chrome — no priority widget).
   const headerRight = pageType !== 'blog' ? (
@@ -187,26 +213,49 @@ function ContentGapCard({
           </Button>
         ) : (
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={FileText}
-              onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand font-medium hover:bg-teal-600/40"
-            >
-              Get Brief
-              {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
-            </Button>
-            {(hidePrices || fullPostPrice != null) && (
+            <div className="flex items-center">
               <Button
-                variant="primary"
+                variant="ghost"
                 size="sm"
-                icon={Sparkles}
-                onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                icon={FileText}
+                onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                className="px-3 py-1.5 rounded-l-[var(--radius-lg)] rounded-r-none bg-teal-600/20 border border-teal-500/30 text-accent-brand font-medium hover:bg-teal-600/40"
               >
-                Full Post
-                {!hidePrices && fullPostPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
+                Get Brief
+                {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={ShoppingCart}
+                aria-label="Add brief to cart"
+                title="Add brief to cart"
+                onClick={() => addContentToCart('brief_only')}
+                className="px-2 py-1.5 rounded-r-[var(--radius-lg)] rounded-l-none border border-l-0 border-teal-500/30 bg-teal-600/10 text-accent-brand hover:bg-teal-600/30"
+              />
+            </div>
+            {(hidePrices || fullPostPrice != null) && (
+              <div className="flex items-center">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Sparkles}
+                  onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
+                  className="rounded-r-none"
+                >
+                  Full Post
+                  {!hidePrices && fullPostPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={ShoppingCart}
+                  aria-label="Add full post to cart"
+                  title="Add full post to cart"
+                  onClick={() => addContentToCart('full_post')}
+                  className="px-2 py-1.5 rounded-r-[var(--radius-lg)] rounded-l-none border border-l-0 border-teal-500/30 bg-teal-600/10 text-accent-brand hover:bg-teal-600/30"
+                />
+              </div>
             )}
           </div>
         ))}

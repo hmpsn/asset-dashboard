@@ -218,6 +218,15 @@ export const queryKeys = {
 
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
+    /**
+     * R2-B agency "work feed" activity. DISTINCT from `activity` above: the work
+     * feed query (`useClientActivityFeed`) fetches a different shape
+     * (`ClientActivityEntry[]` via `fetchClientActivityFeed`) than `useClientActivity`
+     * (`ActivityLogItem[]` via `/api/public/activity`). Sharing one key would cause
+     * last-resolver-wins cache corruption when both hooks mount. Both keys are
+     * invalidated together on ACTIVITY_NEW (see wsInvalidation.ts).
+     */
+    workFeedActivity: (wsId: string) => ['client-work-feed-activity', wsId] as const,
     rankHistory: (wsId: string) => ['client-rank-history', wsId] as const,
     // A4 (audit #15): 180-day rank series for client-requested keywords (Strategy tab trend card).
     requestedKeywordTrend: (wsId: string, keywords: string[]) =>
@@ -252,6 +261,7 @@ export const queryKeys = {
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
     briefing: (wsId: string) => ['client-briefing', wsId] as const,
+    competitorGaps: (wsId: string) => ['client-competitor-gaps', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
     chatUsage: (wsId: string) => ['client-chat-usage', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
@@ -271,6 +281,8 @@ export const queryKeys = {
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
     postPreviewAll: (wsId: string) => ['client', 'post-preview', wsId] as const,
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
+    /** Active background jobs visible to this workspace's client portal. */
+    jobs: (wsId: string) => ['client-jobs', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

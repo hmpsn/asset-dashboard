@@ -29,6 +29,7 @@ import { fmtNum } from '../../utils/formatNumbers';
 
 export const FILTER_ICONS: Record<KeywordCommandCenterFilter, LucideIcon> = {
   [KEYWORD_COMMAND_CENTER_FILTERS.ALL]: SlidersHorizontal,
+  [KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE]: TrendingUp,
   [KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY]: Target,
   [KEYWORD_COMMAND_CENTER_FILTERS.TRACKED]: TrendingUp,
   [KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW]: Eye,

@@ -1262,11 +1262,12 @@ describe('buildFilterFacetsFromCounts', () => {
     declined: 5,
     retired: 2,
     lostVisibility: 9,
+    strikingDistance: 7,
   };
 
-  it('returns 18 filter facets', () => {
+  it('returns 19 filter facets', () => {
     const result = buildFilterFacetsFromCounts(counts);
-    expect(result).toHaveLength(18);
+    expect(result).toHaveLength(19);
   });
 
   it('ALL facet has correct count', () => {

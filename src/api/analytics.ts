@@ -153,3 +153,39 @@ export const gscAdmin = {
 export async function fetchClientIntelligence(workspaceId: string): Promise<ClientIntelligence> {
   return get<ClientIntelligence>(`/api/public/intelligence/${workspaceId}`);
 }
+
+// ── Agency Work Feed ───────────────────────────────────────────────
+export interface ClientActivityEntry {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  actorName?: string;
+  createdAt: string;
+}
+
+export interface ClientJobEntry {
+  id: string;
+  type: string;
+  status: string;
+  progress?: number;
+  total?: number;
+  message?: string;
+  createdAt: string;
+  updatedAt: string;
+  workspaceId?: string;
+}
+
+export async function fetchClientActivityFeed(
+  workspaceId: string,
+  limit = 30,
+  offset = 0,
+): Promise<ClientActivityEntry[]> {
+  return get<ClientActivityEntry[]>(
+    `/api/public/activity/${workspaceId}?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export async function fetchClientJobs(workspaceId: string): Promise<ClientJobEntry[]> {
+  return get<ClientJobEntry[]>(`/api/public/jobs/${workspaceId}`);
+}

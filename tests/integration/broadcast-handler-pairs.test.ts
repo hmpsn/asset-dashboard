@@ -79,10 +79,10 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // the unified-inbox query). They are intentionally NOT listed here anymore. (The admin inbox
   // half lands in PR-2b; a single frontend handler already satisfies this contract.)
 
-  // Background job lifecycle events are handled by BackgroundTaskProvider /
-  // useBackgroundTasks, not by the centralized React Query invalidation layer.
-  'job:created',
-  'job:update',
+  // job:created / job:update are now HANDLED in ClientDashboard.tsx (R2-B
+  // agency work feed wires useWorkspaceEvents for both, invalidating the
+  // client work-feed queries) in addition to BackgroundTaskProvider /
+  // useBackgroundTasks. They are intentionally NOT listed here anymore.
 ]);
 
 /**
@@ -94,6 +94,15 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
   // this via a different code path (not broadcastToWorkspace) — it is a
   // direct admin presence broadcast, not a workspace-scoped event.
   'presence:update',
+
+  // job:created / job:update — handled in ClientDashboard.tsx (R2-B agency
+  // work feed). The server emits these through the jobs subsystem dispatcher
+  // (server/jobs.ts broadcastJobEvent via initJobs), not a literal
+  // broadcastToWorkspace() call, so this static scan cannot see the producer
+  // even though the events are live. Same rationale as the
+  // KNOWN_CONSTANTS_PENDING_ROUTES entries for these events below.
+  'job:created',
+  'job:update',
 
   // lg:grid-cols-5 — Tailwind responsive-prefix class used in a ternary
   // expression inside a template literal in WorkspaceHome.tsx:

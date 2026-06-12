@@ -176,6 +176,7 @@ function adminInvalidationKeys(
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.workspaceOverview(),
         queryKeys.client.activity(workspaceId),
+        queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.AUDIT_COMPLETE:
       return [
@@ -510,7 +511,10 @@ function clientDashboardInvalidationKeys(
 ): readonly QueryInvalidationKey[] {
   switch (eventName) {
     case WS_EVENTS.ACTIVITY_NEW:
-      return [queryKeys.client.activity(workspaceId)] as const;
+      return [
+        queryKeys.client.activity(workspaceId),
+        queryKeys.client.workFeedActivity(workspaceId),
+      ] as const;
     case WS_EVENTS.APPROVAL_UPDATE:
     case WS_EVENTS.APPROVAL_APPLIED:
       return [queryKeys.client.approvals(workspaceId)] as const;
@@ -553,6 +557,7 @@ function clientDashboardInvalidationKeys(
       return [
         queryKeys.client.auditSummary(workspaceId),
         queryKeys.client.activity(workspaceId),
+        queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
       return [queryKeys.client.pricing(workspaceId)] as const;
@@ -561,6 +566,7 @@ function clientDashboardInvalidationKeys(
         queryKeys.shared.pageEditStates(workspaceId, false),
         queryKeys.shared.pageEditStates(workspaceId, true),
         queryKeys.client.activity(workspaceId),
+        queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.RECOMMENDATIONS_UPDATED:
       return [queryKeys.shared.recommendations(workspaceId)] as const;
@@ -626,6 +632,7 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.roi(workspaceId),
         queryKeys.client.postPreviewAll(workspaceId),
         queryKeys.client.activity(workspaceId),
+        queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.ANNOTATION_BRIDGE_CREATED:
       return [queryKeys.client.annotations(workspaceId)] as const;
@@ -639,6 +646,9 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.schemaPlan(workspaceId),
         queryKeys.client.schemaSnapshot(workspaceId),
       ] as const;
+    case WS_EVENTS.JOB_CREATED:
+    case WS_EVENTS.JOB_UPDATED:
+      return [queryKeys.client.jobs(workspaceId)] as const;
     default:
       return NO_KEYS;
   }

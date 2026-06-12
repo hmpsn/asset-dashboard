@@ -26,7 +26,8 @@ export type HubSegment =
   | 'tracked'
   | 'needs_review'
   | 'retired'
-  | 'local';
+  | 'local'
+  | 'striking_distance';
 
 export type HubSortKey =
   | 'opportunity'
@@ -90,6 +91,7 @@ const VALID_SEGMENTS: ReadonlySet<HubSegment> = new Set([
   'needs_review',
   'retired',
   'local',
+  'striking_distance',
 ]);
 
 /** Maps a HubSegment to the corresponding KeywordCommandCenterFilter value. */
@@ -100,6 +102,7 @@ const SEGMENT_TO_FILTER: Record<HubSegment, KeywordCommandCenterFilter> = {
   needs_review: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW,
   retired: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
   local: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL,
+  striking_distance: KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE,
 };
 
 function isValidSegment(s: unknown): s is HubSegment {
