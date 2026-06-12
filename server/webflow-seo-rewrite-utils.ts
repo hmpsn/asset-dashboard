@@ -3,6 +3,7 @@
  */
 
 import { z } from './middleware/validate.js';
+import { uniqStrings } from './utils/collections.js';
 
 /**
  * Enforce a character limit on SEO text with smart truncation.
@@ -33,18 +34,6 @@ const seoPairSchema = z.object({
   description: seoVariationSchema,
 }).strip();
 
-function uniqueSeoTexts(values: string[]): string[] {
-  const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const value of values) {
-    const key = value.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push(value);
-  }
-  return unique;
-}
-
 /**
  * Normalize AI-generated title/description arrays before persistence/display.
  * Rejects prose/object fallbacks and duplicate/empty values instead of padding
@@ -63,7 +52,11 @@ export function normalizeSeoRewriteVariations(raw: unknown, maxLen: number, expe
       return result.success ? result.data : null;
     })
     .filter((value): value is string => value !== null);
-  const normalized = uniqueSeoTexts(parsed.map(value => enforceSeoTextLimit(value, maxLen)).filter(Boolean));
+  const normalized = uniqStrings(parsed.map(value => enforceSeoTextLimit(value, maxLen)).filter(Boolean), {
+    caseInsensitive: true,
+    trim: true,
+    collapseWhitespace: true,
+  });
   return normalized.slice(0, expectedCount);
 }
 

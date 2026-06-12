@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeErrorMessage, sanitizeForPromptInjection } from '../../server/helpers.js';
+import { sanitizeErrorMessage, sanitizeForPromptInjection, sanitizeInlinePromptText } from '../../server/helpers.js';
 
 describe('sanitizeErrorMessage', () => {
   it('returns fallback for non-Error values', () => {
@@ -98,5 +98,20 @@ describe('sanitizeForPromptInjection', () => {
     expect(inner).not.toContain('<untrusted_user_content>');
     expect(inner).toContain('&lt;/untrusted_user_content&gt;');
     expect(inner).toContain('&lt;untrusted_user_content&gt;');
+  });
+});
+
+describe('sanitizeInlinePromptText', () => {
+  it('returns empty string for non-string values', () => {
+    expect(sanitizeInlinePromptText(null)).toBe('');
+    expect(sanitizeInlinePromptText({ value: 'hello' })).toBe('');
+  });
+
+  it('strips control characters into spaces and trims', () => {
+    expect(sanitizeInlinePromptText(' hello\n\tworld\x00 ')).toBe('hello world');
+  });
+
+  it('truncates to the requested max length', () => {
+    expect(sanitizeInlinePromptText('abcdef', 3)).toBe('abc');
   });
 });

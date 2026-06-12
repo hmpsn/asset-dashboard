@@ -232,6 +232,20 @@ export function sanitizeForPromptInjection(untrusted: string): string {
 }
 
 /**
+ * Sanitize short trusted-field values before inline interpolation into prompt
+ * instructions. Unlike sanitizeForPromptInjection(), this does not add an
+ * untrusted-content envelope because callers use it inside already-structured
+ * prompt lines.
+ */
+export function sanitizeInlinePromptText(value: unknown, maxLen = 200): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\x00-\x1F\x7F]+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+/**
  * Sanitize a user-sourced query string (e.g. from Google Search Console) for safe
  * inline embedding as a list item in an LLM prompt. Strips newlines — the primary
  * injection vector that can break prompt formatting — control tokens, and other
