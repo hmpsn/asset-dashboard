@@ -24,7 +24,8 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
-const FLAG = 'keyword-hub';
+// Probe flag must default to false: keyword-hub flipped true at the Phase B cutover.
+const FLAG = 'keyword-universe-full';
 const RETIRED_PRODUCT_UI_FLAGS = [
   'copy-engine',
   'copy-engine-voice',
