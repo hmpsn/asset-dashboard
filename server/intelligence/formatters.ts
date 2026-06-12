@@ -610,7 +610,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
     if (learnings.weCalledIt && learnings.weCalledIt.length > 0) {
       lines.push('Proven predictions:');
       for (const entry of learnings.weCalledIt.slice(0, verbosity === 'detailed' ? 5 : 3)) {
-        lines.push(`  - ${entry.prediction} → ${entry.score}${entry.pageUrl ? ` (${entry.pageUrl})` : ''}`);
+        lines.push(`  - ${entry.prediction} → ${entry.outcome}${entry.pageUrl ? ` (${entry.pageUrl})` : ''}`);
       }
     }
 

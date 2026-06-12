@@ -5,6 +5,78 @@ import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('workspace-intelligence/learnings');
 
+const ACTION_PHRASES: Record<string, string> = {
+  insight_acted_on: 'insight follow-up',
+  content_published: 'content publication',
+  brief_created: 'brief creation',
+  strategy_keyword_added: 'strategy keyword addition',
+  schema_deployed: 'schema deployment',
+  audit_fix_applied: 'audit fix',
+  content_refreshed: 'content refresh',
+  internal_link_added: 'internal link addition',
+  meta_updated: 'metadata update',
+  voice_calibrated: 'voice calibration',
+  competitor_gap_closed: 'competitor gap closure',
+  cluster_published: 'topic cluster publication',
+  cannibalization_resolved: 'cannibalization fix',
+  local_visibility_won: 'local visibility win',
+  local_service_added: 'local service addition',
+};
+
+const METRIC_LABELS: Record<string, string> = {
+  clicks: 'Clicks',
+  impressions: 'Impressions',
+  sessions: 'Sessions',
+  conversions: 'Conversions',
+  ctr: 'CTR',
+  position: 'Position',
+  page_health_score: 'Page health score',
+  voice_score: 'Voice score',
+};
+
+function humanizeUnderscore(value: string): string {
+  return value.replace(/_/g, ' ');
+}
+
+function formatActionPhrase(actionType: string): string {
+  return ACTION_PHRASES[actionType] ?? humanizeUnderscore(actionType);
+}
+
+function formatMetricLabel(metric: string | undefined): string {
+  if (!metric) return 'Primary metric';
+  return METRIC_LABELS[metric] ?? humanizeUnderscore(metric).replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatScoreLabel(score: string | null): string {
+  if (!score) return 'strong win';
+  return humanizeUnderscore(score);
+}
+
+function formatOutcomeNarrative(actionType: string, outcome: ActionOutcome): string {
+  const delta = outcome.deltaSummary;
+  if (
+    delta
+    && Number.isFinite(delta.baseline_value)
+    && Number.isFinite(delta.current_value)
+  ) {
+    const direction = delta.direction === 'declined'
+      ? 'declined'
+      : delta.direction === 'stable'
+        ? 'held steady'
+        : 'improved';
+    const percent = Number.isFinite(delta.delta_percent)
+      ? ` (${delta.direction === 'declined' ? '-' : delta.direction === 'improved' ? '+' : ''}${formatNumber(Math.abs(delta.delta_percent))}%)`
+      : '';
+    return `${formatMetricLabel(delta.primary_metric)} ${direction} from ${formatNumber(delta.baseline_value)} to ${formatNumber(delta.current_value)}${percent}.`;
+  }
+
+  return `${formatActionPhrase(actionType)} was recorded as a ${formatScoreLabel(outcome.score)}.`;
+}
+
 export async function assembleLearnings(
   workspaceId: string,
   opts?: IntelligenceOptions,
@@ -111,8 +183,8 @@ export async function assembleLearnings(
       if (strongWin) {
         weCalledIt.push({
           actionId: action.id,
-          prediction: `${action.actionType} on ${action.pageUrl ?? 'site'}`,
-          outcome: 'strong_win',
+          prediction: `${formatActionPhrase(action.actionType)} on ${action.pageUrl ?? 'site'}`,
+          outcome: formatOutcomeNarrative(action.actionType, strongWin),
           score: 'strong_win',
           pageUrl: action.pageUrl ?? '',
           measuredAt: strongWin.measuredAt ?? '',

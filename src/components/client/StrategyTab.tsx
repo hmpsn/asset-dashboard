@@ -8,11 +8,13 @@ import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
+import { useClientIntelligence } from '../../hooks/client';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
 import { StrategyDeclinedKeywordsSection } from './strategy/StrategyDeclinedKeywordsSection';
 import { StrategyDeclineKeywordModal } from './strategy/StrategyDeclineKeywordModal';
+import { StrategyKeywordFeedbackSummaryCard } from './strategy/StrategyKeywordFeedbackSummaryCard';
 import { StrategyKeywordDrawer } from './strategy/StrategyKeywordDrawer';
 import { StrategyKeywordsSection } from './strategy/StrategyKeywordsSection';
 import { StrategyNextStepsSection } from './strategy/StrategyNextStepsSection';
@@ -89,6 +91,11 @@ function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkT
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [searchParams] = useSearchParams();
+  const { data: clientIntelligence } = useClientIntelligence(workspaceId ?? '');
+  const keywordFeedbackSummary =
+    effectiveTier !== 'free' && clientIntelligence?.tier !== 'free'
+      ? clientIntelligence?.keywordFeedbackSummary
+      : null;
   const initialDeepLinkTab = searchParams.get('tab');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const initial = new Set(['new-content', 'optimize-existing']);
@@ -705,6 +712,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         onReviewPages={() => scrollToSection('optimize-existing', optimizeExistingRef)}
         onManageKeywords={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
+
+      {keywordFeedbackSummary && (
+        <StrategyKeywordFeedbackSummaryCard summary={keywordFeedbackSummary} />
+      )}
 
       {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
       {(feedbackLoadError || trackedKeywordsError) && (

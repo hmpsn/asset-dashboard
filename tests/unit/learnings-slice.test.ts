@@ -83,10 +83,31 @@ beforeEach(() => {
         score: 'strong_win',
         checkpointDays: 30,
         metricsSnapshot: { clicks: 200 },
+        deltaSummary: {
+          primary_metric: 'clicks',
+          baseline_value: 120,
+          current_value: 200,
+          delta_absolute: 80,
+          delta_percent: 66.7,
+          direction: 'improved',
+        },
         measuredAt: '2026-05-22T12:00:00.000Z',
       }];
     }
-    return [{ score: 'neutral', checkpointDays: 30, metricsSnapshot: { clicks: 0 }, measuredAt: '2026-05-23T12:00:00.000Z' }];
+    return [{
+      score: 'neutral',
+      checkpointDays: 30,
+      metricsSnapshot: { clicks: 0 },
+      deltaSummary: {
+        primary_metric: 'clicks',
+        baseline_value: 0,
+        current_value: 0,
+        delta_absolute: 0,
+        delta_percent: 0,
+        direction: 'stable',
+      },
+      measuredAt: '2026-05-23T12:00:00.000Z',
+    }];
   });
   mocks.getTopWinsFromActions.mockImplementation((actions: Array<{ id: string }>, _limit: number, getOutcomes: (id: string) => Array<{ score: string }>) => {
     const action = actions.find((candidate: { id: string }) => getOutcomes(candidate.id).some(outcome => outcome.score === 'strong_win'));
@@ -138,8 +159,8 @@ describe('assembleLearnings', () => {
     expect(result.weCalledIt).toEqual([
       {
         actionId: 'action_1',
-        prediction: 'schema_fix on /pricing',
-        outcome: 'strong_win',
+        prediction: 'schema fix on /pricing',
+        outcome: 'Clicks improved from 120 to 200 (+66.7%).',
         score: 'strong_win',
         pageUrl: '/pricing',
         measuredAt: '2026-05-22T12:00:00.000Z',

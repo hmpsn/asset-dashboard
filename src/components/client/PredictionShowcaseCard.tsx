@@ -1,24 +1,43 @@
-import { Trophy, TrendingUp, Calendar } from 'lucide-react'; // trend-icon-ok — this icon is narrative decoration ("we predicted"), not a directional metric trend indicator.
-import { SectionCard } from '../ui/SectionCard';
+import { Calendar, CheckCircle2, FileText, Target, Trophy } from 'lucide-react';
+import { Badge, Icon, SectionCard } from '../ui';
 import { EmptyState } from '../ui/EmptyState';
-import { Icon } from '../ui/Icon';
 import type { WeCalledItEntry } from '../../../shared/types/intelligence';
 
 interface PredictionShowcaseCardProps {
   predictions: WeCalledItEntry[] | null | undefined;
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-  } catch {
-    return iso;
+function scoreLabel(score: WeCalledItEntry['score']): string {
+  return score
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function scoreTone(score: WeCalledItEntry['score']): 'emerald' | 'blue' {
+  return score === 'strong_win' ? 'emerald' : 'blue';
+}
+
+function looksLikeEnum(value: string): boolean {
+  return /^[a-z]+(?:_[a-z]+)+$/.test(value);
+}
+
+function outcomeCopy(entry: WeCalledItEntry): string {
+  if (!entry.outcome || entry.outcome === entry.score || looksLikeEnum(entry.outcome)) {
+    return `${scoreLabel(entry.score)} confirmed for this recommendation.`;
   }
+  return entry.outcome;
+}
+
+function formatMeasuredDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardProps) {
@@ -41,29 +60,60 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
       title="Predictions That Came True"
       titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
     >
-      <div className="space-y-3">
+      <div className="space-y-5">
         {items.map((p) => (
           <div
             key={p.actionId}
-            className="bg-teal-500/5 border border-teal-500/10 rounded-[var(--radius-xl)] p-4 space-y-2"
+            className="space-y-3 border-t border-[var(--brand-border)] pt-5 first:border-t-0 first:pt-0"
           >
-            {/* What we predicted */}
-            <div className="flex items-start gap-2">
-              <Icon as={TrendingUp} size="md" className="text-accent-brand flex-shrink-0 mt-0.5" />
-              <p className="t-body text-[var(--brand-text-bright)] leading-snug">
-                We predicted <span className="font-medium text-[var(--brand-text-bright)]">{p.prediction}</span>
-              </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                tone={scoreTone(p.score)}
+                variant="soft"
+                shape="pill"
+                icon={CheckCircle2}
+                label={scoreLabel(p.score)}
+              />
+              {p.pageUrl && (
+                <span className="t-caption text-[var(--brand-text-muted)]">
+                  {p.pageUrl}
+                </span>
+              )}
             </div>
 
-            {/* What actually happened */}
-            <p className="t-body text-accent-brand pl-6 leading-snug">
-              Result: {p.outcome}
-            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[var(--brand-text-muted)]">
+                  <Icon as={Target} size="sm" />
+                  <span className="t-label">Before</span>
+                </div>
+                <p className="t-body text-[var(--brand-text-bright)] leading-snug">
+                  We predicted {p.prediction}
+                </p>
+              </div>
 
-            {/* Date measured */}
-            <div className="flex items-center gap-1.5 pl-6 t-caption text-[var(--brand-text-muted)]">
-              <Icon as={Calendar} size="sm" />
-              <span>Confirmed {formatDate(p.measuredAt)}</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[var(--brand-text-muted)]">
+                  <Icon as={CheckCircle2} size="sm" />
+                  <span className="t-label">After</span>
+                </div>
+                <p className="t-body text-accent-brand leading-snug">
+                  {outcomeCopy(p)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 t-caption text-[var(--brand-text-muted)]">
+              {p.pageUrl && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon as={FileText} size="sm" />
+                  {p.pageUrl}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5">
+                <Icon as={Calendar} size="sm" />
+                Confirmed {formatMeasuredDate(p.measuredAt)}
+              </span>
             </div>
           </div>
         ))}

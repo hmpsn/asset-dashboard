@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **496 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **497 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 497. Client Dashboard QW2 PR7 — Strategy Feedback Stories
+
+**What it does:** Turns two existing feedback loops into visible client stories. Growth+ client intelligence now exposes a sanitized `keywordFeedbackSummary` projection with approved/rejected keyword counts, approve rate, display samples, and top rejection reasons from the client-signals slice. The Strategy tab renders that summary in a blue data-oriented `SectionCard`. The "Predictions That Came True" card now frames each recorded outcome as a Before/After story with the stored score, page, and confirmation date, without inventing narrative fields.
+
+**Agency value:** Gives account teams proof that client keyword feedback is shaping strategy and makes outcome tracking easier to explain without opening admin-only diagnostics.
+
+**Client value:** Clients can see that their keyword decisions were heard and can understand the before/after result behind platform predictions in plain language.
+
+**Mutual:** Strengthens the dashboard's trust loop: client feedback becomes visible strategy context, and successful predictions become reusable proof of impact.
+
+**Files:** `shared/types/intelligence.ts`, `server/routes/client-intelligence.ts`, `server/intelligence/learnings-slice.ts`, `server/intelligence/formatters.ts`, `src/components/client/StrategyTab.tsx`, `src/components/client/strategy/StrategyKeywordFeedbackSummaryCard.tsx`, `src/components/client/PredictionShowcaseCard.tsx`. Tests: `tests/component/client/StrategyKeywordFeedbackSummaryCard.test.tsx`, `tests/component/client/PredictionShowcaseCard.test.tsx`, `tests/component/client/StrategyTab.test.tsx`, `tests/client-intelligence-types.test.ts`, `tests/integration/client-intelligence-endpoint.test.ts`, `tests/unit/learnings-slice.test.ts`, `tests/unit/learnings-slice-assembly.test.ts`, `tests/format-for-prompt.test.ts`.
 
 ---
 

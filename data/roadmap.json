@@ -250,9 +250,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.4",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "New <SectionCard> block in StrategyTab.tsx, fed by the clientSignals-backed projection — no ad hoc reads. Turns the feedback loop into visible collaboration."
+          "notes": "Shipped in PR 7. Growth+ client intelligence now projects a sanitized keywordFeedbackSummary from ClientSignalsSlice, and Strategy renders a blue data SectionCard with approve/reject counts, approval rate, display samples, and top rejection reasons."
         },
         {
           "id": "cda-qw2-we-called-it-expansion",
@@ -260,9 +260,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.5",
           "est": "3h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Richer before/after framing per prediction in PredictionShowcaseCard.tsx. Stays on Overview — no new tab."
+          "notes": "Shipped in PR 7. PredictionShowcaseCard now renders each stored outcome as a Before/After story with the recorded score badge, page, and confirmation date, using existing WeCalledItEntry fields only."
         },
         {
           "id": "cda-qw2-inline-prices",
