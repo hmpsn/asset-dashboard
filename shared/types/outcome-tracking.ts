@@ -277,6 +277,47 @@ export interface OutcomeWinEntry {
   detectedAt: string;
 }
 
+/**
+ * Compact, read-back outcome verdict for admin surfaces that close the outcome
+ * loop (W5.1): Strategy tab keyword rows, Keyword Hub drawer, Posts/Briefs badges.
+ *
+ * Built server-side from the LATEST conclusive `action_outcomes` row of a tracked
+ * action (highest checkpoint, score not 'insufficient_data'/'inconclusive'). It
+ * surfaces the baseline→current movement and the verdict so a UI can render a
+ * single chip ("#14→#6 · Win") without re-deriving direction.
+ *
+ * Position semantics: `baselinePosition`/`currentPosition` are GSC/rank positions
+ * where LOWER is better. `direction` is already position-aware (computed by
+ * computeDelta), so consumers must NOT re-infer improvement from raw numbers —
+ * trust `direction`.
+ */
+export interface OutcomeReadback {
+  actionId: string;
+  actionType: ActionType;
+  /** Verdict for the latest conclusive checkpoint. */
+  score: OutcomeScore;
+  /** Checkpoint (days) the verdict was measured at (7/30/60/90). */
+  checkpointDays: 7 | 30 | 60 | 90;
+  /** Primary metric the verdict scored on (e.g. 'position', 'clicks'). */
+  primaryMetric: string;
+  /** Position-aware movement direction. Trust this over raw position math. */
+  direction: DeltaDirection;
+  /** Baseline metric value at action time (e.g. starting position). */
+  baselineValue: number;
+  /** Current metric value at the measured checkpoint. */
+  currentValue: number;
+  /** Baseline GSC/rank position when the primary metric is position-based; else null. */
+  baselinePosition: number | null;
+  /** Current GSC/rank position when the primary metric is position-based; else null. */
+  currentPosition: number | null;
+  /** Baseline 90-day clicks when captured; else null. */
+  baselineClicks: number | null;
+  /** Current clicks at the measured checkpoint; else null. */
+  currentClicks: number | null;
+  /** ISO timestamp the verdict was measured. */
+  measuredAt: string;
+}
+
 export interface WorkspaceOutcomeOverview {
   workspaceId: string;
   workspaceName: string;

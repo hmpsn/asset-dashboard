@@ -13,8 +13,9 @@ import { fmtMoney } from '../../utils/formatNumbers';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
+import type { OutcomeReadback } from '../../../shared/types/outcome-tracking';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
-import { Badge, Button, EmptyState, Icon, IconButton, Skeleton, StatusBadge, TableSkeleton } from '../ui';
+import { Badge, Button, EmptyState, Icon, IconButton, OutcomeReadbackChip, Skeleton, StatusBadge, TableSkeleton } from '../ui';
 import { KeywordDetailPanel } from './KeywordDetailPanel';
 import { KeywordSparkline } from './KeywordSparkline';
 import {
@@ -32,6 +33,8 @@ const MAX_INLINE_MARKETS = 6;
 interface KeywordDetailDrawerProps {
   open: boolean;
   row: KeywordCommandCenterRow | null;
+  /** W5.1: read-back outcome verdict for this keyword (from the detail response). */
+  outcome?: OutcomeReadback;
   workspaceId: string;
   isLoading?: boolean;
   loadingAction?: string;
@@ -42,6 +45,7 @@ interface KeywordDetailDrawerProps {
 export function KeywordDetailDrawer({
   open,
   row,
+  outcome,
   workspaceId,
   isLoading,
   loadingAction,
@@ -303,6 +307,16 @@ export function KeywordDetailDrawer({
                   <p className="t-caption font-semibold text-blue-400 tabular-nums">{percent(row.metrics.ctr)}</p>
                 </KeywordDetailPanel>
               </div>
+
+              {/* W5.1: closed-loop outcome read-back — baseline→current position +
+                  verdict for this keyword's tracked action. Absent when no scored
+                  action exists yet. Honest about direction (chip trusts outcome.direction). */}
+              {outcome && (
+                <div data-testid="keyword-outcome-section">
+                  <p className="t-label text-[var(--brand-text-muted)] mb-2">Outcome So Far</p>
+                  <OutcomeReadbackChip outcome={outcome} />
+                </div>
+              )}
 
               {/* Task 3.3: per-keyword realized $ (server-computed via the single
                   keywordDollarValue helper; emerald = success/$ law). Absent when no cpc. */}

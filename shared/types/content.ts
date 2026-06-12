@@ -1,5 +1,7 @@
 // ── Content domain types ────────────────────────────────────────
 
+import type { OutcomeReadback } from './outcome-tracking.js';
+
 export const CONTENT_GENERATION_STYLES = ['standard', 'concise', 'hybrid'] as const;
 export type ContentGenerationStyle = typeof CONTENT_GENERATION_STYLES[number];
 export const DEFAULT_CONTENT_GENERATION_STYLE: ContentGenerationStyle = 'standard';
@@ -271,6 +273,15 @@ export interface GeneratedPost {
   voiceFeedback?: string;
   // Content generation style used for this generated post
   generationStyle?: ContentGenerationStyle;
+  /**
+   * W5.1: read-back outcome verdict for this post's tracked action — the latest
+   * conclusive measurement (90-day clicks/position delta + verdict). Enriched at
+   * the list-route boundary (GET /api/content-posts/:workspaceId) by joining the
+   * post's targetKeyword to its scored outcome. Absent for unpublished posts or
+   * posts with no scored action yet. NOT persisted on the post row — purely a
+   * read-side decoration. Positions are honest (lower=better); trust `direction`.
+   */
+  outcome?: OutcomeReadback;
   createdAt: string;
   updatedAt: string;
 }

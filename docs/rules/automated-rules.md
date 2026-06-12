@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **177** — 157 error, 20 warn.
+Total rules: **178** — 158 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -173,6 +173,7 @@ advisory but tracked.
 | 155 | recommendation impactScore must flow from canonical OV scorer | error | custom | `server/recommendations.ts` | — | Inline recommendation impactScore buckets drift from computeOpportunityValue() and silently fork ranking behavior from the canonical Opportunity Value scorer. |
 | 156 | tracked_keywords bare read→write outside withTrackedKeywordsTxn | error | custom | `server/` | `// tracked-keywords-txn-ok` | Two concurrent tracked_keywords writers both read the same JSON blob, mutate independently, and last-write-wins silently drops the other writer's keywords. BEGIN IMMEDIATE serialises the read+write so each writer sees the previous writer's result. |
 | 157 | positionColor/positionTone redefinition outside authority | error | custom | `src/ (excluding src/components/ui/constants.ts)` | `// position-color-authority-ok` | A locally-defined positionColor/positionTone bypasses the canonical color authority, causing silent palette drift when rank-color thresholds or accent tokens change. |
+| 158 | Hardcoded nav metadata outside the nav registry | error | custom | `*.tsx, *.ts` | `// nav-registry-ok` | Nav metadata triplicated across the three consumer surfaces silently drifts (a tab missing from one surface, disagreeing needsSite gating). The registry is the single source of truth. |
 
 ---
 

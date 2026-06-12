@@ -85,6 +85,7 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'emerging_keyword',
     'competitor_alert',
     'freshness_alert',
+    'local_visibility_shift',
   ];
 
   const trafficTypes: InsightType[] = [

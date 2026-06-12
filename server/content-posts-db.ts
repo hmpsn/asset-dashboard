@@ -10,6 +10,7 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
+import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
 
 const log = createLogger('content-posts-db');
 
@@ -279,6 +280,38 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
 export function listPosts(workspaceId: string): GeneratedPost[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
   return rows.map(rowToPost);
+}
+
+/**
+ * W5.1: badge PUBLISHED posts with their read-back outcome verdict (90-day
+ * clicks/position delta + verdict). Read-side decoration only — NOT persisted on
+ * the row, so it lives at the list-route boundary rather than in listPosts (which
+ * many non-list consumers call). Joins each published post's tracked action
+ * (recorded under sourceType='post', sourceId=postId, targetKeyword) back to its
+ * scored outcome via the shared read-back indexes. Source-id exact match first
+ * ('post::<postId>'), keyword fallback second. ONE indexed batch read per call.
+ * Only posts with a publishedAt (or a Webflow item) are eligible — a draft has no
+ * measurable outcome. Returns NEW post objects for badged posts; never mutates
+ * the input array.
+ */
+export function enrichPostsWithOutcomes(workspaceId: string, posts: GeneratedPost[]): GeneratedPost[] {
+  const publishedCount = posts.filter(p => p.publishedAt || p.webflowItemId).length;
+  if (publishedCount === 0) return posts;
+  let readbacks: ReturnType<typeof getScoredOutcomeReadbacks>;
+  try {
+    readbacks = getScoredOutcomeReadbacks(workspaceId);
+  } catch (err) {
+    // catch-ok: outcome badge is informational; degrade to no badge on read failure.
+    log.debug({ err, workspaceId }, 'Outcome read-back unavailable for posts list');
+    return posts;
+  }
+  if (readbacks.bySource.size === 0 && readbacks.byKeyword.size === 0) return posts;
+  return posts.map(post => {
+    if (!(post.publishedAt || post.webflowItemId)) return post;
+    const outcome = readbacks.bySource.get(`post::${post.id}`)
+      ?? (post.targetKeyword ? readbacks.byKeyword.get(post.targetKeyword.trim().toLowerCase()) : undefined);
+    return outcome ? { ...post, outcome } : post;
+  });
 }
 
 export function monthKeys(now: Date, months: number): string[] {

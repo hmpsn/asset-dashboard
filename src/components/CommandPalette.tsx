@@ -2,13 +2,17 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { anomalies } from '../api';
 import {
-  Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
-  Target, Code2, Clipboard, Image, TrendingUp, Sparkles, FileText,
-  LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy,
+  Search, Globe, Shield, Code2, FileText,
+  Command, ArrowUp, ArrowDown, CornerDownLeft,
+  Zap, LayoutTemplate, Grid3X3, Layers,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
-import { type Page, adminPath, GLOBAL_TABS } from '../routes';
+import { adminPath, GLOBAL_TABS } from '../routes';
+import {
+  NAV_REGISTRY, type NavGroupKey,
+  resolveNavLabel, isNavEntryHidden,
+} from '../lib/navRegistry';
+import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useToast } from './Toast';
@@ -29,40 +33,20 @@ interface CommandPaletteProps {
   onSelectWorkspace: (ws: Workspace) => void;
 }
 
-const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
-  { id: 'home', label: 'Home', icon: LayoutDashboard, group: '' },
-  // Monitoring
-  { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, group: 'Monitoring', needsSite: true },
-  { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Monitoring', needsSite: true },
-  { id: 'outcomes', label: 'Action Results', icon: Trophy, group: 'Monitoring' },
-  // Site Health
-  { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },
-  { id: 'performance', label: 'Performance', icon: Gauge, group: 'Site Health', needsSite: true },
-  { id: 'links', label: 'Links', icon: Link2, group: 'Site Health', needsSite: true },
-  { id: 'media', label: 'Assets', icon: Image, group: 'Site Health' },
-  // SEO Strategy
-  { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO Strategy', needsSite: true },
-  { id: 'seo-keywords', label: 'Keywords', icon: ListChecks, group: 'SEO Strategy', needsSite: true },
-  { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'SEO Strategy', needsSite: true },
-  // Optimization
-  { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'Optimization', needsSite: true },
-  { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'Optimization', needsSite: true },
-  { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'Optimization' },
-  { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, group: 'Optimization', needsSite: true },
-  // Content
-  { id: 'content-pipeline', label: 'Pipeline', icon: ListChecks, group: 'Content', needsSite: true },
-  { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'Content', needsSite: true },
-  { id: 'content', label: 'Content', icon: FileText, group: 'Content', needsSite: true },
-  { id: 'content-perf', label: 'Content Performance', icon: BarChart3, group: 'Content', needsSite: true },
-  { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'Content' },
-  // Admin (global)
-  { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, group: 'Admin' },
-  { id: 'prospect', label: 'Prospect', icon: FileSearch, group: 'Admin' },
-  { id: 'ai-usage', label: 'AI Usage', icon: BarChart3, group: 'Admin' },
-  { id: 'roadmap', label: 'Roadmap', icon: Shield, group: 'Admin' },
-  { id: 'features', label: 'Feature Library', icon: Layers, group: 'Admin' },
-  { id: 'settings', label: 'Settings', icon: Settings, group: '' },
-];
+// Palette-local presentation: maps each registry group key to the sub-text
+// header shown under a palette item. Item identity (label / needsSite /
+// description) comes from the nav registry — never hard-coded here.
+// nav-registry-ok — group display labels are presentation, not item metadata.
+const PALETTE_GROUP_LABELS: Record<NavGroupKey, string> = {
+  home: '',
+  monitoring: 'Monitoring',
+  'site-health': 'Site Health',
+  'seo-strategy': 'SEO Strategy',
+  optimization: 'Optimization',
+  content: 'Content',
+  admin: 'Admin',
+  utility: '',
+};
 
 const RECENT_KEY = 'admin-palette-recent';
 const MAX_RECENT = 5;
@@ -145,18 +129,22 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const items: PaletteItem[] = useMemo(() => {
     const result: PaletteItem[] = [];
 
-    // Navigation items
-    for (const nav of NAV_ITEMS) {
+    // Navigation items — driven by the nav registry. The keyword-hub relabel /
+    // hide logic lives once in the registry (flagBehavior); we resolve it here.
+    // Only keyword-hub drives nav flagBehavior today; other flags resolve false.
+    const flagResolver = (flag: FeatureFlagKey) => flag === 'keyword-hub' && keywordHubEnabled;
+    for (const entry of NAV_REGISTRY) {
       // Wave 4 P4: the standalone Rank Tracker entry folds into the Hub when ON.
-      if (nav.id === 'seo-ranks' && keywordHubEnabled) continue;
-      const label = nav.id === 'seo-keywords' && keywordHubEnabled ? 'Keyword Hub' : nav.label;
+      if (isNavEntryHidden(entry, flagResolver)) continue;
+      const label = resolveNavLabel(entry, flagResolver);
+      const groupLabel = PALETTE_GROUP_LABELS[entry.group];
       result.push({
-        id: `nav:${nav.id}`,
+        id: `nav:${entry.id}`,
         label,
-        sub: nav.group || undefined,
-        icon: nav.icon,
+        sub: groupLabel || undefined,
+        icon: entry.icon,
         type: 'nav',
-        action: () => { if (GLOBAL_TABS.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
+        action: () => { if (GLOBAL_TABS.has(entry.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', entry.id)); } addRecent(`nav:${entry.id}`); },
       });
     }
 

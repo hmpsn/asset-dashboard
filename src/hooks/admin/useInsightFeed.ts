@@ -338,6 +338,32 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'local_visibility_shift': {
+      const direction = data.direction as string | undefined;
+      const keyword = data.keyword as string | undefined;
+      const marketLabel = data.marketLabel as string | undefined;
+      const competitorName = data.competitorName as string | undefined;
+      if (direction === 'win') {
+        headline = keyword
+          ? `Now visible in local pack for "${keyword}"`
+          : 'Gained local pack visibility';
+      } else if (direction === 'competitor') {
+        headline = competitorName
+          ? `New local competitor: ${competitorName}`
+          : 'New repeat local competitor detected';
+      } else {
+        headline = keyword
+          ? `Lost local pack visibility for "${keyword}"`
+          : 'Lost local pack visibility';
+      }
+      if (marketLabel) contextParts.push(marketLabel);
+      const appearances = data.competitorAppearances as number | undefined;
+      if (direction === 'competitor' && appearances !== undefined) {
+        contextParts.push(`${appearances} keyword${appearances === 1 ? '' : 's'}`);
+      }
+      break;
+    }
+
     case 'milestone_attribution': {
       const daysSinceDelivery = data.daysSinceDelivery as number | undefined;
       const thresholdCrossed = data.thresholdCrossed as string | undefined;

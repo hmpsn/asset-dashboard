@@ -5,6 +5,7 @@ import type {
 } from './rank-tracking.ts';
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
 import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
+import type { OutcomeReadback } from './outcome-tracking.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -326,6 +327,14 @@ export interface KeywordCommandCenterRowsResponse {
 export interface KeywordCommandCenterDetailResponse {
   row: KeywordCommandCenterRow;
   generatedAt?: string | null;
+  /**
+   * W5.1: read-back outcome verdict for this keyword's tracked action — the latest
+   * conclusive measurement (baseline→current position + verdict). Populated by
+   * joining the keyword's (pagePath, keyword) tracked action recorded by
+   * recordKeywordTrackingAction back to its scored outcome. Absent when no scored
+   * action exists yet. Positions are honest (lower=better); trust `direction`.
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface KeywordCommandCenterActionRequest {

@@ -228,6 +228,24 @@ export const lostVisibilityDataSchema = z.object({
   detectedAt: z.string(),
 });
 
+/** LocalVisibilityShiftData — W5.3: local pack visible↔not_visible transitions
+ *  and new repeat competitors (bridge-local-visibility-shift).
+ *  Cross-referenced against shared/types/analytics.ts:LocalVisibilityShiftData */
+export const localVisibilityShiftDataSchema = z.object({
+  direction: z.enum(['risk', 'win', 'competitor']),
+  marketId: z.string(),
+  marketLabel: z.string(),
+  keyword: z.string().optional(),
+  normalizedKeyword: z.string().optional(),
+  device: z.string().optional(),
+  languageCode: z.string().optional(),
+  previousRank: z.number().nullable().optional(),
+  currentRank: z.number().nullable().optional(),
+  competitorName: z.string().optional(),
+  competitorAppearances: z.number().optional(),
+  detectedAt: z.string(),
+});
+
 /**
  * Maps each InsightType to its DB-stored Zod schema.
  * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
@@ -256,4 +274,5 @@ export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
   freshness_alert: freshnessAlertDataSchema.partial().passthrough(),
   milestone_attribution: milestoneAttributionDataSchema.partial().passthrough(),
   lost_visibility: lostVisibilityDataSchema.partial().passthrough(),
+  local_visibility_shift: localVisibilityShiftDataSchema.partial().passthrough(),
 };

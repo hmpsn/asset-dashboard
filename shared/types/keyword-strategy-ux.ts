@@ -4,6 +4,7 @@ import type {
   TrackedKeywordStatus,
 } from './rank-tracking.js';
 import type { LocalStrategySyncStatus } from './local-seo.js';
+import type { OutcomeReadback } from './outcome-tracking.js';
 
 export type KeywordStrategyUxSurface = 'admin' | 'client';
 
@@ -77,6 +78,15 @@ export interface KeywordStrategyExplanation {
    * CTR uplift × cpc, from the same keywordDollarValue helper. Absent when no cpc.
    */
   upsideMonthly?: number;
+  /**
+   * W5.1: read-back outcome verdict for this keyword's tracked action — the latest
+   * conclusive measurement (baseline→current position + verdict). Populated
+   * server-side in buildKeywordStrategyUxPayload by joining the keyword's
+   * (pagePath, keyword) tracked action to its scored outcome. Absent when the
+   * keyword has no scored action yet. Position numbers are honest (lower=better);
+   * `direction` is pre-computed — never re-infer improvement from raw positions.
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface KeywordStrategyRefreshSummary {

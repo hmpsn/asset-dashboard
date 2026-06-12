@@ -5786,6 +5786,10 @@ describe('Meta: customCheck rule name registry', () => {
     // Core-features audit E1 (2026-06-10) — every router.get in public-portal.ts
     // must carry a portal-auth middleware; bootstrap endpoints hatch inline.
     'public-portal.ts GET missing portal-auth middleware',
+    // Admin Surfaces W3.4 (2026-06-11) — nav metadata was triplicated across
+    // Sidebar/CommandPalette/Breadcrumbs and drifted; the nav registry is now
+    // the single source of truth. Bans re-inlining label/needsSite in consumers.
+    'Hardcoded nav metadata outside the nav registry',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -11059,5 +11063,104 @@ describe('Rule: public-portal.ts GET missing portal-auth middleware', () => {
     const hits = runRule(RULE, [file]);
     expect(hits.length).toBeGreaterThanOrEqual(1);
     expect(hits[0].line).toBe(1);
+  });
+});
+
+// ── Admin Surfaces W3.4: nav registry single-source-of-truth guard ──────────
+describe('Rule: Hardcoded nav metadata outside the nav registry', () => {
+  const RULE = 'Hardcoded nav metadata outside the nav registry';
+
+  it('flags a hardcoded nav-metadata object literal in Sidebar.tsx', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/layout/Sidebar.tsx'),
+      lines(
+        "const groups = [",
+        "  { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, needsSite: true },",
+        "];",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a literal needsSite: true in CommandPalette.tsx', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/CommandPalette.tsx'),
+      lines(
+        "const item = {",
+        "  needsSite: true,",
+        "};",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a hardcoded nav-metadata object literal in Breadcrumbs.tsx', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/layout/Breadcrumbs.tsx'),
+      lines("  { id: 'requests', label: 'Requests', icon: MessageSquare },")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does NOT flag reading needsSite from the registry (entry.needsSite)', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/layout/Sidebar.tsx'),
+      lines(
+        "const item = {",
+        "  needsSite: entry.needsSite,",
+        "  label: resolveNavLabel(entry, isFlagEnabled),",
+        "};",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag GROUP_PRESENTATION key/label rows (use key:, not id:)', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/layout/Sidebar.tsx'),
+      lines("  { key: 'monitoring', label: 'MONITORING', groupIcon: Activity },")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // nav-registry-ok on the same line', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/CommandPalette.tsx'),
+      lines("  { id: 'requests', label: 'Requests', icon: X }, // nav-registry-ok")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // nav-registry-ok on the line immediately above', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/layout/Breadcrumbs.tsx'),
+      lines(
+        "  // nav-registry-ok — legacy fallback label, not nav metadata",
+        "  needsSite: false,",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT scan files outside the three consumer surfaces', () => {
+    const file = write(
+      uniqPath('nav-registry', 'src/components/Unrelated.tsx'),
+      lines("  { id: 'analytics-hub', label: 'Search & Traffic', needsSite: true },")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag the registry source file itself', () => {
+    // The registry legitimately contains id/label/needsSite literals; it is the
+    // authority. It is not one of the three consumer suffixes, so it is skipped.
+    const file = write(
+      uniqPath('nav-registry', 'src/lib/navRegistry.tsx'),
+      lines("  { id: 'analytics-hub', label: 'Search & Traffic', icon: X, needsSite: true },")
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

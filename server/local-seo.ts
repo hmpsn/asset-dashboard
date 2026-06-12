@@ -6,6 +6,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
+import { fireBridge } from './bridge-infrastructure.js';
+import { runLocalVisibilityShiftBridge } from './bridge-local-visibility-shift.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
@@ -54,6 +56,8 @@ import {
   type LocalSeoPosture,
   type LocalSeoReportSummary,
   type LocalSeoReadResponse,
+  type LocalSeoVisibilityTrendPoint,
+  type LocalSeoVisibilityTrendSeries,
   type LocalSeoRepeatCompetitor,
   type LocalSeoServiceGap,
   type LocalSeoRefreshRequest,
@@ -614,6 +618,31 @@ const stmts = createStmtCache(() => ({
       AND status = 'success'
     ORDER BY captured_at DESC
   `),
+  // W5.3: per-market visible-count trend. One row per (market, capture-day) with the
+  // count of verified-match identities and the total checked identities that day.
+  // Bucketed on date(captured_at) so multiple intra-day refreshes collapse to one point.
+  // Bounded to RETENTION_RAW_DAYS (180d) so the series is uniformly daily — older rows
+  // have been weekly-thinned and would introduce uneven spacing in the sparkline.
+  // Excludes both provider_failed and degraded rows so neither inflates checked_count
+  // (degraded snapshots carry businessFound=false regardless of actual visibility, matching
+  // the postureFromSummaryRow convention that treats both status values as untrustworthy).
+  visibilityTrend: db.prepare(`
+    SELECT
+      s.market_id AS market_id,
+      s.market_label AS market_label,
+      date(s.captured_at) AS day,
+      COUNT(DISTINCT CASE
+        WHEN s.business_found = 1 AND s.business_match_confidence = ?
+        THEN s.normalized_keyword || '::' || s.device || '::' || s.language_code
+      END) AS visible_count,
+      COUNT(DISTINCT s.normalized_keyword || '::' || s.device || '::' || s.language_code) AS checked_count
+    FROM local_visibility_snapshots s
+    WHERE s.workspace_id = ?
+      AND s.status NOT IN (?, ?)
+      AND s.captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
+    GROUP BY s.market_id, s.market_label, day
+    ORDER BY s.market_id ASC, day ASC
+  `),
   latestSnapshotSummary: db.prepare(`
     SELECT
       s.keyword,
@@ -922,6 +951,7 @@ export function getLocalSeoReadModel(
       }),
       competitorBrands: [],
       serviceGaps: [],
+      visibilityTrend: [],
       caps: {
         maxMarkets: LOCAL_SEO_MAX_MARKETS,
         maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -952,6 +982,7 @@ export function getLocalSeoReadModel(
     }),
     competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
     serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
+    visibilityTrend: getLocalSeoVisibilityTrend(workspace.id),
     caps: {
       maxMarkets: LOCAL_SEO_MAX_MARKETS,
       maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -1127,6 +1158,53 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
   addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', activityDetail, { source: 'local_seo', ...(promotedPrimaryLabel ? { promotedPrimaryLabel } : {}) });
   notifyLocalSeoUpdated(workspace.id, { action: 'configuration_updated', updatedAt: now });
   return getLocalSeoReadModel(workspace.id, featureEnabled);
+}
+
+interface VisibilityTrendRow {
+  market_id: string;
+  market_label: string;
+  day: string;
+  visible_count: number;
+  checked_count: number;
+}
+
+/**
+ * W5.3 — per-market visible-count trend over the retained snapshot window.
+ *
+ * Cheap aggregate read (single GROUP BY over local_visibility_snapshots) — does NOT
+ * invoke any provider or full-model builder. Returns one series per market that has any
+ * usable snapshot, each a chronological list of (date, visibleCount, checkedCount) points
+ * over the D4-thinned window. Markets are ordered by most-recent activity (last point
+ * date DESC) so the busiest market renders first.
+ */
+export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibilityTrendSeries[] {
+  const rows = stmts().visibilityTrend.all(
+    LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+    workspaceId,
+    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+    LOCAL_VISIBILITY_STATUS.DEGRADED,
+  ) as VisibilityTrendRow[];
+
+  const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();
+  for (const row of rows) {
+    let series = byMarket.get(row.market_id);
+    if (!series) {
+      series = { marketId: row.market_id, marketLabel: row.market_label, points: [] };
+      byMarket.set(row.market_id, series);
+    }
+    const point: LocalSeoVisibilityTrendPoint = {
+      date: row.day,
+      visibleCount: row.visible_count,
+      checkedCount: row.checked_count,
+    };
+    series.points.push(point);
+  }
+
+  return [...byMarket.values()].sort((a, b) => {
+    const aLast = a.points[a.points.length - 1]?.date ?? '';
+    const bLast = b.points[b.points.length - 1]?.date ?? '';
+    return bLast.localeCompare(aLast);
+  });
 }
 
 export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
@@ -2513,6 +2591,11 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
     // inside async closures where control-flow narrowing doesn't persist.
     const getLocalVisibility = provider.getLocalVisibility.bind(provider);
 
+    // W5.3: snapshot the PREVIOUS latest-per-(market, keyword, device, language) state
+    // BEFORE the crawl writes new rows, so the shift bridge can diff transitions after
+    // the refresh. Captured here (not after) because storeSnapshot mutates the series.
+    const previousLatestSnapshots = listLatestLocalVisibilitySnapshots(workspaceId);
+
     const total = plan.markets.length * plan.keywords.length;
     let processed = 0;
     let refreshed = 0;
@@ -2627,6 +2710,17 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
 
     notifyLocalSeoUpdated(workspaceId, { action: 'refresh_completed', refreshed, failed, updatedAt: new Date().toISOString() });
     addActivity(workspaceId, 'local_seo_updated', 'Local SEO visibility refreshed', `${refreshed} local visibility checks refreshed`, { source: 'local_seo', refreshed, failed });
+
+    // W5.3: mint local_visibility_shift insights from snapshot transitions. Read the NEW
+    // latest state (after the crawl wrote rows, before the retention prune — the prune
+    // never removes the immortal latest row, so ordering vs. prune is immaterial) and diff
+    // it against the pre-crawl state. fireBridge is fire-and-forget with its own timeout +
+    // error isolation and auto-broadcasts INSIGHT_BRIDGE_UPDATED when modified > 0 — no
+    // manual broadcast here (Bridge rule #3). A bridge failure never fails the refresh.
+    const newLatestSnapshots = listLatestLocalVisibilitySnapshots(workspaceId);
+    fireBridge('bridge-local-visibility-shift', workspaceId, () =>
+      runLocalVisibilityShiftBridge(workspaceId, previousLatestSnapshots, newLatestSnapshots),
+    );
 
     // Bug 3 / D4: retention prune after successful refresh. Wrapped in try/catch
     // so a prune failure never fails the already-successful refresh job.

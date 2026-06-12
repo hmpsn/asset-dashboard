@@ -18,6 +18,7 @@ import {
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { getWorkspace } from './workspaces.js';
+import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from './outcome-tracking.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -571,6 +572,33 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         rawEvidenceOnly: true,
         valueReasons: computeValueReasons(gap.keyword, { volume: gap.volume, difficulty: gap.difficulty }),
       }));
+    }
+  }
+
+  // ── W5.1: enrich each explanation with its read-back outcome verdict ──────────
+  // The persist path records a strategy keyword's tracked action under
+  // STRATEGY_PAGE_KEYWORD_SOURCE_TYPE + strategyPageKeywordSourceId(pagePath, keyword)
+  // (both the strategy-regen writer and the Hub track/promote recorder). Join the
+  // scored outcome back so the Strategy tab can render a "#14→#6 · Win" chip on
+  // pageMap / Quick Win rows. One batch read; exact source-id match first, then a
+  // keyword fallback for actions recorded without a page path. Read-only.
+  let readbacks: ReturnType<typeof getScoredOutcomeReadbacks> | null = null;
+  try {
+    readbacks = getScoredOutcomeReadbacks(options.workspaceId);
+  } catch (err) {
+    // catch-ok: outcome read-back is informational; degrade gracefully if the
+    // outcome store is unavailable so strategy assembly never fails on it.
+    log.debug({ err, workspaceId: options.workspaceId }, 'Outcome read-back unavailable — skipping outcome chips');
+  }
+  if (readbacks && (readbacks.bySource.size > 0 || readbacks.byKeyword.size > 0)) {
+    for (const explanation of explanations.values()) {
+      const pagePath = explanation.pagePath ?? explanation.tracking?.pagePath;
+      const sourceKey = pagePath
+        ? `${STRATEGY_PAGE_KEYWORD_SOURCE_TYPE}::${strategyPageKeywordSourceId(pagePath, explanation.keyword)}`
+        : null;
+      const outcome = (sourceKey ? readbacks.bySource.get(sourceKey) : undefined)
+        ?? readbacks.byKeyword.get(explanation.keyword.trim().toLowerCase());
+      if (outcome) explanation.outcome = outcome;
     }
   }
 

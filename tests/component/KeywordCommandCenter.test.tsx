@@ -90,6 +90,7 @@ vi.mock('../../src/hooks/admin', () => ({
       caps: { maxMarkets: 3, maxKeywordsPerRefresh: 100, keywordsPerRefreshMin: 25, keywordsPerRefreshMax: 300, keywordsPerRefreshDefault: 100 },
       competitorBrands: [],
       serviceGaps: [],
+      visibilityTrend: [],
     },
     isLoading: false,
     error: null,

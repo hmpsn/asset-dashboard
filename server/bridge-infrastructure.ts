@@ -36,6 +36,7 @@ export const BRIDGE_SOURCES = [
   'bridge-briefing-candidate-refresh',
   'bridge-client-signal',
   'bridge-lost-visibility',
+  'bridge-local-visibility-shift',
 ] as const;
 
 export type BridgeSource = (typeof BRIDGE_SOURCES)[number] | 'opportunity-value-events';

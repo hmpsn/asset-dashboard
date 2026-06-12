@@ -15,6 +15,18 @@ import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../App';
 import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
 
+/** Synthetic FixContext built from an AI-suggested signal to prefill ContentBriefs. */
+function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
+  return {
+    targetRoute: 'content-pipeline',
+    primaryKeyword: keyword || undefined,
+    // pageUrl from PipelineSignal is a path/slug — pass as pageSlug so
+    // handleGenerate() picks it up via fixContextRef.current?.pageSlug,
+    // targeting the correct page without polluting the keyword field.
+    pageSlug: pageUrl || undefined,
+  };
+}
+
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
 const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
@@ -64,6 +76,14 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
+  // Synthetic fixContext built from an AI-suggested signal click; overrides the
+  // parent's fixContext while the user is landing on the briefs tab from AiSuggested.
+  const [pipelinePrefill, setPipelinePrefill] = useState<FixContext | null>(null);
+  // Nonce incremented on every handleCreateBrief call so the ContentBriefs key changes,
+  // forcing a remount even if the user is already on the Briefs tab. Without this, the
+  // fixConsumed ref in ContentBriefs is never reset and a second "Create brief" click
+  // while already on the tab silently drops the new keyword.
+  const [prefillNonce, setPrefillNonce] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
 
   // React Query hook replaces manual data fetching
@@ -105,8 +125,15 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
     setExportOpen(false);
   };
 
-  // Navigate to briefs tab when an AI-suggested brief is actioned
-  const handleCreateBrief = () => {
+  // Navigate to briefs tab when an AI-suggested signal is actioned.
+  // Builds a synthetic fixContext from the signal's keyword + pageUrl so
+  // ContentBriefs pre-fills the generator instead of landing empty.
+  // Increments prefillNonce so the ContentBriefs key changes on every call,
+  // forcing a remount even if the Briefs tab is already active (the fixConsumed
+  // ref in ContentBriefs is per-mount, so a remount re-consumes the new context).
+  const handleCreateBrief = (keyword: string, pageUrl?: string) => {
+    setPipelinePrefill(buildSignalPrefill(keyword, pageUrl));
+    setPrefillNonce(n => n + 1);
     setActiveTab('briefs');
   };
 
@@ -259,7 +286,17 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
         </Suspense>
       )}
       {activeTab === 'briefs' && (
-        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} fixContext={fixContext} clearFixContext={clearFixContext} />
+        <ContentBriefs
+          // When pipelinePrefill is active we include the nonce so every handleCreateBrief
+          // call forces a fresh mount even if the tab was already visible, resetting the
+          // fixConsumed ref so the new keyword is reliably pre-filled.
+          key={pipelinePrefill ? `briefs-${workspaceId}-${prefillNonce}` : `briefs-${workspaceId}`}
+          workspaceId={workspaceId}
+          // pipelinePrefill wins over parent fixContext while a signal action is pending.
+          // ContentBriefs calls clearFixContext after consuming — that clears pipelinePrefill.
+          fixContext={pipelinePrefill ?? fixContext}
+          clearFixContext={pipelinePrefill ? () => { setPipelinePrefill(null); clearFixContext?.(); } : clearFixContext}
+        />
       )}
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />
