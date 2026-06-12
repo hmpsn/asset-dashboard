@@ -88,8 +88,8 @@ export interface ROIData {
   growthPercent: number | null;
   /**
    * Portfolio "Revenue at stake" (Task 3.4): Σ keywordDollarValue(kw).upsideMonthly
-   * over the page_keywords already loaded here — the monthly $ unlocked if below-page-1
-   * keywords moved up. Reuses the single keywordDollarValue helper (no second $ math).
+   * over the page_keywords already loaded here — the monthly $ unlocked if tracked
+   * keywords move toward stronger positions. Reuses the single keywordDollarValue helper (no second $ math).
    */
   revenueAtStake?: number;
   /** Breakdown by page */

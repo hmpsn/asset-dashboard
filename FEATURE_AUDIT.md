@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **490 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **491 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 491. Client Dashboard QW2 PR4 — ROI Methodology Explainer
+
+**What it does:** Adds an expandable "How we calculate this" explanation to the client ROI Dashboard. The disclosure explains organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and the conservative assumption that the model does not multiply by lead value, close rate, or lifetime value.
+
+**Agency value:** Gives account teams a ready-made answer to skeptical ROI questions inside the dashboard itself, without changing the formula or adding review work.
+
+**Client value:** Clients can see what inputs drive the dollar figures and why the numbers should be treated as directional traffic value rather than guaranteed booked revenue.
+
+**Mutual:** Makes the ROI tab more transparent and easier to trust while staying copy-only: no new endpoints, no duplicate dollar engine, and no new feature flags.
+
+**Files:** `src/components/client/ROIDashboard.tsx`. Tests: `tests/component/client/ROIDashboard.test.tsx`.
 
 ---
 
@@ -148,7 +162,7 @@ A comprehensive value assessment of every feature in the platform — **490 feat
 
 **Agency value:** One reasons formula and one dollar formula across every surface — the Hub, the client strategy drawer, and the ROI dashboard can never show a contradictory "why" or a contradictory "$" for the same keyword. The realized-$ equivalence (`currentMonthly == roi.ts trafficValue`) is locked by test, so there is no second dollar engine to drift. Real CPC on content gaps makes the value score honest before it propagates.
 
-**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across their below-page-1 keywords — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
+**Client value:** Clients see WHY a keyword is worth pursuing in plain language (not a bare 0–100), the realized $/mo a keyword earns today, the upside $/mo of moving it up, and a portfolio headline of the monthly revenue at stake across tracked keywords with position upside — all behind the existing Growth+ tier gate, the same class of realized $ ROIDashboard already shows.
 
 **Mutual:** Pure reuse — no new endpoint, no new client keyword tab, no second dollar engine. Rides the existing `/api/public/roi` query + the keyword-strategy / KCC serialization. The dollar helper floors to 0 when CPC is unknown (drawers hide the block), so CPC sparsity degrades gracefully.
 
