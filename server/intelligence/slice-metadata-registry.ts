@@ -8,6 +8,7 @@ import { assembleClientSignals } from './client-signals-slice.js';
 import { assembleContentPipeline } from './content-pipeline-slice.js';
 import { assembleEeatAssets } from './eeat-assets-slice.js';
 import { assembleEntityResolution } from './entity-resolution-slice.js';
+import { assembleGenerationQuality } from './generation-quality-slice.js';
 import { assembleInsights } from './insights-slice.js';
 import { assembleLearnings } from './learnings-slice.js';
 import { assembleLocalSeo } from './local-seo-slice.js';
@@ -138,6 +139,11 @@ export const INTELLIGENCE_SLICE_METADATA_REGISTRY = {
   eeatAssets: {
     assemble: async (workspaceId) => ({
       eeatAssets: await assembleEeatAssets(workspaceId),
+    }),
+  },
+  generationQuality: {
+    assemble: async (workspaceId) => ({
+      generationQuality: await assembleGenerationQuality(workspaceId),
     }),
   },
 } as const satisfies Record<IntelligenceSlice, IntelligenceSliceMetadataEntry>;

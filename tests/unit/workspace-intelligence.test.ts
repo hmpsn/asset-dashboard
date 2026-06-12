@@ -143,6 +143,7 @@ describe('buildWorkspaceIntelligence', () => {
   it('uses the shared intelligence slice registry for facade defaults', () => {
     expect(ALL_INTELLIGENCE_SLICES).toEqual(INTELLIGENCE_SLICES);
     expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES).not.toContain('siteInventory');
+    expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES).not.toContain('generationQuality');
     expect(PROMPT_FORMATTABLE_INTELLIGENCE_SLICES.length).toBeGreaterThan(0);
     for (const slice of PROMPT_FORMATTABLE_INTELLIGENCE_SLICES) {
       expect(INTELLIGENCE_SLICES).toContain(slice);

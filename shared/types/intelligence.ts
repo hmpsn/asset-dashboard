@@ -11,6 +11,7 @@ import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
 import type { EntityResolutionSlice } from './entity-resolution.js';
 import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
+import type { StoredGenerationQuality } from './generation-quality.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -37,6 +38,7 @@ export const INTELLIGENCE_SLICES = [
   'localSeo',
   'entityResolution',
   'eeatAssets',
+  'generationQuality',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -127,6 +129,8 @@ export interface WorkspaceIntelligence {
   entityResolution?: EntityResolutionSlice;
   /** Workspace-scoped E-E-A-T trust-signal inventory. */
   eeatAssets?: EeatAssetsSlice;
+  /** Latest internal generation-quality telemetry for workspace-scoped AI generation health. */
+  generationQuality?: GenerationQualitySlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -628,6 +632,11 @@ export interface EeatAssetsSlice {
   byType: Array<{ type: EeatAssetType; count: number }>;
   /** Pre-formatted trust-signal block for prompt consumers. Inject directly. */
   effectiveTrustSignalsBlock: string;
+}
+
+export interface GenerationQualitySlice {
+  /** Latest persisted generation-quality row, or null when the workspace has no observations yet. */
+  latest: StoredGenerationQuality | null;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────
