@@ -193,7 +193,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products."
+          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products. | ABSORBED into cda-content-in-cart (round 2) — implemented there as cart-aware checkout config."
         },
         {
           "id": "cda-sc4-post-purchase-onboarding",
@@ -293,6 +293,26 @@
           "status": "pending",
           "createdAt": "2026-05-11",
           "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts.\n[Platform health recommendation pass 2026-05-26: promoted as the next ClientSignalsSlice expansion to avoid bespoke win-signal paths outside workspace intelligence.]"
+        },
+        {
+          "id": "cda-content-in-cart",
+          "title": "Briefs/posts join the cart — mixed baskets + Premium 10% content discount (absorbs cda-sc4-content-discount)",
+          "source": "Owner request 2026-06-12 + client dashboard audit (sc4)",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-12",
+          "notes": "R1 built the rails: persisted carts (migration 137), server-authoritative pricing, per-item context payloads, webhook family dispatch. Add-to-cart is ADDITIVE next to Buy now. Tier wrinkle: Premium pays for content (unlike fixes) — cart must hold priced content while fixes stay hours-covered. Pair the 10% Premium content discount into the same checkout-builder lane. TIER-COUPLING: keep discount as config — tier model rediscussion (see tier-model-rediscussion item) may re-map it."
+        },
+        {
+          "id": "tier-model-rediscussion",
+          "title": "[BRAINSTORM FIRST — owner session] Revisit and update the tier model (beta learnings)",
+          "source": "Owner request 2026-06-12",
+          "est": "discussion + doc updates + config changes",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-12",
+          "notes": "OWNER: the model has shifted during beta; wants an in-depth discussion before changes. Requires a dedicated brainstorming session (superpowers:brainstorming) covering: tier boundaries (Free/Growth/Premium), what hours cover vs what is purchased, fix vs content pricing asymmetry, discount structure, trial mechanics. Outputs: updated MONETIZATION.md + TierGate mappings + Stripe product/price adjustments + FEATURE_AUDIT. DO NOT implement tier changes piecemeal before this session. Note: competitor-gaps gating + content discount (round 2) deliberately built thin/config-level so this session can re-map them cheaply."
         }
       ]
     },
