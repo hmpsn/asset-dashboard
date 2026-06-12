@@ -246,6 +246,9 @@ const stmts = createStmtCache(() => ({
   listByWs: db.prepare<[workspaceId: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ?',
   ),
+  listByWsPaged: db.prepare<[workspaceId: string, limit: number, offset: number]>(
+    'SELECT * FROM page_keywords WHERE workspace_id = ? ORDER BY page_path ASC LIMIT ? OFFSET ?',
+  ),
   listLiteByWs: db.prepare<[workspaceId: string]>(`
     SELECT
       workspace_id,
@@ -423,6 +426,19 @@ function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationSco
   return grouped;
 }
 
+/** Fetch score histories only for the given normalized page paths (for paged reads). */
+function groupScoreHistoryForPaths(
+  workspaceId: string,
+  normalizedPaths: string[],
+): Map<string, PageOptimizationScoreSnapshot[]> {
+  const grouped = new Map<string, PageOptimizationScoreSnapshot[]>();
+  for (const path of normalizedPaths) {
+    const historyRows = stmts().scoreHistoryByPage.all(workspaceId, path, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
+    grouped.set(path, historyRows.map(rowToScoreHistory));
+  }
+  return grouped;
+}
+
 function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): void {
   if (entry.optimizationScore == null) return;
   const pagePath = normalizePageUrl(entry.pagePath);
@@ -459,6 +475,34 @@ export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
   const histories = groupScoreHistory(workspaceId);
   return rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? []));
+}
+
+export interface ListPageKeywordsPagedResult {
+  items: PageKeywordMap[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+/** Paginated variant — only fetches the score histories for the returned page slice. */
+export function listPageKeywordsPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListPageKeywordsPagedResult {
+  const countRow = stmts().countByWs.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().listByWsPaged.all(workspaceId, limit, offset) as PageKeywordRow[];
+  // Only fetch score histories for the returned page slice to keep memory low.
+  const histories = groupScoreHistoryForPaths(workspaceId, rows.map(r => normalizePageUrl(r.page_path).toLowerCase()));
+  return {
+    items: rows.map(row => rowToModel(row, histories.get(normalizePageUrl(row.page_path).toLowerCase()) ?? [])),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
 }
 
 function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {

@@ -67,6 +67,12 @@ const stmts = createStmtCache(() => ({
   listAll: db.prepare<[workspaceId: string]>(
     'SELECT keyword, status, reason, source, declined_by, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC',
   ),
+  listAllPaged: db.prepare<[workspaceId: string, limit: number, offset: number]>(
+    'SELECT keyword, status, reason, source, declined_by, created_at, updated_at FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?',
+  ),
+  countAll: db.prepare<[workspaceId: string]>(
+    'SELECT COALESCE(COUNT(*), 0) AS cnt FROM keyword_feedback WHERE workspace_id = ?',
+  ),
   upsert: db.prepare<[
     workspaceId: string,
     keyword: string,
@@ -169,6 +175,31 @@ export function listAdminKeywordFeedback(workspaceId: string): AdminKeywordFeedb
 export function listPublicKeywordFeedback(workspaceId: string): KeywordFeedbackListRow[] {
   const rows = stmts().listAll.all(workspaceId) as KeywordFeedbackDbRow[];
   return rows.map(toKeywordFeedbackListRow);
+}
+
+export interface ListPublicKeywordFeedbackPagedResult {
+  items: KeywordFeedbackListRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export function listPublicKeywordFeedbackPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListPublicKeywordFeedbackPagedResult {
+  const countRow = stmts().countAll.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().listAllPaged.all(workspaceId, limit, offset) as KeywordFeedbackDbRow[];
+  return {
+    items: rows.map(toKeywordFeedbackListRow),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
 }
 
 export function saveKeywordFeedback(input: SaveKeywordFeedbackInput): {

@@ -31,6 +31,7 @@ import {
   InvalidTransitionError,
 } from '../state-machines.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+import { computeImpactBand } from '../../shared/types/impact-band.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
@@ -67,8 +68,18 @@ function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
     const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
     const base: Recommendation = safeGain === r.estimatedGain ? r : { ...r, estimatedGain: safeGain };
     if (!base.opportunity) return base;
-    const { emvPerWeek: _emvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
-    return { ...base, opportunity: publicOpportunity as Recommendation['opportunity'] };
+    const { emvPerWeek: rawEmvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
+    // D-IMPACT: project the admin/AI-only weekly EMV into a client-safe banded
+    // monthly range BEFORE it is stripped. computeImpactBand returns undefined below
+    // the display floor (no impact line shown) — in that case we drop the key entirely.
+    const impactBand = computeImpactBand(rawEmvPerWeek);
+    const next: Recommendation = {
+      ...base,
+      opportunity: publicOpportunity as Recommendation['opportunity'],
+    };
+    if (impactBand) next.impactBand = impactBand;
+    else delete next.impactBand;
+    return next;
   });
 }
 

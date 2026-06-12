@@ -9,6 +9,7 @@ import { notifyTeamNewRequest } from '../email.js';
 import { requireClientPortalAuth, upload } from '../middleware.js';
 import {
   listRequests,
+  listRequestsPaged,
   createRequest,
   addNote,
   getRequest,
@@ -16,6 +17,7 @@ import {
   getAttachmentsDir,
   type RequestAttachment,
 } from '../requests.js';
+import { parsePaginationParams } from '../pagination.js';
 import { getWorkspace } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
@@ -95,7 +97,15 @@ router.post('/api/public/requests/:workspaceId', validate(createRequestSchema), 
 
 // Public: client lists their requests
 router.get('/api/public/requests/:workspaceId', (req, res) => {
-  res.json(listRequests(req.params.workspaceId));
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json(listRequests(req.params.workspaceId));
+  }
+  const paged = listRequestsPaged(req.params.workspaceId, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items,
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // Public: client views a single request (with notes)

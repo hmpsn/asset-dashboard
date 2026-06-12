@@ -161,9 +161,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
           "est": "2-3d",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Approvals, client-actions, requests, content-plan cells, audit-detail pages return everything (up to ~500KB worst case). Add limit/offset; attach here because the Health work touches audit-detail payloads."
+          "notes": "Done (R1-C lane). Optional limit/offset (max 200) added to approvals, client-actions, content-requests, requests, keyword-feedback, page-keywords. Back-compat: no params → original shape unchanged; params present → { items, pageInfo: { total, limit, offset, hasMore } }. audit-detail scoreHistory capped at 50. 27 new integration tests. Server helper: server/pagination.ts."
         },
         {
           "id": "cda-sc4-competitor-gaps",
@@ -1204,7 +1204,7 @@
           "priority": "P2",
           "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Done (AI half). 4 new job types (CONTENT_BRIEF_REGENERATE, CONTENT_POST_REVIEW, CONTENT_POST_FIX ephemeral, CONTENT_POST_VOICE_SCORE); 202 jobId + 409 dedupe; PostEditor/ContentManager via useBackgroundTasks; coverage-contract anchored. NOTE: unbounded post/brief list pagination was descoped from this item (no db-layer owner this round) — remains open as a follow-up; schema_snapshots pruning shipped under aw6-state-machine-validation scope."
+          "notes": "Done (AI half). 4 new job types (CONTENT_BRIEF_REGENERATE, CONTENT_POST_REVIEW, CONTENT_POST_FIX ephemeral, CONTENT_POST_VOICE_SCORE); 202 jobId + 409 dedupe; PostEditor/ContentManager via useBackgroundTasks; coverage-contract anchored. NOTE: unbounded post/brief list pagination was descoped from this item (no db-layer owner this round) — landed in R1-C lane (cda-sc3-pagination-enabler, done 2026-06-12); schema_snapshots pruning shipped under aw6-state-machine-validation scope."
         },
         {
           "id": "aw6-wire-or-delete",

@@ -184,10 +184,11 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, requireWorkspaceAccess
   try {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
-      items: items.map((i: { productType: string; quantity: number; pageIds?: string[] }) => ({
+      items: items.map((i: { productType: string; quantity: number; pageIds?: string[]; issueChecks?: string[] }) => ({
         productType: sanitizeString(i.productType, 50) as import('../payments.js').ProductType,
         quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
         pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
+        issueChecks: Array.isArray(i.issueChecks) ? i.issueChecks.map((c: string) => sanitizeString(c, 100)) : undefined,
       })),
       successUrl: context.successUrl,
       cancelUrl: context.cancelUrl,

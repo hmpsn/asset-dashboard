@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { clientPath } from '../routes';
 import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
+import { useRecommendations } from '../hooks/useRecommendations';
+import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
 import {
   AlertTriangle,
   X,
@@ -126,6 +128,16 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
+
+  // ── Recommendations → impact-bands-by-check adapter (R1-A → R1-B seam) ──
+  // Shares the React Query cache with InsightsEngine / OverviewTab — no extra
+  // network request when those components are already mounted on the same page.
+  // gated on dataEnabled so it doesn't fire before workspace auth completes.
+  const { recs: clientRecs } = useRecommendations(dataEnabled ? workspaceId : undefined);
+  const impactBandsByCheck = useMemo(
+    () => buildImpactBandsByCheck(clientRecs),
+    [clientRecs],
+  );
 
   const contentRequests = useMemo(() => contentReqQ.data ?? [], [contentReqQ.data]);
   const requestedTopics = useMemo(() => {
@@ -692,7 +704,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             health: (
               <LazyClientTabPanel>
                 <ErrorBoundary label="Site Health">
-                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
+                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
                     <ErrorBoundary label="Action Plan">
                       <LazyClientTabPanel>
                         <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />

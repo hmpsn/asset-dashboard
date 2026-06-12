@@ -13,8 +13,11 @@ import {
   HealthSiteWideIssuesSection,
   HealthTopFixesSection,
 } from './health-tab/HealthTabSections';
+import { HealthCartSummary } from './health-tab/HealthCartSummary';
 import { useHealthTabShell } from './health-tab/useHealthTabShell';
 import { formatDate } from '../../utils/formatDates';
+import type { Tier } from '../ui/TierGate';
+import type { ImpactBand } from '../../../shared/types/fix-catalog.js';
 
 const ScoreRing = MetricRing;
 
@@ -26,6 +29,14 @@ export interface HealthTabProps {
   workspaceId?: string;
   onContentRequested?: () => void;
   actionPlanSlot?: ReactNode;
+  /** Client tier — controls "Fix this $X" vs "Covered by hours" framing */
+  tier?: Tier;
+  /** Impact bands keyed by audit check type, from the intelligence projection */
+  impactBandsByCheck?: Record<string, ImpactBand>;
+  /** Suppresses all price rendering for external-billing workspaces */
+  hidePrices?: boolean;
+  /** Called when Premium user clicks "request fix" for a specific check */
+  onRequestFix?: (check: string, label: string) => void;
 }
 
 export function HealthTab({
@@ -36,6 +47,10 @@ export function HealthTab({
   workspaceId,
   onContentRequested,
   actionPlanSlot,
+  tier = 'growth',
+  impactBandsByCheck,
+  hidePrices,
+  onRequestFix,
 }: HealthTabProps) {
   const shell = useHealthTabShell({
     auditDetail,
@@ -57,6 +72,9 @@ export function HealthTab({
           liveDomain={liveDomain}
           workspaceId={workspaceId}
           shell={shell}
+          tier={tier}
+          impactBandsByCheck={impactBandsByCheck}
+          onRequestFix={onRequestFix}
         />
         {actionPlanSlot}
         <HealthSiteWideIssuesSection auditDetail={auditDetail} shell={shell} />
@@ -65,8 +83,12 @@ export function HealthTab({
           liveDomain={liveDomain}
           workspaceId={workspaceId}
           shell={shell}
+          tier={tier}
+          impactBandsByCheck={impactBandsByCheck}
+          onRequestFix={onRequestFix}
         />
         <HealthHistorySection auditDetail={auditDetail} shell={shell} />
+        {!hidePrices && <HealthCartSummary hidePrices={hidePrices} />}
       </div>
     );
   }
