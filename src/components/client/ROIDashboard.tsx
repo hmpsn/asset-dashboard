@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
+  Info, ChevronDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState, TierGate } from '../ui';
@@ -14,6 +15,56 @@ import { clientPath } from '../../routes';
 interface ROIDashboardProps {
   workspaceId: string;
   tier: 'free' | 'growth' | 'premium';
+}
+
+function ROIMethodologyDisclosure({ showRevenueAtStake }: { showRevenueAtStake: boolean }) {
+  return (
+    <details
+      data-testid="roi-methodology"
+      className="group rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/5 px-4 py-3"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[var(--radius-md)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 t-ui font-medium text-accent-brand">
+          <Icon as={Info} size="sm" className="text-accent-info" />
+          How we calculate this
+        </span>
+        <Icon
+          as={ChevronDown}
+          size="sm"
+          className="text-[var(--brand-text-muted)] transition-transform group-open:rotate-180"
+        />
+      </summary>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div>
+          <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Organic traffic value</div>
+          <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+            Search Console clicks multiplied by keyword cost-per-click estimates. This shows what comparable traffic would cost to buy.
+          </p>
+        </div>
+        <div>
+          <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Ad spend equivalent</div>
+          <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+            Organic traffic value with typical paid-search management costs included, so the comparison stays closer to real acquisition cost.
+          </p>
+        </div>
+        <div>
+          <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
+            {showRevenueAtStake ? 'Revenue at stake' : 'Content attribution'}
+          </div>
+          <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+            {showRevenueAtStake
+              ? 'Tracked keywords estimate monthly upside from moving toward stronger positions, a conservative click-through lift, and CPC.'
+              : 'Published content is credited only when traffic and keyword-cost data can connect the content to measurable organic value.'}
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-3 border-t border-blue-500/20 pt-3 t-caption-sm text-[var(--brand-text-muted)]">
+        We do not multiply by lead value, close rate, or lifetime value, so this is a directional traffic-value model, not a promise of booked revenue.
+      </p>
+    </details>
+  );
 }
 
 export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
@@ -105,6 +156,8 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
   return (
     <div className="space-y-8">
+      <ROIMethodologyDisclosure showRevenueAtStake={data.revenueAtStake != null} />
+
       {/* Hero metrics */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${data.revenueAtStake != null ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         <StatCard
@@ -150,7 +203,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             value={fmtMoneyFull(data.revenueAtStake)}
             icon={TrendingUp}
             valueColor="text-accent-success"
-            sub="Monthly value you'd unlock by moving below-page-1 keywords up"
+            sub="Monthly value you'd unlock by moving tracked keywords toward stronger positions"
             className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
           />
         )}
