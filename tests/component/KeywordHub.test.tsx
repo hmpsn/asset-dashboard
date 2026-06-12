@@ -46,6 +46,8 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false, error: null }),
   useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
   useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+  // A2: pin toggle added to KeywordDetailDrawer — must be present in mock to avoid "not exported" error.
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
@@ -57,6 +59,29 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
     workspaceEventsMock(workspaceId, handlers);
     return { send: vi.fn() };
   },
+}));
+
+// These mocks cover LocalSeoVisibilityPanel (now mounted in Hub after the idle
+// callback fires). Without them, any test that advances timers will crash when
+// the panel mounts and calls useLocalSeo / useBackgroundTasks from the barrel.
+vi.mock('../../src/hooks/admin', () => ({
+  useLocalSeo: () => ({
+    data: {
+      featureEnabled: false, // keeps the panel in a no-op state for these tests
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useLocalSeoRefresh: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoUpdate: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoLocationLookup: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useSetPrimaryMarket: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
+vi.mock('../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({ findActiveJob: () => null, tasks: [] }),
 }));
 
 // Mock the HubKeywordList so we can drive its callbacks without the full table

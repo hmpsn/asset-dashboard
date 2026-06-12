@@ -79,7 +79,7 @@ vi.mock('../../src/hooks/admin', () => ({
 
 function LocationProbe() {
   const loc = useLocation();
-  return <div data-testid="location" data-path={loc.pathname} />;
+  return <div data-testid="location" data-path={loc.pathname + loc.search} />;
 }
 
 async function renderAt(path: string) {
@@ -120,5 +120,15 @@ describe('seo-ranks fold-in redirect (flag-gated)', () => {
     await renderAt('/ws/ws-1/seo-ranks');
     await waitFor(() => expect(screen.getByTestId('rank-tracker')).toBeInTheDocument());
     expect(screen.getByTestId('location').getAttribute('data-path')).toBe('/ws/ws-1/seo-ranks');
+  });
+
+  it('flag ON: /seo-ranks?q=foo&tab=tracked redirects to /seo-keywords?q=foo&tab=tracked (query params preserved)', async () => {
+    featureFlagMock.mockReturnValue(true); // keyword-hub ON
+    await renderAt('/ws/ws-1/seo-ranks?q=foo&tab=tracked');
+    await waitFor(() => {
+      expect(screen.getByTestId('location').getAttribute('data-path')).toBe('/ws/ws-1/seo-keywords?q=foo&tab=tracked');
+    });
+    expect(screen.queryByTestId('rank-tracker')).toBeNull();
+    expect(screen.getByTestId('keyword-hub')).toBeInTheDocument();
   });
 });

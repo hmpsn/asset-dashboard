@@ -42,9 +42,11 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterAction: () => ({ mutate: rowActionMutate, isPending: false, error: null, variables: undefined }),
   useKeywordHardDelete: () => ({ mutate: hardDeleteMutate, isPending: false, error: null }),
   useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({
+  useLocalSeo: () => ({ data: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
   useLocalSeoRefresh: () => ({ mutate: localRefreshMutate, isPending: false, error: null }),
 }));
 
@@ -238,5 +240,44 @@ describe('KeywordHub — drawer action dispatch (no silent no-op)', () => {
     );
     expect(localRefreshMutate).toHaveBeenCalledWith({ keywords: [DISPLAY] });
     expect(rowActionMutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('KeywordHub — drawer outcome chip (detail fixture)', () => {
+  it('renders the outcome read-back chip from detail.data.outcome (KCC parity)', () => {
+    detailHookMock.mockReturnValue({
+      data: {
+        row: makeRow(),
+        outcome: {
+          actionId: 'act-1',
+          actionType: 'strategy_keyword_added',
+          score: 'win',
+          checkpointDays: 30,
+          primaryMetric: 'position',
+          direction: 'improved',
+          baselineValue: 12,
+          currentValue: 5,
+          baselinePosition: 12,
+          currentPosition: 5,
+          baselineClicks: null,
+          currentClicks: null,
+        },
+      },
+      isFetching: false,
+    });
+
+    renderHub();
+    fireEvent.click(screen.getByText(DISPLAY));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByTestId('keyword-outcome-section')).toBeInTheDocument();
+  });
+
+  it('omits the outcome section when detail.data.outcome is absent', () => {
+    detailHookMock.mockReturnValue({ data: { row: makeRow() }, isFetching: false });
+    renderHub();
+    fireEvent.click(screen.getByText(DISPLAY));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByTestId('keyword-outcome-section')).toBeNull();
   });
 });

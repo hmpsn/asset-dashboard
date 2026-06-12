@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordCommandCenter } from '../../api/keywordCommandCenter';
 import { rankTracking } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
@@ -28,6 +28,7 @@ export function useKeywordCommandCenterRows(workspaceId: string, query: KeywordC
     queryFn: () => keywordCommandCenter.rows(workspaceId, query),
     enabled: !!workspaceId,
     staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -87,6 +88,26 @@ export function useRankTrackingAddKeyword(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (keyword: string) => rankTracking.addKeyword(workspaceId, { query: keyword }),
+    onSuccess: () => {
+      invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
+    },
+  });
+}
+
+/**
+ * Toggle the pin state of a tracked keyword via the existing rank-tracking pin
+ * endpoint (PATCH /api/rank-tracking/:workspaceId/keywords/:keyword/pin).
+ *
+ * Input: the raw keyword string. Invalidates keywordMutationInvalidationKeys so
+ * the Hub (and the KCC prefix key the drawer detail lives under), rank-tracking,
+ * and intelligence caches all refresh and the Pinned badge re-resolves. Pinning
+ * is only meaningful for tracked keywords — the server no-ops the broadcast for
+ * untracked ones, and the drawer only surfaces the toggle when tracked.
+ */
+export function useRankTrackingTogglePin(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (keyword: string) => rankTracking.togglePin(workspaceId, keyword),
     onSuccess: () => {
       invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
     },

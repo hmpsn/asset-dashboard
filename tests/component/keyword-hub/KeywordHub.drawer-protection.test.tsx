@@ -56,10 +56,31 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
     isPending: false,
     error: null,
   }),
+  // A2: pin toggle added to KeywordDetailDrawer — must be present to avoid "not exported" error.
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({
   useLocalSeoRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
+// Barrel mock for LocalSeoVisibilityPanel (now mounted in Hub after idle callback fires).
+vi.mock('../../../src/hooks/admin', () => ({
+  useLocalSeo: () => ({
+    data: { featureEnabled: false },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useLocalSeoRefresh: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoUpdate: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoLocationLookup: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useSetPrimaryMarket: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
+vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({ findActiveJob: () => null, tasks: [] }),
 }));
 
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
@@ -148,7 +169,7 @@ const unprotectedRow: KeywordCommandCenterRow = {
 const summaryPayload: KeywordCommandCenterSummaryResponse = {
   counts: {
     total: 2, inStrategy: 0, tracked: 2, needsReview: 0,
-    rawEvidence: 0, declined: 0, retired: 0,
+    evidence: 0, local: 0, localCandidates: 0, declined: 0, retired: 0,
   },
   filters: [],
   rawEvidenceTotal: 0,

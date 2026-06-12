@@ -149,6 +149,7 @@ function defaultProps(overrides: Partial<React.ComponentProps<typeof HubKeywordL
     onRowClick: vi.fn(),
     activeKeyword: null,
     showLocalSeo: false,
+    isFiltered: false,
     ...overrides,
   };
 }
@@ -214,7 +215,7 @@ describe('HubKeywordList — error state', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Empty state
+// Empty state (A3 blocker 9: filter-aware branching)
 // ---------------------------------------------------------------------------
 describe('HubKeywordList — empty state', () => {
   it('renders action-oriented EmptyState when rows=[] not-loading not-error', () => {
@@ -228,7 +229,7 @@ describe('HubKeywordList — empty state', () => {
     const onClearSelection = vi.fn();
     render(
       <HubKeywordList
-        {...defaultProps({ rows: [], isLoading: false, isError: false, onResetFilters, onClearSelection })}
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: true, onResetFilters, onClearSelection })}
       />,
     );
     const emptyEl = screen.getByTestId('keyword-table-empty');
@@ -236,6 +237,40 @@ describe('HubKeywordList — empty state', () => {
     fireEvent.click(screen.getByRole('button', { name: /clear filters/i }));
     expect(onResetFilters).toHaveBeenCalledTimes(1);
     expect(onClearSelection).not.toHaveBeenCalled();
+  });
+
+  // A3 blocker 9: unfiltered empty → action-oriented CTA; filtered empty → "adjust filters"
+  it('unfiltered empty: shows "No keywords yet" title (not "No keywords match your filters") when isFiltered=false', () => {
+    render(
+      <HubKeywordList
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: false })}
+      />,
+    );
+    const emptyEl = screen.getByTestId('keyword-table-empty');
+    // Review fix: an unfiltered empty view must NOT offer a no-op "Clear filters" action.
+    expect(screen.queryByRole('button', { name: /clear filters/i })).toBeNull();
+    expect(emptyEl).toBeInTheDocument();
+    // Unfiltered: should show action-oriented headline, NOT the filtered copy
+    expect(emptyEl.textContent).not.toContain('No keywords match your filters');
+    // And should show an action-oriented title
+    expect(emptyEl.textContent).toMatch(/no keywords yet|add.*keyword|get started/i);
+  });
+
+  it('filtered empty: shows "No keywords match your filters" and Clear filters button when isFiltered=true', () => {
+    const onResetFilters = vi.fn();
+    render(
+      <HubKeywordList
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: true, onResetFilters })}
+      />,
+    );
+    const emptyEl = screen.getByTestId('keyword-table-empty');
+    expect(emptyEl).toBeInTheDocument();
+    // Filtered: should show the filter-adjust copy
+    expect(emptyEl.textContent).toContain('No keywords match your filters');
+    // Clear filters CTA should be present
+    const clearBtn = screen.getByRole('button', { name: /clear filters/i });
+    fireEvent.click(clearBtn);
+    expect(onResetFilters).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -404,5 +439,48 @@ describe('localSeoColumnLabel', () => {
     const row = makeRow({ localSeo: { posture: 'local_pack_present' } as KeywordCommandCenterRow['localSeo'] });
     // local_pack_present is not in the hub mapping — falls through to localSeoState check
     expect(localSeoColumnLabel(row)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A3 blocker 10: bulk-bar clearance — root container gets pb-24 when someSelected
+// ---------------------------------------------------------------------------
+describe('HubKeywordList — bulk-bar clearance (A3 blocker 10)', () => {
+  it('root container has pb-24 when someSelected=true (bulk bar visible)', () => {
+    const selectedKeys = new Set(['example-keyword']);
+    const { container } = render(
+      <HubKeywordList {...defaultProps({ someSelected: true, selectedKeys })} />,
+    );
+    // The outermost div must have pb-24 to clear the fixed bulk bar
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).toContain('pb-24');
+  });
+
+  it('root container does NOT have pb-24 when someSelected=false (no bulk bar)', () => {
+    const { container } = render(
+      <HubKeywordList {...defaultProps({ someSelected: false })} />,
+    );
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).not.toContain('pb-24');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A3 blocker 8: mobile — scroll container has overflow-x-auto + inner min-width
+// ---------------------------------------------------------------------------
+describe('HubKeywordList — mobile scroll container (A3 blocker 8)', () => {
+  it('renders an overflow-x-auto container wrapping the table content', () => {
+    const { container } = render(<HubKeywordList {...defaultProps()} />);
+    const scrollContainer = container.querySelector('.overflow-x-auto');
+    expect(scrollContainer).toBeInTheDocument();
+  });
+
+  it('inner table container has a min-width class (prevents mobile collapse)', () => {
+    const { container } = render(<HubKeywordList {...defaultProps()} />);
+    const scrollContainer = container.querySelector('.overflow-x-auto');
+    expect(scrollContainer).toBeTruthy();
+    // Inner child should have a min-w-* class
+    const inner = scrollContainer?.firstChild as HTMLElement | null;
+    expect(inner?.className).toMatch(/min-w-\[/);
   });
 });

@@ -63,6 +63,7 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
     isPending: false,
     error: null,
   }),
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 function makeReadResponse(overrides: Partial<LocalSeoReadResponse> = {}): LocalSeoReadResponse {
