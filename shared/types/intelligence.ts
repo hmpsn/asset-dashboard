@@ -451,6 +451,8 @@ export interface ClientSignalsSlice {
   roi?: { organicValue: number; growth: number; period: string } | null;
   engagement?: EngagementMetrics;
   compositeHealthScore?: number | null;
+  /** Client-safe explanation of the weighted composite health score. No raw churn risk or internal diagnostics. */
+  compositeHealthBreakdown?: ClientCompositeHealthBreakdown | null;
   serviceRequests?: { pending: number; total: number };
   /** Intent signals detected in client chat (service_interest / content_interest) */
   intentSignals?: {
@@ -670,6 +672,22 @@ export interface ClientSiteHealthSummary {
   deadLinks: number;
 }
 
+export type ClientCompositeHealthComponentId = 'retention' | 'roi' | 'engagement';
+
+export interface ClientCompositeHealthBreakdownRow {
+  id: ClientCompositeHealthComponentId;
+  label: string;
+  /** 0-100 component score after the component's own bucket logic is applied. */
+  score: number;
+  /** Effective display weight as a percentage. Missing components are omitted and weights are normalized server-side. */
+  weight: number;
+  description: string;
+}
+
+export interface ClientCompositeHealthBreakdown {
+  rows: ClientCompositeHealthBreakdownRow[];
+}
+
 export interface ClientIntelligence {
   workspaceId: string;
   assembledAt: string;
@@ -685,6 +703,8 @@ export interface ClientIntelligence {
   serpOpportunities?: number | null;
   /** Composite health score (0-100). Weighted: 40% churn + 30% ROI + 30% engagement. */
   compositeHealthScore?: number | null;
+  /** Client-safe component breakdown for the composite health score. */
+  compositeHealthBreakdown?: ClientCompositeHealthBreakdown | null;
   /** Predictions that came true — strongest wins from outcome tracking. */
   weCalledIt?: WeCalledItEntry[];
   copyPipelineStatus?: ClientCopyPipelineStatus | null;

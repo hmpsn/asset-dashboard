@@ -169,6 +169,7 @@ router.get('/api/public/intelligence/:workspaceId', requireClientPortalAuth(), a
         rankTrackingSummary: intel.seoContext ? formatRankTrackingForClient(intel.seoContext) : null,
         serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
         compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
+        compositeHealthBreakdown: intel.clientSignals?.compositeHealthBreakdown ?? null,
         weCalledIt: intel.learnings?.availability === 'ready' ? (intel.learnings.weCalledIt ?? []) : [],
         copyPipelineStatus: intel.contentPipeline
           ? formatCopyPipelineForClient(intel.contentPipeline)

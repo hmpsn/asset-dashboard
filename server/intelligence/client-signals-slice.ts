@@ -1,4 +1,5 @@
 import type {
+  ClientCompositeHealthBreakdown,
   ClientSignalsSlice,
   ChurnSignalSummary,
   EngagementMetrics,
@@ -28,6 +29,57 @@ const stmts = createStmtCache(() => ({
     'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
   ),
 }));
+
+const COMPOSITE_HEALTH_WEIGHTS = {
+  retention: 40,
+  roi: 30,
+  engagement: 30,
+} as const;
+
+function describeRetentionScore(score: number): string {
+  if (score >= 90) return 'Relationship signals are steady, so this part of the score stays strong.';
+  if (score >= 60) return 'Recent relationship signals are mostly steady, with one area to strengthen.';
+  if (score >= 30) return 'Recent relationship signals show a few areas to strengthen before confidence improves.';
+  return 'Recent relationship signals need attention before this part of the score can recover.';
+}
+
+function describeRoiScore(growth: number): string {
+  if (growth > 10) return 'Organic value is growing strongly compared with the prior period.';
+  if (growth > 0) return 'Organic value is trending up compared with the prior period.';
+  if (growth === 0) return 'Organic value is holding steady compared with the prior period.';
+  return 'Organic value is below the prior period, which lowers this part of the score.';
+}
+
+function describeEngagementScore(loginFrequency: EngagementMetrics['loginFrequency']): string {
+  if (loginFrequency === 'daily') return 'Recent portal activity is strong.';
+  if (loginFrequency === 'weekly') return 'Recent portal activity is steady.';
+  return 'Recent portal activity is light, so this part of the score has room to improve.';
+}
+
+function normalizeBreakdownWeights(
+  rows: ClientCompositeHealthBreakdown['rows'],
+): ClientCompositeHealthBreakdown['rows'] {
+  const totalRawWeight = rows.reduce((sum, row) => sum + row.weight, 0);
+  if (totalRawWeight <= 0) return rows;
+
+  const weightedRows = rows.map((row, index) => {
+    const exact = (row.weight / totalRawWeight) * 100;
+    const floor = Math.floor(exact);
+    return { row, index, floor, remainder: exact - floor };
+  });
+  const remaining = 100 - weightedRows.reduce((sum, item) => sum + item.floor, 0);
+  const extraIndexes = new Set(
+    [...weightedRows]
+      .sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+      .slice(0, remaining)
+      .map(item => item.index),
+  );
+
+  return weightedRows.map(({ row, index, floor }) => ({
+    ...row,
+    weight: floor + (extraIndexes.has(index) ? 1 : 0),
+  }));
+}
 
 export async function assembleClientSignals(
   workspaceId: string,
@@ -386,10 +438,12 @@ export async function assembleClientSignals(
   // Composite health score (40% churn + 30% ROI + 30% engagement)
   // Weights are normalized to available components so missing data doesn't drag the score down.
   let compositeHealthScore: number | null = null;
+  let compositeHealthBreakdown: ClientCompositeHealthBreakdown | null = null;
   {
     let totalWeight = 0;
     let weightedSum = 0;
     let components = 0;
+    const rows: ClientCompositeHealthBreakdown['rows'] = [];
 
     // Churn component (weight 0.4) — only include if churn subsystem loaded successfully
     if (churnFetchSucceeded) {
@@ -404,6 +458,13 @@ export async function assembleClientSignals(
       weightedSum += churnScore * 0.4;
       totalWeight += 0.4;
       components++;
+      rows.push({
+        id: 'retention',
+        label: 'Retention signals',
+        score: churnScore,
+        weight: COMPOSITE_HEALTH_WEIGHTS.retention,
+        description: describeRetentionScore(churnScore),
+      });
     }
     // ROI component (weight 0.3)
     if (roi) {
@@ -412,6 +473,13 @@ export async function assembleClientSignals(
       weightedSum += roiScore * 0.3;
       totalWeight += 0.3;
       components++;
+      rows.push({
+        id: 'roi',
+        label: 'ROI momentum',
+        score: roiScore,
+        weight: COMPOSITE_HEALTH_WEIGHTS.roi,
+        description: describeRoiScore(roi.growth),
+      });
     }
     // Engagement component (weight 0.3)
     if (engagement.loginFrequency !== 'inactive') {
@@ -424,10 +492,18 @@ export async function assembleClientSignals(
       weightedSum += engagementScore * 0.3;
       totalWeight += 0.3;
       components++;
+      rows.push({
+        id: 'engagement',
+        label: 'Portal engagement',
+        score: engagementScore,
+        weight: COMPOSITE_HEALTH_WEIGHTS.engagement,
+        description: describeEngagementScore(engagement.loginFrequency),
+      });
     }
 
     if (components >= 2 && totalWeight > 0) {
       compositeHealthScore = Math.round(weightedSum / totalWeight);
+      compositeHealthBreakdown = { rows: normalizeBreakdownWeights(rows) };
     }
   }
 
@@ -480,6 +556,7 @@ export async function assembleClientSignals(
     roi,
     engagement,
     compositeHealthScore,
+    compositeHealthBreakdown,
     serviceRequests,
     intentSignals,
     latestBriefing,

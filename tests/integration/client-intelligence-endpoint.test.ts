@@ -38,12 +38,15 @@ let trialWs: SeededFullWorkspace;
 let insightWs: SeededFullWorkspace;
 let largeInsightWs: SeededFullWorkspace;
 let readyLearningsWs: SeededFullWorkspace;
+let healthBreakdownWs: SeededFullWorkspace;
 
 // IDs of rows we insert directly so afterAll can clean them up
 const insertedInsightIds: string[] = [];
 const insertedActionIds: string[] = [];
 const insertedOutcomeIds: string[] = [];
 const insertedLearningWorkspaceIds: string[] = [];
+const insertedChurnSignalIds: string[] = [];
+const insertedClientUserIds: string[] = [];
 
 function insertInsight(opts: {
   id?: string;
@@ -90,6 +93,7 @@ beforeAll(async () => {
   insightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
   largeInsightWs = seedWorkspace({ tier: 'free', clientPassword: '' });
   readyLearningsWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
+  healthBreakdownWs = seedWorkspace({ tier: 'growth', clientPassword: '' });
 
   // Insert a known mix of insights into insightWs so we can assert exact counts.
   //
@@ -206,6 +210,38 @@ beforeAll(async () => {
     JSON.stringify({}),
   );
   insertedOutcomeIds.push(outcomeId);
+
+  const churnSignalId = `churn-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO churn_signals
+      (id, workspace_id, workspace_name, type, severity, title, description, detected_at, dismissed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), NULL)
+  `).run(
+    churnSignalId,
+    healthBreakdownWs.workspaceId,
+    'Health Breakdown Workspace',
+    'no_login_14d',
+    'critical',
+    'No login diagnostic',
+    'Internal client-health warning: high churnRisk',
+  );
+  insertedChurnSignalIds.push(churnSignalId);
+
+  const clientUserId = `cu-${randomUUID()}`;
+  db.prepare(`
+    INSERT INTO client_users
+      (id, email, name, password_hash, role, workspace_id, avatar_url, invited_by, last_login_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, datetime('now'), datetime('now'))
+  `).run(
+    clientUserId,
+    `health-${randomUUID()}@example.com`,
+    'Health Breakdown Tester',
+    'test-hash',
+    'client_member',
+    healthBreakdownWs.workspaceId,
+    new Date().toISOString(),
+  );
+  insertedClientUserIds.push(clientUserId);
 }, 25_000);
 
 afterAll(async () => {
@@ -217,6 +253,12 @@ afterAll(async () => {
   }
   for (const workspaceId of insertedLearningWorkspaceIds) {
     db.prepare('DELETE FROM workspace_learnings WHERE workspace_id = ?').run(workspaceId);
+  }
+  for (const id of insertedClientUserIds) {
+    db.prepare('DELETE FROM client_users WHERE id = ?').run(id);
+  }
+  for (const id of insertedChurnSignalIds) {
+    db.prepare('DELETE FROM churn_signals WHERE id = ?').run(id);
   }
   // Clean up inserted insight rows (FK cascade is OFF in tests)
   for (const id of insertedInsightIds) {
@@ -231,6 +273,7 @@ afterAll(async () => {
   tryCleanup(insightWs);
   tryCleanup(largeInsightWs);
   tryCleanup(readyLearningsWs);
+  tryCleanup(healthBreakdownWs);
 
   await ctx.stopServer();
 });
@@ -329,6 +372,10 @@ describe('free tier — correct fields present and absent', () => {
     expect('compositeHealthScore' in body).toBe(false);
   });
 
+  it('compositeHealthBreakdown key is absent', () => {
+    expect('compositeHealthBreakdown' in body).toBe(false);
+  });
+
   it('weCalledIt key is absent', () => {
     expect('weCalledIt' in body).toBe(false);
   });
@@ -391,6 +438,10 @@ describe('growth tier — correct fields present and absent', () => {
     expect('compositeHealthScore' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present (may be null)', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
   it('weCalledIt key is present (must be an array)', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -450,6 +501,10 @@ describe('premium tier — all fields present', () => {
     expect('compositeHealthScore' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
   it('weCalledIt key is present and is an array', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -500,6 +555,10 @@ describe('trial workspace — free base tier promotes to growth', () => {
     expect('serpOpportunities' in body).toBe(true);
   });
 
+  it('compositeHealthBreakdown key is present', () => {
+    expect('compositeHealthBreakdown' in body).toBe(true);
+  });
+
   it('weCalledIt key is present', () => {
     expect('weCalledIt' in body).toBe(true);
     expect(Array.isArray(body.weCalledIt)).toBe(true);
@@ -541,6 +600,12 @@ describe('expired trial workspace — stays on free tier', () => {
     const res = await api(`/api/public/intelligence/${expiredTrialWs.workspaceId}`);
     const body = await res.json();
     expect('learningHighlights' in body).toBe(false);
+  });
+
+  it('compositeHealthBreakdown absent when trial expired', async () => {
+    const res = await api(`/api/public/intelligence/${expiredTrialWs.workspaceId}`);
+    const body = await res.json();
+    expect('compositeHealthBreakdown' in body).toBe(false);
   });
 });
 
@@ -875,6 +940,22 @@ describe('admin-only fields never exposed to client', () => {
     const res = await api(`/api/public/intelligence/${growthWs.workspaceId}`);
     const body = await res.json();
     expect('churnRisk' in body).toBe(false);
+    expect(JSON.stringify(body)).not.toContain('churnRisk');
+  });
+
+  it('compositeHealthBreakdown does not expose churn diagnostics or raw signal copy', async () => {
+    const res = await api(`/api/public/intelligence/${healthBreakdownWs.workspaceId}`);
+    const body = await res.json();
+    const breakdown = body.compositeHealthBreakdown as {
+      rows: Array<{ id: string; weight: number }>;
+    } | null;
+
+    expect(breakdown).not.toBeNull();
+    expect(breakdown?.rows.map(row => row.id)).toEqual(['retention', 'engagement']);
+    expect(breakdown?.rows.reduce((sum, row) => sum + row.weight, 0)).toBe(100);
+
+    const serialized = JSON.stringify(breakdown);
+    expect(serialized).not.toMatch(/churn|churnRisk|client-health warning|No login diagnostic|Internal|critical|warning|high/i);
   });
 
   it('impactScore is not present in any tier response', async () => {

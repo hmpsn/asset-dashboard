@@ -152,6 +152,7 @@ describe('assembleClientSignals — zero-baseline shape', () => {
     expect(result.serviceRequests).toEqual({ pending: 0, total: 0 });
     // compositeHealthScore null when < 2 components are present
     expect(result.compositeHealthScore).toBeNull();
+    expect(result.compositeHealthBreakdown).toBeNull();
   });
 
   it('returns churnSignals as empty array by default', async () => {
@@ -398,6 +399,25 @@ describe('assembleClientSignals — compositeHealthScore', () => {
     // formula: (0*0.4 + 70*0.3) / (0.4+0.3) = 21/0.7 = 30
     expect(result.compositeHealthScore).not.toBeNull();
     expect(result.compositeHealthScore).toBe(30);
+    expect(result.compositeHealthBreakdown?.rows).toEqual([
+      expect.objectContaining({
+        id: 'retention',
+        label: 'Retention signals',
+        score: 0,
+        weight: 57,
+      }),
+      expect.objectContaining({
+        id: 'engagement',
+        label: 'Portal engagement',
+        score: 70,
+        weight: 43,
+      }),
+    ]);
+    expect(result.compositeHealthBreakdown?.rows.reduce((sum, row) => sum + row.weight, 0)).toBe(100);
+    const serialized = JSON.stringify(result.compositeHealthBreakdown);
+    expect(serialized).not.toContain('churnRisk');
+    expect(serialized).not.toContain('"high"');
+    expect(serialized).not.toMatch(/client-health warning|critical|warning/i);
   });
 
   it('computes score = 100 when all three components are perfect', async () => {
@@ -423,6 +443,11 @@ describe('assembleClientSignals — compositeHealthScore', () => {
 
     // formula: (100*0.4 + 100*0.3 + 100*0.3) / (0.4+0.3+0.3) = 100/1.0 = 100
     expect(result.compositeHealthScore).toBe(100);
+    expect(result.compositeHealthBreakdown?.rows.map((row) => row.id)).toEqual([
+      'retention',
+      'roi',
+      'engagement',
+    ]);
   });
 
   it('excludes failed churn fetch from denominator but still scores 2 remaining components', async () => {
@@ -450,6 +475,11 @@ describe('assembleClientSignals — compositeHealthScore', () => {
     // score = (70*0.3 + 100*0.3) / 0.6 = 51/0.6 = 85
     expect(result.compositeHealthScore).not.toBeNull();
     expect(result.compositeHealthScore).toBe(85);
+    expect(result.compositeHealthBreakdown?.rows.map((row) => row.id)).toEqual([
+      'roi',
+      'engagement',
+    ]);
+    expect(result.compositeHealthBreakdown?.rows.map((row) => row.weight)).toEqual([50, 50]);
   });
 
   it('uses correct roiScore buckets: growth=0 → 40, growth=-5 → 0', async () => {

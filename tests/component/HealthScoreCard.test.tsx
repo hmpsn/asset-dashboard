@@ -6,14 +6,41 @@
  * large score span and the MetricRing, never the raw decimal.
  */
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HealthScoreCard } from '../../src/components/client/HealthScoreCard';
+import type { ClientCompositeHealthBreakdown } from '../../shared/types/intelligence';
 
-function renderCard(score: number | null) {
+const breakdown: ClientCompositeHealthBreakdown = {
+  rows: [
+    {
+      id: 'retention',
+      label: 'Retention signals',
+      score: 60,
+      weight: 40,
+      description: 'Recent relationship signals are mostly steady, with one area to strengthen.',
+    },
+    {
+      id: 'roi',
+      label: 'ROI momentum',
+      score: 70,
+      weight: 30,
+      description: 'Organic value is trending up compared with the prior period.',
+    },
+    {
+      id: 'engagement',
+      label: 'Portal engagement',
+      score: 100,
+      weight: 30,
+      description: 'Recent portal activity is strong.',
+    },
+  ],
+};
+
+function renderCard(score: number | null, componentBreakdown?: ClientCompositeHealthBreakdown | null) {
   return render(
     <MemoryRouter>
-      <HealthScoreCard score={score} workspaceId="ws-test" />
+      <HealthScoreCard score={score} workspaceId="ws-test" breakdown={componentBreakdown} />
     </MemoryRouter>,
   );
 }
@@ -62,5 +89,25 @@ describe('HealthScoreCard', () => {
   it('renders nothing when score is null', () => {
     const { container } = renderCard(null);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('renders an expandable client-safe component breakdown', () => {
+    renderCard(77, breakdown);
+
+    const summary = screen.getByText('What makes up this score');
+    const details = summary.closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+
+    fireEvent.click(summary);
+    expect(details).toHaveAttribute('open');
+
+    expect(screen.getByText('Retention signals')).toBeInTheDocument();
+    expect(screen.getByText('ROI momentum')).toBeInTheDocument();
+    expect(screen.getByText('Portal engagement')).toBeInTheDocument();
+    expect(screen.getByText('40% weight')).toBeInTheDocument();
+    expect(screen.getAllByText('30% weight')).toHaveLength(2);
+    const breakdownText = details?.textContent ?? '';
+    expect(breakdownText).not.toMatch(/churn|client-health warning|critical|warning|\bhigh\b|\bmedium\b|\blow\b/i);
   });
 });
