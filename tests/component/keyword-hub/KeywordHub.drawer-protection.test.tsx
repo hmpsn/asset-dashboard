@@ -169,7 +169,7 @@ const unprotectedRow: KeywordCommandCenterRow = {
 const summaryPayload: KeywordCommandCenterSummaryResponse = {
   counts: {
     total: 2, inStrategy: 0, tracked: 2, needsReview: 0,
-    rawEvidence: 0, declined: 0, retired: 0,
+    evidence: 0, local: 0, localCandidates: 0, declined: 0, retired: 0,
   },
   filters: [],
   rawEvidenceTotal: 0,

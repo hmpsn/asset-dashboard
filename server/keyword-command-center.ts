@@ -732,7 +732,7 @@ function buildNextActions(
     actions.push({
       type: 'view_rankings',
       label: 'View rankings',
-      detail: 'Open Rank Tracker as the measurement surface for this keyword.',
+      detail: 'Open the national-rank history in the Keyword Hub drawer for this keyword.',
       tone: 'blue',
       keyword,
       targetTab: 'seo-keywords',

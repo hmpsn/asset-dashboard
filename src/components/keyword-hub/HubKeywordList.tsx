@@ -222,17 +222,11 @@ export function HubKeywordList({
     : {
         icon: PlusCircle,
         title: 'No keywords yet',
-        description: 'Add your first keyword to start tracking rank, clicks, and local visibility.',
-        action: (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onResetFilters}
-            aria-label="Clear filters"
-          >
-            Clear filters
-          </Button>
-        ),
+        // The add-keyword input lives in the page header above the list — point
+        // there instead of offering a no-op "Clear filters" on an unfiltered view.
+        description:
+          'Use the "Add keyword" input above to start tracking rank, clicks, and local visibility — or generate a keyword strategy to seed the universe.',
+        action: undefined,
       };
 
   return (

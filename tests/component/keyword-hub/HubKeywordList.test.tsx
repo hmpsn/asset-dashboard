@@ -229,7 +229,7 @@ describe('HubKeywordList — empty state', () => {
     const onClearSelection = vi.fn();
     render(
       <HubKeywordList
-        {...defaultProps({ rows: [], isLoading: false, isError: false, onResetFilters, onClearSelection })}
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: true, onResetFilters, onClearSelection })}
       />,
     );
     const emptyEl = screen.getByTestId('keyword-table-empty');
@@ -247,6 +247,8 @@ describe('HubKeywordList — empty state', () => {
       />,
     );
     const emptyEl = screen.getByTestId('keyword-table-empty');
+    // Review fix: an unfiltered empty view must NOT offer a no-op "Clear filters" action.
+    expect(screen.queryByRole('button', { name: /clear filters/i })).toBeNull();
     expect(emptyEl).toBeInTheDocument();
     // Unfiltered: should show action-oriented headline, NOT the filtered copy
     expect(emptyEl.textContent).not.toContain('No keywords match your filters');
