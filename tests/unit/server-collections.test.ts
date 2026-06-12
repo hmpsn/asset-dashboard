@@ -55,6 +55,10 @@ describe('uniqStrings', () => {
     expect(uniqStrings([' foo ', 'foo'], { trim: true })).toHaveLength(1);
   });
 
+  it('collapses whitespace in keys when requested', () => {
+    expect(uniqStrings(['foo  bar', 'foo bar'], { collapseWhitespace: true })).toHaveLength(1);
+  });
+
   it('returns empty array for empty input', () => {
     expect(uniqStrings([])).toEqual([]);
   });

@@ -51,16 +51,19 @@ export function compactStrings(values: Array<string | undefined | null | false>)
  *  - `caseInsensitive` (default false) — fold to lowercase before comparing;
  *    the returned value preserves the first-seen original case.
  *  - `trim` (default false) — strip leading/trailing whitespace before comparing.
+ *  - `collapseWhitespace` (default false) — treat repeated whitespace as one space.
  */
 export function uniqStrings(
   values: string[],
-  opts?: { caseInsensitive?: boolean; trim?: boolean },
+  opts?: { caseInsensitive?: boolean; trim?: boolean; collapseWhitespace?: boolean },
 ): string[] {
   const ci = opts?.caseInsensitive ?? false;
   const tr = opts?.trim ?? false;
+  const collapse = opts?.collapseWhitespace ?? false;
   const seen = new Set<string>();
   return values.filter(v => {
     let key = tr ? v.trim() : v;
+    if (collapse) key = key.replace(/\s+/g, ' ');
     if (ci) key = key.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);

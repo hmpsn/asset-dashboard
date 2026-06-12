@@ -14,6 +14,7 @@ import type { ResolvedEntity } from '../../shared/types/entity-resolution.js';
 import { EEAT_ASSET_TYPE, type EeatAsset } from '../../shared/types/eeat-assets.js';
 import { normalizeDomainHost } from '../domain-normalization.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { compactStrings, uniqStrings } from '../utils/collections.js';
 import { capitalizeWord } from '../utils/strings.js';
 
 export interface PageMetaInput {
@@ -365,10 +366,6 @@ function extractArticleJsonLdAuthor($: cheerio.CheerioAPI, opts: { baseUrl: stri
   return undefined;
 }
 
-function uniqueStrings(values: Array<string | undefined>): string[] {
-  return Array.from(new Set(values.map(v => v?.trim()).filter((v): v is string => !!v)));
-}
-
 function normalizeAuthorIdentity(value: string): string {
   return value
     .toLowerCase()
@@ -411,8 +408,8 @@ function deriveEeatAuthorSignals(
   const titleAuthor = cleanAuthorName(leadBio?.title);
   const author = attributedAuthor || (titleAuthor && looksLikePersonName(titleAuthor) ? titleAuthor : undefined);
   const authorJobTitle = leadBio?.metadata?.attributionRole;
-  const authorSameAs = uniqueStrings([leadBio?.url, leadBio?.metadata?.sourceUrl]);
-  const authorCredentials = uniqueStrings(credentials.map(asset => asset.title));
+  const authorSameAs = uniqStrings(compactStrings([leadBio?.url, leadBio?.metadata?.sourceUrl]));
+  const authorCredentials = uniqStrings(compactStrings(credentials.map(asset => asset.title)));
   return {
     author,
     authorJobTitle: authorJobTitle || undefined,

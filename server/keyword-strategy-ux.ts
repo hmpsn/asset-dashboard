@@ -8,7 +8,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
-import { compactStrings } from './utils/collections.js';
+import { compactStrings, uniqStrings } from './utils/collections.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import {
   computeKeywordValueComponents,
@@ -99,10 +99,6 @@ interface BuildSummaryOptions {
   currentPageMap?: Array<{ pagePath: string; primaryKeyword: string }>;
   trackedKeywords?: TrackedKeyword[];
   skipped?: number;
-}
-
-function uniq(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
 }
 
 function feedbackMap(workspaceId: string): Map<string, KeywordStrategyExplanation['feedbackStatus']> {
@@ -242,7 +238,7 @@ function buildExplanation(input: {
         ? 'Identified as a content opportunity with enough context to review safely.'
         : 'Included in the strategy set that guides tracking and recommendations.';
 
-  const reasons = uniq([...input.businessReasons, fallbackReason]).slice(0, 4);
+  const reasons = uniqStrings([...input.businessReasons, fallbackReason].filter(Boolean)).slice(0, 4);
 
   // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (the
   // ONE $ definition — currentMonthly == roi.ts trafficValue). Only the page_keyword
@@ -269,9 +265,9 @@ function buildExplanation(input: {
     normalizedKeyword,
     role: input.role,
     surfaceLabel: surfaceLabel(input.role, input.surface),
-    sourceEvidence: uniq(input.sourceEvidence).slice(0, 5),
+    sourceEvidence: uniqStrings(input.sourceEvidence.filter(Boolean)).slice(0, 5),
     reasons,
-    fitSignals: uniq(input.fitSignals).slice(0, 5),
+    fitSignals: uniqStrings(input.fitSignals.filter(Boolean)).slice(0, 5),
     feedbackStatus: input.feedbackStatus,
     authorityPosture: input.tracked?.authorityPosture,
     tracking: input.tracked ? {
