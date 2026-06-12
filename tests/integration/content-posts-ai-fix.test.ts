@@ -1,7 +1,7 @@
 /**
  * Integration tests for POST /api/content-posts/:workspaceId/:postId/ai-fix
  *
- * Architecture note: Uses createApp() + http.Server in-process (not createTestContext/child
+ * Architecture note: Uses createApp() + http.Server in-process (not createEphemeralTestContext/child
  * process) so that vi.mock can intercept callOpenAI calls in the server's AI dispatch path.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';

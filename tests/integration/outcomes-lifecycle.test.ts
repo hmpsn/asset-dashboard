@@ -2,7 +2,7 @@
  * Integration tests for the Outcome Intelligence Engine — full lifecycle.
  *
  * Uses the in-process Express server pattern (vi.hoisted broadcast capture,
- * no createTestContext subprocess) so broadcast calls are observable in-process.
+ * no createEphemeralTestContext subprocess) so broadcast calls are observable in-process.
  *
  * Covers:
  * - GET endpoints return 200 with correct shape (array or object)

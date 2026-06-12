@@ -38,7 +38,7 @@ const savedOpenAIKey = process.env.OPENAI_API_KEY;
 const savedWebflowToken = process.env.WEBFLOW_API_TOKEN;
 
 // ── In-process test server ────────────────────────────────────────────────────
-// Using http.createServer(createApp()) instead of createTestContext so we can
+// Using http.createServer(createApp()) instead of createEphemeralTestContext so we can
 // control process.env between tests (needed for OPENAI_API_KEY / Webflow token
 // guard tests).
 
