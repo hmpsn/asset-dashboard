@@ -4,7 +4,6 @@
  * Tests the full HTTP request/response cycle for:
  * - GET /api/rank-tracking/:workspaceId/keywords (list tracked keywords)
  * - POST /api/rank-tracking/:workspaceId/keywords (add keyword)
- * - DELETE /api/rank-tracking/:workspaceId/keywords/:query (remove keyword)
  * - PATCH /api/rank-tracking/:workspaceId/keywords/:query/pin (toggle pin)
  * - GET /api/rank-tracking/:workspaceId/history (rank history)
  * - GET /api/rank-tracking/:workspaceId/latest (latest ranks)
@@ -18,7 +17,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
 const ctx = createTestContext(13213, { autoPublicAuth: true });
-const { api, postJson, patchJson, del } = ctx;
+const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';
 
@@ -81,13 +80,6 @@ describe('Rank Tracking — keywords CRUD', () => {
     const res = await patchJson(
       `/api/rank-tracking/${testWsId}/keywords/${encodeURIComponent('seo audit tool')}/pin`,
       {},
-    );
-    expect(res.status).toBe(200);
-  });
-
-  it('DELETE removes the keyword', async () => {
-    const res = await del(
-      `/api/rank-tracking/${testWsId}/keywords/${encodeURIComponent('seo audit tool')}`,
     );
     expect(res.status).toBe(200);
   });

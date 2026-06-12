@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **497 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **498 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 498. Keyword Hub Cutover — single keyword surface (KCC + Rank Tracker consolidation)
+
+**What it does:** Completes the multi-phase consolidation of the admin Keyword Command Center (`seo-keywords`) and the standalone Rank Tracker (`seo-ranks`) into one keyword-first **Keyword Hub**. Phase B flipped the `keyword-hub` flag default to true; Phase C stripped the legacy stack: the `KeywordCommandCenter` renderer, KCC-only subcomponents, and `RankTracker` were deleted, `seo-ranks` folded into the Hub (transitional redirect retained), and the `keyword-hub` umbrella flag was fully retired (catalog/groups + migration 135 dropping its production override). The RankTracker-only untrack endpoint (`DELETE /api/rank-tracking/:workspaceId/keywords/:query`) was removed; the pin endpoint survives (the Hub drawer's pin toggle uses it). The Hub absorbed everything the legacy surfaces offered: the local-SEO panel + market-setup drawer, KPI summary cards, the detail drawer's pin toggle / outcome chips / replaced-by navigation / multi-keyword rank-history chart. Two anti-reintroduction pr-check rules (retired flag key, retired `seo-ranks` literal) plus a deprecation-lifecycle `removed` registry entry per retired surface keep the cleanup from silently reversing.
+
+**Agency value:** One surface to manage the full keyword lifecycle and rank measurement instead of three drifting admin views; less duplicated UI to maintain and fewer places for keyword state to disagree.
+
+**Client value:** Indirect — a more reliable, consistent keyword operating layer means the strategy and rank stories clients see are backed by a single source of truth.
+
+**Mutual:** Removes ~1,200+ lines of legacy frontend stack and a dead route, lowering the platform's maintenance surface while preserving every keyword lifecycle action, rank history, snapshot capture, pinned trend, and local-SEO segment.
+
+**Files (server/flag/docs lane):** `server/routes/rank-tracking.ts` (untrack route removed), `shared/types/feature-flags.ts` (`keyword-hub` retired), `server/db/migrations/135-retire-keyword-hub-feature-flag.sql`, `scripts/pr-check.ts` (two new rules), `scripts/deprecation-lifecycle.ts` (three `removed` entries + one `hidden`), `docs/rules/keyword-hub.md` (renamed from `keyword-command-center.md`), `docs/rules/route-removal-checklist.md`, `BRAND_DESIGN_LANGUAGE.md`, `CLAUDE.md`. Tests: `tests/integration/rank-tracking-routes.test.ts`, `tests/integration/rank-tracking-lifecycle.test.ts`, `tests/unit/feature-flags.test.ts`, `tests/unit/feature-flags-keyword-hub.test.ts`, `tests/pr-check.test.ts`, `tests/unit/deprecation-lifecycle.test.ts`. Note: the server full-model read path is retained — it is live via the Hub's `local_candidates` advanced filter (see `docs/rules/keyword-hub.md`).
 
 ---
 

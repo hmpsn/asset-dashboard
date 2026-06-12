@@ -120,19 +120,14 @@ describe('Breadcrumbs', () => {
     expect(TAB_LABELS['revenue']).toBe('Revenue');
   });
 
-  // ── Wave 4 P4: seo-keywords crumb relabel (flag-gated) ──────────────────────
-  it('flag OFF (byte-identical): seo-keywords crumb reads "Keywords"', () => {
-    featureFlagMock.mockImplementation((_flag: string) => false);
-    renderBreadcrumbs({ tab: 'seo-keywords' });
-    expect(screen.getByText('Keywords')).toBeInTheDocument();
-    expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
-    // Static map stays unchanged (byte-identical).
-    expect(TAB_LABELS['seo-keywords']).toBe('Keywords');
-  });
-
-  it('flag ON: seo-keywords crumb reads "Keyword Hub"', () => {
-    featureFlagMock.mockImplementation((flag: string) => flag === 'keyword-hub');
+  // ── Keyword Hub crumb (post-W4-cutover: unconditional) ──────────────────────
+  // The Hub is the only keyword surface, so the seo-keywords crumb reads
+  // "Keyword Hub" unconditionally (the old "Keywords" label is retired).
+  it('seo-keywords crumb reads "Keyword Hub"', () => {
     renderBreadcrumbs({ tab: 'seo-keywords' });
     expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+    expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
+    // Static map reflects the registry label.
+    expect(TAB_LABELS['seo-keywords']).toBe('Keyword Hub');
   });
 });

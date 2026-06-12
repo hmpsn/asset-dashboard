@@ -443,9 +443,9 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 - Volume → audience size label (e.g. "~2.4K searches/mo")
 - Trend → "Interest growing / steady / declining"
 
-### Keyword Command Center (`KeywordCommandCenter.tsx`)
+### Keyword Hub (`KeywordHub.tsx`)
 
-The admin Keywords surface uses a full-width dense table with overlay detail, not a persistent side column.
+The admin Keywords surface (the Keyword Hub, the sole keyword surface after the 2026-06-11 cutover) uses a full-width dense table with overlay detail, not a persistent side column.
 
 | Element | Color | Rationale |
 |---------|-------|-----------|
@@ -491,9 +491,9 @@ The admin Keywords surface uses a full-width dense table with overlay detail, no
 - `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
 - `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
 
-### Keyword Hub action affordances (`KeywordActionMenu.tsx`, flag `keyword-hub`)
+### Keyword Hub action affordances (`KeywordActionMenu.tsx`)
 
-The Keyword Hub (Wave 4) introduces a deliberate **action-tone reconciliation** that frees **red exclusively for the one irreversible affordance — permanent Delete.** This is Hub-only (flag-ON); the flag-OFF Keyword Command Center renders byte-identically (the shared server `buildNextActions` still emits `tone:'red'` for retire/decline, which the legacy KCC renderer consumes unchanged — the Hub remaps those locally in `KeywordActionMenu` rather than changing the server).
+The Keyword Hub (Wave 4) introduces a deliberate **action-tone reconciliation** that frees **red exclusively for the one irreversible affordance — permanent Delete.** The shared server `buildNextActions` still emits `tone:'red'` for retire/decline; the Hub remaps those to amber locally in `KeywordActionMenu` rather than changing the server. (Post-cutover the `keyword-hub` flag is retired and the Hub is the only renderer — there is no longer a flag-OFF legacy path.)
 
 | Affordance | Tone | Rationale |
 |------------|------|-----------|

@@ -324,12 +324,12 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
 describe('useFeatureFlag — server response overrides defaults', () => {
   it('returns true for a flag the server has enabled', async () => {
     const serverFlags = Object.fromEntries(
-      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-hub']),
+      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-universe-full']),
     ) as Record<FeatureFlagKey, boolean>;
     mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -357,13 +357,13 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     mockGet.mockRejectedValue(new Error('Failed to fetch feature flags'));
 
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-hub' as FeatureFlagKey),
+      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
     // Error path: no data → falls back to FEATURE_FLAGS default
     await waitFor(() => {
-      expect(result.current).toBe(FEATURE_FLAGS['keyword-hub']);
+      expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
     });
   });
 });

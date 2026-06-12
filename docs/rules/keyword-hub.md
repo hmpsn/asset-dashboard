@@ -1,22 +1,30 @@
-# Keyword Command Center
+# Keyword Hub
 
-The Keyword Command Center is the admin operating layer for keyword lifecycle management. It lives at `/ws/:workspaceId/seo-keywords` and owns the question, "What keywords exist, where did they come from, what state are they in, and what safe action comes next?"
+The Keyword Hub is the admin operating layer for keyword lifecycle management. It lives at `/ws/:workspaceId/seo-keywords` and owns the question, "What keywords exist, where did they come from, what state are they in, and what safe action comes next?"
+
+> **Cutover note (2026-06-11).** The Hub is now the **only** keyword surface. It absorbed the former standalone Keyword Command Center (`seo-keywords`) and the standalone Rank Tracker (`seo-ranks`, now a redirect → `seo-keywords`). Rank history, current positions, and snapshot capture are surfaced inside the Hub (the detail drawer's national-rank section). The `keyword-hub` feature flag was retired at this cutover. The server module + shared types below were **not** renamed — they keep their `keyword-command-center` identifiers (`server/keyword-command-center.ts`, `shared/types/keyword-command-center.ts`, `/api/webflow/keyword-command-center/...` routes), which the Hub consumes directly.
 
 ## Surface Boundaries
 
-- **Command Center owns lifecycle operations:** track, pause, retire, decline, restore, and promote raw evidence into the active operating loop.
-- **Rank Tracker remains measurement-only:** ranking history, current positions, and snapshot capture belong there. Do not add broad management workflows to Rank Tracker when the action is keyword lifecycle state.
+- **The Hub owns lifecycle operations:** track, pause, retire, decline, restore, and promote raw evidence into the active operating loop.
+- **The Hub owns rank measurement:** ranking history, current positions, and snapshot capture are surfaced in the Hub's detail drawer (national-rank section + history chart). There is no longer a separate Rank Tracker surface.
 - **Strategy remains generation/explanation:** strategy can explain selected terms and regeneration diffs, but it should not become the primary keyword manager.
-- **Page Intelligence remains page-first:** it can show a mapped page keyword and hand off to the Command Center, but keyword-universe filtering belongs in the Command Center.
-- **Client Strategy remains client-safe:** client feedback and tracked keywords feed the Command Center, but admin-only raw/provider evidence labels must not leak into client copy.
+- **Page Intelligence remains page-first:** it can show a mapped page keyword and hand off to the Hub, but keyword-universe filtering belongs in the Hub.
+- **Client Strategy remains client-safe:** client feedback and tracked keywords feed the Hub, but admin-only raw/provider evidence labels must not leak into client copy.
 
 ## Data Contract
 
 - Use `shared/types/keyword-command-center.ts` for rows, filters, actions, counts, tracking state, feedback state, and next-action payloads.
-- Use `normalizeKeywordForComparison()` from `shared/keyword-normalization.ts` for Command Center joins and touched keyword lifecycle comparisons.
+- Use `normalizeKeywordForComparison()` from `shared/keyword-normalization.ts` for Hub joins and touched keyword lifecycle comparisons.
 - Preserve raw display strings for user-facing keyword labels and provider payloads. Canonical normalization is for equality, dedupe, and map keys.
 - Raw provider evidence must be labeled as evidence, not a selected strategy action.
 - Inactive lifecycle rows are preserved for auditability; active rank views should continue hiding paused/deprecated/replaced rows by default.
+
+## Skinny vs full-model read path (the `local_candidates` exception)
+
+- The Hub's rows/summary/detail endpoints take the **skinny** path (`buildKeywordCommandCenterRowsSkinny`): a page-bounded source bundle, never the full keyword-universe model.
+- **Exception — the `local_candidates` advanced filter.** When the Hub requests `filter=local_candidates`, `buildKeywordCommandCenterRows` dispatches to `buildKeywordCommandCenterRowsViaModel` → `buildKeywordCommandCenterModel({ includeLocalCandidates: true })`, because local candidates are produced by `buildLocalSeoKeywordCandidates()` and are NOT in the skinny universe. This is a **live** Hub path, not dead code. The candidate list is hard-capped at `LOCAL_CANDIDATE_ROW_LIMIT` (the universe-full flag does NOT lift this cap) to avoid the OOM regression that a page-unbounded full-row evaluation would cause.
+- pr-check rule **`Keyword Command Center summary/detail must not use full model`** keeps `buildKeywordCommandCenterSummary`/`buildKeywordCommandCenterDetail` on the skinny path; the model builder is reachable only via the `local_candidates` rows dispatch.
 
 ## Value Scoring (the `opportunity` sort)
 
@@ -42,7 +50,7 @@ The platform has **two distinct value scorers**, by design. They share the same 
 ## Mutation Rules
 
 - Default "Remove" means lifecycle retirement or feedback suppression — NOT a row delete.
-- **Hard-delete exception (P3-3c).** A deliberate, narrow hard-delete channel exists: `deleteKeywordHard()` (`server/keyword-command-center.ts`), exposed via `DELETE /api/webflow/keyword-command-center/:workspaceId/keywords/:keyword`. It is eligible ONLY for `source === MANUAL`, unpinned, non-client-requested, non-strategy-owned, non-gap-provenance rows (`isHardDeleteEligible`); ineligible rows throw without `?force=true`. It is a SEPARATE channel — never in `KEYWORD_COMMAND_CENTER_ACTIONS`, never a default/bulk action — and it **intentionally drops rank history**. This is the one sanctioned exception to "no hard deletes"; everything else still retires/suppresses.
+- **Hard-delete exception (P3-3c).** A deliberate, narrow hard-delete channel exists: `deleteKeywordHard()` (`server/keyword-command-center.ts`), exposed via `DELETE /api/webflow/keyword-command-center/:workspaceId/keywords/:keyword`. It is eligible ONLY for `source === MANUAL`, unpinned, non-client-requested, non-strategy-owned, non-gap-provenance rows (`isHardDeleteEligible`); ineligible rows throw without `?force=true`. It is a SEPARATE channel — never in `KEYWORD_COMMAND_CENTER_ACTIONS`, never a default/bulk action — and it **intentionally drops rank history**. This is the one sanctioned exception to "no hard deletes"; everything else still retires/suppresses. (Note: the former standalone Rank Tracker untrack endpoint, `DELETE /api/rank-tracking/:workspaceId/keywords/:query`, was removed at the Hub cutover; the Hub's hard-delete + lifecycle-retire channels are the surviving keyword-removal paths. The pin endpoint `PATCH /api/rank-tracking/:workspaceId/keywords/:query/pin` survives — the Hub drawer's pin toggle uses it.)
 - Manual, pinned, and client-requested keywords are protected from accidental retirement or decline. Actions that target them must require explicit confirmation/force semantics.
 - Mutations must preserve rank history and metadata whenever possible (the P3-3c hard delete is the documented exception).
 - Mutations must broadcast the affected surfaces:
@@ -50,7 +58,7 @@ The platform has **two distinct value scorers**, by design. They share the same 
   - `WS_EVENTS.STRATEGY_UPDATED` when strategy/feedback consideration changes.
   - `WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED` when feedback/suppression can affect strategy signals.
 - Mutations must add activity entries for admin-visible lifecycle changes.
-- No Command Center action may publish content, write live metadata, or regenerate strategy automatically.
+- No Hub action may publish content, write live metadata, or regenerate strategy automatically.
 
 ## UI Rules
 
@@ -62,11 +70,11 @@ The platform has **two distinct value scorers**, by design. They share the same 
   - raw provider evidence,
   - client/admin feedback,
   - retired/declined lifecycle state.
+- The detail drawer's national-rank section surfaces multi-keyword rank history (`RankHistoryChart`) and the pin toggle — both folded in from the retired Rank Tracker.
 - Handoffs should navigate with context only:
   - Generate brief → content planning/brief flow.
   - Review page → Page Intelligence.
-  - View rankings → Rank Tracker.
 
 ## Follow-Up Boundary
 
-The Command Center includes only the minimal shared keyword normalizer needed by this surface. The broader `intel-quality-keyword-normalization-route-reliability-hardening` roadmap item remains responsible for migrating legacy keyword equality variants and keyword-loop async routes across the repo before local SEO work begins.
+The Hub includes only the minimal shared keyword normalizer needed by this surface. The broader `intel-quality-keyword-normalization-route-reliability-hardening` roadmap item remains responsible for migrating legacy keyword equality variants and keyword-loop async routes across the repo before local SEO work begins.

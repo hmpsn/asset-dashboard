@@ -16,15 +16,14 @@ list, and add a **public** read-path test (not just the admin route).
 
 ## Surface Boundaries (authoritative division of labor)
 
-Reaffirms and extends `docs/rules/keyword-command-center.md`:
+> **Superseded by the Keyword Hub cutover (2026-06-11).** The three surfaces below were consolidated into one **Keyword Hub** (`seo-keywords`): the standalone Keyword Command Center and Rank Tracker (`seo-ranks`) no longer exist as separate surfaces. Lifecycle + measurement both live in the Hub. The current authoritative contract is `docs/rules/keyword-hub.md`; the division below is retained for historical context.
 
-- **Keyword Command Center = lifecycle** — track / pause / retire / decline / restore / promote. The only keyword *manager*.
-- **Rank Tracker = measurement-only** — GSC positions, history, snapshots. Never gains lifecycle actions during this work.
+Reaffirms and extends `docs/rules/keyword-hub.md`:
+
+- **The Keyword Hub = lifecycle + measurement** — track / pause / retire / decline / restore / promote, plus GSC positions, history, and snapshots (folded in from the retired Rank Tracker). The only keyword *manager*.
 - **Strategy = generation/explanation** — generation + regeneration diffs; not a keyword manager.
-- **Page Intelligence = page-first** — annotate + hand off to KCC.
-- **Client Strategy = client-safe** — no raw provider/evidence labels (`keyword-command-center.md`).
-
-Every one of the three surfaces must carry a shared subtitle stating this division (Wave 4).
+- **Page Intelligence = page-first** — annotate + hand off to the Hub.
+- **Client Strategy = client-safe** — no raw provider/evidence labels (`keyword-hub.md`).
 
 ---
 

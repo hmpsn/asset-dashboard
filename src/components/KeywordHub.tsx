@@ -13,9 +13,10 @@
  * and seeds `initialSegment`. P4's deep-link senders construct
  * `adminPath(ws, 'seo-keywords') + ?tab=<HubSegment>` against this receiver.
  *
- * Gate: rendered only when the 'keyword-hub' feature flag is ON — the gate lives
- * in App.tsx, NOT here (per plan: "the component is NOT itself wrapped in
- * <FeatureFlag>"). `showLocalSeo` now reflects the canonical local SEO surface.
+ * This is the canonical keyword surface: App.tsx renders it unconditionally for
+ * the `seo-keywords` tab (the legacy Keyword Command Center and standalone Rank
+ * Tracker were retired in the W4 cutover). `showLocalSeo` reflects the canonical
+ * local SEO surface.
  *
  * Four Laws of Color enforced via the shared primitives. No violet/indigo/rose/pink.
  */

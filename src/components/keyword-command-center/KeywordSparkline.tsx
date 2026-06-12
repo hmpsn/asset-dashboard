@@ -12,9 +12,9 @@ export interface KeywordSparklineProps {
 /**
  * Compact position-over-time sparkline for a single keyword.
  *
- * Extracted faithfully from `RankTracker.tsx`'s file-private `PositionSparkline`
- * (the SVG math is copied verbatim) so the visual output is unchanged. The
- * original stays in `RankTracker.tsx` until P5 cleanup adopts this primitive.
+ * Originally extracted from the (now-retired) standalone Rank Tracker's
+ * file-private `PositionSparkline` (the SVG math was copied verbatim). It is now
+ * the canonical sparkline, consumed by the Keyword Hub detail drawer.
  *
  * Four Laws: blue data line + endpoint dot (`CHART_SERIES_COLORS.blue`);
  * improvement delta = emerald-400; regression delta = red-400.

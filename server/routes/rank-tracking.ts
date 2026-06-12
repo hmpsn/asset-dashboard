@@ -10,7 +10,6 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import {
   getTrackedKeywords,
   addTrackedKeyword,
-  removeTrackedKeyword,
   togglePinKeyword,
   storeRankSnapshot,
   getRankHistory,
@@ -84,18 +83,6 @@ router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('
 });
 
 // Remove a tracked keyword
-router.delete('/api/rank-tracking/:workspaceId/keywords/:query', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const query = decodeURIComponent(req.params.query);
-  const normalizedQuery = normalizeKeywordQuery(query);
-  const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
-  const keywords = removeTrackedKeyword(req.params.workspaceId, query);
-  if (wasTracked) {
-    addActivity(req.params.workspaceId, 'rank_tracking_updated', 'Tracked keyword removed', `"${normalizedQuery}" removed from rank tracking`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword: normalizedQuery, action: 'removed', source: 'manual' });
-  }
-  res.json(keywords);
-});
-
 // Toggle pin on a tracked keyword
 router.patch('/api/rank-tracking/:workspaceId/keywords/:query/pin', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const query = decodeURIComponent(req.params.query);

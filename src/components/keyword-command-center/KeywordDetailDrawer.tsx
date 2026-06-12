@@ -11,7 +11,6 @@ import { queryKeys } from '../../lib/queryKeys';
 import { positionColor } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
 import { fmtMoney } from '../../utils/formatNumbers';
-import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useRankTrackingTogglePin } from '../../hooks/admin/useKeywordCommandCenter';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
@@ -69,11 +68,6 @@ export function KeywordDetailDrawer({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Wave 4 P2 — the journey sections are gated behind `keyword-hub` so the KCC
-  // (flag-OFF) drawer renders byte-identical to today; only the Hub (flag-ON)
-  // surfaces the journey. The hook runs unconditionally (hooks rules).
-  const hubEnabled = useFeatureFlag('keyword-hub');
-
   const [showAllMarkets, setShowAllMarkets] = useState(false);
 
   // Lock background scroll while the drawer is open so the page underneath can't
@@ -81,10 +75,9 @@ export function KeywordDetailDrawer({
   // scroll container (admin `<main>` / client `<body>`); see useScrollLock.
   useScrollLock(open, drawerRef);
 
-  // Lazy national-rank history for the sparkline. Only fetched when the journey
-  // is enabled, the drawer is open, a row exists, and the keyword is tracked.
-  const rankHistoryEnabled = hubEnabled
-    && open
+  // Lazy national-rank history for the sparkline. Only fetched when the drawer
+  // is open, a row exists, and the keyword is tracked.
+  const rankHistoryEnabled = open
     && !!row
     && row.tracking.status !== 'not_tracked';
   const rankHistoryKeyword = row?.keyword ?? '';
@@ -154,11 +147,11 @@ export function KeywordDetailDrawer({
   if (!open) return null;
 
   const isAwaitingSignal = row?.tracking.status === 'active' && row.tracking.hasSignal === false;
-  // When the journey is enabled, never surface the raw `deprecated` enum — show
-  // the user-facing "Retired" instead (flag-OFF keeps the legacy label verbatim).
-  const hubStatusLabel = hubEnabled && row?.tracking.status === 'deprecated'
+  // Never surface the raw `deprecated`/`replaced` enums — show the user-facing
+  // "Retired"/"Replaced" labels instead.
+  const hubStatusLabel = row?.tracking.status === 'deprecated'
     ? 'Retired'
-    : hubEnabled && row?.tracking.status === 'replaced'
+    : row?.tracking.status === 'replaced'
       ? 'Replaced'
       : row?.tracking.status.replace(/_/g, ' ');
   const trackingLabel = row?.tracking.status === 'not_tracked'
@@ -172,7 +165,7 @@ export function KeywordDetailDrawer({
       ? null
       : 'Source not recorded';
 
-  // ── Journey-section derivations (only meaningful when hubEnabled && row) ──
+  // ── Journey-section derivations (only meaningful when row is present) ──
 
   // T1 Origin: descriptor for where the keyword came from. Returns null → omit.
   const origin = (() => {
@@ -197,7 +190,7 @@ export function KeywordDetailDrawer({
   const sparklineData = (rankHistory.data ?? [])
     .map(point => ({ date: point.date, position: point.positions[rankHistoryKeyword] }))
     .filter((p): p is { date: string; position: number } => typeof p.position === 'number');
-  const showNationalRank = hubEnabled && !!row && row.tracking.status !== 'not_tracked';
+  const showNationalRank = !!row && row.tracking.status !== 'not_tracked';
 
   // T4 Local visibility: per-market breakdown (sorted by marketLabel).
   const allMarkets = row?.localSeo?.markets
@@ -209,8 +202,7 @@ export function KeywordDetailDrawer({
 
   // T5 Lifecycle / why-retired: render only for retired rows or rows with a
   // deprecation timestamp. Never surface the raw `deprecated` enum.
-  const showLifecycle = hubEnabled
-    && !!row
+  const showLifecycle = !!row
     && (row.lifecycleStatus === 'retired' || !!row.tracking.deprecatedAt);
 
   return (
@@ -270,7 +262,7 @@ export function KeywordDetailDrawer({
             />
           ) : (
             <div className="space-y-5">
-              {hubEnabled && origin && (
+              {origin && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Origin</p>
                   <KeywordDetailPanel>
@@ -414,7 +406,7 @@ export function KeywordDetailDrawer({
                             no-ops the broadcast for untracked ones). Optimistic via
                             invalidation; pending disables the control. Uses the
                             existing rank-tracking pin endpoint. */}
-                        {hubEnabled && row.tracking.status !== 'not_tracked' && (
+                        {row.tracking.status !== 'not_tracked' && (
                           <Button
                             variant={row.tracking.pinned === true ? 'secondary' : 'ghost'}
                             size="sm"
@@ -433,7 +425,7 @@ export function KeywordDetailDrawer({
                       {trackingSourceLabel && (
                         <p className="t-caption-sm text-[var(--brand-text-muted)]">{trackingSourceLabel}</p>
                       )}
-                      {hubEnabled && row.tracking.addedAt && (
+                      {row.tracking.addedAt && (
                         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                           Tracked since {formatDate(row.tracking.addedAt)}
                         </p>
@@ -449,7 +441,7 @@ export function KeywordDetailDrawer({
                         (P2's nationalRank journey section). */}
                   </div>
                   {/* Three-state: ONLY strategyOwned === true shows the note; false/undefined omit it. */}
-                  {hubEnabled && row.tracking.strategyOwned === true && (
+                  {row.tracking.strategyOwned === true && (
                     <p className="t-caption-sm text-teal-400 mt-2">
                       Auto-managed — strategy refreshes maintain this keyword&apos;s lifecycle.
                     </p>
@@ -512,7 +504,7 @@ export function KeywordDetailDrawer({
                 </div>
               )}
 
-              {hubEnabled && hasMarkets && (
+              {hasMarkets && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Local visibility</p>
                   <div className="space-y-2">
@@ -617,7 +609,7 @@ export function KeywordDetailDrawer({
                 </div>
               )}
 
-              {row.localSeoState && !(hubEnabled && hasMarkets) && (
+              {row.localSeoState && !hasMarkets && (
                 <div>
                   <p className="t-label text-[var(--brand-text-muted)] mb-2">Local Visibility</p>
                   <KeywordDetailPanel tone="blue">

@@ -19,7 +19,6 @@ import { useAuditSummary } from '../hooks/useAuditSummary';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
 import { type Page, adminPath, clientPath } from '../routes';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
@@ -59,10 +58,9 @@ type HomeTab = 'overview' | 'meeting-brief';
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Wave 4 P4: the standalone Rank Tracker folds into the Keyword Hub when ON;
-  // rank-related drill-ins route to seo-keywords. Flag-OFF byte-identical.
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
-  const ranksTab: Page = keywordHubEnabled ? 'seo-keywords' : 'seo-ranks';
+  // The standalone Rank Tracker folded into the Keyword Hub; rank-related
+  // drill-ins route to seo-keywords.
+  const ranksTab: Page = 'seo-keywords';
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);

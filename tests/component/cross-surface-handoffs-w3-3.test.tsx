@@ -4,7 +4,7 @@
  * Covers:
  *   1. WorkspaceHome "N new client requests" sender encodes ?tab=requests
  *   2. App.tsx requests-tab receiver fires on same-workspace tab navigation
- *   3. KeywordGaps shows View-in-Hub link when keywordHubEnabled=true
+ *   3. KeywordGaps shows a View-in-Hub link when given workspaceId + navigate
  *   4. LocalSeoVisibilityPanel RepeatCompetitorList has Track button per keyword
  *   5. ContentDecay expanded row has "Refresh brief" and "Review page" buttons
  *   6. ContentPipeline decay banner is clickable (navigates to seo-audit?sub=content-decay)
@@ -89,7 +89,10 @@ describe('KeywordGaps: View-in-Hub link', () => {
   ];
   const difficultyColor = () => 'text-amber-400';
 
-  async function setup(keywordHubEnabled: boolean) {
+  // The View-in-Hub link is now unconditional — it renders whenever the gaps
+  // component is given a workspaceId + navigate (the Hub is the only keyword
+  // surface, so there is no flag to gate it). Omitting navigate suppresses it.
+  async function setup(withNavigate = true) {
     const { KeywordGaps } = await import('../../src/components/strategy/KeywordGaps');
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
@@ -99,8 +102,7 @@ describe('KeywordGaps: View-in-Hub link', () => {
             keywordGaps={gaps}
             difficultyColor={difficultyColor}
             workspaceId="ws-1"
-            navigate={navigateMock}
-            keywordHubEnabled={keywordHubEnabled}
+            navigate={withNavigate ? navigateMock : undefined}
           />
         </QueryClientProvider>
       </MemoryRouter>,
@@ -109,20 +111,20 @@ describe('KeywordGaps: View-in-Hub link', () => {
 
   beforeEach(() => { navigateMock.mockClear(); });
 
-  it('renders gap keywords without hub links when keywordHubEnabled is false', async () => {
+  it('renders gap keywords without hub links when no navigate is provided', async () => {
     await setup(false);
     expect(screen.getByText('local dentist')).toBeInTheDocument();
     expect(screen.queryByTitle('View in Hub')).toBeNull();
   });
 
-  it('renders View-in-Hub icon button for each row when keywordHubEnabled is true', async () => {
-    await setup(true);
+  it('renders a View-in-Hub icon button for each row by default', async () => {
+    await setup();
     const hubButtons = screen.getAllByTitle('View in Hub');
     expect(hubButtons).toHaveLength(2);
   });
 
   it('clicking View-in-Hub navigates to seo-keywords with ?q= param', async () => {
-    await setup(true);
+    await setup();
     const hubButtons = screen.getAllByTitle('View in Hub');
     fireEvent.click(hubButtons[0]);
     expect(navigateMock).toHaveBeenCalledOnce();

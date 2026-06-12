@@ -231,22 +231,17 @@ describe('CommandPalette', () => {
     });
   });
 
-  // ── Wave 4 P4: Keyword Hub nav fold-in (flag-gated) ──────────────────────────
-  describe('keyword-hub nav fold-in', () => {
+  // ── Keyword Hub nav (post-W4-cutover: unconditional) ─────────────────────────
+  // The Hub is the only keyword surface. The palette shows "Keyword Hub"
+  // unconditionally; the retired "Rank Tracker" entry and the old "Keywords"
+  // label never appear, regardless of flag state.
+  describe('keyword nav', () => {
     function open() {
       render(<CommandPalette workspaces={[ws]} selectedWorkspace={ws} onSelectWorkspace={vi.fn()} />);
       fireEvent.keyDown(window, { key: 'k', metaKey: true });
     }
 
-    it('flag OFF (byte-identical): NAV_ITEMS show "Keywords" + "Rank Tracker", no "Keyword Hub"', () => {
-      useFeatureFlagMock.mockReturnValue(false);
-      open();
-      expect(screen.getByText('Keywords')).toBeInTheDocument();
-      expect(screen.getByText('Rank Tracker')).toBeInTheDocument();
-      expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
-    });
-
-    it('flag ON: NAV_ITEMS show "Keyword Hub", no "Rank Tracker" / "Keywords"', () => {
+    it('NAV_ITEMS show "Keyword Hub", never the retired "Rank Tracker" / "Keywords"', () => {
       useFeatureFlagMock.mockReturnValue(true);
       open();
       expect(screen.getByText('Keyword Hub')).toBeInTheDocument();

@@ -328,8 +328,8 @@ describe('Bug 3 — trackKeyword error handling', () => {
     // The strategy section with siteKeywords should render
     await screen.findByText('test keyword');
 
-    // keywordHubEnabled is mocked as false, so label is "Track in Rank Tracker"
-    const trackBtn = screen.getByRole('button', { name: /track in rank tracker/i });
+    // The track control is labeled "Track" (the Hub is the only keyword surface).
+    const trackBtn = screen.getByRole('button', { name: /^track$/i });
     expect(trackBtn).not.toBeDisabled();
 
     fireEvent.click(trackBtn);
@@ -350,8 +350,7 @@ describe('Bug 3 — trackKeyword error handling', () => {
 
     await screen.findByText('test keyword');
 
-    // keywordHubEnabled is mocked as false
-    const trackBtn = screen.getByRole('button', { name: /track in rank tracker/i });
+    const trackBtn = screen.getByRole('button', { name: /^track$/i });
     fireEvent.click(trackBtn);
 
     // Should eventually show a role="alert" with the error
@@ -373,7 +372,7 @@ describe('Bug 3 — trackKeyword error handling', () => {
     renderPanel();
     await screen.findByText('test keyword');
 
-    const trackBtn = screen.getByRole('button', { name: /track in rank tracker/i });
+    const trackBtn = screen.getByRole('button', { name: /^track$/i });
     fireEvent.click(trackBtn);
 
     // Wait for the positive signal (the mutation actually ran) before asserting the

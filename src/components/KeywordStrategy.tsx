@@ -31,7 +31,6 @@ import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-comma
 import { queryKeys } from '../lib/queryKeys';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { buildHubDeepLinkQuery } from '../lib/keywordHubDeepLink';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { adminPath } from '../routes';
@@ -74,10 +73,6 @@ interface Props {
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  // Wave 4 P4 — the per-keyword "View in Hub" deep-link affordance + the "Track"
-  // relabel are gated behind `keyword-hub` so the Strategy chip is BYTE-IDENTICAL
-  // flag-OFF (no extra button, legacy "Track in Rank Tracker" copy preserved).
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
   const [startingStrategyJob, setStartingStrategyJob] = useState(false);
   const [lastStartedJobId, setLastStartedJobId] = useState<string | null>(null);
@@ -936,7 +931,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             difficultyColor={kdColor}
             workspaceId={workspaceId}
             navigate={navigate}
-            keywordHubEnabled={keywordHubEnabled}
           />
 
           {/* ── Reference & Analysis ── */}
@@ -993,25 +987,23 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       )}
                       <IconButton
                         onClick={() => trackKeyword(kw)}
-                        title={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : keywordHubEnabled ? 'Track' : 'Track in Rank Tracker'}
-                        label={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : keywordHubEnabled ? 'Track' : 'Track in Rank Tracker'}
+                        title={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : 'Track'}
+                        label={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : 'Track'}
                         icon={isPendingTrack ? Loader2 : tracked ? Check : Plus}
                         size="sm"
                         variant="ghost"
                         disabled={isPendingTrack}
                         className={`ml-0.5 ${isPendingTrack ? 'animate-spin text-[var(--brand-text-muted)]' : tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
                       />
-                      {keywordHubEnabled && (
-                        <IconButton
-                          onClick={() => navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword: kw }))}
-                          title="View in Hub"
-                          label="View in Hub"
-                          icon={ArrowUpRight}
-                          size="sm"
-                          variant="ghost"
-                          className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
-                        />
-                      )}
+                      <IconButton
+                        onClick={() => navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword: kw }))}
+                        title="View in Hub"
+                        label="View in Hub"
+                        icon={ArrowUpRight}
+                        size="sm"
+                        variant="ghost"
+                        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
+                      />
                     </div>
                     {trackError && (
                       <div role="alert" className="t-caption-sm text-accent-danger">{trackError}</div>

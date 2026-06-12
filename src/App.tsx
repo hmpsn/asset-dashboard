@@ -20,7 +20,6 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
-import { useFeatureFlag } from './hooks/useFeatureFlag';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
 
@@ -46,14 +45,12 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 // ── Lazy-loaded SEO sub-tool chunks (split from SeoAudit #131) ──
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
-const KeywordCommandCenter = lazyWithRetry(() => import('./components/KeywordCommandCenter').then(m => ({ default: m.KeywordCommandCenter })));
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentBriefs = lazyWithRetry(() => import('./components/ContentBriefs').then(m => ({ default: m.ContentBriefs })));
 const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
 const LinksPanel = lazyWithRetry(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
-const RankTracker = lazyWithRetry(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazyWithRetry(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
 const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
@@ -190,7 +187,7 @@ function AdminApp() {
   return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
-// Exported for the P4 seo-ranks fold-in redirect test (real routing logic).
+// Exported for component tests that exercise the real admin routing logic.
 export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -255,9 +252,6 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const [searchParams] = useSearchParams();
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions' | 'deliverables'>('deliverables');
-  // Keyword Hub (Wave 4): when ON, the `seo-keywords` tab renders the unified Hub
-  // instead of the legacy Keyword Command Center. Dark (OFF) until P5 cutover.
-  const keywordHubEnabled = useFeatureFlag('keyword-hub');
 
   // Reset requests sub-tab when workspace or tab changes so stale state doesn't persist.
   // On workspace change OR when navigating to the requests tab, honour ?tab= if it matches
@@ -392,7 +386,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'seo-schema', 'seo-briefs', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -432,8 +426,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
-    if (tab === 'seo-keywords' && keywordHubEnabled) return <KeywordHub key={`hub-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'seo-keywords') return <KeywordCommandCenter key={`keywords-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'seo-keywords') return <KeywordHub key={`hub-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} businessProfile={selected.businessProfile} intelligenceProfile={selected.intelligenceProfile} />;
@@ -443,13 +436,6 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
-    // Keyword Hub (Wave 4 P4): when ON, the standalone Rank Tracker folds into
-    // the unified Hub — `seo-ranks` redirects to `seo-keywords` (mirror the
-    // calendar redirect template) so bookmarks resolve, not 404. Flag-OFF stays
-    // BYTE-IDENTICAL: the standalone <RankTracker> still renders. The Page-union
-    // value + RankTracker import are retained for P5 (removed at cutover).
-    if (tab === 'seo-ranks' && keywordHubEnabled) return <Navigate to={adminPath(selected.id, 'seo-keywords') + location.search} replace />;
-    if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} onNavigate={navigate} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
