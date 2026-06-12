@@ -24,6 +24,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
+// Probe flag must default to false: keyword-hub was retired at the Phase C cutover.
 const FLAG = 'keyword-universe-full';
 const RETIRED_PRODUCT_UI_FLAGS = [
   'copy-engine',
