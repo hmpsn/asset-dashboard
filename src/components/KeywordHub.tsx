@@ -22,10 +22,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { Archive, Eye, MapPin, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
 
 import { Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
+import { SummaryMetric } from './keyword-command-center/SummaryMetric';
+import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
 import { isServerAction } from './keyword-command-center/kccDisplayHelpers';
 import { queryKeys } from '../lib/queryKeys';
@@ -151,6 +154,10 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
 
   const showLocalSeo = true;
 
+  // Deferred local panel: mount after first rows render (idle-callback pattern,
+  // same as KCC ~:228-240). The placeholder shows until rows arrive.
+  const [localPanelEnabled, setLocalPanelEnabled] = useState(false);
+
   // Journey drawer (P2): the selected row opens the per-keyword detail drawer.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
@@ -170,6 +177,13 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const rawEvidenceReturned = summary.data?.rawEvidenceReturned ?? 0;
   const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
   const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
+
+  // Summary error band (KCC :461-468 parity) — non-null when the summary fetch fails.
+  const summaryErrorMessage = summary.error instanceof Error
+    ? summary.error.message
+    : summary.error
+      ? 'Keyword summary metrics could not load. Row data remains available.'
+      : null;
 
   const rowsQuery = useMemo(
     () => ({
@@ -220,6 +234,30 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     deepLinkOpenedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only deep-link open; deepLink is a stable ref value
   }, [rows]);
+
+  // Reset local panel when workspaceId changes (mirrors KCC :213-216).
+  useEffect(() => {
+    setLocalPanelEnabled(false);
+  }, [workspaceId]);
+
+  // Deferred local panel mount: fires after the first rows response arrives.
+  // Falls back to setTimeout(0) when requestIdleCallback is absent (jsdom/test).
+  useEffect(() => {
+    if (!rowsResult.data) return;
+    if (localPanelEnabled) return;
+    const idle = 'requestIdleCallback' in window
+      ? (window as Window & {
+        requestIdleCallback: (callback: IdleRequestCallback, opts?: IdleRequestOptions) => number;
+        cancelIdleCallback: (id: number) => void;
+      })
+      : null;
+    if (idle) {
+      const id = idle.requestIdleCallback(() => setLocalPanelEnabled(true), { timeout: 400 });
+      return () => idle.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(() => setLocalPanelEnabled(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [localPanelEnabled, rowsResult.data]);
 
   // WebSocket: invalidate on rank/strategy mutations (both-halves contract).
   const wsHandlers = useMemo(
@@ -377,6 +415,13 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   );
   const allSelected = hub.allSelected(visibleKeys);
 
+  // A filter is active when any non-default state exists — any non-all segment,
+  // any search term, or any advancedFilter set (A3 blocker 9: empty-state branch).
+  const isFiltered =
+    hub.segment !== 'all' ||
+    hub.debouncedSearch.trim().length > 0 ||
+    hub.advancedFilter !== null;
+
   // Add-keyword: trim → guard empty → mutateAsync → clear on success.
   // Errors surface via the shared actionErrorMessage band below.
   const handleAddKeyword = async () => {
@@ -406,7 +451,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         title="Keyword Hub"
         subtitle="One surface for every keyword — strategy, tracking, rank, and local visibility."
         actions={
-          <div className="flex items-center gap-2">
+          // Mobile: flex-col + full-width inputs below sm; row layout above sm (A3 blocker 8).
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {/* Add-keyword input (B1): writes through the existing rank-tracking add path. */}
             <div className="flex items-center gap-1.5">
               <FormInput
@@ -430,7 +476,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
               </Button>
             </div>
 
-            <div className="w-[260px]">
+            <div className="w-full sm:w-[260px]">
               <FormInput
                 value={hub.searchTerm}
                 onChange={hub.setSearchTerm}
@@ -449,6 +495,59 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         >
           <p className="t-caption font-semibold text-red-400">{actionErrorMessage}</p>
         </div>
+      )}
+
+      {/* KPI summary cards — 5 top-line counts above the segment bar (KCC :417-431 parity).
+          Reuses SummaryMetric (kept in Phase C per A1 adoption).
+          Skeleton grid shown while summary data is unavailable. */}
+      {counts ? (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <SummaryMetric label="In Strategy" value={counts.inStrategy ?? 0} icon={Target} tone="teal" />
+          <SummaryMetric label="Tracked" value={counts.tracked ?? 0} icon={TrendingUp} tone="blue" />
+          <SummaryMetric label="Local" value={counts.local ?? 0} icon={MapPin} tone="blue" />
+          <SummaryMetric label="Needs Review" value={counts.needsReview ?? 0} icon={Eye} tone="amber" />
+          <SummaryMetric label="Retired" value={counts.retired ?? 0} icon={Archive} tone="zinc" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[88px] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-3)]/30 animate-pulse"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Summary error band (KCC :461-468 parity). role="status" so screen readers
+          announce the advisory without interrupting the page flow. */}
+      {summaryErrorMessage && (
+        <div
+          role="status"
+          className="rounded-[var(--radius-xl)] border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-amber-300 t-caption"
+        >
+          {summaryErrorMessage}
+        </div>
+      )}
+
+      {/* Local SEO visibility panel — deferred via requestIdleCallback after first rows
+          render (same pattern as KCC :224-240). onOpenKeywords wires to Hub's local segment. */}
+      {localPanelEnabled ? (
+        <LocalSeoVisibilityPanel
+          workspaceId={workspaceId}
+          mode="keywords"
+          onOpenKeywords={() => {
+            hub.setSegment('local');
+            hub.setPage(1);
+          }}
+        />
+      ) : (
+        <SectionCard title="Local Keyword Visibility" variant="subtle">
+          <div className="flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
+            <span className="inline-block h-2 w-2 rounded-[var(--radius-sm)] bg-blue-400 animate-pulse" />
+            Local visibility summary will load after the keyword rows are ready.
+          </div>
+        </SectionCard>
       )}
 
       <SectionCard noPadding variant="subtle">
@@ -517,6 +616,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           onRowClick={(row) => setSelectedKey(row.normalizedKeyword)}
           activeKeyword={selectedKey}
           showLocalSeo={showLocalSeo}
+          isFiltered={isFiltered}
         />
       </SectionCard>
 
@@ -525,10 +625,12 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
       <KeywordDetailDrawer
         open={!!selectedKey}
         row={selectedRow}
+        outcome={detail.data?.outcome}
         workspaceId={workspaceId}
         isLoading={detail.isFetching && !!selectedKey && !detail.data}
         loadingAction={localRefresh.isPending ? 'check_local_visibility' : rowAction.isPending ? rowAction.variables?.action : undefined}
         onAction={handleDrawerAction}
+        onSelectKeyword={(keyword) => setSelectedKey(keyword)}
         onClose={() => {
           setSelectedKey(null);
           // Drop any pending force-override gate tied to the now-closed drawer so a

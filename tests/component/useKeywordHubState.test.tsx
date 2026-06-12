@@ -72,10 +72,15 @@ describe('useKeywordHubState', () => {
   it('setSegment resets page to 1, clears selection, clears advancedFilter', () => {
     const { result } = renderHook(() => useKeywordHubState());
 
+    // Set advancedFilter first (resets page to 1), then setPage to 3 to establish
+    // the precondition the test needs. setAdvancedFilter now also resets page per
+    // the A3 contract — so order matters.
+    act(() => {
+      result.current.setAdvancedFilter(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT);
+    });
     act(() => {
       result.current.setPage(3);
       result.current.toggleKey('kw-a');
-      result.current.setAdvancedFilter(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT);
     });
 
     expect(result.current.page).toBe(3);
@@ -288,6 +293,53 @@ describe('useKeywordHubState', () => {
     expect(result.current.activeKccFilter).toBe(
       KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // A3: setAdvancedFilter resets page to 1 AND clears selection
+  // ---------------------------------------------------------------------------
+  it('setAdvancedFilter resets page to 1 and clears selection (A3 blocker 4)', () => {
+    const { result } = renderHook(() => useKeywordHubState());
+
+    // Get onto page 3 with a selection
+    act(() => {
+      result.current.setPage(3);
+      result.current.toggleKey('kw-a');
+      result.current.toggleKey('kw-b');
+    });
+
+    expect(result.current.page).toBe(3);
+    expect(result.current.selectedKeys.size).toBe(2);
+
+    // Now apply an advanced filter — must reset page + clear selection
+    act(() => {
+      result.current.setAdvancedFilter(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT);
+    });
+
+    expect(result.current.advancedFilter).toBe(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT);
+    expect(result.current.page).toBe(1);
+    expect(result.current.selectedKeys.size).toBe(0);
+  });
+
+  it('setAdvancedFilter(null) also resets page to 1 and clears selection (A3 blocker 4)', () => {
+    const { result } = renderHook(() => useKeywordHubState());
+
+    act(() => {
+      result.current.setAdvancedFilter(KEYWORD_COMMAND_CENTER_FILTERS.CONTENT);
+      result.current.setPage(2);
+      result.current.toggleKey('kw-x');
+    });
+
+    expect(result.current.page).toBe(2);
+    expect(result.current.selectedKeys.size).toBe(1);
+
+    act(() => {
+      result.current.setAdvancedFilter(null);
+    });
+
+    expect(result.current.advancedFilter).toBeNull();
+    expect(result.current.page).toBe(1);
+    expect(result.current.selectedKeys.size).toBe(0);
   });
 
   // ---------------------------------------------------------------------------

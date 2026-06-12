@@ -735,7 +735,7 @@ function buildNextActions(
       detail: 'Open Rank Tracker as the measurement surface for this keyword.',
       tone: 'blue',
       keyword,
-      targetTab: 'seo-ranks',
+      targetTab: 'seo-keywords',
     });
     actions.push({
       type: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,

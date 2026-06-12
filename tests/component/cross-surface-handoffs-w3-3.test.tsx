@@ -146,6 +146,7 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
     isPending: false,
     error: null,
   }),
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin', () => ({

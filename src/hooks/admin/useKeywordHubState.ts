@@ -174,6 +174,8 @@ export function useKeywordHubState(
   const setAdvancedFilter = useCallback(
     (f: KeywordCommandCenterFilter | null) => {
       setAdvancedFilterRaw(f);
+      setPageRaw(1);
+      setSelectedKeys(new Set());
     },
     [],
   );

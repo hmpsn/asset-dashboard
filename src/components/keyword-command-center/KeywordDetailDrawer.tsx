@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, CheckCircle2, History, MapPin, Search, X } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, History, MapPin, Pin, Search, X } from 'lucide-react';
 
 import { adminPath } from '../../routes';
 import { get } from '../../api/client';
-import { rankTrackingHistoryPath } from '../../lib/keywordTracking';
+import { keywordTrackingKey, rankTrackingHistoryPath } from '../../lib/keywordTracking';
+import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
 import { queryKeys } from '../../lib/queryKeys';
 import { positionColor } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
 import { fmtMoney } from '../../utils/formatNumbers';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useRankTrackingTogglePin } from '../../hooks/admin/useKeywordCommandCenter';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
+import { RankHistoryChart } from '../shared/RankTable';
 import { Badge, Button, EmptyState, Icon, IconButton, OutcomeReadbackChip, Skeleton, StatusBadge, TableSkeleton } from '../ui';
 import { KeywordDetailPanel } from './KeywordDetailPanel';
 import { KeywordSparkline } from './KeywordSparkline';
@@ -39,6 +42,13 @@ interface KeywordDetailDrawerProps {
   isLoading?: boolean;
   loadingAction?: string;
   onAction: (action: KeywordCommandCenterNextAction) => void;
+  /**
+   * In-Hub selection callback for the "View replaced-by" affordance. When
+   * provided, clicking the replaced-by link selects the replacement keyword in
+   * place (normalized) instead of navigating. When omitted, the drawer falls
+   * back to a Hub deep-link navigation. Receives the normalized keyword.
+   */
+  onSelectKeyword?: (keyword: string) => void;
   onClose: () => void;
 }
 
@@ -50,9 +60,11 @@ export function KeywordDetailDrawer({
   isLoading,
   loadingAction,
   onAction,
+  onSelectKeyword,
   onClose,
 }: KeywordDetailDrawerProps) {
   const navigate = useNavigate();
+  const togglePin = useRankTrackingTogglePin(workspaceId);
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -398,8 +410,24 @@ export function KeywordDetailDrawer({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="t-caption font-medium text-[var(--brand-text-bright)] capitalize">{trackingLabel}</p>
-                        {hubEnabled && row.tracking.pinned === true && (
-                          <Badge label="Pinned" tone="blue" variant="soft" shape="pill" />
+                        {/* O2: pin toggle — only for tracked keywords (the server
+                            no-ops the broadcast for untracked ones). Optimistic via
+                            invalidation; pending disables the control. Uses the
+                            existing rank-tracking pin endpoint. */}
+                        {hubEnabled && row.tracking.status !== 'not_tracked' && (
+                          <Button
+                            variant={row.tracking.pinned === true ? 'secondary' : 'ghost'}
+                            size="sm"
+                            icon={Pin}
+                            data-testid="keyword-pin-toggle"
+                            loading={togglePin.isPending}
+                            disabled={togglePin.isPending}
+                            aria-pressed={row.tracking.pinned === true}
+                            title={row.tracking.pinned === true ? 'Unpin this keyword' : 'Pin this keyword'}
+                            onClick={() => togglePin.mutate(row.keyword)}
+                          >
+                            {row.tracking.pinned === true ? 'Pinned' : 'Pin'}
+                          </Button>
                         )}
                       </div>
                       {trackingSourceLabel && (
@@ -458,7 +486,20 @@ export function KeywordDetailDrawer({
                       {rankHistory.isLoading ? (
                         <Skeleton className="h-10 w-full" />
                       ) : sparklineData.length >= 2 ? (
-                        <KeywordSparkline data={sparklineData} />
+                        <>
+                          {/* Compact at-a-glance sparkline + the full multi-snapshot
+                              trend chart (RankTracker parity). The chart is the
+                              shared RankHistoryChart primitive fed this keyword's
+                              single-series history (maxKeywords=1 → one line, its own
+                              legend label). */}
+                          <KeywordSparkline data={sparklineData} />
+                          <div data-testid="rank-history-chart" className="mt-3">
+                            <RankHistoryChart
+                              rankHistory={rankHistory.data ?? []}
+                              maxKeywords={1}
+                            />
+                          </div>
+                        </>
                       ) : (
                         <EmptyState
                           icon={History}
@@ -530,13 +571,26 @@ export function KeywordDetailDrawer({
                         <p className="t-caption-sm text-[var(--brand-text)] break-words">
                           Replaced by: <span className="font-medium text-[var(--brand-text-bright)]">{row.tracking.replacedBy}</span>
                         </p>
-                        {/* TODO P4: wire the real href to the replacement keyword in the Hub.
-                            Unwired in P2 — renders the affordance but must NOT navigate. */}
+                        {/* P4: "View replaced-by" — within the Hub, prefer in-place
+                            selection of the replacement keyword (onSelectKeyword,
+                            normalized) so the drawer re-targets without a full
+                            navigation; otherwise fall back to a Hub deep-link. */}
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={ArrowUpRight}
                           data-testid="view-replaced-by-link"
+                          onClick={() => {
+                            const replacedBy = row.tracking.replacedBy;
+                            if (!replacedBy) return;
+                            if (onSelectKeyword) {
+                              onSelectKeyword(keywordTrackingKey(replacedBy));
+                            } else {
+                              navigate(
+                                `${adminPath(workspaceId, 'seo-keywords')}${buildHubDeepLinkQuery({ keyword: replacedBy })}`,
+                              );
+                            }
+                          }}
                         >
                           View in Hub
                         </Button>

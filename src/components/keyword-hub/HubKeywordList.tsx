@@ -8,11 +8,13 @@
  *   - sort wired to onSort (emits raw HubSortKey column keys; the shell translates to KeywordCommandCenterSort)
  *   - selection by normalizedKeyword
  *   - renderKeywordMeta → <HubKeywordRowMeta>
- *   - action-oriented EmptyState with Clear-filters affordance
+ *   - filter-aware EmptyState: unfiltered → "No keywords yet" CTA; filtered → "adjust filters" + Clear
  *   - loading Skeleton via KeywordTable's loading prop
  *   - ErrorState when isError
  *   - KeywordBulkActionBar when someSelected
  *   - Pagination (prev/next ghost buttons + "Page N of M" + total)
+ *   - pb-24 root clearance when bulk bar is visible (A3 blocker 10)
+ *   - overflow-x-auto + min-width inner container for mobile (A3 blocker 8)
  *
  * Also exports the pure `localSeoColumnLabel` helper used to pre-resolve the
  * `localSeoLabel` slot on KeywordTableRow for the local-SEO column.
@@ -22,7 +24,7 @@
  *
  * TODO: virtualize when rows > 200 (react-virtual)
  */
-import { Search } from 'lucide-react';
+import { PlusCircle, Search } from 'lucide-react';
 import { KeywordTable } from '../shared/RankTable';
 import { ErrorState } from '../ui/ErrorState';
 import { KeywordBulkActionBar } from '../keyword-command-center/KeywordBulkActionBar';
@@ -67,6 +69,13 @@ export interface HubKeywordListProps {
   /** normalizedKeyword of the row whose drawer is currently open — drives the active-row highlight. */
   activeKeyword?: string | null;
   showLocalSeo: boolean;
+  /**
+   * True when any filter (segment !== 'all', debouncedSearch non-empty, or advancedFilter set)
+   * is active. Drives empty-state branching (A3 blocker 9):
+   *   false → "No keywords yet" action-oriented CTA
+   *   true  → "No keywords match your filters" + Clear filters button
+   */
+  isFiltered: boolean;
 }
 
 /**
@@ -154,6 +163,7 @@ export function HubKeywordList({
   onRowClick,
   activeKeyword,
   showLocalSeo,
+  isFiltered,
 }: HubKeywordListProps) {
   // Passthrough: the table emits raw column keys (HubSortKey values); forward
   // them unchanged to the Hub sort handler. The HubSortKey → KeywordCommandCenterSort
@@ -180,7 +190,7 @@ export function HubKeywordList({
   // Error state — rendered before the table so it's always visible
   if (isError) {
     return (
-      <div className="overflow-y-auto">
+      <div className={someSelected ? 'pb-24' : ''}>
         <ErrorState
           title="Could not load keywords"
           message="Check your connection and try again."
@@ -190,66 +200,95 @@ export function HubKeywordList({
     );
   }
 
+  // Empty state: branch on whether any filter/search/segment is active (A3 blocker 9).
+  // Unfiltered + empty → action-oriented "No keywords yet" with an add CTA.
+  // Filtered + empty → "No keywords match your filters" + Clear filters button.
+  const emptyStateConfig = isFiltered
+    ? {
+        icon: Search,
+        title: 'No keywords match your filters',
+        description: 'Try adjusting your filters or search term.',
+        action: (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onResetFilters}
+            aria-label="Clear filters"
+          >
+            Clear filters
+          </Button>
+        ),
+      }
+    : {
+        icon: PlusCircle,
+        title: 'No keywords yet',
+        description: 'Add your first keyword to start tracking rank, clicks, and local visibility.',
+        action: (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onResetFilters}
+            aria-label="Clear filters"
+          >
+            Clear filters
+          </Button>
+        ),
+      };
+
   return (
-    <div className="overflow-y-auto">
-      {/* TODO: virtualize when rows > 200 (react-virtual) */}
-      <KeywordTable<HubKeywordTableRow>
-        rows={tableRows}
-        columns={['position', 'clicks', 'volume', 'difficulty']}
-        showLocalSeo={showLocalSeo}
-        onRowClick={onRowClick}
-        isRowActive={(r) => !!activeKeyword && r.normalizedKeyword === activeKeyword}
-        sort={{
-          key: sort.key,
-          direction: sort.direction,
-          onSort: handleSort,
-        }}
-        selection={{
-          selected: selectedKeys,
-          onToggle: onToggleKey,
-          rowId: (r) => r.normalizedKeyword,
-          label: (r) => `Select ${r.keyword}`,
-          header: {
-            checked: allSelected,
-            onToggle: (checked) => {
-              if (checked) {
-                onToggleAll(visibleKeys);
-              } else {
-                onClearSelection();
-              }
-            },
-            label: 'Select all visible keywords',
-          },
-        }}
-        keywordText={(r) => r.keyword}
-        renderKeywordMeta={(r) => <HubKeywordRowMeta row={r} />}
-        renderActions={(r) => (
-          <KeywordActionMenu
-            row={r}
-            isPending={isRowActionPending}
-            onAction={(action: KeywordCommandCenterActionType, opts) => onRowAction(r.keyword, action, opts)}
-            onDeleteHard={onDeleteHard}
+    // pb-24 gates on someSelected: the floating bulk bar only renders when rows
+    // are selected; the clearance is dead padding otherwise (KCC :402-406 parity).
+    <div className={someSelected ? 'pb-24' : ''}>
+      {/* Mobile: overflow-x-auto + min-width inner container so the table scrolls
+          horizontally on narrow viewports rather than collapsing (KCC :544-545 parity). */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[800px] overflow-y-auto">
+          {/* TODO: virtualize when rows > 200 (react-virtual) */}
+          <KeywordTable<HubKeywordTableRow>
+            rows={tableRows}
+            columns={['position', 'clicks', 'volume', 'difficulty']}
+            showLocalSeo={showLocalSeo}
+            onRowClick={onRowClick}
+            isRowActive={(r) => !!activeKeyword && r.normalizedKeyword === activeKeyword}
+            sort={{
+              key: sort.key,
+              direction: sort.direction,
+              onSort: handleSort,
+            }}
+            selection={{
+              selected: selectedKeys,
+              onToggle: onToggleKey,
+              rowId: (r) => r.normalizedKeyword,
+              label: (r) => `Select ${r.keyword}`,
+              header: {
+                checked: allSelected,
+                onToggle: (checked) => {
+                  if (checked) {
+                    onToggleAll(visibleKeys);
+                  } else {
+                    onClearSelection();
+                  }
+                },
+                label: 'Select all visible keywords',
+              },
+            }}
+            keywordText={(r) => r.keyword}
+            renderKeywordMeta={(r) => <HubKeywordRowMeta row={r} />}
+            renderActions={(r) => (
+              <KeywordActionMenu
+                row={r}
+                isPending={isRowActionPending}
+                onAction={(action: KeywordCommandCenterActionType, opts) => onRowAction(r.keyword, action, opts)}
+                onDeleteHard={onDeleteHard}
+              />
+            )}
+            loading={isLoading && rows.length === 0}
+            emptyState={emptyStateConfig}
+            stickyHeader
+            density="comfortable"
           />
-        )}
-        loading={isLoading && rows.length === 0}
-        emptyState={{
-          icon: Search,
-          title: 'No keywords match your filters',
-          description: 'Try adjusting your filters or search term.',
-          action: (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onResetFilters}
-              aria-label="Clear filters"
-            >
-              Clear filters
-            </Button>
-          ),
-        }}
-        stickyHeader
-        density="comfortable"
-      />
+        </div>
+      </div>
 
       {/* Pagination */}
       {pageInfo && (

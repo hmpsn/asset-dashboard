@@ -54,10 +54,28 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordHardDelete: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
   useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+  useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({
   useLocalSeoRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
+// A1 mounts LocalSeoVisibilityPanel inside KeywordHub (idle-deferred); it reads
+// useLocalSeo + friends from the barrel and useBackgroundTasks. Mock both so the
+// panel renders its null state instead of crashing the tree.
+vi.mock('../../../src/hooks/admin', () => ({
+  useLocalSeo: () => ({ data: undefined, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useLocalSeoRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useLocalSeoUpdate: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoLocationLookup: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useLocalSeoLocations: () => ({ data: [], isLoading: false, error: null }),
+  useSetPrimaryMarket: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
+}));
+
+vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({ findActiveJob: () => null, tasks: [] }),
 }));
 
 function renderHub() {
