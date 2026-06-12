@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, FileText, ListChecks, MessageSquare, UploadCloud, Clock, Loader2, CheckCircle2, Send, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge } from '../../ui';
+import { LoadingState, Button, ConfirmDialog, ErrorState, StatusBadge, Badge } from '../../ui';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
@@ -184,6 +184,11 @@ function WorkOrderTrackCard({
   // Count-only page summary — NEVER render raw payload.pageIds (raw Webflow ids).
   const rawPageIds = (d.payload as { pageIds?: unknown }).pageIds;
   const pageCount = Array.isArray(rawPageIds) ? rawPageIds.length : 0;
+  const commentCount = typeof d.commentCount === 'number' ? d.commentCount : null;
+  const commentCountLabel =
+    commentCount === null
+      ? null
+      : `${commentCount} comment${commentCount === 1 ? '' : 's'}`;
 
   const orderId = workOrderIdFromSourceRef(d.sourceRef);
   // Closed orders leave the lane (mirror → cancelled), so this card never renders for `closed`;
@@ -207,13 +212,23 @@ function WorkOrderTrackCard({
       className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
       style={{ borderRadius: 'var(--radius-signature-lg)' }}
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
         <span
           className={`inline-flex items-center gap-1.5 t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] border ${chip.bg} ${chip.border} ${chip.color}`}
         >
           <ChipIcon className={`w-3 h-3 ${chip.spin ? 'animate-spin' : ''}`} />
           {chip.label}
         </span>
+        {commentCountLabel && (
+          <Badge
+            tone="blue"
+            variant="soft"
+            shape="pill"
+            icon={MessageSquare}
+            label={commentCountLabel}
+            ariaLabel={`${commentCountLabel} on this work order`}
+          />
+        )}
       </div>
       {/* duplicate-heading-ok -- distinct section: the work-order TRACK-lane card title mirrors the "Ready to publish" card title intentionally (two separate sections, same card grammar) */}
       <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{d.title}</h4>

@@ -184,6 +184,7 @@ function makeWorkOrderDeliverable(overrides: Partial<ClientDeliverable> = {}): C
     title: 'Order: fix meta',
     summary: 'Metadata optimization for your top pages',
     payload: { family: 'work_order', workOrderStatus: 'in_progress', pageIds: ['pg-1', 'pg-2', 'pg-3'] },
+    commentCount: 0,
     ...overrides,
   });
 }
@@ -647,6 +648,8 @@ describe('InboxTab unified inbox', () => {
     // Count-only page summary (NOT raw payload.pageIds). The raw ids must never reach the DOM.
     expect(screen.getByText('3 pages')).toBeInTheDocument();
     expect(screen.queryByText('pg-1')).not.toBeInTheDocument();
+    // Comment-count badge is blue/read-only data and renders even when the thread is empty.
+    expect(screen.getByText('0 comments')).toBeInTheDocument();
     // The status chip (in_progress) renders. The stepper labels include "In Progress" too — so the
     // chip's "In Progress" appears multiple times; just assert it's present at least once.
     expect(screen.getAllByText('In Progress').length).toBeGreaterThanOrEqual(1);
@@ -784,6 +787,33 @@ describe('InboxTab unified inbox', () => {
       { orderId: 'wo-42', content: 'Any update?' },
       expect.anything(),
     );
+  });
+
+  it('flag ON → work-order comment-count badge handles singular and plural labels', () => {
+    mockUseFeatureFlag.mockReturnValue(false);
+    mockUseUnifiedInbox.mockReturnValue({
+      unifiedInbox: true,
+      deliverables: [
+        makeWorkOrderDeliverable({
+          id: 'cd_order_one_comment',
+          sourceRef: 'work_order:wo-one',
+          commentCount: 1,
+          title: 'Order: one-comment fix',
+        }),
+        makeWorkOrderDeliverable({
+          id: 'cd_order_two_comments',
+          sourceRef: 'work_order:wo-two',
+          commentCount: 2,
+          title: 'Order: two-comment fix',
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<InboxTab {...baseProps} />);
+
+    expect(screen.getByText('1 comment')).toBeInTheDocument();
+    expect(screen.getByText('2 comments')).toBeInTheDocument();
   });
 
   it('flag ON → a CLOSED order hides the comment input (closed-gated)', () => {

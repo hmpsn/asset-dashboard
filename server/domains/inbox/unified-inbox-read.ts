@@ -31,6 +31,7 @@
  * remain testable with seeded rows regardless of flag state.
  */
 import { listDeliverables } from '../../client-deliverables.js';
+import { countWorkOrderCommentsByOrderIds } from '../../work-order-comments.js';
 import { getSectionsForEntry, getMetadata } from '../../copy-review.js';
 import { listBlueprints } from '../../page-strategy.js';
 import { listContentRequests } from '../../content-requests.js';
@@ -84,6 +85,33 @@ function bySentDesc(a: ClientDeliverable, b: ClientDeliverable): number {
   const bk = b.sentAt ?? b.createdAt;
   if (ak !== bk) return ak < bk ? 1 : -1;
   return a.id < b.id ? 1 : -1;
+}
+
+/** Extract the work order id from a deliverable sourceRef (`work_order:<id>`), or null. */
+function workOrderIdFromSourceRef(sourceRef: string | null): string | null {
+  if (!sourceRef) return null;
+  const prefix = 'work_order:';
+  return sourceRef.startsWith(prefix) ? sourceRef.slice(prefix.length) : null;
+}
+
+function addWorkOrderCommentCounts(
+  workspaceId: string,
+  deliverables: ClientDeliverable[],
+): ClientDeliverable[] {
+  const orderIds = deliverables
+    .filter((d) => d.type === 'work_order' && d.kind === 'order')
+    .map((d) => workOrderIdFromSourceRef(d.sourceRef))
+    .filter((id): id is string => !!id);
+
+  if (orderIds.length === 0) return deliverables;
+
+  const counts = countWorkOrderCommentsByOrderIds(workspaceId, orderIds);
+  return deliverables.map((d) => {
+    if (d.type !== 'work_order' || d.kind !== 'order') return d;
+    const orderId = workOrderIdFromSourceRef(d.sourceRef);
+    if (!orderId) return d;
+    return { ...d, commentCount: counts.get(orderId) ?? 0 };
+  });
 }
 
 /**
@@ -140,7 +168,11 @@ function assembleAllDeliverables(workspaceId: string): ClientDeliverable[] {
   const projectedCopy = projectCopyEntries(workspaceId);
   const projectedRequests = projectContentRequests(workspaceId);
 
-  const all = [...physical, ...projectedCopy, ...projectedRequests];
+  const all = addWorkOrderCommentCounts(workspaceId, [
+    ...physical,
+    ...projectedCopy,
+    ...projectedRequests,
+  ]);
   all.sort(bySentDesc);
   return all;
 }

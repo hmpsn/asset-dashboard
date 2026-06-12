@@ -20,6 +20,8 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
+import { createWorkOrder } from '../../server/work-orders.js';
+import { addWorkOrderComment } from '../../server/work-order-comments.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
 // port-ok: 13878 (verified free; 13877 is taken by projected-review-respond-routes.test.ts).
@@ -83,11 +85,47 @@ describe('GET /api/public/deliverables/:workspaceId — work-order TRACK lane (R
     const retInProgress = body.deliverables.find((d) => d.id === inProgress.id)!;
     expect(retInProgress.kind).toBe('order');
     expect(retInProgress.status).toBe('in_progress');
+    expect(retInProgress.commentCount).toBe(0);
 
     // A cancelled order is a terminal internal state — NOT a track-lane item.
     expect(ids).not.toContain(cancelled.id);
     const titles = body.deliverables.map((d) => d.title);
     expect(titles).not.toContain('Order: cancelled (hidden)');
+  });
+
+  it('serializes list-side commentCount for work-order rows without per-row thread reads', async () => {
+    const stamp = Date.now().toString(36);
+    const zero = createWorkOrder(pwless.workspaceId, {
+      paymentId: `pay_zero_${stamp}`,
+      productType: 'fix_meta',
+      status: 'in_progress',
+      pageIds: ['pg-zero'],
+    });
+    const one = createWorkOrder(pwless.workspaceId, {
+      paymentId: `pay_one_${stamp}`,
+      productType: 'schema_page',
+      status: 'in_progress',
+      pageIds: ['pg-one'],
+    });
+    const plural = createWorkOrder(pwless.workspaceId, {
+      paymentId: `pay_plural_${stamp}`,
+      productType: 'fix_redirect',
+      status: 'in_progress',
+      pageIds: ['pg-plural'],
+    });
+
+    addWorkOrderComment(pwless.workspaceId, one.id, 'team', 'One update');
+    addWorkOrderComment(pwless.workspaceId, plural.id, 'team', 'First update');
+    addWorkOrderComment(pwless.workspaceId, plural.id, 'client', 'Client reply');
+
+    const res = await ctx.api(listUrl(pwless.workspaceId));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deliverables: ClientDeliverable[] };
+    const bySourceRef = new Map(body.deliverables.map((d) => [d.sourceRef, d]));
+
+    expect(bySourceRef.get(`work_order:${zero.id}`)?.commentCount).toBe(0);
+    expect(bySourceRef.get(`work_order:${one.id}`)?.commentCount).toBe(1);
+    expect(bySourceRef.get(`work_order:${plural.id}`)?.commentCount).toBe(2);
   });
 
   it('CROSS-LEAK GUARD: a NON-order row (seo_edit/batch) in in_progress/ordered is EXCLUDED', async () => {

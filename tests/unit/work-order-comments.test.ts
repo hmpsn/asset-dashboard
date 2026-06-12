@@ -6,7 +6,11 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createWorkOrder, updateWorkOrder, getWorkOrder } from '../../server/work-orders.js';
-import { addWorkOrderComment, listWorkOrderComments } from '../../server/work-order-comments.js';
+import {
+  addWorkOrderComment,
+  countWorkOrderCommentsByOrderIds,
+  listWorkOrderComments,
+} from '../../server/work-order-comments.js';
 
 let wsId = '';
 // A second workspace used only by the tenant-isolation test below.
@@ -115,6 +119,41 @@ describe('listWorkOrderComments', () => {
     addWorkOrderComment(wsId, b.id, 'team', 'for B');
     expect(listWorkOrderComments(wsId, a.id).map(c => c.content)).toEqual(['for A']);
     expect(listWorkOrderComments(wsId, b.id).map(c => c.content)).toEqual(['for B']);
+  });
+});
+
+describe('countWorkOrderCommentsByOrderIds', () => {
+  it('returns batched zero, singular, and plural counts scoped to the workspace', () => {
+    const zero = makeOrder();
+    const one = makeOrder();
+    const plural = makeOrder();
+    const otherWsOrder = createWorkOrder(wsBId, {
+      paymentId: 'pay_other_ws',
+      productType: 'fix_meta',
+      pageIds: ['/other'],
+    });
+
+    addWorkOrderComment(wsId, one.id, 'team', 'single update');
+    addWorkOrderComment(wsId, plural.id, 'team', 'first update');
+    addWorkOrderComment(wsId, plural.id, 'client', 'reply');
+    addWorkOrderComment(wsBId, otherWsOrder.id, 'team', 'other workspace update');
+
+    const counts = countWorkOrderCommentsByOrderIds(wsId, [
+      zero.id,
+      one.id,
+      plural.id,
+      plural.id,
+      otherWsOrder.id,
+    ]);
+
+    expect(counts.get(zero.id)).toBe(0);
+    expect(counts.get(one.id)).toBe(1);
+    expect(counts.get(plural.id)).toBe(2);
+    expect(counts.get(otherWsOrder.id)).toBe(0);
+  });
+
+  it('returns an empty map without hitting the DB for empty input', () => {
+    expect([...countWorkOrderCommentsByOrderIds(wsId, []).entries()]).toEqual([]);
   });
 });
 

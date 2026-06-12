@@ -113,6 +113,7 @@ const deliverableResponseSchema = z
     generatedAt: z.string().nullable(),
     source: z.string().nullable(),
     sourceRef: z.string().nullable(),
+    commentCount: z.number().int().nonnegative().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
     items: z.array(deliverableItemResponseSchema).optional(),

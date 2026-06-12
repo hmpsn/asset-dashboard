@@ -101,6 +101,8 @@ export interface ClientDeliverable {
   generatedAt: string | null;
   source: string | null;
   sourceRef: string | null;
+  /** Work-order conversation message count, serialized list-side for order rows. */
+  commentCount?: number;
   createdAt: string;
   updatedAt: string;
   items?: ClientDeliverableItem[];
