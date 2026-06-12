@@ -11,7 +11,7 @@
  * keyword/decay rec on the SAME page must be left untouched.
  *
  * Runs the real exported runSeoBulkAcceptFixesJob() in-process so the webflow
- * mock applies (createTestContext spawns a SEPARATE server process where module
+ * mock applies (createEphemeralTestContext spawns a SEPARATE server process where module
  * mocks would not take effect). updatePageSeo is mocked to succeed.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';

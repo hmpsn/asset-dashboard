@@ -14,7 +14,7 @@
  *   - Workspace isolation across all mutation + read paths
  *
  * Architecture: in-process Express server with dynamic port (listen(0)).
- * No createTestContext subprocess — vi.mock() works reliably with this pattern.
+ * No createEphemeralTestContext subprocess — vi.mock() works reliably with this pattern.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
