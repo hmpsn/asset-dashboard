@@ -787,3 +787,9 @@ When shipping UI changes that affect color or design patterns:
 - Impact lines: blue data text (Law 2) with conservative ranges + (i) methodology popover (ROI pattern)
 - Sticky cart summary: `--z-sticky`, teal accents for actions, fmtMoneyFull for all currency
 - Premium / external-billing variants render zero prices — hours-covered / included-in-service framing
+
+### Client Revenue R2 surfaces
+- AgencyWorkFeed: teal live-pulse dot (`--radius-pill`), narrative activity labels, job progress in blue
+- CompetitorGapsSection: Premium chip in teal (confirmed-access, never amber); banded chips only
+- StrategyPageRankStoriesSection: ranked chips blue (data), gap chips amber/10 pill ("worth adding" = attention semantics)
+- Cart content items: strikethrough original + discounted price for Premium (MONETIZATION §261 pattern)

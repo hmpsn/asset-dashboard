@@ -9,7 +9,7 @@ import {
   type PaymentRecord,
   type ProductType,
 } from './payments.js';
-import { getContentRequest, updateContentRequest } from './content-requests.js';
+import { getContentRequest, updateContentRequest, deleteContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
 import { getWorkspace, updateWorkspace, computeEffectiveTier } from './workspaces.js';
@@ -145,25 +145,40 @@ function validatePostPolishedUpgrade(workspaceId: string, contentRequestId: stri
 }
 
 /**
+ * Outcome of a cart content fulfillment attempt:
+ *   - 'advanced' — request moved pending_payment → requested (broadcast CONTENT_REQUEST_UPDATE)
+ *   - 'noop'     — already past pending_payment (webhook replay); nothing to do, no failure
+ *   - 'missing'  — the referenced request no longer exists; the caller MUST record a
+ *                  fulfillment failure so the paid-but-unfulfilled item is reconciled.
+ */
+type CartContentPaymentResult = 'advanced' | 'noop' | 'missing';
+
+/**
  * Fulfill a CART content item (a fresh brief OR full-post purchase). Unlike the
  * single-purchase upgrade path (`applyContentRequestPayment` with post_polished),
  * a cart content request is brand-new in `pending_payment` regardless of service
  * type — it just needs to advance to `requested`. Throws on an unexpected DB
  * error so the webhook's per-family FM-2 handler records the failure; an
  * already-advanced request (replay) is a no-op.
+ *
+ * Returns a discriminated result so the webhook loop can (a) broadcast
+ * CONTENT_REQUEST_UPDATE only when the request actually advanced, and (b) treat a
+ * MISSING request as a fulfillment failure (paid but unfulfillable) rather than a
+ * silent log.warn — the client paid, so the item must surface on reconciliation.
  */
-function applyCartContentPayment(workspaceId: string, contentRequestId: string): void {
+function applyCartContentPayment(workspaceId: string, contentRequestId: string): CartContentPaymentResult {
   const request = getContentRequest(workspaceId, contentRequestId);
   if (!request) {
     log.warn({ workspaceId, contentRequestId }, 'Cart content payment references a missing content request');
-    return;
+    return 'missing';
   }
   if (request.status !== 'pending_payment') {
     // Already advanced (webhook replay) — nothing to do.
     log.info({ workspaceId, contentRequestId, status: request.status }, 'Cart content request already past pending_payment — skipping');
-    return;
+    return 'noop';
   }
   updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+  return 'advanced';
 }
 
 function applyContentRequestPayment(workspaceId: string, productType: string, contentRequestId: string | undefined): void {
@@ -388,6 +403,13 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
   // mirroring the single-purchase flow, and stamp its id back onto the normalized
   // item so the persisted cart can fulfill it in the webhook. dedupe:false — each
   // cart line is a distinct topic the client explicitly added.
+  //
+  // These requests are created BEFORE the Stripe session. If anything downstream
+  // (line-item assembly, customer creation, or sessions.create) throws, these
+  // pending_payment rows would be stranded as client-visible "Awaiting Payment"
+  // items for a checkout that never started. Track their ids and clean them up on
+  // any failure before re-throwing (item 5 — orphaned pending_payment guard).
+  const createdContentRequestIds: string[] = [];
   for (const item of normalizedItems) {
     if (!item.content) continue;
     const c = item.content;
@@ -407,8 +429,10 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
       dedupe: false,
     });
     item.contentRequestId = request.id;
+    createdContentRequestIds.push(request.id);
   }
 
+  try {
   // Stripe line items. Fix/full-price products use their fixed Stripe Price ID.
   // Premium content lines carry an inline `price_data` override so the 10% discount
   // is applied exactly per-line (the configured Price ID is a fixed amount and
@@ -486,6 +510,21 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
   }
 
   return { sessionId: session.id, url: session.url! };
+  } catch (err) {
+    // Session creation (or any step after the content requests were created) failed.
+    // Roll back the just-created pending_payment requests so the client never sees a
+    // stranded "Awaiting Payment" row for a checkout that never started. These are
+    // brand-new requests this call created, so deletion (not status revert) is the
+    // honest cleanup — there is no prior state to revert to.
+    for (const id of createdContentRequestIds) {
+      try {
+        deleteContentRequest(params.workspaceId, id);
+      } catch (cleanupErr) {
+        log.error({ cleanupErr, workspaceId: params.workspaceId, contentRequestId: id }, 'Failed to clean up orphaned cart content request after checkout-session failure');
+      }
+    }
+    throw err;
+  }
 }
 
 async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise<string> {
@@ -725,7 +764,18 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
               // request to requested. Cart content is always a NEW request, so it
               // uses the cart-specific fulfillment (NOT the single-purchase
               // post_polished upgrade path, which expects an approved brief).
-              applyCartContentPayment(workspaceId, item.contentRequestId);
+              const result = applyCartContentPayment(workspaceId, item.contentRequestId);
+              if (result === 'advanced') {
+                // Data Flow Rule 1: a status-changing mutation must broadcast so the
+                // client portal's content list / inbox refresh (mirrors the single-
+                // purchase path's CONTENT_REQUEST_UPDATE at applyContentRequestPayment).
+                _broadcastFn?.(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: item.contentRequestId, status: 'requested' });
+              } else if (result === 'missing') {
+                // Paid but the request vanished — record as a fulfillment failure so
+                // the paid-but-unfulfilled reconciliation activity fires (not a silent
+                // log.warn). The client's money cleared; this item must be reconciled.
+                fulfillmentFailures.push(item.contentRequestId);
+              }
             }
           } catch (err) {
             log.error({ err, workspaceId, productType: item.productType, contentRequestId: item.contentRequestId }, 'Failed to fulfill cart item');

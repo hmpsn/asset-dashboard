@@ -127,7 +127,7 @@ export function CompetitorGapsSection({ workspaceId, tier }: CompetitorGapsSecti
         </span>
       }
       action={
-        <span className="inline-flex items-center gap-1 t-caption-sm text-amber-400">
+        <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand">
           <Lock className="w-3 h-3" /> Premium
         </span>
       }

@@ -7,6 +7,12 @@
  * Both are React Query queries; cache invalidation wires through the central
  * ClientDashboard useWorkspaceEvents handler (JOB_CREATED / JOB_UPDATED for jobs,
  * ACTIVITY_NEW for activity — both halves of the broadcast contract are in place).
+ *
+ * NOTE: the work feed uses its OWN query key (queryKeys.client.workFeedActivity),
+ * distinct from useClientActivity's queryKeys.client.activity. The two hooks fetch
+ * different shapes from different endpoints; sharing a key would corrupt the cache
+ * (last-resolver-wins). The central invalidation mapping (wsInvalidation.ts) refreshes
+ * BOTH keys on every activity-bearing event so they never drift.
  */
 import { useQuery } from '@tanstack/react-query';
 import { fetchClientActivityFeed, fetchClientJobs } from '../../api/analytics.js';
@@ -20,7 +26,7 @@ import { queryKeys } from '../../lib/queryKeys.js';
  */
 export function useClientActivityFeed(workspaceId: string, limit = 30) {
   return useQuery<ClientActivityEntry[]>({
-    queryKey: queryKeys.client.activity(workspaceId),
+    queryKey: queryKeys.client.workFeedActivity(workspaceId),
     queryFn: () => fetchClientActivityFeed(workspaceId, limit, 0),
     staleTime: 30 * 1000,
     enabled: !!workspaceId,

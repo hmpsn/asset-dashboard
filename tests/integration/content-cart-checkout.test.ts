@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupStripeMocks,
   mockCheckoutSession,
+  mockCheckoutSessionError,
   mockCustomerCreate,
   mockCustomerRetrieve,
   resetStripeMocks,
@@ -25,6 +26,7 @@ import {
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { PREMIUM_CONTENT_DISCOUNT } from '../../shared/pricing.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 
 setupStripeMocks();
 
@@ -39,7 +41,7 @@ vi.mock('../../server/stripe-config.js', () => ({
   clearStripeConfig: vi.fn(),
 }));
 
-import { createCartCheckoutSession, handleWebhookEvent } from '../../server/stripe.js';
+import { createCartCheckoutSession, handleWebhookEvent, initStripeBroadcast } from '../../server/stripe.js';
 import { listPayments } from '../../server/payments.js';
 import { listWorkOrders } from '../../server/work-orders.js';
 import { listContentRequests } from '../../server/content-requests.js';
@@ -105,33 +107,49 @@ describe('Content-in-cart checkout — mixed baskets', () => {
     expect(reqs[0].serviceType).toBe('brief_only');
   });
 
-  it('webhook fulfills both families: one work order AND one content request advances', async () => {
-    await createCartCheckoutSession({
-      workspaceId: ws.workspaceId,
-      items: [
-        { productType: 'fix_meta', quantity: 2, pageIds: ['/a', '/b'], issueChecks: ['title'] },
-        { productType: 'brief_blog', quantity: 1, content: briefContext('Spring sale guide') },
-      ],
-      successUrl: 'https://x/s',
-      cancelUrl: 'https://x/c',
-    });
+  it('webhook fulfills both families: one work order AND one content request advances, and broadcasts CONTENT_REQUEST_UPDATE', async () => {
+    // Data Flow Rule 1: capture broadcasts so we can assert the cart content
+    // fulfillment emits CONTENT_REQUEST_UPDATE per advanced item (mirrors the
+    // single-purchase path). Register a spy and restore the prod fn afterward.
+    const broadcasts: Array<{ event: string; data: unknown }> = [];
+    initStripeBroadcast((_wsId, event, data) => { broadcasts.push({ event, data }); });
 
-    const event = createWebhookEvent('checkout.session.completed', {
-      id: 'cs_mixed_001',
-      metadata: { workspaceId: ws.workspaceId, cartItemCount: '2', productTypes: 'fix_meta,brief_blog' },
-      amount_total: 16500,
-      payment_intent: 'pi_mixed_001',
-    });
-    await handleWebhookEvent(event as never);
+    try {
+      await createCartCheckoutSession({
+        workspaceId: ws.workspaceId,
+        items: [
+          { productType: 'fix_meta', quantity: 2, pageIds: ['/a', '/b'], issueChecks: ['title'] },
+          { productType: 'brief_blog', quantity: 1, content: briefContext('Spring sale guide') },
+        ],
+        successUrl: 'https://x/s',
+        cancelUrl: 'https://x/c',
+      });
 
-    // Fix → exactly one metadata work order.
-    const orders = listWorkOrders(ws.workspaceId);
-    expect(orders.filter(o => o.productType === 'fix_meta').length).toBe(1);
+      const event = createWebhookEvent('checkout.session.completed', {
+        id: 'cs_mixed_001',
+        metadata: { workspaceId: ws.workspaceId, cartItemCount: '2', productTypes: 'fix_meta,brief_blog' },
+        amount_total: 16500,
+        payment_intent: 'pi_mixed_001',
+      });
+      await handleWebhookEvent(event as never);
 
-    // Content → request advanced out of pending_payment.
-    const reqs = listContentRequests(ws.workspaceId);
-    expect(reqs.length).toBe(1);
-    expect(reqs[0].status).toBe('requested');
+      // Fix → exactly one metadata work order.
+      const orders = listWorkOrders(ws.workspaceId);
+      expect(orders.filter(o => o.productType === 'fix_meta').length).toBe(1);
+
+      // Content → request advanced out of pending_payment.
+      const reqs = listContentRequests(ws.workspaceId);
+      expect(reqs.length).toBe(1);
+      expect(reqs[0].status).toBe('requested');
+
+      // Broadcast emitted for the advanced content request.
+      const contentBroadcasts = broadcasts.filter(b => b.event === WS_EVENTS.CONTENT_REQUEST_UPDATE);
+      expect(contentBroadcasts.length).toBe(1);
+      expect(contentBroadcasts[0].data).toMatchObject({ id: reqs[0].id, status: 'requested' });
+    } finally {
+      // Restore a no-op broadcaster so the spy doesn't bleed into other tests.
+      initStripeBroadcast(() => {});
+    }
   });
 
   it('content-only cart creates no work orders', async () => {
@@ -240,6 +258,89 @@ describe('Content-in-cart checkout — Premium discount math', () => {
     // post_polished is $500; 10% off → $450 = 45000 cents.
     const payment = listPayments(ws.workspaceId).find(p => p.productType === 'post_polished');
     expect(payment?.amount).toBe(Math.round(500 * 100 * (1 - PREMIUM_CONTENT_DISCOUNT)));
+  });
+});
+
+describe('Content-in-cart checkout — orphaned pending_payment guard (FM-2)', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeEach(() => {
+    resetStripeMocks();
+    mockCustomerCreate();
+    mockCustomerRetrieve();
+    ws = seedWorkspace({ tier: 'growth' });
+  });
+
+  afterEach(() => cleanup(ws));
+
+  it('cleans up just-created pending_payment requests when stripe.sessions.create fails (no stranded rows)', async () => {
+    // Force the session creation to reject AFTER the content requests are created.
+    mockCheckoutSessionError('stripe down');
+
+    await expect(
+      createCartCheckoutSession({
+        workspaceId: ws.workspaceId,
+        items: [
+          { productType: 'brief_blog', quantity: 1, content: briefContext('Stranded brief one') },
+          { productType: 'post_polished', quantity: 1, content: { ...briefContext('Stranded brief two'), serviceType: 'full_post' } },
+        ],
+        successUrl: 'https://x/s',
+        cancelUrl: 'https://x/c',
+      }),
+    ).rejects.toThrow('stripe down');
+
+    // No content requests should remain — the failed checkout must not leave the
+    // client looking at "Awaiting Payment" rows for a checkout that never started.
+    const reqs = listContentRequests(ws.workspaceId);
+    expect(reqs.length).toBe(0);
+
+    // Belt-and-suspenders: no pending_payment rows in the table either.
+    const stranded = db.prepare(
+      "SELECT COUNT(*) as n FROM content_topic_requests WHERE workspace_id = ? AND status = 'pending_payment'",
+    ).get(ws.workspaceId) as { n: number };
+    expect(stranded.n).toBe(0);
+  });
+});
+
+describe('Content-in-cart checkout — paid-but-missing reconciliation (FM-2)', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeEach(() => {
+    resetStripeMocks();
+    mockCustomerCreate();
+    mockCustomerRetrieve();
+    mockCheckoutSession({ id: 'cs_missing_001', url: 'https://checkout.stripe.com/missing' });
+    ws = seedWorkspace({ tier: 'growth' });
+  });
+
+  afterEach(() => cleanup(ws));
+
+  it('records a fulfillment failure when a paid cart content request has vanished before the webhook', async () => {
+    await createCartCheckoutSession({
+      workspaceId: ws.workspaceId,
+      items: [{ productType: 'brief_blog', quantity: 1, content: briefContext('Vanishing brief') }],
+      successUrl: 'https://x/s',
+      cancelUrl: 'https://x/c',
+    });
+
+    // Simulate the request disappearing between checkout and webhook (e.g. deleted
+    // out-of-band). The webhook must treat this as a paid-but-unfulfilled failure,
+    // not a silent log.warn.
+    db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(ws.workspaceId);
+
+    const event = createWebhookEvent('checkout.session.completed', {
+      id: 'cs_missing_001',
+      metadata: { workspaceId: ws.workspaceId, cartItemCount: '1', productTypes: 'brief_blog' },
+      amount_total: 12500,
+      payment_intent: 'pi_missing_001',
+    });
+    await handleWebhookEvent(event as never);
+
+    // A reconciliation activity must fire for the paid-but-missing item.
+    const failures = db.prepare(
+      "SELECT COUNT(*) as n FROM activity_log WHERE workspace_id = ? AND type = 'payment_failed'",
+    ).get(ws.workspaceId) as { n: number };
+    expect(failures.n).toBeGreaterThanOrEqual(1);
   });
 });
 

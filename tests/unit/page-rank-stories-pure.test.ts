@@ -95,6 +95,40 @@ describe('buildPageRankStories — pairing', () => {
     const stories = buildPageRankStories([p], [g]);
     expect(stories).toHaveLength(0);
   });
+
+  it('does NOT pair on a single shared GENERIC token (false-positive guard)', () => {
+    // "best dentist near me" and "best coffee shop" share only "best" (generic).
+    // A single generic overlap must not create a spurious pairing.
+    const p = page({ pagePath: '/dentist', pageTitle: 'Dentist', primaryKeyword: 'best dentist near me', currentPosition: 6 });
+    const g = gap('best coffee shop', 4000);
+    const stories = buildPageRankStories([p], [g]);
+    expect(stories).toHaveLength(0);
+  });
+
+  it('does NOT pair on a single shared generic "guide" token', () => {
+    const p = page({ pagePath: '/plumbing', pageTitle: 'Plumbing', primaryKeyword: 'plumbing repair guide', currentPosition: 7 });
+    const g = gap('mortgage rates guide', 5000);
+    // Only "guide" overlaps — generic, single token → no pairing.
+    const stories = buildPageRankStories([p], [g]);
+    expect(stories).toHaveLength(0);
+  });
+
+  it('DOES pair on a single NON-generic anchor token (e.g. "invisalign")', () => {
+    // Shares only "invisalign" — a real topical anchor, not generic → valid pair.
+    const p = page({ pagePath: '/invisalign', pageTitle: 'Invisalign', primaryKeyword: 'invisalign treatment', currentPosition: 5 });
+    const g = gap('invisalign cost', 2200);
+    const stories = buildPageRankStories([p], [g]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].gapKeywords.some(gk => gk.keyword === 'invisalign cost')).toBe(true);
+  });
+
+  it('DOES pair when ≥2 tokens overlap even without a unique anchor', () => {
+    // "seo audit" ↔ "seo audit report" shares seo + audit = 2 tokens → valid.
+    const p = page({ pagePath: '/seo', pageTitle: 'SEO', primaryKeyword: 'seo audit', currentPosition: 8 });
+    const g = gap('seo audit report', 1500);
+    const stories = buildPageRankStories([p], [g]);
+    expect(stories).toHaveLength(1);
+  });
 });
 
 // ── Banded/labeled output — no raw integers ───────────────────────────────────

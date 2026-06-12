@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **501 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **502 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 502. Client Revenue R2 — Competitor Gaps, Agency-at-Work Feed, Striking Distance, Page Stories, Content in the Cart
+
+**What it does:** Five client-value features in one wave. (1) Premium competitor keyword gaps on Performance→Search — client-safe banded projection (opportunityBand/demandLabel; raw volume/difficulty/EMV stripped + leak-tested), server-enforced 402 below Premium with a soft-gate upsell. (2) "Agency at work" feed on Overview (dark behind `client-work-feed`): narrative-framed client-visible activity + running jobs with human labels. (3) A striking-distance segment in the Keyword Hub — positions 11–20, value-ranked, count and rows sharing one predicate. (4) "You rank for X, missing Y" per-page story cards on the client Strategy tab with stopword-guarded pairing and banded labels only. (5) Briefs/posts join the cart: distinct content items beside R1's merging fix items, a Premium 10% content discount as a single config constant (tier rediscussion can re-map), dual-family webhook fulfillment (work orders + content requests) with per-family failure isolation and orphan cleanup on checkout failure.
+
+**Agency value:** The upsell ladder gets its Premium anchor (competitor gaps), retention gets visible work, and mixed baskets raise order value.
+
+**Client value:** Honest, narrative, price-transparent surfaces — and the easy-wins lists agencies are loved for.
+
+**Mutual:** Round 2 of converting platform capability into perceived and billed value.
+
+**Files:** see PR; highlights: `server/competitor-gaps-projection.ts`, `src/components/client/AgencyWorkFeed.tsx`, `server/page-rank-stories.ts`, `shared/pricing.ts`, the striking_distance KCC filter, `useCart` content items.
 
 ---
 

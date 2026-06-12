@@ -13,6 +13,42 @@ const PAGE_RANK_STORY_MAX_RANKED = 3;    // ranked keyword chips per page
 const PAGE_RANK_STORY_MAX_GAP = 3;       // gap keyword chips per page
 const PAGE_RANK_STORY_MAX_PAGES = 10;    // total pages in the story list
 
+/**
+ * Generic / non-anchor tokens that carry no topical signal on their own. A single
+ * shared generic token ("best dentist near me" ↔ "best coffee shop") must NOT pair
+ * two unrelated keywords. Tokens here are EXCLUDED from being treated as a single
+ * non-generic anchor, but still count toward the ≥2-overlap fallback (two shared
+ * generics is at least a weak signal of related modifiers). Lowercase, post-
+ * normalization. Includes recent year tokens since "2024 guide" ↔ "2024 pricing"
+ * are not topically related.
+ */
+const GENERIC_TOKENS = new Set<string>([
+  'best', 'top', 'near', 'how', 'cost', 'price', 'prices', 'pricing', 'service',
+  'services', 'online', 'guide', 'your', 'with', 'what', 'free', 'the', 'and',
+  'for', 'tips', 'review', 'reviews', 'cheap', 'affordable', 'company', 'companies',
+  '2024', '2025', '2026',
+]);
+
+/**
+ * A gap keyword is "relevant" to a page when it shares meaningful topical tokens.
+ * Single shared generic token is NOT enough (it would pair unrelated keywords).
+ * Require EITHER:
+ *   - ≥1 shared NON-generic anchor token (e.g. "invisalign", "dentist"), OR
+ *   - ≥2 shared tokens total (two overlaps, even if both generic, is a weak but
+ *     real modifier signal).
+ */
+function tokensAreRelevant(gapTokens: Set<string>, pageTokens: Set<string>): boolean {
+  let sharedCount = 0;
+  let hasAnchor = false;
+  for (const token of gapTokens) {
+    if (pageTokens.has(token)) {
+      sharedCount += 1;
+      if (!GENERIC_TOKENS.has(token)) hasAnchor = true;
+    }
+  }
+  return hasAnchor || sharedCount >= 2;
+}
+
 /** Friendly position band — banded label, never raw integer. */
 function friendlyPositionBand(pos: number): string {
   if (pos <= 3) return 'Top 3';
@@ -38,9 +74,11 @@ export interface PageRankStoryItem {
  * Pairing logic:
  *   - A page's "ranked keywords" = primaryKeyword (when currentPosition is set)
  *     + secondaryKeywords that appear in gscKeywords with a position.
- *   - A gap keyword is "relevant" to a page when ≥1 token from the normalized
- *     gap keyword overlaps with normalized tokens of the page's primary or
- *     secondary keywords (stopword-filtered single-char tokens excluded).
+ *   - A gap keyword is "relevant" to a page when its normalized tokens overlap
+ *     with the page's primary/secondary keyword tokens via tokensAreRelevant:
+ *     either ≥1 shared NON-generic anchor token OR ≥2 shared tokens total. A
+ *     single shared generic token ("best", "near", "guide") is NOT enough — it
+ *     would pair "best dentist near me" with "best coffee shop".
  *   - Only pages with ≥1 ranked keyword AND ≥1 gap keyword appear in the list.
  *   - Cap: top PAGE_RANK_STORY_MAX_PAGES pages by ranked keyword count (descending).
  */
@@ -95,13 +133,10 @@ export function buildPageRankStories(
       }
     }
 
-    // Find relevant gap keywords by token overlap.
-    const relevantGaps = normalizedGaps.filter(g => {
-      for (const token of g.tokens) {
-        if (pageTokens.has(token)) return true;
-      }
-      return false;
-    });
+    // Find relevant gap keywords by token overlap. A single shared generic token
+    // ("best", "near", "guide", …) is NOT enough — require a non-generic anchor
+    // token OR ≥2 shared tokens (see tokensAreRelevant).
+    const relevantGaps = normalizedGaps.filter(g => tokensAreRelevant(g.tokens, pageTokens));
 
     if (relevantGaps.length === 0) continue;
 

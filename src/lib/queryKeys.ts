@@ -218,6 +218,15 @@ export const queryKeys = {
 
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
+    /**
+     * R2-B agency "work feed" activity. DISTINCT from `activity` above: the work
+     * feed query (`useClientActivityFeed`) fetches a different shape
+     * (`ClientActivityEntry[]` via `fetchClientActivityFeed`) than `useClientActivity`
+     * (`ActivityLogItem[]` via `/api/public/activity`). Sharing one key would cause
+     * last-resolver-wins cache corruption when both hooks mount. Both keys are
+     * invalidated together on ACTIVITY_NEW (see wsInvalidation.ts).
+     */
+    workFeedActivity: (wsId: string) => ['client-work-feed-activity', wsId] as const,
     rankHistory: (wsId: string) => ['client-rank-history', wsId] as const,
     // A4 (audit #15): 180-day rank series for client-requested keywords (Strategy tab trend card).
     requestedKeywordTrend: (wsId: string, keywords: string[]) =>

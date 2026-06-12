@@ -1797,15 +1797,25 @@ export async function buildKeywordCommandCenterSummary(
   }
   const rankEvidenceTotal = rankEvidence.total;
 
-  // Striking-distance count: distinct keyword keys from latest ranks with
-  // position 11–20 inclusive (page 2). Uses a Set to deduplicate variants.
-  // Position comes from the rank snapshot (the authoritative GSC rank signal);
-  // trackedKeyword.baselinePosition is intentionally excluded here because the
-  // summary uses a key-set approach without full row assembly.
+  // Striking-distance count: distinct keyword keys with position 11–20 inclusive
+  // (page 2). Uses a Set to deduplicate variants. The source set MUST mirror
+  // sourceKeysForRows(STRIKING_DISTANCE) and the isStrikingDistanceRow row filter,
+  // which read the MERGED currentPosition (rank snapshot OR tracked baselinePosition).
+  // Excluding baselinePosition here under-counted the pill vs the rendered rows: a
+  // tracked keyword with baselinePosition 11–20 and NO rank snapshot would appear in
+  // the rows but be invisible to the facet count (rate-display rule — the pill count
+  // must equal the rendered rows).
   const strikingDistanceKeys = new Set<string>();
   for (const rank of latestRanks) {
     if (rank.position >= 11 && rank.position <= 20) {
       const key = keywordComparisonKey(rank.query);
+      if (key) strikingDistanceKeys.add(key);
+    }
+  }
+  for (const tracked of trackedKeywords) {
+    const pos = tracked.baselinePosition;
+    if (pos != null && pos >= 11 && pos <= 20) {
+      const key = keywordComparisonKey(tracked.query);
       if (key) strikingDistanceKeys.add(key);
     }
   }
