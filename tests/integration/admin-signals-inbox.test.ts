@@ -7,11 +7,11 @@
  * - Workspace isolation on the list endpoint
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientSignal } from '../../server/client-signals-store.js';
 
-const ctx = createTestContext(13299);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
 
 let testWsId = '';

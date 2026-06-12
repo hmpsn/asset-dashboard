@@ -42,6 +42,13 @@ const contentBriefRouteSrc = fs.readFileSync(
   path.join(routesDir, 'content-briefs.ts'),
   'utf-8',
 );
+// W6.2: brief generation/regeneration moved off the route and onto the background
+// job platform. The route dispatches startContentBriefGenerationJob; the job module
+// is where generateBrief (the brand-filter-aware path) is actually imported & called.
+const contentBriefGenerationJobSrc = fs.readFileSync(
+  path.join(serverDir, 'content-brief-generation-job.ts'),
+  'utf-8',
+);
 const contentDecaySrc = fs.readFileSync(
   path.join(routesDir, 'content-decay.ts'),
   'utf-8',
@@ -209,9 +216,16 @@ describe('content brief generation pipeline — static source check', () => {
     expect(contentBriefSrc).toContain('export async function generateBrief');
   });
 
-  it('content-briefs route imports generateBrief from content-brief', () => {
-    expect(contentBriefRouteSrc).toContain('generateBrief');
-    expect(contentBriefRouteSrc).toContain('content-brief');
+  it('content-briefs route dispatches the generation job, which imports generateBrief from content-brief', () => {
+    // W6.2: the route no longer imports generateBrief directly — heavyweight AI
+    // generation moved onto the background job platform. The wiring chain that
+    // prevents a brand-filter bypass is now:
+    //   route → startContentBriefGenerationJob → job imports generateBrief.
+    // Pin every link so removing any one of them fails this check.
+    expect(contentBriefRouteSrc).toContain('startContentBriefGenerationJob');
+    expect(contentBriefRouteSrc).toContain('content-brief-generation-job');
+    expect(contentBriefGenerationJobSrc).toContain('generateBrief');
+    expect(contentBriefGenerationJobSrc).toContain('content-brief');
   });
 
   it('content-briefs route reads workspace to provide context including competitor domains', () => {

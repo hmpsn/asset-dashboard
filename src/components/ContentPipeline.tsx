@@ -131,7 +131,9 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   // Increments prefillNonce so the ContentBriefs key changes on every call,
   // forcing a remount even if the Briefs tab is already active (the fixConsumed
   // ref in ContentBriefs is per-mount, so a remount re-consumes the new context).
-  const handleCreateBrief = (keyword: string, pageUrl?: string) => {
+  // suggestedBriefId is accepted for interface compatibility (AiSuggested marks it
+  // accepted in the store before calling this); no additional action needed here.
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
     setPipelinePrefill(buildSignalPrefill(keyword, pageUrl));
     setPrefillNonce(n => n + 1);
     setActiveTab('briefs');

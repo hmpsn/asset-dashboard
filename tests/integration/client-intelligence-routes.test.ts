@@ -6,10 +6,10 @@
  *   - GET /api/public/intelligence/:workspaceId fresh workspace → 200 with expected shape
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13530, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let wsId = '';

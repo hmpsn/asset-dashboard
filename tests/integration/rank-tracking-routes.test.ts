@@ -12,11 +12,11 @@
  * - GET /api/public/rank-tracking/:workspaceId/latest (public)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 
-const ctx = createTestContext(13213, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';

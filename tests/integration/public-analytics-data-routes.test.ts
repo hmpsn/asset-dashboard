@@ -16,15 +16,14 @@
  * not available in CI. The 400 "not configured" guard is the correct observable behavior
  * in this test environment and is itself a meaningful correctness assertion.
  *
- * Port: 13368 (confirmed free)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13368, { autoPublicAuth: true }); // port-ok: confirmed free, above 13356 (current max)
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 // ── Workspace fixtures ──────────────────────────────────────────────────────

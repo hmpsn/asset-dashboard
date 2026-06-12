@@ -20,6 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { waitForServer, stopChildProcess } from './helpers.js';
+import { releaseIntegrationTestPort, reserveIntegrationTestPort } from '../helpers/ports.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createPayment } from '../../server/payments.js';
 import { createSuggestedBrief } from '../../server/suggested-briefs-store.js';
@@ -34,7 +35,8 @@ const ROOT = path.resolve(__dirname, '../..');
 //  a) The ai-stats authenticated tests can derive a matching HMAC admin token.
 //  b) All other routes work normally (SESSION_SECRET doesn't affect them).
 
-const PORT = 13385;
+const PORT_ID = `${fileURLToPath(import.meta.url)}#main`;
+const PORT = reserveIntegrationTestPort(PORT_ID);
 const BASE = `http://localhost:${PORT}`;
 const SESSION_SECRET = 'test-uncovered-admin-routes-wave14';
 
@@ -155,6 +157,7 @@ afterAll(async () => {
   wsCleanup?.();
   await stopChildProcess(proc);
   proc = null;
+  releaseIntegrationTestPort(PORT_ID);
 });
 
 // ── AI Stats (/api/ai-stats/*) ────────────────────────────────────────────────

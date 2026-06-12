@@ -19,12 +19,12 @@
  * Those endpoints are covered by the 400 "not configured" guard tests below.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 import { cleanSeedData } from '../global-setup.js';
 
-const ctx = createTestContext(13309, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 // Workspace A — receives seeded analytics insights

@@ -1520,6 +1520,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
         address: { street: '123 Main', city: 'Austin', region: 'TX', country: 'US', postalCode: '78701' },
         serviceAreas: ['Austin', 'Round Rock'],
       },
+      // W6.1: buildWorkspaceServiceTermRegex is workspace-derived. Provide siteKeywords
+      // containing the service vocabulary so 'plumbing' is in the service term regex
+      // and the page keywords classify as local candidates.
+      keywordStrategy: {
+        siteKeywords: ['plumbing service', 'drain cleaning'],
+        siteKeywordMetrics: [],
+        opportunities: [],
+      },
     } as never);
     updateLocalSeoConfiguration(workspaceId, {
       posture: LOCAL_SEO_POSTURE.LOCAL,
@@ -1627,6 +1635,14 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       liveDomain: 'https://regression-plumbing.example.com',
       businessProfile: {
         address: { street: '1 Main St', city: 'Austin', state: 'TX', country: 'US' },
+      },
+      // W6.1: buildWorkspaceServiceTermRegex is workspace-derived. Provide siteKeywords
+      // so 'pipe' and 'repair' tokens go into the service term regex, making
+      // 'pipe repair' classify as a service keyword and generate local_variant candidates.
+      keywordStrategy: {
+        siteKeywords: ['pipe repair', 'plumbing'],
+        siteKeywordMetrics: [],
+        opportunities: [],
       },
     });
     updateLocalSeoConfiguration(workspaceId, {

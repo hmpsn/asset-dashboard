@@ -268,6 +268,13 @@ export interface GeneratedPost {
   webflowCollectionId?: string;
   publishedAt?: string;
   publishedSlug?: string;
+  /**
+   * W6.6: admin-set planned/scheduled publish date (ISO string) for the
+   * forward-planning Content Calendar. Distinct from publishedAt (the actual
+   * publish outcome): this is the *intent*. Unscheduled drafts have it absent.
+   * Admin-internal — NOT serialized on public post responses.
+   */
+  plannedPublishAt?: string;
   // Brand voice scoring (v2)
   voiceScore?: number;
   voiceFeedback?: string;

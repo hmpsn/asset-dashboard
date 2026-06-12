@@ -4,9 +4,9 @@ import { createMatrix } from '../../server/content-matrices.js';
 import { createTemplate, deleteTemplate } from '../../server/content-templates.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13721);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace | null = null;

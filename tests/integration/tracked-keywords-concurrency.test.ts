@@ -28,12 +28,11 @@
  * T1c — reconcile merge-preservation: a manually-added keyword survives a strategy
  *        reconcile (NOT a race test — a behavioral preservation assertion).
  *
- * Port: 13886 (allocated for this file; matches the pre-plan audit spec)
  */
 import path from 'path';
 import BetterSqlite3, { type Database as BetterSqlite3Database } from 'better-sqlite3';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -61,8 +60,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 });
 
 // ─── Test context ─────────────────────────────────────────────────────────────
-const PORT = 13886;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let workspaceId: string;
 let cleanup: () => void;

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13762);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsId = '';

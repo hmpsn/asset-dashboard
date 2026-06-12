@@ -23,6 +23,8 @@ import { startLegacyJob } from '../legacy-jobs-runner-registry.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
+import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
+import { startAiReviewJob, startAiFixJob, startVoiceScoreJob, aiFixRequestSchema } from '../content-posts-ai-jobs.js';
 import type { StandaloneContentBriefGenerationParams } from '../content-brief-generation-job.js';
 import { getContentRequest } from '../content-requests.js';
 import { getBlueprint, getEntry } from '../page-strategy.js';
@@ -30,6 +32,8 @@ import {
   createContentPostGenerationJob,
   runContentPostGenerationJob,
 } from '../content-posts.js';
+import { getPost } from '../content-posts-db.js';
+import type { AiFixRequest } from '../../shared/types/content.js';
 import {
   createCopyBatchGenerationJob,
   runCopyBatchGenerationJob,
@@ -611,6 +615,65 @@ router.post('/api/jobs', async (req, res) => {
         setImmediate(() => {
           void runAeoSiteReviewJob({ jobId: aeoJob.id, workspaceId: wsId, maxPages });
         });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
+        const mode = params.mode === 'outline' ? 'outline' : 'regenerate';
+        const feedback = typeof params.feedback === 'string' ? params.feedback : undefined;
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!briefId) return res.status(400).json({ error: 'briefId required' });
+        if (mode === 'regenerate' && !feedback) return res.status(400).json({ error: 'feedback required' });
+        if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
+        if (!getBrief(wsId, briefId)) return res.status(404).json({ error: 'Brief not found' });
+        const activeRegen = hasActiveBriefRegenerateJob(wsId);
+        if (activeRegen) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeRegen.id });
+        const started = mode === 'outline'
+          ? startContentBriefRegenerateJob({ mode: 'outline', workspaceId: wsId, briefId, feedback })
+          : startContentBriefRegenerateJob({ mode: 'regenerate', workspaceId: wsId, briefId, feedback: feedback as string });
+        res.status(202).json(started);
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
+        const activeReview = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, wsId);
+        if (activeReview) return res.status(409).json({ error: 'An AI review is already running for this workspace', jobId: activeReview.id });
+        res.status(202).json(startAiReviewJob({ workspaceId: wsId, postId }));
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_FIX: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
+        const fixParsed = aiFixRequestSchema.safeParse(params.body);
+        if (!fixParsed.success) return res.status(400).json({ error: 'Invalid ai-fix body' });
+        const activeFix = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, wsId);
+        if (activeFix) return res.status(409).json({ error: 'An AI fix is already running for this workspace', jobId: activeFix.id });
+        res.status(202).json(startAiFixJob({ workspaceId: wsId, postId, body: fixParsed.data as AiFixRequest }));
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!postId) return res.status(400).json({ error: 'postId required' });
+        const vsPost = getPost(wsId, postId);
+        if (!vsPost) return res.status(404).json({ error: 'Post not found' });
+        if (!getBrief(wsId, vsPost.briefId)) return res.status(404).json({ error: 'Brief not found' });
+        const activeVoice = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, wsId);
+        if (activeVoice) return res.status(409).json({ error: 'Voice scoring is already running for this workspace', jobId: activeVoice.id });
+        res.status(202).json(startVoiceScoreJob({ workspaceId: wsId, postId }));
         break;
       }
 

@@ -11,14 +11,14 @@
  *   - Illegal close (in_progress → closed) is rejected 400.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createWorkOrder, getWorkOrder, updateWorkOrder } from '../../server/work-orders.js';
 import { listWorkOrderComments } from '../../server/work-order-comments.js';
 import { listActivity } from '../../server/activity-log.js';
 import type { WorkOrder } from '../../shared/types/payments.js';
 
-const ctx = createTestContext(13409, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 // pwless: the URL is the credential, so requireClientPortalAuth() passes and we can hit public routes.
 let pwless: SeededFullWorkspace;

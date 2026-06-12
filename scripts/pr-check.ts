@@ -3928,68 +3928,67 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // P1 expansion rule: port collision in integration tests.
+    // P1 expansion rule: fixed test server ports are forbidden.
     //
-    // Literal integration test ports are still allowed via
-    // `createTestContext(NNNN)`, but they must remain unique. The new
-    // lock-backed `createEphemeralTestContext(import.meta.url)` helper is the
-    // preferred migration path when a file no longer wants to own a literal.
-    // This rule only validates the literal path: if two files share a port,
-    // the second test to bind gets EADDRINUSE and the CI run is flaky. It
-    // also flags ports outside the documented range (13201–13899 per
-    // CLAUDE.md) as a separate warning.
-    name: 'Port collision in integration tests',
+    // Normal tests must use the lock-backed
+    // `createEphemeralTestContext(import.meta.url)` helper or raw
+    // `server.listen(0, '127.0.0.1')` for in-process servers. Fixed literal
+    // ports collide when multiple local agents or CI shards run the suite at
+    // the same time, even if the committed port numbers are unique.
+    name: 'Fixed test ports are forbidden',
     pattern: '',
-    fileGlobs: ['*.test.ts'],
+    fileGlobs: ['*.test.ts', '*.test.tsx'],
     pathFilter: 'tests/',
-    excludeLines: ['// port-ok'],
     message:
-      'Two or more test files use the same literal port in createTestContext(). ' +
-      'Each literal integration test port must be unique to avoid EADDRINUSE in parallel CI runs. ' +
-      'Pick an unused port in the 13201–13899 range (grep existing ports first), or migrate the file to createEphemeralTestContext(import.meta.url). ' +
-      'Suppress with // port-ok if this is intentionally shared.',
+      'Tests must not bind fixed server ports. Use createEphemeralTestContext(import.meta.url) ' +
+      'for child-process integration tests, or server.listen(0, "127.0.0.1") and derive baseUrl ' +
+      'from server.address().port for in-process servers.',
     severity: 'error',
     rationale:
-      'Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, ' +
-      'producing intermittent failures that are hard to diagnose.',
+      'Fixed test ports cause flaky local and CI runs when multiple agents or workers run the test suite concurrently.',
     claudeMdRef: '#testing-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Collect all port → [{ file, line }] mappings
-      const portMap = new Map<number, { file: string; line: number; text: string }[]>();
-      const portRe = /\bcreateTestContext\(\s*(\d+)\s*\)/;
-      for (const file of files) {
-        if (!file.endsWith('.test.ts')) continue;
+      const scannedFiles = new Set(files);
+      for (const glob of ['*.test.ts', '*.test.tsx']) {
+        for (const serverTestFile of getFiles(path.join(ROOT, 'server/__tests__'), glob)) {
+          scannedFiles.add(serverTestFile);
+        }
+      }
+      for (const file of scannedFiles) {
+        if (!file.endsWith('.test.ts') && !file.endsWith('.test.tsx')) continue;
+        if (!file.includes('/tests/') && !file.includes('/server/__tests__/')) continue;
         // Skip the pr-check test harness — its fixture strings contain
-        // createTestContext() literals that aren't real port allocations.
+        // createTestContext() literals that aren't real allocations.
         if (file.endsWith('pr-check.test.ts')) continue;
+        // Skip the meta-port-uniqueness test — its error message strings contain
+        // createTestContext(port) as human-readable diagnostic text, not real allocations.
+        if (file.endsWith('meta-port-uniqueness.test.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
+        const fixedPortConsts = new Set<string>();
+        for (const line of lines) {
+          const code = line.replace(/\/\/.*$/, '');
+          const constMatch = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:13[0-9]{3}|[1-9][0-9]{3,})\b/.exec(code);
+          if (constMatch && /PORT/i.test(constMatch[1])) {
+            fixedPortConsts.add(constMatch[1]);
+          }
+        }
         for (let i = 0; i < lines.length; i++) {
-          const m = portRe.exec(lines[i]);
-          if (!m) continue;
-          if (hasHatch(lines, i, '// port-ok')) continue;
-          const port = parseInt(m[1], 10);
-          if (!portMap.has(port)) portMap.set(port, []);
-          portMap.get(port)!.push({ file, line: i + 1, text: lines[i].trim() });
-        }
-      }
-      // Flag every occurrence of a port used more than once
-      for (const [, usages] of portMap) {
-        if (usages.length > 1) {
-          for (const u of usages) hits.push(u);
-        }
-      }
-      // Flag ports outside the documented 13201–13899 range
-      const PORT_MIN = 13201;
-      const PORT_MAX = 13899;
-      for (const [port, usages] of portMap) {
-        if (port < PORT_MIN || port > PORT_MAX) {
-          for (const u of usages) {
-            // Don't double-flag if already flagged as a duplicate
-            if (!hits.some((h) => h.file === u.file && h.line === u.line)) {
-              hits.push(u);
+          const code = lines[i].replace(/\/\/.*$/, '');
+          if (/\bcreateTestContext\s*\(/.test(code)) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+            continue;
+          }
+          if (/\blisten\s*\(\s*(?:[1-9][0-9]{3,}|13[0-9]{3})\b/.test(code)) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+            continue;
+          }
+          for (const portConst of fixedPortConsts) {
+            if (new RegExp(`\\blisten\\s*\\(\\s*${portConst}\\b`).test(code)) {
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
+              break;
             }
           }
         }

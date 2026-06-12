@@ -192,6 +192,28 @@ async function getJson<T>(path: string, headers: Record<string, string> = {}): P
   return { status: res.status, body: await res.json() as T };
 }
 
+// W6.2: ai-review now runs on the background job platform. POST returns 202 { jobId };
+// this helper polls getJob() until terminal and returns the job's status/result/error.
+async function runReviewJob(postIdForReview: string, timeoutMs = 10_000): Promise<{
+  httpStatus: number;
+  jobStatus?: string;
+  result?: { review: Record<string, { pass: boolean }> };
+  jobError?: string;
+}> {
+  const res = await postJson(`/api/content-posts/${wsId}/${postIdForReview}/ai-review`, {});
+  if (res.status !== 202) return { httpStatus: res.status };
+  const { jobId } = await res.json() as { jobId: string };
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = getJob(jobId);
+    if (job && (job.status === 'done' || job.status === 'error' || job.status === 'cancelled')) {
+      return { httpStatus: 202, jobStatus: job.status, result: job.result as { review: Record<string, { pass: boolean }> } | undefined, jobError: job.error };
+    }
+    await new Promise(r => setTimeout(r, 25));
+  }
+  throw new Error(`Timed out waiting for ai-review job ${jobId}`);
+}
+
 function seedPost(): string {
   const id = `post_c4_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString();
@@ -331,10 +353,9 @@ beforeEach(() => {
 
 describe('POST /api/content-posts/:wsId/:postId/ai-review — verdict persistence', () => {
   it('persists verdicts retrievable via a fresh GET after "editor close"', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
-    const live = await res.json() as { review: Record<string, { pass: boolean }> };
-    expect(live.review.brand_voice.pass).toBe(true);
+    const run = await runReviewJob(postId);
+    expect(run.jobStatus).toBe('done');
+    expect(run.result!.review.brand_voice.pass).toBe(true);
 
     // Simulate editor close → fresh read through the actual HTTP read path
     const { status, body } = await getJson<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`);
@@ -350,8 +371,8 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review — verdict persistenc
   });
 
   it('never persists raw AI passes for provenance-sensitive keys', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
+    const run = await runReviewJob(postId);
+    expect(run.jobStatus).toBe('done');
 
     const stored = getPost(wsId, postId);
     for (const key of ['factual_accuracy', 'no_hallucinations'] as const) {
@@ -361,8 +382,8 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review — verdict persistenc
   });
 
   it('persists the evidence snapshot from the brief alongside the verdicts', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
+    const run = await runReviewJob(postId);
+    expect(run.jobStatus).toBe('done');
 
     const stored = getPost(wsId, postId);
     expect(stored?.aiReview?.evidence?.peopleAlsoAsk).toContain('What is evidence grounding?');
@@ -370,8 +391,8 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review — verdict persistenc
   });
 
   it('broadcasts CONTENT_UPDATED and writes an activity row for the persisted review', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
+    const run = await runReviewJob(postId);
+    expect(run.jobStatus).toBe('done');
 
     const contentUpdated = broadcastState.calls.filter(c =>
       c.workspaceId === wsId && c.event === WS_EVENTS.CONTENT_UPDATED && c.payload.action === 'ai_review_completed');
@@ -387,8 +408,8 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review — verdict persistenc
     const freshPostId = seedPost();
     mockOpenAIJsonResponse('content-review', { totally: 'wrong shape' });
 
-    const res = await postJson(`/api/content-posts/${wsId}/${freshPostId}/ai-review`, {});
-    expect(res.status).toBe(500);
+    const run = await runReviewJob(freshPostId);
+    expect(run.jobStatus).toBe('error');
 
     const stored = getPost(wsId, freshPostId);
     expect(stored?.aiReview).toBeUndefined();
@@ -531,8 +552,8 @@ describe('Public boundary — admin-internal fields stripped from client respons
 
   it('client post GET omits aiReview', async () => {
     // Persist a review on the post first
-    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
-    expect(res.status).toBe(200);
+    const run = await runReviewJob(postId);
+    expect(run.jobStatus).toBe('done');
     expect(getPost(wsId, postId)?.aiReview).toBeDefined();
 
     // Associate a post_review request so the public route serves the post

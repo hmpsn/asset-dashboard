@@ -9,7 +9,7 @@
  *
  * Architecture note: the injection-envelope tests call processSource() directly
  * in-process so that vi.mock() can intercept callAI's delegated OpenAI call. The size-cap
- * tests use createTestContext (child process) because they exercise the HTTP
+ * tests use createEphemeralTestContext(import.meta.url) because they exercise the HTTP
  * validation layer (Zod .max + DB trigger).
  */
 
@@ -38,7 +38,7 @@ vi.mock('../../server/broadcast.js', () => ({
 
 // ── Imports (after mock declarations) ────────────────────────────────────────
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { addSource, processSource } from '../../server/discovery-ingestion.js';
 
@@ -49,8 +49,7 @@ let inProcessCleanup: () => void;
 
 // ── HTTP test context (size cap tests) ───────────────────────────────────────
 
-// port-ok: 13201-13324 allocated; extending range
-const ctx = createTestContext(13325);
+const ctx = createEphemeralTestContext(import.meta.url);
 let httpWsId: string;
 let httpCleanup: () => void;
 

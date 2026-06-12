@@ -4,7 +4,7 @@ import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { prepareBulkSchemaGenerationContext } from './schema-generation-context.js';
-import { saveSchemaSnapshot } from './schema-store.js';
+import { saveSchemaSnapshot, pruneSchemaSnapshotOrphans } from './schema-store.js';
 import { generateSchemaSuggestions, type SchemaPageSuggestion } from './schema-suggester.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -50,6 +50,10 @@ export async function runSchemaGenerationJob({
     // Final save — always write the complete result
     if (result.length > 0) {
       persistSnapshot(result, 'generated');
+      // Prune any orphaned rows left by previous generation runs that minted a new
+      // row id each partial save. After the W6.3 single-row fix this is a no-op for
+      // new jobs; for existing DBs it removes stale blobs on the first run.
+      pruneSchemaSnapshotOrphans(siteId);
     }
     if (isJobCancelled(jobId)) {
       updateJob(jobId, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });

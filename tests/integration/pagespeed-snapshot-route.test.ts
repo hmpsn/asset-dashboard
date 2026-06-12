@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import db from '../../server/db/index.js';
 import { savePageSpeed } from '../../server/performance-store.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13354); // port-ok: 13201-13353 already allocated in integration suite
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let workspaceId = '';

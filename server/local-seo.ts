@@ -763,6 +763,121 @@ function isUsableLocalVisibilitySnapshot(snapshot: Pick<LocalVisibilitySnapshot,
   return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
 }
 
+// ── Per-workspace classifier builders ────────────────────────────────────────
+//
+// These replace the original workspace's hardcoded Texas city names and
+// dental/legal vocabulary. Classifiers are derived from the workspace's own
+// markets and business profile so every workspace gets relevant matching.
+// Call once per hot loop (e.g. per candidate build invocation) and reuse.
+
+/**
+ * Builds a geo-term regex from the workspace's configured local SEO markets and
+ * business profile city/state. Always includes `near me` and `/location/` as
+ * universal local-intent signals.
+ *
+ * Returns null when no workspace-specific geo terms are available (the caller
+ * should fall back to the universal patterns only).
+ *
+ * Performance: O(n markets) string ops, called once per build cycle.
+ */
+function buildWorkspaceGeoRegex(workspace: Workspace, markets: LocalSeoMarket[]): RegExp | null {
+  const terms: string[] = [];
+
+  // Markets: city and state/region from each configured market
+  for (const market of markets) {
+    const city = normalizeText(market.city);
+    const state = normalizeText(market.stateOrRegion);
+    if (city) terms.push(city);
+    if (state) terms.push(state);
+  }
+
+  // Business profile: primary address city and state as fallback geo evidence
+  const bpCity = normalizeText(workspace.businessProfile?.address?.city);
+  const bpState = normalizeText(workspace.businessProfile?.address?.state);
+  if (bpCity) terms.push(bpCity);
+  if (bpState) terms.push(bpState);
+
+  // Universal patterns always apply
+  const uniqueTerms = [...new Set(terms.filter(Boolean))];
+  const geoTermPart = uniqueTerms.map(t => `\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).join('|');
+  const combined = geoTermPart
+    ? `\\bnear me\\b|\\/location\\/${geoTermPart ? `|${geoTermPart}` : ''}`
+    : null;
+
+  return combined ? new RegExp(combined, 'i') : null;
+}
+
+/**
+ * Builds a service-term regex from the workspace's own data:
+ *  1. Industry taxonomy match terms (from service-taxonomy.ts via industry field)
+ *  2. Site keywords from the keyword strategy
+ *  3. Knowledge base / business context keyword extraction (simple word tokens)
+ *  4. Generic cross-industry fallback ONLY when no workspace-specific terms are found
+ *
+ * Performance: called once per candidate build cycle; result reused per keyword.
+ */
+function buildWorkspaceServiceTermRegex(workspace: Workspace): RegExp {
+  const terms: string[] = [];
+
+  // Layer 1a: industry taxonomy via explicit intelligenceProfile.industry field.
+  const taxonomy = getTaxonomyForIndustry(workspace.intelligenceProfile?.industry);
+  if (taxonomy) {
+    for (const service of taxonomy) {
+      for (const term of service.matchTerms) {
+        terms.push(term.toLowerCase());
+      }
+    }
+  }
+
+  // Layer 1b: industry taxonomy via implicit detection from workspace name and
+  // business context text. This handles workspaces where the admin hasn't
+  // explicitly set intelligenceProfile.industry but the context clearly signals
+  // an industry (e.g. "Dental office." business context → dental taxonomy).
+  if (!taxonomy) {
+    const implicitIndustryHints = [
+      workspace.name,
+      workspace.keywordStrategy?.businessContext,
+      workspace.knowledgeBase,
+    ].filter(Boolean).join(' ');
+    const implicitTaxonomy = getTaxonomyForIndustry(implicitIndustryHints);
+    if (implicitTaxonomy) {
+      for (const service of implicitTaxonomy) {
+        for (const term of service.matchTerms) {
+          terms.push(term.toLowerCase());
+        }
+      }
+    }
+  }
+
+  // Layer 2: strategy site keywords — the keywords the admin has already identified
+  // as the core services. Extract individual word tokens (4+ chars) so that
+  // multi-word phrases like "cosmetic dentist" contribute both "cosmetic" and "dentist".
+  for (const kw of workspace.keywordStrategy?.siteKeywords ?? []) {
+    const tokens = kw.toLowerCase().trim().split(/\s+/);
+    for (const token of tokens) {
+      if (token.length >= 4) terms.push(token);
+    }
+  }
+
+  // Note: raw business context text is intentionally NOT added to the service term
+  // regex here. Context prose (e.g. "HVAC contractor serving Chicago") produces too
+  // many general nouns (management, software, contractor, serving…) that would
+  // cause false positives against unrelated page titles. Business context is instead
+  // used for implicit industry detection above (Layer 1b), which extracts the
+  // industry taxonomy's authoritative match terms instead of raw prose words.
+
+  if (terms.length === 0) {
+    // Generic fallback: broad cross-industry service signals used ONLY when the workspace
+    // has no profile data at all. This is explicitly documented as a last resort.
+    // Note: no dental/legal-specific terms here — those belong in taxonomy (Layer 1).
+    return /\bservice\b|\bclinic\b|\bcontractor\b|\brestaurant\b|\bsalon\b|\bspa\b|\boffice\b/i;
+  }
+
+  const escaped = [...new Set(terms.filter(Boolean))]
+    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(escaped.join('|'), 'i');
+}
+
 function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 'suggestedPosture' | 'suggestionReasons'> {
   const reasons: string[] = [];
   const profile = workspace.businessProfile;
@@ -773,7 +888,11 @@ function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 's
     .slice(0, 75)
     .map(page => `${page.pagePath} ${page.pageTitle} ${page.primaryKeyword}`.toLowerCase())
     .join(' ');
-  if (/near me|\baustin\b|\bhouston\b|\bsan antonio\b|\bdallas\b|\btexas\b|\/location\//.test(pageTerms)) reasons.push('Page map contains local/service-area terms');
+  // Build geo regex from this workspace's configured markets and business profile —
+  // never from hardcoded city names that only apply to the original Texas dental workspace.
+  const workspaceGeoRegex = buildWorkspaceGeoRegex(workspace, listLocalSeoMarkets(workspace.id));
+  const geoPattern = workspaceGeoRegex ?? /\bnear me\b|\/location\//;
+  if (geoPattern.test(pageTerms)) reasons.push('Page map contains local/service-area terms');
   if (reasons.length >= 2) return { suggestedPosture: LOCAL_SEO_POSTURE.LOCAL, suggestionReasons: reasons };
   if (reasons.length === 1) return { suggestedPosture: LOCAL_SEO_POSTURE.HYBRID, suggestionReasons: reasons };
   return { suggestedPosture: LOCAL_SEO_POSTURE.UNKNOWN, suggestionReasons: ['No explicit local market evidence found yet'] };
@@ -1802,7 +1921,19 @@ function storeSnapshot(snapshot: LocalVisibilitySnapshot, rawResults: LocalVisib
   });
 }
 
-function hasLocalIntent(keyword: string, workspace: Workspace): boolean {
+/**
+ * Returns true if the keyword has local intent for this workspace.
+ *
+ * `precomputedServiceTermRegex` should be provided when called from the hot
+ * candidate loop (where it is precomputed once per build cycle via
+ * `loadCandidateIterationContext`). When omitted, it is derived on demand —
+ * acceptable for cold paths but costs a DB read (markets lookup).
+ */
+function hasLocalIntent(
+  keyword: string,
+  workspace: Workspace,
+  precomputedServiceTermRegex?: RegExp,
+): boolean {
   const normalized = normalizeText(keyword);
   const address = workspace.businessProfile?.address;
   const city = normalizeText(address?.city);
@@ -1810,7 +1941,10 @@ function hasLocalIntent(keyword: string, workspace: Workspace): boolean {
   if (/\bnear me\b|\blocal\b|\bdowntown\b|\bmidtown\b|\bheights\b|\bservice area\b/.test(normalized)) return true;
   if (city && normalized.includes(city)) return true;
   if (state && normalized.includes(state)) return true;
-  if (/dentist|dental|orthodont|implant|invisalign|veneer|emergency|clinic|lawyer|attorney|restaurant|contractor|plumber|roofing|med spa/.test(normalized)) {
+  // Service-term check: use per-workspace derived terms rather than hardcoded
+  // dental/legal vocabulary that only applies to the original workspace.
+  const serviceTermRegex = precomputedServiceTermRegex ?? buildWorkspaceServiceTermRegex(workspace);
+  if (serviceTermRegex.test(normalized)) {
     return readSettings(workspace).posture !== LOCAL_SEO_POSTURE.NON_LOCAL;
   }
   return false;
@@ -1822,12 +1956,29 @@ export function cleanKeywordDisplay(keyword: string | undefined): string | undef
   return cleaned;
 }
 
-export function titleLooksLikeServiceKeyword(title: string | undefined): boolean {
+/**
+ * Returns true if `title` looks like a local service keyword (short enough and
+ * matches service vocabulary).
+ *
+ * When called with a `serviceTermRegex` derived from the workspace via
+ * `buildWorkspaceServiceTermRegex`, the match is per-workspace and accurate for
+ * any industry. Without it, a broad cross-industry fallback regex is used — this
+ * is only appropriate for tests and callers that deliberately have no workspace
+ * context (the `iterateLocalCandidateSignals` hot path always passes a regex).
+ */
+export function titleLooksLikeServiceKeyword(
+  title: string | undefined,
+  serviceTermRegex?: RegExp,
+): boolean {
   const cleaned = cleanKeywordDisplay(title);
   if (!cleaned) return false;
   const tokens = cleaned.split(/\s+/);
   if (tokens.length > 6) return false;
-  return /dent|dental|implant|invisalign|veneer|whiten|emergency|orthodont|clinic|law|attorney|restaurant|contractor|plumb|roof|med spa|service/i.test(cleaned);
+  // Use the provided per-workspace regex, or fall back to the broad cross-industry
+  // list. The fallback retains dental/legal/contractor coverage for the test suite
+  // and for callers that have no workspace context.
+  const regex = serviceTermRegex ?? /dent|dental|implant|invisalign|veneer|whiten|emergency|orthodont|clinic|law|attorney|restaurant|contractor|plumb|roof|med spa|service/i;
+  return regex.test(cleaned);
 }
 
 export function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean {
@@ -2000,6 +2151,21 @@ export interface CandidateIterationContext {
    * requests it so `buildCandidateContext` runs once, not twice.
    */
   evaluationContext?: ReturnType<typeof buildCandidateContext>['evaluationContext'];
+  /**
+   * Per-workspace classifiers precomputed once by `loadCandidateIterationContext`.
+   * Used by `iterateLocalCandidateSignals` to avoid re-deriving them per keyword
+   * in the hot candidate loop.
+   *
+   * `geoTermRegex` — matches the workspace's own city/state names (from markets
+   *   and business profile). Used for `pageLooksLocal` detection.
+   * `serviceTermRegex` — matches the workspace's own service vocabulary (from
+   *   industry taxonomy, strategy keywords, and business context text).
+   *   Passed to `titleLooksLikeServiceKeyword` so it is workspace-aware.
+   */
+  classifiers: {
+    geoTermRegex: RegExp;
+    serviceTermRegex: RegExp;
+  };
 }
 
 /**
@@ -2053,6 +2219,11 @@ export function loadCandidateIterationContext(
       .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
       .map(tracked => keywordComparisonKey(tracked.query)),
   );
+  // Precompute per-workspace classifiers once — reused per keyword in the hot loop.
+  const serviceTermRegex = buildWorkspaceServiceTermRegex(workspace);
+  const geoTermRegex = buildWorkspaceGeoRegex(workspace, markets)
+    ?? /\bnear me\b|\/location\//i;
+
   return {
     workspace,
     markets,
@@ -2063,6 +2234,7 @@ export function loadCandidateIterationContext(
     pageMap: built.pageMap,
     explicitKeywords,
     evaluationContext: options.withEvaluationContext ? built.evaluationContext : undefined,
+    classifiers: { geoTermRegex, serviceTermRegex },
   };
 }
 
@@ -2083,7 +2255,8 @@ export function loadCandidateIterationContext(
 export function* iterateLocalCandidateSignals(
   ctx: CandidateIterationContext,
 ): Generator<CandidateSourceSignal> {
-  const { workspace, markets, trackedKeywords, contentGaps, pageMap, explicitKeywords } = ctx;
+  const { workspace, markets, trackedKeywords, contentGaps, pageMap, explicitKeywords, classifiers } = ctx;
+  const { geoTermRegex, serviceTermRegex } = classifiers;
 
   for (const keyword of explicitKeywords) {
     yield {
@@ -2123,7 +2296,9 @@ export function* iterateLocalCandidateSignals(
   }
 
   for (const page of pageMap) {
-    const pageLooksLocal = /\/location\/|near me|appointment|austin|houston|san antonio|dallas/i.test(`${page.pagePath} ${page.pageTitle}`)
+    // Use the workspace's own market city/state geo regex — not hardcoded Texas city names.
+    const pageLooksLocal = geoTermRegex.test(`${page.pagePath} ${page.pageTitle}`)
+      || /appointment/i.test(`${page.pagePath} ${page.pageTitle}`)
       || page.serpFeatures?.includes('local_pack');
     yield {
       keyword: page.primaryKeyword,
@@ -2151,7 +2326,7 @@ export function* iterateLocalCandidateSignals(
         scoreBoost: 4,
       };
     }
-    if (titleLooksLikeServiceKeyword(page.pageTitle)) {
+    if (titleLooksLikeServiceKeyword(page.pageTitle, serviceTermRegex)) {
       yield {
         keyword: page.pageTitle,
         source: 'page_assignment',
@@ -2164,7 +2339,7 @@ export function* iterateLocalCandidateSignals(
       };
     }
     for (const base of [page.primaryKeyword, page.pageTitle, ...(page.secondaryKeywords ?? [])]) {
-      if (!base || !titleLooksLikeServiceKeyword(base) || isNearDuplicateKeyword(base, workspace.name)) continue;
+      if (!base || !titleLooksLikeServiceKeyword(base, serviceTermRegex) || isNearDuplicateKeyword(base, workspace.name)) continue;
       for (const variant of localVariantKeywordsByMarket(base, markets)) {
         yield {
           keyword: variant.keyword,
@@ -2179,7 +2354,7 @@ export function* iterateLocalCandidateSignals(
       }
     }
     // Intent modifier variants for service-keyword bases (primary keyword only, primary market only)
-    if (titleLooksLikeServiceKeyword(page.pageTitle) && markets.length > 0) {
+    if (titleLooksLikeServiceKeyword(page.pageTitle, serviceTermRegex) && markets.length > 0) {
       const primaryBase = cleanKeywordDisplay(page.pageTitle);
       const primaryMarket = markets[0];
       if (primaryBase && primaryMarket) {
@@ -2210,7 +2385,7 @@ export function* iterateLocalCandidateSignals(
   for (const gap of contentGaps) {
     const localGap = gap.suggestedPageType === 'location'
       || gap.serpFeatures?.includes('local_pack')
-      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace);
+      || hasLocalIntent(`${gap.topic} ${gap.targetKeyword}`, workspace, serviceTermRegex);
     yield {
       keyword: gap.targetKeyword,
       source: 'content_gap',
@@ -2235,7 +2410,7 @@ export function* iterateLocalCandidateSignals(
       };
     }
     // Intent modifier variants for content gap bases
-    if (titleLooksLikeServiceKeyword(gap.targetKeyword) && markets.length > 0) {
+    if (titleLooksLikeServiceKeyword(gap.targetKeyword, serviceTermRegex) && markets.length > 0) {
       const primaryBase = cleanKeywordDisplay(gap.targetKeyword);
       const primaryMarket = markets[0];
       if (primaryBase && primaryMarket) {
@@ -2351,9 +2526,9 @@ export function buildLocalSeoKeywordCandidates(
       candidateHardCapReached = true;
       continue;
     }
-    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace, ctx.classifiers.serviceTermRegex) && !hasMarketModifier(display, ctx.markets)) continue;
 
-    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace) ? 8 : 0;
+    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace, ctx.classifiers.serviceTermRegex) ? 8 : 0;
     const score = candidateSourceScore(signal.source) + localIntentScore + (signal.scoreBoost ?? 0);
     upsertCandidate(candidates, key, display, signal, score, []);
   }
@@ -2395,7 +2570,7 @@ export function buildLocalSeoKeywordCandidatesEvaluated(
       candidateHardCapReached = true;
       continue;
     }
-    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace, ctx.classifiers.serviceTermRegex) && !hasMarketModifier(display, ctx.markets)) continue;
 
     const evaluationSource = signal.source === 'local_variant' ? 'local_generated' : signal.source === 'tracking' ? 'gsc' : 'client';
     const evaluation = isStrategyPoolEligibleKeyword({
@@ -2406,7 +2581,7 @@ export function buildLocalSeoKeywordCandidatesEvaluated(
     }, evaluationContext);
     if (evaluation.suppressed) continue;
 
-    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace) ? 8 : 0;
+    const localIntentScore = hasMarketModifier(display, ctx.markets) ? 12 : hasLocalIntent(display, ctx.workspace, ctx.classifiers.serviceTermRegex) ? 8 : 0;
     const score = candidateSourceScore(signal.source) + localIntentScore + evaluation.scoreDelta + (signal.scoreBoost ?? 0);
     upsertCandidate(candidates, key, display, signal, score, evaluation.reasons.map(r => r.message).slice(0, 4));
   }
@@ -2440,7 +2615,7 @@ export function countLocalSeoKeywordCandidates(workspaceId: string): number {
     if (!display) continue;
     const key = keywordComparisonKey(display);
     if (!key || ctx.declined.has(key) || ctx.inactiveTracked.has(key)) continue;
-    if (!signal.force && !hasLocalIntent(display, ctx.workspace) && !hasMarketModifier(display, ctx.markets)) continue;
+    if (!signal.force && !hasLocalIntent(display, ctx.workspace, ctx.classifiers.serviceTermRegex) && !hasMarketModifier(display, ctx.markets)) continue;
     seen.add(key);
   }
   return seen.size;

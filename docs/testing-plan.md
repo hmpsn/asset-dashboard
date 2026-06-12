@@ -1053,7 +1053,7 @@ Like│                   │                   │Like
 | `tests/global-setup.ts` | Runs SQLite migrations once before parallel workers |
 | `tests/db-setup.ts` | Disables FK constraints for test isolation |
 | `tests/component/setup.ts` | @testing-library/jest-dom + cleanup |
-| `tests/integration/helpers.ts` | `createEphemeralTestContext(import.meta.url)` by default, or `createTestContext(port)` for fixed-port / multi-context integration tests |
+| `tests/integration/helpers.ts` | `createEphemeralTestContext(import.meta.url)` for spawned-server integration tests; pass `contextName` for multiple contexts in one file |
 | `tests/fixtures/intelligence-seed.ts` | Workspace with insights + tracked actions |
 | `tests/fixtures/rich-intelligence.ts` | Full intelligence data for prompt tests |
 | `tests/fixtures/seo-context-mock.ts` | SEO context mock data |

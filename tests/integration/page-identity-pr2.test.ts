@@ -7,7 +7,6 @@
  *     including pre-dedupe of collisions where both cms--{x} and cms-{x} already exist.
  *  3. Migration is idempotent (safe to re-run).
  *
- * Port: 13331 (informational — this test goes directly to DB, no HTTP server)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';

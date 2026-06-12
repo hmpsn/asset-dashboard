@@ -52,7 +52,7 @@ import type { OpportunityScore, RecommendationSet } from '../../shared/types/rec
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 // This file uses the inline server pattern (vi.mock + dynamic import of app)
-// rather than createTestContext(), because createTestContext() spawns a subprocess
+// rather than createEphemeralTestContext(), because createEphemeralTestContext() spawns a subprocess
 // that cannot share the vi.mock state.
 
 import { withPublicTestAuth } from './public-auth-test-helpers.js';

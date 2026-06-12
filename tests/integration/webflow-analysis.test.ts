@@ -1,6 +1,5 @@
 /**
  * Integration tests for server/routes/webflow-analysis.ts
- * Port: 13383
  *
  * Covers:
  * - POST /api/competitor-compare (happy path, validation errors, audit error)

@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
 
-import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
@@ -48,7 +48,7 @@ import {
   updateSchemaPlanForAdmin,
 } from '../domains/schema/schema-plan-lifecycle.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
-import { listPendingSchemas } from '../schema-queue.js';
+// listPendingSchemas import removed in W6.3 (GET /api/pending-schemas endpoint deleted — no UI consumer)
 import { createLogger } from '../logger.js';
 import {
   schemaPlanGenerationErrorResponse,
@@ -840,17 +840,10 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
   res.json(toClientSchemaView(result.plan));
 });
 
-// ── Pending Schemas (D7: pre-generated schema skeletons) ──
-
-router.get('/api/pending-schemas/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  try {
-    const pendingSchemas = listPendingSchemas(req.params.workspaceId);
-    res.json({ pendingSchemas });
-  } catch (err) {
-    log.error({ err }, 'Pending schemas error');
-    res.status(500).json({ error: 'Failed to list pending schemas' });
-  }
-});
+// GET /api/pending-schemas/:workspaceId was removed in W6.3.
+// The endpoint had no UI consumer. The pending_schemas table is still populated by
+// queueSchemaPreGeneration and read by the content-pipeline intelligence slice.
+// See server/schema-queue.ts for the comment trail on markSchemaApplied removal.
 
 // ── Schema Validation ────────────────────────────────────────────
 

@@ -178,6 +178,57 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     }
   }, [jobs, pendingRequestBriefJob, queryClient, toast, workspaceId]);
 
+  // Job IDs for regen operations that switched to the async background-job contract (W6.2).
+  // When set, we watch jobs[] for completion and clear the corresponding regenerating* state.
+  const [regenBriefJobId, setRegenBriefJobId] = useState<{ jobId: string; briefId: string; requestId?: string } | null>(null);
+  const [regenOutlineJobId, setRegenOutlineJobId] = useState<{ jobId: string; briefId: string } | null>(null);
+
+  // Watch for brief-regen job completion (W6.2 async contract).
+  // The BRIEF_UPDATED broadcast from the server invalidates the briefs query automatically
+  // via wsInvalidation; here we just clear local spinner state and expand the new brief.
+  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
+  useEffect(() => {
+    if (!regenBriefJobId) return;
+    const job = jobs.find(j => j.id === regenBriefJobId.jobId);
+    if (!job) return;
+    if (job.status === 'done') {
+      const result = extractGeneratedBriefResult(job.result);
+      if (result?.brief) {
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
+        setExpanded(result.brief.id);
+        if (regenBriefJobId.requestId) {
+          void handleUpdateRequestStatus(regenBriefJobId.requestId, undefined, { briefId: result.brief.id });
+        }
+      }
+      setRegenBriefJobId(null);
+      setRegeneratingBrief(null);
+    } else if (job.status === 'error' || job.status === 'cancelled') {
+      toast(job.error || 'Failed to regenerate brief', 'error');
+      setRegenBriefJobId(null);
+      setRegeneratingBrief(null);
+    }
+  }, [jobs, regenBriefJobId, queryClient, toast, workspaceId]); // eslint-disable-line react-hooks/exhaustive-deps -- handleUpdateRequestStatus is stable; including it would require memo
+
+  // Watch for outline-regen job completion (W6.2 async contract).
+  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
+  useEffect(() => {
+    if (!regenOutlineJobId) return;
+    const job = jobs.find(j => j.id === regenOutlineJobId.jobId);
+    if (!job) return;
+    if (job.status === 'done') {
+      const result = extractGeneratedBriefResult(job.result);
+      if (result?.brief) {
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === regenOutlineJobId!.briefId ? result.brief! : b));
+      }
+      setRegenOutlineJobId(null);
+      setRegeneratingOutline(null);
+    } else if (job.status === 'error' || job.status === 'cancelled') {
+      toast(job.error || 'Failed to regenerate outline', 'error');
+      setRegenOutlineJobId(null);
+      setRegeneratingOutline(null);
+    }
+  }, [jobs, regenOutlineJobId, queryClient, toast, workspaceId]);
+
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
@@ -200,32 +251,62 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     }
   }, [templateCrossref?.pageType, pageType]);
 
+  // W6.2 sibling contract: POST .../regenerate-outline returns 202 { jobId } when
+  // the endpoint has been converted to the background-job platform. The handler also
+  // accepts the old sync ContentBrief response for backward compatibility while the
+  // sibling branch is in flight.
   const handleRegenerateOutline = async (briefId: string, feedback?: string) => {
     setRegeneratingOutline(briefId);
     try {
-      const updated = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback });
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
+      const res = await post<{ jobId?: string } & Partial<ContentBrief>>(
+        `/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback }
+      );
+      if (res.jobId) {
+        // Async path: job was enqueued; watcher effect will clear state on completion.
+        trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
+        setRegenOutlineJobId({ jobId: res.jobId, briefId });
+        // Do NOT clear regeneratingOutline here — the watcher clears it.
+      } else {
+        // Sync path (legacy endpoint not yet converted): apply update immediately.
+        const updated = res as ContentBrief;
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
+        setRegeneratingOutline(null);
+      }
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
       toast(err instanceof Error ? err.message : 'Failed to regenerate outline', 'error');
+      setRegeneratingOutline(null);
     }
-    setRegeneratingOutline(null);
   };
 
+  // W6.2 sibling contract: POST .../regenerate returns 202 { jobId } when converted.
+  // Same backward-compat handling as handleRegenerateOutline above.
   const handleRegenerateBrief = async (briefId: string, feedback: string, requestId?: string) => {
     setRegeneratingBrief(briefId);
     try {
-      const newBrief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback });
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [newBrief, ...(old ?? [])]);
-      setExpanded(newBrief.id);
-      if (requestId) {
-        await handleUpdateRequestStatus(requestId, undefined, { briefId: newBrief.id });
+      const res = await post<{ jobId?: string } & Partial<ContentBrief>>(
+        `/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback }
+      );
+      if (res.jobId) {
+        // Async path: job was enqueued; watcher effect handles result + state clear.
+        trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
+        setRegenBriefJobId({ jobId: res.jobId, briefId, requestId });
+        // Do NOT clear regeneratingBrief here — the watcher clears it.
+      } else {
+        // Sync path (legacy endpoint not yet converted): apply update immediately.
+        const newBrief = res as ContentBrief;
+        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [newBrief, ...(old ?? [])]);
+        setExpanded(newBrief.id);
+        if (requestId) {
+          await handleUpdateRequestStatus(requestId, undefined, { briefId: newBrief.id });
+        }
+        setRegeneratingBrief(null);
       }
     } catch (err) {
       console.error('ContentBriefs operation failed:', err);
       toast(err instanceof Error ? err.message : 'Failed to regenerate brief', 'error');
+      setRegeneratingBrief(null);
     }
-    setRegeneratingBrief(null);
   };
 
   const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
@@ -544,82 +625,6 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         </div>
       )}
 
-      {/* Generated Posts list */}
-      {posts.length > 0 && !activePostId && (
-        // pr-check-disable-next-line -- Generated-post list is a compact non-SectionCard shell around selectable rows.
-        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <Icon as={PenLine} size="md" className="text-accent-info" />
-            <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
-            <Badge label={`${posts.length}`} tone="blue" variant="outline" />
-          </div>
-          <div className="space-y-2">
-            {posts.map(post => {
-              return (
-                <ClickableRow
-                  key={post.id}
-                  onClick={() => setActivePostId(post.id)}
-                  className="w-full text-left rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{post.title}</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Badge
-                        label={post.status === 'generating' ? 'Generating...' : capitalize(post.status)}
-                        tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
-                        variant="outline"
-                      />
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(post.createdAt)}</span>
-                    </div>
-                  </div>
-                </ClickableRow>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Client Requests */}
-      <RequestList
-        clientRequests={clientRequests}
-        expandedRequest={expandedRequest}
-        generatingBriefFor={generatingBriefFor}
-        loadingBrief={loadingBrief}
-        briefError={briefError}
-        deliveringReqId={deliveringReqId}
-        deliveryUrl={deliveryUrl}
-        deliveryNotes={deliveryNotes}
-        getBriefById={getBriefById}
-        onToggleRequestBrief={toggleRequestBrief}
-        onGenerateBriefForRequest={handleGenerateBriefForRequest}
-        generationStyle={generationStyle}
-        onGenerationStyleChange={setGenerationStyle}
-        onUpdateRequestStatus={handleUpdateRequestStatus}
-        onConfirmDeleteRequest={confirmDeleteRequest}
-        onSetDeliveringReqId={setDeliveringReqId}
-        onSetDeliveryUrl={setDeliveryUrl}
-        onSetDeliveryNotes={setDeliveryNotes}
-        onSetBriefError={setBriefError}
-        onSetExpandedRequest={setExpandedRequest}
-        onCopyAsMarkdown={copyAsMarkdown}
-        onExportClientHTML={exportClientHTML}
-        editingBrief={editingBrief}
-        onSetEditingBrief={setEditingBrief}
-        onSaveBriefField={saveBriefField}
-        regeneratingBrief={regeneratingBrief}
-        onRegenerateBrief={handleRegenerateBrief}
-        regeneratingOutline={regeneratingOutline}
-        onRegenerateOutline={handleRegenerateOutline}
-        sendingToClient={sendingToClient}
-        posts={posts}
-        generatingPostFor={generatingPostFor}
-        onGeneratePost={handleGeneratePost}
-        onOpenPost={setActivePostId}
-      />
-
       <PageHeader
         title="Content Briefs"
         subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
@@ -678,6 +683,82 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         onToggleAdvanced={() => setShowAdvanced(v => !v)}
         onGenerate={handleGenerate}
       />
+
+      {/* Client Requests */}
+      <RequestList
+        clientRequests={clientRequests}
+        expandedRequest={expandedRequest}
+        generatingBriefFor={generatingBriefFor}
+        loadingBrief={loadingBrief}
+        briefError={briefError}
+        deliveringReqId={deliveringReqId}
+        deliveryUrl={deliveryUrl}
+        deliveryNotes={deliveryNotes}
+        getBriefById={getBriefById}
+        onToggleRequestBrief={toggleRequestBrief}
+        onGenerateBriefForRequest={handleGenerateBriefForRequest}
+        generationStyle={generationStyle}
+        onGenerationStyleChange={setGenerationStyle}
+        onUpdateRequestStatus={handleUpdateRequestStatus}
+        onConfirmDeleteRequest={confirmDeleteRequest}
+        onSetDeliveringReqId={setDeliveringReqId}
+        onSetDeliveryUrl={setDeliveryUrl}
+        onSetDeliveryNotes={setDeliveryNotes}
+        onSetBriefError={setBriefError}
+        onSetExpandedRequest={setExpandedRequest}
+        onCopyAsMarkdown={copyAsMarkdown}
+        onExportClientHTML={exportClientHTML}
+        editingBrief={editingBrief}
+        onSetEditingBrief={setEditingBrief}
+        onSaveBriefField={saveBriefField}
+        regeneratingBrief={regeneratingBrief}
+        onRegenerateBrief={handleRegenerateBrief}
+        regeneratingOutline={regeneratingOutline}
+        onRegenerateOutline={handleRegenerateOutline}
+        sendingToClient={sendingToClient}
+        posts={posts}
+        generatingPostFor={generatingPostFor}
+        onGeneratePost={handleGeneratePost}
+        onOpenPost={setActivePostId}
+      />
+
+      {/* Generated Posts list */}
+      {posts.length > 0 && !activePostId && (
+        // pr-check-disable-next-line -- Generated-post list is a compact non-SectionCard shell around selectable rows.
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Icon as={PenLine} size="md" className="text-accent-info" />
+            <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
+            <Badge label={`${posts.length}`} tone="blue" variant="outline" />
+          </div>
+          <div className="space-y-2">
+            {posts.map(post => {
+              return (
+                <ClickableRow
+                  key={post.id}
+                  onClick={() => setActivePostId(post.id)}
+                  className="w-full text-left rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{post.title}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge
+                        label={post.status === 'generating' ? 'Generating...' : capitalize(post.status)}
+                        tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
+                        variant="outline"
+                      />
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{formatDate(post.createdAt)}</span>
+                    </div>
+                  </div>
+                </ClickableRow>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Briefs list (standalone — not linked to a request) */}
       <BriefList

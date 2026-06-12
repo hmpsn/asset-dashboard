@@ -7,17 +7,15 @@
  *   - NOTHING when the table is empty (the legacy blob fallback was removed in the
  *     strip — the table is now the sole source of truth).
  *
- * Port: 13890 (exclusive; 13888/13889 used by Wave-3a assembler tests, 13886
  * reserved for tracked-keywords-concurrency).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 
-const PORT = 13890;
-const ctx = createTestContext(PORT, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
 
 let tableWsId = '';
@@ -32,7 +30,7 @@ beforeAll(async () => {
 
   // Workspace A: table populated. A stale legacy blob value is also present to
   // prove the table wins and the blob is ignored.
-  tableWsId = createWorkspace(`SKM Table ${PORT}`).id;
+  tableWsId = createWorkspace(`SKM Table ${ctx.PORT}`).id;
   updateWorkspace(tableWsId, { keywordStrategy: {
     siteKeywords: ['table keyword'],
     siteKeywordMetrics: [{ keyword: 'table keyword', volume: 1, difficulty: 1 }],
@@ -43,7 +41,7 @@ beforeAll(async () => {
 
   // Workspace B: blob-only legacy state (table empty). Post-strip the blob is NO
   // LONGER a fallback — the public route must return no metrics.
-  blobWsId = createWorkspace(`SKM Blob ${PORT}`).id;
+  blobWsId = createWorkspace(`SKM Blob ${ctx.PORT}`).id;
   updateWorkspace(blobWsId, { keywordStrategy: {
     siteKeywords: ['blob keyword'],
     siteKeywordMetrics: [{ keyword: 'blob keyword', volume: 700, difficulty: 12 }],

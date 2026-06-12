@@ -91,3 +91,78 @@ describe('suggestPublishDates', () => {
     expect(results.length).toBeLessThanOrEqual(15);
   });
 });
+
+describe('suggestDraftSchedule', () => {
+  let suggestDraftSchedule: (opts: {
+    drafts: Array<{ id: string; targetKeyword?: string; pageHint?: string }>;
+    startDate: Date;
+    priorityPages?: Array<{ pageUrl: string; priority: 'high' | 'medium' | 'low' }>;
+    spacingDays?: number;
+  }) => Array<{ draftId: string; suggestedDate: string; reason: string }>;
+
+  beforeAll(async () => {
+    const mod = await import('../../server/content-calendar-intelligence.js');
+    suggestDraftSchedule = mod.suggestDraftSchedule;
+  });
+
+  it('returns empty array for no drafts', () => {
+    expect(suggestDraftSchedule({ drafts: [], startDate: new Date('2026-06-15T00:00:00Z') })).toHaveLength(0);
+  });
+
+  it('assigns one date per draft', () => {
+    const result = suggestDraftSchedule({
+      drafts: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      startDate: new Date('2026-06-15T00:00:00Z'), // Monday
+    });
+    expect(result).toHaveLength(3);
+    expect(new Set(result.map(r => r.draftId)).size).toBe(3);
+  });
+
+  it('produces dates that are all in the future relative to startDate', () => {
+    const start = new Date('2026-06-15T00:00:00Z');
+    const result = suggestDraftSchedule({
+      drafts: [{ id: 'a' }, { id: 'b' }],
+      startDate: start,
+    });
+    for (const r of result) {
+      expect(new Date(r.suggestedDate).getTime()).toBeGreaterThanOrEqual(start.getTime());
+    }
+  });
+
+  it('spaces drafts apart (no two drafts on the same day)', () => {
+    const result = suggestDraftSchedule({
+      drafts: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      startDate: new Date('2026-06-15T00:00:00Z'),
+    });
+    const days = result.map(r => r.suggestedDate.slice(0, 10));
+    expect(new Set(days).size).toBe(days.length);
+  });
+
+  it('skips weekends — no suggested date falls on Saturday or Sunday', () => {
+    const result = suggestDraftSchedule({
+      drafts: Array.from({ length: 6 }, (_, i) => ({ id: `d${i}` })),
+      startDate: new Date('2026-06-19T00:00:00Z'), // Friday
+    });
+    for (const r of result) {
+      const dow = new Date(r.suggestedDate).getUTCDay();
+      expect(dow).not.toBe(0); // Sunday
+      expect(dow).not.toBe(6); // Saturday
+    }
+  });
+
+  it('orders high-priority drafts (matching priorityPages) before unprioritized ones', () => {
+    const result = suggestDraftSchedule({
+      drafts: [
+        { id: 'low', pageHint: '/blog/quiet' },
+        { id: 'high', pageHint: '/blog/urgent' },
+      ],
+      startDate: new Date('2026-06-15T00:00:00Z'),
+      priorityPages: [{ pageUrl: '/blog/urgent', priority: 'high' }],
+    });
+    // The high-priority draft should get the earliest date.
+    const highEntry = result.find(r => r.draftId === 'high')!;
+    const lowEntry = result.find(r => r.draftId === 'low')!;
+    expect(new Date(highEntry.suggestedDate).getTime())
+      .toBeLessThan(new Date(lowEntry.suggestedDate).getTime());
+  });
+});

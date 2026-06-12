@@ -10,14 +10,14 @@
  * Pattern follows tests/integration/content-requests-routes.test.ts.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { savePost, getPost, listPostVersions } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
-const ctx = createTestContext(13328, { autoPublicAuth: true }); // port-ok: 13201-13327 fully allocated; extending range
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson, clearCookies } = ctx;
 
 let testWsId = '';

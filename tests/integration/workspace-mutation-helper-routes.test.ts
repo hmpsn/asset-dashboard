@@ -30,12 +30,11 @@
  *     - Delete unknown → 404
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const PORT = 13561;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson, del } = ctx;
 
 let wsId = '';

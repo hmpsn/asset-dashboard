@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { deleteSchemaPlan, getSchemaPlan, saveSchemaPlan } from '../../server/schema-store.js';
 import db from '../../server/db/index.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 
-const ctx = createTestContext(13277, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 let workspaceId = '';

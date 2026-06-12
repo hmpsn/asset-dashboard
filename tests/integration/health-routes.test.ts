@@ -13,18 +13,18 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
 // Use an isolated temp data dir so the synchronous storage-stats/pruning
 // functions operate on an empty directory rather than ~/.asset-dashboard
 // (which can contain tens-of-thousands of files on a dev machine and causes
-// multi-minute timeouts). DATA_DIR is picked up by createTestContext via
+// multi-minute timeouts). DATA_DIR is picked up by createEphemeralTestContext via
 // process.env spread into the spawned server process.
 const ORIGINAL_DATA_DIR = process.env.DATA_DIR;
 const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'health-routes-test-'));
 process.env.DATA_DIR = TEST_DATA_DIR;
 
-const ctx = createTestContext(13217);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, setAuthToken, authApi, authPostJson, authDel, clearCookies } = ctx;
 
 beforeAll(async () => {

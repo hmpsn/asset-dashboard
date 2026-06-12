@@ -11,11 +11,10 @@
  * Actual job execution is not tested — routes fire-and-forget after returning jobId.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const PORT = 13701;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 const { postJson } = ctx;
 
 let workspace: SeededFullWorkspace;

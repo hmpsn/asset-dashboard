@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import db from '../../server/db/index.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createTestContext(13727, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const UNKNOWN_WORKSPACE_ID = 'ws_fixture_public_business_priorities_missing';
 let authFixture: SeededAuth | null = null;
 

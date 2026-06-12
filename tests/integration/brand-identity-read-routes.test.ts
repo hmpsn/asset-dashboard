@@ -7,14 +7,13 @@
  * - GET /api/brand-identity/:workspaceId/:id unknown id → 404
  * - PATCH /api/brand-identity/:workspaceId/:id unknown id → 404
  *
- * Port: 13642 (unique — no other file uses this port).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13642); // port-ok: extending range to 13642
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
 
 let wsId = '';

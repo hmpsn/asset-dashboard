@@ -11,14 +11,14 @@
  * - PATCH status: cancelled transitions
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createPayment } from '../../server/payments.js';
 import { createWorkOrder } from '../../server/work-orders.js';
 import db from '../../server/db/index.js';
 import type { ProductType } from '../../shared/types/payments.js';
 
-const ctx = createTestContext(13698, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, patchJson } = ctx;
 
 let wsAId = '';

@@ -15,10 +15,9 @@
  *   - analytics-event-trend: missing event query param (400)
  *   - analytics-landing-pages: organic=true flag still validates days/limit params
  *
- * Port: 13381 (unique)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
@@ -27,7 +26,7 @@ import { FREE_CHAT_LIMIT, addMessage, getSession } from '../../server/chat-memor
 import { incrementUsage } from '../../server/usage-tracking.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13381, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
 
 // Workspace with no credentials (GSC/GA4 unconfigured) — passwordless

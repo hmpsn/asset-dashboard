@@ -2,8 +2,6 @@
  * Extended integration tests for server/routes/public-portal.ts
  *
  * Targets endpoints and branches NOT covered by the existing test files:
- *   - public-portal-routes.test.ts (port 13367)
- *   - public-portal-auth.test.ts   (port 13304)
  *
  * Focuses on:
  *   1. GET /api/public/pricing/:id
@@ -20,7 +18,7 @@
  */
 import { randomUUID } from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
@@ -29,7 +27,7 @@ import { updateWorkspace } from '../../server/workspaces.js';
 import { initializeSections, saveGeneratedCopy } from '../../server/copy-review.js';
 import { createBlueprint, addEntry } from '../../server/page-strategy.js';
 
-const ctx = createTestContext(13380, { autoPublicAuth: true }); // port-ok: 13380
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, clearCookies } = ctx;
 
 // ── Test state ────────────────────────────────────────────────────────────────

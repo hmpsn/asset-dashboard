@@ -1,6 +1,6 @@
 /**
  * Extended integration tests for server/routes/webflow-alt-text.ts
- * Port: 13374 — confirmed free
+ * Uses an ephemeral in-process server port.
  *
  * Covers uncovered paths:
  * - workspace not found (generate-alt, bulk-generate-alt)
@@ -165,7 +165,6 @@ vi.mock('sharp', () => ({
   })),
 }));
 
-// --- Server setup (port 13374) ---
 
 let server: http.Server | undefined;
 let baseUrl = '';
@@ -178,7 +177,7 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>((resolve) => server!.listen(13374, resolve));
+  await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
   const { port } = server!.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${port}`;
 }

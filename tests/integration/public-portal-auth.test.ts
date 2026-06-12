@@ -39,7 +39,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import {
   createClientUser,
   deleteClientUser,
@@ -50,8 +50,7 @@ import { createUser, deleteUser } from '../../server/users.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { JWT_SECRET } from '../../server/jwt-config.js';
 
-// ── Unique port (no other test file uses 13304) ────────────────────────────
-const ctx = createTestContext(13304, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 // ── State ──────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,6 @@
  * Each test performs an operation via HTTP, then directly queries the DB to
  * assert the resulting log entry shape.
  *
- * Port: 13856
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';

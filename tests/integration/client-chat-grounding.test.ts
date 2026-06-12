@@ -20,10 +20,11 @@
  * satisfied with an admin HMAC token (`x-auth-token`), so a 401 can never
  * shadow the 400 validation-rejection assertion.
  *
- * Port: 13950 (port-ok: unique in integration suite)
+ * Uses an ephemeral in-process server port.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
+import type { AddressInfo } from 'net';
 
 // ── Grounding (intelligence) capture + failure injection ─────────────────────
 // The route calls buildSeoPromptContext() for the slice-derived grounding block.
@@ -87,7 +88,6 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { signAdminToken } from '../../server/middleware.js';
 
 // ── In-process server ────────────────────────────────────────────────────────
-const PORT = 13950; // port-ok: unique in integration suite
 let baseUrl = '';
 let server: http.Server | undefined;
 let wsId = '';
@@ -99,8 +99,9 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>(resolve => server!.listen(PORT, '127.0.0.1', resolve));
-  baseUrl = `http://127.0.0.1:${PORT}`;
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${port}`;
 }
 
 async function stopTestServer(): Promise<void> {
@@ -122,7 +123,7 @@ async function chat(body: unknown, opts?: { auth?: boolean }): Promise<Response>
 beforeAll(async () => {
   await startTestServer();
   adminToken = signAdminToken();
-  wsId = createWorkspace('E4 Client Chat Grounding WS 13950').id;
+  wsId = createWorkspace('E4 Client Chat Grounding WS').id;
 }, 40_000);
 
 afterAll(async () => {

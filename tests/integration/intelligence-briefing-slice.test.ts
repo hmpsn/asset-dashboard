@@ -8,15 +8,14 @@
  *   2. Workspace with only draft (un-published) → latestBriefing === null
  *   3. Workspace with one published briefing → latestBriefing matches the publish
  *
- * Port: 13331 (verified free as of 2026-04-29 — extends range past 13330)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertBriefingDraft, markPublished, markSkipped } from '../../server/briefing-store.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 
-const ctx = createTestContext(13331); // port-ok: verified free; extends range to 13331
+const ctx = createEphemeralTestContext(import.meta.url);
 
 function story(id: string, isHeadline = false): BriefingStory {
   return {

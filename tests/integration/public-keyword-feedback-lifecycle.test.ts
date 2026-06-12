@@ -1,7 +1,6 @@
 /**
  * Integration tests: full lifecycle for the public keyword feedback endpoints.
  *
- * Port: 13855
  *
  * Covers:
  * - GET  /api/public/keyword-feedback/:workspaceId     — empty and populated

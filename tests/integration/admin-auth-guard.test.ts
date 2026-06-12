@@ -37,6 +37,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { stopChildProcess } from './helpers.js';
+import { releaseIntegrationTestPort, reserveIntegrationTestPort } from '../helpers/ports.js';
 
 // ─── Unit imports (in-process) ───
 import { signAdminToken, verifyAdminToken } from '../../server/middleware.js';
@@ -51,12 +52,13 @@ const TEST_APP_PASSWORD = 'test-admin-secret-pw-12345';
 
 // ─── Spawn a server with a real APP_PASSWORD ───
 //
-// The standard createTestContext() helper defaults to APP_PASSWORD='' (gate
+// The standard createEphemeralTestContext() helper defaults to APP_PASSWORD='' (gate
 // disabled) unless a caller opts in via options.env.APP_PASSWORD. This
 // standalone helper spawns a second server instance with a real password so we
 // can exercise the gate logic end-to-end.
 
-const GATED_PORT = 13342;
+const GATED_PORT_ID = `${fileURLToPath(import.meta.url)}#gated`;
+const GATED_PORT = reserveIntegrationTestPort(GATED_PORT_ID);
 const GATED_BASE = `http://localhost:${GATED_PORT}`;
 
 let gatedProc: ChildProcess | null = null;
@@ -368,6 +370,7 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
 
   afterAll(async () => {
     await stopGatedServer();
+    releaseIntegrationTestPort(GATED_PORT_ID);
     deleteUser(gatedJwtUserId);
   });
 
@@ -579,7 +582,8 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
 // are accessible without any auth header. This is the development default.
 
 describe('Integration — ungated server (APP_PASSWORD empty) baseline', () => {
-  const UNGATED_PORT = 13343;
+  const UNGATED_PORT_ID = `${fileURLToPath(import.meta.url)}#ungated`;
+  const UNGATED_PORT = reserveIntegrationTestPort(UNGATED_PORT_ID);
   const UNGATED_BASE = `http://localhost:${UNGATED_PORT}`;
   let ungatedProc: ChildProcess | null = null;
 
@@ -629,6 +633,7 @@ describe('Integration — ungated server (APP_PASSWORD empty) baseline', () => {
     const child = ungatedProc;
     ungatedProc = null;
     await stopChildProcess(child);
+    releaseIntegrationTestPort(UNGATED_PORT_ID);
   });
 
   async function ungatedFetch(urlPath: string, opts: RequestInit = {}): Promise<Response> {

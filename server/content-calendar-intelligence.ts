@@ -67,3 +67,102 @@ export function suggestPublishDates(opts: {
 
   return results.slice(0, 15);
 }
+
+// ── Draft scheduling (W6.6) ──
+// Adapts the page-level suggestions above into concrete per-draft publish-date
+// proposals for the forward-planning Content Calendar. The admin confirms; each
+// confirmed date is applied via PATCH /api/content-posts/:ws/:postId/planned-date.
+
+interface DraftToSchedule {
+  id: string;
+  targetKeyword?: string;
+  /** Page slug/url this draft targets — matched against priorityPages. */
+  pageHint?: string;
+}
+
+interface PriorityPage {
+  pageUrl: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface DraftScheduleSuggestion {
+  draftId: string;
+  /** ISO datetime (midnight UTC of the chosen weekday). */
+  suggestedDate: string;
+  reason: string;
+}
+
+const PRIORITY_RANK: Record<PriorityPage['priority'], number> = { high: 0, medium: 1, low: 2 };
+
+function isWeekend(d: Date): boolean {
+  const dow = d.getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
+/** Advance to the next weekday (Mon–Fri) on/after the given date. */
+function nextWeekday(d: Date): Date {
+  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  while (isWeekend(next)) {
+    next.setUTCDate(next.getUTCDate() + 1);
+  }
+  return next;
+}
+
+/**
+ * Propose a publish date for each unscheduled draft. Drafts whose pageHint
+ * matches a high/medium/low priority page (from suggestPublishDates) are scheduled
+ * first and earliest; the rest follow in input order. Dates are spread across
+ * upcoming weekdays (`spacingDays` business days apart, default 2), starting from
+ * `startDate`. Weekends are skipped.
+ */
+export function suggestDraftSchedule(opts: {
+  drafts: DraftToSchedule[];
+  startDate: Date;
+  priorityPages?: PriorityPage[];
+  spacingDays?: number;
+}): DraftScheduleSuggestion[] {
+  const { drafts, startDate } = opts;
+  if (drafts.length === 0) return [];
+
+  const spacing = Math.max(1, opts.spacingDays ?? 2);
+  const priorityByPage = new Map<string, PriorityPage['priority']>();
+  for (const p of opts.priorityPages ?? []) {
+    priorityByPage.set(p.pageUrl, p.priority);
+  }
+
+  // Stable sort: prioritized drafts first (by rank), preserving original order within ties.
+  const ordered = drafts
+    .map((draft, idx) => {
+      const priority = draft.pageHint ? priorityByPage.get(draft.pageHint) : undefined;
+      return { draft, idx, priority };
+    })
+    .sort((a, b) => {
+      const ra = a.priority ? PRIORITY_RANK[a.priority] : 3;
+      const rb = b.priority ? PRIORITY_RANK[b.priority] : 3;
+      if (ra !== rb) return ra - rb;
+      return a.idx - b.idx;
+    });
+
+  const suggestions: DraftScheduleSuggestion[] = [];
+  // Start at the first weekday on/after startDate.
+  let cursor = nextWeekday(startDate);
+  for (const { draft, priority } of ordered) {
+    const slot = nextWeekday(cursor);
+    suggestions.push({
+      draftId: draft.id,
+      suggestedDate: slot.toISOString(),
+      reason: priority
+        ? `${priority[0].toUpperCase()}${priority.slice(1)}-priority page — scheduled early`
+        : 'Spaced into the next available publishing slot',
+    });
+    // Advance the cursor by `spacing` business days for the next draft.
+    cursor = new Date(slot);
+    let advanced = 0;
+    while (advanced < spacing) {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      if (!isWeekend(cursor)) advanced++;
+    }
+  }
+
+  return suggestions;
+}

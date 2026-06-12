@@ -19,13 +19,13 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createBatch } from '../../server/approvals.js';
 import { saveRecommendations, loadRecommendations } from '../../server/recommendations.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
-const ctx = createTestContext(13872, { autoPublicAuth: true }); // port-ok: next free port above 13871
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { patchJson } = ctx;
 
 let testWsId = '';

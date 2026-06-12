@@ -9,7 +9,6 @@
  * - POST  /api/briefing/:wsId/drafts/:id/skip     skip draft
  * - POST  /api/briefing/:wsId/generate-now        manual trigger (202)
  *
- * Port: 13329 (verified free — highest used is 13328)
  *
  * Sets FEATURE_CLIENT_BRIEFING_V2=true at module load so the spawned test
  * server sees the flag as ON — the generate-now route gates on it. Pattern
@@ -18,13 +17,13 @@
 process.env.FEATURE_CLIENT_BRIEFING_V2 = 'true';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertBriefingDraft } from '../../server/briefing-store.js';
 import { listActivity } from '../../server/activity-log.js';
 import { randomUUID } from 'crypto';
 
-const ctx = createTestContext(13329); // port-ok: verified free as of 2026-04-29; extends range to 13329
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';

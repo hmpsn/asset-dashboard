@@ -25,15 +25,14 @@
  *      keyword counts toward IN_STRATEGY; a de-laundered client keyword does not
  *      inflate it.
  *
- * In-process domain test (no HTTP): createTestContext only bootstraps an isolated
+ * In-process domain test (no HTTP): createEphemeralTestContext only bootstraps an isolated
  * DATA_DIR; the assertions drive the real domain functions against the same DB
  * (the better-sqlite3 singleton uses DATA_DIR/dashboard.db). Mirrors
  * tracked-keywords-concurrency.test.ts.
  *
- * Port: 13895 (exclusive; 13886 reserved for tracked-keywords-concurrency).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 vi.mock('../../server/broadcast.js', () => ({
@@ -42,8 +41,7 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
 
-const PORT = 13895;
-const ctx = createTestContext(PORT);
+const ctx = createEphemeralTestContext(import.meta.url);
 
 let workspaceId = '';
 

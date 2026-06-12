@@ -1,5 +1,4 @@
 /**
- * keyword-universe-coverage.test.ts — Task 3 integration test (port 13904).
  *
  * Exercises the REAL Keyword Command Center read path
  *   GET /api/webflow/keyword-command-center/:workspaceId/rows
@@ -26,7 +25,7 @@
  * so default-OFF resolution stays byte-identical for every other workspace.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { storeRankSnapshot } from '../../server/rank-tracking.js';
 import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
@@ -36,7 +35,7 @@ import type {
   KeywordCommandCenterSummaryResponse,
 } from '../../shared/types/keyword-command-center.js';
 
-const ctx = createTestContext(13904); // port-ok: next free after 13903
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 const FLAG = 'keyword-universe-full' as const;

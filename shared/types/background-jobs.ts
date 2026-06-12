@@ -28,6 +28,10 @@ export const BACKGROUND_JOB_TYPES = {
   LLMS_TXT_GENERATION: 'llms-txt-generation',
   AEO_SITE_REVIEW: 'aeo-site-review',
   CONTENT_PUBLISH: 'content-publish',
+  CONTENT_BRIEF_REGENERATE: 'content-brief-regenerate',
+  CONTENT_POST_REVIEW: 'content-post-review',
+  CONTENT_POST_FIX: 'content-post-fix',
+  CONTENT_POST_VOICE_SCORE: 'content-post-voice-score',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -241,6 +245,33 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Publishes an approved content post to the Webflow CMS on approval.',
     cancellable: false,
     resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE]: {
+    label: 'Brief Regeneration',
+    description: 'Regenerates a content brief (or its outline) from user feedback.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW]: {
+    label: 'AI Content Review',
+    description: 'Runs the AI quality review checklist against a generated post.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_FIX]: {
+    // Review-before-save: the AI fix draft is returned in job.result and applied by
+    // the user via the post PATCH path; the job itself persists nothing. Same posture
+    // as the *_GENERATION draft jobs (ephemeral) — see background-generation.md §3.
+    label: 'AI Content Fix',
+    description: 'Generates a targeted AI revision draft for a post for review before applying.',
+    cancellable: false,
+    resultBehavior: 'ephemeral',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE]: {
+    label: 'Brand Voice Scoring',
+    description: 'Scores a generated post against the workspace brand voice.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
   },
 };
 

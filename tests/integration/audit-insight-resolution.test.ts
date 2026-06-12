@@ -5,7 +5,6 @@
  * present, the corresponding audit_finding insight gets auto-resolved. Tests the logic
  * implemented in server/webflow-seo-audit-bridges.ts (bridge-audit-auto-resolve callback).
  *
- * Port: 13320
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';

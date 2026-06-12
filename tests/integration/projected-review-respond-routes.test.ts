@@ -17,14 +17,11 @@
  *       (`copy:<entryId>` / `content_request:<id>`) returns 404 (projected types must not use the
  *       unified route).
  *
- * Unique port: 13877 (range 13201–13899; verified free against `grep -r 'createTestContext('`).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import { randomUUID } from 'crypto';
-
-const TEST_PORT = 13877;
 
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
@@ -66,7 +63,7 @@ async function startTestServer(): Promise<void> {
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
-  await new Promise<void>(resolve => server!.listen(TEST_PORT, '127.0.0.1', resolve));
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${port}`;
 }

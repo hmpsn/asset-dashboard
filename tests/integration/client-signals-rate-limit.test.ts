@@ -11,10 +11,10 @@
  * operates against a fresh rate-limit bucket (path is scoped to workspaceId).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13300, { autoPublicAuth: true });
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { postJson } = ctx;
 
 /** workspace used for the 10-then-11 limit tests */

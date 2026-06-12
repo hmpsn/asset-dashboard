@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13358, { autoPublicAuth: true }); // port-ok: next free after 13357
+const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 
 let workspaceId = '';
 let workspaceToken = '';

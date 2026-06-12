@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestContext } from './helpers.js';
+import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import type { LocalSeoReadResponse } from '../../shared/types/local-seo.js';
 
-const ctx = createTestContext(13363); // port-ok: next free after 13362
+const ctx = createEphemeralTestContext(import.meta.url);
 const { api } = ctx;
 
 let seeded: SeededFullWorkspace;
