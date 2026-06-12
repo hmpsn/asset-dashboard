@@ -8,11 +8,13 @@ import { getBrief } from '../content-brief.js';
 import { renderBriefHTML } from '../brief-export-html.js';
 import {
   listContentRequests,
+  listContentRequestsPaged,
   getContentRequest,
   createContentRequest,
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
+import { parsePaginationParams } from '../pagination.js';
 import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested, notifyTeamWorkOrderComment } from '../email.js';
 import { getWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
@@ -21,7 +23,7 @@ import { invalidateContentPipelineIntelligence } from '../intelligence-freshness
 import { normalizePageUrl, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
-import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
+import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page-keywords.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
@@ -265,12 +267,20 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
 router.get('/api/public/page-keywords/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const entries = listPageKeywords(ws.id);
-  res.json(entries.map(p => ({
+  const pagination = parsePaginationParams(req.query);
+  const toClientView = (p: ReturnType<typeof listPageKeywords>[number]) => ({
     pagePath: p.pagePath,
     primaryKeyword: p.primaryKeyword,
     secondaryKeywords: p.secondaryKeywords ?? [],
-  })));
+  });
+  if (!pagination) {
+    return res.json(listPageKeywords(ws.id).map(toClientView));
+  }
+  const paged = listPageKeywordsPaged(ws.id, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items.map(toClientView),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // --- Public Content Topic Requests (client picks topics from strategy) ---
@@ -301,8 +311,8 @@ router.post('/api/public/content-request/:workspaceId', requirePublicContentWrit
 router.get('/api/public/content-requests/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const requests = listContentRequests(req.params.workspaceId);
-  res.json(requests.map(r => ({
+  const pagination = parsePaginationParams(req.query);
+  const toClientView = (r: ReturnType<typeof listContentRequests>[number]) => ({
     id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
     priority: r.priority, status: r.status, source: r.source,
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
@@ -314,7 +324,15 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     // Include postId only when post is ready for client review or beyond
     postId: ['post_review', 'delivered', 'published'].includes(r.status) || (r.status === 'changes_requested' && r.serviceType === 'full_post') ? r.postId : undefined,
     clientFeedback: r.clientFeedback,
-  })));
+  });
+  if (!pagination) {
+    return res.json(listContentRequests(req.params.workspaceId).map(toClientView));
+  }
+  const paged = listContentRequestsPaged(req.params.workspaceId, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items.map(toClientView),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // Client submits their own topic request

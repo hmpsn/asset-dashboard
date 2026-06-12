@@ -64,6 +64,12 @@ const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
     'SELECT * FROM requests WHERE workspace_id = ? ORDER BY created_at DESC',
   ),
+  selectByWorkspacePaged: db.prepare(
+    'SELECT * FROM requests WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+  ),
+  countByWorkspace: db.prepare(
+    'SELECT COALESCE(COUNT(*), 0) AS cnt FROM requests WHERE workspace_id = ?',
+  ),
   selectById: db.prepare('SELECT * FROM requests WHERE id = ?'),
   insert: db.prepare(`
         INSERT INTO requests (id, workspace_id, title, description, category, priority,
@@ -91,6 +97,31 @@ export function listRequests(workspaceId?: string): ClientRequest[] {
     rows = stmts().selectAll.all() as RequestRow[];
   }
   return rows.map(rowToRequest);
+}
+
+export interface ListRequestsPagedResult {
+  items: ClientRequest[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export function listRequestsPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListRequestsPagedResult {
+  const countRow = stmts().countByWorkspace.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().selectByWorkspacePaged.all(workspaceId, limit, offset) as RequestRow[];
+  return {
+    items: rows.map(rowToRequest),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
 }
 
 export function getRequest(id: string): ClientRequest | undefined {

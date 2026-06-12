@@ -11,8 +11,10 @@ const router = Router();
 import { canSend, recordSend } from '../email-throttle.js';
 import {
   listBatches,
+  listBatchesPaged,
   getBatch,
 } from '../approvals.js';
+import { parsePaginationParams } from '../pagination.js';
 import {
   createApprovalBatchForClient,
   deleteApprovalBatchForClient,
@@ -121,7 +123,15 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
 
 // --- Public Approvals (client dashboard, no auth required) ---
 router.get('/api/public/approvals/:workspaceId', requireClientPortalAuth(), (req, res) => {
-  res.json(toClientInboxApprovalBatches(listBatches(req.params.workspaceId)));
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json(toClientInboxApprovalBatches(listBatches(req.params.workspaceId)));
+  }
+  const paged = listBatchesPaged(req.params.workspaceId, pagination.limit, pagination.offset);
+  return res.json({
+    items: toClientInboxApprovalBatches(paged.items),
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAuth(), (req, res) => {

@@ -1,0 +1,11 @@
+-- Persist the SERVER-AUTHORITATIVE normalized cart out-of-band on the payment
+-- record, keyed by Stripe session id. Stripe checkout-session metadata values
+-- are capped at 500 chars, so a large cart's full normalized line items (with
+-- all merged pageIds) cannot live in metadata — a ~15+ page cart would throw an
+-- opaque Stripe error at checkout. We keep metadata to a compact reference and
+-- read the full cart from this column at webhook-fulfillment time.
+--
+-- Stored as a JSON array of normalized cart items:
+--   [{ productType, quantity, pageIds?, issueChecks? }, ...]
+-- Parsed at the read boundary via parseJsonSafeArray. NULL for non-cart payments.
+ALTER TABLE payments ADD COLUMN cart_items TEXT; -- JSON: NormalizedCartItem[]

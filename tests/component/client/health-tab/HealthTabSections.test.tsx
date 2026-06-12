@@ -39,6 +39,24 @@ vi.mock('../../../../src/lib/health-tab-content-request', () => ({
   buildContentImprovementRequest: vi.fn(),
 }));
 
+// ── useCart — stub so FixableIssueRow renders without a CartProvider ──────────
+vi.mock('../../../../src/components/client/useCart', () => ({
+  useCart: () => ({
+    items: [],
+    totalItems: 0,
+    totalPrice: 0,
+    addItem: vi.fn(),
+    openCart: vi.fn(),
+    removeItem: vi.fn(),
+    updateQuantity: vi.fn(),
+    clearCart: vi.fn(),
+    isOpen: false,
+    closeCart: vi.fn(),
+    toggleCart: vi.fn(),
+  }),
+  CartProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function makeQueryClient() {
   return new QueryClient({

@@ -4,6 +4,7 @@ import { useCart } from './useCart';
 import { post } from '../../api/client';
 import { Button, IconButton } from '../ui';
 import { fmtMoneyFull } from '../../utils/formatNumbers';
+import { packUpsellForItem } from './seoCartUpsell';
 
 const fmt = fmtMoneyFull;
 
@@ -34,7 +35,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
     setCheckingOut(true);
     setError(null);
     try {
-      const data = await post<{ url?: string; error?: string }>('/api/stripe/cart-checkout', { workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity, pageIds: i.pageIds })) });
+      const data = await post<{ url?: string; error?: string }>('/api/stripe/cart-checkout', { workspaceId, items: items.map(i => ({ productType: i.productType, quantity: i.quantity, pageIds: i.pageIds, issueChecks: i.issueChecks })) });
       if (data.url) {
         clearCart();
         window.location.href = data.url;
@@ -85,7 +86,9 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Add fixes from the Site Health tab</p>
             </div>
           ) : (
-            items.map(item => (
+            items.map(item => {
+              const upsell = item.isFlat ? null : packUpsellForItem(item.productType, item.quantity);
+              return (
               <div key={item.productType} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -125,23 +128,21 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                   <IconButton icon={Trash2} label={`Remove ${item.displayName}`} size="sm" onClick={() => removeItem(item.productType)} className="hover:text-[var(--red)]" />
                 </div>
 
-                {/* Pack upsell for per-page items */}
-                {!item.isFlat && item.quantity >= 7 && item.quantity < 10 && (
+                {/* Pack upsell — only when buying the pack actually saves money
+                    (savings derived from the catalog; never a negative nudge). */}
+                {upsell && (
                   <div className="mt-2 px-2.5 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3 h-3 text-accent-brand" />
                       <span className="t-caption-sm text-accent-brand">
-                        {item.productType === 'fix_meta'
-                          ? 'Get the 10-page pack for $179 (save $' + (item.quantity * 20 - 179) + ' more)'
-                          : item.productType === 'schema_page'
-                            ? 'Get the 10-page pack for $299 (save $' + (item.quantity * 39 - 299) + ' more)'
-                            : `Buy ${10 - item.quantity} more for a pack discount`}
+                        Get the {upsell.packSize}-page pack for {fmt(upsell.packPrice)} (save {fmt(upsell.savings)} more)
                       </span>
                     </div>
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

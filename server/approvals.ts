@@ -32,7 +32,15 @@ const stmts = createStmtCache(() => ({
          VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @note, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM approval_batches WHERE workspace_id = ?`,
+    // ORDER BY parity with selectByWorkspacePaged — unpaged and paged reads must
+    // return rows in the same order (newest first) so callers see a stable order.
+    `SELECT * FROM approval_batches WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectByWorkspacePaged: db.prepare(
+    `SELECT * FROM approval_batches WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+  ),
+  countByWorkspace: db.prepare(
+    `SELECT COALESCE(COUNT(*), 0) AS cnt FROM approval_batches WHERE workspace_id = ?`,
   ),
   selectById: db.prepare(
     `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
@@ -121,6 +129,31 @@ export function createBatch(
 export function listBatches(workspaceId: string): ApprovalBatch[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as BatchRow[];
   return rows.map(rowToBatch);
+}
+
+export interface ListBatchesPagedResult {
+  items: ApprovalBatch[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export function listBatchesPaged(
+  workspaceId: string,
+  limit: number,
+  offset: number,
+): ListBatchesPagedResult {
+  const countRow = stmts().countByWorkspace.get(workspaceId) as { cnt: number };
+  const total = Number(countRow.cnt) || 0;
+  const rows = stmts().selectByWorkspacePaged.all(workspaceId, limit, offset) as BatchRow[];
+  return {
+    items: rows.map(rowToBatch),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  };
 }
 
 export function getBatch(workspaceId: string, batchId: string): ApprovalBatch | undefined {

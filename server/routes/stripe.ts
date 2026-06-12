@@ -99,6 +99,28 @@ const stripeProductsConfigSchema = z.object({
   products: z.array(stripeProductPriceSchema).max(100),
 });
 
+// Cart-checkout body caps. A fix cart is bounded — even a full-site audit yields
+// far fewer than these limits — so generous caps keep honest callers unaffected
+// while preventing an unbounded payload (which would also defeat §3's out-of-band
+// persistence). pageIds/issueChecks are capped per item to bound the persisted blob.
+const CART_MAX_ITEMS = 50;
+const CART_MAX_PAGE_IDS = 500;
+const CART_MAX_ISSUE_CHECKS = 100;
+const cartCheckoutSchema = z.object({
+  workspaceId: z.string().min(1).max(100),
+  items: z
+    .array(
+      z.object({
+        productType: z.string().min(1).max(80),
+        quantity: z.number().int().min(1).max(1000).optional(),
+        pageIds: z.array(z.string().max(400)).max(CART_MAX_PAGE_IDS).optional(),
+        issueChecks: z.array(z.string().max(120)).max(CART_MAX_ISSUE_CHECKS).optional(),
+      }),
+    )
+    .min(1)
+    .max(CART_MAX_ITEMS),
+}).passthrough();
+
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
 
@@ -174,7 +196,9 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, requireWorkspaceAcce
 });
 
 // Cart checkout: multiple SEO fix products in one Stripe session
-router.post('/api/stripe/cart-checkout', checkoutLimiter, requireWorkspaceAccessFromBody(), async (req, res) => {
+// validate() runs before the workspace-access guard so an over-cap payload is
+// rejected (400) regardless of auth, and bounds the persisted out-of-band cart.
+router.post('/api/stripe/cart-checkout', checkoutLimiter, validate(cartCheckoutSchema), requireWorkspaceAccessFromBody(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const { workspaceId, items } = req.body;
   if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });
@@ -184,10 +208,11 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, requireWorkspaceAccess
   try {
     const { sessionId, url } = await createCartCheckoutSession({
       workspaceId,
-      items: items.map((i: { productType: string; quantity: number; pageIds?: string[] }) => ({
+      items: items.map((i: { productType: string; quantity: number; pageIds?: string[]; issueChecks?: string[] }) => ({
         productType: sanitizeString(i.productType, 50) as import('../payments.js').ProductType,
         quantity: Math.max(1, Math.min(100, Number(i.quantity) || 1)),
         pageIds: Array.isArray(i.pageIds) ? i.pageIds.map((p: string) => sanitizeString(p, 200)) : undefined,
+        issueChecks: Array.isArray(i.issueChecks) ? i.issueChecks.map((c: string) => sanitizeString(c, 100)) : undefined,
       })),
       successUrl: context.successUrl,
       cancelUrl: context.cancelUrl,

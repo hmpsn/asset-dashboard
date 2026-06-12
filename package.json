@@ -46,6 +46,7 @@
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
     "verify:observability": "tsx scripts/report-platform-observability.ts",
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
+    "verify:stripe-prices": "tsx scripts/verify-stripe-prices.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
     "verify:platform-health-cadence": "tsx scripts/platform-health-cadence.ts",
     "verify:adr-log": "tsx scripts/adr-log.ts",

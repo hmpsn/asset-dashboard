@@ -23,8 +23,13 @@ import { ScoreHistoryChart } from '../helpers';
 import { toLiveUrl } from '../utils';
 import { CAT_LABELS, SEV, type AuditDetail, type CwvStrategyResult } from '../types';
 import { hasContentIssues } from '../../../lib/health-tab-content-request';
-import { buildFixTypeGroups, checkImpact } from './healthTabModel';
+import { checkImpact } from './healthTabModel';
+import { HealthFixByTypeSection } from './HealthFixByTypeSection';
+import { FixableIssueRow } from './FixableIssueRow';
+import { HealthImpactLine } from './HealthImpactLine';
 import type { HealthTabShell } from './useHealthTabShell';
+import type { Tier } from '../../ui/TierGate';
+import type { ImpactBand } from '../../../../shared/types/fix-catalog.js';
 import { capitalize } from '../../../utils/strings';
 
 interface HeaderSectionProps {
@@ -317,9 +322,25 @@ interface TopFixesProps {
     | 'requestContentImprovement'
     | 'allPagesRef'
   >;
+  /** Current client tier — controls Fix CTA vs hours framing */
+  tier?: Tier;
+  /** External-billing workspaces: render request-fix framing, never prices/cart. */
+  hidePrices?: boolean;
+  /** Impact bands keyed by audit check type */
+  impactBandsByCheck?: Record<string, ImpactBand>;
+  onRequestFix?: (check: string, label: string) => void;
 }
 
-export function HealthTopFixesSection({ auditDetail, liveDomain, workspaceId, shell }: TopFixesProps) {
+export function HealthTopFixesSection({
+  auditDetail,
+  liveDomain,
+  workspaceId,
+  shell,
+  tier = 'growth',
+  hidePrices,
+  impactBandsByCheck,
+  onRequestFix,
+}: TopFixesProps) {
   const { prioritized, sortedPages } = useMemo(() => {
     const allIssues: Array<{
       pageId: string;
@@ -400,6 +421,23 @@ export function HealthTopFixesSection({ auditDetail, liveDomain, workspaceId, sh
                           {checkImpact(item.issue.check)}
                         </div>
                       )}
+                      {/* Impact line */}
+                      {impactBandsByCheck?.[item.issue.check] && (
+                        <div className="mt-1">
+                          <HealthImpactLine impactBand={impactBandsByCheck[item.issue.check]} />
+                        </div>
+                      )}
+                      {/* Fix CTA — purchasable checks */}
+                      <div className="mt-1.5">
+                        <FixableIssueRow
+                          check={item.issue.check}
+                          displayName={`${item.page} — ${item.issue.check}`}
+                          pageIds={[item.pageId]}
+                          tier={tier}
+                          hidePrices={hidePrices}
+                          onRequestFix={() => onRequestFix?.(item.issue.check, item.issue.check)}
+                        />
+                      </div>
                     </div>
                     {hasContentIssues([item.issue]) && workspaceId && !shell.requestedPages.has(item.pageId) && (
                       <Button
@@ -620,9 +658,25 @@ interface AllPagesProps {
     | 'requestContentImprovement'
   >;
   workspaceId?: string;
+  /** Current client tier — controls Fix CTA vs hours framing in by-fix-type view */
+  tier?: Tier;
+  /** External-billing workspaces: render request-fix framing, never prices/cart. */
+  hidePrices?: boolean;
+  /** Impact bands keyed by audit check type for the by-fix-type view */
+  impactBandsByCheck?: Record<string, ImpactBand>;
+  onRequestFix?: (check: string, label: string) => void;
 }
 
-export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspaceId }: AllPagesProps) {
+export function HealthAllPagesSection({
+  auditDetail,
+  liveDomain,
+  shell,
+  workspaceId,
+  tier = 'growth',
+  hidePrices,
+  impactBandsByCheck,
+  onRequestFix,
+}: AllPagesProps) {
   return (
     <div ref={shell.allPagesRef}>
       <SectionCard noPadding>
@@ -757,73 +811,17 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
           </div>
         )}
 
-        {shell.viewMode === 'by-fix-type' &&
-          (() => {
-            const groups = buildFixTypeGroups(
-              auditDetail,
-              shell.severityFilter,
-              shell.showInfoItems,
-            );
-
-            return (
-              <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
-                {groups.length === 0 && (
-                  <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">
-                    No issues match your filters
-                  </div>
-                )}
-                {groups.map((group) => {
-                  const sc = SEV[group.severity];
-                  const key = `fix-type-${group.check}`;
-                  const isExpanded = shell.expandedPages.has(key);
-                  return (
-                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
-                      <ClickableRow onClick={() => shell.togglePage(key)} className="flex items-center gap-3 px-4 py-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="t-caption font-medium text-[var(--brand-text)]">{group.label}</div>
-                          <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                            {group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <Badge
-                            label={String(group.pages.length)}
-                            tone={group.severity === 'error' ? 'red' : group.severity === 'warning' ? 'amber' : 'blue'}
-                            variant="outline"
-                          />
-                          <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
-                        </div>
-                      </ClickableRow>
-
-                      {isExpanded && (
-                        <div className="px-4 pb-3">
-                          {checkImpact(group.check) && (
-                            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2 leading-relaxed px-1">
-                              {checkImpact(group.check)}
-                            </div>
-                          )}
-                          <div className="space-y-1.5">
-                            {group.pages.map((page, i) => (
-                              <div key={`${page.pageId}-${i}`} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
-                                <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{page.page}</div>
-                                <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
-                                {page.recommendation && (
-                                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                                    {page.recommendation}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+        {shell.viewMode === 'by-fix-type' && (
+          <HealthFixByTypeSection
+            auditDetail={auditDetail}
+            liveDomain={liveDomain}
+            shell={shell}
+            tier={tier}
+            hidePrices={hidePrices}
+            impactBandsByCheck={impactBandsByCheck}
+            onRequestFix={onRequestFix}
+          />
+        )}
       </SectionCard>
     </div>
   );

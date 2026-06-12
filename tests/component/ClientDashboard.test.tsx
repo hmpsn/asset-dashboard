@@ -64,6 +64,11 @@ vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: vi.fn(() => false),
 }));
 
+vi.mock('../../src/hooks/useRecommendations', () => ({
+  useRecommendations: vi.fn(() => ({ recs: [], loaded: false })),
+  useRecommendationSet: vi.fn(() => ({ data: undefined })),
+}));
+
 vi.mock('../../src/hooks/usePayments', () => ({
   usePayments: vi.fn(() => ({
     pricingModal: null,
@@ -190,7 +195,14 @@ vi.mock('../../src/components/client/PerformanceTab', () => ({
   PerformanceTab: () => <div data-testid="performance-tab">Performance</div>,
 }));
 vi.mock('../../src/components/client/HealthTab', () => ({
-  HealthTab: () => <div data-testid="health-tab">Health</div>,
+  HealthTab: ({ impactBandsByCheck }: { impactBandsByCheck?: Record<string, unknown> }) => (
+    <div
+      data-testid="health-tab"
+      data-impact-bands={impactBandsByCheck ? JSON.stringify(impactBandsByCheck) : undefined}
+    >
+      Health
+    </div>
+  ),
 }));
 vi.mock('../../src/components/client/StrategyTab', () => ({
   StrategyTab: () => <div data-testid="strategy-tab">Strategy</div>,
@@ -226,6 +238,7 @@ vi.mock('../../src/lib/lazyWithRetry', () => ({
 // ── Now import subject under test ─────────────────────────────────────────────
 import { get, getOptional } from '../../src/api/client';
 import { ClientDashboard } from '../../src/components/ClientDashboard';
+import { useRecommendations } from '../../src/hooks/useRecommendations';
 import {
   resolveClientTab,
   KNOWN_CLIENT_TABS,
@@ -764,5 +777,142 @@ describe('ClientDashboard — JWT auto-auth', () => {
       expect(screen.getByTestId('client-header')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('client-auth-gate')).not.toBeInTheDocument();
+  });
+});
+
+// ── R1-A → R1-B seam: impactBandsByCheck prop flow ───────────────────────────
+//
+// Asserts that ClientDashboard builds the per-check impact map from the
+// client recommendations and passes it through to HealthTab.
+
+describe('ClientDashboard — impactBandsByCheck wiring (R1 seam)', () => {
+  const mockUseRecommendations = vi.mocked(useRecommendations);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    mockGetOptional.mockResolvedValue(null);
+  });
+
+  it('passes impactBandsByCheck to HealthTab derived from audit-sourced recs', async () => {
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    // Stub two audit recs with impactBand — one with audit: prefix, one site-wide
+    mockUseRecommendations.mockReturnValue({
+      recs: [
+        {
+          id: 'rec-1',
+          workspaceId: 'ws-test',
+          priority: 'fix_now',
+          type: 'metadata',
+          title: 'Fix titles',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'high',
+          effort: 'low',
+          impactScore: 80,
+          source: 'audit:title',
+          affectedPages: ['/home'],
+          trafficAtRisk: 200,
+          impressionsAtRisk: 1000,
+          estimatedGain: 'Better rankings',
+          actionType: 'purchase',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'medium', monthlyRangeUsd: [100, 200] },
+        },
+        {
+          id: 'rec-2',
+          workspaceId: 'ws-test',
+          priority: 'fix_soon',
+          type: 'schema',
+          title: 'Add schema',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'medium',
+          effort: 'medium',
+          impactScore: 55,
+          source: 'audit:structured-data',
+          affectedPages: ['/about'],
+          trafficAtRisk: 50,
+          impressionsAtRisk: 200,
+          estimatedGain: 'Richer SERP',
+          actionType: 'purchase',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'low', monthlyRangeUsd: [30, 60] },
+        },
+      ],
+      loaded: true,
+      forPage: vi.fn(),
+      ofType: vi.fn(),
+      forPageAndType: vi.fn(),
+    });
+
+    renderDashboard({ initialTab: 'health' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('health-tab')).toBeInTheDocument();
+    });
+
+    const healthTab = screen.getByTestId('health-tab');
+    const rawBands = healthTab.getAttribute('data-impact-bands');
+    expect(rawBands).not.toBeNull();
+    const bands = JSON.parse(rawBands!);
+    expect(bands.title).toEqual({ band: 'medium', monthlyRangeUsd: [100, 200] });
+    expect(bands['structured-data']).toEqual({ band: 'low', monthlyRangeUsd: [30, 60] });
+  });
+
+  it('passes an empty impactBandsByCheck when recs have no audit source', async () => {
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    mockUseRecommendations.mockReturnValue({
+      recs: [
+        {
+          id: 'rec-1',
+          workspaceId: 'ws-test',
+          priority: 'fix_soon',
+          type: 'content',
+          title: 'Content gap',
+          description: 'desc',
+          insight: 'insight',
+          impact: 'medium',
+          effort: 'medium',
+          impactScore: 40,
+          source: 'strategy:content-gap',
+          affectedPages: [],
+          trafficAtRisk: 0,
+          impressionsAtRisk: 0,
+          estimatedGain: 'More traffic',
+          actionType: 'content_creation',
+          status: 'pending',
+          createdAt: '2026-06-01T00:00:00Z',
+          updatedAt: '2026-06-01T00:00:00Z',
+          impactBand: { band: 'medium', monthlyRangeUsd: [80, 160] },
+        },
+      ],
+      loaded: true,
+      forPage: vi.fn(),
+      ofType: vi.fn(),
+      forPageAndType: vi.fn(),
+    });
+
+    renderDashboard({ initialTab: 'health' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('health-tab')).toBeInTheDocument();
+    });
+
+    const healthTab = screen.getByTestId('health-tab');
+    // data-impact-bands attr should be absent (empty object → adapter renders undefined)
+    // OR be an empty object — either is acceptable; both mean "no impact for any check"
+    const rawBands = healthTab.getAttribute('data-impact-bands');
+    if (rawBands !== null) {
+      expect(JSON.parse(rawBands)).toEqual({});
+    }
   });
 });

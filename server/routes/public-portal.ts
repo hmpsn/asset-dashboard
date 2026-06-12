@@ -31,10 +31,12 @@ import { listBlueprints } from '../page-strategy.js';
 import {
   clearKeywordFeedback,
   listPublicKeywordFeedback,
+  listPublicKeywordFeedbackPaged,
   notifyKeywordFeedbackChanged,
   saveBulkKeywordFeedback,
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
+import { parsePaginationParams } from '../pagination.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -294,6 +296,10 @@ router.get('/api/public/audit-detail/:workspaceId', requireClientPortalAuth(), (
     }
   }
 
+  // Safety cap: scoreHistory is fetched unbounded from DB and can grow indefinitely
+  // (one row per audit run). Cap at 50 most-recent entries — the chart only renders
+  // ~12–24 meaningful data points and the full unbounded list can exceed 200KB.
+  const SCORE_HISTORY_CAP = 50;
   res.json({
     id: latest.id,
     createdAt: latest.createdAt,
@@ -301,7 +307,7 @@ router.get('/api/public/audit-detail/:workspaceId', requireClientPortalAuth(), (
     logoUrl: latest.logoUrl,
     previousScore,
     audit: filtered,
-    scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore, errors: h.errors, warnings: h.warnings })),
+    scoreHistory: history.slice(0, SCORE_HISTORY_CAP).map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore, errors: h.errors, warnings: h.warnings })),
     auditDiff,
   });
 });
@@ -332,7 +338,15 @@ router.get('/api/public/audit-traffic/:workspaceId', requireAuthenticatedClientP
 router.get('/api/public/keyword-feedback/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  res.json(listPublicKeywordFeedback(ws.id));
+  const pagination = parsePaginationParams(req.query);
+  if (!pagination) {
+    return res.json(listPublicKeywordFeedback(ws.id));
+  }
+  const paged = listPublicKeywordFeedbackPaged(ws.id, pagination.limit, pagination.offset);
+  return res.json({
+    items: paged.items,
+    pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
+  });
 });
 
 // Client: submit keyword feedback (approve/decline)
