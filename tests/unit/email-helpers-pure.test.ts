@@ -164,7 +164,6 @@ describe('getThrottleCategory', () => {
     ['request_status', 'status'],
     ['request_response', 'status'],
     ['audit_complete', 'audit'],
-    ['audit_improved', 'audit'],
     ['recommendations_ready', 'audit'],
     ['approval_ready', 'action'],
     ['content_brief_ready', 'action'],

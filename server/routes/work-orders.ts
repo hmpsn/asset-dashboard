@@ -9,9 +9,9 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { listClientUsers } from '../client-users.js';
 import { notifyClientFixesApplied, notifyClientWorkOrderComment } from '../email.js';
 import { sanitizeString } from '../helpers.js';
+import { listClientNotificationRecipients } from '../notification-recipients.js';
 import { listPayments } from '../payments.js';
 import { listWorkOrders, getWorkOrder, updateWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
@@ -85,19 +85,16 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
       { workOrderId: order.id, productType: order.productType });
     // Email client
     if (ws) {
-      const clientUsers = listClientUsers(wsId);
       const dashboardUrl = getClientPortalUrl(ws);
-      for (const cu of clientUsers) {
-        if (cu.email) {
-          notifyClientFixesApplied({
-            clientEmail: cu.email,
-            workspaceName: ws.name,
-            workspaceId: wsId,
-            productType: order.productType.replace(/_/g, ' '),
-            pageCount: order.pageIds.length,
-            dashboardUrl,
-          });
-        }
+      for (const recipient of listClientNotificationRecipients(wsId, 'fixes_applied')) {
+        notifyClientFixesApplied({
+          clientEmail: recipient.email,
+          workspaceName: ws.name,
+          workspaceId: wsId,
+          productType: order.productType.replace(/_/g, ' '),
+          pageCount: order.pageIds.length,
+          dashboardUrl,
+        });
       }
     }
   }
@@ -150,17 +147,15 @@ router.post('/api/work-orders/:workspaceId/:orderId/comment', requireWorkspaceAc
   const ws = getWorkspace(wsId);
   if (ws) {
     const dashboardUrl = getClientPortalUrl(ws);
-    for (const cu of listClientUsers(wsId)) {
-      if (cu.email) {
-        notifyClientWorkOrderComment({
-          clientEmail: cu.email,
-          workspaceName: ws.name,
-          workspaceId: wsId,
-          orderTitle,
-          message: content,
-          dashboardUrl,
-        });
-      }
+    for (const recipient of listClientNotificationRecipients(wsId, 'work_order_comment_client')) {
+      notifyClientWorkOrderComment({
+        clientEmail: recipient.email,
+        workspaceName: ws.name,
+        workspaceId: wsId,
+        orderTitle,
+        message: content,
+        dashboardUrl,
+      });
     }
   }
 
