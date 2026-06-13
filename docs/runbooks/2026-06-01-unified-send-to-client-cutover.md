@@ -31,7 +31,7 @@ These were deliberately deferred from the dark PRs (each is harmless while dark)
 
 1. **Send-seam re-mirror must route through the guarded path (PR-1a L1, PR-1b).** The dual-write hooks call `upsertDeliverable` directly, bypassing the `validateTransition` resend guard. If a legacy artifact is re-sent after its unified row was already `approved`, the `ON CONFLICT DO UPDATE` would silently revert it to `awaiting_client` (nulling `decided_at`/`applied_at`). Fix: route the mirror through `sendToClient` (or add a `findBySourceRef` + `validateTransition` check) in `approval-batch-dual-write.ts`, `client-action-dual-write.ts`, `schema-plan-dual-write.ts`, `work-order-dual-write.ts`. **Dark today (no rows exist); a real bug the instant dual-write turns on.**
 2. **redirect / internal_link producer `sourceId` change (PR-1b/M2/B17).** The adapters compute a stable `redirect:<siteId>`/`internal_link:<siteId>` `sourceRef`, but the LIVE producers (`RedirectManager.tsx:179`, `InternalLinks.tsx:144`) still key the legacy `client_action.sourceId` on a timestamp. Until they use the stable key, a re-send mints a NEW legacy row (B17 dup) that the backfill then maps to the same deliverable. Change the producers to the stable site key so legacy + dual-write + backfill all converge.
-3. **CP-K4 matrix-cell guard (deferred from PR-1a).** Before content_plan approvals write back to the matrix cell at cutover, bring `updateMatrixCell` (`server/content-matrices.ts`) under a `MATRIX_CELL_TRANSITIONS` guard (or derive the cell status from the deliverable) so a failed/partial apply can't desync (audit CP-K4 / B2 / M6).
+3. **CP-K4 matrix-cell guard (resolved 2026-06-13).** `updateMatrixCell` (`server/content-matrices.ts`) and wholesale matrix cell rewrites now run through `MATRIX_CELL_TRANSITIONS`, with route-level 409 coverage for illegal skips. Keep future content_plan apply work on that guarded path so a failed/partial apply can't desync (audit CP-K4 / B2 / M6).
 4. **Apply opt-in stays OFF until the field map soaks (D-apply).** Every adapter's `applyDeliverable` is a disabled stub. Do NOT enable apply-on-approve at the same time as the read flip. Enable dual-write + read first; enable apply per-adapter only after the audit_issue field map (the B1 fix) has been observed correct in the shadow window.
 
 ---
@@ -84,7 +84,7 @@ Resolve these as you cut over (none block the dark build):
 3. **`redirect_proposal` vs `redirect`** — the stored `sourceType` is `redirect_proposal`; the deliverable type is `redirect`. Map at the boundary (current) or migrate the stored value?
 4. **declined/expired vs dedup** — does a `declined`/`expired` deliverable block a fresh send under `uq_cd_ws_type_sourceref`? Decide which statuses count as "active" for supersede-on-resend.
 5. **schema_plan send-route guard** — `webflow-schema.ts:696` is site-scoped only; standardize to the admin `requireWorkspaceAccess` pattern at cutover.
-6. **B15** (client-reply visibility on `requests`) stays deferred while **B24** (the `REQUEST_TRANSITIONS` guard — scoped but not yet added; add it when convenient) is in scope.
+6. **B15** (client-reply visibility on `requests`) stays deferred. **B24** (`REQUEST_TRANSITIONS`) is resolved as of 2026-06-13: single and bulk request status updates now validate the state machine before mutation, and illegal transitions return 409 without broadcasts or client status emails.
 
 ---
 

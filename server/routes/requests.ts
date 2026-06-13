@@ -26,7 +26,7 @@ import {
   type RequestStatus,
 } from '../requests.js';
 import { getWorkspace, getClientPortalUrl, updatePageState } from '../workspaces.js';
-import { InvalidTransitionError } from '../state-machines.js';
+import { InvalidTransitionError, REQUEST_TRANSITIONS, validateTransition } from '../state-machines.js';
 
 const router = Router();
 
@@ -147,6 +147,18 @@ router.patch('/api/requests/bulk', validate(bulkUpdateRequestSchema), (req, res)
   const existingRequests = ids.map(id => getRequest(id));
   if (existingRequests.some(existing => existing && !requestUserCanAccessWorkspace(req, existing.workspaceId))) {
     return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
+  try {
+    if (status) {
+      for (const existing of existingRequests) {
+        if (existing && status !== existing.status) {
+          validateTransition('request', REQUEST_TRANSITIONS, existing.status, status);
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+    throw err;
   }
   const succeededRequests = existingRequests
     .map((existing, index) => existing ? updateRequest(existing.workspaceId, ids[index], updates) : null)
