@@ -97,6 +97,40 @@ export const DEPRECATION_REGISTRY: DeprecationEntry[] = [
     ],
   },
   {
+    id: 'client-approvals-tab-removed',
+    capability: 'Legacy ApprovalsTab client component',
+    state: 'removed',
+    owner: 'inbox',
+    replacement: 'Use UnifiedInbox with InlineApprovalCard and DecisionDetailModal over /api/public/deliverables.',
+    requiresHumanVerification: true,
+    notes: 'Removed 2026-06-13 after the unified inbox became the canonical client approval surface. RequestsTab and SchemaReviewTab remain live and were intentionally retained.',
+    contracts: [
+      {
+        kind: 'safe-failure',
+        description: 'The canonical inbox renders approval decisions, and a contract test asserts the retired ApprovalsTab file stays absent.',
+        evidence: 'src/components/client/inbox/UnifiedInbox.tsx (canonical client inbox approval renderer)',
+        testEvidence: 'tests/contract/client-data-react-query.test.ts (retired ApprovalsTab deletion assertion)',
+      },
+    ],
+  },
+  {
+    id: 'legacy-approval-apply-route-deprecated',
+    capability: 'Legacy approval apply route (POST /api/public/approvals/:workspaceId/:batchId/apply)',
+    state: 'deprecated',
+    owner: 'inbox',
+    replacement: 'Use POST /api/public/deliverables/:workspaceId/:id/apply.',
+    requiresHumanVerification: true,
+    notes: 'Deprecated 2026-06-13. Compatibility remains for old clients, but the canonical client API now applies by deliverable id and resolves the legacy batch source server-side.',
+    contracts: [
+      {
+        kind: 'safe-failure',
+        description: 'Legacy apply calls continue to work but return an X-Deprecated-Route header pointing at the canonical deliverable apply URL.',
+        evidence: 'server/routes/approvals.ts (X-Deprecated-Route compatibility header)',
+        testEvidence: 'tests/integration/r3b-apply-to-website.test.ts (deprecated compatibility route assertion)',
+      },
+    ],
+  },
+  {
     id: 'keyword-value-scoring-dark-launch',
     capability: 'Keyword Hub value-first opportunity scoring (dark-launched behind keyword-value-scoring)',
     state: 'hidden',

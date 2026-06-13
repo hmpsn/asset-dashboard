@@ -14,6 +14,7 @@ interface UnifiedInboxResponse {
  *
  *   GET   /api/public/deliverables/:workspaceId            — the client-facing unified list
  *   PATCH /api/public/deliverables/:workspaceId/:id/respond — approve / request-changes / decline
+ *   POST  /api/public/deliverables/:workspaceId/:id/apply   — apply approved SEO changes
  *
  * No raw fetch in components (CLAUDE.md).
  */
@@ -50,18 +51,16 @@ export const publicDeliverables = {
     ),
 
   /**
-   * R3b — Apply to Website. Calls the SAME proven legacy apply route the legacy
-   * ApprovalBatchCard uses (no new apply logic): it does the Webflow writes + server-side
-   * applyability gate + markBatchApplied + activity + outcome tracking + broadcasts, and flips the
-   * unified mirror to `applied`. `legacyBatchId` is read off the
-   * deliverable's `payload.legacyBatchId`. Return shape matches the route at approvals.ts.
+   * R3b — Apply to Website. Calls the canonical deliverable apply route; the server resolves the
+   * legacy approval batch id and delegates to the proven apply service for Webflow writes,
+   * markBatchApplied, activity, outcome tracking, broadcasts, and mirror flip.
    */
-  applyApproval: (wsId: string, legacyBatchId: string) =>
+  applyApproval: (wsId: string, deliverableId: string) =>
     post<{
       results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }>;
       applied: number;
       failed: number;
-    }>(`/api/public/approvals/${wsId}/${legacyBatchId}/apply`),
+    }>(`/api/public/deliverables/${wsId}/${deliverableId}/apply`),
 };
 
 /**

@@ -343,7 +343,7 @@ export function UnifiedInbox({
   ...contentTabProps
 }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
-  // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
+  // Item 2 — edit-before-approve is gated to the non-free tier (retired approvals UI parity:
   // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
   // pass-through props the inbox already receives.
   const editable = contentTabProps.effectiveTier !== 'free';
@@ -412,7 +412,7 @@ export function UnifiedInbox({
   );
 
   // R3b "Ready to publish": already-approved deliverables that are client-applyable through the
-  // legacy /apply route (the shared predicate mirrors that route's field/targetRef/collectionId
+  // canonical deliverable apply route (the shared predicate mirrors its field/targetRef/collectionId
   // gate — see shared/applyability.ts). `approved` is intentionally NOT in ACTIONABLE_STATUSES (it
   // must not re-show approve/decline verbs), but it IS client-facing, so these rows ARE present in
   // `deliverables`. Non-applyable approved deliverables (schema, content_plan, approved
@@ -490,9 +490,9 @@ export function UnifiedInbox({
   // R3b — open the "Apply to live site?" confirmation (copy mirrors the legacy ApprovalBatchCard).
   const onApply = (d: ClientDeliverable) => setApplyConfirm(d);
 
-  // R3b — run the apply after the client confirms. Reads the legacy batch id off the deliverable's
-  // payload (typeof-guard) and calls the SAME proven legacy /apply route via the typed mutation.
-  // The legacy /apply route returns HTTP 200 even on a total runtime Webflow write failure
+  // R3b — run the apply after the client confirms. Calls the canonical deliverable apply route,
+  // which resolves the legacy approval source server-side before delegating to the apply service.
+  // The apply service returns HTTP 200 even on a total runtime Webflow write failure
   // (`applied:0, failed:N`), so we MUST branch on the result body — never show success
   // unconditionally (FM-2 anti-pattern). Mirrors the proven legacy ApprovalBatchCard guard.
   // Post-apply UX on full success: the deliverable flips to `applied`, which is filtered OUT
@@ -504,13 +504,8 @@ export function UnifiedInbox({
     const d = applyConfirm;
     setApplyConfirm(null);
     if (!d) return;
-    const legacyBatchId = (d.payload as { legacyBatchId?: unknown }).legacyBatchId;
-    if (typeof legacyBatchId !== 'string' || !legacyBatchId) {
-      setToast({ message: 'Could not apply: this item is missing its source reference.', type: 'error' });
-      return;
-    }
     try {
-      const data = await apply.mutateAsync({ legacyBatchId });
+      const data = await apply.mutateAsync({ deliverableId: d.id });
       if (data.applied > 0 && data.failed === 0) {
         setToast({
           message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`,

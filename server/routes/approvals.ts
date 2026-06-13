@@ -213,8 +213,11 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   res.json(result.batch);
 });
 
-// Apply approved items to Webflow
+// Apply approved items to Webflow. Deprecated compatibility URL; the canonical client path is
+// POST /api/public/deliverables/:workspaceId/:id/apply, which resolves the legacy batch id
+// server-side before delegating to this same domain service.
 router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPortalAuth(), async (req, res) => {
+  res.setHeader('X-Deprecated-Route', '/api/public/deliverables/:workspaceId/:id/apply');
   const result = await applyApprovedBatchItems(req.params.workspaceId, req.params.batchId);
   if (!result.ok) return res.status(result.status).json({ error: result.error });
   res.json({ results: result.results, applied: result.applied, failed: result.failed });
