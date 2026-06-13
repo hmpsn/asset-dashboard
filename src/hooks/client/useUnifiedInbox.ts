@@ -58,7 +58,7 @@ export function useRespondToDeliverable(workspaceId: string) {
   });
 }
 
-/** Result shape of the apply mutation (mirrors the legacy /apply route response). */
+/** Result shape of the apply mutation. */
 export interface ApplyDeliverableResult {
   results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }>;
   applied: number;
@@ -66,18 +66,18 @@ export interface ApplyDeliverableResult {
 }
 
 export interface ApplyDeliverableVars {
-  /** The legacy approval-batch id, read off the deliverable's `payload.legacyBatchId`. */
-  legacyBatchId: string;
+  /** The client-facing deliverable id. The server resolves its approval-batch source. */
+  deliverableId: string;
 }
 
 /**
- * Calls the same legacy apply route via the typed wrapper. On success it invalidates the unified
+ * Calls the canonical deliverable apply route via the typed wrapper. On success it invalidates the unified
  * inbox query so the applied deliverable leaves the client-facing list.
  */
 export function useApplyDeliverable(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation<ApplyDeliverableResult, Error, ApplyDeliverableVars>({
-    mutationFn: ({ legacyBatchId }) => publicDeliverables.applyApproval(workspaceId, legacyBatchId),
+    mutationFn: ({ deliverableId }) => publicDeliverables.applyApproval(workspaceId, deliverableId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.unifiedInbox(workspaceId) });
     },

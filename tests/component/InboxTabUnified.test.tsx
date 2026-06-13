@@ -602,12 +602,12 @@ describe('InboxTab unified inbox', () => {
     expect(mockApplyMutateAsync).not.toHaveBeenCalled();
 
     // Confirm — the dialog's own "Apply to Website" confirm button is the 2nd match (rendered after
-    // the card button). Clicking it fires the apply mutation with the deliverable's legacyBatchId.
+    // the card button). Clicking it fires the apply mutation with the canonical deliverable id.
     const applyButtons = screen.getAllByRole('button', { name: 'Apply to Website' });
     fireEvent.click(applyButtons[applyButtons.length - 1]);
 
     await vi.waitFor(() => {
-      expect(mockApplyMutateAsync).toHaveBeenCalledWith({ legacyBatchId: 'batch-xyz' });
+      expect(mockApplyMutateAsync).toHaveBeenCalledWith({ deliverableId: 'cd_apply' });
     });
     // FIX 1: applied:1/failed:0 → success toast.
     await vi.waitFor(() => {
@@ -624,7 +624,7 @@ describe('InboxTab unified inbox', () => {
       deliverables: [makeReadyToPublishDeliverable()],
       isLoading: false,
     });
-    // The legacy /apply route returns HTTP 200 with applied:0/failed:N on a total write failure — the
+    // The apply service returns HTTP 200 with applied:0/failed:N on a total write failure — the
     // mutation RESOLVES (no throw), so the toast branching is the only thing preventing a false-success.
     mockApplyMutateAsync.mockResolvedValue({ applied: 0, failed: 1, results: [] });
 
