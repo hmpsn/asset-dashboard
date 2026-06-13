@@ -241,10 +241,10 @@ router.patch(
 router.post(
   '/api/deliverables/:workspaceId/:id/remind',
   requireWorkspaceAccess('workspaceId'),
-  (req, res) => {
+  async (req, res) => {
     const { workspaceId, id } = req.params;
     try {
-      const deliverable = remindDeliverable(workspaceId, id);
+      const deliverable = await remindDeliverable(workspaceId, id);
       // Data-Flow Rule #4: the sibling respond handler logs activity; a remind is an
       // operator-initiated client-facing nudge, so it must too (NOT client-visible).
       addActivity(

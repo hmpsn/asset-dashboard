@@ -39,15 +39,20 @@ import { createLogger } from '../../logger.js';
 import {
   isEmailConfigured,
   notifyApprovalReady,
+  sendEmail,
   notifyTeamActionApproved,
   notifyTeamChangesRequested,
 } from '../../email.js';
+import { canSend, recordSend } from '../../email-throttle.js';
+import { renderApprovalReminder } from '../../email-templates.js';
+import { getReminderSentAt, upsertReminder } from '../../sent-reminders-db.js';
 import { assertSchemaPlanFeedbackAllowed } from '../schema/schema-plan-feedback.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
 import type { ClientDeliverable, DeliverableType } from '../../../shared/types/client-deliverable.js';
 
 const log = createLogger('send-to-client');
+const REMINDER_RESEND_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 export class SendToClientError extends Error {
   readonly status: number;
@@ -312,12 +317,12 @@ export function markDeliverableApplied(
  * the approval-reminder prior art across every type (design §6, E4). No-op-safe when
  * email is unconfigured. Returns the deliverable so the route can echo it back.
  */
-export function remindDeliverable(workspaceId: string, deliverableId: string): ClientDeliverable {
+export async function remindDeliverable(workspaceId: string, deliverableId: string): Promise<ClientDeliverable> {
   const current = getDeliverable(deliverableId);
   if (!current || current.workspaceId !== workspaceId) {
     throw new SendToClientError('Deliverable not found', 404);
   }
-  notifyClientOfSend(workspaceId, current);
+  await notifyClientOfReminder(workspaceId, current);
   broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
     deliverableId: current.id,
     type: current.type,
@@ -375,6 +380,49 @@ function notifyClientOfSend(workspaceId: string, deliverable: ClientDeliverable)
     itemCount: deliverable.items?.length ?? 1,
     dashboardUrl: getClientPortalUrl(ws),
   });
+}
+
+function reminderAgeDays(deliverable: ClientDeliverable): number {
+  const raw = deliverable.sentAt ?? deliverable.createdAt;
+  const timestamp = raw ? new Date(raw).getTime() : NaN;
+  if (!Number.isFinite(timestamp)) return 1;
+  return Math.max(1, Math.floor((Date.now() - timestamp) / 86400000));
+}
+
+async function notifyClientOfReminder(workspaceId: string, deliverable: ClientDeliverable): Promise<void> {
+  if (!isEmailConfigured()) return;
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.clientEmail) return;
+
+  const reminderKey = `deliverable:${deliverable.id}`;
+  const lastSentAt = getReminderSentAt(reminderKey);
+  if (lastSentAt) {
+    const lastSentMs = new Date(lastSentAt).getTime();
+    if (Number.isFinite(lastSentMs) && Date.now() - lastSentMs < REMINDER_RESEND_WINDOW_MS) {
+      log.debug({ workspaceId, deliverableId: deliverable.id }, 'deliverable reminder suppressed by dedupe window');
+      return;
+    }
+  }
+
+  const throttle = canSend(ws.clientEmail, 'action');
+  if (!throttle.allowed) {
+    log.info({ workspaceId, deliverableId: deliverable.id, reason: throttle.reason }, 'deliverable reminder throttled');
+    return;
+  }
+
+  const dashboardUrl = getClientPortalUrl(ws);
+  const { subject, html } = renderApprovalReminder({
+    workspaceName: ws.name,
+    batchName: deliverable.title,
+    pendingCount: deliverable.items?.length ?? 1,
+    staleDays: reminderAgeDays(deliverable),
+    dashboardUrl,
+  });
+  const sent = await sendEmail(ws.clientEmail, subject, html);
+  if (!sent) return;
+
+  recordSend(ws.clientEmail, 'action', 'deliverable_reminder', workspaceId, 1);
+  upsertReminder(reminderKey);
 }
 
 function notifyTeamOfResponse(

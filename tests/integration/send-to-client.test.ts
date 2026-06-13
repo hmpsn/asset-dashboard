@@ -2,26 +2,68 @@ import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vites
 import db from '../../server/db/index.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   registerAdapter,
   __resetAdapterRegistryForTests,
   type DeliverableAdapter,
 } from '../../server/domains/inbox/deliverable-adapters/types.js';
-import { sendToClient, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
+import { sendToClient, respondToDeliverable, remindDeliverable } from '../../server/domains/inbox/send-to-client.js';
 import { getDeliverable, upsertDeliverable } from '../../server/client-deliverables.js';
 import { InvalidTransitionError } from '../../server/state-machines.js';
 
 const WS = 'send-to-client-test';
 
+const emailState = vi.hoisted(() => ({
+  sent: [] as Array<{ to: string; subject: string; html: string }>,
+  approvalReady: [] as unknown[],
+}));
+
+vi.mock('../../server/email.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../server/email.js')>();
+  return {
+    ...actual,
+    isEmailConfigured: vi.fn(() => true),
+    sendEmail: vi.fn(async (to: string, subject: string, html: string) => {
+      emailState.sent.push({ to, subject, html });
+      return true;
+    }),
+    notifyApprovalReady: vi.fn((payload: unknown) => {
+      emailState.approvalReady.push(payload);
+    }),
+    notifyTeamActionApproved: vi.fn(),
+    notifyTeamChangesRequested: vi.fn(),
+  };
+});
+
 const wsBroadcast = vi.fn();
+let reminderWorkspaceId = '';
+const originalAppUrl = process.env.APP_URL;
+
 beforeAll(() => {
   // The broadcast singleton is normally wired in index.ts after the WS server starts;
   // tests that exercise broadcasting paths init it with spies (established pattern).
   setBroadcast(vi.fn(), wsBroadcast);
+  process.env.APP_URL = 'https://portal.test';
+  const reminderWorkspace = createWorkspace('SendToClient Reminder Test');
+  reminderWorkspaceId = reminderWorkspace.id;
+  db.prepare('UPDATE workspaces SET client_email = ? WHERE id = ?').run(
+    'reminder-client@example.com',
+    reminderWorkspaceId,
+  );
 });
 
 afterAll(() => {
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
+  db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(reminderWorkspaceId);
+  db.prepare("DELETE FROM sent_reminders WHERE key LIKE 'deliverable:%'").run();
+  db.prepare("DELETE FROM email_sends WHERE recipient = 'reminder-client@example.com'").run();
+  if (reminderWorkspaceId) deleteWorkspace(reminderWorkspaceId);
+  if (originalAppUrl === undefined) {
+    delete process.env.APP_URL;
+  } else {
+    process.env.APP_URL = originalAppUrl;
+  }
 });
 
 interface FakeInput {
@@ -59,8 +101,15 @@ function applyingAdapter(): DeliverableAdapter<FakeInput> {
 beforeEach(() => {
   __resetAdapterRegistryForTests();
   applyCalls = [];
+  emailState.sent = [];
+  emailState.approvalReady = [];
   wsBroadcast.mockClear();
   db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(WS);
+  if (reminderWorkspaceId) {
+    db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(reminderWorkspaceId);
+  }
+  db.prepare("DELETE FROM sent_reminders WHERE key LIKE 'deliverable:%'").run();
+  db.prepare("DELETE FROM email_sends WHERE recipient = 'reminder-client@example.com'").run();
 });
 
 describe('sendToClient', () => {
@@ -169,5 +218,45 @@ describe('respondToDeliverable', () => {
     await respondToDeliverable(WS, d.id, { decision: 'declined' });
     await expect(respondToDeliverable(WS, d.id, { decision: 'approved' })).rejects.toThrow();
     expect(getDeliverable(d.id)!.status).toBe('declined');
+  });
+});
+
+describe('remindDeliverable', () => {
+  function seedReminderTarget(title = 'Reminder target') {
+    return upsertDeliverable({
+      workspaceId: reminderWorkspaceId,
+      type: 'redirect',
+      kind: 'decision',
+      status: 'awaiting_client',
+      title,
+      payload: {},
+      sentAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    });
+  }
+
+  it('sends reminder copy and records a deliverable reminder key', async () => {
+    const d = seedReminderTarget('Redirect reminder target');
+
+    const reminded = await remindDeliverable(reminderWorkspaceId, d.id);
+
+    expect(reminded.id).toBe(d.id);
+    expect(emailState.sent).toHaveLength(1);
+    expect(emailState.sent[0].to).toBe('reminder-client@example.com');
+    expect(emailState.sent[0].subject).toContain('Reminder:');
+    expect(emailState.sent[0].html).toContain('Approval Reminder');
+    expect(emailState.sent[0].html).toContain(`https://portal.test/client/${reminderWorkspaceId}`);
+    const row = db.prepare('SELECT sent_at FROM sent_reminders WHERE key = ?').get(`deliverable:${d.id}`);
+    expect(row).toBeTruthy();
+  });
+
+  it('does not send a duplicate reminder within the three-day reminder window', async () => {
+    const d = seedReminderTarget();
+
+    await remindDeliverable(reminderWorkspaceId, d.id);
+    await remindDeliverable(reminderWorkspaceId, d.id);
+
+    expect(emailState.sent).toHaveLength(1);
+    const rows = db.prepare('SELECT COUNT(*) AS count FROM sent_reminders WHERE key = ?').get(`deliverable:${d.id}`) as { count: number };
+    expect(rows.count).toBe(1);
   });
 });
