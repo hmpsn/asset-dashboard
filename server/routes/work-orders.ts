@@ -15,7 +15,7 @@ import { sanitizeString } from '../helpers.js';
 import { listPayments } from '../payments.js';
 import { listWorkOrders, getWorkOrder, updateWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
-import { getWorkspace, updatePageState } from '../workspaces.js';
+import { getClientPortalUrl, getWorkspace, updatePageState } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { workOrderCommentSchema } from '../schemas/work-orders.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -86,6 +86,7 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
     // Email client
     if (ws) {
       const clientUsers = listClientUsers(wsId);
+      const dashboardUrl = getClientPortalUrl(ws);
       for (const cu of clientUsers) {
         if (cu.email) {
           notifyClientFixesApplied({
@@ -94,6 +95,7 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
             workspaceId: wsId,
             productType: order.productType.replace(/_/g, ' '),
             pageCount: order.pageIds.length,
+            dashboardUrl,
           });
         }
       }
@@ -147,6 +149,7 @@ router.post('/api/work-orders/:workspaceId/:orderId/comment', requireWorkspaceAc
   // Best-effort team → client notification (never blocks the write).
   const ws = getWorkspace(wsId);
   if (ws) {
+    const dashboardUrl = getClientPortalUrl(ws);
     for (const cu of listClientUsers(wsId)) {
       if (cu.email) {
         notifyClientWorkOrderComment({
@@ -155,6 +158,7 @@ router.post('/api/work-orders/:workspaceId/:orderId/comment', requireWorkspaceAc
           workspaceId: wsId,
           orderTitle,
           message: content,
+          dashboardUrl,
         });
       }
     }

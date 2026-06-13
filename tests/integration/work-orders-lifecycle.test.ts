@@ -23,6 +23,14 @@ const emailState = vi.hoisted(() => ({
     pageCount: number;
     dashboardUrl?: string;
   }>,
+  workOrderComments: [] as Array<{
+    clientEmail: string;
+    workspaceName: string;
+    workspaceId: string;
+    orderTitle: string;
+    message: string;
+    dashboardUrl?: string;
+  }>,
 }));
 
 const broadcastState = vi.hoisted(() => ({
@@ -44,6 +52,9 @@ vi.mock('../../server/email.js', async importOriginal => {
     notifyClientFixesApplied: vi.fn((p: (typeof emailState.fixesApplied)[0]) => {
       emailState.fixesApplied.push(p);
     }),
+    notifyClientWorkOrderComment: vi.fn((p: (typeof emailState.workOrderComments)[0]) => {
+      emailState.workOrderComments.push(p);
+    }),
   };
 });
 
@@ -62,9 +73,11 @@ let wsId = '';
 let wsIdOther = '';
 const wsName = 'WorkOrderLifecycle-Test';
 const originalAppPassword = process.env.APP_PASSWORD;
+const originalAppUrl = process.env.APP_URL;
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
+  process.env.APP_URL = 'https://portal.test';
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   server = http.createServer(app);
@@ -84,6 +97,14 @@ async function stopTestServer(): Promise<void> {
 async function patchJson(path: string, body: unknown): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
     method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function postJson(path: string, body: unknown): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -117,6 +138,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   emailState.fixesApplied = [];
+  emailState.workOrderComments = [];
   broadcastState.calls = [];
 });
 
@@ -134,6 +156,11 @@ afterAll(async () => {
     delete process.env.APP_PASSWORD;
   } else {
     process.env.APP_PASSWORD = originalAppPassword;
+  }
+  if (originalAppUrl === undefined) {
+    delete process.env.APP_URL;
+  } else {
+    process.env.APP_URL = originalAppUrl;
   }
 }, 30_000);
 
@@ -320,6 +347,36 @@ describe('PATCH .../completed — side effects', () => {
     expect(n.workspaceName).toBe(wsName);
     expect(n.productType).toBe('fix meta tags');
     expect(n.pageCount).toBe(2);
+    expect(n.dashboardUrl).toBe(`https://portal.test/client/${wsId}`);
+  });
+
+  it('fires notifyClientWorkOrderComment with a dashboard URL when team comments', async () => {
+    const commentWs = createWorkspace('WorkOrderCommentNotify-Test');
+    const testEmail = `comment_client_${Date.now()}@example.com`;
+    await createClientUser(testEmail, 'TestPassword123!', 'Comment Client', commentWs.id);
+    const order = makeWorkOrder(commentWs.id, { status: 'in_progress' });
+
+    try {
+      const res = await postJson(`/api/work-orders/${commentWs.id}/${order.id}/comment`, {
+        content: 'We finished the first pass.',
+      });
+      expect(res.status).toBe(200);
+
+      expect(emailState.workOrderComments).toHaveLength(1);
+      const n = emailState.workOrderComments[0];
+      expect(n.clientEmail).toBe(testEmail);
+      expect(n.workspaceId).toBe(commentWs.id);
+      expect(n.workspaceName).toBe('WorkOrderCommentNotify-Test');
+      expect(n.orderTitle).toBe('fix meta tags');
+      expect(n.message).toBe('We finished the first pass.');
+      expect(n.dashboardUrl).toBe(`https://portal.test/client/${commentWs.id}`);
+    } finally {
+      db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(commentWs.id);
+      db.prepare('DELETE FROM work_orders WHERE workspace_id = ?').run(commentWs.id);
+      db.prepare('DELETE FROM work_order_comments WHERE workspace_id = ?').run(commentWs.id);
+      db.prepare('DELETE FROM client_users WHERE workspace_id = ?').run(commentWs.id);
+      deleteWorkspace(commentWs.id);
+    }
   });
 });
 
