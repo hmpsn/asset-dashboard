@@ -193,8 +193,8 @@ When adding email notifications for a new event type:
 2. **Add template**: Create `renderMyEvent()` function following existing patterns (use `layout()`, `itemRow()`, `countPill()`, badges)
 3. **Add case**: Add to `renderDigest()` switch statement
 4. **Add helper**: Create `notifyMyEvent()` in `server/email.ts` using `queueEmail(makeEvent(...))`
-5. **Wire it**: Call the notify helper at the relevant point in server logic
-6. **Recipient logic**: Use `getNotificationEmail()` for admin team, `ws.clientEmail` for client. Consider severity-based filtering (e.g., anomalies: admin gets all, client gets critical-only)
+5. **Recipient policy**: For admin/team notifications, use `getNotificationEmail()`. For client-facing notifications, add or confirm the event in `server/notification-recipients.ts` before wiring the send. Workspace-level events use `workspace.clientEmail`; work-order client events use `client_users.email`; explicit user flows such as welcome/password reset stay caller-owned.
+6. **Wire it**: Call the notify helper at the relevant point in server logic. Consider severity-based filtering (e.g., anomalies: admin gets all, client gets critical-only)
 
 ## Caching Pattern
 

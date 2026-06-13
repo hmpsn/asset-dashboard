@@ -928,7 +928,7 @@
           "source": "Post-merge notification gap review 2026-05-26",
           "est": "2-4h",
           "priority": "P1",
-          "notes": "Completed 2026-06-12 in `docs/audits/2026-06-12-client-email-surface-audit.md`. Matrix covers live client-facing triggers, adjacent team-only/dormant paths, throttling/dedupe, payload contracts, and follow-up PRs. Main follow-ups: pass dashboard CTAs into work-order client emails, normalize unified deliverable reminders against legacy approval reminders, decide Stripe/client receipt authority, retire or intentionally wire the dormant `audit_improved` template, and establish notification recipient authority for workspace vs client-user emails.",
+          "notes": "Completed 2026-06-12 in `docs/audits/2026-06-12-client-email-surface-audit.md`. Matrix covers live client-facing triggers, adjacent team-only/dormant paths, throttling/dedupe, payload contracts, and follow-up PRs. Follow-up maintenance resolved the concrete contract drift: work-order and anomaly emails now pass dashboard CTAs, unified deliverable reminders use reminder copy plus `sent_reminders` dedupe, Stripe-hosted receipts are documented as the client receipt authority, dormant `audit_improved` was retired, and `server/notification-recipients.ts` now records workspace-primary vs client-user vs explicit-recipient authority.",
           "status": "done"
         }
       ]

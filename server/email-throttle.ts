@@ -3,7 +3,7 @@
  *
  * Categories & limits:
  *   status       (request_status, request_response)         → 1/day, morning digest
- *   audit        (audit_complete, audit_improved, recs)     → 1 per 14 days
+ *   audit        (audit_complete, recommendations_ready)    → 1 per 14 days
  *   action       (approval_ready, brief_ready, published…)  → 3/day
  *   alert        (anomaly_alert, audit_alert)               → 1/day
  *   transactional (password_reset, welcome, trial_warning)  → unlimited
@@ -33,7 +33,6 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
 
   // Audit — max 1 per 14 days
   audit_complete: 'audit',
-  audit_improved: 'audit',
   recommendations_ready: 'audit',
 
   // Action — requires client action, max 3/day

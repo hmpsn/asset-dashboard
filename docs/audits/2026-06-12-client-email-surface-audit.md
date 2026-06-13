@@ -2,7 +2,7 @@
 
 ## Scope
 
-This audit covers outbound email paths that can reach clients, plus adjacent team-only email helpers that are often confused with client notifications. It is docs-only and reflects the codebase at `origin/staging` after PR #1225.
+This audit covers outbound email paths that can reach clients, plus adjacent team-only email helpers that are often confused with client notifications. It was originally written against `origin/staging` after PR #1225 and updated by the autonomous maintenance follow-ups to record resolved findings.
 
 Primary files reviewed:
 
@@ -27,6 +27,7 @@ Primary files reviewed:
 - `server/scheduled-audits.ts`
 - `server/anomaly-detection.ts`
 - `server/stripe.ts`
+- `server/notification-recipients.ts`
 
 ## Infrastructure Snapshot
 
@@ -35,7 +36,7 @@ Most client notifications go through `queueEmail()`, which batches by `recipient
 | Category | Event types | Limit |
 | --- | --- | --- |
 | `status` | `request_status`, `request_response` | 1 per day, morning digest |
-| `audit` | `audit_complete`, `audit_improved`, `recommendations_ready` | 1 per 14 days |
+| `audit` | `audit_complete`, `recommendations_ready` | 1 per 14 days |
 | `action` | `approval_ready`, `content_brief_ready`, `content_post_ready`, `content_published`, `fixes_applied`, `client_briefing_ready`, work-order client replies | 3 per day |
 | `alert` | `anomaly_alert`, `audit_alert` | 1 per day |
 | `transactional` | `password_reset`, `client_welcome`, `trial_expiry_warning` | unthrottled |
@@ -44,12 +45,14 @@ Most client notifications go through `queueEmail()`, which batches by `recipient
 
 All queued non-transactional client emails also count toward the global cap of 5 non-transactional client emails per day.
 
+Recipient authority now lives in `server/notification-recipients.ts`: most client notifications resolve to `workspace.clientEmail`, work-order client notifications resolve to `client_users.email`, and password reset/client welcome remain caller-owned explicit-recipient events.
+
 ## Client-Facing Matrix
 
 | Workflow | Trigger route/job/source | Audience | Template/event type | Throttle/dedupe | Required payload | Expected user-visible outcome | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Generic deliverable or SEO approval sent | `createAdminClientAction()`, `createApprovalBatchForClient()`, `sendDeliverable()`, `sendSchemaPlanToClient()` | `workspace.clientEmail` | `approval_ready` | Queued, `action`, 5-minute batching, global daily cap | `batchName`, `itemCount`, `dashboardUrl` | Client receives a "Changes Ready for Review" email with review CTA | Covers legacy approval batches, client actions, schema strategy review, and unified deliverables. |
-| Unified deliverable reminder | `remindDeliverable()` via `POST /api/deliverables/:workspaceId/:id/remind` | `workspace.clientEmail` | `approval_ready` | Queued, `action`; no `sent_reminders` key | Existing deliverable title, item count, `dashboardUrl` | Client gets a fresh "ready for review" style email | Copy differs from legacy approval reminder and does not record reminder-specific dedupe. |
+| Unified deliverable reminder | `remindDeliverable()` via `POST /api/deliverables/:workspaceId/:id/remind` | `workspace.clientEmail` | `renderApprovalReminder()` direct send | `action` throttle, `sent_reminders` key `deliverable:<deliverable.id>`, 3-day resend window | `workspaceName`, deliverable title, item count, stale days, `dashboardUrl` | Client gets reminder copy for the pending deliverable | Normalized after the original audit; route response/activity/broadcast remain non-blocking. |
 | Legacy approval reminder, automatic | `checkStaleApprovals()` in `server/approval-reminders.ts` | `workspace.clientEmail` | `renderApprovalReminder()` direct send | `action` throttle, `sent_reminders` key `approval:<batch.id>`, 3-day resend window | `workspaceName`, `batchName`, `pendingCount`, `staleDays`, `dashboardUrl` | Client is nudged about stale pending approval items | Direct send bypasses queue batching but records `email_sends`. |
 | Legacy approval reminder, manual | `POST /api/approvals/:workspaceId/:batchId/remind` | `workspace.clientEmail` | `renderApprovalReminder()` direct send | `action` throttle; does not update `sent_reminders` | Same as automatic reminder | Admin can manually nudge the client | Manual route validates pending items and configured email before sending. |
 | Content brief sent for review | `POST /api/content-briefs/:workspaceId/:briefId/send-to-client`; `PATCH /api/content-requests/:workspaceId/:id` to `client_review` | `workspace.clientEmail` | `content_brief_ready` | Queued, `action` | `topic`, `targetKeyword`, `dashboardUrl` | Client receives a brief-review CTA | The brief route dedupes open content requests before notifying. The generic status patch has no event-level dedupe beyond queue/throttle. |
@@ -59,12 +62,12 @@ All queued non-transactional client emails also count toward the global cap of 5
 | Weekly briefing auto-published | `briefing-cron.ts` auto-publish path | `workspace.clientEmail` | `client_briefing_ready` | Queued, `action` | Same as manual publish | Client receives a briefing CTA | Also gated by `client-briefing-v2`; path explicitly passes `dashboardUrl`. |
 | Admin updates request status | `PATCH /api/requests/:id` when status changes | `workspace.clientEmail` | `request_status` | Queued, `status`, morning digest, 1 per day | `requestTitle`, `newStatus`, `dashboardUrl` | Client sees request status changes in a digest | Only fires when status differs from previous status. |
 | Admin replies to request | `POST /api/requests/:id/notes`; `POST /api/requests/:id/notes-with-files` when content exists | `workspace.clientEmail` | `request_response` | Queued, `status`, morning digest, 1 per day | `requestTitle`, `noteContent`, `dashboardUrl` | Client receives a conversation update | Attachment-only team notes do not send unless there is note content. |
-| Work-order fix completed | `PATCH /api/work-orders/:workspaceId/:orderId` to `completed` | Every `client_user.email` for workspace | `fixes_applied` | Queued, `action` per recipient | `productType`, `pageCount`; helper supports `dashboardUrl` | Client user is told purchased fixes are live | Route does not pass `dashboardUrl`, so CTA is absent. Audience differs from most workspace-level emails. |
-| Team replies on work order | `POST /api/work-orders/:workspaceId/:orderId/comment` | Every `client_user.email` for workspace | `work_order_comment_client` | Queued, `action` per recipient | `orderTitle`, `message`; helper supports `dashboardUrl` | Client user receives a work-order conversation reply | Route does not pass `dashboardUrl`, so CTA is absent. |
+| Work-order fix completed | `PATCH /api/work-orders/:workspaceId/:orderId` to `completed` | `client_users.email` via `listClientNotificationRecipients(..., 'fixes_applied')` | `fixes_applied` | Queued, `action` per recipient | `productType`, `pageCount`, `dashboardUrl` | Client user is told purchased fixes are live with a dashboard CTA | Audience differs from most workspace-level emails by explicit recipient policy. |
+| Team replies on work order | `POST /api/work-orders/:workspaceId/:orderId/comment` | `client_users.email` via `listClientNotificationRecipients(..., 'work_order_comment_client')` | `work_order_comment_client` | Queued, `action` per recipient | `orderTitle`, `message`, `dashboardUrl` | Client user receives a work-order conversation reply with a dashboard CTA | Audience differs from most workspace-level emails by explicit recipient policy. |
 | Audit complete from background job | `seo-audit-background-job.ts` after audit completion | `workspace.clientEmail` | `audit_complete` | Queued, `audit`, 1 per 14 days | `score`, optional `previousScore`, `totalPages`, `errors`, `warnings`, `topIssues`, `fixedCount`, `dashboardUrl` | Client receives health-score summary and CTA to Health | Also sends `recommendations_ready` when non-backfilled recommendations exist. |
 | Audit complete from scheduler | `scheduled-audits.ts` | `workspace.clientEmail` | `audit_complete` | Queued, `audit`, 1 per 14 days | Same as background job | Client receives health-score summary | Duplicates background-job template shape, but from scheduled audit path. |
 | Recommendations ready after audit | `seo-audit-background-job.ts` | `workspace.clientEmail` | `recommendations_ready` | Queued, `audit`, 1 per 14 days | `recCount`, `dashboardUrl` | Client is told new recommendations are ready | Counts active, non-dismissed, non-backfilled recommendations. |
-| Critical anomaly alert | `anomaly-detection.ts` when critical anomaly exists | `workspace.clientEmail` | `anomaly_alert` | Queued, `alert`, 1 per day | `title`, `description`, `severity`, `source`, `changePct`, optional `aiSummary`; helper supports `dashboardUrl` | Client receives a critical anomaly alert | `anomaly-detection.ts` does not pass `dashboardUrl`, so CTA is absent. Warnings go team-only. |
+| Critical anomaly alert | `anomaly-detection.ts` when critical anomaly exists | `workspace.clientEmail` | `anomaly_alert` | Queued, `alert`, 1 per day | `title`, `description`, `severity`, `source`, `changePct`, optional `aiSummary`, `dashboardUrl` | Client receives a critical anomaly alert with a dashboard CTA | Warnings go team-only. |
 | Monthly or weekly report | `monthly-report.ts` when `workspace.autoReports` is true | `workspace.clientEmail` | `renderMonthlyReport()` direct send | `report`; period dedupe via `.report-sent.json` keyed by workspace and current week/month | Workspace health, request counts, approval counts, activity, traffic, chat topics, trial state | Client receives periodic performance report | Direct send bypasses queue; records `email_sends` as `monthly_report` even when frequency is weekly. |
 | Trial expiry warning | `trial-reminders.ts` | `workspace.clientEmail` | `trial_expiry_warning` direct send | Transactional; `sent_reminders` keys `trial:<workspaceId>:4` and `trial:<workspaceId>:1` | `daysRemaining`, dashboard `/plans` URL | Client gets 4-day and 1-day Growth trial warnings | Direct send bypasses queue and marks reminder only after successful send. |
 | Password reset | `POST /api/public/forgot-password/:id` | Submitted email if `createResetToken()` accepts it | `password_reset` direct send | Transactional; token TTL handled by auth store | `resetUrl` | Client can reset password | Response is enumeration-safe. Email is direct send, not queued. |
@@ -80,48 +83,33 @@ All queued non-transactional client emails also count toward the global cap of 5
 | Client approves brief/post/approval/action | Public content and inbox response routes | `NOTIFICATION_EMAIL` | `action_approved` | Team-only notification. |
 | Client requests changes on brief/post/approval/action | Public content and inbox response routes | `NOTIFICATION_EMAIL` | `content_changes_requested` | Team-only notification. |
 | Client comments on work order | Public work-order comment route in `server/routes/public-content.ts` | `NOTIFICATION_EMAIL` | `work_order_comment_team` | Team-only notification. |
-| Stripe checkout payment received | `server/stripe.ts` checkout completion | `NOTIFICATION_EMAIL` | `payment_received` | Team-only notification. No platform client receipt email in this repo. Stripe-hosted receipts may exist outside this code path. |
+| Stripe checkout payment received | `server/stripe.ts` checkout completion | `NOTIFICATION_EMAIL` | `payment_received` | Team-only notification. Stripe-hosted receipts are the client receipt authority; the platform intentionally does not send a duplicate client receipt email. |
 | Churn signal | `server/churn-signals.ts` | `NOTIFICATION_EMAIL` | `churn_signal` | Team-only notification. |
 | Client AI service intent signal | `public-analytics.ts` and `client-signals.ts` | `NOTIFICATION_EMAIL` | `client_signal` | Team-only notification. |
-| Audit score improved | `notifyClientAuditImproved()` helper and `audit_improved` template | Client helper exists | `audit_improved` | Dormant. No current production call site found. Audit improvements currently flow through `audit_complete`. |
+| Audit score improved | Removed dormant helper/template | n/a | n/a | Retired. Audit improvements flow through `audit_complete` and `recommendations_ready`; add a new event only with an intentional score-improvement workflow. |
 | Audit alert | `notifyAuditAlert()` and `scheduled-audits.ts` score-drop path | `NOTIFICATION_EMAIL` | `audit_alert` | Team-only health alert. Not client-facing. |
 
 ## Findings
 
-1. Work-order client emails are missing CTAs.
-   `notifyClientFixesApplied()` and `notifyClientWorkOrderComment()` support `dashboardUrl`, but `server/routes/work-orders.ts` does not pass it. Clients get the email but no button back to the work order/dashboard.
+1. Work-order client emails were missing CTAs. Resolved: `server/routes/work-orders.ts` now passes `dashboardUrl` for fixes-applied and work-order comment emails.
 
-2. Approval reminder semantics are split.
-   Legacy approval reminders use `renderApprovalReminder()` plus `sent_reminders` dedupe. Unified deliverable reminders call `notifyApprovalReady()` and look like a fresh "ready for review" email with no reminder-specific dedupe key. This may be fine short-term, but it is inconsistent and can confuse future maintenance.
+2. Approval reminder semantics were split. Resolved: unified deliverable reminders now use reminder copy and `sent_reminders` dedupe keyed by `deliverable:<id>`.
 
-3. Billing has no in-app client receipt surface.
-   Checkout completion sends `payment_received` to the team only. If client receipts are expected, they are either Stripe-managed outside this repo or missing from the platform email contract.
+3. Billing has no in-app client receipt surface by design. Contract decision: Stripe-hosted receipts are the client receipt authority; `payment_received` stays team-only to avoid duplicate receipts.
 
-4. `audit_improved` is a dormant client-facing template.
-   The helper and template exist, but no current call site invokes `notifyClientAuditImproved()`. Keeping it unused is not harmful, but it should either be wired intentionally or retired to reduce false confidence.
+4. `audit_improved` was a dormant client-facing template. Resolved: the unused helper/template/event type was retired.
 
-5. Critical anomaly client alerts have no CTA.
-   `notifyAnomalyAlert()` accepts `dashboardUrl`, but `anomaly-detection.ts` does not pass one. Client-facing anomaly alerts therefore render without a dashboard button.
+5. Critical anomaly client alerts were missing CTAs. Resolved: `anomaly-detection.ts` now passes `dashboardUrl`.
 
-6. Recipient authority is inconsistent by domain.
-   Most client emails go to `workspace.clientEmail`. Work-order emails and client welcome/password reset use `client_users` or submitted user email. This is probably transitional from shared-password to multi-user auth, but notification preferences and future per-user routing need a documented authority.
+6. Recipient authority is now documented in code. `server/notification-recipients.ts` defines workspace-primary, client-user, and explicit-recipient policies. Existing work-order client notifications use the resolver; other send paths retain their current behavior until preferences require broader migration.
 
 7. Content review notifications depend on multiple send paths.
    Brief/post review emails are triggered from route-level status changes and the newer `sendPostToClient()` service. There is no event-level idempotency beyond queue batching/throttle, so future routes should avoid adding another direct status-based sender.
 
 ## Recommended Follow-Up PRs
 
-1. Add `dashboardUrl` to work-order client emails.
-   Scope: `server/routes/work-orders.ts` plus tests in `tests/integration/work-orders-lifecycle.test.ts`.
+1. Keep future content review sends centralized.
+   Scope: route new brief/post review send paths through the existing content send services or add event-level idempotency before introducing another status-based sender.
 
-2. Normalize reminder copy and dedupe for unified deliverables.
-   Scope: decide whether `remindDeliverable()` should use `renderApprovalReminder()` or a new deliverable reminder template, and whether it should record a `sent_reminders` key.
-
-3. Decide billing receipt ownership.
-   Scope: document Stripe-managed receipts as the authority, or add a platform client receipt email explicitly if product wants it.
-
-4. Retire or wire `audit_improved`.
-   Scope: either delete the unused helper/template branch or call it from a deliberate score-improvement workflow without conflicting with `audit_complete`.
-
-5. Establish recipient authority for client notifications.
-   Scope: add a small notification recipient resolver that can choose workspace-level vs client-user recipients per event type before notification preferences are built.
+2. Build notification preferences on top of `server/notification-recipients.ts`.
+   Scope: add per-user preference fields and apply them inside the resolver rather than scattering preference checks across send sites.

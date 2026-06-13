@@ -180,7 +180,6 @@ export type EmailEventType =
   | 'payment_received'
   | 'fixes_applied'
   | 'recommendations_ready'
-  | 'audit_improved'
   | 'anomaly_alert'
   | 'content_published'
   | 'audit_complete'
@@ -255,8 +254,6 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderFixesApplied(events, count, ws, dashUrl, logoUrl); break;
     case 'recommendations_ready':
       result = renderRecommendationsReady(events, count, ws, dashUrl, logoUrl); break;
-    case 'audit_improved':
-      result = renderAuditImproved(events, count, ws, dashUrl, logoUrl); break;
     case 'anomaly_alert':
       result = renderAnomalyAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'content_published':
@@ -937,27 +934,6 @@ function renderRecommendationsReady(_events: EmailEvent[], _count: number, ws: s
       subtitle: ws,
       body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">${recCount} prioritized recommendation${recCount !== 1 ? 's' : ''} based on your latest audit are ready for review.</div>`,
       cta: dashUrl ? { label: 'View Recommendations', url: dashUrl } : undefined,
-      logoUrl,
-    }),
-  };
-}
-
-function renderAuditImproved(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
-  const e = _events[0];
-  const score = (e.data.score as number) || 0;
-  const prev = (e.data.previousScore as number) || 0;
-  const delta = score - prev;
-  return {
-    subject: `🎉 Your site health improved to ${score} — ${ws}`,
-    html: layout({
-      preheader: `Site health went from ${prev} to ${score}`,
-      headline: 'Site Health Improved!',
-      subtitle: ws,
-      body: `<div style="padding:16px 24px;text-align:center;">
-        <div style="font-size:48px;font-weight:800;color:#4ade80;">${score}</div>
-        <div style="font-size:14px;color:#a1a1aa;margin-top:4px;">Up ${delta} point${delta !== 1 ? 's' : ''} from ${prev}</div>
-      </div>`,
-      cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),
   };
