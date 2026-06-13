@@ -7826,52 +7826,35 @@ export const CHECKS: Check[] = [
   {
     // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
     //
-    // Every `/api/public/<resource>/:workspaceId/...` route that serves
-    // workspace-scoped data must apply either `requireClientPortalAuth()` or
+    // Every `/api/public/...` route that serves workspace-scoped or client data
+    // must apply either `requireClientPortalAuth()` or
     // `requireAuthenticatedClientPortalAuth()`. As of E3 (passwordless portal
     // closure) BOTH reject passwordless workspaces — a portal returns 401 until
     // a client credential is configured. `requireAuthenticatedClientPortalAuth`
-    // additionally rejects internal-JWT-only access and is preferred for the
-    // most sensitive mutations.
+    // is preferred for sensitive mutations that require a concrete client/admin
+    // actor.
     //
     // The global app gate at server/app.ts advances passwordless requests to
     // the route (it is an advance-only defense-in-depth layer, not the backstop
     // — see the comment there). This per-route middleware is the real backstop,
     // which is why full per-route coverage is mandatory and enforced here.
     //
-    // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
-    // allowed by the global gate (server/app.ts:258): bootstrap/login flow
-    // endpoints that legitimately must accept unauthenticated callers.
+    // The PUBLIC_AUTH_ALLOWLIST below matches bootstrap/login flow endpoints
+    // that legitimately must accept unauthenticated callers.
     name: 'Public route under /api/public/ missing client-portal auth middleware',
     pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
     excludeLines: ['// public-no-auth-ok'],
-    // Grandfather the 19 routes already shipped without per-route auth as of
-    // 2026-05-27 (audit-drift-closure Plan A Task 1). Tracked under roadmap
-    // item `audit-drift-public-route-auth-sweep-followup`; each file will be
-    // migrated route-by-route alongside test-fixture updates so existing
-    // integration tests (which create passwordless workspaces and expect 200s)
-    // are not broken in a single PR.
-    exclude: [
-      'server/routes/public-portal.ts',
-      // public-content.ts and public-requests.ts use router.use() file-level
-      // portal auth — Pass 1 detects that, so no exclude needed.
-      'server/routes/reports.ts',
-      // stripe.ts has mixed auth coverage — individual unprotected routes are
-      // hatched with // public-no-auth-ok inline. (recommendations.ts is now
-      // fully gated with requireClientPortalAuth() — no inline hatches remain.)
-    ],
     message:
-      'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
-      '(preferred — denies passwordless workspaces) or requireClientPortalAuth() (allows passwordless). ' +
-      'The global app gate alone is insufficient: it short-circuits on workspaces without clientPassword, ' +
-      'leaking data during the pre-setup window. Suppress with // public-no-auth-ok: <reason> if the ' +
-      'route is part of the bootstrap/login flow.',
+      'New /api/public routes must call requireAuthenticatedClientPortalAuth() ' +
+      '(preferred for sensitive mutations) or requireClientPortalAuth(). The global app gate alone ' +
+      'is insufficient. Suppress with // public-no-auth-ok: <reason> only for bootstrap/login or ' +
+      'intentional share-link routes.',
     severity: 'error',
     rationale:
-      'Without per-route portal auth, sensitive client data leaks from workspaces that have not yet ' +
-      'had a clientPassword set (e.g. freshly-created accounts).',
+      'Without per-route portal auth or an explicit documented public hatch, sensitive client data ' +
+      'can be exposed through routes that happen to sit under /api/public/.',
     claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
       // path[3] values the global gate (server/app.ts:258) lets through
@@ -7883,6 +7866,8 @@ export const CHECKS: Check[] = [
         'client-logout',
         'client-me',
         'auth-mode',
+        'tier',
+        'pricing',
         'forgot-password',
         'reset-password',
       ]);
@@ -7899,6 +7884,7 @@ export const CHECKS: Check[] = [
         // Example: router.use('/api/public/:resource/:workspaceId',
         // requireClientPortalAuth('workspaceId')).
         const fileLevelAuthPrefixes: string[] = [];
+        const localAuthMiddlewareAliases = new Set<string>();
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           if (/^\s*(\/\/|\*)/.test(line)) continue;
@@ -7910,6 +7896,35 @@ export const CHECKS: Check[] = [
           const literalPrefix = useMatch[1].replace(/\/:.*$/, '');
           fileLevelAuthPrefixes.push(literalPrefix);
         }
+
+        // Some route files wrap the canonical portal guards in local middleware aliases so they
+        // can attach extra request context. Treat those aliases as auth only when their same-file
+        // definition directly contains one of the canonical guards.
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const aliasMatch = line.match(/^\s*const\s+([A-Za-z_$][\w$]*)\s*=\s*(\[|requireClientPortalAuth\s*\(|requireAuthenticatedClientPortalAuth\s*\()/);
+          if (!aliasMatch) continue;
+          const alias = aliasMatch[1];
+          const rhsWindow = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          if (rhsWindow.includes('requireClientPortalAuth(') || rhsWindow.includes('requireAuthenticatedClientPortalAuth(')) {
+            localAuthMiddlewareAliases.add(alias);
+          }
+        }
+
+        const routeSignatureWindow = (start: number): string => {
+          const windowLines: string[] = [];
+          for (let j = start; j < Math.min(start + 8, lines.length); j++) {
+            let wl = lines[j];
+            if (j > start && /\brouter\.\w+\s*\(/.test(wl)) break;
+            if (/^\s*(\/\/|\*)/.test(wl)) continue;
+            const slash = wl.indexOf('//');
+            if (slash >= 0) wl = wl.slice(0, slash);
+            windowLines.push(wl);
+            if (wl.includes('(req, res)') || /=>\s*\{?\s*$/.test(wl)) break;
+          }
+          return windowLines.join('\n');
+        };
 
         // Pass 2: scan individual route handlers.
         for (let i = 0; i < lines.length; i++) {
@@ -7926,9 +7941,10 @@ export const CHECKS: Check[] = [
           if (fileLevelAuthPrefixes.some(prefix => fullPath.startsWith(prefix))) continue;
           // Look forward up to 8 lines (covers multi-line router.METHOD(
           // signatures) for either auth middleware.
-          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          const window = routeSignatureWindow(i);
           if (window.includes('requireClientPortalAuth(')) continue;
           if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          if ([...localAuthMiddlewareAliases].some(alias => new RegExp(`(?:\\.\\.\\.)?\\b${alias}\\b`).test(window))) continue;
           hits.push({ file, line: i + 1, text: line.trim() });
         }
       }
@@ -7939,12 +7955,12 @@ export const CHECKS: Check[] = [
   // ── E1: public-portal.ts GET-specific auth guard (2026-06-10) ───────────
   {
     // Specifically targets server/routes/public-portal.ts GETs (excluded from
-    // the broader "Public route under /api/public/" rule above, which uses a
-    // different exclude strategy). The three intentionally-public bootstrap
-    // GETs (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
-    // `// portal-auth-public-ok` since they serve the login screen and must
-    // be accessible before authentication. All other GET routes in this file
-    // must carry either requireClientPortalAuth() or
+    // a different hatch token than the broader "Public route under /api/public/"
+    // rule above). The three intentionally-public bootstrap GETs
+    // (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
+    // `// portal-auth-public-ok` since they serve the login screen and must be
+    // accessible before authentication. All other GET routes in this file must
+    // carry either requireClientPortalAuth() or
     // requireAuthenticatedClientPortalAuth() as middleware.
     name: 'public-portal.ts GET missing portal-auth middleware',
     pattern: '',

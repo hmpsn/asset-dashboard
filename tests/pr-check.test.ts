@@ -9949,6 +9949,65 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
+  it('does not flag routes covered by a local auth middleware alias', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'local-alias'),
+      lines(
+        "import { router } from './router.js';",
+        "const requireClientStrategyMutationAuth = [",
+        "  requireAuthenticatedClientPortalAuth('workspaceId'),",
+        "  attachClientEmail,",
+        "];",
+        "router.post('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, validate(schema), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag routes covered by a direct local auth middleware alias', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'direct-alias'),
+      lines(
+        "import { router } from './router.js';",
+        "const requireClientCopyReviewAuth = requireAuthenticatedClientPortalAuth('workspaceId');",
+        "router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags an unguarded public route even when it does not use a workspaceId param', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'non-workspace-public'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/report/:id', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag intentional public share-link routes with an inline hatch', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'share-link-hatch'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/report/:id', (req, res) => { // public-no-auth-ok: signed share-link",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
   it('does not flag bootstrap/login allow-list resources', () => {
     const file = writeRoute(
       uniqPath('rule-public-auth', 'allowlist'),
@@ -9956,10 +10015,28 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
         "import { router } from './router.js';",
         "router.post('/api/public/auth/:id', (req, res) => res.json({ ok: true }));",
         "router.get('/api/public/auth-mode/:id', (req, res) => res.json({}));",
+        "router.get('/api/public/tier/:id', (req, res) => res.json({}));",
+        "router.get('/api/public/pricing/:id', (req, res) => res.json({}));",
         "router.post('/api/public/forgot-password/:id', (req, res) => res.json({ ok: true }));",
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags an unguarded route whose body has a TODO comment naming the middleware', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'todo-comment'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', (req, res) => {",
+        "  // TODO: add requireClientPortalAuth() later",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
   });
 
   it('respects // public-no-auth-ok inline hatch', () => {
@@ -9974,13 +10051,6 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
-
-  // Note: the rule's `exclude` list (file-level grandfathering) is enforced
-  // by the pr-check runner outside the customCheck function, so it cannot be
-  // exercised via the unit-level runRule() helper used here. The grandfather
-  // exemption is verified end-to-end by running `npx tsx scripts/pr-check.ts`
-  // against the committed routes (the seven listed files contain unprotected
-  // public routes but pr-check passes because they sit in the exclude list).
 });
 
 // ── Plan A Task 2: trial-state centralization ─────────────────────────────
