@@ -1,9 +1,15 @@
-import { describe, it, expect, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, afterEach, afterAll, beforeEach } from 'vitest';
 import db from '../../server/db/index.js';
 // The barrel self-registers the schema_plan adapter the mirror resolves.
 import '../../server/domains/inbox/deliverable-adapters/index.js';
-import { mirrorSchemaPlanToDeliverable } from '../../server/domains/inbox/schema-plan-dual-write.js';
+import {
+  cancelSchemaPlanDeliverable,
+  mirrorSchemaPlanToDeliverable,
+  syncSchemaPlanDeliverable,
+} from '../../server/domains/inbox/schema-plan-dual-write.js';
 import { listDeliverables, upsertDeliverable } from '../../server/client-deliverables.js';
+import { setBroadcast } from '../../server/broadcast.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 
@@ -88,5 +94,53 @@ describe('schema-plan dual-write mirror', () => {
     expect(mirrored!.parentDeliverableId).toBeNull();
     // The raw soft-FK is stashed so linkage is never lost.
     expect(mirrored!.payload.clientPreviewBatchId).toBe('unmirrored');
+  });
+});
+
+describe('schema-plan deliverable broadcasts', () => {
+  let events: Array<{ workspaceId: string; event: string; data: Record<string, unknown> }> = [];
+
+  beforeEach(() => {
+    events = [];
+    setBroadcast(
+      () => {},
+      (workspaceId, event, data) => events.push({ workspaceId, event, data: data as Record<string, unknown> }),
+    );
+  });
+
+  afterEach(() => {
+    setBroadcast(() => {}, () => {});
+  });
+
+  it('does not broadcast on direct mirror because the send route owns DELIVERABLE_SENT', () => {
+    const first = mirrorSchemaPlanToDeliverable(WS, makePlan({ id: 'plan_broadcast_v1' }));
+    const second = mirrorSchemaPlanToDeliverable(WS, makePlan({ id: 'plan_broadcast_v2' }));
+
+    expect(second?.id).toBe(first?.id);
+    expect(events).toHaveLength(0);
+  });
+
+  it('broadcasts DELIVERABLE_UPDATED when syncing or cancelling an existing mirror', () => {
+    const mirrored = mirrorSchemaPlanToDeliverable(WS, makePlan({ id: 'plan_sync_v1' }));
+    events = [];
+
+    const synced = syncSchemaPlanDeliverable(makePlan({ id: 'plan_sync_v1', status: 'client_approved' }));
+    const cancelled = cancelSchemaPlanDeliverable(WS, SITE);
+
+    expect(synced?.id).toBe(mirrored?.id);
+    expect(cancelled?.id).toBe(mirrored?.id);
+    expect(events.map(e => e.event)).toEqual([
+      WS_EVENTS.DELIVERABLE_UPDATED,
+      WS_EVENTS.DELIVERABLE_UPDATED,
+    ]);
+    expect(events[0].data).toEqual(expect.objectContaining({ status: 'approved' }));
+    expect(events[1].data).toEqual(expect.objectContaining({ status: 'cancelled' }));
+  });
+
+  it('does not broadcast when the adapter rejects the schema plan', () => {
+    const result = mirrorSchemaPlanToDeliverable(WS, makePlan({ pageRoles: [], canonicalEntities: [] }));
+
+    expect(result).toBeNull();
+    expect(events).toHaveLength(0);
   });
 });

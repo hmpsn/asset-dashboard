@@ -25,12 +25,30 @@
  */
 import type { WorkOrder } from '../../../shared/types/payments.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { upsertDeliverable } from '../../client-deliverables.js';
+import { findBySourceRef, upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import { mapWorkOrderStatusToDeliverableStatus } from './deliverable-adapters/work-order.js';
 import { createLogger } from '../../logger.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 
 const log = createLogger('work-order-dual-write');
+
+function safeBroadcastDeliverable(
+  workspaceId: string,
+  event: typeof WS_EVENTS.DELIVERABLE_SENT | typeof WS_EVENTS.DELIVERABLE_UPDATED,
+  deliverable: ClientDeliverable,
+): void {
+  try {
+    broadcastToWorkspace(workspaceId, event, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+  } catch (err) {
+    log.warn({ err, workspaceId, deliverableId: deliverable.id, event }, 'work-order deliverable broadcast failed (swallowed)');
+  }
+}
 
 /**
  * Mirror a work order into `client_deliverable`. Called at BOTH the create seam (a freshly-inserted
@@ -55,9 +73,14 @@ export function mirrorWorkOrderToDeliverable(order: WorkOrder): ClientDeliverabl
 
     const built = adapter.buildPayload(order);
     const sourceRef = adapter.sourceRef(order);
+    if (!sourceRef) {
+      log.warn({ workspaceId: order.workspaceId, workOrderId: order.id }, 'work-order mirror skipped: adapter returned no sourceRef');
+      return null;
+    }
     // Canonical ORDER-lifecycle status, recomputed from the order's CURRENT status each mirror so
     // the deliverable tracks lifecycle progress (pending→ordered, in_progress, completed, cancelled).
     const status = mapWorkOrderStatusToDeliverableStatus(order.status);
+    const existing = findBySourceRef(order.workspaceId, 'work_order', sourceRef);
 
     const deliverable = upsertDeliverable({
       // OWNING workspace — read off the order itself (work_orders stores workspace_id per row).
@@ -82,6 +105,11 @@ export function mirrorWorkOrderToDeliverable(order: WorkOrder): ClientDeliverabl
     log.debug(
       { workspaceId: order.workspaceId, workOrderId: order.id, status, deliverableId: deliverable.id },
       'work order mirrored into client_deliverable (dual-write)',
+    );
+    safeBroadcastDeliverable(
+      order.workspaceId,
+      existing ? WS_EVENTS.DELIVERABLE_UPDATED : WS_EVENTS.DELIVERABLE_SENT,
+      deliverable,
     );
     return deliverable;
   } catch (err) {
