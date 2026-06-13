@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { post } from '../api/client';
 import type { WorkspaceInfo } from '../components/client/types';
+
+export const CLIENT_SESSION_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export interface ClientUser {
   id: string;
@@ -73,6 +75,8 @@ export function useClientAuth(
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirm, setResetConfirm] = useState('');
   const [resetDone, setResetDone] = useState(false);
+  const lastClientRefreshAtRef = useRef(0);
+  const clientRefreshInFlightRef = useRef(false);
 
   const handlePasswordSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -98,6 +102,7 @@ export function useClientAuth(
     try {
       const turnstileToken = getTurnstileToken?.();
       const data = await post<{ user: ClientUser }>(`/api/public/client-login/${workspaceId}`, { email: loginEmail.trim(), password: loginPassword.trim(), turnstileToken });
+      lastClientRefreshAtRef.current = Date.now();
       setClientUser(data.user);
       setAuthenticated(true);
       sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
@@ -117,6 +122,46 @@ export function useClientAuth(
     setAuthenticated(false);
     sessionStorage.removeItem(`dash_auth_${workspaceId}`);
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (!authenticated || !clientUser) return;
+
+    let cancelled = false;
+    const refreshClientSession = async () => {
+      if (clientRefreshInFlightRef.current) return;
+      clientRefreshInFlightRef.current = true;
+      try {
+        const data = await post<{ user: ClientUser }>(`/api/public/client-refresh/${workspaceId}`);
+        if (cancelled) return;
+        lastClientRefreshAtRef.current = Date.now();
+        setClientUser(data.user);
+        setAuthenticated(true);
+        sessionStorage.setItem(`dash_auth_${workspaceId}`, 'true');
+      } catch (err) {
+        if (!cancelled) console.error('useClientAuth refresh failed:', err);
+      } finally {
+        clientRefreshInFlightRef.current = false;
+      }
+    };
+
+    if (lastClientRefreshAtRef.current === 0) {
+      void refreshClientSession();
+    }
+
+    const intervalId = window.setInterval(refreshClientSession, CLIENT_SESSION_REFRESH_INTERVAL_MS);
+    const refreshWhenStale = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastClientRefreshAtRef.current < CLIENT_SESSION_REFRESH_INTERVAL_MS) return;
+      void refreshClientSession();
+    };
+    document.addEventListener('visibilitychange', refreshWhenStale);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenStale);
+    };
+  }, [authenticated, clientUser, workspaceId]);
 
   return {
     authenticated, setAuthenticated,

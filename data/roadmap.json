@@ -261,9 +261,9 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
           "est": "1-2d",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "24h client JWT with no refresh — sessions die mid-use. Refresh endpoint + silent client-side renewal."
+          "notes": "Done 2026-06-13: added /api/public/client-refresh/:id to renew valid client-user JWT + legacy client session cookies, wired useClientAuth to silently refresh auto-restored client-user sessions and renew every 12h, and covered valid/no-token/malformed/cross-workspace refresh cases plus hook behavior."
         },
         {
           "id": "cda-sc6-legacy-deprecation",
