@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getEmailEventPayloadIssues,
   renderApprovalReminder,
   renderDigest,
   renderMonthlyReport,
@@ -86,5 +87,36 @@ describe('email templates', () => {
     expect(html).toContain('Homepage &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
     expect(html).toContain('href="https://dashboard.example.com/review?next=&quot;bad&quot;"');
     expect(html).not.toContain('<script>alert');
+  });
+
+  it('reports missing required client email payload fields', () => {
+    const issues = getEmailEventPayloadIssues(event('content_post_ready', {
+      targetKeyword: 'local seo',
+    }));
+
+    expect(issues).toEqual(['data.topic must be a non-empty string']);
+  });
+
+  it('rejects malformed client-facing digest payloads before rendering fallback copy', () => {
+    expect(() => renderDigest('approval_ready', [
+      event('approval_ready', { batchName: 'Homepage updates', itemCount: 'two' }),
+    ])).toThrow(/data\.itemCount must be a finite number/);
+
+    expect(() => renderDigest('client_welcome', [
+      event('client_welcome', { clientName: ' ' }),
+    ])).toThrow(/data\.clientName must be a non-empty string/);
+  });
+
+  it('renders valid client-facing payloads after contract validation', () => {
+    const { subject, html } = renderDigest('content_post_ready', [
+      event('content_post_ready', {
+        topic: 'June dental implant guide',
+        targetKeyword: 'dental implants austin',
+      }),
+    ]);
+
+    expect(subject).toBe('Post ready for review: "June dental implant guide" — Acme & Sons');
+    expect(html).toContain('June dental implant guide');
+    expect(html).toContain('dental implants austin');
   });
 });
