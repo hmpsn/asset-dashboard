@@ -190,6 +190,66 @@ export type EmailEventType =
   | 'work_order_comment_team'
   | 'work_order_comment_client';
 
+type PayloadRule = {
+  requiredStrings?: string[];
+  requiredNumbers?: string[];
+  requiredArrays?: string[];
+};
+
+const CLIENT_EMAIL_PAYLOAD_RULES: Partial<Record<EmailEventType, PayloadRule>> = {
+  approval_ready: { requiredStrings: ['batchName'], requiredNumbers: ['itemCount'] },
+  request_status: { requiredStrings: ['requestTitle', 'newStatus'] },
+  request_response: { requiredStrings: ['requestTitle', 'noteContent'] },
+  content_brief_ready: { requiredStrings: ['topic', 'targetKeyword'] },
+  content_post_ready: { requiredStrings: ['topic', 'targetKeyword'] },
+  client_welcome: { requiredStrings: ['clientName'] },
+  trial_expiry_warning: { requiredNumbers: ['daysRemaining'] },
+  password_reset: { requiredStrings: ['resetUrl'] },
+  fixes_applied: { requiredStrings: ['productType'], requiredNumbers: ['pageCount'] },
+  recommendations_ready: { requiredNumbers: ['recCount'] },
+  anomaly_alert: { requiredStrings: ['title', 'description', 'severity', 'source'], requiredNumbers: ['changePct'] },
+  content_published: { requiredStrings: ['topic'] },
+  audit_complete: {
+    requiredNumbers: ['score', 'totalPages', 'errors', 'warnings', 'fixedCount'],
+    requiredArrays: ['topIssues'],
+  },
+  client_briefing_ready: { requiredStrings: ['weekOf', 'heroHeadline'], requiredNumbers: ['storyCount'] },
+  work_order_comment_client: { requiredStrings: ['orderTitle', 'message'] },
+};
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+export function getEmailEventPayloadIssues(event: EmailEvent): string[] {
+  const issues: string[] = [];
+  if (!isNonEmptyString(event.recipient)) issues.push('recipient must be a non-empty string');
+  if (!isNonEmptyString(event.workspaceName)) issues.push('workspaceName must be a non-empty string');
+  if (!event.data || typeof event.data !== 'object' || Array.isArray(event.data)) {
+    issues.push('data must be an object');
+    return issues;
+  }
+
+  const rule = CLIENT_EMAIL_PAYLOAD_RULES[event.type];
+  if (!rule) return issues;
+
+  for (const field of rule.requiredStrings ?? []) {
+    if (!isNonEmptyString(event.data[field])) issues.push(`data.${field} must be a non-empty string`);
+  }
+  for (const field of rule.requiredNumbers ?? []) {
+    if (!isFiniteNumber(event.data[field])) issues.push(`data.${field} must be a finite number`);
+  }
+  for (const field of rule.requiredArrays ?? []) {
+    if (!Array.isArray(event.data[field])) issues.push(`data.${field} must be an array`);
+  }
+
+  return issues;
+}
+
 // ── Template renderers ──
 
 function deriveLogoUrl(dashUrl?: string): string | undefined {
@@ -217,6 +277,19 @@ function deriveLogoUrl(dashUrl?: string): string | undefined {
 }
 
 export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subject: string; html: string } {
+  if (events.length === 0) {
+    throw new Error(`Cannot render ${type} email without events`);
+  }
+  const payloadIssues = events.flatMap((event, index) => {
+    const issues = event.type === type
+      ? getEmailEventPayloadIssues(event)
+      : [`event type ${event.type} does not match digest type ${type}`];
+    return issues.map(issue => `event[${index}]: ${issue}`);
+  });
+  if (payloadIssues.length > 0) {
+    throw new Error(`Invalid ${type} email payload: ${payloadIssues.join('; ')}`);
+  }
+
   const count = events.length;
   const ws = events[0].workspaceName;
   const dashUrl = events.find(e => e.dashboardUrl)?.dashboardUrl;

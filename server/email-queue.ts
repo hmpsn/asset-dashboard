@@ -10,7 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
-import { renderDigest, type EmailEvent, type EmailEventType } from './email-templates.js';
+import { getEmailEventPayloadIssues, renderDigest, type EmailEvent, type EmailEventType } from './email-templates.js';
 import {
   getThrottleCategory,
   canSend,
@@ -189,6 +189,16 @@ async function flushBucket(key: string) {
   // Clear bucket before sending (so new events during send get a fresh batch)
   buckets.delete(key);
   persistQueue();
+
+  const payloadIssues = events.flatMap((event, index) => (
+    getEmailEventPayloadIssues(event).map(issue => `event[${index}]: ${issue}`)
+  ));
+  if (payloadIssues.length > 0) {
+    const reason = `Invalid ${type} email payload: ${payloadIssues.join('; ')}`;
+    log.error({ count: events.length, reason }, 'Email events moved to dead letter queue');
+    appendDeadLetters(events, reason);
+    return;
+  }
 
   if (!sendFn) {
     log.warn({ count: events.length }, 'No send function registered, requeueing email events');

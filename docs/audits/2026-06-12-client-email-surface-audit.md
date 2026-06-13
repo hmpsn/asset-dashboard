@@ -47,6 +47,8 @@ All queued non-transactional client emails also count toward the global cap of 5
 
 Recipient authority now lives in `server/notification-recipients.ts`: most client notifications resolve to `workspace.clientEmail`, work-order client notifications resolve to `client_users.email`, and password reset/client welcome remain caller-owned explicit-recipient events.
 
+Client-facing queued payloads are now validated at the email-template boundary before rendering. Invalid queued events are moved to the email dead-letter file instead of rendering fallback copy, retrying forever, or sending vague client emails. Direct transactional render paths use the same validator through `renderDigest()`.
+
 ## Client-Facing Matrix
 
 | Workflow | Trigger route/job/source | Audience | Template/event type | Throttle/dedupe | Required payload | Expected user-visible outcome | Notes |
@@ -105,6 +107,9 @@ Recipient authority now lives in `server/notification-recipients.ts`: most clien
 
 7. Content review notifications depend on multiple send paths.
    Brief/post review emails are triggered from route-level status changes and the newer `sendPostToClient()` service. There is no event-level idempotency beyond queue batching/throttle, so future routes should avoid adding another direct status-based sender.
+
+8. Client-facing payload drift could previously render fallback copy.
+   Resolved: `server/email-templates.ts` now records required payload fields for client-facing email types, and `server/email-queue.ts` dead-letters malformed queued events before rendering.
 
 ## Recommended Follow-Up PRs
 
