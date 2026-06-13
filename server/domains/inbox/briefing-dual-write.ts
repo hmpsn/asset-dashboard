@@ -23,11 +23,29 @@
  */
 import type { BriefingDraft } from '../../../shared/types/briefing.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
-import { upsertDeliverable } from '../../client-deliverables.js';
+import { findBySourceRef, upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import { createLogger } from '../../logger.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 
 const log = createLogger('briefing-dual-write');
+
+function safeBroadcastDeliverable(
+  workspaceId: string,
+  event: typeof WS_EVENTS.DELIVERABLE_SENT | typeof WS_EVENTS.DELIVERABLE_UPDATED,
+  deliverable: ClientDeliverable,
+): void {
+  try {
+    broadcastToWorkspace(workspaceId, event, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+  } catch (err) {
+    log.warn({ err, workspaceId, deliverableId: deliverable.id, event }, 'briefing deliverable broadcast failed (swallowed)');
+  }
+}
 
 /**
  * Mirror a just-published briefing into `client_deliverable`. Called at the publish seams
@@ -63,6 +81,11 @@ export function mirrorBriefingToDeliverable(draft: BriefingDraft): ClientDeliver
 
     const built = adapter.buildPayload(draft);
     const sourceRef = adapter.sourceRef(draft);
+    if (!sourceRef) {
+      log.warn({ workspaceId: draft.workspaceId, briefingId: draft.id }, 'briefing mirror skipped: adapter returned no sourceRef');
+      return null;
+    }
+    const existing = findBySourceRef(draft.workspaceId, 'briefing', sourceRef);
     // publishedAt is epoch ms on the draft; carry it as ISO for the deliverable timestamps. A
     // just-published draft always has publishedAt set, but fall back to now defensively.
     const publishedIso = draft.publishedAt != null
@@ -96,6 +119,11 @@ export function mirrorBriefingToDeliverable(draft: BriefingDraft): ClientDeliver
     log.debug(
       { workspaceId: draft.workspaceId, briefingId: draft.id, deliverableId: deliverable.id },
       'briefing mirrored into client_deliverable (dual-write)',
+    );
+    safeBroadcastDeliverable(
+      draft.workspaceId,
+      existing ? WS_EVENTS.DELIVERABLE_UPDATED : WS_EVENTS.DELIVERABLE_SENT,
+      deliverable,
     );
     return deliverable;
   } catch (err) {
