@@ -1,7 +1,7 @@
 /**
  * public-auth routes — extracted from server/index.ts
  */
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 
 const router = Router();
 
@@ -21,7 +21,7 @@ import {
 import { sendEmail } from '../email.js';
 import { sanitizeString } from '../helpers.js';
 import { addActivity } from '../activity-log.js';
-import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures } from '../middleware.js';
+import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures, requireAuthenticatedClientPortalAuth } from '../middleware.js';
 import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
@@ -29,6 +29,7 @@ import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-auth');
+const CLIENT_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const clientLoginSchema = z.object({
   email: z.string().email('Valid email is required'),
@@ -42,6 +43,30 @@ const resetPasswordSchema = z.object({
 
 function isClientPortalDisabled(ws: { clientPortalEnabled?: boolean }): boolean {
   return ws.clientPortalEnabled != null && !ws.clientPortalEnabled;
+}
+
+function setClientSessionCookie(res: Response, workspaceId: string): void {
+  const sessionToken = signClientSession(workspaceId);
+  res.cookie(`client_session_${workspaceId}`, sessionToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: CLIENT_SESSION_MAX_AGE_MS,
+    secure: IS_PROD,
+  });
+}
+
+function setClientUserTokenCookie(res: Response, workspaceId: string, token: string): void {
+  res.cookie(`client_user_token_${workspaceId}`, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: CLIENT_SESSION_MAX_AGE_MS,
+    secure: IS_PROD,
+  });
+}
+
+function setClientAuthCookies(res: Response, workspaceId: string, token: string): void {
+  setClientSessionCookie(res, workspaceId);
+  setClientUserTokenCookie(res, workspaceId, token);
 }
 
 router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
@@ -61,13 +86,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
       try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-auth: POST /api/public/auth/:id: programming error'); /* best-effort migration */ }
     }
     // Issue signed session cookie for server-side verification
-    const sessionToken = signClientSession(ws.id);
-    res.cookie(`client_session_${ws.id}`, sessionToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: IS_PROD,
-    });
+    setClientSessionCookie(res, ws.id);
     addActivity(ws.id, 'portal_session', 'Client portal session started', 'Via shared password'); // client-visibility-ok: authentication session telemetry is admin-only by design
     return res.json({ ok: true });
   }
@@ -107,19 +126,36 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
     const { passwordHash: _pw, ...safe } = user;
     void _pw;
     const token = signClientToken(safe);
-    // Also set the legacy session cookie so existing session middleware works
-    const legacySessionToken = signClientSession(ws.id);
-    res.cookie(`client_session_${ws.id}`, legacySessionToken, {
-      httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
-    });
-    res.cookie(`client_user_token_${ws.id}`, token, {
-      httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
-    });
+    setClientAuthCookies(res, ws.id, token);
     addActivity(ws.id, 'portal_session', 'Client portal session started', `Via client login: ${safe.email}`, undefined, { id: safe.id, name: safe.name }); // client-visibility-ok: authentication session telemetry is admin-only by design
     res.json({ ok: true, user: safe });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
+});
+
+// Refresh current client user token before the 24h cookie expires.
+router.post('/api/public/client-refresh/:id', requireAuthenticatedClientPortalAuth('id'), (req, res) => {
+  const ws = getWorkspace(req.params.id);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+
+  const token = req.cookies?.[`client_user_token_${req.params.id}`];
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+
+  const payload = verifyClientToken(token);
+  if (!payload || payload.workspaceId !== req.params.id) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const user = getSafeClientUser(payload.clientUserId);
+  if (!user || user.workspaceId !== req.params.id) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const refreshedToken = signClientToken(user);
+  setClientAuthCookies(res, ws.id, refreshedToken);
+  res.json({ ok: true, user });
 });
 
 // Get current client user from token
