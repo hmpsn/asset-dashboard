@@ -17,7 +17,7 @@
 import crypto from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { listWorkspaces, type Workspace } from './workspaces.js';
+import { getClientPortalUrl, listWorkspaces, type Workspace } from './workspaces.js';
 import { getSearchPeriodComparison, getTopDroppedGscPage, getTopSpikedGscPage } from './search-console.js';
 import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page, getTopSpikedGA4Page } from './google-analytics.js';
 import { listSnapshots } from './reports.js';
@@ -607,6 +607,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             })),
             aiSummary: summary || undefined,
             clientEmail: ws.clientEmail,
+            dashboardUrl: getClientPortalUrl(ws),
           });
         }
 
