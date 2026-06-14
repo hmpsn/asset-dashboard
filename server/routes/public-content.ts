@@ -30,7 +30,7 @@ import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import { handleContentPerformance } from './content-requests.js';
+import { handlePublicContentPerformance } from '../domains/content/content-performance.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
@@ -546,7 +546,7 @@ router.get('/api/public/content-brief/:workspaceId/:briefId/export', (req, res) 
 
 router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
   try {
-    const data = await handleContentPerformance(req.params.workspaceId);
+    const data = await handlePublicContentPerformance(req.params.workspaceId);
     res.json(data);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

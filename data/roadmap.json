@@ -13,9 +13,9 @@
           "source": "Core-features audit 2026-06-10 (#27)",
           "est": "M-L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "UNBLOCKED 2026-06-11 — prerequisite C4 (#16: persisted brief source text + AI review verdicts) merged. Join published-content performance back to the brief/strategy that drove it, and grade whether the published content actually covered the terms the brief's SERP/reference evidence prescribed. Consumes C4's persisted source-text output shape — do NOT re-derive it. Ready to schedule on owner prioritization; start with a short scoping pass against C4's stored shape."
+          "notes": "Done 2026-06-14 in codex/content-performance-joinback: moved content performance assembly into a content-domain read helper, preserved existing GSC/GA4 metrics, joined delivered/published request items back to linked briefs/posts, and added deterministic term-coverage grading from brief-prescribed keywords/questions/entities/SERP evidence against generated post text. Admin content performance now shows brief/post lineage, source-evidence availability, coverage badges, and capped missing-term diagnostics; public/client content-performance returns only a safe coverage summary with raw C4 source evidence and AI review internals scrubbed. Matrix items without reliable lineage degrade to coverage unavailable."
         },
         {
           "id": "audit0610-25-serp-position-checks",

@@ -12,18 +12,17 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { listMatrices } from '../content-matrices.js';
 import {
   listContentRequests,
   getContentRequest,
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
+import { handleContentPerformance } from '../domains/content/content-performance.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../domains/content/send-post-to-client.js';
 import { listPosts } from '../content-posts.js';
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
-import { getGA4LandingPages } from '../google-analytics.js';
-import { getAllGscPages, getPageTrend } from '../search-console.js';
+import { getPageTrend } from '../search-console.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
@@ -42,6 +41,7 @@ import { startContentBriefGenerationJob } from '../content-brief-generation-job.
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const log = createLogger('content-requests');
+export { handleContentPerformance };
 
 const updateContentRequestSchema = z.object({
   status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'post_review', 'delivered', 'published', 'declined']).optional(),
@@ -311,131 +311,6 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     res.status(500).json({ error: msg });
   }
 });
-
-// --- Content Performance Tracker (#31) ---
-// Shared handler for both admin and public routes
-export async function handleContentPerformance(workspaceId: string): Promise<{
-  items: Array<{
-    requestId: string;
-    topic: string;
-    targetKeyword: string;
-    targetPageSlug?: string;
-    pageType?: string;
-    status: string;
-    publishedAt?: string;
-    daysSincePublish: number;
-    gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
-    ga4: { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number } | null;
-    source?: 'request' | 'matrix';
-  }>;
-}> {
-  const ws = getWorkspace(workspaceId);
-  if (!ws) throw new Error('Workspace not found');
-
-  const requests = listContentRequests(workspaceId);
-  const published = requests.filter(r => r.status === 'delivered' || r.status === 'published');
-
-  // Batch-fetch GSC page data (one API call)
-  const gscPages: Map<string, { clicks: number; impressions: number; ctr: number; position: number }> = new Map();
-  if (ws.gscPropertyUrl && ws.webflowSiteId) {
-    try {
-      const pages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-      for (const p of pages) {
-        // Store by path (strip domain)
-        try {
-          const url = new URL(p.page);
-          gscPages.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
-        } catch (err) {
-          gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
-        }
-      }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ } // url-fetch-ok
-  }
-
-  // Batch-fetch GA4 landing pages (one API call)
-  const ga4Pages: Map<string, { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }> = new Map();
-  if (ws.ga4PropertyId) {
-    try {
-      const pages = await getGA4LandingPages(ws.ga4PropertyId, 90, 100);
-      for (const p of pages) {
-        ga4Pages.set(p.landingPage, { sessions: p.sessions, users: p.users, bounceRate: p.bounceRate, avgEngagementTime: p.avgEngagementTime, conversions: p.conversions });
-      }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GA4 unavailable */ }
-  }
-
-  const now = Date.now();
-  const seenKeywords = new Set<string>();
-  const items: Array<{
-    requestId: string; topic: string; targetKeyword: string; targetPageSlug?: string;
-    pageType?: string; status: string; publishedAt?: string; daysSincePublish: number;
-    gsc: { clicks: number; impressions: number; ctr: number; position: number } | null;
-    ga4: { sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number } | null;
-    source?: 'request' | 'matrix';
-  }> = published.map(r => {
-    const slug = r.targetPageSlug;
-    const path = slug ? normalizePageUrl(slug) : undefined;
-    if (r.targetKeyword) seenKeywords.add(r.targetKeyword.toLowerCase());
-
-    // Match GSC data by slug path
-    const gsc = path ? (gscPages.get(path) || null) : null;
-    // Match GA4 data by slug path
-    const ga4 = path ? (ga4Pages.get(path) || null) : null;
-
-    // Calculate days since publish (use updatedAt as proxy for publish date)
-    const publishDate = r.updatedAt || r.requestedAt;
-    const daysSincePublish = Math.floor((now - new Date(publishDate).getTime()) / (1000 * 60 * 60 * 24));
-
-    return {
-      requestId: r.id,
-      topic: r.topic,
-      targetKeyword: r.targetKeyword,
-      targetPageSlug: r.targetPageSlug,
-      pageType: r.pageType,
-      status: r.status,
-      publishedAt: publishDate,
-      daysSincePublish,
-      gsc,
-      ga4,
-      source: 'request' as const,
-    };
-  });
-
-  // Include published matrix cells not already covered by content requests
-  try {
-    const matrices = listMatrices(workspaceId);
-    for (const matrix of matrices) {
-      for (const cell of (matrix.cells || [])) {
-        if (cell.status !== 'published' || !cell.targetKeyword) continue;
-        if (seenKeywords.has(cell.targetKeyword.toLowerCase())) continue;
-        seenKeywords.add(cell.targetKeyword.toLowerCase());
-
-        const slug = cell.plannedUrl;
-        const path = slug ? normalizePageUrl(slug) : undefined;
-        const gsc = path ? (gscPages.get(path) || null) : null;
-        const ga4 = path ? (ga4Pages.get(path) || null) : null;
-
-        items.push({
-          requestId: cell.id,
-          topic: cell.variableValues ? Object.values(cell.variableValues).join(' × ') : cell.targetKeyword,
-          targetKeyword: cell.targetKeyword,
-          targetPageSlug: slug,
-          pageType: undefined,
-          status: 'published',
-          publishedAt: matrix.updatedAt,
-          daysSincePublish: Math.floor((now - new Date(matrix.updatedAt).getTime()) / (1000 * 60 * 60 * 24)),
-          gsc,
-          ga4,
-          source: 'matrix' as const,
-        });
-      }
-    }
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* matrices not available — skip */ }
-
-  // Sort by GSC clicks descending, then by days since publish
-  items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);
-
-  return { items };
-}
 
 router.get('/api/content-performance/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {

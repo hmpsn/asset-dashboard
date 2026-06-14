@@ -15,6 +15,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { upsertBrief, type ContentBrief } from '../../server/content-brief.js';
+import { savePost, type GeneratedPost } from '../../server/content-posts.js';
+import db from '../../server/db/index.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
@@ -32,6 +36,95 @@ afterAll(async () => {
   if (wsId) deleteWorkspace(wsId);
   await ctx.stopServer();
 });
+
+function makePublicPerformanceBrief(workspaceId: string, briefId: string): ContentBrief {
+  return {
+    id: briefId,
+    workspaceId,
+    targetKeyword: 'emergency dentist cost',
+    secondaryKeywords: ['same-day extraction', 'after-hours dental care'],
+    suggestedTitle: 'Emergency Dentist Cost Guide',
+    suggestedMetaDesc: 'Costs and next steps for emergency dental care.',
+    outline: [{ heading: 'Emergency care costs', notes: 'Explain urgent dental pricing.', keywords: ['dental abscess'] }],
+    wordCountTarget: 1400,
+    intent: 'informational',
+    audience: 'patients',
+    competitorInsights: 'Competitors answer urgent care cost questions.',
+    internalLinkSuggestions: [],
+    createdAt: '2026-06-14T00:00:00.000Z',
+    realPeopleAlsoAsk: ['How much does emergency dental care cost?'],
+    topicalEntities: [],
+    serpAnalysis: {
+      contentType: 'guide',
+      avgWordCount: 1300,
+      commonElements: ['insurance coverage'],
+      gaps: [],
+    },
+    sourceEvidence: {
+      capturedAt: '2026-06-14T00:00:00.000Z',
+      scrapedReferences: [
+        {
+          url: 'https://competitor.example/private-source',
+          title: 'Private competitor page',
+          metaDescription: 'Private source',
+          headings: [{ level: 2, text: 'Private heading' }],
+          bodyText: 'Competitor-only private source text must never be serialized publicly.',
+          wordCount: 500,
+          fetchedAt: '2026-06-14T00:00:00.000Z',
+        },
+      ],
+      serpResults: [
+        {
+          position: 1,
+          title: 'Emergency dentist cost',
+          url: 'https://example.com/emergency-dentist',
+          snippet: 'Walk-in dentist',
+        },
+      ],
+    },
+  };
+}
+
+function makePublicPerformancePost(workspaceId: string, postId: string, briefId: string): GeneratedPost {
+  return {
+    id: postId,
+    workspaceId,
+    briefId,
+    targetKeyword: 'emergency dentist cost',
+    title: 'Emergency Dentist Cost and Same-Day Extraction',
+    metaDescription: 'How much emergency dental care costs, including insurance coverage.',
+    introduction: '<p>Emergency dentist cost depends on the treatment and insurance coverage.</p>',
+    sections: [
+      {
+        index: 0,
+        heading: 'Same-day extraction for a dental abscess',
+        content: '<p>Same-day extraction may be needed when a dental abscess is severe.</p>',
+        wordCount: 120,
+        targetWordCount: 200,
+        keywords: ['same-day extraction', 'dental abscess'],
+        status: 'done',
+      },
+    ],
+    conclusion: '<p>How much does emergency dental care cost? Ask for pricing before treatment starts.</p>',
+    totalWordCount: 500,
+    targetWordCount: 1400,
+    status: 'approved',
+    aiReview: {
+      review: {
+        factual_accuracy: { pass: false, reason: 'Needs human review', humanReviewRequired: true },
+        brand_voice: { pass: true, reason: 'On voice' },
+        internal_links: { pass: true, reason: 'Includes links' },
+        no_hallucinations: { pass: false, reason: 'Needs human review', humanReviewRequired: true },
+        meta_optimized: { pass: true, reason: 'Optimized' },
+        word_count_target: { pass: true, reason: 'Acceptable' },
+      },
+      reviewedAt: '2026-06-14T00:00:00.000Z',
+      model: 'test-model',
+    },
+    createdAt: '2026-06-14T00:00:00.000Z',
+    updatedAt: '2026-06-14T00:00:00.000Z',
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/public/seo-strategy/:workspaceId
@@ -302,6 +395,51 @@ describe('GET /api/public/content-performance/:workspaceId', () => {
     // Response should be an object (not null/undefined)
     expect(body).toBeDefined();
     expect(typeof body).toBe('object');
+  });
+
+  it('returns client-safe coverage summary without raw C4 evidence or AI review internals', async () => {
+    const workspace = createWorkspace(`PubContent Perf Privacy ${ctx.PORT}`);
+    const briefId = `brief_public_${Date.now()}`;
+    const postId = `post_public_${Date.now()}`;
+    try {
+      const request = createContentRequest(workspace.id, {
+        topic: 'Emergency dentist guide',
+        targetKeyword: 'emergency dentist cost',
+        intent: 'informational',
+        priority: 'high',
+        rationale: 'Public privacy test',
+        targetPageSlug: '/emergency-dentist-cost',
+      });
+      upsertBrief(workspace.id, makePublicPerformanceBrief(workspace.id, briefId));
+      savePost(workspace.id, makePublicPerformancePost(workspace.id, postId, briefId));
+      updateContentRequest(workspace.id, request.id, { briefId, postId, status: 'delivered' });
+
+      const res = await api(`/api/public/content-performance/${workspace.id}`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { items: Array<Record<string, unknown>> };
+      const item = body.items.find(i => i.requestId === request.id);
+
+      expect(item?.coverage).toMatchObject({
+        status: 'partial',
+        requiredCount: 7,
+        matchedCount: 5,
+        missingCount: 2,
+        coveragePct: 71,
+      });
+      expect(item?.joinback).toBeUndefined();
+      const serialized = JSON.stringify(body);
+      expect(serialized).not.toContain('scrapedReferences');
+      expect(serialized).not.toContain('styleExamples');
+      expect(serialized).not.toContain('bodyText');
+      expect(serialized).not.toContain('Competitor-only private source text');
+      expect(serialized).not.toContain('aiReview');
+      expect(serialized).not.toContain('test-model');
+    } finally {
+      db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(workspace.id);
+      db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(workspace.id);
+      db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(workspace.id);
+      deleteWorkspace(workspace.id);
+    }
   });
 });
 

@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **502 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **503 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 503. Content Performance Join-Back + Term-Coverage Grading
+
+**What it does:** Upgrades admin Content Performance from a metric scoreboard into a brief-execution diagnostic. The content performance read model now preserves existing GSC/GA4 metrics while joining each delivered/published request back to its linked content brief and generated post. A deterministic grader compares brief-prescribed target terms, secondary keywords, outline keywords, PAA questions, topical entities, SERP common elements/gaps, and persisted SERP evidence against the final generated post text. The admin surface shows coverage badges, brief/post lineage, source-evidence availability, and capped missing-term chips. The public/client content-performance route receives only a safe summary and never serializes raw C4 source evidence, scraped body text, or stored AI review internals.
+
+**Agency value:** Account teams can distinguish weak content ideas from weak execution. Underperforming posts now come with a concrete refresh path instead of only clicks/impressions/sessions.
+
+**Client value:** Indirect for this PR — safer, more precise agency recommendations lead to better content refreshes without exposing competitor/source evidence in the client portal.
+
+**Mutual:** Closes the loop from strategy/brief → generated content → published performance → next improvement, using already-persisted evidence rather than new scraping or AI spend.
+
+**Files:** `server/domains/content/content-performance.ts`, `server/routes/content-requests.ts`, `server/routes/public-content.ts`, `shared/types/content.ts`, `src/components/ContentPerformance.tsx`. Tests: `tests/unit/content-performance-coverage.test.ts`, `tests/integration/content-requests-client-actions-lifecycle.test.ts`, `tests/integration/public-content-routes.test.ts`.
 
 ---
 
