@@ -32,7 +32,9 @@ vi.mock('../../server/email.js', async importOriginal => {
 });
 
 import { createEphemeralTestContext } from './helpers.js';
+import { broadcast, broadcastToWorkspace } from '../../server/broadcast.js';
 import db from '../../server/db/index.js';
+import { notifyClientStatusChange } from '../../server/email.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createRequest, getRequest, listRequests } from '../../server/requests.js';
 
@@ -56,6 +58,7 @@ beforeAll(async () => {
 beforeEach(() => {
   clearWorkspaceData(workspaceId);
   clearWorkspaceData(otherWorkspaceId);
+  vi.clearAllMocks();
 });
 
 afterAll(async () => {
@@ -239,6 +242,9 @@ describe('PATCH /api/requests/:id — update', () => {
     // new → closed is legal
     const closeRes = await patchJson(`/api/requests/${seeded.id}`, { status: 'closed' });
     expect(closeRes.status).toBe(200);
+    vi.mocked(broadcast).mockClear();
+    vi.mocked(broadcastToWorkspace).mockClear();
+    vi.mocked(notifyClientStatusChange).mockClear();
 
     // closed → new is illegal → 409
     const res = await patchJson(`/api/requests/${seeded.id}`, { status: 'new' });
@@ -247,6 +253,9 @@ describe('PATCH /api/requests/:id — update', () => {
 
     // Row stays closed — the illegal move did not partially apply.
     expect(getRequest(seeded.id)?.status).toBe('closed');
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(notifyClientStatusChange).not.toHaveBeenCalled();
   });
 
   it('logs activity when status transitions to completed', async () => {
@@ -476,5 +485,35 @@ describe('PATCH /api/requests/bulk — bulk update', () => {
     expect(body.updated).toBe(2);
     expect(getRequest(r1.id)?.priority).toBe('high');
     expect(getRequest(r2.id)?.priority).toBe('high');
+  });
+
+  it('preflights status transitions before bulk updates so illegal mixes do not partially apply', async () => {
+    const closed = createRequest(workspaceId, {
+      title: 'Bulk terminal request',
+      description: 'This request will become closed before the bulk update',
+      category: 'seo',
+    });
+    const stillNew = createRequest(workspaceId, {
+      title: 'Bulk legal candidate',
+      description: 'This request would be legal if updated alone',
+      category: 'content',
+    });
+
+    const closeRes = await patchJson(`/api/requests/${closed.id}`, { status: 'closed' });
+    expect(closeRes.status).toBe(200);
+    vi.mocked(broadcast).mockClear();
+    vi.mocked(broadcastToWorkspace).mockClear();
+
+    const res = await patchJson('/api/requests/bulk', {
+      ids: [stillNew.id, closed.id],
+      status: 'in_review',
+    });
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/transition/i);
+    expect(getRequest(closed.id)?.status).toBe('closed');
+    expect(getRequest(stillNew.id)?.status).toBe('new');
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 });

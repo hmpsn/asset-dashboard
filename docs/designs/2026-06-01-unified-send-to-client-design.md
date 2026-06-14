@@ -157,7 +157,7 @@ Canonical: `draft → awaiting_client → {changes_requested ↔ awaiting_client
 - **`notification`** kind (`briefing`): **no** client transitions (one-way; enforces PC-2 safety).
 - **`order`** kind (`work_order`): `ordered → in_progress → completed`/`cancelled`; no client decision, but a client *status* surface + operator advance/complete UI (D-workorder, M10).
 
-`validateTransition()` is called before every status mutation, exactly as the existing maps require. **Sibling fix (M11):** add a `REQUEST_TRANSITIONS` map + guard to `PATCH /api/requests/:id` (`server/routes/requests.ts:188` is currently any-to-any, re-firing the client status email on `closed→new`) — this is one of the design's own "one state machine" laws and is independent of the table.
+`validateTransition()` is called before every status mutation, exactly as the existing maps require. **Sibling fix (M11, resolved 2026-06-13):** `PATCH /api/requests/:id` and `PATCH /api/requests/bulk` now validate `REQUEST_TRANSITIONS`; illegal transitions return 409 before any broadcast, status email, or partial bulk mutation.
 
 ### 4.3 `sendToClient()` — five structural guarantees
 
@@ -180,7 +180,7 @@ PATCH /api/public/deliverables/:workspaceId/:id/respond   (server/routes/deliver
 ```
 - **Auth (M1):** the route param is **`:workspaceId`** (matching the existing `requireClientPortalAuth('workspaceId')` convention — using `:ws` silently reads `undefined` and **bypasses auth**). Use **`requireAuthenticatedClientPortalAuth`** (denies passwordless — this route mutates state) and a **per-type guard resolver** that delegates to the existing scoped guards (`requireClientCopyReviewAuth` for copy, `requireClientStrategyMutationAuth` for strategy) so each type's current access semantics are preserved; schema-plan's currently-unguarded send is treated as a **bug to fix, not replicate**. A per-type "unauthenticated `respond` → 401" contract test is required.
 - **Handler:** validate transition → persist response + `client_response_note` → **team email on every outcome** → broadcast + invalidate admin caches → **on `approved`, call `adapter.applyDeliverable()` only if the adapter opted in** (D-apply). Apply default is **no-op**; "client approved" and "write to source-of-truth" remain two distinct transitions with distinct authorization during cutover. Apply is only folded into approve *after* a type's field map has soaked behind the flag with apply disabled. This is the guard that prevents the unified path from re-creating B1.
-- **B2 (content-plan) reconciliation (M6):** `applyDeliverable()` for `content_plan_*` writes the matrix cell — but `updateMatrixCell` (`server/content-matrices.ts:289-330`) is currently **un-guarded** (CP-K4). Bring it under a `MATRIX_CELL_TRANSITIONS` guard (or make the cell status **derive** from the deliverable status — single source of truth) and define the compensating transition for a failed/partial apply. CP-K4 is **in scope**.
+- **B2 (content-plan) reconciliation (M6, CP-K4 resolved 2026-06-13):** `applyDeliverable()` for `content_plan_*` writes the matrix cell, so it must stay on the guarded `updateMatrixCell` path. `updateMatrixCell` and wholesale cell rewrites now validate `MATRIX_CELL_TRANSITIONS`; future content_plan apply work should define any compensating transition explicitly instead of bypassing the matrix-cell machine.
 
 ### 4.5 Adapter contract (the only thing a new type implements)
 
@@ -230,7 +230,7 @@ interface DeliverableAdapter<T> {
 
 **Read-path inventory (M12) — required before Pillar 3 plans.** The 5 per-table shapes are read deeply by more than one slice: `operational-slice` (approval queue depth + oldest age via `listBatches`), `content-pipeline-slice` (raw SQL over `copy_sections` + `getSchemaPlan`), `ClientSignalsSlice`, the `/api/workspace-overview` rollup (6 per-domain summaries feeding the bell, Command Center, and the 3 counters). The plan must enumerate **every consumer** with a per-consumer decision: *migrate to read `client_deliverable`* or *be fed by a per-type backfilled projection*. Any field that is **filtered/sorted/counted/slice-read** (e.g. copy `version`) is promoted **out of `payload` into a typed column** (CLAUDE.md "normalize repeated/queried arrays out of JSON"). **B29** (workspace-overview double-counts content-plan batches into the SEO tally and collapses `review`+`flagged`) is fixed/retired during the content_plan cutover.
 
-`requests` (support tickets) and `keyword_feedback` remain *client→engine* and stay out of the deliverable model; **B24** (requests guard) is fixed as the M11 sibling task, and **B15** (client-reply visibility on requests) is documented as **deferred-with-owner**, not implied-closed.
+`requests` (support tickets) and `keyword_feedback` remain *client→engine* and stay out of the deliverable model; **B24** (requests guard) is resolved as the M11 sibling task, and **B15** (client-reply visibility on requests) is documented as **deferred-with-owner**, not implied-closed.
 
 ---
 

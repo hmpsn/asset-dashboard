@@ -240,8 +240,8 @@ export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
 
 // ── Client Request (support tickets) ──
 // The 6 RequestStatus values from shared/types/requests.ts. PATCH /api/requests/:id
-// (server/routes/requests.ts) is currently any-to-any and re-fires the client status
-// email on illegal moves like closed→new (B24/M11). This map closes that gap.
+// and PATCH /api/requests/bulk both validate this map before mutating so illegal moves
+// like closed→new do not re-fire client status email, broadcast, or partially bulk-apply.
 // Forward flow with operator reopen edges; closed is terminal.
 export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
   new:         ['in_review', 'in_progress', 'on_hold', 'completed', 'closed'],
