@@ -186,7 +186,8 @@ describe('InboxTab unified inbox', () => {
     render(<InboxTab {...baseProps} />);
 
     // PriorityStrip header is shown (it's finally mounted).
-    expect(screen.getByText('Needs your attention')).toBeInTheDocument();
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'P')).toBe(true);
 
     // The title appears in both the PriorityStrip item and the DecisionCard.
     expect(screen.getAllByText('Redirect plan for /old').length).toBeGreaterThanOrEqual(1);
@@ -429,12 +430,12 @@ describe('InboxTab unified inbox', () => {
     expect(heading.tagName).toBe('H3');
     // The one-line "what is this" subtitle.
     expect(screen.getByText('Items waiting on your decision')).toBeInTheDocument();
-    // Vocab reconcile: "Decisions" appears BOTH as the PriorityStrip chip (span) AND as the section
-    // heading (h3) — the chip and the section it scrolls to now use the same canonical noun.
-    const decisionsNodes = screen.getAllByText('Decisions');
-    expect(decisionsNodes.length).toBeGreaterThanOrEqual(2);
-    expect(decisionsNodes.some((n) => n.tagName === 'H3')).toBe(true);
-    expect(decisionsNodes.some((n) => n.tagName === 'SPAN')).toBe(true);
+    // Vocab reconcile: decision items in the strip now point at the attention section, while
+    // the destination card lane keeps the specific Decisions heading.
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'SPAN')).toBe(true);
+    const decisionsHeading = screen.getByRole('heading', { name: 'Decisions' });
+    expect(decisionsHeading.tagName).toBe('H3');
   });
 
   it('canonical inbox → Ready to publish + Work in progress sections render their subtitles', () => {

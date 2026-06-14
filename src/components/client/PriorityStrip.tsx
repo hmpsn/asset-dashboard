@@ -4,7 +4,7 @@ import { CheckCircle } from 'lucide-react';
 import { Button, Icon } from '../ui';
 
 const SECTION_LABELS: Record<string, string> = {
-  decisions: 'Decisions',
+  decisions: 'Needs your attention',
   conversations: 'Conversations',
   reviews: 'Reviews',
 };

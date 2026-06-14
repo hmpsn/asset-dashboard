@@ -5,7 +5,6 @@ import type {
   ClientRequest,
 } from './types';
 import { UnifiedInbox } from './inbox/UnifiedInbox';
-import { useBetaMode } from './BetaContext';
 import { resolveInboxFilter } from './inbox/inbox-filter';
 
 export {
@@ -64,10 +63,9 @@ export function InboxTab({
   hidePrices = false,
 }: InboxTabProps) {
   const [searchParams] = useSearchParams();
-  const betaMode = useBetaMode();
   const requestedTab = searchParams.get('tab');
   const initialFilter = requestedTab !== null || seededFilter
-    ? resolveInboxFilter(requestedTab, betaMode, seededFilter ?? 'all')
+    ? resolveInboxFilter(requestedTab, seededFilter ?? 'all')
     : undefined;
 
   return (

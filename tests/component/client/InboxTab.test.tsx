@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { InboxTab } from '../../../src/components/client/InboxTab';
+import { BetaProvider } from '../../../src/components/client/BetaContext';
 import type { ClientContentRequest, ClientRequest } from '../../../src/components/client/types';
 
 const mockUnifiedInbox = vi.fn();
@@ -47,6 +48,39 @@ function renderInboxAt(path: string, props = {}) {
   );
 }
 
+function renderBetaInboxAt(path: string, props = {}) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <BetaProvider value>
+        <InboxTab {...baseProps} {...props} />
+      </BetaProvider>
+    </MemoryRouter>,
+  );
+}
+
+function InboxWithRouteControls() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => navigate('/client/ws-1/inbox?tab=reviews')}>
+        Reviews tab
+      </button>
+      <button type="button" onClick={() => navigate('/client/ws-1/inbox?tab=conversations')}>
+        Conversations tab
+      </button>
+      <InboxTab {...baseProps} />
+    </>
+  );
+}
+
+function renderInboxWithRouteControls() {
+  return render(
+    <MemoryRouter initialEntries={['/client/ws-1/inbox?tab=decisions']}>
+      <InboxWithRouteControls />
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -79,6 +113,56 @@ describe('InboxTab', () => {
     renderInboxAt('/client/ws-1/inbox?tab=requests');
     expect(mockUnifiedInbox).toHaveBeenCalledWith(
       expect.objectContaining({ initialFilter: 'conversations' }),
+    );
+  });
+
+  it('resolves canonical inbox section deep links', () => {
+    renderInboxAt('/client/ws-1/inbox?tab=reviews');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'reviews' }),
+    );
+
+    vi.clearAllMocks();
+    renderInboxAt('/client/ws-1/inbox?tab=conversations');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'conversations' }),
+    );
+  });
+
+  it('resolves beta inbox Reviews deep links without coercing them to Decisions', () => {
+    renderBetaInboxAt('/client/beta/ws-1/inbox?tab=reviews');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'reviews' }),
+    );
+
+    vi.clearAllMocks();
+    renderBetaInboxAt('/client/beta/ws-1/inbox?tab=content');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'reviews' }),
+    );
+  });
+
+  it('updates the unified inbox filter when the URL tab changes while mounted', () => {
+    renderInboxWithRouteControls();
+    expect(mockUnifiedInbox).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialFilter: 'decisions' }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reviews tab' }));
+    expect(mockUnifiedInbox).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialFilter: 'reviews' }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations tab' }));
+    expect(mockUnifiedInbox).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialFilter: 'conversations' }),
+    );
+  });
+
+  it('resolves legacy approvals inbox alias to Decisions', () => {
+    renderInboxAt('/client/ws-1/inbox?tab=approvals');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'decisions' }),
     );
   });
 
