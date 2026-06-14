@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { InboxTab } from '../../../src/components/client/InboxTab';
-import type { ApprovalBatch, ClientContentRequest, ClientRequest } from '../../../src/components/client/types';
-import type { ClientAction } from '../../../shared/types/client-actions';
+import type { ClientContentRequest, ClientRequest } from '../../../src/components/client/types';
 
 const mockUnifiedInbox = vi.fn();
 
@@ -17,12 +16,6 @@ vi.mock('../../../src/components/client/inbox/UnifiedInbox', () => ({
 const baseProps = {
   workspaceId: 'ws-1',
   effectiveTier: 'growth' as const,
-  approvalBatches: [] as ApprovalBatch[],
-  clientActions: [] as ClientAction[],
-  approvalsLoading: false,
-  pendingApprovals: 0,
-  setApprovalBatches: vi.fn(),
-  loadApprovals: vi.fn(),
   requests: [] as ClientRequest[],
   requestsLoading: false,
   clientUser: { id: 'client-1', name: 'Pat', email: 'pat@example.com', role: 'owner' },
