@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { Button, ClickableRow, SectionCard, StatCard, Icon } from '../ui';
 import {
   Loader2, TrendingUp, Globe, Search, Link2,
@@ -90,7 +90,7 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
 }
 
 export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, cachedKeywordGaps }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const queryClient = useQueryClient();
   const competitorKey = competitors.join(',');
 
@@ -165,14 +165,6 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
 
   const myDomain = data?.domains.find(d => d.isOwn);
   const compDomains = data?.domains.filter(d => !d.isOwn) ?? [];
-
-  const toggleExpand = (key: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
 
   return (
     <div className="space-y-6">

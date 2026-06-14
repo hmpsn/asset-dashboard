@@ -8,6 +8,7 @@ import { post } from '../../api';
 import { normalizeKeyword } from './strategy/strategyKeywordDisplay';
 import { capitalize } from '../../utils/strings';
 import { KeywordMetricCell } from '../shared/KeywordMetricCell';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 
 interface GscKeyword {
   query: string;
@@ -71,18 +72,9 @@ function getPageFolder(path: string): string {
 
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback, explanations = [] }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [expandedFolders, toggleFolder] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [expandedPages, togglePage] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [discussingPage, setDiscussingPage] = useState<string | null>(null);
-
-  const togglePage = (path: string) => {
-    setExpandedPages(prev => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  };
 
   const filteredPages = useMemo(() => {
     switch (activeFilter) {
@@ -113,15 +105,6 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
     () => new Map(explanations.map(explanation => [explanation.normalizedKeyword, explanation])),
     [explanations],
   );
-
-  const toggleFolder = (folder: string) => {
-    setExpandedFolders(prev => {
-      const next = new Set(prev);
-      if (next.has(folder)) next.delete(folder);
-      else next.add(folder);
-      return next;
-    });
-  };
 
   const filterTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all', label: 'All Pages', count: pageMap.length },

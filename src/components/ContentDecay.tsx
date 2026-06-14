@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { contentDecay } from '../api/content';
 import { clientActions } from '../api/clientActions';
 import { EmptyState, Icon, Button, ClickableRow, FormTextarea } from './ui';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { formatDate } from '../utils/formatDates';
 import { adminPath } from '../routes';
 
@@ -52,7 +53,7 @@ export default function ContentDecay({ workspaceId }: Props) {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [generatingRecs, setGeneratingRecs] = useState(false);
-  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [expandedPages, togglePage] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'watch'>('all');
   const [sendingPage, setSendingPage] = useState<string | null>(null);
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
@@ -82,14 +83,6 @@ export default function ContentDecay({ workspaceId }: Props) {
       setAnalysis(result as DecayAnalysis);
     } catch (err) { console.error('ContentDecay operation failed:', err); }
     finally { setGeneratingRecs(false); }
-  };
-
-  const togglePage = (page: string) => {
-    setExpandedPages(prev => {
-      const n = new Set(prev);
-      if (n.has(page)) n.delete(page); else n.add(page);
-      return n;
-    });
   };
 
   const sendPageToClient = async (page: DecayingPage) => {

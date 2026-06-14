@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TierGate, ConfirmDialog, type Tier, Icon, Button, ClickableRow, FormInput, FormTextarea, Badge, StatusBadge } from '../ui';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
 import { findPageMapEntryBySlug } from '../../lib/pathUtils';
@@ -36,7 +37,7 @@ export function ApprovalBatchCard({
   const [rejectingItem, setRejectingItem] = useState<string | null>(null);
   const [rejectDraft, setRejectDraft] = useState('');
   const [applyingBatch, setApplyingBatch] = useState(false);
-  const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+  const [collapsedPages, togglePage] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [confirmState, setConfirmState] = useState<{
     open: boolean; title: string; message: string;
   }>({ open: false, title: '', message: '' });
@@ -65,12 +66,6 @@ export function ApprovalBatchCard({
     actionRef.current = null;
     setConfirmState(s => ({ ...s, open: false }));
   }, []);
-
-  const togglePage = (key: string) => setCollapsedPages(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
 
   const updateApprovalItem = async (
     itemId: string,

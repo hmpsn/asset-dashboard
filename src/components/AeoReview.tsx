@@ -12,6 +12,7 @@ import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, Clickab
 import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import { useJobProgress } from '../hooks/useJobProgress';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
 import { countAeoQuickWins, estimateAeoChangesMinutes } from '../../shared/types/aeo';
@@ -67,8 +68,8 @@ function getClientReadyPage(page: AeoPageReview): AeoPageReview {
 export function AeoReview({ workspaceId }: Props) {
   const [review, setReview] = useState<AeoSiteReview | null>(null);
   const [loadingPage, setLoadingPage] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [expandedChanges, setExpandedChanges] = useState<Set<string>>(new Set());
+  const [expanded, togglePage] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [expandedChanges, toggleChange] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [filterEffort, setFilterEffort] = useState<AeoEffort | 'all'>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [sendingPage, setSendingPage] = useState<string | null>(null);
@@ -129,22 +130,6 @@ export function AeoReview({ workspaceId }: Props) {
       setLoadingPage(null);
     }
   }, [workspaceId]);
-
-  const togglePage = (url: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(url)) next.delete(url); else next.add(url);
-      return next;
-    });
-  };
-
-  const toggleChange = (id: string) => {
-    setExpandedChanges(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   const sendPageToClient = useCallback(async (page: AeoPageReview) => {
     setSendingPage(page.pageUrl);

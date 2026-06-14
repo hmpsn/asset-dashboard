@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSafe, post } from '../../../api/client';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../../hooks/useToggleSet';
 import type { AuditDetail, PageAuditResult } from '../types';
 import { toLiveUrl } from '../utils';
 import { buildContentImprovementRequest } from '../../../lib/health-tab-content-request';
@@ -43,11 +44,11 @@ export function useHealthTabShell({
   workspaceId,
   onContentRequested,
 }: UseHealthTabShellOptions) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['site-wide-all']));
+  const [expandedSections, toggleSection] = useToggleSet<string>(['site-wide-all'], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const allPagesRef = useRef<HTMLDivElement>(null);
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(initialSeverity || 'warning');
   const [showInfoItems, setShowInfoItems] = useState(false);
-  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [expandedPages, togglePage] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [viewMode, setViewMode] = useState<ViewMode>('by-page');
   const [auditSearch, setAuditSearch] = useState('');
   const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
@@ -63,23 +64,6 @@ export function useHealthTabShell({
     if (!initialSeverity) return;
     setSeverityFilter(initialSeverity);
   }, [initialSeverity]);
-
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section);
-      else next.add(section);
-      return next;
-    });
-  };
-
-  const togglePage = (id: string) =>
-    setExpandedPages((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   const requestContentImprovement = async (page: RequestablePage) => {
     if (!workspaceId || requestedPages.has(page.pageId)) return;

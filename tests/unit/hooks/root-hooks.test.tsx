@@ -46,7 +46,7 @@ const mockPost = vi.mocked(post);
 
 // ── Imports ─────────────────────────────────────────────────────────────────
 
-import { useToggleSet } from '../../../src/hooks/useToggleSet';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../../src/hooks/useToggleSet';
 import { useToast } from '../../../src/hooks/useToast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
@@ -93,6 +93,11 @@ describe('useToggleSet — initial state', () => {
   it('exposes a toggle function as the second element', () => {
     const { result } = renderHook(() => useToggleSet(['a']));
     expect(typeof result.current[1]).toBe('function');
+  });
+
+  it('supports lazy defaults', () => {
+    const { result } = renderHook(() => useToggleSet(() => ['lazy-a', 'lazy-b']));
+    expect(result.current[0]).toEqual(new Set(['lazy-a', 'lazy-b']));
   });
 });
 
@@ -160,6 +165,23 @@ describe('useToggleSet — toggle behaviour', () => {
     const { result } = renderHook(() => useToggleSet(['a', 'b'], { max: 3 }));
     act(() => { result.current[1]('c'); });
     expect(result.current[0].size).toBe(3);
+  });
+
+  it('supports non-string keys', () => {
+    const { result } = renderHook(() => useToggleSet([1], UNBOUNDED_TOGGLE_SET_OPTIONS));
+    act(() => { result.current[1](2); });
+    act(() => { result.current[1](1); });
+    expect(result.current[0]).toEqual(new Set([2]));
+  });
+
+  it('supports unbounded empty expansion sets', () => {
+    const { result } = renderHook(() => useToggleSet([], UNBOUNDED_TOGGLE_SET_OPTIONS));
+    act(() => { result.current[1]('a'); });
+    act(() => { result.current[1]('b'); });
+    act(() => { result.current[1]('c'); });
+    act(() => { result.current[1]('d'); });
+    act(() => { result.current[1]('a'); });
+    expect(result.current[0]).toEqual(new Set(['b', 'c', 'd']));
   });
 });
 

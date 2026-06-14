@@ -18,6 +18,7 @@ import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { useToast } from '../Toast';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -137,8 +138,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
   const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
   const [startingRegeneration, setStartingRegeneration] = useState(false);
   const lastObservedRecommendationJobId = useRef<string | null>(null);
-  const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
-  const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
+  const [expandedPriorities, togglePriority] = useToggleSet<RecPriority>(['fix_now'], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [expandedRecs, toggleRec] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const activeRecommendationJob = findActiveJob({
     type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
     workspaceId,
@@ -221,12 +222,6 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
       toast('Could not dismiss recommendation', 'error');
     }
   };
-
-  const togglePriority = (p: RecPriority) =>
-    setExpandedPriorities(prev => { const n = new Set(prev); if (n.has(p)) n.delete(p); else n.add(p); return n; });
-
-  const toggleRec = (id: string) =>
-    setExpandedRecs(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   // Group recommendations by priority, excluding dismissed
   const grouped = useMemo(() => {
