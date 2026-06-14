@@ -148,6 +148,24 @@ describe('MCP content tools (integration)', () => {
     expect(String(payload.dashboard_url)).toContain(`/ws/${ws.workspaceId}/content`);
   });
 
+  it('prepare_brief_context returns target hints when provided', async () => {
+    const result = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'best CRMs for solopreneurs',
+      target_keyword: 'best crm for solopreneurs',
+      target_page_path: '/blog/best-crm',
+      layout: buildLayout(),
+    });
+    expect(result.isError).toBeFalsy();
+
+    const payload = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(payload.target_keyword).toBe('best crm for solopreneurs');
+    expect(payload.target_page_path).toBe('/blog/best-crm');
+    expect(String(payload.prompt_context)).toContain('## Brief Target');
+    expect(String(payload.prompt_context)).toContain('Target keyword: best crm for solopreneurs');
+    expect(String(payload.prompt_context)).toContain('Target page path: /blog/best-crm');
+  });
+
   it('save_brief persists a brief and logs mcp_brief_saved activity', async () => {
     const prepared = await callMcpTool('prepare_brief_context', {
       workspace_id: ws.workspaceId,

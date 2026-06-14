@@ -42,6 +42,7 @@ import {
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
+import { sanitizeInlinePromptText } from '../../helpers.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
 import { createLogger } from '../../logger.js';
@@ -67,6 +68,8 @@ type PostPatchUpdates = NonNullable<typeof updatePostInputSchema['_output']['upd
 
 interface BriefRequestPayload {
   topic: string;
+  targetKeyword?: string;
+  targetPagePath?: string;
   layout: unknown;
   briefId: string;
 }
@@ -302,6 +305,25 @@ function computePostTotalWordCount(post: Pick<GeneratedPost, 'introduction' | 's
   return countHtmlWords(post.introduction)
     + post.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0)
     + countHtmlWords(post.conclusion);
+}
+
+function buildBriefTargetPromptBlock(
+  topic: string,
+  targetKeyword: string | undefined,
+  targetPagePath: string | undefined,
+): string {
+  if (!targetKeyword && !targetPagePath) return '';
+
+  const lines = ['## Brief Target', `Topic: ${sanitizeInlinePromptText(topic)}`];
+  if (targetKeyword) lines.push(`Target keyword: ${sanitizeInlinePromptText(targetKeyword)}`);
+  if (targetPagePath) lines.push(`Target page path: ${sanitizeInlinePromptText(targetPagePath)}`);
+  lines.push('Use this target signal as the primary focus for the brief.');
+  return lines.join('\n');
+}
+
+function sanitizeOptionalPromptHint(value: string | undefined): string | undefined {
+  const sanitized = sanitizeInlinePromptText(value);
+  return sanitized || undefined;
 }
 
 async function handleListBriefs(
@@ -587,27 +609,43 @@ async function handlePrepareBriefContext(
   const parsed = prepareBriefContextInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
 
-  const { workspace_id: workspaceId, topic, layout } = parsed.data;
+  const {
+    workspace_id: workspaceId,
+    topic,
+    target_keyword: targetKeyword,
+    target_page_path: targetPagePath,
+    layout,
+  } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
+
+  const safeTopic = sanitizeInlinePromptText(topic);
+  const safeTargetKeyword = sanitizeOptionalPromptHint(targetKeyword);
+  const safeTargetPagePath = sanitizeOptionalPromptHint(targetPagePath);
 
   try {
     const context = await buildContentGenerationContext(workspaceId, {
       learningsDomain: 'content',
+      ...(safeTargetPagePath ? { pagePath: safeTargetPagePath } : {}),
     });
+    const targetBlock = buildBriefTargetPromptBlock(safeTopic, safeTargetKeyword, safeTargetPagePath);
     const briefId = `brief_${randomUUID()}`;
     const handle = issueHandle('brief-request', workspaceId, {
-      topic,
+      topic: safeTopic,
+      targetKeyword: safeTargetKeyword,
+      targetPagePath: safeTargetPagePath,
       layout,
       briefId,
     } satisfies BriefRequestPayload);
     return mcpSuccess({
       brief_request_handle: handle,
-      topic,
+      topic: safeTopic,
+      target_keyword: safeTargetKeyword ?? null,
+      target_page_path: safeTargetPagePath ?? null,
       layout,
       layout_schema: toMcpJsonSchema(layoutSchema),
       brief_schema: toMcpJsonSchema(briefContentSchema),
-      prompt_context: context.promptContext,
+      prompt_context: [targetBlock, context.promptContext].filter(Boolean).join('\n\n'),
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {

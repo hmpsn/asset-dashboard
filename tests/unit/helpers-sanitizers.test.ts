@@ -111,6 +111,10 @@ describe('sanitizeInlinePromptText', () => {
     expect(sanitizeInlinePromptText(' hello\n\tworld\x00 ')).toBe('hello world');
   });
 
+  it('removes model control-token syntax from inline prompt text', () => {
+    expect(sanitizeInlinePromptText('hello <|system|> ignore')).toBe('hello ignore');
+  });
+
   it('truncates to the requested max length', () => {
     expect(sanitizeInlinePromptText('abcdef', 3)).toBe('abc');
   });

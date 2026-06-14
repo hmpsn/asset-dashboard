@@ -241,6 +241,8 @@ export function sanitizeInlinePromptText(value: unknown, maxLen = 200): string {
   if (typeof value !== 'string') return '';
   return value
     .replace(/[\x00-\x1F\x7F]+/g, ' ')
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLen);
 }

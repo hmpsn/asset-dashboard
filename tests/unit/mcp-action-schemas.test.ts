@@ -99,6 +99,42 @@ describe('mcp-action-schemas', () => {
     });
   });
 
+  describe('prepareBriefContextInputSchema', () => {
+    it('accepts optional target keyword and page path', () => {
+      expect(prepareBriefContextInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        topic: 'Best CRM tools',
+        target_keyword: 'best crm for solopreneurs',
+        target_page_path: '/blog/best-crm',
+        layout: {
+          type: 'outline',
+          structure: { sections: [{ heading: { level: 1, text: 'H1' } }] },
+        },
+      }).success).toBe(true);
+    });
+
+    it('rejects blank optional target fields when provided', () => {
+      expect(prepareBriefContextInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        topic: 'Best CRM tools',
+        target_keyword: ' ',
+        layout: {
+          type: 'outline',
+          structure: { sections: [{ heading: { level: 1, text: 'H1' } }] },
+        },
+      }).success).toBe(false);
+      expect(prepareBriefContextInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        topic: 'Best CRM tools',
+        target_page_path: ' ',
+        layout: {
+          type: 'outline',
+          structure: { sections: [{ heading: { level: 1, text: 'H1' } }] },
+        },
+      }).success).toBe(false);
+    });
+  });
+
   describe('startSeoAuditInputSchema', () => {
     it('requires site_id', () => {
       expect(startSeoAuditInputSchema.safeParse({ workspace_id: 'ws-1' }).success).toBe(false);
