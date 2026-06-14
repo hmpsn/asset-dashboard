@@ -1,7 +1,7 @@
 /**
- * Unit tests for normalizeDeliverable (PR-2a) — the unified ClientDeliverable → NormalizedDecision
+ * Unit tests for normalizeDeliverable — the canonical ClientDeliverable → NormalizedDecision
  * adapter. Asserts each deliverable kind adapts correctly (the inline-vs-modal discriminant,
- * item count, badge, and the sentAt staleness clock), and that legacy adapters still carry `kind`.
+ * item count, badge, and the sentAt staleness clock), and that compatibility adapters still carry `kind`.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -207,7 +207,7 @@ describe('normalizeDeliverable — carries items + payload to the card contract 
   it('source is "deliverable" so the additive fields never leak onto legacy adapters', () => {
     const d = normalizeDeliverable(makeDeliverable());
     expect(d.source).toBe('deliverable');
-    // The legacy adapters (normalizeClientAction/normalizeApprovalBatch) never set items/payload.
+    // The compatibility adapters (normalizeClientAction/normalizeApprovalBatch) never set items/payload.
   });
 });
 
@@ -236,7 +236,7 @@ describe('isProjectedDeliverable (projected vs physical tagging)', () => {
   });
 });
 
-describe('legacy adapters carry kind (back-compat widening)', () => {
+describe('compatibility adapters carry kind (back-compat widening)', () => {
   it('content_decay client action → decision kind + isSingleAction', () => {
     const action = {
       id: 'ca1', title: 'Decay', summary: 's', sourceType: 'content_decay',

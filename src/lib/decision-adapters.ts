@@ -71,13 +71,16 @@ function itemCountForAction(action: ClientAction): number {
   return 1;  // content_decay and unknown types
 }
 
-// ── Public adapters ────────────────────────────────────────────────────────
+// ── Legacy compatibility adapters ──────────────────────────────────────────
 
 /**
  * Normalize a `client_action` row into a `NormalizedDecision` for `<DecisionCard>`.
  *
  * `isSingleAction` is true only for `content_decay` — those render inline
  * with approve/flag buttons; all other types open `<DecisionDetailModal>`.
+ *
+ * @deprecated Production client inbox rendering normalizes `ClientDeliverable` rows.
+ * Keep this only for archived compatibility tests until old source projections are fully retired.
  */
 export function normalizeClientAction(action: ClientAction): NormalizedDecision {
   // content_decay → inline single-action ('decision' kind); all others open the modal ('batch').
@@ -102,6 +105,9 @@ export function normalizeClientAction(action: ClientAction): NormalizedDecision 
  *
  * Approval batches never have isSingleAction=true — they always open the
  * full-screen `<DecisionDetailModal>` regardless of item count.
+ *
+ * @deprecated Production client inbox rendering normalizes `ClientDeliverable` rows.
+ * Keep this only for archived compatibility tests until old source projections are fully retired.
  */
 export function normalizeApprovalBatch(batch: ApprovalBatch): NormalizedDecision {
   return {
@@ -120,7 +126,7 @@ export function normalizeApprovalBatch(batch: ApprovalBatch): NormalizedDecision
   };
 }
 
-// ── Unified ClientDeliverable adapter (PR-2a) ───────────────────────────────
+// ── Canonical ClientDeliverable adapter ─────────────────────────────────────
 
 /** Short human badge for each unified deliverable type — shown in the inbox card/strip. */
 const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {

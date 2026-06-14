@@ -25,9 +25,9 @@ import type { ClientDeliverable, DeliverableKind, DeliverableType } from '../../
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 
 /**
- * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal
- * (R4). `workspaceId`, `setToast`, the auto-expand seed, AND the solo id are supplied locally, so they
- * are omitted from the bag. Threaded from ClientDashboard → InboxTab → here (flag-ON-only).
+ * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal.
+ * `workspaceId`, `setToast`, the auto-expand seed, and the solo id are supplied locally, so they
+ * are omitted from the bag. Threaded from ClientDashboard → InboxTab → here.
  * `soloRequestId` (ISSUE 2d) is supplied by the modal locally — it must NOT be a forwarded
  * pass-through prop.
  */
@@ -720,7 +720,7 @@ export function UnifiedInbox({
           apply/review verb (a work order is not a decision). Each card does NOT call
           normalizeDeliverable, does NOT construct a DecisionCard, and wires ZERO decision mutations
           (structural verb-safety). The ONLY interactive element is the verb-free client↔team
-          conversation input (DARK; reachable only when UnifiedInbox renders behind `unified-inbox`).
+          conversation input.
           Page targets are shown count-only — the raw payload.pageIds are raw Webflow ids and are never
           surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors the R3b "Ready to publish"
           container (surface-2 + brand signature radius). */}
