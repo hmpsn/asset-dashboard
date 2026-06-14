@@ -350,6 +350,18 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+    if (rt.topKeywordMovers?.length) {
+      const movers = rt.topKeywordMovers
+        .slice(0, 5)
+        .map((mover) => {
+          const icon = mover.direction === 'improved' ? '↑' : '↓';
+          const rankLabel = mover.position > 0 ? `#${Number.isInteger(mover.position) ? mover.position : mover.position.toFixed(1)}` : 'unranked';
+          const valueLabel = typeof mover.valueScore === 'number' ? `, value ${mover.valueScore}` : '';
+          return `${mover.direction} "${mover.query}" ${rankLabel} (${icon}${Math.abs(mover.change)}${valueLabel}, ${mover.impressions.toLocaleString()} impressions)`;
+        })
+        .join('; ');
+      lines.push(`Top keyword movers: ${movers}`);
+    }
   }
 
   // GSC discovered query summary — at standard+ verbosity

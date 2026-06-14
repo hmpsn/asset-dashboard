@@ -898,6 +898,45 @@ describe('formatForPrompt — seoContext section', () => {
     expect(result).toContain('12.3');
   });
 
+  it('includes named keyword movers in standard rank tracking context', () => {
+    const intel = makeIntelligence({
+      seoContext: makeSeoContext({
+        businessContext: 'Dental',
+        rankTracking: {
+          trackedKeywords: 25,
+          avgPosition: 12.3,
+          positionChanges: { improved: 5, declined: 2, stable: 18 },
+          topKeywordMovers: [
+            {
+              query: 'dental implants',
+              position: 4,
+              change: -3,
+              direction: 'improved',
+              clicks: 12,
+              impressions: 300,
+              ctr: 4,
+            },
+            {
+              query: 'emergency dentist',
+              position: 9,
+              change: 2,
+              direction: 'declined',
+              clicks: 4,
+              impressions: 900,
+              ctr: 0.44,
+              valueScore: 71,
+            },
+          ],
+        },
+      }),
+    });
+    const result = formatForPrompt(intel);
+    expect(result).toContain('Top keyword movers');
+    expect(result).toContain('improved "dental implants" #4');
+    expect(result).toContain('declined "emergency dentist" #9');
+    expect(result).toContain('value 71');
+  });
+
   it('omits rank tracking in compact verbosity', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({

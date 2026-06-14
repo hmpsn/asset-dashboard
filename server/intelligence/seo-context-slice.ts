@@ -26,6 +26,32 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
+function buildTopKeywordMovers(
+  latest: RankEntry[],
+): NonNullable<SeoContextSlice['rankTracking']>['topKeywordMovers'] {
+  return [...latest]
+    .filter((rank) => typeof rank.change === 'number' && rank.change !== 0)
+    .sort((a, b) => {
+      const movementDelta = Math.abs(b.change ?? 0) - Math.abs(a.change ?? 0);
+      if (movementDelta !== 0) return movementDelta;
+      const impressionDelta = b.impressions - a.impressions;
+      if (impressionDelta !== 0) return impressionDelta;
+      return a.query.localeCompare(b.query);
+    })
+    .slice(0, 8)
+    .map((rank) => ({
+      query: rank.query,
+      position: rank.position,
+      change: rank.change!,
+      direction: rank.change! < 0 ? 'improved' : 'declined',
+      clicks: rank.clicks,
+      impressions: rank.impressions,
+      ctr: rank.ctr,
+      ...(rank.pagePath ? { pagePath: rank.pagePath } : {}),
+      ...(rank.pageTitle ? { pageTitle: rank.pageTitle } : {}),
+    }));
+}
+
 export async function assembleSeoContext(
   workspaceId: string,
   opts?: IntelligenceOptions,
@@ -134,6 +160,7 @@ export async function assembleSeoContext(
         trackedKeywords: tracked.length,
         avgPosition,
         positionChanges: { improved, declined, stable },
+        topKeywordMovers: buildTopKeywordMovers(latest),
       };
     },
     { logger: log },
