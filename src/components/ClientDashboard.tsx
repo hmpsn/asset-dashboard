@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   Clock, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader, InlineBanner } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { CartProvider } from './client/useCart';
 import { SeoCartDrawer } from './client/SeoCart';
@@ -672,12 +672,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
-          <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={AlertTriangle} size="md" className="text-accent-danger flex-shrink-0 mt-0.5" />
-            <div className="t-body text-accent-danger space-y-0.5">
+          <InlineBanner>
+            <div className="t-body space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
-          </div>
+          </InlineBanner>
         )}
 
         {/* SEO Education Tips — per-tab first-visit contextual tips */}

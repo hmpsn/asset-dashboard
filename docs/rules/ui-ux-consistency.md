@@ -10,6 +10,7 @@ All UI components MUST use primitives from `src/components/ui/` instead of creat
 - `EmptyState` - For all empty states with contextual icons and actions
 - `LoadingState` - For loading with contextual messages and size variants  
 - `ErrorState` - For errors with type-specific handling and recovery actions
+- `InlineBanner` - For inline, recoverable section errors or warnings that should not replace the whole view
 - `StatCard` - For metric displays with consistent styling
 - `SectionCard` - For all section containers
 - `PageHeader` - For all page headers

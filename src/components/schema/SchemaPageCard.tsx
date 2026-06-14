@@ -9,7 +9,7 @@ import {
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
   Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
-import { Badge, StatusBadge, FormSelect, FormTextarea, Icon, Button, IconButton, ClickableRow, cn } from '../ui';
+import { Badge, StatusBadge, FormSelect, FormTextarea, Icon, Button, IconButton, ClickableRow, InlineBanner, cn } from '../ui';
 import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
@@ -413,10 +413,9 @@ export function SchemaPageCard({
                       )}
                     </Button>
                     {templateSaveError && (
-                      <span className="badge-span-ok t-caption text-red-400/80 flex items-center gap-1">
-                        <Icon as={AlertTriangle} size="sm" />
+                      <InlineBanner size="sm" className="basis-full sm:basis-auto">
                         {templateSaveError}
-                      </span>
+                      </InlineBanner>
                     )}
                   </>
                 )
@@ -504,10 +503,9 @@ export function SchemaPageCard({
                       )}
                     </Button>
                     {sendPageError && (
-                      <span className="badge-span-ok t-caption text-red-400/80 flex items-center gap-1">
-                        <Icon as={AlertTriangle} size="sm" />
+                      <InlineBanner size="sm" className="basis-full sm:basis-auto">
                         {sendPageError}
-                      </span>
+                      </InlineBanner>
                     )}
                     <FormTextarea
                       value={pageNote}

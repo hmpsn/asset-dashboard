@@ -1,11 +1,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { FileText, AlertCircle, Search } from 'lucide-react';
 
 import { Badge } from '../../../src/components/ui/Badge';
 import { TrendBadge } from '../../../src/components/ui/TrendBadge';
 import { EmptyState } from '../../../src/components/ui/EmptyState';
+import { InlineBanner } from '../../../src/components/ui/InlineBanner';
 import { ErrorState, NetworkError, DataError, PermissionError } from '../../../src/components/ui/ErrorState';
 import { LoadingState } from '../../../src/components/ui/LoadingState';
 import {
@@ -292,6 +293,38 @@ describe('EmptyState', () => {
       <EmptyState icon={Search} title="x" className="my-custom" />,
     );
     expect((container.firstChild as HTMLElement).className).toContain('my-custom');
+  });
+});
+
+// ─── InlineBanner ─────────────────────────────────────────────────────────────
+
+describe('InlineBanner', () => {
+  it('renders error banners as assertive alerts by default', () => {
+    render(<InlineBanner>Could not save changes</InlineBanner>);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save changes');
+  });
+
+  it('renders title and message content', () => {
+    render(<InlineBanner title="Page generation failed" message="Network timeout" />);
+    expect(screen.getByText('Page generation failed')).toBeInTheDocument();
+    expect(screen.getByText('Network timeout')).toBeInTheDocument();
+  });
+
+  it('uses status role for non-error informational banners', () => {
+    render(<InlineBanner tone="success">Saved</InlineBanner>);
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+  });
+
+  it('renders numeric children', () => {
+    render(<InlineBanner>{0}</InlineBanner>);
+    expect(screen.getByRole('alert')).toHaveTextContent('0');
+  });
+
+  it('calls onDismiss from the dismiss button', () => {
+    const onDismiss = vi.fn();
+    render(<InlineBanner onDismiss={onDismiss} dismissLabel="Dismiss error">Failed</InlineBanner>);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss error' }));
+    expect(onDismiss).toHaveBeenCalledOnce();
   });
 });
 

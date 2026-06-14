@@ -8,7 +8,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, ArrowUpRight, X,
 } from 'lucide-react';
-import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
+import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, InlineBanner, positionColor } from './ui';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy, useLocalSeoRefresh } from '../hooks/admin';
@@ -29,6 +29,7 @@ import { keywords, rankTracking } from '../api/seo';
 import { keywordCommandCenter } from '../api/keywordCommandCenter';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center';
 import { queryKeys } from '../lib/queryKeys';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { keywordTrackingKey } from '../lib/keywordTracking';
 import { buildHubDeepLinkQuery } from '../lib/keywordHubDeepLink';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -275,7 +276,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     } catch (err: unknown) {
       // Duplicate / already-tracked responses are silently fine — the server deduplicates.
       // Real network/server failures are surfaced as a visible error on the keyword chip.
-      const errMsg = (err as { error?: string })?.error ?? (err instanceof Error ? err.message : '');
+      const errMsg = extractErrorMessage(err, '');
       const isDuplicate = /already|duplicate/i.test(errMsg);
       if (!isDuplicate) {
         setTrackingErrors(prev => new Map(prev).set(key, 'Failed to track keyword. Please try again.'));
@@ -491,16 +492,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         )}
       >
         {addKeywordError && (
-          <div role="alert" className="mb-3 rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/5 px-3 py-2 flex items-center justify-between gap-2">
-            <span className="t-caption-sm text-accent-danger">{addKeywordError}</span>
-            <IconButton
-              icon={X}
-              size="sm"
-              label="Dismiss error"
-              onClick={() => setAddKeywordError(null)}
-              className="shrink-0"
-            />
-          </div>
+          <InlineBanner
+            size="sm"
+            className="mb-3"
+            onDismiss={() => setAddKeywordError(null)}
+            dismissLabel="Dismiss error"
+          >
+            {addKeywordError}
+          </InlineBanner>
         )}
         {keywordFeedbackRows.length === 0 ? (
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -1006,7 +1005,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       />
                     </div>
                     {trackError && (
-                      <div role="alert" className="t-caption-sm text-accent-danger">{trackError}</div>
+                      <InlineBanner size="sm" icon={false} className="mt-1">
+                        {trackError}
+                      </InlineBanner>
                     )}
                   </div>
                 );

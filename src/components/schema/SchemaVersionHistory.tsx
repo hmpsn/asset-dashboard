@@ -5,8 +5,9 @@
 import { useState, useEffect } from 'react';
 import { formatDateTime } from '../../utils/formatDates';
 import { getSafe, post } from '../../api/client';
-import { AlertTriangle, Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle, X } from 'lucide-react';
-import { Icon, Button, IconButton } from '../ui';
+import { Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { Icon, Button, InlineBanner } from '../ui';
+import { extractErrorMessage } from '../../lib/extractErrorMessage';
 
 interface PublishEntry {
   id: string;
@@ -55,7 +56,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
         setRollbackError('Rollback did not succeed. Please try again.');
       }
     } catch (err) {
-      setRollbackError(err instanceof Error ? err.message : 'Failed to restore this version. Please try again.');
+      setRollbackError(extractErrorMessage(err, 'Failed to restore this version. Please try again.'));
     } finally {
       setRollingBack(null);
     }
@@ -81,18 +82,13 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
   return (
     <div className="space-y-2">
       {rollbackError && (
-        <div role="alert" className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-red-500/8 border border-red-500/20 text-red-400 t-caption-sm">
-          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
-          <span>{rollbackError}</span>
-          <IconButton
-            icon={X}
-            label="Dismiss"
-            size="sm"
-            variant="ghost"
-            onClick={() => setRollbackError(null)}
-            className="ml-auto flex-shrink-0"
-          />
-        </div>
+        <InlineBanner
+          size="sm"
+          onDismiss={() => setRollbackError(null)}
+          dismissLabel="Dismiss"
+        >
+          {rollbackError}
+        </InlineBanner>
       )}
       <div className="space-y-1 max-h-64 overflow-y-auto">
         {history.map((entry, i) => {

@@ -4,12 +4,12 @@ import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus,
-  BookOpen, AlertTriangle, X,
+  BookOpen,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
-import { Icon, cn, Button, IconButton } from './ui';
+import { Icon, cn, Button, InlineBanner } from './ui';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
@@ -33,6 +33,7 @@ import {
   SchemaGeneratorHero,
   SchemaInitialPageTypePicker,
 } from './schema/SchemaGeneratorSetup';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { formatDateShort } from '../utils/formatDates';
 
 type SchemaSubTab = 'generator' | 'guide';
@@ -338,21 +339,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
         {singlePageError ? (
-          <div role="alert" className="w-full max-w-lg flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
-            <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="t-caption font-medium text-red-400">Page generation failed</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
-            </div>
-            <IconButton
-              icon={X}
-              label="Dismiss error"
-              size="sm"
-              variant="ghost"
-              onClick={() => setSinglePageError(null)}
-              className="flex-shrink-0"
-            />
-          </div>
+          <InlineBanner
+            title="Page generation failed"
+            message={singlePageError}
+            onDismiss={() => setSinglePageError(null)}
+            dismissLabel="Dismiss error"
+            className="w-full max-w-lg"
+          />
         ) : (
           <>
             <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
@@ -446,18 +439,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             />
           )}
           {sendToClientError && (
-            <span role="alert" className="flex items-center gap-1 t-caption text-red-400/80">
-              <Icon as={AlertTriangle} size="sm" />
+            <InlineBanner
+              size="sm"
+              onDismiss={() => setSendToClientError(null)}
+              dismissLabel="Dismiss"
+            >
               {sendToClientError}
-              <IconButton
-                icon={X}
-                label="Dismiss"
-                size="sm"
-                variant="ghost"
-                onClick={() => setSendToClientError(null)}
-                className="ml-1"
-              />
-            </span>
+            </InlineBanner>
           )}
           <div className="relative">
             <Button
@@ -482,10 +470,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               />
             )}
             {fetchPagesError && (
-              <div role="alert" className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-start gap-1 px-2 py-1.5 max-w-xs bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80">
-                <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
+              <InlineBanner
+                size="sm"
+                className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] max-w-xs"
+              >
                 {fetchPagesError}
-              </div>
+              </InlineBanner>
             )}
           </div>
           <Button onClick={handleRunScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
@@ -502,21 +492,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       {/* Single-page generation error — dismissible inline banner, does NOT replace the results view */}
       {singlePageError && (
-        <div role="alert" className="flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
-          <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="t-caption font-medium text-red-400">Page generation failed</p>
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
-          </div>
-          <IconButton
-            icon={X}
-            label="Dismiss error"
-            size="sm"
-            variant="ghost"
-            onClick={() => setSinglePageError(null)}
-            className="flex-shrink-0"
-          />
-        </div>
+        <InlineBanner
+          title="Page generation failed"
+          message={singlePageError}
+          onDismiss={() => setSinglePageError(null)}
+          dismissLabel="Dismiss error"
+        />
       )}
 
       {/* Pending schema approval batches sent to client */}
@@ -575,7 +556,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                 setPageTypeErrors(prev => { const n = { ...prev }; delete n[pid]; return n; });
                 // Persist page-type to server; surface failure so the user knows the selection wasn't saved
                 put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch((err: unknown) => {
-                  const msg = err instanceof Error ? err.message : 'Page type not saved — try again.';
+                  const msg = extractErrorMessage(err, 'Page type not saved — try again.');
                   setPageTypeErrors(prev => ({ ...prev, [pid]: msg }));
                   // Revert local state to the prior saved value (not deleted — that would show 'auto' even if server has a different value)
                   setPageTypes(prev => {
