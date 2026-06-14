@@ -30,6 +30,26 @@ describe('PriorityStrip', () => {
     expect(screen.getByText('Reviews')).toBeInTheDocument();
   });
 
+  it('labels decision items by the visible attention section', () => {
+    render(
+      <PriorityStrip
+        items={[
+          {
+            id: 'a1',
+            icon: Inbox,
+            title: 'Approve SEO edits',
+            section: 'decisions',
+            ctaLabel: 'Review',
+            onCta: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'SPAN')).toBe(true);
+    expect(screen.queryByText('Decisions')).not.toBeInTheDocument();
+  });
+
   it('shows all caught up state when items empty and showAllCaughtUp=true', () => {
     render(<PriorityStrip items={[]} showAllCaughtUp />);
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();

@@ -676,7 +676,8 @@ describe('PriorityStrip', () => {
 
   it('renders items list header when items present', () => {
     renderWithWrapper(<PriorityStrip items={[makeItem()]} />);
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument();
+    const attentionLabels = screen.getAllByText(/needs your attention/i);
+    expect(attentionLabels.some((node) => node.tagName === 'P')).toBe(true);
   });
 
   it('renders item title', () => {
@@ -696,9 +697,10 @@ describe('PriorityStrip', () => {
     expect(onCta).toHaveBeenCalledOnce();
   });
 
-  it('renders section chip for decisions section', () => {
+  it('renders section chip for decisions section as the attention section', () => {
     renderWithWrapper(<PriorityStrip items={[makeItem({ section: 'decisions' })]} />);
-    expect(screen.getByText('Decisions')).toBeInTheDocument();
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'SPAN')).toBe(true);
   });
 
   it('renders section chip for conversations section', () => {
