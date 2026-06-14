@@ -677,9 +677,9 @@
           "source": "Outline compression planning 2026-05-26",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "brand-engine",
-          "notes": "Follow-up to audit `server/blueprint-generator.ts` service/location/landing section plans, remove old NAP/local SEO reader-facing guidance, align copy pipeline section counts and word budgets with the page-type copy contract, and add blueprint/copy-pipeline prompt tests."
+          "notes": "Follow-up to audit `server/blueprint-generator.ts` service/location/landing section plans, remove old NAP/local SEO reader-facing guidance, align copy pipeline section counts and word budgets with the page-type copy contract, and add blueprint/copy-pipeline prompt tests. DONE 2026-06-13: compressed conversion-page defaults to match the page-type outline/copy contracts. Added an explicit landing plan, reduced service from seven sections/1,450 target words to five sections/980 target words, reduced location from six sections/1,100 target words to five sections/790 target words, and removed seeded NAP/schema/local-SEO-operations wording from location/contact defaults. Added unit guardrails for conversion-page section/word bounds and SEO-ops wording."
         },
         {
           "id": "intel-quality-keyword-per-market-relevance",
