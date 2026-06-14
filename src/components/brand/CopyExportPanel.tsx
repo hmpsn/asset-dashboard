@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useExportCopy } from '../../hooks/admin/useCopyPipeline';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { SectionCard, Badge, EmptyState, Icon, Button, cn, FormSelect } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { ExportFormat, ExportScope } from '../../../shared/types/copy-pipeline';
@@ -100,7 +101,7 @@ function triggerDownload(content: string, filename: string) {
 function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('csv');
   const [selectedScope, setSelectedScope] = useState<ExportScope>('all');
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+  const [selectedEntryIds, toggleEntryId] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [singleEntryId, setSingleEntryId] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -111,20 +112,6 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
   // approved sections. We still filter to the full entries list for scope
   // selection, letting the server determine what's truly exportable.
   const exportableEntries = entries;
-
-  // ── Entry multi-select toggle ─────────────────────────────────────────────
-
-  function toggleEntryId(id: string) {
-    setSelectedEntryIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
 
   // ── Derived: can the Export button be pressed? ─────────────────────────────
 

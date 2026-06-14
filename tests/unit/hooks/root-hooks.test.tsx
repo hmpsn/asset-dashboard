@@ -95,6 +95,11 @@ describe('useToggleSet — initial state', () => {
     expect(typeof result.current[1]).toBe('function');
   });
 
+  it('exposes the Set setter as the third element for reset/seed cases', () => {
+    const { result } = renderHook(() => useToggleSet(['a']));
+    expect(typeof result.current[2]).toBe('function');
+  });
+
   it('supports lazy defaults', () => {
     const { result } = renderHook(() => useToggleSet(() => ['lazy-a', 'lazy-b']));
     expect(result.current[0]).toEqual(new Set(['lazy-a', 'lazy-b']));
@@ -182,6 +187,12 @@ describe('useToggleSet — toggle behaviour', () => {
     act(() => { result.current[1]('d'); });
     act(() => { result.current[1]('a'); });
     expect(result.current[0]).toEqual(new Set(['b', 'c', 'd']));
+  });
+
+  it('allows callers to replace the active set when external data selects the open row', () => {
+    const { result } = renderHook(() => useToggleSet(['a'], UNBOUNDED_TOGGLE_SET_OPTIONS));
+    act(() => { result.current[2](new Set(['server-selected'])); });
+    expect(result.current[0]).toEqual(new Set(['server-selected']));
   });
 });
 

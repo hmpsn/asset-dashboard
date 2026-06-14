@@ -1792,6 +1792,56 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'Hand-rolled Set toggle outside useToggleSet',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/',
+    message:
+      'Use useToggleSet() for simple Set-backed toggle state. Keep custom Set transitions only when the state shape or side effects are not a single toggle set.',
+    severity: 'error',
+    rationale:
+      'Duplicated Set clone/has/delete/add callbacks drift across components. Centralizing simple toggle state in useToggleSet keeps min/max behavior, reset support, and future fixes consistent.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const toggleDeclarationRe = /\bfunction\s+toggle[A-Za-z0-9_]*\b|\bconst\s+toggle[A-Za-z0-9_]*\s*=\s*(?:useCallback\s*\(\s*)?(?:async\s*)?(?:\([^;\n]*\)|[A-Za-z_$][\w$]*)\s*=>/;
+      const setterCallRe = /\bset[A-Z][A-Za-z0-9_]*\s*\(/;
+
+      for (const file of files) {
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        const normalized = file.replace(/\\/g, '/');
+        const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+        const isSourceFile =
+          rel.startsWith('src/components/') ||
+          rel.startsWith('src/hooks/') ||
+          normalized.includes('/src/components/') ||
+          normalized.includes('/src/hooks/');
+        if (!isSourceFile) continue;
+        if (rel === 'src/hooks/useToggleSet.ts' || normalized.endsWith('/src/hooks/useToggleSet.ts')) continue;
+
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!toggleDeclarationRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, 'use-toggle-set-ok')) continue;
+
+          const windowText = lines.slice(i, Math.min(lines.length, i + 25)).join('\n');
+          const handRolledSetToggle =
+            setterCallRe.test(windowText) &&
+            /new\s+Set\s*\(/.test(windowText) &&
+            /\.has\s*\(/.test(windowText) &&
+            /\.delete\s*\(/.test(windowText) &&
+            /\.add\s*\(/.test(windowText);
+
+          if (handRolledSetToggle) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+          }
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
     name: 'Local prepared statement caching',
     pattern: 'let stmt',
     fileGlobs: ['*.ts'],

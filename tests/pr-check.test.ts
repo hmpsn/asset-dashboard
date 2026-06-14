@@ -1883,6 +1883,135 @@ describe('Rule: Raw fetch() in components', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Hand-rolled Set toggle outside useToggleSet
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Hand-rolled Set toggle outside useToggleSet', () => {
+  const RULE = 'Hand-rolled Set toggle outside useToggleSet';
+
+  it('flags a simple toggle* function that clones/adds/deletes Set state', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/Trigger.tsx'),
+      lines(
+        "import { useState } from 'react';",                 // 1
+        "export function Trigger() {",                       // 2
+        "  const [expanded, setExpanded] = useState(new Set<string>());", // 3
+        "  const toggleExpanded = (id: string) => {",        // 4
+        "    setExpanded(prev => {",                         // 5
+        "      const next = new Set(prev);",                 // 6
+        "      if (next.has(id)) next.delete(id);",          // 7
+        "      else next.add(id);",                          // 8
+        "      return next;",                                // 9
+        "    });",                                           // 10
+        "  };",                                              // 11
+        "  return null;",                                    // 12
+        "}",                                                 // 13
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('respects // use-toggle-set-ok on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/HatchAbove.tsx'),
+      lines(
+        "import { useState } from 'react';",                 // 1
+        "export function Trigger() {",                       // 2
+        "  const [expandedByPost, setExpandedByPost] = useState<Record<string, Set<number>>>({});", // 3
+        "  // use-toggle-set-ok -- map of Sets, not one Set state", // 4
+        "  const toggleSection = (postId: string, index: number) => {", // 5
+        "    setExpandedByPost(prev => {",                   // 6
+        "      const next = new Set(prev[postId] ?? []);",   // 7
+        "      if (next.has(index)) next.delete(index);",    // 8
+        "      else next.add(index);",                       // 9
+        "      return { ...prev, [postId]: next };",         // 10
+        "    });",                                           // 11
+        "  };",                                              // 12
+        "  return null;",                                    // 13
+        "}",                                                 // 14
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag callers that use useToggleSet()', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/SharedHook.tsx'),
+      lines(
+        "import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';",
+        "export function Trigger() {",
+        "  const [expanded, toggleExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);",
+        "  return <button onClick={() => toggleExpanded('a')}>{expanded.size}</button>;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag async operation Set state that is not a toggle* function', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/OperationSet.tsx'),
+      lines(
+        "import { useState } from 'react';",
+        "export function Trigger() {",
+        "  const [saving, setSaving] = useState(new Set<string>());",
+        "  async function save(id: string) {",
+        "    setSaving(prev => new Set(prev).add(id));",
+        "    setSaving(prev => {",
+        "      const next = new Set(prev);",
+        "      next.delete(id);",
+        "      return next;",
+        "    });",
+        "  }",
+        "  return null;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not confuse toggleMutation variables with toggle handlers', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/MutationName.tsx'),
+      lines(
+        "import { useState } from 'react';",
+        "export function Trigger() {",
+        "  const [expanded, setExpanded] = useState(new Set<string>());",
+        "  const toggleMutation = useMutation({ mutationFn: async () => undefined });",
+        "  setExpanded(prev => {",
+        "    const next = new Set(prev);",
+        "    if (next.has('x')) next.delete('x');",
+        "    else next.add('x');",
+        "    return next;",
+        "  });",
+        "  return null;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores files outside src/components and src/hooks', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'server/Trigger.ts'),
+      lines(
+        "const toggleExpanded = (id: string) => {",
+        "  setExpanded(prev => {",
+        "    const next = new Set(prev);",
+        "    if (next.has(id)) next.delete(id);",
+        "    else next.add(id);",
+        "    return next;",
+        "  });",
+        "};",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: Assembled-but-never-rendered slice fields
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -5751,6 +5880,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Raw string literal in broadcastToWorkspace() event arg',
     'Raw string literal in broadcast() event arg',
     'Raw fetch() in components',
+    'Hand-rolled Set toggle outside useToggleSet',
     // Migrated from inline blocks (PR #168 scaled-review I17)
     'Assembled-but-never-rendered slice fields',
     'callCreativeAI without json: flag in files that use parseJsonFallback',

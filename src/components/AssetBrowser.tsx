@@ -12,6 +12,7 @@ import { Button, Checkbox, EmptyState, Icon, IconButton } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { OrganizePreview } from './assets/OrganizePreview';
 import { AssetFilters } from './assets/AssetFilters';
 import { AssetCard } from './assets/AssetCard';
@@ -114,7 +115,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortField>('createdOn');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, toggleSelect, setSelected] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [editingAlt, setEditingAlt] = useState<string | null>(null);
   const [altDraft, setAltDraft] = useState('');
   const [generatingAlt, setGeneratingAlt] = useState<Set<string>>(new Set());
@@ -172,14 +173,6 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       if (sort === 'fileName') return (a.displayName || '').localeCompare(b.displayName || '');
       return (b.createdOn || '').localeCompare(a.createdOn || '');
     });
-
-  const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   const selectAll = () => {
     if (selected.size === filtered.length) {

@@ -497,6 +497,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     }
   };
 
+  // use-toggle-set-ok -- section expansion is keyed by postId, so this is a map of Sets rather than one Set state.
   const toggleSection = (i: number) => {
     setExpandedSectionsByPost(prev => {
       const autoExpanded = new Set(post?.sections.filter(s => s.status === 'done').map(s => s.index) ?? []);

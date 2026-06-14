@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { buildInitialEdits, type CmsCollection } from './cmsEditorModel';
 
 interface UseCmsEditorShellStateArgs {
@@ -8,24 +9,24 @@ interface UseCmsEditorShellStateArgs {
 
 export function useCmsEditorShellState({ siteId, collections }: UseCmsEditorShellStateArgs) {
   const restoredFromCache = useRef(false);
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
+  const [expandedCollections, toggleCollection, setExpandedCollections] = useToggleSet<string>(() => {
     try {
       const raw = sessionStorage.getItem(`cms-editor-expanded-colls-${siteId}`);
-      if (raw) return new Set(JSON.parse(raw));
+      if (raw) return new Set<string>(JSON.parse(raw) as string[]);
     } catch {
       // ignore session cache failures and fall back to empty state
     }
-    return new Set();
-  });
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
+    return new Set<string>();
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [expandedItems, toggleItem, setExpandedItems] = useToggleSet<string>(() => {
     try {
       const raw = sessionStorage.getItem(`cms-editor-expanded-items-${siteId}`);
-      if (raw) return new Set(JSON.parse(raw));
+      if (raw) return new Set<string>(JSON.parse(raw) as string[]);
     } catch {
       // ignore session cache failures and fall back to empty state
     }
-    return new Set();
-  });
+    return new Set<string>();
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>(() => {
     try {
       const raw = sessionStorage.getItem(`cms-editor-edits-${siteId}`);
@@ -52,10 +53,10 @@ export function useCmsEditorShellState({ siteId, collections }: UseCmsEditorShel
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
+  const [historyExpanded, toggleHistory] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
+  const [previewExpanded, togglePreview] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   // Sync state to sessionStorage for persistence across tab switches + refresh.
   // Always syncing edits avoids stale-cache resurrection after a later reset.
@@ -99,42 +100,6 @@ export function useCmsEditorShellState({ siteId, collections }: UseCmsEditorShel
     setDirty(new Set());
     setSaved(new Set());
   }, [collections]);
-
-  const toggleCollection = (collectionId: string) => {
-    setExpandedCollections(previous => {
-      const next = new Set(previous);
-      if (next.has(collectionId)) next.delete(collectionId);
-      else next.add(collectionId);
-      return next;
-    });
-  };
-
-  const toggleItem = (itemId: string) => {
-    setExpandedItems(previous => {
-      const next = new Set(previous);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  };
-
-  const toggleHistory = (itemId: string) => {
-    setHistoryExpanded(previous => {
-      const next = new Set(previous);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  };
-
-  const togglePreview = (itemId: string) => {
-    setPreviewExpanded(previous => {
-      const next = new Set(previous);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  };
 
   const updateField = (itemId: string, fieldSlug: string, value: string) => {
     setEdits(previous => ({

@@ -7,6 +7,7 @@ import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import {
   ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
@@ -66,7 +67,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay', 'guide'];
     return valid.includes(sub as AuditSubTab) ? (sub as AuditSubTab) : 'audit';
   });
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<CheckCategory | 'all'>('all');
@@ -348,15 +349,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const toggleExpand = (page: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(page)) next.delete(page); else next.add(page);
-      return next;
-    });
-  };
-
 
   const handleExportReport = () => {
     setReportModal(false);
