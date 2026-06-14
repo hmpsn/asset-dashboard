@@ -85,7 +85,7 @@ export function formatForPrompt(
 
   // SEO Context
   if (intelligence.seoContext && (!include || include.has('seoContext'))) {
-    sections.push(formatSeoContextSection(intelligence.seoContext, verbosity));
+    sections.push(formatSeoContextSection(intelligence.seoContext, verbosity, opts?.includeRankMovers ?? true));
   }
 
   // Insights
@@ -281,7 +281,7 @@ function applyFilteredTokenBudget(
   return render(content);
 }
 
-function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
+function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity, includeRankMovers = true): string {
   const lines: string[] = ['## SEO Context'];
 
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
@@ -350,7 +350,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
-    if (rt.topKeywordMovers?.length) {
+    if (includeRankMovers && rt.topKeywordMovers?.length) {
       const movers = rt.topKeywordMovers
         .slice(0, 5)
         .map((mover) => {

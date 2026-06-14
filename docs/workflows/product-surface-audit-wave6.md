@@ -7,7 +7,7 @@ Generated from:
 
 Date: 2026-05-18
 
-Update 2026-06-14: the Legacy Client Inbox Aliases and Standalone Schema Review Tab Retirement items have completed their redirect-window sunset. Top-level `/client/:workspaceId/approvals`, `/requests`, `/content`, and `/schema-review` redirects were removed; first-party content/review links now use `/client/:workspaceId/inbox?tab=reviews`.
+Update 2026-06-14: the Legacy Client Inbox Aliases and Standalone Schema Review Tab Retirement items have completed their first-party link sunset. First-party content/review links now use `/client/:workspaceId/inbox?tab=reviews`; old external/bookmark URLs such as `/client/:workspaceId/approvals`, `/requests`, `/content`, and `/schema-review` remain compatibility redirects into the appropriate Inbox section.
 
 ## Coverage Snapshot
 

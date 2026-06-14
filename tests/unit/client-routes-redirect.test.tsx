@@ -15,7 +15,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
-import { clientPath } from '../../src/routes';
+import { clientPath, resolveClientInboxRouteAlias } from '../../src/routes';
 
 // Re-implement the function under test inline. The production version lives
 // in App.tsx and is not exported. Keeping the test isolated to the redirect
@@ -26,6 +26,15 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
+  const splatTabId = splatTab?.split('/')[0];
+  const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+  if (legacyInboxFilter && workspaceId) {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, splatTabId);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   const queryTab = searchParams.get('tab');
   if (queryTab && workspaceId && !splatTab) {
     const remaining = new URLSearchParams(searchParams);
@@ -100,49 +109,49 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it('passes retired /client/:id/content through to dashboard fallback handling', () => {
+  it('redirects retired /client/:id/content to Inbox Reviews', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/content');
-    expect(getByTestId('initialTab').textContent).toBe('content');
-    expect(getByTestId('tabParam').textContent).toBe('<none>');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 
-  it('passes retired /client/:id/requests through to dashboard fallback handling', () => {
+  it('redirects retired /client/:id/requests to Inbox Conversations', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/requests');
-    expect(getByTestId('initialTab').textContent).toBe('requests');
-    expect(getByTestId('tabParam').textContent).toBe('<none>');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('conversations');
   });
 
-  it('passes retired /client/:id/approvals through to dashboard fallback handling', () => {
+  it('redirects retired /client/:id/approvals to Inbox Decisions', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/approvals');
-    expect(getByTestId('initialTab').textContent).toBe('approvals');
-    expect(getByTestId('tabParam').textContent).toBe('<none>');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('decisions');
   });
 
-  it('passes retired /client/:id/schema-review through to dashboard fallback handling', () => {
+  it('redirects retired /client/:id/schema-review to Inbox Reviews', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/schema-review');
-    expect(getByTestId('initialTab').textContent).toBe('schema-review');
-    expect(getByTestId('tabParam').textContent).toBe('<none>');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 });
 
 describe('clientPath client routes', () => {
-  it('does not rewrite retired content route aliases', () => {
-    expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/content');
+  it('canonicalizes retired content route aliases to Inbox Reviews', () => {
+    expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 
-  it('does not rewrite retired requests route aliases', () => {
-    expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/requests');
+  it('canonicalizes retired requests route aliases to Inbox Conversations', () => {
+    expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/inbox?tab=conversations');
   });
 
-  it('does not rewrite retired approvals route aliases', () => {
-    expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/approvals');
+  it('canonicalizes retired approvals route aliases to Inbox Decisions', () => {
+    expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/inbox?tab=decisions');
   });
 
   it('preserves normal client tab paths', () => {
     expect(clientPath('ws_test', 'performance')).toBe('/client/ws_test/performance');
   });
 
-  it('does not rewrite retired schema-review links', () => {
-    expect(clientPath('ws_test', 'schema-review')).toBe('/client/ws_test/schema-review');
+  it('canonicalizes retired schema-review links to Inbox Reviews', () => {
+    expect(clientPath('ws_test', 'schema-review')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 });

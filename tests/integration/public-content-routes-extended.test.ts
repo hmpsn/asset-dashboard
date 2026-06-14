@@ -87,7 +87,7 @@ afterAll(async () => {
 
 // ── Helper: make a fresh content request in a given status ────────────────────
 
-function makeRequest(wsId: string, status: 'requested' | 'client_review' | 'approved' | 'post_review') {
+function makeRequest(wsId: string, status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'post_review' | 'delivered' | 'declined') {
   const kw = `kw-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
   const req = createContentRequest(wsId, {
     topic: `Topic ${kw}`,
@@ -99,6 +99,9 @@ function makeRequest(wsId: string, status: 'requested' | 'client_review' | 'appr
     dedupe: false,
   });
   if (status === 'requested') return req;
+  if (status === 'brief_generated') return updateContentRequest(wsId, req.id, { status: 'brief_generated' })!;
+  if (status === 'delivered') return updateContentRequest(wsId, req.id, { status: 'delivered' })!;
+  if (status === 'declined') return updateContentRequest(wsId, req.id, { status: 'declined' })!;
   // Advance to client_review
   const inReview = updateContentRequest(wsId, req.id, {
     status: 'client_review',
@@ -610,8 +613,8 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
     expect(body.error).toMatch(/request/i);
   });
 
-  it('returns { trend: [] } when request has no targetPageSlug or GSC config', async () => {
-    const req = makeRequest(openWsId, 'requested');
+  it('returns { trend: [] } when visible request has no targetPageSlug or GSC config', async () => {
+    const req = makeRequest(openWsId, 'delivered');
     try {
       const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
       expect(res.status).toBe(200);
@@ -621,6 +624,21 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
       db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
     }
   });
+
+  it.each(['requested', 'brief_generated', 'post_review', 'declined'] as const)(
+    'returns 404 for non-public %s request status',
+    async (status) => {
+      const req = makeRequest(openWsId, status);
+      try {
+        const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
+        expect(res.status).toBe(404);
+        const body = await res.json() as { error: string };
+        expect(body.error).toMatch(/request/i);
+      } finally {
+        db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
+      }
+    },
+  );
 });
 
 // ── POST /api/public/content-request/:workspaceId/from-audit ─────────────────

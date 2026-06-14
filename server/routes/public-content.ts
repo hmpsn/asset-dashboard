@@ -63,6 +63,7 @@ const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
+const PUBLIC_CONTENT_PERFORMANCE_STATUSES = new Set(['delivered', 'published']);
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -560,6 +561,9 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const request = getContentRequest(req.params.workspaceId, req.params.requestId);
     if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (!PUBLIC_CONTENT_PERFORMANCE_STATUSES.has(request.status)) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
     if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
       return res.json({ trend: [] });
     }
@@ -578,8 +582,8 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
     res.json({ trend });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: msg });
+    log.warn({ err, workspaceId: req.params.workspaceId, requestId: req.params.requestId }, 'public content performance trend failed');
+    res.status(500).json({ error: 'Unable to load content performance trend' });
   }
 });
 

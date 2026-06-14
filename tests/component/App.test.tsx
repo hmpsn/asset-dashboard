@@ -610,10 +610,10 @@ describe('LandingPage route', () => {
   });
 });
 
-// ── ClientRoutes retired alias passthrough ─────────────────────────────────
+// ── ClientRoutes retired alias compatibility ───────────────────────────────
 
-describe('ClientRoutes — retired inbox alias passthrough', () => {
-  it('passes /client/:id/approvals through to ClientDashboard fallback handling', async () => {
+describe('ClientRoutes — retired inbox alias compatibility', () => {
+  it('redirects /client/:id/approvals to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -626,11 +626,11 @@ describe('ClientRoutes — retired inbox alias passthrough', () => {
       </QueryClientProvider>,
     );
     await waitFor(() => {
-      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'approvals');
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
     });
   });
 
-  it('passes /client/:id/requests through to ClientDashboard fallback handling', async () => {
+  it('redirects /client/:id/requests to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -643,11 +643,11 @@ describe('ClientRoutes — retired inbox alias passthrough', () => {
       </QueryClientProvider>,
     );
     await waitFor(() => {
-      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'requests');
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
     });
   });
 
-  it('passes /client/:id/content through to ClientDashboard fallback handling', async () => {
+  it('redirects /client/:id/content to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -660,7 +660,24 @@ describe('ClientRoutes — retired inbox alias passthrough', () => {
       </QueryClientProvider>,
     );
     await waitFor(() => {
-      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'content');
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
+    });
+  });
+
+  it('redirects /client/:id/schema-review to the Inbox tab', async () => {
+    const { ClientRoutes } = await importClientRoutes();
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/client/ws-1/schema-review']}>
+          <Routes>
+            <Route path="/client/:workspaceId/*" element={<ClientRoutes />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
     });
   });
 });
@@ -760,7 +777,7 @@ async function importAdminApp() {
 async function importClientRoutes() {
   const React = await import('react');
   const { useParams, useSearchParams, Navigate } = await import('react-router-dom');
-  const { clientPath } = await import('../../src/routes');
+  const { clientPath, resolveClientInboxRouteAlias } = await import('../../src/routes');
   const { ClientDashboard } = await import('../../src/components/ClientDashboard');
 
   function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
@@ -768,6 +785,15 @@ async function importClientRoutes() {
     const [searchParams] = useSearchParams();
     const workspaceId = params.workspaceId!;
     const splatTab = params['*'] || undefined;
+    const splatTabId = splatTab?.split('/')[0];
+    const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+    if (legacyInboxFilter && workspaceId) {
+      const remaining = new URLSearchParams(searchParams);
+      remaining.delete('tab');
+      const qs = remaining.toString();
+      const target = clientPath(workspaceId, splatTabId, betaMode);
+      return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+    }
     const queryTab = searchParams.get('tab');
 
     if (queryTab && workspaceId && !splatTab) {

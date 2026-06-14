@@ -25,6 +25,7 @@ interface GenerationContextBuilderOptions {
   slices?: readonly IntelligenceSlice[];
   enrichWithBacklinks?: boolean;
   includeLocalSeo?: boolean;
+  includeRankMovers?: boolean;
 }
 
 export interface GenerationContextResult {
@@ -77,6 +78,7 @@ async function buildGenerationContext(
     sections: slices,
     tokenBudget: opts.tokenBudget,
     learningsDomain: opts.learningsDomain,
+    includeRankMovers: opts.includeRankMovers,
   });
   return {
     intelligence,

@@ -82,6 +82,13 @@ describe('InboxTab', () => {
     );
   });
 
+  it('resolves legacy content inbox alias to Reviews', () => {
+    renderInboxAt('/client/ws-1/inbox?tab=content');
+    expect(mockUnifiedInbox).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFilter: 'reviews' }),
+    );
+  });
+
   it('passes hidePrices through for pricing-sensitive portals', () => {
     renderInbox({ hidePrices: true });
     expect(mockUnifiedInbox).toHaveBeenCalledWith(
