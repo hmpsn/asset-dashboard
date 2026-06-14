@@ -58,7 +58,7 @@ export const contentTools: Tool[] = [
   {
     name: 'get_content_performance',
     description:
-      'Get post/request content performance with GSC and GA4 metrics, publish age, and source metadata.',
+      'Get post/request content performance with GSC and GA4 metrics, publish age, source metadata, and brief execution coverage where available.',
     inputSchema: toMcpJsonSchema(getContentPerformanceInputSchema),
   },
 ];
