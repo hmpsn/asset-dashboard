@@ -7,6 +7,7 @@ import {
   useSkipBriefing,
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, ClickableRow, FormInput, Modal } from '../ui';
 import type { BriefingCategory, BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
@@ -45,18 +46,9 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
   const publishM = usePublishBriefing(workspaceId);
   const skipM = useSkipBriefing(workspaceId);
   const genM = useGenerateBriefingNow(workspaceId);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [skipping, setSkipping] = useState<string | null>(null);
   const [skipNote, setSkipNote] = useState('');
-
-  const toggleExpanded = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const generateNowAction = (
     <Button

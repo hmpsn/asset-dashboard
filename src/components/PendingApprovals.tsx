@@ -8,6 +8,7 @@ import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
 import { Button, Icon, IconButton, StatusBadge, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 import { formatDateShort } from '../utils/formatDates';
 
@@ -27,7 +28,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   const queryClient = useQueryClient();
   const [reminding, setReminding] = useState<string | null>(null);
   const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const { data: rawBatches = [], isLoading: loading } = useQuery({
@@ -63,14 +64,6 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       setReminderSent(prev => new Set(prev).add(batchId));
     } catch (err) { console.error('PendingApprovals reminder failed:', err); }
     finally { setReminding(null); }
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
   };
 
   const statusBadge = (status: string) => {

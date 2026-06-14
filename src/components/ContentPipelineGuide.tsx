@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import {
   Layers, FileText, Grid3X3, Download,
   Clipboard, RefreshCw, ChevronDown, ChevronRight,
   Sparkles, Flag, Eye, Send, ArrowRight,
 } from 'lucide-react';
 import { SectionCard, Icon, ClickableRow } from './ui';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 
 interface GuideSection {
   id: string;
@@ -116,16 +116,7 @@ const SECTIONS: GuideSection[] = [
 ];
 
 export function ContentPipelineGuide() {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['planner']));
-
-  const toggle = (id: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const [expandedSections, toggle] = useToggleSet<string>(['planner'], UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   return (
     <div className="space-y-8 max-w-3xl">

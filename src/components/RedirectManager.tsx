@@ -9,6 +9,7 @@ import { Badge, PageHeader, StatCard, FormInput, FormTextarea, Icon, SectionCard
 import { normalizePageUrl } from '../lib/pathUtils';
 import { redirects } from '../api/misc';
 import { clientActions } from '../api/clientActions';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { themeColor } from './ui/constants';
 
 interface RedirectHop {
@@ -73,7 +74,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ViewFilter>('all');
   const [search, setSearch] = useState('');
-  const [expandedChains, setExpandedChains] = useState<Set<number>>(new Set());
+  const [expandedChains, toggleChain] = useToggleSet<number>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [rules, setRules] = useState<RedirectRule[]>([]);
   const [editingRule, setEditingRule] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
@@ -199,14 +200,6 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
     } finally {
       setSendingToClient(false);
     }
-  };
-
-  const toggleChain = (idx: number) => {
-    setExpandedChains(prev => {
-      const n = new Set(prev);
-      if (n.has(idx)) n.delete(idx); else n.add(idx);
-      return n;
-    });
   };
 
   // status-semantic-ok -- HTTP response code presentation is protocol semantics, not app lifecycle status.

@@ -6,6 +6,7 @@ import {
 import SearchableSelect from './SearchableSelect';
 import { MetricRing, EmptyState, Icon, Button, PageHeader, ClickableRow } from './ui';
 import { pageWeight, webflow } from '../api/seo';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 
 interface CoreWebVitals {
   LCP: number | null;
@@ -126,7 +127,7 @@ export function PageSpeedPanel({ siteId, workspaceId, showHeader = true }: Props
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
   const [strategy, setStrategy] = useState<'mobile' | 'desktop'>('mobile');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState<WebflowPage[]>([]);
@@ -212,14 +213,6 @@ export function PageSpeedPanel({ siteId, workspaceId, showHeader = true }: Props
       })
       .catch(e => setError(e instanceof Error ? e.message : 'PageSpeed analysis failed'))
       .finally(() => setLoading(false));
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
   };
 
   const pageHeader = showHeader ? (
