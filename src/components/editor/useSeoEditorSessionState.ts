@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FixContext } from '../../App';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { SeoEditState, SeoVariationSet, SeoEditorPage } from './seoEditorTypes';
 import { matchPageIdentity } from '../../lib/pathUtils';
 import {
@@ -33,13 +34,13 @@ export function useSeoEditorSessionState({
     restoredFromCache.current = cached.restoredFromCache;
     return cached.edits;
   });
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
+  const [expanded, toggleExpand, setExpanded] = useToggleSet<string>(() => {
     return readCachedExpandedPages(siteId);
-  });
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
     return readCachedSeoVariations(siteId);
   });
-  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
+  const [previewExpanded, togglePreview] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   useEffect(() => {
     persistCachedSeoEdits(siteId, edits);
@@ -81,22 +82,6 @@ export function useSeoEditorSessionState({
   const hasUnsaved = useMemo(() => {
     return Object.values(edits).some(entry => entry.dirty);
   }, [edits]);
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const togglePreview = (pageId: string) => {
-    setPreviewExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
-      return next;
-    });
-  };
 
   return {
     edits,

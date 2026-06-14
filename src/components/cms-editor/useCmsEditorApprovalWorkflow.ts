@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { post } from '../../api/client';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import {
   buildApprovalPayloadItems,
   type CmsCollection,
@@ -18,13 +19,6 @@ interface UseCmsEditorApprovalWorkflowArgs {
   collections: CmsCollection[];
   refreshStates: () => void;
   onApprovalBatchMutated?: () => void;
-}
-
-function toggleStringSet(previous: Set<string>, id: string): Set<string> {
-  const next = new Set(previous);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  return next;
 }
 
 function toggleStringIds(previous: Set<string>, ids: string[]): Set<string> {
@@ -46,7 +40,7 @@ export function useCmsEditorApprovalWorkflow({
   refreshStates,
   onApprovalBatchMutated,
 }: UseCmsEditorApprovalWorkflowArgs) {
-  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
+  const [approvalSelected, toggleApprovalItem, setApprovalSelected] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
@@ -54,10 +48,6 @@ export function useCmsEditorApprovalWorkflow({
 
   const clearApprovalErrorLater = useCallback(() => {
     setTimeout(() => setApprovalError(null), 5000);
-  }, []);
-
-  const toggleApprovalItem = useCallback((itemId: string) => {
-    setApprovalSelected(previous => toggleStringSet(previous, itemId));
   }, []);
 
   const toggleSelectAllInCollection = useCallback((collectionItemIds: string[]) => {

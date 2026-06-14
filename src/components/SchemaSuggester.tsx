@@ -10,6 +10,7 @@ import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
 import { Icon, cn, Button, IconButton } from './ui';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -71,7 +72,7 @@ function inferLocalBusinessIntent(
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile, intelligenceProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand, setExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
 
   // `onPageGenerated` must have a STABLE identity across renders: the generation
@@ -215,14 +216,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     runScan();
   };
   const impactData = useSchemaImpactData(workspaceId);
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   const schemaTabBar = (
     <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">

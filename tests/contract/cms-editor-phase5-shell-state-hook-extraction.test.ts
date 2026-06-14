@@ -44,16 +44,19 @@ describe('CmsEditor phase-5 shell state hook extraction contract', () => {
 
     expect(hookSource).toContain('export function useCmsEditorShellState');
     expect(hookSource).toContain('const restoredFromCache = useRef(false)');
+    expect(hookSource).toContain("from '../../hooks/useToggleSet'");
     expect(hookSource).toContain('sessionStorage.getItem(');
     expect(hookSource).toContain('sessionStorage.setItem(');
-    expect(hookSource).toContain('const [expandedCollections, setExpandedCollections]');
-    expect(hookSource).toContain('const [expandedItems, setExpandedItems]');
+    expect(hookSource).toContain('const [expandedCollections, toggleCollection, setExpandedCollections]');
+    expect(hookSource).toContain('const [expandedItems, toggleItem, setExpandedItems]');
     expect(hookSource).toContain('const [edits, setEdits]');
     expect(hookSource).toContain('const [dirty, setDirty]');
-    expect(hookSource).toContain('const toggleCollection = (');
-    expect(hookSource).toContain('const toggleItem = (');
-    expect(hookSource).toContain('const toggleHistory = (');
-    expect(hookSource).toContain('const togglePreview = (');
+    expect(hookSource).toContain('const [historyExpanded, toggleHistory]');
+    expect(hookSource).toContain('const [previewExpanded, togglePreview]');
+    expect(hookSource).not.toContain('const toggleCollection = (');
+    expect(hookSource).not.toContain('const toggleItem = (');
+    expect(hookSource).not.toContain('const toggleHistory = (');
+    expect(hookSource).not.toContain('const togglePreview = (');
     expect(hookSource).toContain('const updateField = (');
   });
 });

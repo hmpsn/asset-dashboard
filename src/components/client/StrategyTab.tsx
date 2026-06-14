@@ -9,6 +9,7 @@ import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
 import { useClientIntelligence } from '../../hooks/client';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
@@ -97,13 +98,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       ? clientIntelligence?.keywordFeedbackSummary
       : null;
   const initialDeepLinkTab = searchParams.get('tab');
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+  const [expandedSections, toggleSection, setExpandedSections] = useToggleSet<string>(() => {
     const initial = new Set(['new-content', 'optimize-existing']);
     if (isStrategyDeepLinkTab(initialDeepLinkTab)) {
       initial.add(STRATEGY_TAB_SECTION_MAP[initialDeepLinkTab]);
     }
     return initial;
-  });
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   const {
     keywordFeedback,
@@ -300,15 +301,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerPreviousFocusRef = useRef<HTMLElement | null>(null);
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section);
-      else next.add(section);
-      return next;
-    });
-  };
 
   const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement | null>) => {
     // Ensure section is expanded before scrolling

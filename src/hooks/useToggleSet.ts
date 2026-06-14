@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type Dispatch, type SetStateAction } from 'react';
 
 export interface ToggleSetOptions {
   min?: number;  // minimum active items (default 1)
@@ -19,7 +19,11 @@ type ToggleSetKey<T extends string | number> = T extends number ? number : strin
 export function useToggleSet<T extends string | number>(
   defaults: Iterable<T> | (() => Iterable<T>),
   { min = 1, max = 3 }: ToggleSetOptions = {},
-): [Set<ToggleSetKey<T>>, (key: ToggleSetKey<T>) => void] {
+): [
+  Set<ToggleSetKey<T>>,
+  (key: ToggleSetKey<T>) => void,
+  Dispatch<SetStateAction<Set<ToggleSetKey<T>>>>,
+] {
   const [active, setActive] = useState<Set<ToggleSetKey<T>>>(() =>
     new Set((typeof defaults === 'function' ? defaults() : defaults) as Iterable<ToggleSetKey<T>>),
   );
@@ -36,5 +40,5 @@ export function useToggleSet<T extends string | number>(
     });
   }, [min, max]);
 
-  return [active, toggle];
+  return [active, toggle, setActive];
 }

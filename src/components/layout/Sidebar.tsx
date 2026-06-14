@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
 import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
@@ -6,6 +6,7 @@ import {
   NAV_REGISTRY, type NavEntry, type NavGroupKey,
   resolveNavLabel, resolveNavDescription, isNavEntryHidden,
 } from '../../lib/navRegistry';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -123,21 +124,20 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
 
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+  const [collapsedGroups, toggleGroup, setCollapsedGroups] = useToggleSet<string>(() => {
     try {
       const stored = localStorage.getItem('admin-sidebar-collapsed');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
+      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+    } catch { return new Set<string>(); }
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
 
-  const toggleGroup = useCallback((label: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
-      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...collapsedGroups]));
+    } catch (err) {
+      console.error('App operation failed:', err);
+    }
+  }, [collapsedGroups]);
 
   // No nav entry currently uses flagBehavior, so all flags resolve as OFF.
   const navGroups = buildNavGroups(() => false);
@@ -149,7 +149,6 @@ export function Sidebar({
       setCollapsedGroups(prev => {
         const next = new Set(prev);
         next.delete(activeGroup.label);
-        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
         return next;
       });
     }

@@ -12,6 +12,7 @@ import {
   useBatchJob,
   useCopyStatus,
 } from '../../hooks/admin/useCopyPipeline';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { SectionCard, Badge, StatusBadge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
@@ -129,7 +130,7 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
     [entries]
   );
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(includedIds);
+  const [selectedIds, toggleEntry, setSelectedIds] = useToggleSet<string>(() => includedIds, UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   // Sync when entries change: add new included entries, remove deleted entries
   useEffect(() => {
@@ -169,18 +170,6 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
 
   const allSelected  = entries.length > 0 && selectedIds.size === entries.length;
   const noneSelected = selectedIds.size === 0;
-
-  function toggleEntry(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
 
   function toggleAll() {
     if (allSelected) {
