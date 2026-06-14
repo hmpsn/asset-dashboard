@@ -9509,19 +9509,32 @@ describe('Rule: retired-client-inbox-route-alias', () => {
     expect(hits[0].line).toBe(2);
   });
 
-  it('flags beta client retired route aliases in src', () => {
-    const file = write(
-      uniqPath('rule-retired-client-route', 'src/components/BadRoute.tsx'),
+	  it('flags beta client retired route aliases in src', () => {
+	    const file = write(
+	      uniqPath('rule-retired-client-route', 'src/components/BadRoute.tsx'),
       lines(
         'export function BadRoute({ workspaceId }: { workspaceId: string }) {',
         '  return <a href={`/client/beta/${workspaceId}/schema-review`}>Review</a>;',
         '}',
       ),
     );
-    expect(runRule(RULE, [file])).toHaveLength(1);
-  });
+	    expect(runRule(RULE, [file])).toHaveLength(1);
+	  });
 
-  it('allows canonical Inbox Reviews links', () => {
+	  it('flags production clientPath calls with retired aliases', () => {
+	    const file = write(
+	      uniqPath('rule-retired-client-route', 'src/components/BadClientPath.tsx'),
+	      lines(
+	        "import { clientPath } from '../../routes';",
+	        'export function BadClientPath({ workspaceId }: { workspaceId: string }) {',
+	        "  return clientPath(workspaceId, 'content');",
+	        '}',
+	      ),
+	    );
+	    expect(runRule(RULE, [file])).toHaveLength(1);
+	  });
+
+	  it('allows canonical Inbox Reviews links', () => {
     const file = write(
       uniqPath('rule-retired-client-route', 'server/routes/content-requests.ts'),
       lines(

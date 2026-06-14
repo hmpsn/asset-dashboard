@@ -966,6 +966,8 @@ export interface PromptFormatOptions {
   tokenBudget?: number;
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   pagePath?: string;
+  /** Client-facing prompts should keep aggregate rank context without exact changed queries. */
+  includeRankMovers?: boolean;
 }
 
 // ── Suggested briefs (shared between server store + frontend API client) ──

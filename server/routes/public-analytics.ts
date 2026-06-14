@@ -474,6 +474,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
     try {
       const seoPrompt = await buildSeoPromptContext(ws.id, {
         slices: ['seoContext', 'insights', 'siteHealth', 'learnings'],
+        includeRankMovers: false,
       });
       seoContextBlock = seoPrompt.seoPromptContext;
     } catch (err) {

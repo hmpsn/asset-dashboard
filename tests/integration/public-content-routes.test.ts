@@ -416,17 +416,41 @@ describe('GET /api/public/content-performance/:workspaceId', () => {
 
       const res = await api(`/api/public/content-performance/${workspace.id}`);
       expect(res.status).toBe(200);
-      const body = await res.json() as { items: Array<Record<string, unknown>> };
-      const item = body.items.find(i => i.requestId === request.id);
+	      const body = await res.json() as { items: Array<Record<string, unknown>> };
+	      const item = body.items.find(i => i.requestId === request.id);
+	      expect(item).toBeDefined();
+	      expect(Object.keys(item ?? {}).sort()).toEqual([
+	        'coverage',
+	        'daysSincePublish',
+	        'ga4',
+	        'gsc',
+	        'pageType',
+	        'publishedAt',
+	        'requestId',
+	        'source',
+	        'status',
+	        'targetKeyword',
+	        'targetPageSlug',
+	        'topic',
+	      ].sort());
 
-      expect(item?.coverage).toMatchObject({
-        status: 'partial',
-        requiredCount: 7,
-        matchedCount: 5,
-        missingCount: 2,
-        coveragePct: 71,
-      });
-      expect(item?.joinback).toBeUndefined();
+	      expect(item?.coverage).toMatchObject({
+	        status: 'partial',
+	        requiredCount: 7,
+	        matchedCount: 5,
+	        missingCount: 2,
+	        coveragePct: 71,
+	      });
+	      expect(Object.keys(item?.coverage as Record<string, unknown>).sort()).toEqual([
+	        'coveragePct',
+	        'matchedCount',
+	        'missingCount',
+	        'missingTerms',
+	        'requiredCount',
+	        'status',
+	      ].sort());
+	      expect((item?.coverage as { missingTerms?: unknown[] }).missingTerms).toEqual([]);
+	      expect(item?.joinback).toBeUndefined();
       const serialized = JSON.stringify(body);
       expect(serialized).not.toContain('scrapedReferences');
       expect(serialized).not.toContain('styleExamples');

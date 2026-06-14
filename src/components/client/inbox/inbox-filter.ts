@@ -9,6 +9,7 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   approvals: 'decisions',
   requests: 'conversations',
+  content: 'reviews',
   copy: 'reviews',
   'content-plan': 'decisions',
   completed: 'all',

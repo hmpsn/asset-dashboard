@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
-import { type Page, adminPath, clientPath, GLOBAL_TABS } from './routes';
+import { type Page, adminPath, clientPath, GLOBAL_TABS, resolveClientInboxRouteAlias } from './routes';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
@@ -103,6 +103,15 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
+  const splatTabId = splatTab?.split('/')[0];
+  const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+  if (legacyInboxFilter && workspaceId) {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, splatTabId, betaMode);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   // Backward-compat: redirect old `/client/:id?tab=X` URLs to path-based
   // `/client/:id/X`. ONLY fires when the splat is empty — when a tab path is
   // already present (e.g. `/client/:id/inbox?tab=reviews`), `?tab=X` is a

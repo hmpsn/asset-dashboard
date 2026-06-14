@@ -282,10 +282,10 @@
         "monetizable": false,
         "requiresHumanVerification": false,
         "owner": "inbox",
-        "notes": "Standalone route removed after SchemaReviewModal became part of Inbox > Reviews.",
+        "notes": "Standalone tab removed after SchemaReviewModal became part of Inbox > Reviews; old schema-review URLs redirect to the Inbox Reviews section for bookmark compatibility.",
         "evidence": [
           "src/components/client/SchemaReviewModal.tsx (modal mounted from Inbox Reviews)",
-          "src/lib/client-dashboard-tab.ts (unknown tab fallback)"
+          "src/routes.ts (schema-review compatibility alias -> /inbox?tab=reviews)"
         ]
       },
       {

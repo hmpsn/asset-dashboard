@@ -7621,32 +7621,34 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
-  {
-    // Flags retired top-level client route aliases. These used to be rewritten
-    // to Inbox filters, but the redirect-window sunset removed that behavior.
-    name: 'retired-client-inbox-route-alias',
+	  {
+	    // Flags retired top-level client route aliases in first-party links. Runtime
+	    // still redirects old external links for compatibility, but production code
+	    // should generate canonical Inbox section URLs directly.
+	    name: 'retired-client-inbox-route-alias',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     excludeLines: ['retired-client-inbox-route-alias-ok'],
-    message:
-      'Retired top-level client route alias — use /client/:workspaceId/inbox?tab=decisions|reviews|conversations instead, or document an intentional historical fixture with // retired-client-inbox-route-alias-ok.',
+	    message:
+	      'Retired top-level client route alias — generate /client/:workspaceId/inbox?tab=decisions|reviews|conversations instead, or document an intentional historical fixture with // retired-client-inbox-route-alias-ok.',
     severity: 'error',
-    rationale:
-      'Prevents first-party links from sending clients to removed /approvals, /requests, /content, or /schema-review route aliases after the Inbox alias sunset.',
+	    rationale:
+	      'Prevents first-party links from sending clients through legacy /approvals, /requests, /content, or /schema-review compatibility redirects.',
     claudeMdRef: '#routing',
     customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retiredRouteRe = /\/client(?:\/beta)?\/(?:\$\{[^}]+\}|[^/'"`\s]+)\/(approvals|requests|content|schema-review)(?=[/?'"`]|$)/;
-      for (const file of files) {
+	      const hits: CustomCheckMatch[] = [];
+	      const retiredRouteRe = /\/client(?:\/beta)?\/(?:\$\{[^}]+\}|[^/'"`\s]+)\/(approvals|requests|content|schema-review)(?=[/?'"`]|$)/;
+	      const clientPathAliasRe = /clientPath\s*\([^)]*,\s*['"`](approvals|requests|content|schema-review)['"`]/;
+	      for (const file of files) {
         if (!/\.(ts|tsx)$/.test(file)) continue;
         if (!file.includes('/src/') && !file.includes('/server/')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
-        if (!retiredRouteRe.test(content)) continue;
-        const lines = content.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (!retiredRouteRe.test(line)) continue;
+	        if (!retiredRouteRe.test(content) && !clientPathAliasRe.test(content)) continue;
+	        const lines = content.split('\n');
+	        for (let i = 0; i < lines.length; i++) {
+	          const line = lines[i];
+	          if (!retiredRouteRe.test(line) && !clientPathAliasRe.test(line)) continue;
           if (/^\s*\/\//.test(line)) continue;
           if (hasHatch(lines, i, 'retired-client-inbox-route-alias-ok')) continue;
           hits.push({ file, line: i + 1, text: line.trim() });

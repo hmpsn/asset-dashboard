@@ -24,19 +24,20 @@ describe('LEGACY_FILTER_MAP', () => {
     }
   });
 
-  it('contains exactly the 5 backward-compat URL alias keys', () => {
-    // Phase 2B complete: intermediate filter names (needs-action, seo-changes, content)
+  it('contains exactly the 6 backward-compat URL alias keys', () => {
+    // Phase 2B complete: intermediate filter names (needs-action, seo-changes)
     // have been removed — ActionQueueStrip now emits final InboxFilter values directly.
-    // Only URL alias params remain for external URL backward-compat.
-    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    // Only URL alias params remain for external URL backward-compat; `content`
+    // is an old content-review URL alias that now resolves to Reviews.
+    const expectedKeys = ['approvals', 'requests', 'content', 'copy', 'content-plan', 'completed'];
     for (const k of expectedKeys) {
       expect(LEGACY_FILTER_MAP).toHaveProperty(k);
     }
+    expect(LEGACY_FILTER_MAP.content).toBe('reviews');
     // Intermediate keys must be absent
     expect(LEGACY_FILTER_MAP).not.toHaveProperty('needs-action');
     expect(LEGACY_FILTER_MAP).not.toHaveProperty('seo-changes');
-    expect(LEGACY_FILTER_MAP).not.toHaveProperty('content');
-    expect(Object.keys(LEGACY_FILTER_MAP)).toHaveLength(5);
+    expect(Object.keys(LEGACY_FILTER_MAP)).toHaveLength(6);
   });
 });
 

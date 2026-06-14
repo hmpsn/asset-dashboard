@@ -937,6 +937,35 @@ describe('formatForPrompt — seoContext section', () => {
     expect(result).toContain('value 71');
   });
 
+  it('can omit named keyword movers while preserving aggregate rank tracking context', () => {
+    const intel = makeIntelligence({
+      seoContext: makeSeoContext({
+        businessContext: 'Dental',
+        rankTracking: {
+          trackedKeywords: 25,
+          avgPosition: 12.3,
+          positionChanges: { improved: 5, declined: 2, stable: 18 },
+          topKeywordMovers: [
+            {
+              query: 'dental implants',
+              position: 4,
+              change: -3,
+              direction: 'improved',
+              clicks: 12,
+              impressions: 300,
+              ctr: 4,
+            },
+          ],
+        },
+      }),
+    });
+    const result = formatForPrompt(intel, { includeRankMovers: false });
+    expect(result).toContain('Rank tracking');
+    expect(result).toContain('25 keywords');
+    expect(result).not.toContain('Top keyword movers');
+    expect(result).not.toContain('dental implants');
+  });
+
   it('omits rank tracking in compact verbosity', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({

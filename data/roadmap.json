@@ -1178,7 +1178,7 @@
           "est": "3-5h",
           "priority": "P1",
           "status": "done",
-          "notes": "Done 2026-06-14: owner confirmed the new Inbox is already in active use after the feature-flag rollout. Removed top-level client route alias redirects for `/approvals`, `/requests`, `/content`, and `/schema-review`; first-party content purchase/navigation now lands on `/inbox?tab=reviews`; retired aliases safely fall through to the dashboard overview fallback. Updated product-surface and deprecation registries from redirect/migration to removed/safe-failure evidence."
+          "notes": "Done 2026-06-14: owner confirmed the new Inbox is already in active use after the feature-flag rollout. First-party content purchase/navigation now lands on canonical `/inbox?tab=reviews` links. Follow-up retro-review restored external/bookmark compatibility redirects for `/approvals`, `/requests`, `/content`, and `/schema-review` so retired aliases land in the matching Inbox section instead of falling through to Overview. Product-surface and deprecation registries track the first-party link sunset while runtime compatibility remains."
         },
         {
           "id": "audit-drift-public-route-auth-sweep-followup",
