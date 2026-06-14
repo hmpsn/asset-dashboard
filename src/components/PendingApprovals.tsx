@@ -176,15 +176,12 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
               </div>
               {isExpanded && (
                 <div className="px-3 pb-2 pl-8 space-y-1">
-                  {batch.items.map(item => {
-                    const itemStatus = item.status === 'approved' ? 'text-emerald-400' : item.status === 'rejected' ? 'text-red-400' : 'text-[var(--brand-text)]';
-                    return (
-                      <div key={item.id} className="flex items-center gap-2 t-caption-sm">
-                        <span className={cn('uppercase font-medium', itemStatus)}>{item.status}</span>
-                        <span className="text-[var(--brand-text-muted)] truncate">{item.pageTitle} — {item.field}</span>
-                      </div>
-                    );
-                  })}
+                  {batch.items.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 t-caption-sm">
+                      <StatusBadge status={item.status} domain="approval" fallback="neutral" />
+                      <span className="text-[var(--brand-text-muted)] truncate">{item.pageTitle} — {item.field}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
