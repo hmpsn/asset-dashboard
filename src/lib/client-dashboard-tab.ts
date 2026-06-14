@@ -1,8 +1,8 @@
 /**
  * Pure helper for resolving the active client-portal tab from the URL.
  * Extracted from src/components/ClientDashboard.tsx so the tab fallback logic
- * (legacy aliases + unknown-tab fallback) can be unit-tested
- * without rendering the full dashboard.
+ * (legacy aliases + unknown-tab fallback) can be unit-tested without rendering
+ * the full dashboard.
  */
 import type { ClientTab } from '../routes';
 
@@ -31,9 +31,6 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'health',
   'strategy',
   'inbox',
-  'approvals',
-  'requests',
-  'content',
   'plans',
   'roi',
   'content-plan',
@@ -51,7 +48,6 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
 export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
-  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > Reviews
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

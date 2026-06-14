@@ -610,10 +610,10 @@ describe('LandingPage route', () => {
   });
 });
 
-// ── ClientRoutes legacy alias redirects ───────────────────────────────────
+// ── ClientRoutes retired alias passthrough ─────────────────────────────────
 
-describe('ClientRoutes — legacy inbox alias redirects', () => {
-  it('redirects /client/:id/approvals to /client/:id/inbox?tab=decisions', async () => {
+describe('ClientRoutes — retired inbox alias passthrough', () => {
+  it('passes /client/:id/approvals through to ClientDashboard fallback handling', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -625,11 +625,12 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    // After redirect, it should render the ClientDashboard (since inbox is the target)
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'approvals');
+    });
   });
 
-  it('redirects /client/:id/requests to inbox with conversations tab', async () => {
+  it('passes /client/:id/requests through to ClientDashboard fallback handling', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -641,10 +642,12 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'requests');
+    });
   });
 
-  it('redirects /client/:id/content to inbox with reviews tab', async () => {
+  it('passes /client/:id/content through to ClientDashboard fallback handling', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -656,7 +659,9 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'content');
+    });
   });
 });
 
@@ -755,7 +760,7 @@ async function importAdminApp() {
 async function importClientRoutes() {
   const React = await import('react');
   const { useParams, useSearchParams, Navigate } = await import('react-router-dom');
-  const { clientPath, isClientInboxAlias } = await import('../../src/routes');
+  const { clientPath } = await import('../../src/routes');
   const { ClientDashboard } = await import('../../src/components/ClientDashboard');
 
   function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
@@ -763,7 +768,6 @@ async function importClientRoutes() {
     const [searchParams] = useSearchParams();
     const workspaceId = params.workspaceId!;
     const splatTab = params['*'] || undefined;
-    const splatRoot = splatTab?.split('/')[0];
     const queryTab = searchParams.get('tab');
 
     if (queryTab && workspaceId && !splatTab) {
@@ -771,13 +775,6 @@ async function importClientRoutes() {
       remaining.delete('tab');
       const qs = remaining.toString();
       const target = clientPath(workspaceId, queryTab, betaMode);
-      return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-    }
-    if (workspaceId && isClientInboxAlias(splatRoot)) {
-      const remaining = new URLSearchParams(searchParams);
-      remaining.delete('tab');
-      const qs = remaining.toString();
-      const target = clientPath(workspaceId, splatRoot, betaMode);
       return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
     }
     return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;

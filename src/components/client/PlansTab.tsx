@@ -273,7 +273,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
           {tier !== 'free' && (
             <div className="mt-5 text-center">
-              <Button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} icon={FileText}>
+              <Button onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=reviews`)} icon={FileText}>
                 Browse Content Opportunities
               </Button>
             </div>

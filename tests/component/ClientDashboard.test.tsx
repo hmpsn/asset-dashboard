@@ -318,8 +318,11 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('analytics')).toBe('performance');
   });
 
-  it('maps retired "schema-review" to inbox', () => {
-    expect(resolveClientTab('schema-review')).toBe('inbox');
+  it('falls back to overview for retired inbox route aliases', () => {
+    expect(resolveClientTab('approvals')).toBe('overview');
+    expect(resolveClientTab('requests')).toBe('overview');
+    expect(resolveClientTab('content')).toBe('overview');
+    expect(resolveClientTab('schema-review')).toBe('overview');
   });
 
   it('passes through "brand"', () => {

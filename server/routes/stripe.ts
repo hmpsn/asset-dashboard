@@ -50,10 +50,14 @@ interface CheckoutPreflightContext {
 
 export function buildCheckoutRedirectUrls(req: Pick<Request, 'protocol' | 'get'>, workspaceId: string, returnTab: CheckoutReturnTab): { baseUrl: string; successUrl: string; cancelUrl: string } {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const returnPath = returnTab === 'content'
+    ? `/client/${workspaceId}/inbox?tab=reviews`
+    : `/client/${workspaceId}/${returnTab}`;
+  const separator = returnPath.includes('?') ? '&' : '?';
   return {
     baseUrl,
-    successUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=cancelled`,
+    successUrl: `${baseUrl}${returnPath}${separator}payment=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}${returnPath}${separator}payment=cancelled`,
   };
 }
 

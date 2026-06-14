@@ -708,7 +708,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             health: (
               <LazyClientTabPanel>
                 <ErrorBoundary label="Site Health">
-                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
+                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check Inbox > Reviews to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
                     <ErrorBoundary label="Action Plan">
                       <LazyClientTabPanel>
                         <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />

@@ -376,6 +376,22 @@ export function getClientPortalUrl(ws: { id: string }): string | undefined {
   return `${base}/client/${ws.id}`;
 }
 
+export function buildClientPortalUrl(baseUrl: string | undefined, workspaceId: string, suffix = ''): string | undefined {
+  if (!baseUrl) return undefined;
+  const base = baseUrl.replace(/\/+$/, '');
+  const normalizedSuffix = suffix && !suffix.startsWith('/') ? `/${suffix}` : suffix;
+  return `${base}/client/${workspaceId}${normalizedSuffix}`;
+}
+
+export function buildClientInboxReviewsUrl(baseUrl: string | undefined, workspaceId: string): string | undefined {
+  return buildClientPortalUrl(baseUrl, workspaceId, '/inbox?tab=reviews');
+}
+
+export function getClientInboxReviewsUrl(ws: { id: string }): string | undefined {
+  const portalUrl = getClientPortalUrl(ws);
+  return portalUrl ? `${portalUrl}/inbox?tab=reviews` : undefined;
+}
+
 // Look up the token for a given siteId across all workspaces, fall back to env
 export function getTokenForSite(siteId: string): string | null {
   const row = stmts().getBySiteId.get(siteId) as WorkspaceRow | undefined;

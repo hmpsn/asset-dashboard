@@ -9,9 +9,9 @@ const broadcastState = vi.hoisted(() => ({
 const emailState = vi.hoisted(() => ({
   teamContentRequests: [] as unknown[],
   teamChangesRequested: [] as unknown[],
-  clientBriefReady: [] as unknown[],
-  clientPostReady: [] as unknown[],
-  clientContentPublished: [] as unknown[],
+  clientBriefReady: [] as Array<{ dashboardUrl?: string }>,
+  clientPostReady: [] as Array<{ dashboardUrl?: string }>,
+  clientContentPublished: [] as Array<{ dashboardUrl?: string }>,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -51,11 +51,12 @@ import {
   listContentRequests,
   updateContentRequest,
 } from '../../server/content-requests.js';
+import { upsertBrief } from '../../server/content-brief.js';
 import { savePost } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
-import { createWorkspace, deleteWorkspace, getPageState } from '../../server/workspaces.js';
-import type { GeneratedPost } from '../../shared/types/content.js';
+import { createWorkspace, deleteWorkspace, getPageState, updateWorkspace } from '../../server/workspaces.js';
+import type { ContentBrief, GeneratedPost } from '../../shared/types/content.js';
 
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
@@ -98,7 +99,7 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 async function patchJson(path: string, body: unknown): Promise<Response> {
   return api(path, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: 'https://dashboard.example.test' },
     body: JSON.stringify(body),
   });
 }
@@ -167,6 +168,27 @@ function makeStubPost(workspaceId: string, briefId: string): GeneratedPost {
   };
 }
 
+function makeStubBrief(workspaceId: string): ContentBrief {
+  return {
+    id: `brief_mutation_${unique('brief')}`,
+    workspaceId,
+    targetKeyword: 'mutation safety brief keyword',
+    secondaryKeywords: ['brief safety'],
+    suggestedTitle: 'Mutation Safety Brief',
+    suggestedMetaDesc: 'Mutation safety brief meta description.',
+    outline: [
+      { heading: 'Overview', notes: 'Explain the opportunity.', wordCount: 250, keywords: ['brief safety'] },
+    ],
+    wordCountTarget: 1000,
+    intent: 'informational',
+    audience: 'Client stakeholders',
+    competitorInsights: 'Competitors are investing in educational content.',
+    internalLinkSuggestions: ['/services/content'],
+    createdAt: new Date().toISOString(),
+    pageType: 'blog',
+  };
+}
+
 function createPostReviewRequest(workspaceId: string) {
   const request = createRequest(workspaceId, 'requested', { serviceType: 'full_post' });
   const briefId = `brief_post_review_${unique('brief')}`;
@@ -220,6 +242,7 @@ beforeAll(async () => {
   await startTestServer();
   wsAId = createWorkspace('Content Request Mutation Safety A').id;
   wsBId = createWorkspace('Content Request Mutation Safety B').id;
+  updateWorkspace(wsAId, { clientEmail: 'client-a@example.com' });
 }, 25_000);
 
 beforeEach(() => {
@@ -233,6 +256,7 @@ beforeEach(() => {
   db.prepare('DELETE FROM page_edit_states WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_post_versions WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_posts WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
+  db.prepare('DELETE FROM content_briefs WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_topic_requests WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
 });
 
@@ -241,6 +265,7 @@ afterAll(async () => {
   db.prepare('DELETE FROM page_edit_states WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_post_versions WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_posts WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
+  db.prepare('DELETE FROM content_briefs WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_topic_requests WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   deleteWorkspace(wsAId);
   deleteWorkspace(wsBId);
@@ -328,6 +353,8 @@ describe('content request mutation safety', () => {
     expect(reviewRes.status).toBe(200);
     expect(getContentRequest(wsAId, request.id)).toMatchObject({ status: 'post_review', postId: post.id });
     expect(countActivities(wsAId, 'post_sent_for_review', request.id)).toBe(1);
+    expect(emailState.clientPostReady).toHaveLength(1);
+    expect(emailState.clientPostReady[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
     expect(contentRequestBroadcasts()).toEqual([
       {
         workspaceId: wsAId,
@@ -361,6 +388,35 @@ describe('content request mutation safety', () => {
       status: 'delivered',
       deliveryUrl: 'https://example.com/delivery/content-request-mutation',
     });
+  });
+
+  it('admin patch brief-ready and published emails link to Inbox Reviews', async () => {
+    const request = createRequest(wsAId, 'requested');
+
+    const reviewRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, { status: 'client_review' });
+    expect(reviewRes.status).toBe(200);
+    expect(emailState.clientBriefReady).toHaveLength(1);
+    expect(emailState.clientBriefReady[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
+
+    const publishRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, { status: 'published' });
+    expect(publishRes.status).toBe(200);
+    expect(emailState.clientContentPublished).toHaveLength(1);
+    expect(emailState.clientContentPublished[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
+  });
+
+  it('content brief send-to-client email links to Inbox Reviews', async () => {
+    const brief = makeStubBrief(wsAId);
+    upsertBrief(wsAId, brief);
+
+    const res = await api(`/api/content-briefs/${wsAId}/${brief.id}/send-to-client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://dashboard.example.test' },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+    expect(emailState.clientBriefReady).toHaveLength(1);
+    expect(emailState.clientBriefReady[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
   });
 
   it('admin delete removes the request with context activity, broadcast, and read-path cleanup', async () => {

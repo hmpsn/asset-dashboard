@@ -7,6 +7,8 @@ Generated from:
 
 Date: 2026-05-18
 
+Update 2026-06-14: the Legacy Client Inbox Aliases and Standalone Schema Review Tab Retirement items have completed their redirect-window sunset. Top-level `/client/:workspaceId/approvals`, `/requests`, `/content`, and `/schema-review` redirects were removed; first-party content/review links now use `/client/:workspaceId/inbox?tab=reviews`.
+
 ## Coverage Snapshot
 
 - Feature-audit headline count: `481`
@@ -33,10 +35,10 @@ Date: 2026-05-18
 - **Team Outcomes Overview** (`workspace-command-center`) — human review required
 - **Deep Diagnostics** (`platform-foundation`) — already dark-launched, keep hidden
 
-### Deprecate After Redirect Window
+### Completed Redirect-Window Sunsets
 
-- **Legacy Client Inbox Aliases** (`inbox`) — human review required
-- **Standalone Schema Review Tab Retirement** (`inbox`) — human review required
+- **Legacy Client Inbox Aliases** (`inbox`) — removed 2026-06-14
+- **Standalone Schema Review Tab Retirement** (`inbox`) — standalone route removed 2026-06-14; workflow remains in Inbox > Reviews
 
 ## Human Verification Queue
 
@@ -45,13 +47,11 @@ The following must be explicitly approved before rollout:
 1. `ai-usage-ledger` — hide behind progressive disclosure
 2. `prospect-tooling` — hide behind progressive disclosure
 3. `team-outcomes-overview` — hide behind progressive disclosure
-4. `client-inbox-legacy-aliases` — deprecate after redirect window
-5. `schema-review-standalone-tab-retirement` — deprecate after redirect window
 
 ## Implementation Notes
 
 - This audit is **classification-only** for Wave 6.
-- No routes or user-facing paths were removed in this pass.
+- No routes or user-facing paths were removed in the original Wave 6 classification pass; the inbox alias sunset happened later on 2026-06-14.
 - Follow-up execution should ship one change class at a time:
   1. disclosure demotions (with review approvals),
   2. alias deprecation telemetry window,

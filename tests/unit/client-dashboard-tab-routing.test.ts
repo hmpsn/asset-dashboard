@@ -1,7 +1,7 @@
 /**
  * Unit tests for src/lib/client-dashboard-tab.ts. Covers the tab resolution
  * edge cases that previously lived inline in ClientDashboard.tsx — legacy
- * aliases and the unknown-tab fallback.
+ * performance aliases and the unknown-tab fallback.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveClientTab, KNOWN_CLIENT_TABS } from '../../src/lib/client-dashboard-tab';
@@ -37,19 +37,19 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('strategy')).toBe('strategy');
   });
 
-  it('passes through inbox/approvals/requests/content', () => {
+  it('passes through inbox', () => {
     expect(resolveClientTab('inbox')).toBe('inbox');
-    expect(resolveClientTab('approvals')).toBe('approvals');
-    expect(resolveClientTab('requests')).toBe('requests');
-    expect(resolveClientTab('content')).toBe('content');
   });
 
   it('passes through legacy surface "content-plan"', () => {
     expect(resolveClientTab('content-plan')).toBe('content-plan');
   });
 
-  it('redirects retired "schema-review" tab to inbox', () => {
-    expect(resolveClientTab('schema-review')).toBe('inbox');
+  it('falls back to "overview" for retired inbox route aliases', () => {
+    expect(resolveClientTab('approvals')).toBe('overview');
+    expect(resolveClientTab('requests')).toBe('overview');
+    expect(resolveClientTab('content')).toBe('overview');
+    expect(resolveClientTab('schema-review')).toBe('overview');
   });
 
   // ── Unknown / falsy → "overview" ──

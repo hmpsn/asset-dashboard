@@ -94,7 +94,7 @@ export function usePayments(
           if (Array.isArray(reqs) && reqs.length > 0) setContentRequests(reqs);
         }).catch((err) => { console.error('usePayments operation failed:', err); });
         const label = pricingModal.serviceType === 'full_post' ? 'Full blog post' : 'Brief';
-        setToast({ message: `${label} requested for "${pricingModal.topic}"! Check the Content tab.`, type: 'success' });
+        setToast({ message: `${label} requested for "${pricingModal.topic}"! Check Inbox > Reviews.`, type: 'success' });
         setRequestingTopic(null);
       } else {
         const created = await post<ClientContentRequest>(`/api/public/content-request/${workspaceId}/submit`, { topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, notes: pricingModal.notes || undefined, serviceType: pricingModal.serviceType, pageType: pricingModal.pageType || 'blog', targetPageId: pricingModal.targetPageId, targetPageSlug: pricingModal.targetPageSlug });

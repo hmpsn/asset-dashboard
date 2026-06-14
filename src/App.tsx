@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
-import { type Page, adminPath, clientPath, GLOBAL_TABS, isClientInboxAlias } from './routes';
+import { type Page, adminPath, clientPath, GLOBAL_TABS } from './routes';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
@@ -103,35 +103,17 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
-  const splatRoot = splatTab?.split('/')[0];
   // Backward-compat: redirect old `/client/:id?tab=X` URLs to path-based
   // `/client/:id/X`. ONLY fires when the splat is empty — when a tab path is
-  // already present (e.g. `/client/:id/inbox?tab=approvals`), `?tab=X` is a
+  // already present (e.g. `/client/:id/inbox?tab=reviews`), `?tab=X` is a
   // filter param for the inner page (e.g. <InboxTab>'s useSearchParams
-  // reader), NOT the tab name. Without this guard, `<ActionQueueStrip>`
-  // chips that deep-link to `/inbox?tab=approvals` get rewritten to
-  // `/approvals` (which renders nothing — see ClientDashboard.tsx tab
-  // dispatch) — silent navigation bug that would only manifest at click time.
+  // reader), NOT the tab name.
   const queryTab = searchParams.get('tab');
   if (queryTab && workspaceId && !splatTab) {
     const remaining = new URLSearchParams(searchParams);
     remaining.delete('tab');
     const qs = remaining.toString();
     const target = clientPath(workspaceId, queryTab, betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
-  if (workspaceId && isClientInboxAlias(splatRoot)) {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, splatRoot, betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
-  if (workspaceId && splatRoot === 'schema-review') {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, 'schema-review', betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;

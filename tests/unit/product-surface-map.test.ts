@@ -30,7 +30,6 @@ describe('product surface map', () => {
   it('keeps explicit human-verification queue for non-obvious cuts', () => {
     const reviewQueue = PRODUCT_SURFACE_MAP.filter(entry => entry.requiresHumanVerification);
     expect(reviewQueue.length).toBeGreaterThan(0);
-    expect(reviewQueue.some(entry => entry.id === 'client-inbox-legacy-aliases')).toBe(true);
     expect(reviewQueue.some(entry => entry.id === 'prospect-tooling')).toBe(true);
     expect(reviewQueue.some(entry => entry.id === 'ai-usage-ledger')).toBe(true);
   });
@@ -49,7 +48,7 @@ describe('product surface map', () => {
     expect(report.policyGaps).toEqual([]);
     expect(report.humanReviewRequired).toBeGreaterThan(0);
     expect(report.counts.recommendations['hide-behind-progressive-disclosure']).toBeGreaterThan(0);
-    expect(report.counts.recommendations['deprecate-after-redirect-window']).toBeGreaterThan(0);
+    expect(report.counts.lifecycle.removed).toBeGreaterThan(0);
   });
 
   it('formats markdown output for review docs', () => {
