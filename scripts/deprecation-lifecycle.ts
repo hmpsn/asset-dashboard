@@ -82,17 +82,17 @@ export const DEPRECATION_REGISTRY: DeprecationEntry[] = [
   {
     id: 'client-inbox-legacy-route-aliases',
     capability: 'Legacy client route aliases (/approvals, /requests, /content)',
-    state: 'deprecated',
+    state: 'removed',
     owner: 'inbox',
     replacement: 'Use /client/:workspaceId/inbox?tab=decisions|conversations|reviews.',
     requiresHumanVerification: true,
-    notes: 'Old route aliases remain active only to preserve bookmarks while traffic cool-down is measured.',
+    notes: 'Removed 2026-06-14 after the unified Inbox became the live client experience. Retired paths no longer redirect; they fall through to the dashboard safe fallback.',
     contracts: [
       {
-        kind: 'redirect',
-        description: 'Legacy aliases are rewritten to Inbox filter deep-links.',
-        evidence: 'src/routes.ts (CLIENT_INBOX_ALIASES + clientPath)',
-        testEvidence: 'tests/unit/client-routes-redirect.test.tsx (legacy alias redirect assertions)',
+        kind: 'safe-failure',
+        description: 'Retired route aliases are no longer accepted as renderable client tabs and fall back to the dashboard overview path.',
+        evidence: 'src/lib/client-dashboard-tab.ts (retired aliases omitted from KNOWN_CLIENT_TABS)',
+        testEvidence: 'tests/unit/client-dashboard-tab-routing.test.ts (retired route alias fallback assertions)',
       },
     ],
   },
@@ -245,13 +245,13 @@ export const DEPRECATION_REGISTRY: DeprecationEntry[] = [
     owner: 'inbox',
     replacement: 'Use /client/:workspaceId/inbox?tab=reviews and the SchemaReviewModal entry point.',
     requiresHumanVerification: true,
-    notes: 'Migration preserved deep-link continuity by routing legacy tab intents into Inbox.',
+    notes: 'Migrated into Inbox Reviews. On 2026-06-14 the legacy standalone route redirect was removed; the old tab segment now follows the normal unknown-tab fallback.',
     contracts: [
       {
         kind: 'migration',
-        description: 'Retired schema-review tab now resolves to Inbox routing path.',
-        evidence: 'src/lib/client-dashboard-tab.ts (schema-review -> inbox fallback)',
-        testEvidence: 'tests/unit/client-dashboard-tab-routing.test.ts (schema-review assertion)',
+        description: 'The schema review workflow is available through the Inbox Reviews modal rather than a standalone client tab.',
+        evidence: 'src/components/client/SchemaReviewModal.tsx (Inbox-mounted schema review modal)',
+        testEvidence: 'tests/components/client/inbox-components.test.tsx (SchemaReviewModal render assertions)',
       },
       {
         kind: 'safe-failure',

@@ -8,14 +8,15 @@ describe('Stripe checkout route preflight helpers', () => {
   };
 
   it.each([
-    ['content', '/client/ws_checkout/content'],
+    ['content', '/client/ws_checkout/inbox?tab=reviews'],
     ['health', '/client/ws_checkout/health'],
     ['plans', '/client/ws_checkout/plans'],
   ] as const)('builds legacy %s checkout redirect URLs', (tab, path) => {
     const urls = buildCheckoutRedirectUrls(req, 'ws_checkout', tab);
 
     expect(urls.baseUrl).toBe('https://dashboard.example.test');
-    expect(urls.successUrl).toBe(`https://dashboard.example.test${path}?payment=success&session_id={CHECKOUT_SESSION_ID}`);
-    expect(urls.cancelUrl).toBe(`https://dashboard.example.test${path}?payment=cancelled`);
+    const separator = path.includes('?') ? '&' : '?';
+    expect(urls.successUrl).toBe(`https://dashboard.example.test${path}${separator}payment=success&session_id={CHECKOUT_SESSION_ID}`);
+    expect(urls.cancelUrl).toBe(`https://dashboard.example.test${path}${separator}payment=cancelled`);
   });
 });

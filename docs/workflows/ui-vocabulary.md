@@ -56,7 +56,7 @@ The briefing page action strip chips emit final `InboxFilter` values as `?tab=` 
 | Decisions | `decisions` | Decisions section (schema + action cards without note) |
 | Reviews | `reviews` | Reviews section (briefs + posts needing editorial review) |
 
-**DO NOT** use the retired intermediate values (`seo-changes`, `content`, `needs-action`) — these were trimmed from `LEGACY_FILTER_MAP` in PR #665. Only 5 URL alias entries remain in `CLIENT_INBOX_ALIASES` for backward-compat with bookmarked URLs.
+**DO NOT** use the retired intermediate values (`seo-changes`, `content`, `needs-action`) — these were trimmed from `LEGACY_FILTER_MAP` in PR #665. Canonical first-party links use `decisions`, `reviews`, or `conversations`; any remaining `LEGACY_FILTER_MAP` entries are external URL filter compatibility only, not top-level client route aliases.
 
 ## Overflow Menu Labels
 

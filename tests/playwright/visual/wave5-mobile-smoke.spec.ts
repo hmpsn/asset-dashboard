@@ -18,7 +18,7 @@ const ROUTES = [
   { key: 'workspace-settings-client-dashboard', path: (workspaceId: string) => `/ws/${workspaceId}/workspace-settings?tab=dashboard` },
   { key: 'client-overview', path: (workspaceId: string) => `/client/${workspaceId}/overview` },
   { key: 'client-strategy', path: (workspaceId: string) => `/client/${workspaceId}/strategy` },
-  { key: 'client-content', path: (workspaceId: string) => `/client/${workspaceId}/content` },
+  { key: 'client-inbox-reviews', path: (workspaceId: string) => `/client/${workspaceId}/inbox?tab=reviews` },
 ] as const;
 
 async function loginAsAdmin(page: Page, token: string): Promise<void> {

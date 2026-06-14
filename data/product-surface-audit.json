@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-06-05T02:46:31.636Z",
-  "featureAuditHeadlineCount": 478,
+  "generatedAt": "2026-06-14T16:33:07.890Z",
+  "featureAuditHeadlineCount": 502,
   "productSurfaceEntryCount": 18,
-  "humanVerificationCount": 5,
+  "humanVerificationCount": 3,
   "recommendations": {
     "promote": 1,
-    "keep": 11,
+    "keep": 13,
     "hide-behind-progressive-disclosure": 4,
-    "deprecate-after-redirect-window": 2
+    "deprecate-after-redirect-window": 0
   },
   "placement": {
     "first-class-navigation": 8,
@@ -18,8 +18,9 @@
   "lifecycle": {
     "active": 16,
     "flagged-dark-launch": 0,
-    "deprecated-but-present": 1,
-    "legacy-alias": 1
+    "deprecated-but-present": 0,
+    "legacy-alias": 0,
+    "removed": 2
   },
   "byOwner": {
     "outcomes-roi": 1,
@@ -44,25 +45,11 @@
       "notes": "High-utility operator view but not a core daily workflow for most admins."
     },
     {
-      "id": "client-inbox-legacy-aliases",
-      "capability": "Legacy Client Inbox Aliases",
-      "owner": "inbox",
-      "recommendation": "deprecate-after-redirect-window",
-      "notes": "Legacy route aliases prevent bookmark breakage; remove only after measured alias traffic cool-down."
-    },
-    {
       "id": "prospect-tooling",
       "capability": "Prospect Tooling",
       "owner": "workspace-command-center",
       "recommendation": "hide-behind-progressive-disclosure",
       "notes": "Internal sales utility is valuable but can be progressively disclosed from the core nav."
-    },
-    {
-      "id": "schema-review-standalone-tab-retirement",
-      "capability": "Standalone Schema Review Tab Retirement",
-      "owner": "inbox",
-      "recommendation": "deprecate-after-redirect-window",
-      "notes": "Already migrated into Inbox > Reviews with redirects preserved; monitor and eventually trim legacy links."
     },
     {
       "id": "team-outcomes-overview",
@@ -216,6 +203,23 @@
         ]
       },
       {
+        "id": "client-inbox-legacy-aliases",
+        "capability": "Legacy Client Inbox Aliases",
+        "boundedContextId": "inbox",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "removed",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": false,
+        "requiresHumanVerification": false,
+        "owner": "inbox",
+        "notes": "Removed after the unified Inbox became the live client experience; retired top-level aliases now fall through to the dashboard fallback.",
+        "evidence": [
+          "src/lib/client-dashboard-tab.ts (retired inbox aliases fall back to overview)"
+        ]
+      },
+      {
         "id": "schema-workbench",
         "capability": "Schema Workbench",
         "boundedContextId": "schema",
@@ -264,6 +268,24 @@
         "notes": "Core deliverable cluster directly tied to visible client outcomes.",
         "evidence": [
           "src/components/layout/Sidebar.tsx (SITE HEALTH group)"
+        ]
+      },
+      {
+        "id": "schema-review-standalone-tab-retirement",
+        "capability": "Standalone Schema Review Tab Retirement",
+        "boundedContextId": "inbox",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "removed",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": false,
+        "requiresHumanVerification": false,
+        "owner": "inbox",
+        "notes": "Standalone route removed after SchemaReviewModal became part of Inbox > Reviews.",
+        "evidence": [
+          "src/components/client/SchemaReviewModal.tsx (modal mounted from Inbox Reviews)",
+          "src/lib/client-dashboard-tab.ts (unknown tab fallback)"
         ]
       },
       {
@@ -355,41 +377,6 @@
         ]
       }
     ],
-    "deprecateAfterRedirectWindow": [
-      {
-        "id": "client-inbox-legacy-aliases",
-        "capability": "Legacy Client Inbox Aliases",
-        "boundedContextId": "inbox",
-        "placement": "context-triggered",
-        "role": "support-system",
-        "lifecycle": "legacy-alias",
-        "recommendation": "deprecate-after-redirect-window",
-        "clientFacing": true,
-        "monetizable": false,
-        "requiresHumanVerification": true,
-        "owner": "inbox",
-        "notes": "Legacy route aliases prevent bookmark breakage; remove only after measured alias traffic cool-down.",
-        "evidence": [
-          "src/routes.ts (CLIENT_INBOX_ALIASES approvals/requests/content)"
-        ]
-      },
-      {
-        "id": "schema-review-standalone-tab-retirement",
-        "capability": "Standalone Schema Review Tab Retirement",
-        "boundedContextId": "inbox",
-        "placement": "context-triggered",
-        "role": "support-system",
-        "lifecycle": "deprecated-but-present",
-        "recommendation": "deprecate-after-redirect-window",
-        "clientFacing": true,
-        "monetizable": false,
-        "requiresHumanVerification": true,
-        "owner": "inbox",
-        "notes": "Already migrated into Inbox > Reviews with redirects preserved; monitor and eventually trim legacy links.",
-        "evidence": [
-          "src/components/client/InboxTab.tsx (SchemaReviewModal mounted in Reviews section)"
-        ]
-      }
-    ]
+    "deprecateAfterRedirectWindow": []
   }
 }

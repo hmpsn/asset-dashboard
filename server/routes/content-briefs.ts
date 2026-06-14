@@ -29,7 +29,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
-import { getWorkspace } from '../workspaces.js';
+import { buildClientInboxReviewsUrl, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
@@ -294,7 +294,7 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
   // Send email notification
   if (ws?.clientEmail) {
     const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
-    const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
+    const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
     notifyClientBriefReady({
       clientEmail: ws.clientEmail,
       workspaceName: ws.name,

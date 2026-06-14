@@ -39,7 +39,7 @@ import { getPost } from '../../content-posts-db.js';
 import { notifyClientPostReady } from '../../email.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { createLogger } from '../../logger.js';
-import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
+import { getClientInboxReviewsUrl, getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import type { ContentTopicRequest, GeneratedPost } from '../../../shared/types/content.js';
 
@@ -154,7 +154,7 @@ export function sendPostToClientForReview(
       workspaceId,
       topic: updated.topic,
       targetKeyword: updated.targetKeyword,
-      dashboardUrl: getClientPortalUrl(ws),
+      dashboardUrl: getClientInboxReviewsUrl(ws),
     });
   }
 

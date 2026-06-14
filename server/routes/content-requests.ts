@@ -30,7 +30,7 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
-import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
+import { buildClientInboxReviewsUrl, getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { normalizePageUrl, resolvePagePath } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
@@ -110,7 +110,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
+      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
@@ -119,7 +119,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
+      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
       notifyClientPostReady({
         clientEmail: wsInfo.clientEmail,
         workspaceName: wsInfo.name,
@@ -166,7 +166,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
+      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
       notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }

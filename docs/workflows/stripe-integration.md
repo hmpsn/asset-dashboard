@@ -161,7 +161,7 @@ Stripe config stored encrypted on disk at `~/.asset-dashboard/config/stripe.json
 - [ ] Content request status updated after payment
 - [ ] Activity log shows payment event
 - [ ] Success redirect shows toast in client dashboard
-- [ ] Cancel redirect returns to content tab cleanly
+- [ ] Cancel redirect returns to Inbox > Reviews cleanly for content purchases
 - [ ] Admin can view payment history via API
 - [ ] Products can be enabled/disabled individually in admin UI
 - [ ] `npm run verify:stripe-prices` passes (no live-Stripe price drift) before release

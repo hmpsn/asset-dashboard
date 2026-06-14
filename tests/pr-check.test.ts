@@ -5991,6 +5991,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Wikidata disambiguation outside entity-resolution intelligence modules',
     // 2026-05-08 inbox redesign — retired InboxFilter literals
     'inbox-legacy-filter-literal',
+    // 2026-06-14 inbox alias sunset — top-level client route aliases are removed
+    'retired-client-inbox-route-alias',
     // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
     'feedback-module-reintroduction',
     'prediction-showcase-ungated',
@@ -9481,6 +9483,82 @@ describe('Rule: inbox-legacy-filter-literal', () => {
         '  return <a href={`/inbox?tab=approvals`}>x</a>;',
         '}',
       )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: retired-client-inbox-route-alias
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: retired-client-inbox-route-alias', () => {
+  const RULE = 'retired-client-inbox-route-alias';
+
+  it('flags server-built /client/:workspaceId/content links', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/content-requests.ts'),
+      lines(
+        'export function buildUrl(origin: string, workspaceId: string) {',
+        '  return `${origin}/client/${workspaceId}/content`;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags beta client retired route aliases in src', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'src/components/BadRoute.tsx'),
+      lines(
+        'export function BadRoute({ workspaceId }: { workspaceId: string }) {',
+        '  return <a href={`/client/beta/${workspaceId}/schema-review`}>Review</a>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('allows canonical Inbox Reviews links', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/content-requests.ts'),
+      lines(
+        'export function buildUrl(origin: string, workspaceId: string) {',
+        '  return `${origin}/client/${workspaceId}/inbox?tab=reviews`;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores tests and comment-only historical references', () => {
+    const testFile = write(
+      uniqPath('rule-retired-client-route', 'tests/unit/client-routes.test.ts'),
+      lines(
+        "expect(clientPath('ws', 'content')).toBe('/client/ws/content');",
+      ),
+    );
+    const srcFile = write(
+      uniqPath('rule-retired-client-route', 'src/routes.ts'),
+      lines(
+        '// Historical note: old links looked like /client/ws/content.',
+        'export const route = "/client/ws/inbox?tab=reviews";',
+      ),
+    );
+    expect(runRule(RULE, [testFile, srcFile])).toHaveLength(0);
+  });
+
+  it('suppresses with retired-client-inbox-route-alias-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/legacy-fixture.ts'),
+      lines(
+        'export function legacyFixture(origin: string, workspaceId: string) {',
+        '  // retired-client-inbox-route-alias-ok: intentional external compatibility fixture',
+        '  return `${origin}/client/${workspaceId}/requests`;',
+        '}',
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
