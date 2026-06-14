@@ -5,6 +5,7 @@ import {
 } from './seo-audit-html.js';
 import { computePageScore } from '../shared/scoring.js';
 import { decodeEntities } from './helpers.js';
+import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
 export type Severity = 'error' | 'warning' | 'info';
 
 export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
@@ -30,14 +31,6 @@ export interface PageSeoResult {
   noindex?: boolean;
   /** Never set by auditPage() — `slug` stores the full relative path (e.g. `/services/seo`) without leading slash. Reserved for callers that enrich post-audit. */
   publishedPath?: string | null;
-}
-
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
 }
 
 export const CHECK_CATEGORY: Record<string, CheckCategory> = {
@@ -84,7 +77,7 @@ export function auditPage(
   pageName: string,
   slug: string,
   url: string,
-  meta: PageMeta | null,
+  meta: SchemaSourcePageMeta | null,
   html: string | null,
 ): PageSeoResult {
   const issues: SeoIssue[] = [];
@@ -503,4 +496,3 @@ export function isExcludedPage(slug: string, title?: string): boolean {
   }
   return false;
 }
-

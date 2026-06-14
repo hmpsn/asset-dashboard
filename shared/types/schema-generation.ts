@@ -39,6 +39,24 @@ export interface SchemaPublishResponse {
   error?: string;
 }
 
+export interface SchemaSourcePageMeta {
+  id: string;
+  title: string;
+  slug: string;
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
+  openGraph?: {
+    title?: string | null;
+    description?: string | null;
+    titleCopied?: boolean;
+    descriptionCopied?: boolean;
+  };
+  /** Webflow lastPublished when available; used for schema catalog freshness. */
+  lastPublished?: string | null;
+  /** Webflow createdOn when available; used as datePublished fallback. */
+  createdOn?: string | null;
+}
+
 export interface SkippedSchemaType {
   type: string;
   reason: string;

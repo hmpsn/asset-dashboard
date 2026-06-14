@@ -43,7 +43,7 @@ export const STATUS_BADGE_REGISTRY: Record<StatusBadgeDomain, Record<string, Sta
   'page-edit': statusConfig,
   content: {
     draft: { label: 'Draft', tone: 'zinc' },
-    generating: { label: 'Generating', tone: 'amber' },
+    generating: { label: 'Generating...', tone: 'amber' },
     requested: { label: 'Requested', tone: 'blue' },
     new: { label: 'New', tone: 'blue' },
     open: { label: 'Open', tone: 'teal' },

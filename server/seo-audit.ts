@@ -12,6 +12,7 @@ import { createLogger } from './logger.js';
 import { getToken, webflowFetch } from './webflow-client.js';
 import { runSiteWideChecks } from './seo-audit-site-checks.js';
 import { generateAiRecommendations } from './seo-audit-ai-recs.js';
+import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
 
 const log = createLogger('seo-audit');
 
@@ -50,21 +51,13 @@ export interface SeoAuditResult {
   deadLinkDetails?: DeadLink[];
 }
 
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
-}
-
 function pageListMetaFallback(page: {
   id: string;
   title?: string;
   slug?: string;
   seo?: { title?: string | null; description?: string | null };
   openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
-}): PageMeta {
+}): SchemaSourcePageMeta {
   return {
     id: page.id,
     title: page.title || '',
@@ -82,12 +75,12 @@ function pageListMetaFallback(page: {
   };
 }
 
-export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
+export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<SchemaSourcePageMeta | null> {
   if (!tokenOverride && !getToken()) return null;
   try {
     const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
     if (!res.ok) return null;
-    return await res.json() as PageMeta;
+    return await res.json() as SchemaSourcePageMeta;
   } catch (err) {
     log.debug({ err }, 'seo-audit/fetchPageMeta: network failure — degrading gracefully');
     return null;
