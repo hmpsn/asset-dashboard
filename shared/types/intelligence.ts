@@ -843,6 +843,27 @@ export interface RankTrackingSummary {
   trackedKeywords: number;
   avgPosition: number | null;
   positionChanges: { improved: number; declined: number; stable: number };
+  /** Top changed keywords by absolute SERP movement, derived from latest rank snapshots. */
+  topKeywordMovers?: RankTrackingKeywordMover[];
+}
+
+export interface RankTrackingKeywordMover {
+  query: string;
+  position: number;
+  /** Signed getLatestRanks() movement: negative = improved/moved up, positive = declined/dropped. */
+  change: number;
+  direction: 'improved' | 'declined';
+  clicks: number;
+  impressions: number;
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
+  ctr: number;
+  pagePath?: string;
+  pageTitle?: string;
+  /**
+   * Optional keyword value score when a caller has already joined value scoring
+   * into rank context. The current getLatestRanks() read path does not compute it.
+   */
+  valueScore?: number;
 }
 
 export interface DiscoveredQuerySummary {
