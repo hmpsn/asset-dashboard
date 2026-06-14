@@ -497,8 +497,8 @@
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
           "est": "small-medium",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Wave 5. formatPageMapForPrompt emits only keyword strings, dropping each page's searchIntent/volume/difficulty/cpc; render the metrics already on each entry so the brief can lead with the highest-value term. AND prepare_brief_context (MCP) threads no pagePath/targetKeyword, so the external brief model never gets the per-page match — pass topic→targetKeyword through the existing builder. || PLACEMENT [new, brief-side wiring]: content-brief.ts formatPageMapForPrompt is lossy (drops per-page searchIntent/volume/KD/CPC) + MCP prepare_brief_context threads no topic->page. Render the metrics already on each entry + thread the page; also surface the value score as first-class (today only laundered through opportunityScore). NOTE: content/post GENERATION inherits keyword targeting via the brief, so wiring the brief covers generation — no separate content-gen item needed."
+          "status": "done",
+          "notes": "Done. formatPageMapForPrompt now preserves the legacy keyword-map shape while appending available per-page intent, volume/monthlyVolume, difficulty/KD, CPC, and optional score fields; absent metrics are omitted. MCP prepare_brief_context now accepts target_keyword + target_page_path, threads pagePath into buildContentGenerationContext for page-specific intelligence, returns the target hints, and prepends a compact Brief Target block only when hints are provided. Content/post generation inherits this through the existing brief context path; no UI, DB, or product-route changes."
         },
         {
           "id": "kwv-cannibalization-click-winner",

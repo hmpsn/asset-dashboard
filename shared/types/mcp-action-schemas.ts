@@ -106,6 +106,8 @@ export const addKeywordToStrategyInputSchema = z.object({
 export const prepareBriefContextInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   topic: z.string().min(1),
+  target_keyword: z.string().trim().min(1).optional(),
+  target_page_path: z.string().trim().min(1).optional(),
   layout: layoutSchema,
 });
 

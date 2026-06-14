@@ -897,6 +897,38 @@ export function formatPersonasForPrompt(personas: AudiencePersona[] | null | und
   return `\n\nTARGET AUDIENCE PERSONAS (write to address these specific people — their pain points, goals, and objections):\n${personaStr}`;
 }
 
+type PageMapPromptEntry = NonNullable<NonNullable<SeoContextSlice['strategy']>['pageMap']>[number] & {
+  opportunityScore?: number;
+  valueScore?: number;
+};
+
+function finiteMetric(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function formatMetricNumber(value: number): string {
+  return Number.isInteger(value) ? value.toLocaleString('en-US') : value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+}
+
+function formatPageMapMetrics(page: PageMapPromptEntry): string {
+  const metrics: string[] = [];
+  if (page.searchIntent) metrics.push(`intent: ${page.searchIntent}`);
+
+  const volume = finiteMetric(page.volume) ?? finiteMetric(page.monthlyVolume);
+  if (volume != null) metrics.push(`vol: ${formatMetricNumber(volume)}`);
+
+  const difficulty = finiteMetric(page.difficulty) ?? finiteMetric(page.keywordDifficulty);
+  if (difficulty != null) metrics.push(`KD: ${formatMetricNumber(difficulty)}`);
+
+  const cpc = finiteMetric(page.cpc);
+  if (cpc != null) metrics.push(`CPC: $${cpc.toFixed(2)}`);
+
+  const valueScore = finiteMetric(page.valueScore) ?? finiteMetric(page.opportunityScore);
+  if (valueScore != null) metrics.push(`value: ${formatMetricNumber(valueScore)}`);
+
+  return metrics.length ? ` [${metrics.join('; ')}]` : '';
+}
+
 export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
   if (!seo?.strategy?.pageMap?.length) return '';
 
@@ -908,7 +940,7 @@ export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, 
 
   // Preserves the legacy keyword-map prompt shape used before retirement.
   const mapStr = pageMap.map(
-    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`
+    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}${formatPageMapMetrics(p)}`
   ).join('\n');
 
   return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;

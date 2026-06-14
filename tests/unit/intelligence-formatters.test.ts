@@ -731,6 +731,40 @@ describe('formatPageMapForPrompt', () => {
     const result = formatPageMapForPrompt(seo);
     expect(result).toContain('cannibalization');
   });
+
+  it('includes available per-page keyword metrics without requiring every metric', () => {
+    const seo = makeSeoContext({
+      strategy: {
+        id: 's1',
+        workspaceId: 'ws1',
+        siteKeywords: [],
+        pageMap: [
+          {
+            pagePath: '/services',
+            primaryKeyword: 'dental seo',
+            secondaryKeywords: [],
+            searchIntent: 'commercial',
+            volume: 1200,
+            difficulty: 34,
+            cpc: 6.5,
+          },
+          {
+            pagePath: '/about',
+            primaryKeyword: 'about dental practice',
+            secondaryKeywords: [],
+          },
+        ],
+        businessContext: '',
+        status: 'active',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      } as never,
+    });
+    const result = formatPageMapForPrompt(seo);
+    expect(result).toContain('/services: "dental seo" [intent: commercial; vol: 1,200; KD: 34; CPC: $6.50]');
+    expect(result).toContain('/about: "about dental practice"');
+    expect(result).not.toContain('/about: "about dental practice" [');
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
