@@ -6,7 +6,7 @@
  * restore in-progress UI. This test verifies both halves of that contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkAcceptPanel } from '../../../src/components/audit/BulkAcceptPanel';
 import { seoBulkJobs } from '../../../src/api/seo';
@@ -241,6 +241,25 @@ describe('BulkAcceptPanel — sessionStorage job recovery', () => {
       'persisted-job-123',
       { workspaceId: WORKSPACE_ID },
     );
+  });
+
+  it('shows an inline error when acceptAll fails to start', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(seoBulkJobs.bulkAcceptFixes).mockRejectedValue(new Error('Queue unavailable'));
+
+    const { onRegisterHandlers, onBulkError } = renderPanel({ data: minimalDataWithFixes });
+
+    await waitFor(() => expect(onRegisterHandlers).toHaveBeenCalled());
+    const handlers = onRegisterHandlers.mock.calls[0][0] as { acceptAll: () => Promise<void> };
+
+    await act(async () => { await handlers.acceptAll(); });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Queue unavailable');
+    });
+    expect(onBulkError.mock.calls.some(([value]) => value === 'Queue unavailable')).toBe(true);
+
+    consoleSpy.mockRestore();
   });
 
   it('registers acceptAll and cancel handlers with parent', async () => {

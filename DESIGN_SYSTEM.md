@@ -501,6 +501,7 @@ src/components/ui/
 ├── DataList.tsx            # Ranked list display
 ├── Badge.tsx               # Category/metadata/counter pill
 ├── EmptyState.tsx          # Placeholder for empty/unconfigured states
+├── InlineBanner.tsx        # Inline alert/status banner with tone tokens and optional dismiss
 ├── ErrorState.tsx          # Error display with retry action; includes NetworkError, DataError, PermissionError helpers
 ├── LoadingState.tsx        # Spinner + contextual message; also exports Skeleton and TableSkeleton
 ├── TabBar.tsx              # Sub-navigation tabs

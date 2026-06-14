@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow } from './ui';
+import { SectionCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow, InlineBanner } from './ui';
 import { TemplateEditor, MatrixBuilder, MatrixGrid } from './matrix';
 import { contentTemplates, contentMatrices } from '../api/content';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { queryKeys } from '../lib/queryKeys';
 import type { ContentTemplate, ContentMatrix, MatrixCell } from './matrix';
 
@@ -58,7 +59,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       await loadData();
       setView({ mode: 'list' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save template');
+      setError(extractErrorMessage(err, 'Failed to save template'));
     }
   }, [workspaceId, templates, loadData]);
 
@@ -76,7 +77,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       await loadData();
       setView({ mode: 'list' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create matrix');
+      setError(extractErrorMessage(err, 'Failed to create matrix'));
     }
   }, [workspaceId, loadData]);
 
@@ -99,7 +100,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         await contentMatrices.sendSamples(workspaceId, view.matrixId, cellIds);
         await queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to send selected pages for review');
+        setError(extractErrorMessage(err, 'Failed to send selected pages for review'));
       }
     }
     // Other bulk actions will be wired to specific endpoints as they're implemented
@@ -114,7 +115,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         prev => (prev ?? []).map(m => m.id === view.matrixId ? updated : m),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update cell');
+      setError(extractErrorMessage(err, 'Failed to update cell'));
     }
   }, [workspaceId, view, queryClient]);
 
@@ -281,11 +282,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       />
 
       {error && (
-        // pr-check-disable-next-line -- Error banner uses brand signature radius as alert chrome, not a content card.
-        <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <Icon as={AlertTriangle} size="md" className="text-accent-danger flex-shrink-0 mt-0.5" />
-          <span className="t-caption-sm text-accent-danger">{error}</span>
-        </div>
+        <InlineBanner>{error}</InlineBanner>
       )}
 
       {/* Templates */}

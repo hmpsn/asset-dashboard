@@ -4,9 +4,10 @@ import {
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard } from './ui';
+import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard, InlineBanner } from './ui';
 import { CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { contentPerformance } from '../api/seo';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { capitalize } from '../utils/strings';
 
 interface GscMetrics {
@@ -131,7 +132,7 @@ export function ContentPerformance({ workspaceId }: Props) {
     let cancelled = false;
     contentPerformance.get(workspaceId)
       .then(data => { if (!cancelled) { setItems((data as { items?: ContentItem[] }).items || []); setError(null); } })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load'); })
+      .catch(e => { if (!cancelled) setError(extractErrorMessage(e, 'Failed to load')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [workspaceId]);
@@ -184,7 +185,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       />
 
       {error && (
-        <div className="t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-4 py-3">{error}</div>
+        <InlineBanner>{error}</InlineBanner>
       )}
 
       {items.length === 0 && !error ? (

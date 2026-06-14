@@ -14,6 +14,7 @@ export { FreshnessStamp, type FreshnessStampProps } from './FreshnessStamp';
 export { SerpPreview } from './SerpPreview';
 export { SocialPreview } from './SocialPreview';
 export { EmptyState } from './EmptyState';
+export { InlineBanner, type InlineBannerTone, type InlineBannerSize } from './InlineBanner';
 export { LoadingState, Skeleton as LoadingSkeleton, TableSkeleton } from './LoadingState';
 export { ErrorState, NetworkError, DataError, PermissionError } from './ErrorState';
 export { NextStepsCard } from './NextStepsCard';

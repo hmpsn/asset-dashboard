@@ -112,9 +112,9 @@
           "source": "Scaled code review of fix/admin-surfaces-w1-silent-failures (2026-06-11)",
           "est": "3-4h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "W1 introduced ~8 inline error surfaces with drift: bg-red-500/5 vs /8 vs /10, dismissible vs not, span vs div, ~16 inline 'err instanceof Error ? err.message : fallback' sites. Reviewer table in scaled review. UI/UX Rule 9 extraction: InlineBanner (role=alert, icon, optional dismiss, consistent tokens) + shared extractErrorMessage in src/lib. Converge KeywordStrategy trackError/addKeywordError divergence while at it."
+          "notes": "Done 2026-06-14 in codex/inline-banner-error-helper: added shared InlineBanner (alert/status roles, tone tokens, optional dismiss, compact mode) plus extractErrorMessage(err, fallback). Migrated scoped W1 drift surfaces in SchemaSuggester/SchemaPageCard, KeywordStrategy add/track errors, ContentPlanner, ContentPerformance, BulkAcceptPanel, SchemaVersionHistory, and ClientDashboard section-load errors. Added primitive/helper tests and bulk-start failure coverage."
         }
       ]
     },
