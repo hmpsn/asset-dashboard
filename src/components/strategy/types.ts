@@ -38,6 +38,10 @@ export interface StrategyMetrics {
   requestedFeedback: AdminKeywordFeedbackListRow[];
   approvedFeedback: AdminKeywordFeedbackListRow[];
   feedbackNewerThanStrategy: boolean;
+  /** True if ANY page in the UNFILTERED pageMap has a currentPosition. Wire StrategyHowItWorks.hasAnyRanking from this — NOT `ranked.length > 0` (ranked is volume-filtered). */
+  hasAnyRanking: boolean;
+  /** True if ANY page in the UNFILTERED pageMap has volume > 0. Wire StrategyStalenessNudges.hasVolumeValidation from this — NOT a filteredPageMap check. */
+  hasVolumeValidation: boolean;
 }
 
 /** Minimum monthly search volume to display a strategy card. Below this is noise. */
@@ -98,6 +102,7 @@ export interface StrategySettingsProps {
 }
 
 export interface StrategyStalenessNudgesProps {
+  /** Source from StrategyMetrics.hasVolumeValidation (unfiltered pageMap.some(volume>0)). The unvalidated warning renders when this is FALSE. */
   hasVolumeValidation: boolean;
   localSyncApplies: boolean;
   strategyStaleVsLocal: boolean;
@@ -143,6 +148,8 @@ export interface KeywordOpportunitiesProps {
 }
 
 export interface StrategyHowItWorksProps {
+  /** Source from `strategy?.seoDataMode` (the SAVED strategy mode) — NOT the settings-form `seoDataMode` (editable state). */
   displayedSeoDataMode?: string;
+  /** Source from StrategyMetrics.hasAnyRanking (unfiltered pageMap.some(currentPosition)). The GSC tip renders when this is FALSE. */
   hasAnyRanking: boolean;
 }
