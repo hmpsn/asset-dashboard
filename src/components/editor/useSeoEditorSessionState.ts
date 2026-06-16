@@ -62,7 +62,7 @@ export function useSeoEditorSessionState({
 
   // effect-layout-ok -- this sync is intentionally post-paint because it scrolls the target element.
   useEffect(() => {
-    if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
+    if ((fixContext?.pageId || fixContext?.pageSlug) && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
       const match = pages.find(p =>
         p.id === fixContext.pageId ||
         p.slug === fixContext.pageSlug ||

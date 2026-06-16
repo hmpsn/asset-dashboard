@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
+import type { CannibalizationItem } from '../../../shared/types/workspace';
 
 /** Page→keyword mapping row as rendered by the Strategy page. Moved verbatim from KeywordStrategy.tsx. */
 export interface PageKeywordMap {
@@ -131,6 +132,12 @@ export interface DecayingPagesCardProps {
 
 /** Act band: queries that lost visibility (lost_visibility insight) with a recovery CTA. */
 export interface LostQueryRecoveryCardProps {
+  workspaceId: string;
+}
+
+/** Act band: keyword-cannibalization triage queue with per-duplicate Fix-in-Editor CTAs. */
+export interface CannibalizationTriageProps {
+  entries: CannibalizationItem[];
   workspaceId: string;
 }
 

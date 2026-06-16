@@ -24,3 +24,4 @@ export * from './StrategyHowItWorks';
 export * from './OpportunitiesList';
 export * from './DecayingPagesCard';
 export * from './LostQueryRecoveryCard';
+export * from './CannibalizationTriage';
