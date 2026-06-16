@@ -4,15 +4,20 @@
  * Each keyword-cannibalization issue shows the competing pages with the KEEPER marked (canonical, or
  * best-position) and every DUPLICATE carrying a "Fix in editor" CTA that opens the SEO Editor focused
  * on that page (via fixContext.pageSlug — the editor's prefill effect matches by normalized path).
- * Read-only/navigation only; Mark-resolved + Send-to-client are Phase 3b. Admin Strategy page.
+ * Per issue: Fix-in-editor (navigation), Mark-resolved (records the cannibalization_resolved
+ * outcome → drops the issue from the queue), and Send-to-client (a dedicated `cannibalization`
+ * client-action so the client sees a purpose-built consolidation card). Admin Strategy page.
  * The shared CannibalizationAlert is left untouched (still used by the legacy layout + ContentPipeline).
  */
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Copy, AlertTriangle, ArrowUpRight, Check, CheckCircle2 } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { Copy, AlertTriangle, ArrowUpRight, Check, CheckCircle2, Send } from 'lucide-react';
 import { Badge, Button, Icon, SectionCard, type BadgeTone } from '../ui';
 import { adminPath } from '../../routes';
 import { matchPageIdentity } from '../../../shared/page-address-utils';
 import { useOutcomeActions, useRecordOutcomeAction } from '../../hooks/admin/useOutcomes';
+import { clientActions } from '../../api/clientActions';
 import { cannibalizationSourceId } from '../../lib/cannibalizationSourceId';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
 import type { CannibalizationTriageProps } from './types';
@@ -48,6 +53,34 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
   const navigate = useNavigate();
   const { data: resolvedActions } = useOutcomeActions(workspaceId, 'cannibalization_resolved');
   const resolveMutation = useRecordOutcomeAction(workspaceId);
+
+  // Send-to-client: a dedicated `cannibalization` client action (the client sees a purpose-built
+  // consolidation card). Dedup by the normalized-keyword sourceId so re-sends collapse onto one row.
+  // NOTE: all hooks must stay above the visible.length early return (rules of hooks) — the editor
+  // is a stable-keyed mount, so an empty↔non-empty transition would otherwise change the hook count.
+  const [sentKeys, setSentKeys] = useState<Set<string>>(new Set());
+  const [sendingKey, setSendingKey] = useState<string | null>(null);
+  const sendMutation = useMutation({
+    mutationFn: (item: CannibalizationItem) => {
+      const canonicalPath = keeperPathOf(item);
+      return clientActions.create(workspaceId, {
+        sourceType: 'cannibalization',
+        sourceId: cannibalizationSourceId(item.keyword),
+        title: `Keyword cannibalization: “${item.keyword}”`,
+        summary: item.recommendation,
+        payload: {
+          keyword: item.keyword,
+          pages: item.pages.map(p => ({ path: p.path, position: p.position })),
+          recommendation: item.recommendation,
+          canonicalPath,
+          metadata: { origin: { targetKeyword: item.keyword, pageUrl: canonicalPath } },
+        },
+      });
+    },
+    onMutate: (item) => { setSendingKey(cannibalizationSourceId(item.keyword)); },
+    onSuccess: (_d, item) => { setSentKeys(prev => new Set(prev).add(cannibalizationSourceId(item.keyword))); },
+    onSettled: () => { setSendingKey(null); },
+  });
 
   // Resolution is inferred from durable tracked_actions (the cannibalization_issues row is
   // delete-then-reinsert on regen, so it can't hold the flag). Filter to OUR source type so
@@ -97,6 +130,9 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
       <div className="space-y-2">
         {visible.map((item, i) => {
           const keeperPath = keeperPathOf(item);
+          const sourceId = cannibalizationSourceId(item.keyword);
+          const sent = sentKeys.has(sourceId);
+          const sending = sendingKey === sourceId;
           return (
             <div key={`${item.keyword}-${i}`} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
               <div className="flex items-center justify-between gap-2">
@@ -107,6 +143,21 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge tone={SEV_TONE[item.severity]} size="sm" label={item.severity} />
                   {item.action && <span className="t-caption-sm text-[var(--brand-text-muted)]">{ACTION_LABEL[item.action]}</span>}
+                  {sent ? (
+                    <span className="flex items-center gap-1 t-caption-sm text-emerald-400 flex-shrink-0">
+                      <Icon as={Check} size="sm" className="text-emerald-400" /> Sent
+                    </span>
+                  ) : (
+                    <Button
+                      onClick={() => sendMutation.mutate(item)}
+                      disabled={sending}
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
+                    >
+                      <Icon as={Send} size="sm" className="text-teal-300" /> {sending ? 'Sending…' : 'Send to client'}
+                    </Button>
+                  )}
                   <Button
                     onClick={() => markResolved(item, keeperPath)}
                     disabled={resolveMutation.isPending}

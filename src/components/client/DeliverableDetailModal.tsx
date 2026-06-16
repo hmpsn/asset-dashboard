@@ -22,12 +22,13 @@ import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/deci
 import type { ClientDeliverableItem } from '../../../shared/types/client-deliverable';
 import type {
   AeoChangePayload,
+  CannibalizationPayload,
   InternalLinkPayload,
   RedirectProposalPayload,
 } from '../../../shared/types/client-actions';
 import type { PageRoleAssignment, CanonicalEntity, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
-import { ItemDiffRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer } from './decision-renderers';
+import { ItemDiffRow, AeoRenderer, InternalLinkRenderer, RedirectRenderer, CannibalizationRenderer } from './decision-renderers';
 import { approveCtaLabel } from '../../lib/decision-adapters';
 
 /** Item 2 — a per-item edited proposed value (seoTitle/seoDescription) forwarded on approve. */
@@ -292,6 +293,9 @@ export function DeliverableDetailModal({
         payload={{ redirects: (payloadItems as RedirectProposalPayload['redirects']) ?? [] }}
       />
     );
+  } else if (subType === 'cannibalization' || decision.badge === 'Keywords') {
+    const issue = (Array.isArray(payloadItems) ? payloadItems[0] : undefined) as CannibalizationPayload | undefined;
+    body = <CannibalizationRenderer payload={issue ?? { keyword: '', pages: [], recommendation: '' }} />;
   } else if (schemaPlanPageRoles.length > 0 || schemaPlanEntities.length > 0) {
     // A1b — schema_plan (kind:'review', no typed items): render its pageRoles + canonicalEntities
     // read-only so the whole-site schema strategy is reviewable, not blind.

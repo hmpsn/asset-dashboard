@@ -10,6 +10,7 @@ const CLIENT_ACTION_BADGES: Record<string, string> = {
   internal_link:     'Internal Links',
   redirect_proposal: 'Redirects',
   content_decay:     'Content',
+  cannibalization:   'Keywords',
   keyword_strategy:  'Keywords',   // deprecated; archived rows only
 };
 
@@ -83,8 +84,8 @@ function itemCountForAction(action: ClientAction): number {
  * Keep this only for archived compatibility tests until old source projections are fully retired.
  */
 export function normalizeClientAction(action: ClientAction): NormalizedDecision {
-  // content_decay → inline single-action ('decision' kind); all others open the modal ('batch').
-  const kind: DecisionKind = action.sourceType === 'content_decay' ? 'decision' : 'batch';
+  // content_decay + cannibalization → inline single-action ('decision'); all others open the modal.
+  const kind: DecisionKind = action.sourceType === 'content_decay' || action.sourceType === 'cannibalization' ? 'decision' : 'batch';
   return {
     id: `ca-${action.id}`,
     source: 'client_action',
@@ -138,6 +139,7 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   internal_link:         'Internal Links',
   aeo_change:            'AEO',
   content_decay:         'Content',
+  cannibalization:       'Keywords',
   content_plan_sample:   'Content Plan',
   content_plan_template: 'Content Plan',
   work_order:            'Work Order',

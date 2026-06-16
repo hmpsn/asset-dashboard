@@ -21,7 +21,7 @@ interface ClientActionRow {
 }
 
 const validStatuses: ClientActionStatus[] = ['pending', 'approved', 'changes_requested', 'completed', 'archived'];
-const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay'];
+const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay', 'cannibalization'];
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`

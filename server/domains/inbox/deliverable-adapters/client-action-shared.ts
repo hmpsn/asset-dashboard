@@ -76,6 +76,7 @@ export const CLIENT_ACTION_FAMILY_TYPES = [
   'internal_link',
   'aeo_change',
   'content_decay',
+  'cannibalization',
 ] as const;
 
 export type ClientActionFamilyType = (typeof CLIENT_ACTION_FAMILY_TYPES)[number];
@@ -97,6 +98,8 @@ export function clientActionDeliverableType(
       return 'aeo_change';
     case 'content_decay':
       return 'content_decay';
+    case 'cannibalization':
+      return 'cannibalization';
   }
 }
 
@@ -149,7 +152,9 @@ export function buildClientActionPayload(
   itemNoun: string,
 ): BuiltDeliverablePayload {
   const count = items.length;
-  const kind = type === 'content_decay' ? 'decision' : 'batch';
+  // content_decay + cannibalization are single inline decisions (one page / one keyword issue);
+  // the array-backed types (redirect / internal_link / aeo_change) open the batch modal.
+  const kind = type === 'content_decay' || type === 'cannibalization' ? 'decision' : 'batch';
   return {
     title: action.title,
     summary:

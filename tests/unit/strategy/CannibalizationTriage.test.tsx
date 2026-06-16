@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { CannibalizationTriage } from '../../../src/components/strategy/CannibalizationTriage';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
@@ -17,6 +18,11 @@ vi.mock('../../../src/hooks/admin/useOutcomes', () => ({
   useRecordOutcomeAction: () => ({ mutate: mutateMock, isPending: false }),
 }));
 
+const createMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../src/api/clientActions', () => ({
+  clientActions: { create: createMock },
+}));
+
 const item = (over: Partial<CannibalizationItem> = {}): CannibalizationItem => ({
   keyword: 'best crm',
   pages: [
@@ -28,16 +34,27 @@ const item = (over: Partial<CannibalizationItem> = {}): CannibalizationItem => (
   ...over,
 });
 
+function renderTriage(entries: CannibalizationItem[], workspaceId = 'ws1') {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <CannibalizationTriage entries={entries} workspaceId={workspaceId} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe('CannibalizationTriage', () => {
-  beforeEach(() => { vi.clearAllMocks(); outcomeState.resolved = []; });
+  beforeEach(() => { vi.clearAllMocks(); outcomeState.resolved = []; createMock.mockResolvedValue({ id: 'ca_x' }); });
 
   it('renders null when there are no entries', () => {
-    const { container } = render(<MemoryRouter><CannibalizationTriage entries={[]} workspaceId="ws1" /></MemoryRouter>);
+    const { container } = renderTriage([]);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('marks the best-position page as keeper and routes Fix-in-editor for the duplicate', () => {
-    render(<MemoryRouter><CannibalizationTriage entries={[item()]} workspaceId="ws1" /></MemoryRouter>);
+    renderTriage([item()]);
     expect(screen.getByText('“best crm”')).toBeInTheDocument();
     expect(screen.getByText('Consolidate to the primary page.')).toBeInTheDocument();
     // Best position (#3 /crm) is the keeper → exactly one Fix button (for the #11 duplicate).
@@ -53,14 +70,7 @@ describe('CannibalizationTriage', () => {
   });
 
   it('treats canonicalPath as the keeper regardless of position', () => {
-    render(
-      <MemoryRouter>
-        <CannibalizationTriage
-          entries={[item({ canonicalPath: '/blog/crm-guide' })]}
-          workspaceId="ws1"
-        />
-      </MemoryRouter>,
-    );
+    renderTriage([item({ canonicalPath: '/blog/crm-guide' })]);
     // canonicalPath /blog/crm-guide is the keeper → the OTHER page (/crm) is the only duplicate.
     const fixButtons = screen.getAllByRole('button', { name: /fix in editor/i });
     expect(fixButtons).toHaveLength(1);
@@ -75,18 +85,18 @@ describe('CannibalizationTriage', () => {
 
   it('hides an issue that has a resolved cannibalization tracked action', () => {
     outcomeState.resolved = [{ sourceType: 'cannibalization', sourceId: 'best crm' }];
-    const { container } = render(<MemoryRouter><CannibalizationTriage entries={[item()]} workspaceId="ws1" /></MemoryRouter>);
+    const { container } = renderTriage([item()]);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('does NOT hide for a cannibalization_resolved action from a different source type (recommendation)', () => {
     outcomeState.resolved = [{ sourceType: 'recommendation', sourceId: 'best crm' }];
-    render(<MemoryRouter><CannibalizationTriage entries={[item()]} workspaceId="ws1" /></MemoryRouter>);
+    renderTriage([item()]);
     expect(screen.getByText('“best crm”')).toBeInTheDocument();
   });
 
   it('records a cannibalization_resolved outcome when Mark resolved is clicked', () => {
-    render(<MemoryRouter><CannibalizationTriage entries={[item()]} workspaceId="ws1" /></MemoryRouter>);
+    renderTriage([item()]);
     fireEvent.click(screen.getByRole('button', { name: /mark resolved/i }));
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -96,5 +106,19 @@ describe('CannibalizationTriage', () => {
         targetKeyword: 'best crm',
       }),
     );
+  });
+
+  it('sends a dedicated cannibalization client action when Send to client is clicked', async () => {
+    renderTriage([item()]);
+    fireEvent.click(screen.getByRole('button', { name: /send to client/i }));
+    await waitFor(() =>
+      expect(createMock).toHaveBeenCalledWith('ws1', expect.objectContaining({
+        sourceType: 'cannibalization',
+        sourceId: 'best crm',
+        payload: expect.objectContaining({ keyword: 'best crm', recommendation: 'Consolidate to the primary page.' }),
+      })),
+    );
+    // On success the button flips to a "Sent" affordance.
+    await waitFor(() => expect(screen.getByText('Sent')).toBeInTheDocument());
   });
 });

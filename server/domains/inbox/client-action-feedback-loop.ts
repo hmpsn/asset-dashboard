@@ -19,6 +19,7 @@ const OUTCOME_ACTION_TYPE_BY_SOURCE: Record<ClientActionSourceType, ActionType> 
   internal_link: 'internal_link_added',
   redirect_proposal: 'audit_fix_applied',
   content_decay: 'content_refreshed',
+  cannibalization: 'cannibalization_resolved',
 };
 
 const ensureLifecycleTrackedActionTx = db.transaction((params: {
