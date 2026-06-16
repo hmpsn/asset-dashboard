@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **507 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **508 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 508. Strategy Page — Reference Band: Authority & Backlinks merge (Phase 4a, behind `strategy-decision-bands`)
+
+**What it does:** Consolidates the Strategy page's "Reference" band (the third band of the decision-first IA). The previously separate Backlink Profile and Competitive Intelligence cards merge into one **Authority & Backlinks** leaf: the backlink profile sits above a trimmed competitive comparison that drops the redundant own-domain stat grid (it duplicated the backlink stats) and the embedded Keyword Gaps list (deduped to the standalone competitor-evidence surface). The Backlink Profile was migrated off a hand-rolled fetch to a React Query hook so it now refetches when a strategy regen or competitor-domains save fires `strategy:updated` — closing a staleness gap where backlink and competitor data sat stale until the page remounted. The misleading "Cached 48h" freshness label (the real DataForSEO cache is 7 days, and the timestamp was response-assembly time, not cache age) is corrected to an honest "Updated …". All flag-gated; the flag-off legacy layout is byte-identical.
+
+**Agency value:** One authority cockpit instead of two scattered cards, with live data that actually refreshes when the strategy changes — no more stale backlink numbers or a duplicated "your stats" block, and no more a freshness label that lied about how old the data was.
+
+**Client value:** Indirect — accurate, current competitive/authority context feeds better strategic decisions on the client's behalf.
+
+**Mutual:** Pure consolidation + correctness — no new provider/AI spend; reuses the existing `/api/backlinks` and competitive-intel endpoints, now wired into the shared `strategy:updated` invalidation set.
+
+**Files:** `src/components/strategy/AuthorityAndBacklinks.tsx` (new), `src/components/strategy/BacklinkProfile.tsx` (RQ migration), `src/components/strategy/CompetitiveIntel.tsx` (`variant` gating + cache-label fix), `src/hooks/admin/useBacklinkProfile.ts` (new), `src/api/seo.ts` (`BacklinkData` typing), `src/lib/queryKeys.ts`, `src/lib/wsInvalidation.ts` (invalidation gap), `src/components/strategy/{types,index}.ts`, `src/components/KeywordStrategy.tsx`. Tests: `tests/unit/strategy/CompetitiveIntel-variant.test.tsx`, `tests/component/BacklinkProfile-link-types.test.tsx`, `tests/unit/wsInvalidationRegistry.test.ts`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md`.
 
 ---
 

@@ -1,56 +1,19 @@
-import { useState, useEffect } from 'react';
 import { Icon } from '../ui';
 import { Link2, Globe, ExternalLink, Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState } from '../ui';
-import { backlinks } from '../../api';
+import { useBacklinkProfile } from '../../hooks/admin/useBacklinkProfile';
 import { fmtNum } from '../../utils/formatNumbers';
 import { formatDate } from '../../utils/formatDates';
-
-interface BacklinksOverview {
-  totalBacklinks: number;
-  referringDomains: number;
-  followLinks: number;
-  nofollowLinks: number;
-  textLinks: number;
-  imageLinks: number;
-  formLinks: number;
-  frameLinks: number;
-}
-
-interface ReferringDomain {
-  domain: string;
-  backlinksCount: number;
-  firstSeen: string;
-  lastSeen: string;
-}
-
-interface BacklinkData {
-  domain: string;
-  overview: BacklinksOverview | null;
-  referringDomains: ReferringDomain[];
-}
 
 interface Props {
   workspaceId: string;
 }
 
-
-
 export function BacklinkProfile({ workspaceId }: Props) {
-  const [data, setData] = useState<BacklinkData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    backlinks.get(workspaceId)
-      .then((d) => { if (!cancelled) setData(d as BacklinkData); })
-      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [workspaceId]);
+  // React Query (useBacklinkProfile) so the profile refetches on strategy:updated — the previous raw
+  // useEffect never re-fetched, leaving backlink data stale until remount.
+  const { data, isLoading: loading, error } = useBacklinkProfile(workspaceId);
+  const errorMsg = error instanceof Error ? error.message : error ? String(error) : null;
 
   if (loading) {
     return (
@@ -62,8 +25,8 @@ export function BacklinkProfile({ workspaceId }: Props) {
     );
   }
 
-  if (error) {
-    if (error.includes('No SEO data provider configured')) {
+  if (errorMsg) {
+    if (errorMsg.includes('No SEO data provider configured')) {
       return (
         <SectionCard noPadding>
           <div className="px-4 py-4 flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
@@ -76,7 +39,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
     return (
       <SectionCard noPadding>
         <div className="px-4 py-4 flex items-center gap-2 text-red-400 t-caption">
-          <Icon as={AlertTriangle} size="md" className="text-red-400" /> {error}
+          <Icon as={AlertTriangle} size="md" className="text-red-400" /> {errorMsg}
         </div>
       </SectionCard>
     );

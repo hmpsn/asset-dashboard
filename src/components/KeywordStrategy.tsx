@@ -43,6 +43,7 @@ import {
   DecayingPagesCard,
   LostQueryRecoveryCard,
   CannibalizationTriage,
+  AuthorityAndBacklinks,
   buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
@@ -369,6 +370,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         cachedKeywordGaps={strategy?.keywordGaps}
       />
     ),
+    // Reference band (decision-bands layout only): backlink + competitive merged into one leaf.
+    // Legacy keeps standalone backlink + competitive above.
+    authorityAndBacklinks: (
+      <AuthorityAndBacklinks
+        workspaceId={workspaceId}
+        competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
+        seoDataAvailable={settings.seoDataAvailable}
+      />
+    ),
     siteKeywords: (
       <SiteTargetKeywords
         workspaceId={workspaceId}
@@ -417,8 +427,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.statGrid}
             {realLeaves.distribution}
             {realLeaves.topicClusters}
-            {realLeaves.backlink}
-            {realLeaves.competitive}
+            {realLeaves.authorityAndBacklinks}
             {realLeaves.siteKeywords}
             {realLeaves.opportunities}
             {clientFeedbackDeclinedEl}

@@ -29,6 +29,18 @@ describe('wsInvalidation registry', () => {
     ]);
   });
 
+  it('maps STRATEGY_UPDATED for admin to refresh the backlink profile and competitor intel (Phase 4 invalidation gap)', () => {
+    const keys = getWorkspaceInvalidationKeys(WS_EVENTS.STRATEGY_UPDATED, WS_ID, undefined, 'admin');
+
+    // A strategy regen / competitor-domains save broadcasts STRATEGY_UPDATED; the Reference-band
+    // Authority & Backlinks view must refetch both data sources.
+    expect(keys).toContainEqual(queryKeys.admin.backlinkProfile(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.competitorIntelAll(WS_ID));
+    // existing strategy keys still present
+    expect(keys).toContainEqual(queryKeys.admin.keywordStrategy(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.strategyDiff(WS_ID));
+  });
+
   it('maps RANK_TRACKING_UPDATED for the client dashboard to ranking and keyword readers', () => {
     const keys = getWorkspaceInvalidationKeys(WS_EVENTS.RANK_TRACKING_UPDATED, WS_ID, undefined, 'client-dashboard');
 

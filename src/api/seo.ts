@@ -151,9 +151,36 @@ export const rankTracking = {
 };
 
 // ── Backlinks ────────────────────────────────────────────────────
+/** Mirrors server `BacklinksOverview` (server/seo-data-provider.ts). */
+export interface BacklinksOverview {
+  totalBacklinks: number;
+  referringDomains: number;
+  followLinks: number;
+  nofollowLinks: number;
+  textLinks: number;
+  imageLinks: number;
+  formLinks: number;
+  frameLinks: number;
+}
+
+/** Mirrors server `ReferringDomain` (server/seo-data-provider.ts). */
+export interface ReferringDomain {
+  domain: string;
+  backlinksCount: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+/** Response shape of GET /api/backlinks/:workspaceId (server/routes/backlinks.ts). */
+export interface BacklinkData {
+  domain: string;
+  overview: BacklinksOverview | null;
+  referringDomains: ReferringDomain[];
+}
+
 export const backlinks = {
   get: (wsId: string) =>
-    getOptional<unknown>(`/api/backlinks/${wsId}`),
+    getOptional<BacklinkData>(`/api/backlinks/${wsId}`),
 };
 
 // ── Webflow ─────────────────────────────────────────────────────

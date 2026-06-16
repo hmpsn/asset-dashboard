@@ -90,6 +90,7 @@ export const queryKeys = {
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     strategyDiff: (wsId: string) => ['admin-strategy-diff', wsId] as const,
     contentDecay: (wsId: string) => ['admin-content-decay', wsId] as const,
+    backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
