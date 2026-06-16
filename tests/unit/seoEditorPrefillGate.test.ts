@@ -37,4 +37,19 @@ describe('useSeoEditorSessionState prefill gate (pageSlug-only)', () => {
     const { result } = render({ targetRoute: 'page-intelligence', pageSlug: '/blog/seo' });
     expect(result.current.expanded.size).toBe(0);
   });
+
+  it('re-fires for a NEW fixContext target within the same session (no remount)', () => {
+    const pages = [
+      page({ id: 'a', slug: '/a', publishedPath: '/a' }),
+      page({ id: 'b', slug: '/b', publishedPath: '/b' }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ fc }: { fc: FixContext }) => useSeoEditorSessionState({ siteId: 's1', workspaceId: 'ws1', pages, fixContext: fc }),
+      { initialProps: { fc: { targetRoute: 'seo-editor', pageSlug: '/a' } as FixContext } },
+    );
+    expect(result.current.expanded.has('a')).toBe(true);
+    // A second "Fix in editor" for a different duplicate must expand it (the editor doesn't remount).
+    rerender({ fc: { targetRoute: 'seo-editor', pageSlug: '/b' } });
+    expect(result.current.expanded.has('b')).toBe(true);
+  });
 });

@@ -24,12 +24,21 @@ const ACTION_LABEL: Record<NonNullable<CannibalizationItem['action']>, string> =
   noindex: 'Noindex',
 };
 
-/** The page to keep: the canonical page if set, else the best-ranking page (lowest position, then most impressions). */
+/**
+ * The page to keep: the canonical page when it's set AND is one of the competing pages; otherwise
+ * the best-ranking page. Ranking tiebreak mirrors the server's canonical derivation
+ * (server/keyword-strategy-enrichment.ts): lowest position, then most clicks, then most impressions.
+ */
 function keeperPathOf(item: CannibalizationItem): string | undefined {
-  if (item.canonicalPath) return item.canonicalPath;
+  if (item.canonicalPath && item.pages.some(p => matchPageIdentity(p.path, item.canonicalPath!))) {
+    return item.canonicalPath;
+  }
   const ranked = [...item.pages]
     .filter(p => p.position != null)
-    .sort((a, b) => (a.position! - b.position!) || ((b.impressions ?? 0) - (a.impressions ?? 0)));
+    .sort((a, b) =>
+      (a.position! - b.position!) ||
+      ((b.clicks ?? 0) - (a.clicks ?? 0)) ||
+      ((b.impressions ?? 0) - (a.impressions ?? 0)));
   return (ranked[0] ?? item.pages[0])?.path;
 }
 
