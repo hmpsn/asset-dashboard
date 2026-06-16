@@ -50,6 +50,34 @@ export const VOLUME_THRESHOLD = 10;
 
 export type SeoDataMode = 'none' | 'quick' | 'full';
 
+/** A Quick Win as stored on the strategy blob (structurally identical to the inline type in QuickWins.tsx). */
+export interface StrategyQuickWin {
+  pagePath: string;
+  action: string;
+  estimatedImpact: string;
+  rationale: string;
+  roiScore?: number;
+}
+
+/**
+ * One actionable row in the Act band's OpportunitiesList. Discriminated by `kind`:
+ * - 'quick_win'   → an AI-suggested page action (from strategy.quickWins)
+ * - 'low_hanging' → a page ranking #4–20 with impressions (from metrics.lowHangingFruit)
+ * Both carry a pagePath so a per-row Fix CTA can deep-link into Page Intelligence.
+ */
+export type OpportunityRow =
+  | { kind: 'quick_win'; pagePath: string; action: string; estimatedImpact: string; rationale: string; roiScore?: number }
+  | {
+      kind: 'low_hanging';
+      pagePath: string;
+      pageTitle: string;
+      primaryKeyword: string;
+      currentPosition?: number;
+      impressions?: number;
+      clicks?: number;
+      volume?: number;
+    };
+
 // ── Leaf component prop contracts (pre-committed; leaves import from here) ──
 
 export interface StrategyHeaderActionsProps {
@@ -86,6 +114,23 @@ export interface ClientKeywordFeedbackProps {
 }
 
 export interface DecisionQueueProps {
+  workspaceId: string;
+}
+
+/** Act band: merged Quick Wins + Low-Hanging Fruit with per-row Fix CTAs. */
+export interface OpportunitiesListProps {
+  quickWins: StrategyQuickWin[];
+  lowHangingFruit: PageKeywordMap[];
+  workspaceId: string;
+}
+
+/** Act band: top decaying pages (content_decay) with Refresh-brief / Review-page CTAs. */
+export interface DecayingPagesCardProps {
+  workspaceId: string;
+}
+
+/** Act band: queries that lost visibility (lost_visibility insight) with a recovery CTA. */
+export interface LostQueryRecoveryCardProps {
   workspaceId: string;
 }
 
