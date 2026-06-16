@@ -38,7 +38,10 @@ interface Props {
 }
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
-type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used' | 'cms-images' | 'cms-missing-alt';
+type FilterType = 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used' | 'cms-images' | 'cms-missing-alt';
+
+const CMS_FILTERS = new Set<FilterType>(['cms-images', 'cms-missing-alt']);
+const NON_CMS_FILTERS = new Set<FilterType>(['missing-alt', 'oversized', 'images', 'svg', 'unused', 'used']);
 
 function AssetBrowser({ siteId, workspaceId }: Props) {
   const queryClient = useQueryClient();
@@ -113,7 +116,26 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     });
   const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId, workspaceId) });
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [activeFilters, toggleFilter, setActiveFilters] = useToggleSet<FilterType>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+
+  // Mutually exclude CMS and non-CMS filter groups: toggling into one clears the other.
+  const handleFilterToggle = (value: FilterType) => {
+    if (CMS_FILTERS.has(value)) {
+      setActiveFilters(prev => {
+        const next = new Set(prev);
+        NON_CMS_FILTERS.forEach(f => next.delete(f));
+        next.has(value) ? next.delete(value) : next.add(value);
+        return next;
+      });
+    } else {
+      setActiveFilters(prev => {
+        const next = new Set(prev);
+        CMS_FILTERS.forEach(f => next.delete(f));
+        next.has(value) ? next.delete(value) : next.add(value);
+        return next;
+      });
+    }
+  };
   const [sort, setSort] = useState<SortField>('createdOn');
   const [selected, toggleSelect, setSelected] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [editingAlt, setEditingAlt] = useState<string | null>(null);
@@ -142,7 +164,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
 
-  const isCmsFilter = filter === 'cms-images' || filter === 'cms-missing-alt';
+  const isCmsFilter = activeFilters.has('cms-images') || activeFilters.has('cms-missing-alt');
   const sourceList = isCmsFilter ? cmsAssetList : assets;
 
   const filtered = sourceList
@@ -153,20 +175,26 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         if (!name.toLowerCase().includes(q) && !(a.altText || '').toLowerCase().includes(q)) return false;
       }
       if (isCmsFilter) {
-        // Narrow by selected CMS fields
         const usages = cmsUsageMap.get(a.id);
         const inSelectedField = usages?.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`)) ?? false;
         if (!inSelectedField) return false;
-        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
+        // OR logic: cms-images is superset, so when active show all; restrict to
+        // missing-alt only when cms-missing-alt is the sole active CMS filter.
+        if (activeFilters.has('cms-missing-alt') && !activeFilters.has('cms-images')) {
+          return !a.altText || a.altText.trim() === '';
+        }
         return true;
       }
-      if (filter === 'missing-alt') return !a.altText || a.altText.trim() === '';
-      if (filter === 'oversized') return a.size > 500 * 1024;
-      if (filter === 'images') return a.contentType?.startsWith('image/') && !a.contentType?.includes('svg');
-      if (filter === 'svg') return a.contentType?.includes('svg');
-      if (filter === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
-      if (filter === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
-      return true;
+      if (activeFilters.size === 0) return true;
+      return [...activeFilters].some(f => {
+        if (f === 'missing-alt') return !a.altText || a.altText.trim() === '';
+        if (f === 'oversized') return a.size > 500 * 1024;
+        if (f === 'images') return a.contentType?.startsWith('image/') && !a.contentType?.includes('svg');
+        if (f === 'svg') return a.contentType?.includes('svg');
+        if (f === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
+        if (f === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
+        return false;
+      });
     })
     .sort((a, b) => {
       if (sort === 'fileSize') return b.size - a.size;
@@ -501,11 +529,11 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         )}
         {cmsImageCount > 0 && (
           <Button
-            onClick={() => setFilter('cms-images')}
+            onClick={() => toggleFilter('cms-images')}
             icon={Database}
             variant="ghost"
             size="sm"
-            className={`${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
+            className={`${isCmsFilter ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
           >
             {cmsImageCount} CMS{cmsMissingAltCount > 0 ? `, ${cmsMissingAltCount} missing alt` : ''}
           </Button>
@@ -632,13 +660,16 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
 
       {/* Toolbar */}
       <AssetFilters
-        search={search} filter={filter} sort={sort}
+        search={search} activeFilters={activeFilters} sort={sort}
         hasCmsData={cmsImageCount > 0}
-        onSearchChange={setSearch} onFilterChange={setFilter} onSortChange={setSort}
+        onSearchChange={setSearch}
+        onFilterToggle={handleFilterToggle}
+        onFilterClear={() => setActiveFilters(new Set<FilterType>())}
+        onSortChange={setSort}
       />
 
       {/* CMS field selector — shown when a CMS filter is active */}
-      {(filter === 'cms-images' || filter === 'cms-missing-alt') && cmsImageData?.collections && (
+      {isCmsFilter && cmsImageData?.collections && (
         <CmsFieldSelector
           collections={cmsImageData.collections}
           selectedFields={selectedCmsFields}
@@ -646,7 +677,55 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         />
       )}
 
-      {/* Bulk actions */}
+      {/* Asset grid — pb-24 creates clearance for the sticky bulk bar rendered below */}
+      <div className={selected.size > 0 ? 'pb-24' : ''}>
+        <div className="space-y-1">
+          {/* Header */}
+          <div className="grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 text-xs text-[var(--brand-text-muted)] font-medium">
+            <div>
+              <Checkbox
+                checked={selected.size === filtered.length && filtered.length > 0}
+                onChange={selectAll}
+                label="Select all assets"
+                srOnlyLabel
+              />
+            </div>
+            <div></div>
+            <div>Filename</div>
+            <div>Alt Text</div>
+            <div className="text-right">Size</div>
+            <div></div>
+          </div>
+
+          {/* Rows */}
+          {filtered.map(asset => (
+            <AssetCard
+              key={asset.id} asset={asset} selected={selected.has(asset.id)}
+              editingAlt={editingAlt === asset.id} altDraft={altDraft}
+              generatingAlt={generatingAlt.has(asset.id)} compressing={compressing.has(asset.id)}
+              renamingId={renamingId === asset.id} renameDraft={renameDraft}
+              renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
+              cmsUsages={cmsUsageMap.get(asset.id)}
+              compressDisabled={isCmsFilter && richTextOnlyIds.has(asset.id)}
+              onToggleSelect={toggleSelect}
+              onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
+              onCancelEditAlt={() => setEditingAlt(null)}
+              onSaveAlt={handleSaveAlt} onAltDraftChange={setAltDraft}
+              onGenerateAlt={handleGenerateAlt} onCompress={handleCompress}
+              onSmartRename={handleSmartRename} onSaveRename={handleSaveRename}
+              onCancelRename={() => { setRenamingId(null); setRenameDraft(''); }}
+              onRenameDraftChange={setRenameDraft}
+            />
+          ))}
+
+          {filtered.length === 0 && (
+            <EmptyState icon={search ? Search : Image} title={search ? 'No assets match your search' : 'No assets found'} className="py-10" />
+          )}
+        </div>
+      </div>
+
+      {/* Bulk actions — sticky bottom-4, sibling after the pb-24 grid so the bar
+          never pushes content down and the last row can always scroll clear of it. */}
       {selected.size > 0 && (
         <BulkActions
           selectedCount={selected.size} bulkProgress={bulkProgress}
@@ -657,51 +736,6 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           onClearSelection={() => setSelected(new Set())}
         />
       )}
-
-      {/* Asset grid */}
-      <div className="space-y-1">
-        {/* Header */}
-        <div className="grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 text-xs text-[var(--brand-text-muted)] font-medium">
-          <div>
-            <Checkbox
-              checked={selected.size === filtered.length && filtered.length > 0}
-              onChange={selectAll}
-              label="Select all assets"
-              srOnlyLabel
-            />
-          </div>
-          <div></div>
-          <div>Filename</div>
-          <div>Alt Text</div>
-          <div className="text-right">Size</div>
-          <div></div>
-        </div>
-
-        {/* Rows */}
-        {filtered.map(asset => (
-          <AssetCard
-            key={asset.id} asset={asset} selected={selected.has(asset.id)}
-            editingAlt={editingAlt === asset.id} altDraft={altDraft}
-            generatingAlt={generatingAlt.has(asset.id)} compressing={compressing.has(asset.id)}
-            renamingId={renamingId === asset.id} renameDraft={renameDraft}
-            renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
-            cmsUsages={cmsUsageMap.get(asset.id)}
-            compressDisabled={isCmsFilter && richTextOnlyIds.has(asset.id)}
-            onToggleSelect={toggleSelect}
-            onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
-            onCancelEditAlt={() => setEditingAlt(null)}
-            onSaveAlt={handleSaveAlt} onAltDraftChange={setAltDraft}
-            onGenerateAlt={handleGenerateAlt} onCompress={handleCompress}
-            onSmartRename={handleSmartRename} onSaveRename={handleSaveRename}
-            onCancelRename={() => { setRenamingId(null); setRenameDraft(''); }}
-            onRenameDraftChange={setRenameDraft}
-          />
-        ))}
-
-        {filtered.length === 0 && (
-          <EmptyState icon={search ? Search : Image} title={search ? 'No assets match your search' : 'No assets found'} className="py-10" />
-        )}
-      </div>
     </div>
     </ErrorBoundary>
   );

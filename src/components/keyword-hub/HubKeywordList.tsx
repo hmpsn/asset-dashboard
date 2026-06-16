@@ -230,8 +230,9 @@ export function HubKeywordList({
       };
 
   return (
-    // pb-24 gates on someSelected: the floating bulk bar only renders when rows
-    // are selected; the clearance is dead padding otherwise (KCC :402-406 parity).
+    // Outer wrapper: pb-24 ensures the last keyword row can always scroll clear of
+    // the sticky bulk bar (which renders as a sibling after this div).
+    <>
     <div className={someSelected ? 'pb-24' : ''}>
       {/* Mobile: overflow-x-auto + min-width inner container so the table scrolls
           horizontally on narrow viewports rather than collapsing (KCC :544-545 parity). */}
@@ -321,15 +322,19 @@ export function HubKeywordList({
         </nav>
       )}
 
-      {/* Bulk action bar — floats over the bottom of the page when rows are selected */}
-      {someSelected && (
-        <KeywordBulkActionBar
-          selectedCount={selectedKeys.size}
-          isPending={isBulkPending}
-          onAction={onBulkAction}
-          onClear={onClearSelection}
-        />
-      )}
     </div>
+    {/* Bulk action bar — sticky bottom-4 so it never pushes content down or covers
+        items: when content is short it sits naturally below pagination; when long
+        the sticky positions it at the viewport bottom and pb-24 above ensures the
+        last keyword can always be scrolled clear of the bar. */}
+    {someSelected && (
+      <KeywordBulkActionBar
+        selectedCount={selectedKeys.size}
+        isPending={isBulkPending}
+        onAction={onBulkAction}
+        onClear={onClearSelection}
+      />
+    )}
+    </>
   );
 }
