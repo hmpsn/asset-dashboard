@@ -8419,6 +8419,7 @@ export const CHECKS: Check[] = [
         'internal_link',
         'aeo_change',
         'content_decay',
+        'cannibalization',
         'content_plan_sample',
         'content_plan_template',
         'work_order',

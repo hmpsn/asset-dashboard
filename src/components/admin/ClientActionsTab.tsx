@@ -31,6 +31,7 @@ const SOURCE_TYPE_LABELS: Record<ClientAction['sourceType'], string> = {
   internal_link: 'Internal Link',
   redirect_proposal: 'Redirect Proposal',
   content_decay: 'Content Decay',
+  cannibalization: 'Keyword Cannibalization',
 };
 
 const STATUS_LABELS: Record<ClientActionStatus, string> = {

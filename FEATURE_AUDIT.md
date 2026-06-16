@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **506 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **507 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 507. Strategy Page — Cannibalization "Send to client" (Phase 3b-ii — dedicated client deliverable)
+
+**What it does:** Completes the cannibalization triage loop: each issue gets a **Send to client** button that delivers a purpose-built `cannibalization` item to the client's inbox. The client sees a dedicated, plain-language card — "Several of your pages are competing for the same search term; we recommend consolidating them" — with the competing pages (the keeper marked) and the recommended fix, and can approve/request-changes/decline. It's a brand-new client-action / deliverable type (not a repurposed redirect/AEO card), wired end to end: the legacy client action, the unified inbox deliverable (auto-mirrored), a read-only client renderer in both the production and legacy inbox modals, and the outcome feedback loop (a client approval maps to the `cannibalization_resolved` outcome). Re-sending the same keyword dedupes onto one inbox item.
+
+**Agency value:** When a cannibalization fix needs the client's sign-off (a consolidation, a 301, a noindex), the strategist sends it in one click and the client gets a card they can actually understand — no SEO jargon, no raw page dumps. The send dedupes, so re-running strategy doesn't spam the inbox.
+
+**Client value:** A clear, self-contained explanation of a technical SEO problem and the proposed fix, in their own inbox, with simple approve/decline — instead of being copied a redirect spreadsheet or left out of the loop.
+
+**Mutual:** Reuses the entire client-action → deliverable dual-write, the unified inbox, the respond-propagation, and the outcome pipeline; the only net-new surface is the type itself and its client renderer. Closes the cannibalization loop: detect (Strategy) → fix in editor / mark resolved (3a/3b-i) → send for client sign-off (3b-ii).
+
+**Files:** `shared/types/client-actions.ts` (+ `CannibalizationPayload`), `shared/types/client-deliverable.ts`, `server/client-actions.ts`, `server/routes/client-actions.ts`, `server/domains/inbox/deliverable-adapters/{client-action-shared,cannibalization,index}.ts`, `server/domains/inbox/client-action-feedback-loop.ts`, `src/lib/decision-adapters.ts`, `src/components/client/{decision-renderers,DeliverableDetailModal,DecisionDetailModal}.tsx`, `src/components/admin/ClientActionsTab.tsx`, `src/components/strategy/CannibalizationTriage.tsx`, `scripts/pr-check.ts`. Tests: `tests/unit/cannibalizationAdapter.test.ts`, `tests/unit/strategy/CannibalizationTriage.test.tsx`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-ii-cannibalization-send.md`.
 
 ---
 

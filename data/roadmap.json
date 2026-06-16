@@ -63,9 +63,29 @@
           "source": "Strategy redesign spec 2026-06-16",
           "est": "S-M",
           "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-16",
+          "notes": "Done 2026-06-16 (PR #1254, merged to staging). Per-issue 'Mark resolved' in CannibalizationTriage records the existing cannibalization_resolved outcome (durable tracked_action, sourceType 'cannibalization', sourceId=normalized keyword); resolved issues drop out of the queue (read via useOutcomeActions, refetched by the global OUTCOME_ACTION_RECORDED invalidation). Fixed the stale actionTypeEnum (server/schemas/outcome-schemas.ts) which omitted cannibalization_resolved + 4 others. New: outcomesApi.recordAction, useRecordOutcomeAction, cannibalizationSourceId helper. No migration, no strategy-GET change. Review found zero issues. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-i-cannibalization-mark-resolved.md."
+        },
+        {
+          "id": "strategy-redesign-phase-3b-ii-cannibalization-send",
+          "title": "Phase 3b-ii — Cannibalization Send-to-client (dedicated 'cannibalization' client-action type)",
+          "source": "Strategy redesign spec 2026-06-16",
+          "est": "L",
+          "priority": "P2",
           "status": "in_progress",
           "createdAt": "2026-06-16",
-          "notes": "PR opening to staging. Per-issue 'Mark resolved' in CannibalizationTriage records the existing cannibalization_resolved outcome (durable tracked_action, sourceType 'cannibalization', sourceId=normalized keyword); resolved issues drop out of the queue (read via useOutcomeActions, refetched by the global OUTCOME_ACTION_RECORDED invalidation). Fixed the stale actionTypeEnum (server/schemas/outcome-schemas.ts) which omitted cannibalization_resolved + 4 others. New: outcomesApi.recordAction, useRecordOutcomeAction, cannibalizationSourceId helper. No migration, no strategy-GET change. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-i-cannibalization-mark-resolved.md. Phase 3b-ii (Send-to-client dedicated 'cannibalization' client-action type) follows."
+          "notes": "PR opening to staging. New dedicated 'cannibalization' client-action / deliverable type (owner decision — purpose-built client card). Per-issue 'Send to client' in CannibalizationTriage → createAdminClientAction (grandfathered route) → dual-write mirrors a 'cannibalization' deliverable; new deliverable adapter (decision-kind, modeled on content-decay); new CannibalizationRenderer in both DeliverableDetailModal + DecisionDetailModal. Lockstep one-commit wiring across ClientActionSourceType + validSources + sourceTypeSchema + clientActionDeliverableType + CLIENT_ACTION_FAMILY_TYPES + DELIVERABLE_TYPES + pr-check list + DELIVERABLE_TYPE_BADGES + CLIENT_ACTION_BADGES + SOURCE_TYPE_LABELS + OUTCOME_ACTION_TYPE_BY_SOURCE. Completes Phase 3. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-ii-cannibalization-send.md."
+        },
+        {
+          "id": "strategy-cannibalization-operator-keeper-override",
+          "title": "Cannibalization triage — operator-selectable keeper (override the auto-derived canonical page)",
+          "source": "Owner refinement 2026-06-16 (post Phase 3b-ii)",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-16",
+          "notes": "Phase 3 follow-on. Today CannibalizationTriage auto-derives the keeper page (item.canonicalPath if set, else best-ranking via keeperPathOf). Owner wants to OVERRIDE which competing page is the keeper (real example: keep a keyword on a services page, not the auto-picked insights page). Scope: a per-issue keeper picker; the chosen keeper must flow into (a) which pages show 'Fix in editor' (non-keepers = duplicates), and (b) the Send-to-client payload canonicalPath. KEY CONSTRAINT: the override MUST persist across strategy regeneration — cannibalization_issues is delete-then-reinsert (replaceAllCannibalizationIssues clobbers canonical_path), so the operator's keeper choice can't live on that row. Store it durably keyed by normalized keyword (mirror the 3b-i resolution pattern: a tracked record / small override table / preserved-metadata Map on the delete-reinsert), and have keeperPathOf prefer the operator override over the auto-derivation. Do after the current Strategy redesign batch. Owner expects further refinements to surface as Strategy gets exercised."
         }
       ]
     },

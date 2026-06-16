@@ -22,6 +22,7 @@ import './redirect.js';
 import './internal-link.js';
 import './aeo-change.js';
 import './content-decay.js';
+import './cannibalization.js';
 // schema_plan (the per-site schema STRATEGY review artifact — distinct from the PR-1a
 // schema_item per-page batches).
 import './schema-plan.js';
