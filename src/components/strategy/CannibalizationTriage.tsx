@@ -8,10 +8,12 @@
  * The shared CannibalizationAlert is left untouched (still used by the legacy layout + ContentPipeline).
  */
 import { useNavigate } from 'react-router-dom';
-import { Copy, AlertTriangle, ArrowUpRight, Check } from 'lucide-react';
+import { Copy, AlertTriangle, ArrowUpRight, Check, CheckCircle2 } from 'lucide-react';
 import { Badge, Button, Icon, SectionCard, type BadgeTone } from '../ui';
 import { adminPath } from '../../routes';
 import { matchPageIdentity } from '../../../shared/page-address-utils';
+import { useOutcomeActions, useRecordOutcomeAction } from '../../hooks/admin/useOutcomes';
+import { cannibalizationSourceId } from '../../lib/cannibalizationSourceId';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
 import type { CannibalizationTriageProps } from './types';
 
@@ -44,14 +46,44 @@ function keeperPathOf(item: CannibalizationItem): string | undefined {
 
 export function CannibalizationTriage({ entries, workspaceId }: CannibalizationTriageProps) {
   const navigate = useNavigate();
-  if (!entries || entries.length === 0) return null;
+  const { data: resolvedActions } = useOutcomeActions(workspaceId, 'cannibalization_resolved');
+  const resolveMutation = useRecordOutcomeAction(workspaceId);
 
-  const highCount = entries.filter(e => e.severity === 'high').length;
+  // Resolution is inferred from durable tracked_actions (the cannibalization_issues row is
+  // delete-then-reinsert on regen, so it can't hold the flag). Filter to OUR source type so
+  // recommendation-sourced cannibalization_resolved actions don't collide. Resolved issues drop out
+  // of the queue (mirrors DecisionQueue's server-backed status filter — no local optimistic toggles).
+  const resolvedKeys = new Set(
+    (resolvedActions ?? [])
+      .filter(a => a.sourceType === 'cannibalization')
+      .map(a => a.sourceId)
+      .filter((id): id is string => id != null),
+  );
+  const visible = (entries ?? []).filter(e => !resolvedKeys.has(cannibalizationSourceId(e.keyword)));
+  if (visible.length === 0) return null;
+
+  const highCount = visible.filter(e => e.severity === 'high').length;
 
   const fixInEditor = (path: string) =>
     navigate(adminPath(workspaceId, 'seo-editor'), {
       state: { fixContext: { targetRoute: 'seo-editor', pageSlug: path, pageName: path } },
     });
+
+  const markResolved = (item: CannibalizationItem, keeperPath: string | undefined) => {
+    const keeper = keeperPath ? item.pages.find(p => matchPageIdentity(p.path, keeperPath)) : undefined;
+    resolveMutation.mutate({
+      actionType: 'cannibalization_resolved',
+      sourceType: 'cannibalization',
+      sourceId: cannibalizationSourceId(item.keyword),
+      targetKeyword: item.keyword,
+      pageUrl: keeperPath,
+      baselineSnapshot: {
+        ...(keeper?.position != null ? { position: keeper.position } : {}),
+        ...(keeper?.clicks != null ? { clicks: keeper.clicks } : {}),
+        ...(keeper?.impressions != null ? { impressions: keeper.impressions } : {}),
+      },
+    });
+  };
 
   return (
     <SectionCard
@@ -63,7 +95,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
         Multiple pages competing for the same keyword dilute ranking power. Keep one page and fix or consolidate the duplicates.
       </p>
       <div className="space-y-2">
-        {entries.map((item, i) => {
+        {visible.map((item, i) => {
           const keeperPath = keeperPathOf(item);
           return (
             <div key={`${item.keyword}-${i}`} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
@@ -75,6 +107,15 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge tone={SEV_TONE[item.severity]} size="sm" label={item.severity} />
                   {item.action && <span className="t-caption-sm text-[var(--brand-text-muted)]">{ACTION_LABEL[item.action]}</span>}
+                  <Button
+                    onClick={() => markResolved(item, keeperPath)}
+                    disabled={resolveMutation.isPending}
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 px-2 py-1 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] font-medium hover:bg-[var(--surface-3)]"
+                  >
+                    <Icon as={CheckCircle2} size="sm" className="text-emerald-400" /> {resolveMutation.isPending ? 'Resolving…' : 'Mark resolved'}
+                  </Button>
                 </div>
               </div>
 

@@ -50,6 +50,23 @@ export const outcomesApi = {
   getOverview: (signal?: AbortSignal) =>
     getSafe<WorkspaceOutcomeOverview[]>(`/api/outcomes/overview`, [], signal),
 
+  recordAction: (
+    wsId: string,
+    body: {
+      actionType: string;
+      sourceType: string;
+      sourceId?: string;
+      pageUrl?: string;
+      targetKeyword?: string;
+      baselineSnapshot?: { position?: number; clicks?: number; impressions?: number; ctr?: number; sessions?: number };
+      attribution?: string;
+    },
+  ) =>
+    post<{ success: boolean; action: TrackedAction; deduplicated?: boolean }>(
+      `/api/outcomes/${wsId}/actions`,
+      { baselineSnapshot: {}, ...body },
+    ),
+
   addNote: (wsId: string, actionId: string, note: string) =>
     post<{ success: boolean }>(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
 
