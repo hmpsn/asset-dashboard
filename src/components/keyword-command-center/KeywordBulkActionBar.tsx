@@ -17,18 +17,17 @@ export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onCle
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-4 z-[var(--z-sticky)] pointer-events-none">
-      <div
-        role="toolbar"
-        aria-label="Selected keyword bulk actions"
-        className="mx-auto w-[min(960px,calc(100%-2rem))] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 pointer-events-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-        style={{ boxShadow: 'var(--brand-shadow-md)' }}
-      >
-        <div className="min-w-0">
-          <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{selectedCount} selected</p>
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">Bulk lifecycle changes preserve protected keywords unless confirmed.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <div
+      role="toolbar"
+      aria-label="Selected keyword bulk actions"
+      className="sticky bottom-4 mt-4 z-[var(--z-sticky)] w-full rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      style={{ boxShadow: 'var(--brand-shadow-md)' }}
+    >
+      <div className="min-w-0">
+        <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{selectedCount} selected</p>
+        <p className="t-caption-sm text-[var(--brand-text-muted)]">Bulk lifecycle changes preserve protected keywords unless confirmed.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="primary"
@@ -77,7 +76,6 @@ export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onCle
           <Button size="sm" variant="ghost" icon={X} disabled={isPending} onClick={onClear}>
             Clear
           </Button>
-        </div>
       </div>
     </div>
   );

@@ -57,15 +57,17 @@ vi.mock('../../src/components/assets/AssetFilters', () => ({
   AssetFilters: ({
     search,
     onSearchChange,
-    onFilterChange,
+    onFilterToggle,
+    onFilterClear,
     onSortChange,
   }: {
     search: string;
-    filter: string;
+    activeFilters: Set<string>;
     sort: string;
     hasCmsData: boolean;
     onSearchChange: (v: string) => void;
-    onFilterChange: (v: string) => void;
+    onFilterToggle: (v: string) => void;
+    onFilterClear: () => void;
     onSortChange: (v: string) => void;
   }) => (
     <div data-testid="asset-filters">
@@ -74,10 +76,10 @@ vi.mock('../../src/components/assets/AssetFilters', () => ({
         value={search}
         onChange={e => onSearchChange(e.target.value)}
       />
-      <button onClick={() => onFilterChange('missing-alt')}>Filter missing alt</button>
-      <button onClick={() => onFilterChange('oversized')}>Filter oversized</button>
-      <button onClick={() => onFilterChange('unused')}>Filter unused</button>
-      <button onClick={() => onFilterChange('all')}>Filter all</button>
+      <button onClick={() => onFilterToggle('missing-alt')}>Filter missing alt</button>
+      <button onClick={() => onFilterToggle('oversized')}>Filter oversized</button>
+      <button onClick={() => onFilterToggle('unused')}>Filter unused</button>
+      <button onClick={onFilterClear}>Filter all</button>
       <button onClick={() => onSortChange('fileName')}>Sort by name</button>
       <button onClick={() => onSortChange('fileSize')}>Sort by size</button>
     </div>
