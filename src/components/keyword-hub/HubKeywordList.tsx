@@ -230,10 +230,11 @@ export function HubKeywordList({
       };
 
   return (
-    // Outer wrapper: pb-24 ensures the last keyword row can always scroll clear of
-    // the sticky bulk bar (which renders as a sibling after this div).
+    // Scroll clearance (pb-24) is applied by KeywordHub.tsx on the outer page
+    // wrapper — outside SectionCard.overflow-hidden — so the fixed bulk bar
+    // never covers the last keyword row.
     <>
-    <div className={someSelected ? 'pb-24' : ''}>
+    <div>
       {/* Mobile: overflow-x-auto + min-width inner container so the table scrolls
           horizontally on narrow viewports rather than collapsing (KCC :544-545 parity). */}
       <div className="overflow-x-auto">
@@ -323,10 +324,8 @@ export function HubKeywordList({
       )}
 
     </div>
-    {/* Bulk action bar — sticky bottom-4 so it never pushes content down or covers
-        items: when content is short it sits naturally below pagination; when long
-        the sticky positions it at the viewport bottom and pb-24 above ensures the
-        last keyword can always be scrolled clear of the bar. */}
+    {/* Fixed bulk bar — rendered here so React mounts/unmounts it with the list.
+        It positions itself via CSS fixed (see KeywordBulkActionBar). */}
     {someSelected && (
       <KeywordBulkActionBar
         selectedCount={selectedKeys.size}

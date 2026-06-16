@@ -16,11 +16,15 @@ interface KeywordBulkActionBarProps {
 export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onClear }: KeywordBulkActionBarProps) {
   if (selectedCount === 0) return null;
 
+  // fixed: SectionCard has overflow-hidden which prevents sticky from anchoring
+  // to the viewport. The scroll clearance (pb-24) is applied in KeywordHub.tsx
+  // on the outer page wrapper so it falls outside the overflow-hidden boundary.
   return (
+    <div className="fixed inset-x-0 bottom-4 z-[var(--z-dropdown)] pointer-events-none">
     <div
       role="toolbar"
       aria-label="Selected keyword bulk actions"
-      className="sticky bottom-4 mt-4 z-[var(--z-sticky)] w-full rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      className="mx-auto w-[min(960px,calc(100%-2rem))] pointer-events-auto rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       style={{ boxShadow: 'var(--brand-shadow-md)' }}
     >
       <div className="min-w-0">
@@ -77,6 +81,7 @@ export function KeywordBulkActionBar({ selectedCount, isPending, onAction, onCle
             Clear
           </Button>
       </div>
+    </div>
     </div>
   );
 }

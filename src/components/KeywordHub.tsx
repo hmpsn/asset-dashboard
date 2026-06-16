@@ -449,7 +449,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
       : null;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4${hub.someSelected ? ' pb-24' : ''}`}>
       <PageHeader
         title="Keyword Hub"
         subtitle="One surface for every keyword — strategy, tracking, rank, and local visibility."
