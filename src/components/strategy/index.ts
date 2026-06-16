@@ -21,3 +21,6 @@ export * from './RankingDistribution';
 export * from './SiteTargetKeywords';
 export * from './KeywordOpportunities';
 export * from './StrategyHowItWorks';
+export * from './OpportunitiesList';
+export * from './DecayingPagesCard';
+export * from './LostQueryRecoveryCard';

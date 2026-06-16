@@ -1,25 +1,30 @@
-import { useState, useEffect } from 'react';
-import { Badge, ClickableRow, Icon } from '../ui';
-import { RefreshCw, Plus, Minus, ArrowRight, ChevronDown, Eye, Lightbulb } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { Badge, Button, ClickableRow, Icon } from '../ui';
+import { RefreshCw, Plus, Minus, ArrowRight, ArrowUpRight, ChevronDown, Eye, Lightbulb } from 'lucide-react';
 import { keywords } from '../../api/seo';
-import type { StrategyDiff as StrategyDiffType } from '../../api/seo';
 import { formatDate } from '../../utils/formatDates';
+import { adminPath } from '../../routes';
+import { queryKeys } from '../../lib/queryKeys';
+import { strategyNextActionTarget } from '../../lib/strategyNextActionTarget';
 
 export interface StrategyDiffProps {
   workspaceId: string;
 }
 
 export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
-  const [diff, setDiff] = useState<StrategyDiffType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    keywords.strategyDiff(workspaceId)
-      .then(d => setDiff(d ?? null))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [workspaceId]);
+  // useQuery (keyed on admin.strategyDiff) so the diff refetches when a strategy regen broadcasts
+  // strategy:updated — strategyMutationKeys invalidates this key. The previous raw useEffect never
+  // re-fetched, leaving the diff stale until the component remounted.
+  const { data: diff, isLoading: loading } = useQuery({
+    queryKey: queryKeys.admin.strategyDiff(workspaceId),
+    queryFn: () => keywords.strategyDiff(workspaceId),
+    enabled: !!workspaceId,
+  });
 
   if (loading || !diff) return null;
 
@@ -74,19 +79,35 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
                 <Icon as={Lightbulb} size="sm" className="text-teal-400" /> Why these matter
               </div>
               <div className="space-y-1.5">
-                {explanationPreview.map(explanation => (
-                  <div key={`${explanation.role}-${explanation.normalizedKeyword}`} className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="t-caption font-medium text-[var(--brand-text-bright)]">{explanation.keyword}</span>
-                      <Badge
-                        tone={explanation.nextAction.type === 'generate_brief' ? 'emerald' : explanation.nextAction.type === 'optimize_page' ? 'blue' : 'teal'}
-                        size="sm"
-                        label={explanation.nextAction.label}
-                      />
+                {explanationPreview.map(explanation => {
+                  const target = strategyNextActionTarget(explanation);
+                  return (
+                    <div key={`${explanation.role}-${explanation.normalizedKeyword}`} className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="t-caption font-medium text-[var(--brand-text-bright)]">{explanation.keyword}</span>
+                        {target ? (
+                          // Actionable next action → teal CTA (action-color law). Passive ones stay a Badge.
+                          <Button
+                            onClick={() => navigate(
+                              adminPath(workspaceId, target.tab) + (target.search ?? ''),
+                              target.fixContext ? { state: { fixContext: target.fixContext } } : undefined,
+                            )}
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 flex-shrink-0"
+                            aria-label={`${explanation.nextAction.label}: ${explanation.keyword}`}
+                          >
+                            {explanation.nextAction.label} <Icon as={ArrowUpRight} size="sm" className="text-teal-300" />
+                          </Button>
+                        ) : (
+                          // watch / review_evidence — informational, neutral tone (not a CTA).
+                          <Badge tone="zinc" size="sm" label={explanation.nextAction.label} />
+                        )}
+                      </div>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{explanation.reasons[0]}</p>
                     </div>
-                    <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{explanation.reasons[0]}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

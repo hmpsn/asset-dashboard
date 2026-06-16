@@ -23,9 +23,9 @@
           "source": "Strategy redesign spec 2026-06-16",
           "est": "M-L",
           "priority": "P2",
-          "status": "in_progress",
+          "status": "done",
           "createdAt": "2026-06-16",
-          "notes": "Flag + StrategyBand containers + reorder existing leaves + RequestedKeywordTriage hoist + settings-collapsed + maxPages persistence fix + header summary. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-1a-ia-scaffold.md."
+          "notes": "Done 2026-06-16 (PR #1249, merged to staging): flag + StrategyBand containers + reorder existing leaves + RequestedKeywordTriage hoist + settings-collapsed + maxPages persistence fix + header summary. Flag OFF = byte-identical legacy layout. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-1a-ia-scaffold.md."
         },
         {
           "id": "strategy-redesign-phase-1b-decision-queue",
@@ -33,9 +33,19 @@
           "source": "Strategy redesign spec 2026-06-16",
           "est": "M-L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-16",
-          "notes": "Extract shared RecRow from AdminRecommendationQueue; useAdminRecommendationSet superset; fix-CTA routing via fixContext."
+          "notes": "Done 2026-06-16 (PR #1250, merged to staging): DecisionQueue leads the Decide band; extracted shared RecommendationRow/OvBreakdown/formatEmv with additive onFixCta slot; useAdminRecommendationSet superset (emvPerWeek-safe); fix-CTA routing via src/lib/recTypeTab.ts (content→content-pipeline). Excludes dismissed + completed recs."
+        },
+        {
+          "id": "strategy-redesign-phase-2-act-band",
+          "title": "Phase 2 — Act band actionable (merged Opportunities, navigating What-Changed, decay + lost-query cards)",
+          "source": "Strategy redesign spec 2026-06-16",
+          "est": "M-L",
+          "priority": "P2",
+          "status": "in_progress",
+          "createdAt": "2026-06-16",
+          "notes": "PR opening to staging. OpportunitiesList merges Quick Wins + Low-Hanging Fruit (dedup by pagePath) with per-row Optimize-page CTAs; StrategyDiff migrated to useQuery (refetches on strategy:updated) with navigating nextAction CTAs (watch/review_evidence stay passive); new DecayingPagesCard (useContentDecay) + LostQueryRecoveryCard (useLostVisibility). Shared content-decay types promoted to shared/types/content-decay.ts. Bands Act band only; legacy layout untouched. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-2-act-band.md."
         }
       ]
     },

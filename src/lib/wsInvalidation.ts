@@ -38,6 +38,7 @@ function contentSubscriptionKeys(workspaceId: string): readonly QueryInvalidatio
 function strategyMutationKeys(workspaceId: string): readonly QueryInvalidationKey[] {
   return [
     queryKeys.admin.keywordStrategy(workspaceId),
+    queryKeys.admin.strategyDiff(workspaceId),
     queryKeys.admin.keywordFeedback(workspaceId),
     queryKeys.admin.keywordCommandCenter(workspaceId),
     queryKeys.admin.rankTrackingKeywords(workspaceId),

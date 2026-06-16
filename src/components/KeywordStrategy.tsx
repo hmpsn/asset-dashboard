@@ -39,6 +39,9 @@ import {
   StrategyBand,
   DecisionQueue,
   RequestedKeywordTriage,
+  OpportunitiesList,
+  DecayingPagesCard,
+  LostQueryRecoveryCard,
   buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
@@ -331,6 +334,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       </div>
     ),
     lhf: <LowHangingFruit pages={metrics.lowHangingFruit} />,
+    // Act band (decision-bands layout only): Quick Wins + Low-Hanging Fruit merged into one
+    // actionable card, plus decay + lost-query recovery surfaces. Legacy layout keeps quickWins/lhf.
+    opportunitiesList: <OpportunitiesList quickWins={strategy.quickWins ?? []} lowHangingFruit={metrics.lowHangingFruit} workspaceId={workspaceId} />,
+    decayingPages: <DecayingPagesCard workspaceId={workspaceId} />,
+    lostQueries: <LostQueryRecoveryCard workspaceId={workspaceId} />,
     contentGaps: <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />,
     keywordGaps: (
       <KeywordGaps
@@ -393,8 +401,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {realLeaves.stalenessNudges}
           <StrategyBand label="Act">
             {realLeaves.contentGaps}
-            {realLeaves.quickWins}
-            {realLeaves.lhf}
+            {realLeaves.opportunitiesList}
+            {realLeaves.decayingPages}
+            {realLeaves.lostQueries}
             {realLeaves.keywordGaps}
             {realLeaves.cannibalization}
             {realLeaves.strategyDiff}
