@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **505 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **506 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 506. Strategy Page — Cannibalization "Mark resolved" + resolved re-filter (Phase 3b-i, behind `strategy-decision-bands`)
+
+**What it does:** Makes the cannibalization triage queue (shipped read-only in 3a) actionable on the admin side: each issue gets a **Mark resolved** button that records the platform's existing `cannibalization_resolved` outcome (a durable tracked action), and resolved issues drop out of the queue so it always shows only open work. Resolution is inferred from the tracked action — never stored on the cannibalization issue row, which is rebuilt wholesale on every strategy regeneration — so a resolved issue stays resolved across regens (keyed by a normalized keyword). Also fixes a latent bug: the outcomes API's action-type validation schema had drifted and silently rejected `cannibalization_resolved` (and four other newer action types).
+
+**Agency value:** The strategist clears cannibalization issues as they fix them and the queue stays focused on what's left — and because "resolved" is a real tracked outcome, each fix flows into the outcome-measurement engine (scored on click recovery at the 7/30/60/90-day checkpoints) and the workspace's win/learnings history, rather than being a throwaway UI toggle.
+
+**Client value:** Indirect — resolved cannibalization fixes become measured wins that surface in the client's outcome summary, and the agency's strategy work is tracked end-to-end.
+
+**Mutual:** Reuses the fully-wired `cannibalization_resolved` action type, the generic outcomes record route, and the existing outcome scoring/learnings pipeline — no new endpoint, no migration. The resolved-state read piggybacks the existing outcome-actions query and its WebSocket invalidation.
+
+**Files:** `server/schemas/outcome-schemas.ts` (action-type enum lockstep fix), `src/api/outcomes.ts` (`recordAction`), `src/hooks/admin/useOutcomes.ts` (`useRecordOutcomeAction`), `src/lib/cannibalizationSourceId.ts`, `src/components/strategy/CannibalizationTriage.tsx`. Tests: `tests/unit/strategy/CannibalizationTriage.test.tsx`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-i-cannibalization-mark-resolved.md`.
 
 ---
 
