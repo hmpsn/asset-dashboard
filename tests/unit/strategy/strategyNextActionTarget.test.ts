@@ -20,8 +20,12 @@ describe('strategyNextActionTarget', () => {
     expect(strategyNextActionTarget(expl({ type: 'generate_brief', label: 'Draft brief', detail: '' }))?.tab).toBe('content-pipeline');
   });
 
-  it('maps track_keyword → seo-keywords', () => {
-    expect(strategyNextActionTarget(expl({ type: 'track_keyword', label: 'Track', detail: '' }))?.tab).toBe('seo-keywords');
+  it('maps track_keyword → seo-keywords via the ?q=/?tab= deep-link (NOT router-state fixContext, which KeywordHub ignores)', () => {
+    const t = strategyNextActionTarget(expl({ type: 'track_keyword', label: 'Track', detail: '' }));
+    expect(t?.tab).toBe('seo-keywords');
+    expect(t?.fixContext).toBeUndefined();
+    expect(t?.search).toContain('q=');
+    expect(t?.search).toContain('tab=tracked');
   });
 
   it('returns null for watch and review_evidence (no dead CTA)', () => {

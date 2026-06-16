@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **503 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **504 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 504. Strategy Page — Decision-First Redesign: Act Band Actionable (Phase 2, behind `strategy-decision-bands`)
+
+**What it does:** Turns the admin Strategy page's "Act" band from a passive scroll into a do-this-now surface (part of the decision-first 3-band IA: Decide / Act / Reference). Quick Wins and Low-Hanging Fruit are merged into one `OpportunitiesList` (de-duplicated by page path) where every row carries an "Optimize page" CTA that deep-links into Page Intelligence with the page pre-expanded. The "What Changed" diff now refetches on strategy regeneration (migrated to React Query, invalidated by `strategy:updated`) and its per-keyword next-action badges navigate (generate brief → content pipeline, optimize → page intelligence, track → keyword hub); informational `watch`/`review_evidence` stay passive. Two new cards surface decay and lost rankings: `DecayingPagesCard` (pages losing search traffic, with Refresh-brief / Review-page CTAs) and `LostQueryRecoveryCard` (queries that fell out of search, with a Create-recovery-content CTA). All of this is gated by the `strategy-decision-bands` flag; the flag-off legacy layout is byte-identical.
+
+**Agency value:** The strategist lands on the page and is led straight to the highest-leverage actions — refresh a decaying page, recover a lost query, optimize a near-page-1 ranking — each one click from the surface that resolves it. No more scanning a 30-section scroll to decide what to do.
+
+**Client value:** Indirect — admin acts faster and more precisely on the work that protects and grows the client's organic traffic (decay caught early, lost queries recovered, near-miss pages pushed onto page 1).
+
+**Mutual:** Reuses already-computed intelligence (recommendations, content-decay analysis, lost_visibility insights) rather than new AI/provider spend; closes the loop from signal → one-click action on the owning surface.
+
+**Files:** `src/components/strategy/OpportunitiesList.tsx`, `src/components/strategy/buildOpportunityRows.ts`, `src/components/strategy/DecayingPagesCard.tsx`, `src/components/strategy/LostQueryRecoveryCard.tsx`, `src/components/strategy/StrategyDiff.tsx`, `src/lib/strategyNextActionTarget.ts`, `src/hooks/admin/useContentDecay.ts`, `src/hooks/admin/useLostVisibility.ts`, `shared/types/content-decay.ts`, `src/components/KeywordStrategy.tsx`. Tests: `tests/unit/strategy/{buildOpportunityRows,OpportunitiesList,strategyNextActionTarget,StrategyDiff,DecayingPagesCard,LostQueryRecoveryCard}.test.{ts,tsx}`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-2-act-band.md`.
 
 ---
 

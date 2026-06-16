@@ -88,7 +88,10 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
                         {target ? (
                           // Actionable next action → teal CTA (action-color law). Passive ones stay a Badge.
                           <Button
-                            onClick={() => navigate(adminPath(workspaceId, target.tab), { state: { fixContext: target.fixContext } })}
+                            onClick={() => navigate(
+                              adminPath(workspaceId, target.tab) + (target.search ?? ''),
+                              target.fixContext ? { state: { fixContext: target.fixContext } } : undefined,
+                            )}
                             variant="ghost"
                             size="sm"
                             className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 flex-shrink-0"
