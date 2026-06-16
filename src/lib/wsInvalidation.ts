@@ -39,6 +39,8 @@ function strategyMutationKeys(workspaceId: string): readonly QueryInvalidationKe
   return [
     queryKeys.admin.keywordStrategy(workspaceId),
     queryKeys.admin.strategyDiff(workspaceId),
+    queryKeys.admin.backlinkProfile(workspaceId),
+    queryKeys.admin.competitorIntelAll(workspaceId),
     queryKeys.admin.keywordFeedback(workspaceId),
     queryKeys.admin.keywordCommandCenter(workspaceId),
     queryKeys.admin.rankTrackingKeywords(workspaceId),

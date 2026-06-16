@@ -78,6 +78,16 @@
           "notes": "PR opening to staging. New dedicated 'cannibalization' client-action / deliverable type (owner decision — purpose-built client card). Per-issue 'Send to client' in CannibalizationTriage → createAdminClientAction (grandfathered route) → dual-write mirrors a 'cannibalization' deliverable; new deliverable adapter (decision-kind, modeled on content-decay); new CannibalizationRenderer in both DeliverableDetailModal + DecisionDetailModal. Lockstep one-commit wiring across ClientActionSourceType + validSources + sourceTypeSchema + clientActionDeliverableType + CLIENT_ACTION_FAMILY_TYPES + DELIVERABLE_TYPES + pr-check list + DELIVERABLE_TYPE_BADGES + CLIENT_ACTION_BADGES + SOURCE_TYPE_LABELS + OUTCOME_ACTION_TYPE_BY_SOURCE. Completes Phase 3. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-ii-cannibalization-send.md."
         },
         {
+          "id": "strategy-redesign-phase-4a-authority-backlinks",
+          "title": "Phase 4a — Reference band: Authority & Backlinks merge + BacklinkProfile RQ migration + competitor invalidation/cache-label fixes",
+          "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
+          "est": "M",
+          "priority": "P2",
+          "status": "in_progress",
+          "createdAt": "2026-06-16",
+          "notes": "PR opening to staging. First of three Phase 4 sub-PRs (4a/4b/4c). New AuthorityAndBacklinks leaf merges the Reference band's backlink + competitive children into one: composes BacklinkProfile + CompetitiveIntel variant='merged' (hides the own-domain stat grid + the embedded Keyword Gaps section, deduped; corrected cache-freshness label). BacklinkProfile migrated off raw useState+useEffect+fetch to a new useBacklinkProfile React Query hook (queryKeys.admin.backlinkProfile) — the last hand-rolled fetch in src/components/strategy/. Fixed the STRATEGY_UPDATED→competitorIntel invalidation gap (added backlinkProfile + competitorIntelAll to strategyMutationKeys) and the wrong 48h staleTime/cache-label (real DataForSEO TTL is 7d). Bands Reference band only; legacy layout byte-identical (CompetitiveIntel variant defaults to 'full'; flag NOT removed). Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
+        },
+        {
           "id": "strategy-cannibalization-operator-keeper-override",
           "title": "Cannibalization triage — operator-selectable keeper (override the auto-derived canonical page)",
           "source": "Owner refinement 2026-06-16 (post Phase 3b-ii)",

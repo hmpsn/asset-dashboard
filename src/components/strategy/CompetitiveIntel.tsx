@@ -63,6 +63,13 @@ interface Props {
   seoDataAvailable: boolean;
   /** Keyword gaps from the stored strategy — used as fallback when the live API call fails or returns empty */
   cachedKeywordGaps?: KeywordGap[];
+  /**
+   * 'full' (default) = the standalone Competitive Intel card (legacy layout, byte-identical).
+   * 'merged' = embedded inside the Reference-band Authority & Backlinks leaf (Phase 4): hides the
+   * own-domain stat grid (duplicates the backlink stats) and the Keyword Gaps section (deduped to the
+   * standalone CompetitorEvidence surface), and uses the corrected cache freshness label.
+   */
+  variant?: 'full' | 'merged';
 }
 
 function difficultyColor(kd: number): string {
@@ -89,7 +96,8 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
   );
 }
 
-export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, cachedKeywordGaps }: Props) {
+export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, cachedKeywordGaps, variant = 'full' }: Props) {
+  const merged = variant === 'merged';
   const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const queryClient = useQueryClient();
   const competitorKey = competitors.join(',');
@@ -98,7 +106,10 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
     queryKey: queryKeys.admin.competitorIntel(workspaceId, competitorKey),
     queryFn: () => get<IntelResponse>(`/api/seo/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
     enabled: competitors.length > 0 && seoDataAvailable,
-    staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
+    // Merged (Reference-band) view uses a 168h staleTime — comfortably within the underlying
+    // DataForSEO provider caches (overview/backlinks 168h, competitors 336h), so the old 48h just
+    // forced needless refetches of provider-cached data. Legacy 'full' keeps 48h (flag-off unchanged).
+    staleTime: (merged ? 168 : 48) * 60 * 60 * 1000,
     retry: 1,
   });
 
@@ -184,8 +195,8 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         </Button>
       </div>
 
-      {/* Domain Overview Cards */}
-      {myDomain?.overview && (
+      {/* Domain Overview Cards — hidden in the merged Authority & Backlinks leaf (duplicates the backlink stats) */}
+      {!merged && myDomain?.overview && (
         <div className="grid grid-cols-4 gap-3">
           <StatCard label="Your Organic Traffic" value={fmtNum(myDomain.overview.organicTraffic)} icon={TrendingUp} iconColor="text-teal-400" />
           <StatCard label="Your Keywords" value={fmtNum(myDomain.overview.organicKeywords)} icon={Search} iconColor="text-teal-400" />
@@ -256,8 +267,8 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         );
       })}
 
-      {/* Keyword Gaps */}
-      {effectiveGaps.length > 0 && (
+      {/* Keyword Gaps — hidden in the merged leaf (deduped to the standalone CompetitorEvidence surface) */}
+      {!merged && effectiveGaps.length > 0 && (
         // pr-check-disable-next-line -- brand asymmetric signature on Keyword Gaps collapsible section; non-SectionCard chrome
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
           <ClickableRow
@@ -302,7 +313,12 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         <p className="t-caption-sm text-[var(--brand-text-muted)] text-right ml-auto">
           Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'
-            : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}
+            : data?.fetchedAt
+              ? (merged
+                  // fetchedAt is response-assembly time, not the provider cache age — label it honestly.
+                  ? `Updated ${new Date(data.fetchedAt).toLocaleString()}`
+                  : `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}`)
+              : ''}
         </p>
       </div>
     </div>
