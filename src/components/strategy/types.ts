@@ -85,6 +85,10 @@ export interface ClientKeywordFeedbackProps {
   showRequested?: boolean;
 }
 
+export interface DecisionQueueProps {
+  workspaceId: string;
+}
+
 export interface StrategyBandProps {
   /** Band label shown in the section divider, e.g. "Decide". */
   label: string;

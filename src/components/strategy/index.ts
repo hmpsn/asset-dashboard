@@ -8,6 +8,7 @@ export * from './hooks/useKeywordFeedback';
 
 export * from './StrategyHeaderActions';
 export * from './StrategyBand';
+export * from './DecisionQueue';
 export * from './RequestedKeywordTriage';
 export * from './strategySummaryLine';
 export * from './StrategyFeedbackNudge';

@@ -62,6 +62,11 @@ vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: () => mocks.decisionBandsEnabled,
 }));
 
+vi.mock('../../src/hooks/admin/useAdminRecommendations', () => ({
+  useAdminRecommendationSet: () => ({ data: undefined, isLoading: false }),
+  useAdminUndismissRecommendation: () => ({ mutate: vi.fn() }),
+}));
+
 vi.mock('../../src/api/seo', () => ({
   keywords: {
     providerStatus: mocks.providerStatus,
@@ -122,11 +127,13 @@ describe('KeywordStrategyPanel background job wiring', () => {
     };
   });
 
-  it('renders the decision-bands layout with a collapsed Settings panel when the flag is on', () => {
+  it('renders the decision-bands layout with the Decision Queue + collapsed Settings when the flag is on', () => {
     mocks.decisionBandsEnabled = true;
     renderPanel();
-    // The Decide band renders even pre-generation (it carries Settings).
+    // The Decide band renders even pre-generation (it carries the queue + Settings).
     expect(screen.getByText('Decide')).toBeInTheDocument();
+    // The Decision Queue leads the band.
+    expect(screen.getByText('Do this next')).toBeInTheDocument();
     // Settings header is present but COLLAPSED by default in the bands layout, so its body
     // (the "All" page-limit option) must not be visible.
     expect(screen.getByText('Strategy Settings')).toBeInTheDocument();
