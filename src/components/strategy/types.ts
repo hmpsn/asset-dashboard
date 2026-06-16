@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 
@@ -72,6 +73,28 @@ export interface ClientKeywordFeedbackProps {
   requested: AdminKeywordFeedbackListRow[];
   declined: AdminKeywordFeedbackListRow[];
   approved: AdminKeywordFeedbackListRow[];
+  addPending: boolean;
+  addError: string | null;
+  onAdd: (keyword: string) => void;
+  onDismissError: () => void;
+  /**
+   * When false, the "Requested by client" triage block is suppressed (declined-only log).
+   * Used by the decision-bands layout, which hoists requested keywords into <RequestedKeywordTriage>
+   * in the Decide band. Defaults to true so the legacy (flag-off) combined card is unchanged.
+   */
+  showRequested?: boolean;
+}
+
+export interface StrategyBandProps {
+  /** Band label shown in the section divider, e.g. "Decide". */
+  label: string;
+  /** First band suppresses the top border so it sits flush under the header. */
+  first?: boolean;
+  children: ReactNode;
+}
+
+export interface RequestedKeywordTriageProps {
+  requested: AdminKeywordFeedbackListRow[];
   addPending: boolean;
   addError: string | null;
   onAdd: (keyword: string) => void;
