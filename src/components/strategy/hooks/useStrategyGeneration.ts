@@ -8,7 +8,6 @@ import { queryKeys } from '../../../lib/queryKeys';
 interface LocalSync {
   localNeedsRefresh?: boolean;
   applies?: boolean;
-  [key: string]: unknown;
 }
 
 interface GenerationParams {

@@ -51,10 +51,8 @@ export type SeoDataMode = 'none' | 'quick' | 'full';
 
 // ── Leaf component prop contracts (pre-committed; leaves import from here) ──
 
-export interface StrategyHeaderProps {
+export interface StrategyHeaderActionsProps {
   isRealStrategy: boolean;
-  generatedAt: string | null | undefined;
-  pageCount: number;
   generating: boolean;
   localSyncApplies: boolean;
   localNeedsRefresh: boolean;
