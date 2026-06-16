@@ -46,6 +46,11 @@ export const FEATURE_FLAGS = {
   // + local relevance multiplier). Also gates the content-gap opportunity spine.
   // OFF = byte-identical to today. See docs/superpowers/plans/2026-06-05-keyword-value-scoring.md.
   'keyword-value-scoring': false,
+
+  // Strategy page — decision-first 3-band IA (Decide/Act/Reference). Dark-launches the
+  // reorganized admin Strategy layout (and, in Phase 1b, the Decision Queue). OFF = today's
+  // sequential layout, byte-identical. See docs/superpowers/specs/2026-06-16-strategy-page-decision-first-redesign-design.md.
+  'strategy-decision-bands': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -96,6 +101,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Keyword Hub',
+  'Strategy',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -254,6 +260,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-02',
     },
   },
+  'strategy-decision-bands': {
+    label: 'Strategy page — decision-first 3-band IA (Decide/Act/Reference)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-16',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the decision-first Strategy IA is validated on staging and becomes the default; the legacy sequential layout path is then deleted (Phase 4).',
+      linkedRoadmapItemId: 'strategy-redesign-phase-1a-ia-scaffold',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-16',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -280,6 +299,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Keyword Hub',
     keys: ['keyword-universe-full', 'keyword-value-scoring'],
+  },
+  {
+    label: 'Strategy',
+    keys: ['strategy-decision-bands'],
   },
 ];
 

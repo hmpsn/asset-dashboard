@@ -182,6 +182,8 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
+  /** The effective (clamped) page-limit used for the last generation. 0 = no limit. Persisted so the Settings UI can rehydrate it after a remount. */
+  maxPages?: number;
   seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {

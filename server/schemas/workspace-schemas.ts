@@ -163,6 +163,7 @@ export const keywordStrategySchema = z.object({
     difficulty: z.number(),
   })).optional(),
   generatedAt: z.string().optional(),
+  maxPages: z.number().optional(),
   seoDataStatus: z.object({
     mode: z.enum(['quick', 'full', 'none']),
     provider: z.string().optional(),

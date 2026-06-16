@@ -160,4 +160,27 @@ describe('ClientKeywordFeedback', () => {
     );
     expect(screen.getByText(/1 declined · 1 requested · 1 approved/i)).toBeInTheDocument();
   });
+
+  it('with showRequested=false: suppresses requested block + Add button, still renders declined log', () => {
+    render(
+      <ClientKeywordFeedback
+        rows={[requestedRow, declinedRow]}
+        requested={[requestedRow]}
+        declined={[declinedRow]}
+        approved={[]}
+        addPending={false}
+        addError={null}
+        onAdd={vi.fn()}
+        onDismissError={vi.fn()}
+        showRequested={false}
+      />,
+    );
+    // Requested block must be absent
+    expect(screen.queryByText('Requested by client')).not.toBeInTheDocument();
+    expect(screen.queryByText('best dentist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add to Strategy/i })).not.toBeInTheDocument();
+    // Declined log must still render
+    expect(screen.getByText('cheap dentist')).toBeInTheDocument();
+    expect(screen.getByText('Too price-sensitive')).toBeInTheDocument();
+  });
 });

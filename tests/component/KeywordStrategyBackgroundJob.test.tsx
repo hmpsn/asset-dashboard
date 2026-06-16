@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   providerStatus: vi.fn(),
   getWorkspaceById: vi.fn(),
   isAuxLoading: false,
+  decisionBandsEnabled: false,
   keywordStrategyData: {
     strategy: null,
     seoDataAvailable: true,
@@ -55,6 +56,10 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
     startJob: mocks.startJob,
     findActiveJob: mocks.findActiveJob,
   }),
+}));
+
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => mocks.decisionBandsEnabled,
 }));
 
 vi.mock('../../src/api/seo', () => ({
@@ -108,12 +113,32 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'dataforseo', configured: true }] });
     mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'dataforseo' });
     mocks.isAuxLoading = false;
+    mocks.decisionBandsEnabled = false;
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
       providers: [{ name: 'dataforseo', configured: true }],
       workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'dataforseo' },
     };
+  });
+
+  it('renders the decision-bands layout with a collapsed Settings panel when the flag is on', () => {
+    mocks.decisionBandsEnabled = true;
+    renderPanel();
+    // The Decide band renders even pre-generation (it carries Settings).
+    expect(screen.getByText('Decide')).toBeInTheDocument();
+    // Settings header is present but COLLAPSED by default in the bands layout, so its body
+    // (the "All" page-limit option) must not be visible.
+    expect(screen.getByText('Strategy Settings')).toBeInTheDocument();
+    expect(screen.queryByText('All')).not.toBeInTheDocument();
+  });
+
+  it('keeps the legacy sequential layout (no band labels, Settings open) when the flag is off', () => {
+    mocks.decisionBandsEnabled = false;
+    renderPanel();
+    expect(screen.queryByText('Decide')).not.toBeInTheDocument();
+    // Legacy: Settings open by default, so its body (the "All" page-limit option) is visible.
+    expect(screen.getByText('All')).toBeInTheDocument();
   });
 
   it('starts keyword strategy generation through the shared background job API', async () => {

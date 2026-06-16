@@ -7,6 +7,9 @@ export * from './hooks/useTrackKeyword';
 export * from './hooks/useKeywordFeedback';
 
 export * from './StrategyHeaderActions';
+export * from './StrategyBand';
+export * from './RequestedKeywordTriage';
+export * from './strategySummaryLine';
 export * from './StrategyFeedbackNudge';
 export * from './ClientKeywordFeedback';
 export * from './StrategySettings';

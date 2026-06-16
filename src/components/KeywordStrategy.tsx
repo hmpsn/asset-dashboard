@@ -6,6 +6,7 @@ import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
@@ -35,6 +36,9 @@ import {
   SiteTargetKeywords,
   KeywordOpportunities,
   StrategyHowItWorks,
+  StrategyBand,
+  RequestedKeywordTriage,
+  buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
 
@@ -46,6 +50,9 @@ interface Props {
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
+
+  // Decision-first 3-band IA (Decide/Act/Reference). OFF = today's sequential layout, byte-identical.
+  const decisionBandsEnabled = useFeatureFlag('strategy-decision-bands');
 
   // React Query hook replaces manual data fetching
   const { data: keywordData, isLoading: loading, isAuxLoading, isError: strategyFetchError, refetch: refetchStrategy } = useKeywordStrategy(workspaceId);
@@ -61,7 +68,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const localSync = keywordData?.strategy?.strategyUx?.localSync;
 
   // ── Logic hooks (extracted from this orchestrator in Phase 0) ──
-  const settings = useStrategySettings(keywordData, strategy, workspaceId);
+  // Settings starts collapsed only in the decision-bands layout; the legacy layout keeps it open.
+  const settings = useStrategySettings(keywordData, strategy, workspaceId, decisionBandsEnabled);
   const generation = useStrategyGeneration({
     workspaceId,
     localSync,
@@ -105,6 +113,349 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     );
   }
 
+  // Header subtitle: in the decision-bands layout, lead with a decision summary when there is one;
+  // otherwise (and always in the legacy layout) show artifact freshness — byte-identical to today.
+  const summaryLine = buildStrategySummaryLine({
+    contentGaps: strategy?.contentGaps?.length ?? 0,
+    requested: metrics.requestedFeedback.length,
+    quickWins: strategy?.quickWins?.length ?? 0,
+  });
+  const headerSubtitle = !isRealStrategy
+    ? 'AI-powered keyword mapping for your entire site'
+    : decisionBandsEnabled && summaryLine
+      ? summaryLine
+      : `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`;
+
+  // ── Shared elements (defined once; the two layouts arrange the same elements differently) ──
+  const headerActions = (
+    <StrategyHeaderActions
+      isRealStrategy={isRealStrategy}
+      generating={generation.generating}
+      localSyncApplies={!!localSync?.applies}
+      localNeedsRefresh={!!localSync?.localNeedsRefresh}
+      refreshPending={generation.refresh.isPending}
+      onIncremental={() => generation.generateStrategy('incremental')}
+      onFullRefresh={() => generation.refresh.mutate({
+        thenRegenerateStrategy: true,
+        strategyGeneration: settings.buildStrategyGenerationParams(),
+      })}
+      onGenerate={() => generation.generateStrategy('full')}
+    />
+  );
+
+  const headerEl = (
+    <PageHeader
+      title="Keyword Strategy"
+      subtitle={headerSubtitle}
+      icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      actions={headerActions}
+    />
+  );
+
+  const refreshPromptEl = localSync?.applies && localSync.localNeedsRefresh ? (
+    <RefreshOrderingPrompt
+      open={generation.refreshOrderingPromptOpen}
+      reason={localSync.localNeedsRefreshReason ?? 'stale'}
+      lastLocalRefreshAt={localSync.lastLocalRefreshAt}
+      onFullRefresh={() => {
+        generation.refresh.mutate({
+          thenRegenerateStrategy: true,
+          strategyGeneration: settings.buildStrategyGenerationParams(),
+        });
+        generation.setRefreshOrderingPromptOpen(false);
+      }}
+      onGenerateAnyway={() => {
+        generation.setRefreshOrderingPromptOpen(false);
+        void generation.runStartJob('full');
+      }}
+      onCancel={() => generation.setRefreshOrderingPromptOpen(false)}
+    />
+  ) : null;
+
+  const aiContextEl = !isRealStrategy && !generation.generating
+    ? <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
+    : null;
+
+  const localSeoEl = (
+    <LocalSeoVisibilityPanel
+      workspaceId={workspaceId}
+      mode="strategy"
+      onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+    />
+  );
+
+  const feedbackNudgeEl = metrics.feedbackNewerThanStrategy ? (
+    <StrategyFeedbackNudge
+      requestedCount={metrics.requestedFeedback.length}
+      declinedCount={metrics.declinedFeedback.length}
+    />
+  ) : null;
+
+  const settingsEl = (
+    <StrategySettings
+      workspaceId={workspaceId}
+      isAuxLoading={isAuxLoading}
+      settingsOpen={settings.settingsOpen}
+      setSettingsOpen={settings.setSettingsOpen}
+      seoDataAvailable={settings.seoDataAvailable}
+      seoDataMode={settings.seoDataMode}
+      setSeoDataMode={settings.setSeoDataMode}
+      maxPages={settings.maxPages}
+      setMaxPages={settings.setMaxPages}
+      competitors={settings.competitors}
+      setCompetitors={settings.setCompetitors}
+      businessContext={settings.businessContext}
+      setBusinessContext={settings.setBusinessContext}
+      contextOpen={settings.contextOpen}
+      setContextOpen={settings.setContextOpen}
+      discoveringCompetitors={settings.discoveringCompetitors}
+      discoverError={settings.discoverError}
+      onDiscoverCompetitors={settings.discoverCompetitors}
+    />
+  );
+
+  const intelligenceSignalsEl = <IntelligenceSignals workspaceId={workspaceId} />;
+
+  const progressEl = (
+    <ProgressIndicator
+      status={generation.generating ? 'running' : 'idle'}
+      step={generation.activeStrategyJob?.message || (generation.startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
+      percent={generation.activeStrategyJob?.total ? Math.round(((generation.activeStrategyJob.progress ?? 0) / generation.activeStrategyJob.total) * 100) : undefined}
+    />
+  );
+
+  const errorEl = generation.error ? (
+    <ErrorState
+      type="general"
+      title="Strategy Generation Failed"
+      message={generation.error}
+      action={{ label: 'Try Again', onClick: () => generation.generateStrategy('full') }}
+    />
+  ) : null;
+
+  const nextStepsEl = generation.showNextSteps && isRealStrategy && !generation.generating ? (
+    <NextStepsCard
+      title="Strategy ready"
+      variant="success"
+      onDismiss={() => generation.setShowNextSteps(false)}
+      staggerIndex={0}
+      steps={[
+        {
+          label: 'Review Quick Wins',
+          onClick: () => { generation.setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
+          estimatedTime: '2 min',
+        },
+      ]}
+    />
+  ) : null;
+
+  const emptyStateEl = !isRealStrategy && !generation.generating ? <StrategyEmptyState /> : null;
+
+  // Client keyword feedback: the legacy layout shows the combined card; the bands layout hoists
+  // the requested-keyword triage into the Decide band and shows the declined log (only) in Reference.
+  const clientFeedbackCombinedEl = (
+    <ClientKeywordFeedback
+      rows={feedback.rows}
+      requested={metrics.requestedFeedback}
+      declined={metrics.declinedFeedback}
+      approved={metrics.approvedFeedback}
+      addPending={feedback.addPending}
+      addError={feedback.addError}
+      onAdd={feedback.addRequestedKeyword}
+      onDismissError={() => feedback.setAddError(null)}
+    />
+  );
+  const clientFeedbackDeclinedEl = (
+    <ClientKeywordFeedback
+      rows={feedback.rows}
+      requested={metrics.requestedFeedback}
+      declined={metrics.declinedFeedback}
+      approved={metrics.approvedFeedback}
+      addPending={feedback.addPending}
+      addError={feedback.addError}
+      onAdd={feedback.addRequestedKeyword}
+      onDismissError={() => feedback.setAddError(null)}
+      showRequested={false}
+    />
+  );
+  const requestedTriageEl = (
+    <RequestedKeywordTriage
+      requested={metrics.requestedFeedback}
+      addPending={feedback.addPending}
+      addError={feedback.addError}
+      onAdd={feedback.addRequestedKeyword}
+      onDismissError={() => feedback.setAddError(null)}
+    />
+  );
+
+  // Real-strategy leaf elements — identical in both layouts; only the grouping/order differs.
+  const realLeaves = isRealStrategy && strategy ? {
+    stalenessNudges: (
+      <StrategyStalenessNudges
+        hasVolumeValidation={metrics.hasVolumeValidation}
+        localSyncApplies={!!localSync?.applies}
+        strategyStaleVsLocal={!!localSync?.strategyStaleVsLocal}
+        lastLocalRefreshAt={localSync?.lastLocalRefreshAt}
+        lastStrategyGeneratedAt={localSync?.lastStrategyGeneratedAt}
+        dismissedRefreshAt={generation.dismissedRefreshAt}
+        onDismiss={() => generation.setDismissedRefreshAt(localSync?.lastLocalRefreshAt ?? null)}
+        onGenerate={() => generation.generateStrategy('full')}
+      />
+    ),
+    statGrid: (
+      <StrategyStatGrid
+        filteredPageMap={metrics.filteredPageMap}
+        totalPageCount={strategy.pageMap?.length ?? 0}
+        totalImpressions={metrics.totalImpressions}
+        totalClicks={metrics.totalClicks}
+        ranked={metrics.ranked}
+        avgPos={metrics.avgPos}
+      />
+    ),
+    distribution: (
+      <RankingDistribution
+        filteredPageMap={metrics.filteredPageMap}
+        ranked={metrics.ranked}
+        top3={metrics.top3}
+        top10={metrics.top10}
+        top20={metrics.top20}
+        beyond20={metrics.beyond20}
+        notRankingCount={metrics.notRankingCount}
+        intentCounts={metrics.intentCounts}
+      />
+    ),
+    quickWins: (
+      <div id="quick-wins-section">
+        <QuickWins quickWins={strategy.quickWins ?? []} />
+      </div>
+    ),
+    lhf: <LowHangingFruit pages={metrics.lowHangingFruit} />,
+    contentGaps: <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />,
+    keywordGaps: (
+      <KeywordGaps
+        keywordGaps={strategy.keywordGaps || []}
+        difficultyColor={kdColor}
+        workspaceId={workspaceId}
+        navigate={navigate}
+      />
+    ),
+    topicClusters: strategy.topicClusters && strategy.topicClusters.length > 0
+      ? <TopicClusters clusters={strategy.topicClusters} />
+      : null,
+    cannibalization: strategy.cannibalization && strategy.cannibalization.length > 0
+      ? <CannibalizationAlert entries={strategy.cannibalization} />
+      : null,
+    strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
+    backlink: <BacklinkProfile workspaceId={workspaceId} />,
+    competitive: (
+      <CompetitiveIntel
+        workspaceId={workspaceId}
+        competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
+        seoDataAvailable={settings.seoDataAvailable}
+        cachedKeywordGaps={strategy?.keywordGaps}
+      />
+    ),
+    siteKeywords: (
+      <SiteTargetKeywords
+        workspaceId={workspaceId}
+        siteKeywords={strategy.siteKeywords}
+        siteKeywordMetrics={strategy.siteKeywordMetrics}
+        trackedKeywords={tracking.trackedKeywords}
+        trackingPending={tracking.trackingPending}
+        trackingErrors={tracking.trackingErrors}
+        onTrack={tracking.trackKeyword}
+      />
+    ),
+    opportunities: <KeywordOpportunities opportunities={strategy.opportunities} />,
+    howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
+  } : null;
+
+  // ── Decision-bands layout (flag ON) ──
+  const bandsAnalysis = (
+    <div className="space-y-8">
+      {headerEl}
+      {refreshPromptEl}
+      {aiContextEl}
+      {localSeoEl}
+      <StrategyBand label="Decide" first>
+        {feedbackNudgeEl}
+        {metrics.requestedFeedback.length > 0 && requestedTriageEl}
+        {settingsEl}
+      </StrategyBand>
+      {progressEl}
+      {errorEl}
+      {nextStepsEl}
+      {emptyStateEl}
+      {realLeaves && (
+        <>
+          {realLeaves.stalenessNudges}
+          <StrategyBand label="Act">
+            {realLeaves.contentGaps}
+            {realLeaves.quickWins}
+            {realLeaves.lhf}
+            {realLeaves.keywordGaps}
+            {realLeaves.cannibalization}
+            {realLeaves.strategyDiff}
+          </StrategyBand>
+          <StrategyBand label="Reference">
+            {realLeaves.statGrid}
+            {realLeaves.distribution}
+            {realLeaves.topicClusters}
+            {realLeaves.backlink}
+            {realLeaves.competitive}
+            {realLeaves.siteKeywords}
+            {realLeaves.opportunities}
+            {clientFeedbackDeclinedEl}
+            {intelligenceSignalsEl}
+            {realLeaves.howItWorks}
+          </StrategyBand>
+        </>
+      )}
+    </div>
+  );
+
+  // ── Legacy sequential layout (flag OFF) — byte-identical to pre-flag ──
+  const legacyAnalysis = (
+    <div className="space-y-8">
+      {headerEl}
+      {refreshPromptEl}
+      {aiContextEl}
+      {localSeoEl}
+      {feedbackNudgeEl}
+      {clientFeedbackCombinedEl}
+      {settingsEl}
+      {intelligenceSignalsEl}
+      {progressEl}
+      {errorEl}
+      {nextStepsEl}
+      {emptyStateEl}
+      {realLeaves && (
+        <>
+          {realLeaves.stalenessNudges}
+          {realLeaves.statGrid}
+          {realLeaves.distribution}
+          {realLeaves.quickWins}
+          {realLeaves.lhf}
+          {realLeaves.contentGaps}
+          {realLeaves.keywordGaps}
+          {/* ── Reference & Analysis ── */}
+          <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
+            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
+            <div className="flex-1 border-t border-[var(--brand-border)]" />
+          </div>
+          {realLeaves.topicClusters}
+          {realLeaves.cannibalization}
+          {realLeaves.strategyDiff}
+          {realLeaves.backlink}
+          {realLeaves.competitive}
+          {realLeaves.siteKeywords}
+          {realLeaves.opportunities}
+          {realLeaves.howItWorks}
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-8">
       {/* tab-deeplink-ok: KeywordStrategy is not a direct navigation target for ?tab= */}
@@ -114,244 +465,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')}
       />
       {strategyTab === 'guide' && <KeywordStrategyGuide />}
-      {strategyTab === 'analysis' && <div className="space-y-8">
-        <PageHeader
-          title="Keyword Strategy"
-          subtitle={
-            isRealStrategy
-              ? `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`
-              : 'AI-powered keyword mapping for your entire site'
-          }
-          icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
-          actions={
-            <StrategyHeaderActions
-              isRealStrategy={isRealStrategy}
-              generating={generation.generating}
-              localSyncApplies={!!localSync?.applies}
-              localNeedsRefresh={!!localSync?.localNeedsRefresh}
-              refreshPending={generation.refresh.isPending}
-              onIncremental={() => generation.generateStrategy('incremental')}
-              onFullRefresh={() => generation.refresh.mutate({
-                thenRegenerateStrategy: true,
-                strategyGeneration: settings.buildStrategyGenerationParams(),
-              })}
-              onGenerate={() => generation.generateStrategy('full')}
-            />
-          }
-        />
-
-        {/* Refresh ordering prompt — opens when Generate is clicked and local data needs refresh */}
-        {localSync?.applies && localSync.localNeedsRefresh && (
-          <RefreshOrderingPrompt
-            open={generation.refreshOrderingPromptOpen}
-            reason={localSync.localNeedsRefreshReason ?? 'stale'}
-            lastLocalRefreshAt={localSync.lastLocalRefreshAt}
-            onFullRefresh={() => {
-              generation.refresh.mutate({
-                thenRegenerateStrategy: true,
-                strategyGeneration: settings.buildStrategyGenerationParams(),
-              });
-              generation.setRefreshOrderingPromptOpen(false);
-            }}
-            onGenerateAnyway={() => {
-              generation.setRefreshOrderingPromptOpen(false);
-              void generation.runStartJob('full');
-            }}
-            onCancel={() => generation.setRefreshOrderingPromptOpen(false)}
-          />
-        )}
-
-        {!isRealStrategy && !generation.generating && (
-          <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
-        )}
-
-        <LocalSeoVisibilityPanel
-          workspaceId={workspaceId}
-          mode="strategy"
-          onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
-        />
-
-        {metrics.feedbackNewerThanStrategy && (
-          <StrategyFeedbackNudge
-            requestedCount={metrics.requestedFeedback.length}
-            declinedCount={metrics.declinedFeedback.length}
-          />
-        )}
-
-        <ClientKeywordFeedback
-          rows={feedback.rows}
-          requested={metrics.requestedFeedback}
-          declined={metrics.declinedFeedback}
-          approved={metrics.approvedFeedback}
-          addPending={feedback.addPending}
-          addError={feedback.addError}
-          onAdd={feedback.addRequestedKeyword}
-          onDismissError={() => feedback.setAddError(null)}
-        />
-
-        <StrategySettings
-          workspaceId={workspaceId}
-          isAuxLoading={isAuxLoading}
-          settingsOpen={settings.settingsOpen}
-          setSettingsOpen={settings.setSettingsOpen}
-          seoDataAvailable={settings.seoDataAvailable}
-          seoDataMode={settings.seoDataMode}
-          setSeoDataMode={settings.setSeoDataMode}
-          maxPages={settings.maxPages}
-          setMaxPages={settings.setMaxPages}
-          competitors={settings.competitors}
-          setCompetitors={settings.setCompetitors}
-          businessContext={settings.businessContext}
-          setBusinessContext={settings.setBusinessContext}
-          contextOpen={settings.contextOpen}
-          setContextOpen={settings.setContextOpen}
-          discoveringCompetitors={settings.discoveringCompetitors}
-          discoverError={settings.discoverError}
-          onDiscoverCompetitors={settings.discoverCompetitors}
-        />
-
-        <IntelligenceSignals workspaceId={workspaceId} />
-
-        {/* Progress Indicator */}
-        <ProgressIndicator
-          status={generation.generating ? 'running' : 'idle'}
-          step={generation.activeStrategyJob?.message || (generation.startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
-          percent={generation.activeStrategyJob?.total ? Math.round(((generation.activeStrategyJob.progress ?? 0) / generation.activeStrategyJob.total) * 100) : undefined}
-        />
-
-        {generation.error && (
-          <ErrorState
-            type="general"
-            title="Strategy Generation Failed"
-            message={generation.error}
-            action={{ label: 'Try Again', onClick: () => generation.generateStrategy('full') }}
-          />
-        )}
-
-        {generation.showNextSteps && isRealStrategy && !generation.generating && (
-          <NextStepsCard
-            title="Strategy ready"
-            variant="success"
-            onDismiss={() => generation.setShowNextSteps(false)}
-            staggerIndex={0}
-            steps={[
-              {
-                label: 'Review Quick Wins',
-                onClick: () => { generation.setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
-                estimatedTime: '2 min',
-              },
-            ]}
-          />
-        )}
-
-        {!isRealStrategy && !generation.generating && <StrategyEmptyState />}
-
-        {isRealStrategy && strategy && (
-          <>
-            <StrategyStalenessNudges
-              hasVolumeValidation={metrics.hasVolumeValidation}
-              localSyncApplies={!!localSync?.applies}
-              strategyStaleVsLocal={!!localSync?.strategyStaleVsLocal}
-              lastLocalRefreshAt={localSync?.lastLocalRefreshAt}
-              lastStrategyGeneratedAt={localSync?.lastStrategyGeneratedAt}
-              dismissedRefreshAt={generation.dismissedRefreshAt}
-              onDismiss={() => generation.setDismissedRefreshAt(localSync?.lastLocalRefreshAt ?? null)}
-              onGenerate={() => generation.generateStrategy('full')}
-            />
-
-            {/* ── Summary Dashboard ── */}
-            <StrategyStatGrid
-              filteredPageMap={metrics.filteredPageMap}
-              totalPageCount={strategy.pageMap?.length ?? 0}
-              totalImpressions={metrics.totalImpressions}
-              totalClicks={metrics.totalClicks}
-              ranked={metrics.ranked}
-              avgPos={metrics.avgPos}
-            />
-
-            {/* ── Performance Tiers Bar ── */}
-            <RankingDistribution
-              filteredPageMap={metrics.filteredPageMap}
-              ranked={metrics.ranked}
-              top3={metrics.top3}
-              top10={metrics.top10}
-              top20={metrics.top20}
-              beyond20={metrics.beyond20}
-              notRankingCount={metrics.notRankingCount}
-              intentCounts={metrics.intentCounts}
-            />
-
-            {/* ── Quick Wins ── */}
-            <div id="quick-wins-section">
-              <QuickWins quickWins={strategy.quickWins ?? []} />
-            </div>
-
-            {/* ── Low-Hanging Fruit ── */}
-            <LowHangingFruit pages={metrics.lowHangingFruit} />
-
-            {/* ── Content Gaps ── */}
-            <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
-
-            {/* Keyword Gaps */}
-            <KeywordGaps
-              keywordGaps={strategy.keywordGaps || []}
-              difficultyColor={kdColor}
-              workspaceId={workspaceId}
-              navigate={navigate}
-            />
-
-            {/* ── Reference & Analysis ── */}
-            <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
-              <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
-              <div className="flex-1 border-t border-[var(--brand-border)]" />
-            </div>
-
-            {/* ── Topical Authority ── */}
-            {strategy.topicClusters && strategy.topicClusters.length > 0 && (
-              <TopicClusters clusters={strategy.topicClusters} />
-            )}
-
-            {/* ── Cannibalization Alert ── */}
-            {strategy.cannibalization && strategy.cannibalization.length > 0 && (
-              <CannibalizationAlert entries={strategy.cannibalization} />
-            )}
-
-            {/* ── What Changed (Strategy Diff) ── */}
-            <StrategyDiff workspaceId={workspaceId} />
-
-            {/* Backlink Profile */}
-            <BacklinkProfile workspaceId={workspaceId} />
-
-            {/* Competitive Intelligence Hub */}
-            <CompetitiveIntel
-              workspaceId={workspaceId}
-              competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-              seoDataAvailable={settings.seoDataAvailable}
-              cachedKeywordGaps={strategy?.keywordGaps}
-            />
-
-            {/* ── Site Keywords ── */}
-            <SiteTargetKeywords
-              workspaceId={workspaceId}
-              siteKeywords={strategy.siteKeywords}
-              siteKeywordMetrics={strategy.siteKeywordMetrics}
-              trackedKeywords={tracking.trackedKeywords}
-              trackingPending={tracking.trackingPending}
-              trackingErrors={tracking.trackingErrors}
-              onTrack={tracking.trackKeyword}
-            />
-
-            {/* ── Opportunities ── */}
-            <KeywordOpportunities opportunities={strategy.opportunities} />
-
-            {/* How it works */}
-            <StrategyHowItWorks
-              displayedSeoDataMode={displayedSeoDataMode}
-              hasAnyRanking={metrics.hasAnyRanking}
-            />
-          </>
-        )}
-      </div>}
+      {strategyTab === 'analysis' && (decisionBandsEnabled ? bandsAnalysis : legacyAnalysis)}
     </div>
   );
 }
