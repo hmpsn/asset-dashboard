@@ -99,7 +99,8 @@ src/components/strategy/
 **Decomposition principles**
 - Each leaf takes a consistent prop shape (`{ workspaceId, strategy, ... }`) so leaves are interchangeable slot contents.
 - The orchestrator owns data fetching (`useKeywordStrategy`) and passes down; leaves do their own scoped queries only where they already do (these get migrated off hand-rolled `useState+useEffect+fetch` to React Query — `StrategyDiff`, `BacklinkProfile`).
-- Existing `src/components/strategy/*` files are moved into band folders, not rewritten, in Phase 0.
+- **Phase 0 is flat extraction** under `src/components/strategy/` in the *current* render order (pure mechanical extract: inline JSX → leaf components, cohesive logic → hooks). **Phase 1** introduces the `bands/` containers and moves leaves into the `decide/ act/ reference` folders as part of the reorder — this keeps the behavior-preserving extraction diff cleanly separate from the IA categorization decision (a few components' band assignment is itself a Phase-1 design call).
+- Cohesive orchestrator logic is extracted into hooks so the orchestrator becomes genuinely thin (not "dumb leaves + a still-fat parent"): `useStrategyMetrics` (derived page/feedback metrics), `useStrategySettings` (settings state + sync effects + `buildStrategyGenerationParams`), `useStrategyGeneration` (job orchestration), `useTrackKeyword` (tracking state), `useKeywordFeedback` (rows + add-to-strategy mutation).
 
 ---
 
