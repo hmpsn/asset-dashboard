@@ -37,6 +37,7 @@ import {
   KeywordOpportunities,
   StrategyHowItWorks,
   StrategyBand,
+  DecisionQueue,
   RequestedKeywordTriage,
   buildStrategySummaryLine,
 } from './strategy';
@@ -378,6 +379,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {aiContextEl}
       {localSeoEl}
       <StrategyBand label="Decide" first>
+        <DecisionQueue workspaceId={workspaceId} />
         {feedbackNudgeEl}
         {metrics.requestedFeedback.length > 0 && requestedTriageEl}
         {settingsEl}
