@@ -46,6 +46,7 @@ export interface PersistKeywordStrategyOptions {
   questionKeywords: QuestionKeywordGroup[];
   businessContext: string;
   seoDataMode: KeywordStrategySeoDataMode;
+  maxPages?: number;
   seoDataStatus: SeoDataStatus;
   searchData: Pick<KeywordStrategySearchData, 'deviceBreakdown' | 'countryBreakdown' | 'periodComparison' | 'organicLandingPages' | 'organicOverview'>;
 }
@@ -69,6 +70,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords,
     businessContext,
     seoDataMode,
+    maxPages,
     seoDataStatus,
     searchData,
   } = options;
@@ -115,6 +117,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords: questionKeywords.length > 0 ? questionKeywords : undefined,
     businessContext: businessContext || undefined,
     seoDataMode,
+    maxPages: maxPages != null ? maxPages : undefined,
     seoDataStatus,
     // Enriched search signals
     searchSignals: {

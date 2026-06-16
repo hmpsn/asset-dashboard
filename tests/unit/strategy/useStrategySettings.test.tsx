@@ -24,4 +24,32 @@ describe('useStrategySettings', () => {
     await act(async () => { await result.current.discoverCompetitors(); });
     await waitFor(() => expect(result.current.competitors).toContain('rival.com'));
   });
+
+  it('settingsOpen defaults to open (legacy flag-off parity)', () => {
+    const { result } = renderHook(() => useStrategySettings(undefined, null, 'ws1'));
+    expect(result.current.settingsOpen).toBe(true);
+  });
+
+  it('settingsOpen starts collapsed when collapsedByDefault is true (decision-bands layout)', () => {
+    const { result } = renderHook(() => useStrategySettings(undefined, null, 'ws1', true));
+    expect(result.current.settingsOpen).toBe(false);
+  });
+
+  it('hydrates maxPages from strategy on mount', async () => {
+    const strategy = { businessContext: '', seoDataMode: 'quick' as const, maxPages: 250 };
+    const { result } = renderHook(() => useStrategySettings(undefined, strategy, 'ws1'));
+    await waitFor(() => expect(result.current.maxPages).toBe(250));
+  });
+
+  it('does not clobber an in-session seoDataMode change on a background strategy refetch', async () => {
+    const { result, rerender } = renderHook(
+      ({ strategy }) => useStrategySettings(undefined, strategy, 'ws1'),
+      { initialProps: { strategy: { seoDataMode: 'quick' as const } } },
+    );
+    await waitFor(() => expect(result.current.seoDataMode).toBe('quick'));
+    act(() => result.current.setSeoDataMode('full'));
+    // A background refetch returns a NEW strategy object identity still carrying 'quick'.
+    rerender({ strategy: { seoDataMode: 'quick' as const } });
+    expect(result.current.seoDataMode).toBe('full');
+  });
 });

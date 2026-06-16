@@ -363,6 +363,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           questionKeywords: existingStrategy?.questionKeywords ?? allQuestionKws,
           businessContext,
           seoDataMode,
+          maxPages: maxPagesParam,
           seoDataStatus,
           searchData: {
             deviceBreakdown,
@@ -560,6 +561,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       questionKeywords: enrichmentQuestionKeywords,
       businessContext,
       seoDataMode,
+      maxPages: maxPagesParam,
       seoDataStatus,
       searchData: {
         deviceBreakdown,

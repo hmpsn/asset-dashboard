@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { keywords } from '../../../api/seo';
 
 type SeoProviderOption = { name: string; configured: boolean };
@@ -25,12 +25,19 @@ interface KeywordDataShape {
 interface StrategyShape {
   businessContext?: string;
   seoDataMode?: 'none' | 'quick' | 'full';
+  maxPages?: number;
 }
 
 export function useStrategySettings(
   keywordData: KeywordDataShape | undefined,
   strategy: StrategyShape | null,
   workspaceId: string,
+  /**
+   * Collapse the Settings panel initially. Defaults to false (open) to preserve the legacy
+   * flag-off layout byte-identically; the decision-bands layout passes true so Settings starts
+   * collapsed in the Decide band.
+   */
+  collapsedByDefault = false,
 ) {
   const seoDataAvailableFromHook = keywordData?.seoDataAvailable || false;
   const savedSeoDataProvider = keywordData?.workspaceData?.seoDataProvider;
@@ -43,7 +50,7 @@ export function useStrategySettings(
   const [competitors, setCompetitors] = useState('');
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(collapsedByDefault ? false : true);
 
   // Derive providerList before selectedSeoDataProvider so the computed value has access to it
   const providerList = keywordData?.providers ?? [];
@@ -69,6 +76,11 @@ export function useStrategySettings(
     }
   }, [keywordData?.workspaceData?.competitorDomains, competitors]);
 
+  // Track whether each strategy-derived setting has been hydrated once, so a
+  // background refetch (new strategy object identity) never clobbers an in-session user edit.
+  const maxPagesHydratedRef = useRef(false);
+  const seoDataModeHydratedRef = useRef(false);
+
   // Sync business context + competitors from loaded strategy
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally reacts to strategy object identity; checking individual fields would cause stale-closure issues with businessContext set-once guard
   useEffect(() => {
@@ -76,8 +88,13 @@ export function useStrategySettings(
       setBusinessContext(strategy.businessContext);
     }
     const savedSeoDataMode = strategy?.seoDataMode;
-    if (savedSeoDataMode && savedSeoDataMode !== 'none') {
+    if (savedSeoDataMode && savedSeoDataMode !== 'none' && !seoDataModeHydratedRef.current) {
       setSeoDataMode(savedSeoDataMode);
+      seoDataModeHydratedRef.current = true;
+    }
+    if (strategy?.maxPages != null && !maxPagesHydratedRef.current) {
+      setMaxPages(strategy.maxPages);
+      maxPagesHydratedRef.current = true;
     }
   }, [strategy]);
 

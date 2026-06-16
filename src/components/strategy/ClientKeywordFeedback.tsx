@@ -3,16 +3,18 @@ import { Badge, SectionCard, Icon, Button, InlineBanner } from '../ui';
 import type { ClientKeywordFeedbackProps } from './types';
 import { formatDate } from '../../utils/formatDates';
 
-export function ClientKeywordFeedback({
-  rows,
-  requested,
-  declined,
-  approved,
-  addPending,
-  addError,
-  onAdd,
-  onDismissError,
-}: ClientKeywordFeedbackProps) {
+export function ClientKeywordFeedback(props: ClientKeywordFeedbackProps) {
+  const {
+    rows,
+    requested,
+    declined,
+    approved,
+    addPending,
+    addError,
+    onAdd,
+    onDismissError,
+    showRequested = true,
+  } = props;
   return (
     <SectionCard
       title="Client Keyword Feedback"
@@ -23,7 +25,7 @@ export function ClientKeywordFeedback({
         </span>
       )}
     >
-      {addError && (
+      {showRequested && addError && (
         <InlineBanner
           size="sm"
           className="mb-3"
@@ -39,7 +41,7 @@ export function ClientKeywordFeedback({
         </p>
       ) : (
         <div className="space-y-4">
-          {requested.length > 0 && (
+          {showRequested && requested.length > 0 && (
             <div className="space-y-2">
               <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Requested by client</p>
               {requested.map((item) => (
@@ -72,7 +74,7 @@ export function ClientKeywordFeedback({
           )}
           {declined.length > 0 ? (
             <div className="space-y-2">
-              {requested.length > 0 && (
+              {showRequested && requested.length > 0 && (
                 <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Declined by client</p>
               )}
               {declined.slice(0, 12).map((item) => (
