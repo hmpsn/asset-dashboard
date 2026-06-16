@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **504 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **505 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 505. Strategy Page — Cannibalization Triage Queue + Fix-in-Editor (Phase 3a, behind `strategy-decision-bands`)
+
+**What it does:** Replaces the passive "Keyword Cannibalization Detected" alert (in the decision-bands Act band only) with an actionable triage queue. Each issue shows the competing pages with the **keeper** marked (the canonical page, or the best-ranking page when no canonical is set) and every **duplicate** carrying a one-click **Fix in editor** CTA that opens the SEO Editor focused on that page. To make the focus work, the SEO Editor's prefill effect was corrected to activate on a page slug (it previously required a Webflow page id that no caller supplied, so the prefill was dead for every "open editor for this page" CTA — Page Intelligence and the broken-link panel included). The legacy (flag-off) layout and the Content Pipeline keep the original passive alert untouched.
+
+**Agency value:** Cannibalization stops being a thing you read and becomes a thing you fix — one click from each duplicate page to the editor that resolves it. Fixing the long-broken slug-based editor prefill also makes every existing "open editor for page X" jump land on the right page.
+
+**Client value:** Indirect — faster, more accurate consolidation of competing pages protects the client's ranking power for the affected keywords.
+
+**Mutual:** Reuses the existing cannibalization detection (the `cannibalization_issues` store) and the shared `fixContext` deep-link contract; no new data or AI spend. Resolution tracking + send-to-client are Phase 3b.
+
+**Files:** `src/components/strategy/CannibalizationTriage.tsx`, `src/components/strategy/types.ts`, `src/components/strategy/index.ts`, `src/components/editor/useSeoEditorSessionState.ts` (prefill-gate fix), `src/components/KeywordStrategy.tsx`. Tests: `tests/unit/strategy/CannibalizationTriage.test.tsx`, `tests/unit/seoEditorPrefillGate.test.ts`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3a-cannibalization-triage.md`.
 
 ---
 

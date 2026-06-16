@@ -27,7 +27,12 @@ export function useSeoEditorSessionState({
   fixContext,
 }: UseSeoEditorSessionStateParams) {
   const restoredFromCache = useRef(false);
-  const fixConsumed = useRef(false);
+  // The last fixContext target we auto-expanded. Keyed (not a once-per-mount boolean) so a NEW
+  // fixContext target re-fires the prefill — the editor is mounted with a workspace-stable key and
+  // does not remount, so a triage queue's successive "Fix in editor" jumps (page A, then page B)
+  // must each expand their target. location.state is cleared after consumption (App.tsx), so the
+  // prop only changes on a fresh navigation — no back/forward re-trigger.
+  const lastFixKey = useRef<string | null>(null);
 
   const [edits, setEdits] = useState<Record<string, SeoEditState>>(() => {
     const cached = readCachedSeoEdits(siteId);
@@ -62,14 +67,15 @@ export function useSeoEditorSessionState({
 
   // effect-layout-ok -- this sync is intentionally post-paint because it scrolls the target element.
   useEffect(() => {
-    if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
+    const fixKey = fixContext?.pageId || fixContext?.pageSlug;
+    if (fixKey && fixContext?.targetRoute === 'seo-editor' && pages.length > 0 && lastFixKey.current !== fixKey) {
       const match = pages.find(p =>
         p.id === fixContext.pageId ||
         p.slug === fixContext.pageSlug ||
         (fixContext.pageSlug ? matchPageIdentity(p.publishedPath || p.slug || '', fixContext.pageSlug) : false)
       );
       if (match) {
-        fixConsumed.current = true;
+        lastFixKey.current = fixKey;
         setExpanded(new Set([match.id]));
         setTimeout(() => {
           const el = document.getElementById(`seo-editor-page-${match.id}`);

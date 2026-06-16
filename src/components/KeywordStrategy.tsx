@@ -42,6 +42,7 @@ import {
   OpportunitiesList,
   DecayingPagesCard,
   LostQueryRecoveryCard,
+  CannibalizationTriage,
   buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
@@ -354,6 +355,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     cannibalization: strategy.cannibalization && strategy.cannibalization.length > 0
       ? <CannibalizationAlert entries={strategy.cannibalization} />
       : null,
+    // Act band (decision-bands layout only): actionable triage queue. Legacy keeps cannibalization above.
+    cannibalizationTriage: strategy.cannibalization && strategy.cannibalization.length > 0
+      ? <CannibalizationTriage entries={strategy.cannibalization} workspaceId={workspaceId} />
+      : null,
     strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
     backlink: <BacklinkProfile workspaceId={workspaceId} />,
     competitive: (
@@ -405,7 +410,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.decayingPages}
             {realLeaves.lostQueries}
             {realLeaves.keywordGaps}
-            {realLeaves.cannibalization}
+            {realLeaves.cannibalizationTriage}
             {realLeaves.strategyDiff}
           </StrategyBand>
           <StrategyBand label="Reference">

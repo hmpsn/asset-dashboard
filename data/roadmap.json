@@ -43,9 +43,19 @@
           "source": "Strategy redesign spec 2026-06-16",
           "est": "M-L",
           "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-16",
+          "notes": "Done 2026-06-16 (PR #1251, merged to staging). OpportunitiesList merges Quick Wins + Low-Hanging Fruit (dedup by pagePath) with per-row Optimize-page CTAs; StrategyDiff migrated to useQuery (refetches on strategy:updated) with navigating nextAction CTAs (watch/review_evidence stay passive); new DecayingPagesCard (useContentDecay) + LostQueryRecoveryCard (useLostVisibility). Shared content-decay types promoted to shared/types/content-decay.ts. Scaled review caught + fixed a track_keyword dead-CTA. Bands Act band only; legacy layout untouched. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-2-act-band.md."
+        },
+        {
+          "id": "strategy-redesign-phase-3a-cannibalization-triage",
+          "title": "Phase 3a — Cannibalization triage UI + Fix-in-Editor CTA (read-only)",
+          "source": "Strategy redesign spec 2026-06-16",
+          "est": "M",
+          "priority": "P2",
           "status": "in_progress",
           "createdAt": "2026-06-16",
-          "notes": "PR opening to staging. OpportunitiesList merges Quick Wins + Low-Hanging Fruit (dedup by pagePath) with per-row Optimize-page CTAs; StrategyDiff migrated to useQuery (refetches on strategy:updated) with navigating nextAction CTAs (watch/review_evidence stay passive); new DecayingPagesCard (useContentDecay) + LostQueryRecoveryCard (useLostVisibility). Shared content-decay types promoted to shared/types/content-decay.ts. Bands Act band only; legacy layout untouched. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-2-act-band.md."
+          "notes": "PR opening to staging. New CannibalizationTriage leaf replaces the passive CannibalizationAlert in the bands Act band only (legacy + ContentPipeline keep CannibalizationAlert). Per issue: keeper page marked (canonicalPath or best position), each duplicate gets a Fix-in-editor CTA → seo-editor prefilled by pageSlug. Relaxed the SEO-editor prefill gate (useSeoEditorSessionState) to fire on pageId||pageSlug (slug-fallback match already existed; also fixes latent no-prefill for PageIntelligence + DeadLinkPanel). Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3a-cannibalization-triage.md. Phase 3b (Mark-resolved cannibalization_resolved outcome + Send-to-client via dedicated 'cannibalization' client-action type) follows."
         }
       ]
     },
