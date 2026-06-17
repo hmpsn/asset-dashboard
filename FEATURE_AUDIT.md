@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **509 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **510 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 510. Strategy Page — Reference Band: compact stats, click-to-Hub distribution, help disclosure (Phase 4c, behind `strategy-decision-bands`)
+
+**What it does:** Finishes the Strategy "Reference" band — the demoted, below-the-fold context band of the decision-first IA. The four hero stat cards compress to one slim **CompactStatBar** (the stats are reference, not headline). The **Ranking Distribution** chart's "11–20" (striking-distance) segment becomes a one-click deep-link into the Keyword Hub's striking-distance view — the one position band with a real filter destination — which also fixed a latent bug where the Hub deep-link helper silently dropped the `striking_distance` segment (the sender's allowed set had omitted a segment the Hub actually honors). And the standalone **Guide tab** is demoted into a single collapsible **"How it works & metric glossary"** disclosure at the foot of the band, consolidating the previously triplicated help prose and dropping a stale "Rank Tracker" reference (a feature retired in the Keyword Hub cutover). All flag-gated; the flag-off legacy layout — including the full Guide tab — is byte-identical.
+
+**Agency value:** The Reference band stops competing for attention with the decision/action bands above it — compact stats, a distribution chart that's now a launchpad to the highest-leverage "almost on page 1" keywords, and help that's one disclosure instead of a separate tab plus a duplicated footer.
+
+**Client value:** Indirect — a tighter, less cluttered strategist cockpit means faster, more focused work on the client's rankings.
+
+**Mutual:** Pure presentation + a deep-link-helper correctness fix; reuses the `CompactStatBar` primitive, the `?tab=` Hub deep-link contract, and the existing disclosure pattern. No new data or AI spend.
+
+**Files:** `src/components/strategy/StrategyStatBar.tsx` (new), `src/components/strategy/StrategyHelpDisclosure.tsx` (new), `src/components/strategy/RankingDistribution.tsx` (click-to-filter), `src/lib/keywordHubDeepLink.ts` (striking_distance segment fix), `src/components/strategy/KeywordStrategyGuide.tsx` (glossary export), `src/components/strategy/{types,index}.ts`, `src/components/KeywordStrategy.tsx` (flag-conditional TabBar). Tests: `tests/unit/strategy/{StrategyStatBar,StrategyHelpDisclosure,RankingDistribution}.test.tsx`, `tests/unit/keywordHubDeepLink.test.ts`, `tests/contract/tab-deep-link-wiring.test.ts`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md`.
 
 ---
 
