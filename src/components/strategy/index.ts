@@ -26,3 +26,4 @@ export * from './DecayingPagesCard';
 export * from './LostQueryRecoveryCard';
 export * from './CannibalizationTriage';
 export * from './AuthorityAndBacklinks';
+export * from './ManageInHubCard';
