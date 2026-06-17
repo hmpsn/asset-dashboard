@@ -11,6 +11,7 @@ import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
 import { stopDataRetentionCrons } from './data-retention.js';
 import { stopIntelligenceCrons, stopCompetitorMonitoringCron } from './intelligence-crons.js';
+import { stopInsightRecomputeCron } from './insight-recompute-cron.js';
 import { stopScheduler } from './scheduled-audits.js';
 import { stopApprovalReminders } from './approval-reminders.js';
 import { stopTrialReminders } from './trial-reminders.js';
@@ -121,6 +122,7 @@ function gracefulShutdown(signal: string) {
   stopDataRetentionCrons();
   stopIntelligenceCrons();
   stopCompetitorMonitoringCron();
+  stopInsightRecomputeCron();
   stopScheduler();
   stopApprovalReminders();
   stopTrialReminders();
