@@ -20,6 +20,7 @@ import {
 import { fireBridge } from './bridge-infrastructure.js';
 import { runLostVisibilityBridge } from './bridge-lost-visibility.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('rank-tracking-scheduler');
@@ -88,6 +89,9 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         date,
         queryCount: queries.length,
       });
+      // Phase 5c: fresh rank data lands → refresh signals. No-ops unless the signal-auto-recompute
+      // flag is on; deduped via hasActiveJob (the lost_visibility bridge above owns its own insights).
+      enqueueIntelligenceRecompute(ws.id);
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to capture rank snapshot — skipping workspace');

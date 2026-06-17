@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **511 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **512 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 512. Strategy Page — Automated signal freshness: daily recompute cron + on-mutation refresh (Phase 5c, behind `signal-auto-recompute`)
+
+**What it does:** Closes the loop on signal freshness so intelligence signals stay current without anyone opening the page. A daily, activity-gated cron recomputes a workspace's analytics insights when it has recent activity (within 2 days) and its signals are stale (>24h) — and the same recompute fires on-mutation whenever a strategy is edited, a rank snapshot lands, or content is published. Both paths enqueue the Phase-5b `INTELLIGENCE_RECOMPUTE` background job (deduped, so a burst collapses to one run). Previously nothing recomputed signals automatically — an unviewed workspace silently went stale. Dark-launched behind the `signal-auto-recompute` flag (default OFF) so the per-workspace GSC/GA4 provider cost is validated on staging before rollout.
+
+**Agency value:** Open any workspace and the signals already reflect its latest search reality — no manual refresh, no stale-data surprises — while the activity gate + dedup keep provider spend bounded to workspaces that actually changed.
+
+**Client value:** Indirect — the strategist always works from current data, so the work done on the client's behalf reflects what's happening now, not a days-old snapshot.
+
+**Mutual:** Reuses the 5b recompute job, the existing `hasRecentActivity` cost gate, the 24h staleness throttle (un-forced — fresh workspaces are skipped), and the established cron/start-stop lifecycle. The kill-switch flag makes rollout reversible without a deploy. No new tables.
+
+**Files:** `server/insight-recompute-cron.ts` (new daily cron), `server/intelligence-recompute-job.ts` (`enqueueIntelligenceRecompute` flag-gated + deduped helper), `server/keyword-strategy-follow-ons.ts` + `server/rank-tracking-scheduler.ts` (on-mutation hooks), `server/startup.ts` + `server/index.ts` (start/stop), `shared/types/feature-flags.ts` (`signal-auto-recompute`). Tests: `tests/unit/insight-recompute-cron.test.ts`, `tests/unit/intelligence-recompute-job.test.ts`. Plan: `docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md`.
 
 ---
 

@@ -1,9 +1,26 @@
 import { getOrComputeInsights } from './analytics-intelligence.js';
 import { isProgrammingError } from './errors.js';
-import { getJob, updateJob } from './jobs.js';
+import { getJob, updateJob, createJob, hasActiveJob } from './jobs.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
+import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
 const log = createLogger('intelligence-recompute-job');
+
+/**
+ * Enqueue an automated intelligence recompute for a workspace — the single entry point for the daily
+ * cron (Phase 5c) and the on-mutation triggers (strategy edit / rank snapshot / content publish).
+ *
+ * Gated on the `signal-auto-recompute` flag (default OFF → dark-launched, so the GSC/GA4 cost can be
+ * watched on staging) and deduped via `hasActiveJob` so a burst of triggers collapses to one job.
+ * The manual "Recompute now" route does NOT go through this — it always enqueues regardless of the flag.
+ */
+export function enqueueIntelligenceRecompute(workspaceId: string): void {
+  if (!isFeatureEnabled('signal-auto-recompute')) return;
+  if (hasActiveJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, workspaceId)) return;
+  const job = createJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, { workspaceId, message: 'Refreshing signals...' });
+  setTimeout(() => { void runIntelligenceRecomputeJob(job.id, workspaceId); }, 100);
+}
 
 /**
  * Background worker that recomputes a workspace's analytics insights / intelligence signals.

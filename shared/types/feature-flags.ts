@@ -51,6 +51,10 @@ export const FEATURE_FLAGS = {
   // reorganized admin Strategy layout (and, in Phase 1b, the Decision Queue). OFF = today's
   // sequential layout, byte-identical. See docs/superpowers/specs/2026-06-16-strategy-page-decision-first-redesign-design.md.
   'strategy-decision-bands': false,
+  // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
+  // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
+  // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
+  'signal-auto-recompute': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -273,6 +277,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-16',
     },
   },
+  'signal-auto-recompute': {
+    label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-17',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the daily-cron + on-mutation provider (GSC/GA4) cost is validated acceptable on staging; the flag is then removed and the recompute paths run unconditionally.',
+      linkedRoadmapItemId: 'strategy-redesign-phase-5c-auto-recompute',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-17',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -302,7 +319,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['strategy-decision-bands'],
+    keys: ['strategy-decision-bands', 'signal-auto-recompute'],
   },
 ];
 

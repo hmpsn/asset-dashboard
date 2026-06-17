@@ -4,6 +4,7 @@ import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { hasStrategyOwnedTrackedKeywords, reconcileStrategyRankTracking, summarizeStrategyRankTrackingChangeSet } from './rank-tracking-reconciliation.js';
 import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
 import { queueDelayedRecommendationRegen, RECOMMENDATION_REFRESH_DELAY_MS } from './recommendation-regen-scheduler.js';
+import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 import { createLogger } from './logger.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -75,4 +76,8 @@ export function queueKeywordStrategyPostUpdateFollowOns(options: QueueKeywordStr
   // out of the same resource spike as provider-backed strategy generation makes
   // staging less likely to restart under peak load; recommendations are best-effort.
   queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS);
+
+  // Phase 5c: a strategy/content mutation changes the data insights derive from — refresh signals.
+  // No-ops unless the signal-auto-recompute flag is on; deduped via hasActiveJob.
+  enqueueIntelligenceRecompute(workspaceId);
 }

@@ -11,6 +11,7 @@ import { startAnomalyDetection } from './anomaly-detection.js';
 import { startOutcomeCrons } from './outcome-crons.js';
 import { startDataRetentionCrons } from './data-retention.js';
 import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelligence-crons.js';
+import { startInsightRecomputeCron } from './insight-recompute-cron.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
 import { startBriefingCron } from './briefing-cron.js';
 
@@ -34,6 +35,7 @@ export function startSchedulers() {
   startDataRetentionCrons();
   startIntelligenceCrons();
   startCompetitorMonitoringCron();
+  startInsightRecomputeCron();
   startRankTrackingScheduler();
   startBriefingCron();
 }
