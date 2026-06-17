@@ -210,6 +210,22 @@ export const strategyHistoryPageMapSchema = z.object({
   primaryKeyword: z.string(),
 }).passthrough();
 
+// Prior-snapshot page shape needed to recompute Orient-zone metrics (visibility
+// score + clicks/impressions/position deltas). page_map_json stores the full
+// PageKeywordMap, so these fields are present; this schema types the subset we read.
+export const strategyHistoryOrientPageSchema = z.object({
+  currentPosition: z.number().optional(),
+  volume: z.number().optional(),
+  clicks: z.number().optional(),
+  impressions: z.number().optional(),
+  gscKeywords: z.array(z.object({
+    query: z.string(),
+    clicks: z.number(),
+    impressions: z.number(),
+    position: z.number(),
+  })).optional(),
+}).passthrough();
+
 // ── Personas ──
 
 export const audiencePersonaSchema = z.object({

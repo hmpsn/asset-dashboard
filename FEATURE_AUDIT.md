@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **513 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **514 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 514. Strategy Page — Orient zone: visibility score + trend stats (Phase 1, behind `strategy-command-center`)
+
+**What it does:** Introduces the Strategy v2 "command center" Orient zone — the top-line "where this site sits" glance that replaces the legacy stat grid when the `strategy-command-center` flag is on. A 0–100 **visibility score** (computed server-side from the CTR-decay curve — how much of the site's available, volume-weighted search-click opportunity it actually captures) renders in a `MetricRing` (emerald/amber/red per the score-color law), beside a one-line deterministic verdict and a 4-stat strip (clicks / impressions / ranked keywords / avg position). Each stat carries a delta vs the previous strategy generation, drawn from the `strategy_history` snapshot; the score delta is suppressed when volume coverage flips the weighting mode between snapshots (so a coverage change can't masquerade as a ranking gain), and avg-position deltas read directionally ("improved 0.8" / "slipped 0.8"). Metrics are computed whole-site (every page) — a deliberate top-line semantic, distinct from the legacy grid's volume-thresholded per-card view. Flag-OFF is byte-identical (the legacy grid is untouched).
+
+**Agency value:** Open a workspace and instantly read its search standing — one score, one verdict, four trending stats — instead of assembling it from scattered cards. The foundation the rest of the v2 command center (Act queue, interior tabs) builds on.
+
+**Client value:** Indirect in Phase 1 (admin-only; the score is not yet serialized to client routes). The eventual client Orient (Phase 6) reframes the same data.
+
+**Mutual:** Reuses the OV model's CTR curve (`ctrAt`/`buildCtrCurve`), the `MetricRing`/`CompactStatBar`/`TrendBadge` primitives, and the existing `strategy_history` snapshot for deltas — no new tables, no new dependency. Dark-launched behind `strategy-command-center` (default OFF).
+
+**Files:** `server/keyword-strategy-orient.ts` (new — `buildOrientMetrics` pure + `computeOrientMetrics` DB read), `server/scoring/visibility-score.ts` (Phase 0 helper), `server/schemas/workspace-schemas.ts` (`strategyHistoryOrientPageSchema`), `server/routes/keyword-strategy.ts` (GET attaches `strategyUx.orient`), `shared/types/keyword-strategy-ux.ts` (`OrientMetrics`), `src/components/strategy/OrientZone.tsx` (new), `src/components/KeywordStrategy.tsx` (flag-gated swap of the stat grid). Tests: `tests/unit/keyword-strategy-orient.test.ts`, `tests/unit/scoring/visibility-score.test.ts`, `tests/component/strategy/OrientZone.test.tsx`. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 1).
 
 ---
 

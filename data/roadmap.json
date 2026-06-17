@@ -15,7 +15,7 @@
           "priority": "P2",
           "status": "in_progress",
           "createdAt": "2026-06-17",
-          "notes": "Phase R (bands removal) merged (PR #1266). Phase 0 (strategy-command-center flag + computeVisibilityScore CTR-weighted helper) in progress. Phases: 0 contracts/score → 1 Orient → 2 Act queue → 3 tab shell + Content → 4 Rankings → 5 Competitive → 6 Client reframe → delete legacy."
+          "notes": "Phase R (bands removal, PR #1266) + Phase 0 (strategy-command-center flag + visibility-score helper, PR #1267) merged to staging. Phase 1 (Orient zone — visibility score + trend stats) in progress. Phases: 0 contracts/score → 1 Orient → 2 Act queue → 3 tab shell + Content → 4 Rankings → 5 Competitive → 6 Client reframe → delete legacy."
         }
       ]
     },
