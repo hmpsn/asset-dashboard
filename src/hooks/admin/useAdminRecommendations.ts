@@ -16,12 +16,14 @@ import { get, patch } from '../../api/client.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import type { RecommendationSet, Recommendation } from '../../../shared/types/recommendations.js';
 
-export function useAdminRecommendationSet(workspaceId: string | undefined) {
+export function useAdminRecommendationSet(workspaceId: string | undefined, opts?: { enabled?: boolean }) {
   return useQuery<RecommendationSet>({
     queryKey: queryKeys.admin.recommendations(workspaceId!),
     queryFn: (): Promise<RecommendationSet> =>
       get<RecommendationSet>(`/api/recommendations/${workspaceId}`),
-    enabled: !!workspaceId,
+    // `enabled` lets a caller suppress the fetch entirely (e.g. a flag-gated consumer that must not
+    // add a network request when the flag is off). Defaults to true — existing callers are unaffected.
+    enabled: !!workspaceId && (opts?.enabled ?? true),
     staleTime: 30_000,
   });
 }

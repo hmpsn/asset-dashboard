@@ -6,6 +6,7 @@ import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
+import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendations';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
@@ -33,6 +34,7 @@ import {
   StrategyEmptyState,
   StrategyStatGrid,
   OrientZone,
+  ActQueue,
   RankingDistribution,
   SiteTargetKeywords,
   KeywordOpportunities,
@@ -75,6 +77,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const tracking = useTrackKeyword(workspaceId);
   const feedback = useKeywordFeedback(workspaceId);
   const metrics = useStrategyMetrics(strategy, feedback.rows, isRealStrategy);
+  // The v2 Act queue reads the unified recommendation set (separately generated from the strategy
+  // blob). Read it here too — sharing the React Query cache with ActQueue — to decide whether the
+  // queue actually has content yet; if not, the legacy action sections stay as a fallback. Gated on
+  // the flag so flag-OFF adds NO extra fetch (truly inert).
+  const { data: recommendationSet } = useAdminRecommendationSet(workspaceId, { enabled: commandCenterEnabled });
+  const hasActiveRecommendations = (recommendationSet?.recommendations ?? []).some(
+    (r) => r.status !== 'dismissed' && r.status !== 'completed',
+  );
 
   // intentColor is consumed by ContentGaps — kept in the orchestrator and passed down.
   const intentColor = (intent?: string) => {
@@ -339,6 +349,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const orientEl = commandCenterEnabled && isRealStrategy
     ? <OrientZone orient={strategy?.strategyUx?.orient} />
     : null;
+  // Strategy v2 Act zone — the unified impact-ranked recommendation queue. It replaces the legacy
+  // quick-wins / LHF / content-gaps / keyword-gaps sections (which it already unifies) ONLY once the
+  // recommendation set actually has content. Until then (fresh strategy before regen runs, a
+  // pre-engine workspace, or a fetch error) the legacy sections stay as a fallback so no actionable
+  // content is hidden behind an empty queue.
+  const useActQueue = commandCenterEnabled && isRealStrategy && hasActiveRecommendations;
+  const actQueueEl = useActQueue ? <ActQueue workspaceId={workspaceId} /> : null;
 
   // ── Strategy analysis layout ──
   const legacyAnalysis = (
@@ -359,11 +376,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <>
           {realLeaves.stalenessNudges}
           {orientEl ?? realLeaves.statGrid}
+          {actQueueEl}
           {realLeaves.distribution}
-          {realLeaves.quickWins}
-          {realLeaves.lhf}
-          {realLeaves.contentGaps}
-          {realLeaves.keywordGaps}
+          {useActQueue ? null : (
+            <>
+              {realLeaves.quickWins}
+              {realLeaves.lhf}
+              {realLeaves.contentGaps}
+              {realLeaves.keywordGaps}
+            </>
+          )}
           {/* ── Reference & Analysis ── */}
           <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
             <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
