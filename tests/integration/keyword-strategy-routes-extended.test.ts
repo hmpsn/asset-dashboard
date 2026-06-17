@@ -453,6 +453,40 @@ describe('PATCH /api/webflow/keyword-strategy — error and success paths', () =
     expect(body.opportunities).toEqual(['original opportunity']);
   });
 
+  it('PATCH snapshots the prior strategy boundary so /diff attributes the human edit (Phase 5 #4)', async () => {
+    const wsId = freshWs('PATCH snapshots history boundary');
+    updateWorkspace(wsId, {
+      keywordStrategy: {
+        siteKeywords: ['original keyword'],
+        opportunities: [],
+        generatedAt: '2026-02-01T00:00:00.000Z',
+      },
+    });
+    // No history boundary yet.
+    expect((db.prepare('SELECT COUNT(*) AS n FROM strategy_history WHERE workspace_id = ?').get(wsId) as { n: number }).n).toBe(0);
+
+    const res = await ctx.patchJson(`/api/webflow/keyword-strategy/${wsId}`, { siteKeywords: ['edited keyword'] });
+    expect(res.status).toBe(200);
+
+    // The manual edit recorded a boundary capturing the PRE-edit state at the PRIOR generatedAt.
+    const rows = db.prepare('SELECT strategy_json, generated_at FROM strategy_history WHERE workspace_id = ?').all(wsId) as { strategy_json: string; generated_at: string }[];
+    expect(rows.length).toBe(1);
+    expect(rows[0].generated_at).toBe('2026-02-01T00:00:00.000Z');
+    expect(JSON.parse(rows[0].strategy_json).siteKeywords).toEqual(['original keyword']);
+
+    // /diff now attributes the edit to that boundary rather than misattributing to the last regen.
+    const diff = await (await ctx.api(`/api/webflow/keyword-strategy/${wsId}/diff`)).json();
+    expect(diff.newKeywords).toContain('edited keyword');
+    expect(diff.lostKeywords).toContain('original keyword');
+  });
+
+  it('PATCH on a workspace with no prior strategy blob records NO history snapshot (guard)', async () => {
+    const wsId = freshWs('PATCH no prior blob no snapshot');
+    const res = await ctx.patchJson(`/api/webflow/keyword-strategy/${wsId}`, { siteKeywords: ['first edit'] });
+    expect(res.status).toBe(200);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM strategy_history WHERE workspace_id = ?').get(wsId) as { n: number }).n).toBe(0);
+  });
+
   it('response includes all table-backed arrays even for blob-only PATCH', async () => {
     const wsId = freshWs('PATCH response includes table arrays');
     replaceAllQuickWins(wsId, [

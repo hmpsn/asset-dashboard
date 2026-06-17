@@ -56,6 +56,42 @@ export interface PersistKeywordStrategyResult {
   pageMap: PageKeywordMap[];
 }
 
+/**
+ * Snapshot the prior strategy state into strategy_history (capped to 5 rows), so the "What Changed"
+ * (StrategyDiff) boundary moves to this point. Reused by BOTH the AI-regen path and the manual PATCH
+ * edit path so human edits don't get misattributed to the last regeneration.
+ *
+ * MUST be called INSIDE a db.transaction(), and BEFORE the replaceAll/upsert calls clobber the
+ * table-backed arrays (callers pass the prior arrays read just before mutating). No-ops when there is
+ * no prior `generatedAt` (a table-backed-only workspace with no blob has no boundary to record).
+ */
+export function snapshotStrategyHistory(
+  workspaceId: string,
+  previousStrategy: KeywordStrategy | undefined,
+  prior: {
+    pageMap: ReturnType<typeof listPageKeywords>;
+    contentGaps: ReturnType<typeof listContentGaps>;
+    quickWins: ReturnType<typeof listQuickWins>;
+    keywordGaps: ReturnType<typeof listKeywordGaps>;
+    topicClusters: ReturnType<typeof listTopicClusters>;
+    cannibalization: ReturnType<typeof listCannibalizationIssues>;
+  },
+): void {
+  if (!previousStrategy?.generatedAt) return;
+  const previousStrategySnapshot = {
+    ...previousStrategy,
+    contentGaps: prior.contentGaps,
+    quickWins: prior.quickWins,
+    keywordGaps: prior.keywordGaps,
+    topicClusters: prior.topicClusters,
+    cannibalization: prior.cannibalization,
+  };
+  db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run( // txn-ok: callers (writeKeywordStrategy + PATCH applyPatch) invoke this inside db.transaction()
+    workspaceId, JSON.stringify(previousStrategySnapshot), JSON.stringify(prior.pageMap), previousStrategy.generatedAt
+  );
+  db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(workspaceId, workspaceId); // txn-ok: enclosed by caller's transaction
+}
+
 export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): PersistKeywordStrategyResult {
   const {
     ws,
@@ -177,21 +213,14 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     // is the source of truth every reader resolves through.
     replaceAllSiteKeywordMetrics(ws.id, siteKeywordMetrics);
 
-    const previousStrategy = ws.keywordStrategy;
-    if (previousStrategy?.generatedAt) {
-      const previousStrategySnapshot = {
-        ...previousStrategy,
-        contentGaps: prevContentGapsForHistory,
-        quickWins: prevQuickWinsForHistory,
-        keywordGaps: prevKeywordGapsForHistory,
-        topicClusters: prevTopicClustersForHistory,
-        cannibalization: prevCannibalizationForHistory,
-      };
-      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run( // txn-ok: enclosed by writeKeywordStrategy transaction
-        ws.id, JSON.stringify(previousStrategySnapshot), JSON.stringify(prevPageMapForHistory), previousStrategy.generatedAt
-      );
-      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
-    }
+    snapshotStrategyHistory(ws.id, ws.keywordStrategy, {
+      pageMap: prevPageMapForHistory,
+      contentGaps: prevContentGapsForHistory,
+      quickWins: prevQuickWinsForHistory,
+      keywordGaps: prevKeywordGapsForHistory,
+      topicClusters: prevTopicClustersForHistory,
+      cannibalization: prevCannibalizationForHistory,
+    });
 
     updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
