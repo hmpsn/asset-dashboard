@@ -208,6 +208,13 @@ export interface RankingDistributionProps {
   beyond20: PageKeywordMap[];
   notRankingCount: number;
   intentCounts: Record<string, number>;
+  /**
+   * When provided (Reference band, Phase 4c), the striking-distance (11–20) legend row becomes a
+   * deep-link to the Keyword Hub's striking_distance view — the one position band with a real Hub
+   * filter destination. Omitted in legacy → static legend, byte-identical.
+   */
+  workspaceId?: string;
+  navigate?: (path: string) => void;
 }
 
 export interface SiteTargetKeywordsProps {

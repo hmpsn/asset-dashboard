@@ -1,4 +1,6 @@
-import { Badge, SectionCard } from '../ui';
+import { ArrowUpRight } from 'lucide-react';
+import { Badge, ClickableRow, Icon, SectionCard } from '../ui';
+import { adminPath } from '../../routes';
 import type { RankingDistributionProps } from './types';
 
 export function RankingDistribution({
@@ -10,8 +12,13 @@ export function RankingDistribution({
   beyond20,
   notRankingCount,
   intentCounts,
+  workspaceId,
+  navigate,
 }: RankingDistributionProps) {
   if (ranked.length === 0) return null;
+
+  // Striking distance (positions 11–20) is the one band with a real Hub filter destination.
+  const showStrikingLink = !!(workspaceId && navigate);
 
   return (
     <SectionCard
@@ -28,7 +35,19 @@ export function RankingDistribution({
       <div className="flex items-center gap-4 mt-2 flex-wrap">
         <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></div>
         <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></div>
-        <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></div>
+        {showStrikingLink ? (
+          <ClickableRow
+            onClick={() => navigate!(adminPath(workspaceId!, 'seo-keywords') + '?tab=striking_distance')}
+            title="Review striking-distance keywords in the Keyword Hub"
+            // inline-flex + w-auto override ClickableRow's base w-full so the chip stays an inline legend item.
+            className="inline-flex w-auto items-center gap-1.5 t-caption-sm rounded-[var(--radius-lg)] px-1 -mx-1 hover:bg-[var(--surface-3)]/50 hover:text-accent-brand transition-colors"
+          >
+            <div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span>
+            <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)]" />
+          </ClickableRow>
+        ) : (
+          <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></div>
+        )}
         <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></div>
         <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></div>
       </div>

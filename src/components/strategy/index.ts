@@ -27,3 +27,5 @@ export * from './LostQueryRecoveryCard';
 export * from './CannibalizationTriage';
 export * from './AuthorityAndBacklinks';
 export * from './ManageInHubCard';
+export * from './StrategyStatBar';
+export * from './StrategyHelpDisclosure';

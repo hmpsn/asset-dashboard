@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { RankingDistribution } from '../../../src/components/strategy/RankingDistribution';
 import type { PageKeywordMap } from '../../../src/components/strategy/types';
 
@@ -84,5 +84,20 @@ describe('RankingDistribution', () => {
     };
     const { container } = render(<RankingDistribution {...props} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('click-to-filter (Phase 4c): the 11–20 striking-distance row deep-links to the Hub when nav is provided', () => {
+    const navigate = vi.fn();
+    render(<RankingDistribution {...baseProps} workspaceId="ws1" navigate={navigate} />);
+    const row = screen.getByText('11–20').closest('button');
+    expect(row).not.toBeNull();
+    fireEvent.click(row!);
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('seo-keywords'));
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('?tab=striking_distance'));
+  });
+
+  it('legacy parity: the 11–20 row is NOT a button without workspaceId/navigate', () => {
+    render(<RankingDistribution {...baseProps} />);
+    expect(screen.getByText('11–20').closest('button')).toBeNull();
   });
 });

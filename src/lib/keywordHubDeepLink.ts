@@ -26,11 +26,11 @@ export const HUB_DEEP_LINK_PARAMS = {
   segment: 'tab',
 } as const satisfies { readonly query: 'q'; readonly segment: 'tab' };
 
-// The `tab` value-space is the SIX segments the Keyword Hub actually honors
+// The `tab` value-space is the SEVEN segments the Keyword Hub actually honors
 // (its HubSegment ids — see VALID_SEGMENTS in useKeywordHubState), NOT all 18
 // KeywordCommandCenterFilter values. The sender's accepted set MUST equal the
 // receiver's honored set: a `tab` that is a valid filter but not one of these
-// six would silently fall back to the default 'all' segment (a silent
+// seven would silently fall back to the default 'all' segment (a silent
 // navigation bug). These string values are exactly the HubSegment ids.
 const HUB_SEGMENT_VALUES = new Set<string>([
   KEYWORD_COMMAND_CENTER_FILTERS.ALL,
@@ -39,6 +39,7 @@ const HUB_SEGMENT_VALUES = new Set<string>([
   KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW,
   KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
   KEYWORD_COMMAND_CENTER_FILTERS.LOCAL,
+  KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE,
 ]);
 
 /**

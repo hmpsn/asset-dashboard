@@ -45,6 +45,8 @@ import {
   CannibalizationTriage,
   AuthorityAndBacklinks,
   ManageInHubCard,
+  StrategyStatBar,
+  StrategyHelpDisclosure,
   buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
@@ -319,6 +321,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         avgPos={metrics.avgPos}
       />
     ),
+    // Reference band (decision-bands layout only): compact stat bar instead of the hero grid.
+    statBar: (
+      <StrategyStatBar
+        filteredPageMap={metrics.filteredPageMap}
+        totalPageCount={strategy.pageMap?.length ?? 0}
+        totalImpressions={metrics.totalImpressions}
+        totalClicks={metrics.totalClicks}
+        ranked={metrics.ranked}
+        avgPos={metrics.avgPos}
+      />
+    ),
     distribution: (
       <RankingDistribution
         filteredPageMap={metrics.filteredPageMap}
@@ -329,6 +342,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         beyond20={metrics.beyond20}
         notRankingCount={metrics.notRankingCount}
         intentCounts={metrics.intentCounts}
+      />
+    ),
+    // Reference band (decision-bands layout only): striking-distance (11–20) row deep-links to the Hub.
+    distributionInteractive: (
+      <RankingDistribution
+        filteredPageMap={metrics.filteredPageMap}
+        ranked={metrics.ranked}
+        top3={metrics.top3}
+        top10={metrics.top10}
+        top20={metrics.top20}
+        beyond20={metrics.beyond20}
+        notRankingCount={metrics.notRankingCount}
+        intentCounts={metrics.intentCounts}
+        workspaceId={workspaceId}
+        navigate={navigate}
       />
     ),
     quickWins: (
@@ -412,6 +440,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     manageInHub: <ManageInHubCard workspaceId={workspaceId} />,
     opportunitiesInteractive: <KeywordOpportunities opportunities={strategy.opportunities} workspaceId={workspaceId} navigate={navigate} />,
     howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
+    // Reference band (decision-bands layout only): collapsed help disclosure (how-it-works + glossary)
+    // replacing the standalone Guide tab. Legacy keeps the Guide tab + the inline howItWorks footer.
+    helpDisclosure: <StrategyHelpDisclosure displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
   } : null;
 
   // ── Decision-bands layout (flag ON) ──
@@ -443,8 +474,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.strategyDiff}
           </StrategyBand>
           <StrategyBand label="Reference">
-            {realLeaves.statGrid}
-            {realLeaves.distribution}
+            {realLeaves.statBar}
+            {realLeaves.distributionInteractive}
             {realLeaves.topicClusters}
             {realLeaves.authorityAndBacklinks}
             {realLeaves.competitorEvidence}
@@ -452,7 +483,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.opportunitiesInteractive}
             {clientFeedbackDeclinedEl}
             {intelligenceSignalsEl}
-            {realLeaves.howItWorks}
+            {realLeaves.helpDisclosure}
           </StrategyBand>
         </>
       )}
@@ -501,6 +532,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     </div>
   );
 
+  // Decision-bands layout (flag ON): the Guide tab is demoted into the Reference-band help disclosure,
+  // so there is no top-level TabBar — render the bands analysis directly.
+  if (decisionBandsEnabled) return bandsAnalysis;
+
+  // Legacy layout (flag OFF) — byte-identical to pre-flag: Analysis/Guide TabBar.
   return (
     <div className="space-y-8">
       {/* tab-deeplink-ok: KeywordStrategy is not a direct navigation target for ?tab= */}
@@ -510,7 +546,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')}
       />
       {strategyTab === 'guide' && <KeywordStrategyGuide />}
-      {strategyTab === 'analysis' && (decisionBandsEnabled ? bandsAnalysis : legacyAnalysis)}
+      {strategyTab === 'analysis' && legacyAnalysis}
     </div>
   );
 }

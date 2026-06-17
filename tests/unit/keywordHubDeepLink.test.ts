@@ -16,11 +16,18 @@ describe('keywordHubDeepLink', () => {
   });
 
   describe('isKeywordHubSegment', () => {
-    it('accepts every one of the six segments the Hub honors', () => {
-      // The value-space MUST equal the receiver's HubSegment ids.
-      for (const seg of ['all', 'in_strategy', 'tracked', 'needs_review', 'retired', 'local']) {
+    it('accepts every one of the seven segments the Hub honors', () => {
+      // The value-space MUST equal the receiver's HubSegment ids (VALID_SEGMENTS in useKeywordHubState).
+      for (const seg of ['all', 'in_strategy', 'tracked', 'needs_review', 'retired', 'local', 'striking_distance']) {
         expect(isKeywordHubSegment(seg)).toBe(true);
       }
+    });
+    it('accepts striking_distance (Phase 4c: the Ranking Distribution → Hub deep-link target)', () => {
+      // The receiver (useKeywordHubState VALID_SEGMENTS) honors striking_distance; the sender set had
+      // omitted it, silently dropping the tab. Sender == receiver is restored.
+      expect(isKeywordHubSegment('striking_distance')).toBe(true);
+      const qs = buildHubDeepLinkQuery({ keyword: 'x', segment: 'striking_distance' });
+      expect(qs).toContain('tab=striking_distance');
     });
     it('rejects an unknown value', () => {
       expect(isKeywordHubSegment('nope')).toBe(false);
