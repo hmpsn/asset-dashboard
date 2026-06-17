@@ -44,7 +44,8 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { hasActiveJob } from '../jobs.js';
+import { hasActiveJob, createJob } from '../jobs.js';
+import { runIntelligenceRecomputeJob } from '../intelligence-recompute-job.js';
 import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { normalizeRuntimeSeoDataProvider } from '../seo-data-provider.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
@@ -693,6 +694,11 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspac
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
     const insights = getInsights(ws.id);
+    // Freshness for the "Computed X ago" caption: the newest computed_at across the workspace's
+    // insight rows (matches the throttle's MAX semantics in analytics-intelligence.getOrComputeInsights).
+    const computedAt = insights.length
+      ? insights.reduce((newest, i) => (i.computedAt > newest ? i.computedAt : newest), insights[0].computedAt)
+      : undefined;
     try {
       const intelligence = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'clientSignals'] });
       const keywordEvaluationContext = buildStrategyKeywordEvaluationContext({
@@ -707,15 +713,31 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspac
         strictBusinessFit: true,
       });
       const signals = buildStrategySignals(insights, { keywordEvaluationContext });
-      return res.json({ signals });
+      return res.json({ signals, computedAt });
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to build keyword context for strategy signals; returning unfiltered signals');
-      return res.json({ signals: buildStrategySignals(insights) });
+      return res.json({ signals: buildStrategySignals(insights), computedAt });
     }
   } catch (err) {
     log.error({ err, workspaceId: ws.id }, 'Failed to build strategy signals');
-    res.json({ signals: [] });
+    res.json({ signals: [], computedAt: undefined });
   }
+});
+
+// POST /api/webflow/keyword-strategy/:workspaceId/signals/recompute
+// Manual "Recompute now" — enqueues the background recompute (pulls GSC/GA4 → must NOT run inline per
+// the long-running-provider-work rule). Returns { jobId }; NotificationBell surfaces progress, and the
+// recompute's feedback loop broadcasts INTELLIGENCE_SIGNALS_UPDATED to refresh the card.
+router.post('/api/webflow/keyword-strategy/:workspaceId/signals/recompute', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const active = hasActiveJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, ws.id);
+  if (active) return res.json({ jobId: active.id, existing: true });
+
+  const job = createJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, { workspaceId: ws.id, message: 'Refreshing signals...' });
+  res.json({ jobId: job.id });
+  setTimeout(() => { void runIntelligenceRecomputeJob(job.id, ws.id); }, 100);
 });
 
 export default router;
