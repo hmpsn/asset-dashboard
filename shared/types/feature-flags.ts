@@ -47,10 +47,6 @@ export const FEATURE_FLAGS = {
   // OFF = byte-identical to today. See docs/superpowers/plans/2026-06-05-keyword-value-scoring.md.
   'keyword-value-scoring': false,
 
-  // Strategy page — decision-first 3-band IA (Decide/Act/Reference). Dark-launches the
-  // reorganized admin Strategy layout (and, in Phase 1b, the Decision Queue). OFF = today's
-  // sequential layout, byte-identical. See docs/superpowers/specs/2026-06-16-strategy-page-decision-first-redesign-design.md.
-  'strategy-decision-bands': false,
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
@@ -264,19 +260,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-02',
     },
   },
-  'strategy-decision-bands': {
-    label: 'Strategy page — decision-first 3-band IA (Decide/Act/Reference)',
-    group: 'Strategy',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-16',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the decision-first Strategy IA is validated on staging and becomes the default; the legacy sequential layout path is then deleted (Phase 4).',
-      linkedRoadmapItemId: 'strategy-redesign-phase-1a-ia-scaffold',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-16',
-    },
-  },
   'signal-auto-recompute': {
     label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
     group: 'Strategy',
@@ -319,7 +302,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['strategy-decision-bands', 'signal-auto-recompute'],
+    keys: ['signal-auto-recompute'],
   },
 ];
 

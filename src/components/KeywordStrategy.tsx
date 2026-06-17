@@ -6,7 +6,6 @@ import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
@@ -36,18 +35,6 @@ import {
   SiteTargetKeywords,
   KeywordOpportunities,
   StrategyHowItWorks,
-  StrategyBand,
-  DecisionQueue,
-  RequestedKeywordTriage,
-  OpportunitiesList,
-  DecayingPagesCard,
-  LostQueryRecoveryCard,
-  CannibalizationTriage,
-  AuthorityAndBacklinks,
-  ManageInHubCard,
-  StrategyStatBar,
-  StrategyHelpDisclosure,
-  buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
 
@@ -59,9 +46,6 @@ interface Props {
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
-
-  // Decision-first 3-band IA (Decide/Act/Reference). OFF = today's sequential layout, byte-identical.
-  const decisionBandsEnabled = useFeatureFlag('strategy-decision-bands');
 
   // React Query hook replaces manual data fetching
   const { data: keywordData, isLoading: loading, isAuxLoading, isError: strategyFetchError, refetch: refetchStrategy } = useKeywordStrategy(workspaceId);
@@ -77,8 +61,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const localSync = keywordData?.strategy?.strategyUx?.localSync;
 
   // ── Logic hooks (extracted from this orchestrator in Phase 0) ──
-  // Settings starts collapsed only in the decision-bands layout; the legacy layout keeps it open.
-  const settings = useStrategySettings(keywordData, strategy, workspaceId, decisionBandsEnabled);
+  const settings = useStrategySettings(keywordData, strategy, workspaceId);
   const generation = useStrategyGeneration({
     workspaceId,
     localSync,
@@ -122,18 +105,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     );
   }
 
-  // Header subtitle: in the decision-bands layout, lead with a decision summary when there is one;
-  // otherwise (and always in the legacy layout) show artifact freshness — byte-identical to today.
-  const summaryLine = buildStrategySummaryLine({
-    contentGaps: strategy?.contentGaps?.length ?? 0,
-    requested: metrics.requestedFeedback.length,
-    quickWins: strategy?.quickWins?.length ?? 0,
-  });
+  // Header subtitle: artifact freshness once a real strategy exists.
   const headerSubtitle = !isRealStrategy
     ? 'AI-powered keyword mapping for your entire site'
-    : decisionBandsEnabled && summaryLine
-      ? summaryLine
-      : `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`;
+    : `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`;
 
   // ── Shared elements (defined once; the two layouts arrange the same elements differently) ──
   const headerActions = (
@@ -260,36 +235,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   const emptyStateEl = !isRealStrategy && !generation.generating ? <StrategyEmptyState /> : null;
 
-  // Client keyword feedback: the legacy layout shows the combined card; the bands layout hoists
-  // the requested-keyword triage into the Decide band and shows the declined log (only) in Reference.
   const clientFeedbackCombinedEl = (
     <ClientKeywordFeedback
       rows={feedback.rows}
       requested={metrics.requestedFeedback}
       declined={metrics.declinedFeedback}
       approved={metrics.approvedFeedback}
-      addPending={feedback.addPending}
-      addError={feedback.addError}
-      onAdd={feedback.addRequestedKeyword}
-      onDismissError={() => feedback.setAddError(null)}
-    />
-  );
-  const clientFeedbackDeclinedEl = (
-    <ClientKeywordFeedback
-      rows={feedback.rows}
-      requested={metrics.requestedFeedback}
-      declined={metrics.declinedFeedback}
-      approved={metrics.approvedFeedback}
-      addPending={feedback.addPending}
-      addError={feedback.addError}
-      onAdd={feedback.addRequestedKeyword}
-      onDismissError={() => feedback.setAddError(null)}
-      showRequested={false}
-    />
-  );
-  const requestedTriageEl = (
-    <RequestedKeywordTriage
-      requested={metrics.requestedFeedback}
       addPending={feedback.addPending}
       addError={feedback.addError}
       onAdd={feedback.addRequestedKeyword}
@@ -321,17 +272,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         avgPos={metrics.avgPos}
       />
     ),
-    // Reference band (decision-bands layout only): compact stat bar instead of the hero grid.
-    statBar: (
-      <StrategyStatBar
-        filteredPageMap={metrics.filteredPageMap}
-        totalPageCount={strategy.pageMap?.length ?? 0}
-        totalImpressions={metrics.totalImpressions}
-        totalClicks={metrics.totalClicks}
-        ranked={metrics.ranked}
-        avgPos={metrics.avgPos}
-      />
-    ),
     distribution: (
       <RankingDistribution
         filteredPageMap={metrics.filteredPageMap}
@@ -344,32 +284,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         intentCounts={metrics.intentCounts}
       />
     ),
-    // Reference band (decision-bands layout only): striking-distance (11–20) row deep-links to the Hub.
-    distributionInteractive: (
-      <RankingDistribution
-        filteredPageMap={metrics.filteredPageMap}
-        ranked={metrics.ranked}
-        top3={metrics.top3}
-        top10={metrics.top10}
-        top20={metrics.top20}
-        beyond20={metrics.beyond20}
-        notRankingCount={metrics.notRankingCount}
-        intentCounts={metrics.intentCounts}
-        workspaceId={workspaceId}
-        navigate={navigate}
-      />
-    ),
     quickWins: (
       <div id="quick-wins-section">
         <QuickWins quickWins={strategy.quickWins ?? []} />
       </div>
     ),
     lhf: <LowHangingFruit pages={metrics.lowHangingFruit} />,
-    // Act band (decision-bands layout only): Quick Wins + Low-Hanging Fruit merged into one
-    // actionable card, plus decay + lost-query recovery surfaces. Legacy layout keeps quickWins/lhf.
-    opportunitiesList: <OpportunitiesList quickWins={strategy.quickWins ?? []} lowHangingFruit={metrics.lowHangingFruit} workspaceId={workspaceId} />,
-    decayingPages: <DecayingPagesCard workspaceId={workspaceId} />,
-    lostQueries: <LostQueryRecoveryCard workspaceId={workspaceId} />,
     contentGaps: <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />,
     keywordGaps: (
       <KeywordGaps
@@ -379,29 +299,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         navigate={navigate}
       />
     ),
-    // Reference band (decision-bands layout only): the single deduped competitor-evidence surface with
-    // inline Track. Legacy keeps the no-track keywordGaps leaf above (in its Act position).
-    competitorEvidence: (
-      <KeywordGaps
-        keywordGaps={strategy.keywordGaps || []}
-        difficultyColor={kdColor}
-        workspaceId={workspaceId}
-        navigate={navigate}
-        trackedKeywords={tracking.trackedKeywords}
-        trackingPending={tracking.trackingPending}
-        trackingErrors={tracking.trackingErrors}
-        onTrack={tracking.trackKeyword}
-      />
-    ),
     topicClusters: strategy.topicClusters && strategy.topicClusters.length > 0
       ? <TopicClusters clusters={strategy.topicClusters} />
       : null,
     cannibalization: strategy.cannibalization && strategy.cannibalization.length > 0
       ? <CannibalizationAlert entries={strategy.cannibalization} />
-      : null,
-    // Act band (decision-bands layout only): actionable triage queue. Legacy keeps cannibalization above.
-    cannibalizationTriage: strategy.cannibalization && strategy.cannibalization.length > 0
-      ? <CannibalizationTriage entries={strategy.cannibalization} workspaceId={workspaceId} />
       : null,
     strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
     backlink: <BacklinkProfile workspaceId={workspaceId} />,
@@ -411,15 +313,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
         seoDataAvailable={settings.seoDataAvailable}
         cachedKeywordGaps={strategy?.keywordGaps}
-      />
-    ),
-    // Reference band (decision-bands layout only): backlink + competitive merged into one leaf.
-    // Legacy keeps standalone backlink + competitive above.
-    authorityAndBacklinks: (
-      <AuthorityAndBacklinks
-        workspaceId={workspaceId}
-        competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-        seoDataAvailable={settings.seoDataAvailable}
       />
     ),
     siteKeywords: (
@@ -434,63 +327,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       />
     ),
     opportunities: <KeywordOpportunities opportunities={strategy.opportunities} />,
-    // Reference band (decision-bands layout only): compact Hub deep-link replacing the full
-    // SiteTargetKeywords list, and opportunities with a per-row "Explore in Hub" affordance.
-    // Legacy keeps the full siteKeywords + plain opportunities leaves.
-    manageInHub: <ManageInHubCard workspaceId={workspaceId} />,
-    opportunitiesInteractive: <KeywordOpportunities opportunities={strategy.opportunities} workspaceId={workspaceId} navigate={navigate} />,
     howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
-    // Reference band (decision-bands layout only): collapsed help disclosure (how-it-works + glossary)
-    // replacing the standalone Guide tab. Legacy keeps the Guide tab + the inline howItWorks footer.
-    helpDisclosure: <StrategyHelpDisclosure displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
   } : null;
 
-  // ── Decision-bands layout (flag ON) ──
-  const bandsAnalysis = (
-    <div className="space-y-8">
-      {headerEl}
-      {refreshPromptEl}
-      {aiContextEl}
-      {localSeoEl}
-      <StrategyBand label="Decide" first>
-        <DecisionQueue workspaceId={workspaceId} />
-        {feedbackNudgeEl}
-        {metrics.requestedFeedback.length > 0 && requestedTriageEl}
-        {settingsEl}
-      </StrategyBand>
-      {progressEl}
-      {errorEl}
-      {nextStepsEl}
-      {emptyStateEl}
-      {realLeaves && (
-        <>
-          {realLeaves.stalenessNudges}
-          <StrategyBand label="Act">
-            {realLeaves.contentGaps}
-            {realLeaves.opportunitiesList}
-            {realLeaves.decayingPages}
-            {realLeaves.lostQueries}
-            {realLeaves.cannibalizationTriage}
-            {realLeaves.strategyDiff}
-          </StrategyBand>
-          <StrategyBand label="Reference">
-            {realLeaves.statBar}
-            {realLeaves.distributionInteractive}
-            {realLeaves.topicClusters}
-            {realLeaves.authorityAndBacklinks}
-            {realLeaves.competitorEvidence}
-            {realLeaves.manageInHub}
-            {realLeaves.opportunitiesInteractive}
-            {clientFeedbackDeclinedEl}
-            {intelligenceSignalsEl}
-            {realLeaves.helpDisclosure}
-          </StrategyBand>
-        </>
-      )}
-    </div>
-  );
-
-  // ── Legacy sequential layout (flag OFF) — byte-identical to pre-flag ──
+  // ── Strategy analysis layout ──
   const legacyAnalysis = (
     <div className="space-y-8">
       {headerEl}
@@ -532,11 +372,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     </div>
   );
 
-  // Decision-bands layout (flag ON): the Guide tab is demoted into the Reference-band help disclosure,
-  // so there is no top-level TabBar — render the bands analysis directly.
-  if (decisionBandsEnabled) return bandsAnalysis;
-
-  // Legacy layout (flag OFF) — byte-identical to pre-flag: Analysis/Guide TabBar.
   return (
     <div className="space-y-8">
       {/* tab-deeplink-ok: KeywordStrategy is not a direct navigation target for ?tab= */}

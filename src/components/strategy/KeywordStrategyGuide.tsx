@@ -103,7 +103,7 @@ const STEPS = [
   },
 ];
 
-/** Exported so the Reference-band help disclosure (StrategyHelpDisclosure) reuses the same glossary. */
+/** Exported so help surfaces can reuse the same glossary. */
 export const METRIC_GLOSSARY = [
   { term: 'KD %', def: 'Keyword Difficulty — 0–100 scale of how hard it is to rank for this term. Under 30 = low competition.' },
   { term: 'CPC', def: 'Cost-Per-Click — what advertisers pay per ad click. High CPC signals commercial intent and potential revenue.' },

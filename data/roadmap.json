@@ -5,7 +5,7 @@
       "name": "Strategy Page — Decision-First Redesign",
       "hours": "TBD — phased, one PR per phase",
       "rationale": "Up-level the admin seo-strategy page from a ~30-section passive scroll into a decision-first 3-band IA (Decide/Act/Reference). Spec: docs/superpowers/specs/2026-06-16-strategy-page-decision-first-redesign-design.md.",
-      "notes": "Branch series strategy-phase-*; one PR per phase, staging-first. Phase 0 (decomposition) merged via PR #1248.",
+      "notes": "SUPERSEDED 2026-06-17 by the v2 'SEO command center' IA (docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md). Phases 0–5 shipped behind strategy-decision-bands; Phase R retired the 3-band layout + flag before removal, reusable leaves carried into v2. Branch series strategy-phase-*; one PR per phase, staging-first.",
       "items": [
         {
           "id": "strategy-redesign-phase-0-decomposition",

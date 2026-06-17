@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **512 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **513 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 513. Strategy Page — decision-bands layout retired (Phase R, superseded by v2 "command center")
+
+**What it does:** Removes the `strategy-decision-bands` 3-band (Decide/Act/Reference) layout and its feature flag. The admin Strategy page reverts to the single sequential `legacyAnalysis` layout as the shipped baseline while the new "SEO command center" IA (Orient → Act → Evidence) is built behind a fresh `strategy-command-center` flag. The 3-band layout was a reorganization that re-bucketed the same ~20 cards without reducing density — owner review found it still overwhelming — so it is retired before flag removal rather than promoted. Four bands-only wrapper components (`StrategyBand`, `StrategyStatBar`, `StrategyHelpDisclosure`, `ManageInHubCard`) are deleted; the reusable leaves (Decision Queue, Opportunities List, Decaying Pages, Lost-Query Recovery, Cannibalization Triage, Authority & Backlinks, etc.) are retained — they re-home into the v2 command center.
+
+**Agency value:** Removes a half-built, never-defaulted layout that added a confusing third UI state, keeping the codebase honest while the genuinely better v2 IA is built. No user-facing change — the flag was default-off, so the legacy layout was always what shipped.
+
+**Mutual:** Pure simplification — one fewer layout to reason about, a smaller flag catalog, and every component worth keeping survives into v2. The Phase 4–5 component work (merged competitor surface, dedup, Hub deep-links, signal recompute) is preserved.
+
+**Files:** `src/components/KeywordStrategy.tsx` (bands layout + flag wiring removed), `shared/types/feature-flags.ts` (`strategy-decision-bands` removed from defaults/catalog/group), `src/components/strategy/index.ts` + `types.ts` (wrapper exports/`StrategyBandProps` removed; orphan tracker added), deleted `StrategyBand`/`StrategyStatBar`/`StrategyHelpDisclosure`/`ManageInHubCard` + their unit tests. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase R).
 
 ---
 
