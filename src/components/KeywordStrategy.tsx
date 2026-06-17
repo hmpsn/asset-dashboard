@@ -44,6 +44,7 @@ import {
   LostQueryRecoveryCard,
   CannibalizationTriage,
   AuthorityAndBacklinks,
+  ManageInHubCard,
   buildStrategySummaryLine,
 } from './strategy';
 import { adminPath } from '../routes';
@@ -350,6 +351,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         navigate={navigate}
       />
     ),
+    // Reference band (decision-bands layout only): the single deduped competitor-evidence surface with
+    // inline Track. Legacy keeps the no-track keywordGaps leaf above (in its Act position).
+    competitorEvidence: (
+      <KeywordGaps
+        keywordGaps={strategy.keywordGaps || []}
+        difficultyColor={kdColor}
+        workspaceId={workspaceId}
+        navigate={navigate}
+        trackedKeywords={tracking.trackedKeywords}
+        trackingPending={tracking.trackingPending}
+        trackingErrors={tracking.trackingErrors}
+        onTrack={tracking.trackKeyword}
+      />
+    ),
     topicClusters: strategy.topicClusters && strategy.topicClusters.length > 0
       ? <TopicClusters clusters={strategy.topicClusters} />
       : null,
@@ -391,6 +406,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       />
     ),
     opportunities: <KeywordOpportunities opportunities={strategy.opportunities} />,
+    // Reference band (decision-bands layout only): compact Hub deep-link replacing the full
+    // SiteTargetKeywords list, and opportunities with a per-row "Explore in Hub" affordance.
+    // Legacy keeps the full siteKeywords + plain opportunities leaves.
+    manageInHub: <ManageInHubCard workspaceId={workspaceId} />,
+    opportunitiesInteractive: <KeywordOpportunities opportunities={strategy.opportunities} workspaceId={workspaceId} navigate={navigate} />,
     howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
   } : null;
 
@@ -419,7 +439,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.opportunitiesList}
             {realLeaves.decayingPages}
             {realLeaves.lostQueries}
-            {realLeaves.keywordGaps}
             {realLeaves.cannibalizationTriage}
             {realLeaves.strategyDiff}
           </StrategyBand>
@@ -428,8 +447,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {realLeaves.distribution}
             {realLeaves.topicClusters}
             {realLeaves.authorityAndBacklinks}
-            {realLeaves.siteKeywords}
-            {realLeaves.opportunities}
+            {realLeaves.competitorEvidence}
+            {realLeaves.manageInHub}
+            {realLeaves.opportunitiesInteractive}
             {clientFeedbackDeclinedEl}
             {intelligenceSignalsEl}
             {realLeaves.howItWorks}

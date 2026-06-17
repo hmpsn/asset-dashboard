@@ -83,9 +83,19 @@
           "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
           "est": "M",
           "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-16",
+          "notes": "Done 2026-06-16 (PR #1257, merged to staging). First of three Phase 4 sub-PRs (4a/4b/4c). New AuthorityAndBacklinks leaf merges the Reference band's backlink + competitive children into one: composes BacklinkProfile + CompetitiveIntel variant='merged' (hides the own-domain stat grid + the embedded Keyword Gaps section, deduped; corrected cache-freshness label). BacklinkProfile migrated off raw useState+useEffect+fetch to a new useBacklinkProfile React Query hook (queryKeys.admin.backlinkProfile) — the last hand-rolled fetch in src/components/strategy/. Fixed the STRATEGY_UPDATED→competitorIntel invalidation gap (added backlinkProfile + competitorIntelAll to strategyMutationKeys) and the wrong 48h staleTime/cache-label (real DataForSEO TTL is 7d). Bands Reference band only; legacy layout byte-identical (CompetitiveIntel variant defaults to 'full'; flag NOT removed). Review: zero Critical/Important. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
+        },
+        {
+          "id": "strategy-redesign-phase-4b-competitor-evidence",
+          "title": "Phase 4b — Reference band: Competitor Evidence inline Track + Site Keywords→Hub deep-link + Opportunities Explore-in-Hub",
+          "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
+          "est": "M",
+          "priority": "P2",
           "status": "in_progress",
           "createdAt": "2026-06-16",
-          "notes": "PR opening to staging. First of three Phase 4 sub-PRs (4a/4b/4c). New AuthorityAndBacklinks leaf merges the Reference band's backlink + competitive children into one: composes BacklinkProfile + CompetitiveIntel variant='merged' (hides the own-domain stat grid + the embedded Keyword Gaps section, deduped; corrected cache-freshness label). BacklinkProfile migrated off raw useState+useEffect+fetch to a new useBacklinkProfile React Query hook (queryKeys.admin.backlinkProfile) — the last hand-rolled fetch in src/components/strategy/. Fixed the STRATEGY_UPDATED→competitorIntel invalidation gap (added backlinkProfile + competitorIntelAll to strategyMutationKeys) and the wrong 48h staleTime/cache-label (real DataForSEO TTL is 7d). Bands Reference band only; legacy layout byte-identical (CompetitiveIntel variant defaults to 'full'; flag NOT removed). Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
+          "notes": "PR opening to staging. Second of three Phase 4 sub-PRs. KeywordGaps (the 'Raw Competitor Evidence' surface) gains an OPTIONAL inline Track button (gated showTrack=!!onTrack; keyed Fragment keeps the no-track legacy row byte-identical) and MOVES from the bands Act band to the bands Reference band as the single deduped competitor-evidence surface (the embedded gaps in CompetitiveIntel were already dropped in 4a's merged variant). New ManageInHubCard replaces the full SiteTargetKeywords list in the bands Reference band with a compact 'Manage in Keyword Hub' deep-link (literal ?tab=in_strategy → two-halves contract honored by KeywordHub). KeywordOpportunities gains an OPTIONAL per-row 'Explore in Hub' deep-link (freeform AI prose → Hub research, NOT auto-Track which would pollute rank tracking). All three via NEW bands-only realLeaves keys (competitorEvidence/manageInHub/opportunitiesInteractive); legacy keeps keywordGaps/siteKeywords/opportunities byte-identical. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
         },
         {
           "id": "strategy-cannibalization-operator-keeper-override",

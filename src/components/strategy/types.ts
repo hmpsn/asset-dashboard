@@ -222,6 +222,13 @@ export interface SiteTargetKeywordsProps {
 
 export interface KeywordOpportunitiesProps {
   opportunities: string[];
+  /**
+   * When provided (Reference band, Phase 4b), each opportunity row gets an "Explore in Hub" deep-link
+   * so the analyst can research the (freeform, AI-suggested) phrase in the Keyword Hub. Omitted in the
+   * legacy layout → no per-row affordance, byte-identical.
+   */
+  workspaceId?: string;
+  navigate?: (path: string) => void;
 }
 
 /**

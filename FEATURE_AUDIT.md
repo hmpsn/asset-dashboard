@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **508 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **509 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 509. Strategy Page — Reference Band: Competitor Evidence + keyword surfaces (Phase 4b, behind `strategy-decision-bands`)
+
+**What it does:** Makes the Strategy "Reference" band's keyword surfaces actionable and de-duplicated. The competitor-evidence list (the keyword gaps competitors rank for) now lives in exactly one place — the Reference band — with a per-row **Track** button that adds the keyword to rank tracking inline (it previously rendered twice: once in the Act band and once inside Competitive Intel, with no Track). The "Site Target Keywords" block — a long inline list that duplicated the Keyword Hub — collapses to a compact **"Manage in Keyword Hub →"** card that deep-links to the Hub's in-strategy view, where those keywords are actually managed. And the AI-suggested **Keyword Opportunities** gain a per-row **"Explore in Hub"** deep-link so an analyst can research each freeform suggestion with one click (rather than copy-pasting). All flag-gated; the flag-off legacy layout is byte-identical.
+
+**Agency value:** Competitor evidence appears once, not three times, and every keyword on the page is one click from tracking it or researching it in the Hub — no more re-typing a competitor term into the Hub search, and no more a redundant site-keyword list that drifts from the Hub's source of truth.
+
+**Client value:** Indirect — faster, less error-prone keyword operations mean the strategist spends time on decisions, not data-shuffling, on the client's behalf.
+
+**Mutual:** Pure consolidation + reuse — the Track button reuses the existing `useTrackKeyword` hook and rank-tracking endpoint; the Hub deep-links reuse the established `buildHubDeepLinkQuery` / `?tab=` two-halves contract. No new data or AI spend.
+
+**Files:** `src/components/strategy/KeywordGaps.tsx` (inline Track), `src/components/strategy/ManageInHubCard.tsx` (new), `src/components/strategy/KeywordOpportunities.tsx` ("Explore in Hub"), `src/components/strategy/{types,index}.ts`, `src/components/KeywordStrategy.tsx`. Tests: `tests/unit/strategy/{KeywordGaps-track,KeywordOpportunities,ManageInHubCard}.test.tsx`, `tests/contract/tab-deep-link-wiring.test.ts`. Plan: `docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md`.
 
 ---
 
