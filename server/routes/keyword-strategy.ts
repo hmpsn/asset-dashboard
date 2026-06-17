@@ -19,6 +19,7 @@ import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
+import { snapshotStrategyHistory } from '../keyword-strategy-persistence.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import type { KeywordStrategySiteKeywordMetric } from '../keyword-strategy-enrichment.js';
 import { validate, z } from '../middleware/validate.js';
@@ -464,6 +465,17 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   let pageMapChanged = false;
   const applyPatch = db.transaction(() => {
+    // Phase 5 (deliverable #4): snapshot the prior strategy boundary BEFORE the edits clobber the
+    // table-backed arrays, so "What Changed" attributes this human edit to the right boundary instead
+    // of the last AI regeneration. Reads prior state first; no-ops when there's no prior generatedAt.
+    snapshotStrategyHistory(ws.id, ws.keywordStrategy, {
+      pageMap: listPageKeywords(ws.id),
+      contentGaps: listContentGaps(ws.id),
+      quickWins: listQuickWins(ws.id),
+      keywordGaps: listKeywordGaps(ws.id),
+      topicClusters: listTopicClusters(ws.id),
+      cannibalization: listCannibalizationIssues(ws.id),
+    });
     if (req.body.pageMap) {
       pageMapChanged = true;
       upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
