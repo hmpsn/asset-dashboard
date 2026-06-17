@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
@@ -139,14 +138,6 @@ export interface LostQueryRecoveryCardProps {
 export interface CannibalizationTriageProps {
   entries: CannibalizationItem[];
   workspaceId: string;
-}
-
-export interface StrategyBandProps {
-  /** Band label shown in the section divider, e.g. "Decide". */
-  label: string;
-  /** First band suppresses the top border so it sits flush under the header. */
-  first?: boolean;
-  children: ReactNode;
 }
 
 export interface RequestedKeywordTriageProps {

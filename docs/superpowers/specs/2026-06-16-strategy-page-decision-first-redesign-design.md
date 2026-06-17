@@ -1,7 +1,7 @@
 # Admin Strategy Page — Decision-First Redesign
 
 **Date:** 2026-06-16
-**Status:** Design approved, pre-plan
+**Status:** SUPERSEDED 2026-06-17 by the v2 "SEO command center" IA (`docs/superpowers/specs/2026-06-17-strategy-v2-command-center.md`). Phases 0–5 shipped behind `strategy-decision-bands`; the 3-band layout + flag were retired in Phase R before flag removal, with reusable components carried into v2.
 **Owner:** Josh (hmpsn.studio)
 **Surface:** Admin `seo-strategy` page (`KeywordStrategyPanel`, `src/components/KeywordStrategy.tsx`)
 

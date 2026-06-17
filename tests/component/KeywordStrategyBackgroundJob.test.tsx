@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   providerStatus: vi.fn(),
   getWorkspaceById: vi.fn(),
   isAuxLoading: false,
-  decisionBandsEnabled: false,
   keywordStrategyData: {
     strategy: null,
     seoDataAvailable: true,
@@ -59,7 +58,7 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
 }));
 
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: () => mocks.decisionBandsEnabled,
+  useFeatureFlag: () => false,
 }));
 
 vi.mock('../../src/hooks/admin/useAdminRecommendations', () => ({
@@ -118,7 +117,6 @@ describe('KeywordStrategyPanel background job wiring', () => {
     mocks.providerStatus.mockResolvedValue({ providers: [{ name: 'dataforseo', configured: true }] });
     mocks.getWorkspaceById.mockResolvedValue({ seoDataProvider: 'dataforseo' });
     mocks.isAuxLoading = false;
-    mocks.decisionBandsEnabled = false;
     mocks.keywordStrategyData = {
       strategy: null,
       seoDataAvailable: true,
@@ -127,24 +125,11 @@ describe('KeywordStrategyPanel background job wiring', () => {
     };
   });
 
-  it('renders the decision-bands layout with the Decision Queue + collapsed Settings when the flag is on', () => {
-    mocks.decisionBandsEnabled = true;
+  it('renders the strategy analysis layout with Settings open', () => {
     renderPanel();
-    // The Decide band renders even pre-generation (it carries the queue + Settings).
-    expect(screen.getByText('Decide')).toBeInTheDocument();
-    // The Decision Queue leads the band.
-    expect(screen.getByText('Do this next')).toBeInTheDocument();
-    // Settings header is present but COLLAPSED by default in the bands layout, so its body
-    // (the "All" page-limit option) must not be visible.
-    expect(screen.getByText('Strategy Settings')).toBeInTheDocument();
-    expect(screen.queryByText('All')).not.toBeInTheDocument();
-  });
-
-  it('keeps the legacy sequential layout (no band labels, Settings open) when the flag is off', () => {
-    mocks.decisionBandsEnabled = false;
-    renderPanel();
+    // Single sequential analysis layout — no decision-bands labels.
     expect(screen.queryByText('Decide')).not.toBeInTheDocument();
-    // Legacy: Settings open by default, so its body (the "All" page-limit option) is visible.
+    // Settings is open by default, so its body (the "All" page-limit option) is visible.
     expect(screen.getByText('All')).toBeInTheDocument();
   });
 
