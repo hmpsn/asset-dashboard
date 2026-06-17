@@ -80,6 +80,11 @@ export function useStrategySettings(
   // background refetch (new strategy object identity) never clobbers an in-session user edit.
   const maxPagesHydratedRef = useRef(false);
   const seoDataModeHydratedRef = useRef(false);
+  // settingsOpen is initialized once from collapsedByDefault (= the decision-bands flag), but that flag
+  // is async (React Query): on a cold cache it's `false` on first render, so the bands-layout Decide-band
+  // panel would mount EXPANDED. Force-collapse ONCE when the flag resolves on; never re-collapse after,
+  // so a manual toggle sticks. Flag-OFF (collapsedByDefault stays false) never fires this → legacy parity.
+  const collapsedAppliedRef = useRef(false);
 
   // Sync business context + competitors from loaded strategy
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally reacts to strategy object identity; checking individual fields would cause stale-closure issues with businessContext set-once guard
@@ -97,6 +102,14 @@ export function useStrategySettings(
       maxPagesHydratedRef.current = true;
     }
   }, [strategy]);
+
+  // Collapse the settings panel once the bands flag resolves on (see collapsedAppliedRef above).
+  useEffect(() => {
+    if (collapsedByDefault && !collapsedAppliedRef.current) {
+      setSettingsOpen(false);
+      collapsedAppliedRef.current = true;
+    }
+  }, [collapsedByDefault]);
 
   const buildStrategyGenerationParams = useCallback(() => {
     const compList = competitors.trim()

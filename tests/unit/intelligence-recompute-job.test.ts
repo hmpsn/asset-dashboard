@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   createJob: vi.fn(),
   hasActiveJob: vi.fn(),
   getOrComputeInsights: vi.fn(),
+  broadcast: vi.fn(),
   flagEnabled: false,
 }));
 
@@ -14,6 +15,10 @@ vi.mock('../../server/jobs.js', () => ({
   updateJob: state.updateJob,
   createJob: state.createJob,
   hasActiveJob: state.hasActiveJob,
+}));
+
+vi.mock('../../server/broadcast.js', () => ({
+  broadcastToWorkspace: state.broadcast,
 }));
 
 vi.mock('../../server/feature-flags.js', () => ({
@@ -75,20 +80,29 @@ describe('runIntelligenceRecomputeJob', () => {
     state.getJob.mockReset();
     state.updateJob.mockReset();
     state.getOrComputeInsights.mockReset();
+    state.broadcast.mockReset();
     state.getJob.mockReturnValue({ status: 'running' });
   });
 
-  it('forces a full recompute and marks the job done on success', async () => {
+  it('forces a full recompute, broadcasts signals-updated, and marks the job done on success', async () => {
     state.getOrComputeInsights.mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]);
 
     await runIntelligenceRecomputeJob('job-1', 'ws-1');
 
     expect(state.getOrComputeInsights).toHaveBeenCalledWith('ws-1', undefined, { force: true });
+    expect(state.broadcast).toHaveBeenCalledWith('ws-1', 'intelligence:signals_updated', expect.objectContaining({ source: 'intelligence_recompute' }));
     expect(state.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'running' }));
     expect(state.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'done', progress: 100 }));
   });
 
-  it('marks the job error when the recompute throws (FM-2)', async () => {
+  it('broadcasts signals-updated even when the recompute clears ALL signals (the zero-signal caption-staleness fix)', async () => {
+    state.getOrComputeInsights.mockResolvedValue([]);
+    await runIntelligenceRecomputeJob('job-z', 'ws-1');
+    // The feedback loop would NOT broadcast on 0 signals — the worker's unconditional broadcast must.
+    expect(state.broadcast).toHaveBeenCalledWith('ws-1', 'intelligence:signals_updated', expect.anything());
+  });
+
+  it('marks the job error when the recompute throws (FM-2) and does NOT broadcast', async () => {
     state.getOrComputeInsights.mockRejectedValue(new Error('GSC provider unavailable'));
 
     await runIntelligenceRecomputeJob('job-2', 'ws-1');
@@ -98,6 +112,7 @@ describe('runIntelligenceRecomputeJob', () => {
       expect.objectContaining({ status: 'error', error: 'GSC provider unavailable' }),
     );
     expect(state.updateJob).not.toHaveBeenCalledWith('job-2', expect.objectContaining({ status: 'done' }));
+    expect(state.broadcast).not.toHaveBeenCalled();
   });
 
   it('no-ops when the job is already cancelled', async () => {

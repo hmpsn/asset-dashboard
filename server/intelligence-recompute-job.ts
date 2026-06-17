@@ -1,8 +1,10 @@
 import { getOrComputeInsights } from './analytics-intelligence.js';
+import { broadcastToWorkspace } from './broadcast.js';
 import { isProgrammingError } from './errors.js';
 import { getJob, updateJob, createJob, hasActiveJob } from './jobs.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
+import { WS_EVENTS } from './ws-events.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
 const log = createLogger('intelligence-recompute-job');
@@ -27,8 +29,9 @@ export function enqueueIntelligenceRecompute(workspaceId: string): void {
  *
  * Drives `getOrComputeInsights(ws, undefined, { force: true })` — the full recompute (pulls GSC/GA4),
  * which is why this runs on the background-job platform (CLAUDE.md long-running-provider-work rule)
- * rather than synchronously in a request. The recompute's feedback-loop step broadcasts
- * INTELLIGENCE_SIGNALS_UPDATED, which auto-invalidates the IntelligenceSignals query on the frontend.
+ * rather than synchronously in a request. On success it broadcasts INTELLIGENCE_SIGNALS_UPDATED
+ * unconditionally (the feedback loop only broadcasts when >0 signals result), so the IntelligenceSignals
+ * query/caption refresh even when a recompute clears all signals.
  *
  * Shared by the manual "Recompute now" button, the daily activity-gated cron, and the on-mutation
  * triggers (Phase 5c). FM-2: any failure ends the job in `error` status.
@@ -46,6 +49,16 @@ export async function runIntelligenceRecomputeJob(jobId: string, workspaceId: st
 
     const insights = await getOrComputeInsights(workspaceId, undefined, { force: true });
     if (jobWasCancelled()) return;
+
+    // Always refresh the IntelligenceSignals card. The recompute's feedback loop only broadcasts
+    // INTELLIGENCE_SIGNALS_UPDATED when it produces >0 signals, so a recompute that CLEARS all signals
+    // (the most important "Recompute now" case) would otherwise leave the stale list + "Computed X ago"
+    // caption on screen until refocus/staleTime. This unconditional broadcast covers that gap (and the
+    // cron / on-mutation paths); a redundant double-fire when signals>0 is harmless (idempotent invalidate).
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+      source: 'intelligence_recompute',
+      insightCount: insights.length,
+    });
 
     updateJob(jobId, {
       status: 'done',

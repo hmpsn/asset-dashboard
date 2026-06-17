@@ -11,15 +11,16 @@ export function useTrackKeyword(workspaceId: string) {
   const [trackingErrors, setTrackingErrors] = useState<Map<string, string>>(new Map());
 
   // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization.
-  // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape RankTracker
-  // consumes — both components share this key). `select` derives the normalized Set this component needs
-  // WITHOUT mutating the cached shape, so a tab switch between this panel and RankTracker can't read a Set
-  // where an array is expected (or vice versa).
+  // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape the Page
+  // Intelligence keyword-tracking surface — usePageIntelligenceKeywordTracking — also consumes; both share
+  // this key). `select` derives the normalized Set this component needs WITHOUT mutating the cached shape,
+  // so a tab switch between this panel and Page Intelligence can't read a Set where an array is expected.
+  // staleTime matches usePageIntelligenceKeywordTracking (1min) so both observers refetch on one cadence.
   const { data: trackedKeywordsData } = useQuery({
     queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
     queryFn: () => rankTracking.keywords(workspaceId),
     select: (rows) => new Set((rows ?? []).map(k => keywordTrackingKey(k.query))),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
     enabled: !!workspaceId,
   });
   const trackedKeywords = trackedKeywordsData ?? new Set<string>();
@@ -31,7 +32,7 @@ export function useTrackKeyword(workspaceId: string) {
     setTrackingErrors(prev => { const m = new Map(prev); m.delete(key); return m; });
     try {
       await rankTracking.addKeyword(workspaceId, { query: kw });
-      // The rankTrackingKeywords cache holds TrackedKeyword[] (shared with RankTracker). addKeyword
+      // The rankTrackingKeywords cache holds TrackedKeyword[] (shared with Page Intelligence). addKeyword
       // returns `unknown`, so we cannot synthesize a faithful TrackedKeyword (pinned/addedAt/source/etc.)
       // for an optimistic array append. Invalidate instead — correctness over a micro-optimization; the
       // refetch is cheap and keeps the canonical array shape intact for both consumers.

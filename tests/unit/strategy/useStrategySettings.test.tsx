@@ -35,6 +35,21 @@ describe('useStrategySettings', () => {
     expect(result.current.settingsOpen).toBe(false);
   });
 
+  it('collapses once when the bands flag resolves ON after mount, then respects manual re-open (async-flag cold-cache fix)', () => {
+    // Cold flag cache: useFeatureFlag returns the static default (false) on first render, then resolves.
+    const { result, rerender } = renderHook(
+      ({ collapsed }) => useStrategySettings(undefined, null, 'ws1', collapsed),
+      { initialProps: { collapsed: false } },
+    );
+    expect(result.current.settingsOpen).toBe(true); // flag still resolving → open
+    act(() => rerender({ collapsed: true }));        // flag resolves true (bands) → force-collapse once
+    expect(result.current.settingsOpen).toBe(false);
+    // One-shot: a manual re-open must NOT be re-collapsed by a later re-render with the flag still true.
+    act(() => result.current.setSettingsOpen(true));
+    act(() => rerender({ collapsed: true }));
+    expect(result.current.settingsOpen).toBe(true);
+  });
+
   it('hydrates maxPages from strategy on mount', async () => {
     const strategy = { businessContext: '', seoDataMode: 'quick' as const, maxPages: 250 };
     const { result } = renderHook(() => useStrategySettings(undefined, strategy, 'ws1'));
