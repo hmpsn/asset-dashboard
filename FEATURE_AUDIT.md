@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **514 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **515 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 515. Strategy Page — Act queue: unified impact-ranked "what to do next" (Phase 2, behind `strategy-command-center`)
+
+**What it does:** Replaces the Strategy page's scattered action sections (quick wins, low-hanging fruit, content gaps, keyword gaps) with a single **impact-ranked Act queue** — the v2 "command center" hero — when the `strategy-command-center` flag is on. It surfaces the unified recommendation set (the recommendation engine already produces content gaps, decaying pages, cannibalization, quick wins, lost queries and more as first-class recommendation types), sorted by opportunity value, with **filter chips** (All / Content / Technical / Quick wins, each with a live count) and a one-click **Fix** CTA per row that deep-links to the surface that resolves it. To avoid hiding content behind an empty queue, the legacy sections are replaced only once the recommendation set actually has content — a freshly-generated strategy whose recommendations haven't run yet (or a pre-engine workspace) keeps the familiar sections as a fallback. Flag-OFF is byte-identical.
+
+**Agency value:** One ranked list answering "what moves the needle next," instead of four separate cards the operator has to mentally merge and prioritize. Every row carries its projected impact and routes straight to the fix.
+
+**Client value:** Indirect in Phase 2 (admin-only; the queue shows admin EMV). The client reframe (Phase 6) presents the same ranked work as approvable/purchasable.
+
+**Mutual:** Pure reuse of the recommendation engine + `RecommendationRow` + the `buildRecFixContext` deep-link router — no server changes, no new data path. The category map is an exhaustive `Record<RecType, …>`, so a new recommendation type must be categorized to compile. Dark-launched behind `strategy-command-center` (default OFF).
+
+**Files:** `src/components/strategy/ActQueue.tsx` (new), `src/lib/recCategoryMap.ts` (new — RecType → filter category), `src/components/KeywordStrategy.tsx` (flag-gated swap with empty-set fallback). Tests: `tests/component/strategy/ActQueue.test.tsx`, `tests/unit/recCategoryMap.test.ts`. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 2).
 
 ---
 
