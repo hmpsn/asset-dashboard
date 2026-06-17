@@ -256,7 +256,6 @@ function adminInvalidationKeys(
       return [queryKeys.admin.workspaceDeliverables(workspaceId)] as const;
     case WS_EVENTS.INSIGHT_RESOLVED:
       return [
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         queryKeys.client.intelligence(workspaceId),
@@ -330,7 +329,6 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.INSIGHT_BRIDGE_UPDATED:
       return [
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         // Bridge score adjustments change feed ordering (2026-06-09 audit).
@@ -405,7 +403,6 @@ function adminInvalidationKeys(
         queryKeys.admin.recommendations(workspaceId),
         queryKeys.shared.pageEditStates(workspaceId, false),
         queryKeys.shared.pageEditStates(workspaceId, true),
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),

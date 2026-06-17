@@ -79,7 +79,7 @@ const CONTEXT_ALIASES: Record<string, Partial<GroupMatchers>> = {
     routes: [/server\/routes\/(?:approvals|client-actions|content-requests|content-posts)\.ts$/],
     serverModules: [/server\/(?:approvals|client-actions|content-requests|content-posts)\.ts$/],
     apiWrappers: [/src\/api\/clientActions\.ts$/, /src\/api\/content\.ts$/],
-    hooks: [/src\/hooks\/admin\/(?:useActionQueue|useQueue)\.ts$/],
+    hooks: [/src\/hooks\/admin\/useQueue\.ts$/],
     components: [/src\/components\/client\/(?:Decision|Approval|Priority|SchemaReview)/],
     tests: [/tests\/(?:integration|contract|component|unit)\/.*(?:approval|decision|inbox|content-request)/i],
     docs: [/docs\/rules\/inbox-section-routing\.md$/],
