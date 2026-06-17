@@ -103,6 +103,27 @@ export interface KeywordStrategyRefreshSummary {
   resolvedContentGaps: number;
 }
 
+/**
+ * Strategy v2 Orient-zone metrics — the top-line "where the site sits" glance.
+ * Computed server-side (admin GET only) because the visibility score depends on
+ * the CTR-decay curve and the deltas require the prior strategy_history snapshot.
+ * Each stat pairs a current value with a delta vs the previous strategy generation
+ * (null when there is no prior snapshot). `avgPositionDelta` is signed
+ * (current − prior); negative means improved (a lower position is better).
+ */
+export interface OrientMetrics {
+  visibilityScore: number;
+  visibilityScoreDelta: number | null;
+  clicks: number;
+  clicksDelta: number | null;
+  impressions: number;
+  impressionsDelta: number | null;
+  rankedKeywords: number;
+  rankedKeywordsDelta: number | null;
+  avgPosition: number;
+  avgPositionDelta: number | null;
+}
+
 export interface KeywordStrategyUxPayload {
   refreshSummary?: KeywordStrategyRefreshSummary;
   explanations: KeywordStrategyExplanation[];
@@ -114,6 +135,8 @@ export interface KeywordStrategyUxPayload {
    * (page_keywords only). Absent on client-facing reads.
    */
   localSync?: LocalStrategySyncStatus;
+  /** Strategy v2 Orient-zone metrics — admin GET only, present when a real strategy exists. */
+  orient?: OrientMetrics;
 }
 
 export interface KeywordStrategyKeywordChange {

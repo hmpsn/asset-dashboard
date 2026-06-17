@@ -27,6 +27,7 @@ import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafe, parseJsonSafeArray } from '../db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from '../schemas/workspace-schemas.js';
+import { computeOrientMetrics } from '../keyword-strategy-orient.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -302,6 +303,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       surface: 'admin',
     });
     strategyUx.localSync = localSync;
+    // Strategy v2 Orient-zone metrics (visibility score + clicks/impressions/position deltas).
+    // Consumed by the Orient zone when the strategy-command-center flag is on; ignored otherwise.
+    strategyUx.orient = computeOrientMetrics(ws.id, pageMap);
     res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics, strategyUx));
   } catch (err) {
     next(err);

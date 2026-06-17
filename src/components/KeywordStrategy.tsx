@@ -6,6 +6,7 @@ import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
 import { CompetitiveIntel } from './strategy/CompetitiveIntel';
@@ -31,6 +32,7 @@ import {
   StrategyStalenessNudges,
   StrategyEmptyState,
   StrategyStatGrid,
+  OrientZone,
   RankingDistribution,
   SiteTargetKeywords,
   KeywordOpportunities,
@@ -46,6 +48,9 @@ interface Props {
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
+
+  // Strategy v2 "SEO command center" — Orient zone replaces the legacy stat grid when ON.
+  const commandCenterEnabled = useFeatureFlag('strategy-command-center');
 
   // React Query hook replaces manual data fetching
   const { data: keywordData, isLoading: loading, isAuxLoading, isError: strategyFetchError, refetch: refetchStrategy } = useKeywordStrategy(workspaceId);
@@ -330,6 +335,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
   } : null;
 
+  // Strategy v2 Orient zone — replaces the legacy stat grid when the command-center flag is on.
+  const orientEl = commandCenterEnabled && isRealStrategy
+    ? <OrientZone orient={strategy?.strategyUx?.orient} />
+    : null;
+
   // ── Strategy analysis layout ──
   const legacyAnalysis = (
     <div className="space-y-8">
@@ -348,7 +358,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {realLeaves && (
         <>
           {realLeaves.stalenessNudges}
-          {realLeaves.statGrid}
+          {orientEl ?? realLeaves.statGrid}
           {realLeaves.distribution}
           {realLeaves.quickWins}
           {realLeaves.lhf}
