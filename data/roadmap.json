@@ -1,6 +1,25 @@
 {
   "sprints": [
     {
+      "id": "sprint-strategy-v2-command-center-2026-06-17",
+      "name": "Strategy v2 — SEO Command Center",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "Rebuild the admin Strategy page into a decision-first 'SEO command center' (Orient → Act → Evidence + interior Content/Rankings/Competitive tabs), monetization-led. Supersedes the retired decision-bands layout. Spec: docs/superpowers/specs/2026-06-17-strategy-v2-command-center.md; plan: docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.",
+      "notes": "Behind the strategy-command-center flag (default OFF). Flag OFF = legacy sequential layout, byte-identical, until v2 is the default — then legacy is deleted.",
+      "items": [
+        {
+          "id": "strategy-redesign-v2-command-center",
+          "title": "Strategy v2 — command-center IA (Orient/Act/Evidence + interior tabs)",
+          "source": "Strategy v2 spec 2026-06-17",
+          "est": "XL",
+          "priority": "P2",
+          "status": "in_progress",
+          "createdAt": "2026-06-17",
+          "notes": "Phase R (bands removal) merged (PR #1266). Phase 0 (strategy-command-center flag + computeVisibilityScore CTR-weighted helper) in progress. Phases: 0 contracts/score → 1 Orient → 2 Act queue → 3 tab shell + Content → 4 Rankings → 5 Competitive → 6 Client reframe → delete legacy."
+        }
+      ]
+    },
+    {
       "id": "sprint-strategy-decision-first-redesign-2026-06-16",
       "name": "Strategy Page — Decision-First Redesign",
       "hours": "TBD — phased, one PR per phase",

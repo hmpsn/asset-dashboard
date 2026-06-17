@@ -51,6 +51,12 @@ export const FEATURE_FLAGS = {
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
   'signal-auto-recompute': false,
+
+  // Strategy v2 "SEO command center" — decision-first IA (Orient → Act → Evidence) + interior
+  // tabs. Dark-launches the rebuilt admin Strategy page; replaces the retired decision-bands
+  // layout. OFF = the legacy sequential layout, byte-identical.
+  // See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.
+  'strategy-command-center': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -273,6 +279,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-17',
     },
   },
+  'strategy-command-center': {
+    label: 'Strategy v2 — SEO command center (Orient/Act/Evidence + interior tabs)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-17',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the v2 command-center IA is validated on staging and becomes the default; the legacy sequential Strategy layout is then deleted.',
+      linkedRoadmapItemId: 'strategy-redesign-v2-command-center',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-17',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -302,7 +321,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute'],
+    keys: ['signal-auto-recompute', 'strategy-command-center'],
   },
 ];
 
