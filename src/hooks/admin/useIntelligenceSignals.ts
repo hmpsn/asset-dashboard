@@ -12,6 +12,8 @@ import type { StrategySignal } from '../../../shared/types/insights.js';
 
 interface SignalsResponse {
   signals: StrategySignal[];
+  /** Newest insight `computedAt` (ISO) backing these signals — drives the "Computed X ago" caption. */
+  computedAt?: string;
 }
 
 export function useIntelligenceSignals(workspaceId: string) {

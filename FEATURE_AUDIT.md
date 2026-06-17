@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **510 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **511 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 511. Strategy Page — Signal freshness: "Computed X ago" + "Recompute now" (Phase 5b)
+
+**What it does:** Makes the Strategy page's Intelligence Signals card honest about freshness and gives the strategist a one-click refresh. The card now shows a "Computed {N} ago" caption (sourced from the newest insight timestamp backing the signals) and a teal "Recompute now" button. Recompute runs as a background job (`INTELLIGENCE_RECOMPUTE`) — it pulls live GSC/GA4 and recomputes the workspace's analytics insights off the request path — with progress surfaced in the NotificationBell; when it finishes, the existing `intelligence:signals_updated` broadcast auto-refreshes the card. Previously signals were only (re)computed lazily when someone happened to load the insights feed with >24h-stale data, and the card gave no indication of how old they were.
+
+**Agency value:** No more guessing whether the signals on the page are current — the caption says, and one click refreshes them on demand. Foundation for the automated freshness (Phase 5c daily cron + on-mutation recompute).
+
+**Client value:** Indirect — the strategist acts on current data, so recommendations and decisions reflect the client's latest search reality, not a stale snapshot.
+
+**Mutual:** Reuses the existing recompute engine (`getOrComputeInsights` force path), the background-job platform (NotificationBell), and the already-wired `intelligence:signals_updated` live-update broadcast — no new tables, no duplicate broadcast. The recompute deliberately logs no activity (so it can't self-perpetuate the daily cron's activity gate in 5c).
+
+**Files:** `server/intelligence-recompute-job.ts` (new worker), `shared/types/background-jobs.ts` (`INTELLIGENCE_RECOMPUTE` type + metadata), `server/routes/keyword-strategy.ts` (POST `/signals/recompute` + `computedAt` on the `/signals` payload), `src/hooks/admin/useIntelligenceSignals.ts` (`computedAt`), `src/hooks/admin/useRecomputeSignals.ts` (new), `src/components/strategy/IntelligenceSignals.tsx` (caption + button). Tests: `tests/unit/intelligence-recompute-job.test.ts`, `tests/unit/strategy/IntelligenceSignals.test.tsx`. Plan: `docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md`.
 
 ---
 

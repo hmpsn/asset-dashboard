@@ -1,8 +1,10 @@
 import { useIntelligenceSignals } from '../../hooks/admin/useIntelligenceSignals.js';
+import { useRecomputeSignals } from '../../hooks/admin/useRecomputeSignals.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
-import { Badge, Icon } from '../ui';
-import { TrendingUp, AlertTriangle, Target } from 'lucide-react'; // trend-icon-ok — icon usage here is signal-category decoration, not a directional metric trend readout.
+import { Badge, Button, Icon } from '../ui';
+import { TrendingUp, AlertTriangle, Target, RefreshCw } from 'lucide-react'; // trend-icon-ok — icon usage here is signal-category decoration, not a directional metric trend readout.
+import { timeAgo } from '../../lib/timeAgo.js';
 import type { StrategySignal } from '../../../shared/types/insights.js';
 
 interface Props {
@@ -35,7 +37,23 @@ const badgeLabelMap: Record<StrategySignal['type'], string> = {
 
 export function IntelligenceSignals({ workspaceId }: Props) {
   const { data, isLoading } = useIntelligenceSignals(workspaceId);
+  const recompute = useRecomputeSignals(workspaceId);
   const signals = data?.signals ?? [];
+
+  // Right-aligned freshness caption + manual recompute (teal action). Lives in the SectionCard `action`
+  // slot. The caption only renders once a computedAt is known.
+  const headerAction = (
+    <div className="flex items-center gap-2">
+      {data?.computedAt && (
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">
+          Computed {timeAgo(data.computedAt, { style: 'long' })} ago
+        </span>
+      )}
+      <Button variant="link" size="sm" icon={RefreshCw} loading={recompute.isPending} onClick={() => recompute.mutate()}>
+        Recompute now
+      </Button>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -57,6 +75,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
       <SectionCard
         title="Intelligence Signals"
         titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
+        action={headerAction}
       >
         <EmptyState
           icon={TrendingUp}
@@ -72,6 +91,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
       title="Intelligence Signals"
       titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
       titleExtra={<Badge label={`${signals.length}`} tone="teal" />}
+      action={headerAction}
     >
       <div className="space-y-2">
         {signals.slice(0, 10).map(signal => {

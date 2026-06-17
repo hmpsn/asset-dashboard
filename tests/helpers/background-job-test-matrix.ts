@@ -295,4 +295,13 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/w6-ai-ops-to-jobs.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE]: entry(
+    'INTELLIGENCE_RECOMPUTE',
+    {
+      expectedLabel: 'Refreshing signals',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/unit/intelligence-recompute-job.test.ts',
+  ),
 };

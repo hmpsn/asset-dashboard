@@ -32,6 +32,7 @@ export const BACKGROUND_JOB_TYPES = {
   CONTENT_POST_REVIEW: 'content-post-review',
   CONTENT_POST_FIX: 'content-post-fix',
   CONTENT_POST_VOICE_SCORE: 'content-post-voice-score',
+  INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -272,6 +273,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Scores a generated post against the workspace brand voice.',
     cancellable: false,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE]: {
+    label: 'Refreshing signals',
+    description: 'Recomputes analytics insights / intelligence signals for a workspace.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
   },
 };
 

@@ -113,9 +113,19 @@
           "source": "Strategy redesign spec 2026-06-16 §10 (Phase 5 signal generation)",
           "est": "S",
           "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-17",
+          "notes": "Done 2026-06-17 (PR #1262, merged to staging). First of three Phase 5 sub-PRs. The manual PATCH strategy-edit path (routes/keyword-strategy.ts) did NOT snapshot strategy_history (only the AI-regen writeKeywordStrategy did), so StrategyDiff ('What Changed') misattributed human edits to the last AI regeneration. Extracted the snapshot INSERT+prune-to-5 from keyword-strategy-persistence.ts into a reusable snapshotStrategyHistory(workspaceId, previousStrategy, priorArrays) helper (guards on prior generatedAt; must run inside db.transaction BEFORE the replaceAll/upsert clobber). Called it at the top of the PATCH applyPatch transaction (reads prior table-backed arrays + uses the PRIOR generatedAt). Behavior-preserving refactor of the regen path. Integration test: PATCH-then-/diff attributes the edit to the new boundary; no-blob PATCH records no snapshot (guard). Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md (decisions: cron conservative+kill-switch behind signal-auto-recompute flag; on-mutation always-enqueue)."
+        },
+        {
+          "id": "strategy-redesign-phase-5b-recompute-job",
+          "title": "Phase 5b — Recompute job + manual 'Recompute now' + 'Computed X ago' caption",
+          "source": "Strategy redesign spec 2026-06-16 §5 (Phase 5 signal generation)",
+          "est": "M",
+          "priority": "P2",
           "status": "in_progress",
           "createdAt": "2026-06-17",
-          "notes": "PR opening to staging. First of three Phase 5 sub-PRs. The manual PATCH strategy-edit path (routes/keyword-strategy.ts) did NOT snapshot strategy_history (only the AI-regen writeKeywordStrategy did), so StrategyDiff ('What Changed') misattributed human edits to the last AI regeneration. Extracted the snapshot INSERT+prune-to-5 from keyword-strategy-persistence.ts into a reusable snapshotStrategyHistory(workspaceId, previousStrategy, priorArrays) helper (guards on prior generatedAt; must run inside db.transaction BEFORE the replaceAll/upsert clobber). Called it at the top of the PATCH applyPatch transaction (reads prior table-backed arrays + uses the PRIOR generatedAt). Behavior-preserving refactor of the regen path. Integration test: PATCH-then-/diff attributes the edit to the new boundary; no-blob PATCH records no snapshot (guard). Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md (decisions: cron conservative+kill-switch behind signal-auto-recompute flag; on-mutation always-enqueue)."
+          "notes": "PR opening to staging. Second of three Phase 5 sub-PRs (always-on, no flag). New INTELLIGENCE_RECOMPUTE background job type (BACKGROUND_JOB_TYPES + metadata; resultBehavior domain-store; FM-2 transitions verified) + worker server/intelligence-recompute-job.ts (getOrComputeInsights force:true — computeAndPersistInsights stays private; NO addActivity, to avoid self-perpetuating 5c's activity-gated cron). New POST /api/webflow/keyword-strategy/:ws/signals/recompute (hasActiveJob reuse-or-create → createJob → setTimeout worker → {jobId}; recommendations.ts template). Threaded computedAt (MAX insight computed_at) onto the /signals payload (all 3 return branches) + SignalsResponse. IntelligenceSignals card: 'Computed X ago' muted caption (timeAgo) + teal 'Recompute now' Button (variant=link) in the SectionCard action slot, wired via useRecomputeSignals (POST → trackJob; NotificationBell surfaces progress; the existing INTELLIGENCE_SIGNALS_UPDATED broadcast auto-invalidates — no 2nd broadcast). Worker FM-2 + component tests. Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md."
         },
         {
           "id": "strategy-cannibalization-operator-keeper-override",
