@@ -1,7 +1,6 @@
 /**
  * Smoke tests for admin components:
  *   - WorkspaceHealthBadge
- *   - ActionQueue
  *   - BriefingReviewQueue
  *   - CannibalizationAlert
  *   - ClientActionsTab
@@ -14,13 +13,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 import { WorkspaceHealthBadge } from '../../../src/components/admin/WorkspaceHealthBadge';
-import { ActionQueue } from '../../../src/components/admin/ActionQueue';
 import { BriefingReviewQueue } from '../../../src/components/admin/BriefingReviewQueue';
 import { CannibalizationAlert } from '../../../src/components/ui/CannibalizationAlert';
 import { ClientActionsTab } from '../../../src/components/admin/ClientActionsTab';
 import { AdminInbox } from '../../../src/components/admin/AdminInbox';
 
-import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type { CannibalizationWarning, CannibalizationEntry } from '../../../shared/types/intelligence';
 import type { ClientAction } from '../../../shared/types/client-actions';
 import type { ClientSignal } from '../../../shared/types/client-signals';
@@ -78,20 +75,6 @@ function renderWithWrapper(ui: React.ReactElement) {
 }
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
-
-const makeInsight = (overrides: Partial<AnalyticsInsight> = {}): AnalyticsInsight => ({
-  id: 'insight-1',
-  workspaceId: 'ws-1',
-  pageId: 'page-1',
-  insightType: 'title_missing',
-  data: {} as AnalyticsInsight['data'],
-  severity: 'critical',
-  computedAt: '2026-05-01T00:00:00Z',
-  pageTitle: 'Home Page',
-  impactScore: 85,
-  domain: 'content',
-  ...overrides,
-});
 
 const makeClientAction = (overrides: Partial<ClientAction> = {}): ClientAction => ({
   id: 'action-1',
@@ -217,115 +200,6 @@ describe('WorkspaceHealthBadge', () => {
     const spans = screen.getAllByText('40');
     const span = spans.find(el => el.tagName === 'SPAN');
     expect(span?.className).toContain('red');
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// ActionQueue
-// ════════════════════════════════════════════════════════════════════════════
-
-describe('ActionQueue', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders the section card title', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({ items: [] });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    // Title appears (could be "Action Queue" or include count)
-    await waitFor(() => {
-      expect(screen.getByText(/Action Queue/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows empty state when no items', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({ items: [] });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => {
-      expect(screen.getByText('All caught up')).toBeInTheDocument();
-    });
-  });
-
-  it('shows items when data is returned', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [makeInsight({ id: 'i1', pageTitle: 'Home Page' })],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => {
-      expect(screen.getByText('Home Page')).toBeInTheDocument();
-    });
-  });
-
-  it('shows impact score for items', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [makeInsight({ impactScore: 92 })],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => {
-      expect(screen.getByText('92')).toBeInTheDocument();
-    });
-  });
-
-  it('renders multiple items', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [
-        makeInsight({ id: 'i1', pageTitle: 'Home' }),
-        makeInsight({ id: 'i2', pageTitle: 'About' }),
-      ],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => {
-      expect(screen.getByText('Home')).toBeInTheDocument();
-      expect(screen.getByText('About')).toBeInTheDocument();
-    });
-  });
-
-  it('expands an item row when clicked', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [makeInsight({ id: 'i1', pageTitle: 'Home', insightType: 'title_missing' })],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => expect(screen.getByText('Home')).toBeInTheDocument());
-
-    const row = screen.getByText('Home');
-    fireEvent.click(row);
-
-    await waitFor(() => {
-      expect(screen.getByText(/title_missing/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows resolution buttons when expanded', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [makeInsight({ id: 'i1', pageTitle: 'Home' })],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => expect(screen.getByText('Home')).toBeInTheDocument());
-
-    fireEvent.click(screen.getByText('Home'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Mark Resolved')).toBeInTheDocument();
-      expect(screen.getByText('In Progress')).toBeInTheDocument();
-    });
-  });
-
-  it('shows item count in title when items exist', async () => {
-    const { getSafe } = await import('../../../src/api/client');
-    vi.mocked(getSafe).mockResolvedValue({
-      items: [makeInsight({ id: 'i1' }), makeInsight({ id: 'i2' })],
-    });
-    renderWithWrapper(<ActionQueue workspaceId="ws-1" />);
-    await waitFor(() => {
-      expect(screen.getByText(/Action Queue \(2\)/)).toBeInTheDocument();
-    });
   });
 });
 

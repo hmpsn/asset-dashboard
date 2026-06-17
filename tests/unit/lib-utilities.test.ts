@@ -485,10 +485,6 @@ describe('queryKeys — admin outcome + signals keys', () => {
   it('aiSuggestedBriefs key shape', () => {
     expect(queryKeys.admin.aiSuggestedBriefs(WS)).toEqual(['admin-ai-suggested-briefs', WS]);
   });
-
-  it('actionQueue key shape', () => {
-    expect(queryKeys.admin.actionQueue(WS)).toEqual(['admin-action-queue', WS]);
-  });
 });
 
 describe('queryKeys — client outcome + plan keys', () => {

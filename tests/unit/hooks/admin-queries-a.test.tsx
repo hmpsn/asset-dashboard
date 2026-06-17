@@ -33,9 +33,8 @@ vi.mock('../../../src/api/client', () => ({
   post: vi.fn(),
 }));
 
-import { get, getSafe } from '../../../src/api/client';
+import { get } from '../../../src/api/client';
 const mockGet = vi.mocked(get);
-const mockGetSafe = vi.mocked(getSafe);
 
 // ── Mock: src/api/content ───────────────────────────────────────────────────
 
@@ -135,7 +134,6 @@ const mockBlueprintsList = vi.mocked(blueprintsApi.list);
 
 // ── Hook imports ────────────────────────────────────────────────────────────
 
-import { useActionQueue } from '../../../src/hooks/admin/useActionQueue';
 import { useAdminBriefsList, useAdminRequestsList } from '../../../src/hooks/admin/useAdminBriefs';
 import { useAdminROI } from '../../../src/hooks/admin/useAdminROI';
 import { useAdminPostsList, useAdminPost } from '../../../src/hooks/admin/useAdminPosts';
@@ -145,32 +143,6 @@ import { useWorkspaceIntelligence } from '../../../src/hooks/admin/useWorkspaceI
 import { useAiSuggestedBriefs } from '../../../src/hooks/admin/useAiSuggestedBriefs';
 import { useBlueprints } from '../../../src/hooks/admin/useBlueprints';
 import { useHealthCheck } from '../../../src/hooks/admin/useHealthCheck';
-
-// ── useActionQueue ──────────────────────────────────────────────────────────
-
-describe('useActionQueue', () => {
-  beforeEach(() => { mockGetSafe.mockReset(); });
-
-  it('is disabled when workspaceId is empty string', () => {
-    const { result } = renderHook(() => useActionQueue(''), { wrapper: makeWrapper() });
-    expect(result.current.data).toBeUndefined();
-    expect(result.current.isLoading).toBe(false);
-    expect(mockGetSafe).not.toHaveBeenCalled();
-  });
-
-  it('enters loading state when enabled with a valid workspaceId', () => {
-    mockGetSafe.mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useActionQueue('ws-1'), { wrapper: makeWrapper() });
-    expect(result.current.isLoading).toBe(true);
-  });
-
-  it('returns data when API resolves', async () => {
-    const payload = { items: [{ id: 'i1', type: 'seo_fix' }] };
-    mockGetSafe.mockResolvedValue(payload);
-    const { result } = renderHook(() => useActionQueue('ws-1'), { wrapper: makeWrapper() });
-    await waitFor(() => expect(result.current.data).toEqual(payload));
-  });
-});
 
 // ── useAdminBriefsList ──────────────────────────────────────────────────────
 

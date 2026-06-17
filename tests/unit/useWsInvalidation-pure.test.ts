@@ -230,7 +230,6 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.shared.recommendations(WS_ID));
     expect(keys).toContainEqual(queryKeys.shared.pageEditStates(WS_ID, false));
     expect(keys).toContainEqual(queryKeys.shared.pageEditStates(WS_ID, true));
-    expect(keys).toContainEqual(queryKeys.admin.actionQueue(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.intelligence(WS_ID));

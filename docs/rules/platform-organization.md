@@ -119,7 +119,7 @@ Owns decision, conversation, approval, and review flows shared between admin and
 - Owned routes/modules:
   `server/routes/approvals.ts`, `server/routes/client-actions.ts`, `server/routes/requests.ts`, `server/routes/public-requests.ts`, `server/approvals.ts`, `server/client-actions.ts`, `server/requests.ts`
 - Owned components/hooks/API wrappers/shared types:
-  `src/components/admin/AdminInbox.tsx`, `src/components/admin/ActionQueue.tsx`, `src/components/admin/BriefingReviewQueue.tsx`, `src/components/client/InboxTab.tsx`, `DecisionCard.tsx`, `DecisionDetailModal.tsx`, `ApprovalBatchCard.tsx`, `PriorityStrip.tsx`, `SchemaReviewModal.tsx`, `ClientActionDetailModal.tsx`, `src/hooks/admin/useActionQueue.ts`, `useQueue.ts`, `src/api/clientActions.ts`, `shared/types/approvals.ts`, `shared/types/client-actions.ts`, `shared/types/decision.ts`, `shared/types/requests.ts`
+  `src/components/admin/AdminInbox.tsx`, `src/components/admin/BriefingReviewQueue.tsx`, `src/components/client/InboxTab.tsx`, `DecisionCard.tsx`, `DecisionDetailModal.tsx`, `ApprovalBatchCard.tsx`, `PriorityStrip.tsx`, `SchemaReviewModal.tsx`, `ClientActionDetailModal.tsx`, `src/hooks/admin/useQueue.ts`, `src/api/clientActions.ts`, `shared/types/approvals.ts`, `shared/types/client-actions.ts`, `shared/types/decision.ts`, `shared/types/requests.ts`
 - WebSocket/events:
   `WS_EVENTS.APPROVAL_UPDATE`, `WS_EVENTS.APPROVAL_APPLIED`, `WS_EVENTS.CLIENT_ACTION_UPDATE`, `WS_EVENTS.REQUEST_CREATED`, `WS_EVENTS.REQUEST_UPDATE`
 - Tests/docs:
