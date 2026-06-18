@@ -233,17 +233,6 @@ export interface KeywordOpportunitiesProps {
   navigate?: (path: string) => void;
 }
 
-/**
- * Reference-band-only merged Authority & Backlinks leaf (Phase 4). Composes the backlink profile
- * with the trimmed competitive comparison (own-domain stat grid + keyword-gaps section removed,
- * cache-label corrected). Flag-ON only; legacy keeps standalone BacklinkProfile + CompetitiveIntel.
- */
-export interface AuthorityAndBacklinksProps {
-  workspaceId: string;
-  competitors: string[];
-  seoDataAvailable: boolean;
-}
-
 export interface StrategyHowItWorksProps {
   /** Source from `strategy?.seoDataMode` (the SAVED strategy mode) — NOT the settings-form `seoDataMode` (editable state). */
   displayedSeoDataMode?: string;

@@ -182,7 +182,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     let persistedEntries: PageKeywordMap[];
     if (strategyMode === 'full') {
       const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-      upsertAndCleanPageKeywords(ws.id, stampedMap);
+      // rotate=true: this is the strategy-refresh boundary, so each surviving page's
+      // prior current_position rotates into previous_position — the producer the
+      // Rankings-tab movements card reads (improved/declined/lost vs the last refresh).
+      upsertAndCleanPageKeywords(ws.id, stampedMap, true);
       persistedEntries = stampedMap;
     } else {
       // Only update pages actually re-analyzed in this incremental run.
@@ -193,7 +196,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       const analyzedMappings = pageMap
         .filter((pm) => pathsToUpdate.has(normalizePageUrl(pm.pagePath)))
         .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-      upsertPageKeywordsBatch(ws.id, analyzedMappings);
+      // rotate=true: incremental is still a refresh boundary for the pages it touches,
+      // so re-analyzed pages rotate prior current_position → previous_position. Untouched
+      // pages aren't upserted, so their movement baseline stays frozen until next refreshed.
+      upsertPageKeywordsBatch(ws.id, analyzedMappings, true);
       persistedEntries = analyzedMappings;
       for (const pagePath of explicitlyRemovedPaths) {
         db.prepare('DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id

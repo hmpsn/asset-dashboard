@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { Badge, Icon, IconButton, InlineBanner } from '../ui';
-import { ArrowUpRight, Eye, Users, Loader2, Check, Plus } from 'lucide-react';
+import { ArrowUpRight, Eye, Users, Loader2, Check, Plus, FileText } from 'lucide-react';
 import { adminPath } from '../../routes';
 import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
@@ -27,6 +27,12 @@ export interface KeywordGapsProps {
   trackingPending?: Set<string>;
   trackingErrors?: Map<string, string>;
   onTrack?: (kw: string) => void;
+  /**
+   * Create-brief affordance (Strategy v2 Competitive tab, Phase 5). When `onCreateBrief` is provided,
+   * each row gets a "Create brief" button that turns a competitor-gap keyword into a content brief.
+   * Omitted in the legacy/Overview layout → no button, byte-identical.
+   */
+  onCreateBrief?: (keyword: string) => void;
 }
 
 export function KeywordGaps({
@@ -38,11 +44,13 @@ export function KeywordGaps({
   trackingPending,
   trackingErrors,
   onTrack,
+  onCreateBrief,
 }: KeywordGapsProps) {
   if (keywordGaps.length === 0) return null;
 
   const showHubLink = !!(workspaceId && navigate);
   const showTrack = !!onTrack;
+  const showCreateBrief = !!onCreateBrief;
 
   return (
     <div className="bg-[var(--surface-2)] border border-orange-500/20 p-5 rounded-[var(--radius-signature)]">
@@ -87,6 +95,17 @@ export function KeywordGaps({
                       title="View in Hub"
                       label="View in Hub"
                       icon={ArrowUpRight}
+                      size="sm"
+                      variant="ghost"
+                      className="text-[var(--brand-text-muted)] hover:text-accent-brand"
+                    />
+                  )}
+                  {showCreateBrief && (
+                    <IconButton
+                      onClick={() => onCreateBrief!(gap.keyword)}
+                      title="Create brief"
+                      label="Create brief"
+                      icon={FileText}
                       size="sm"
                       variant="ghost"
                       className="text-[var(--brand-text-muted)] hover:text-accent-brand"

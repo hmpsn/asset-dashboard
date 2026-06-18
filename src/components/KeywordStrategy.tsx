@@ -40,6 +40,7 @@ import {
   DecayingPagesCard,
   RankingDistribution,
   StrategyRankingsTab,
+  StrategyCompetitiveTab,
   SiteTargetKeywords,
   KeywordOpportunities,
   StrategyHowItWorks,
@@ -47,13 +48,15 @@ import {
 import { adminPath } from '../routes';
 
 // Strategy v2 interior tabs (command-center layout). Overview = Orient + Act + reference;
-// Content = the content "money page". Rankings + Competitive are added in later phases.
+// Content = the content "money page"; Rankings = position distribution + movements;
+// Competitive = share of voice + keyword gaps + backlinks (the "research mode" surface).
 // The literal ids appear here so the ?tab= deep-link contract test recognizes this receiver.
-type StrategyInteriorTab = 'overview' | 'content' | 'rankings';
+type StrategyInteriorTab = 'overview' | 'content' | 'rankings' | 'competitive';
 const STRATEGY_INTERIOR_TABS: { id: StrategyInteriorTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'content', label: 'Content' },
   { id: 'rankings', label: 'Rankings' },
+  { id: 'competitive', label: 'Competitive' },
 ];
 
 interface Props {
@@ -117,6 +120,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist. Gated on the flag so flag-OFF adds no fetch.
   const { data: contentDecayData } = useContentDecay(workspaceId, { enabled: commandCenterEnabled });
+
+  // Competitor domains as a clean array — shared by the legacy CompetitiveIntel leaf and the v2
+  // Competitive tab so the CSV/newline parse lives in exactly one place.
+  const competitorList = settings.competitors.split(/[,\n]+/).map((c) => c.trim()).filter(Boolean);
 
   // intentColor is consumed by ContentGaps — kept in the orchestrator and passed down.
   const intentColor = (intent?: string) => {
@@ -358,7 +365,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     competitive: (
       <CompetitiveIntel
         workspaceId={workspaceId}
-        competitors={settings.competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
+        competitors={competitorList}
         seoDataAvailable={settings.seoDataAvailable}
         cachedKeywordGaps={strategy?.keywordGaps}
       />
@@ -437,8 +444,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </div>
               {realLeaves.cannibalization}
               {realLeaves.strategyDiff}
-              {realLeaves.backlink}
-              {realLeaves.competitive}
               {realLeaves.siteKeywords}
               {realLeaves.opportunities}
               {intelligenceSignalsEl}
@@ -465,6 +470,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
           {interiorTab === 'rankings' && (
             <StrategyRankingsTab metrics={metrics} workspaceId={workspaceId} navigate={navigate} />
+          )}
+          {interiorTab === 'competitive' && (
+            <StrategyCompetitiveTab
+              workspaceId={workspaceId}
+              competitors={competitorList}
+              seoDataAvailable={settings.seoDataAvailable}
+              keywordGaps={strategy?.keywordGaps || []}
+              navigate={navigate}
+            />
           )}
         </>
       )}
