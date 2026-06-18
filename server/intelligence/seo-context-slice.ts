@@ -474,15 +474,14 @@ export async function assembleSeoContext(
     workspaceId,
     undefined,
     async () => {
-      const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadRecommendations, isActiveRec } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const recSet = loadRecommendations(workspaceId);
       const topId = recSet?.summary?.topRecommendationId ?? null;
       if (topId) {
         const topRec = recSet?.recommendations.find(
           (r) =>
             r.id === topId &&
-            r.status !== 'completed' &&
-            r.status !== 'dismissed',
+            isActiveRec(r),
         );
         if (topRec?.opportunity) {
           return {

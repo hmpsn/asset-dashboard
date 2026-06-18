@@ -63,11 +63,11 @@ export async function assemblePageProfile(
   // Recommendations for this page
   let recommendations: string[] = [];
   try {
-    const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { loadRecommendations, isActiveRec } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const recSetPP: RecommendationSet | null = loadRecommendations(workspaceId);
     if (recSetPP?.recommendations) {
       recommendations = recSetPP.recommendations
-        .filter(r => r.affectedPages?.some(p => matchPageIdentity(p, pagePath)) && (r.status === 'pending' || !r.status))
+        .filter(r => r.affectedPages?.some(p => matchPageIdentity(p, pagePath)) && isActiveRec(r))
         .map(r => r.title ?? r.description ?? '')
         .filter(Boolean);
     }
