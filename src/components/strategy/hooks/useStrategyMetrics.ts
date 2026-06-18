@@ -41,6 +41,28 @@ export function useStrategyMetrics(
       acc[intent] = (acc[intent] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+    // Position movements vs each page's previousPosition (v2 Rankings tab). Computed from the
+    // filtered map so it's consistent with the distribution shown alongside it.
+    let improved = 0;
+    let declined = 0;
+    let newlyRanking = 0;
+    let lost = 0;
+    for (const p of filteredPageMap) {
+      const cur = p.currentPosition;
+      const prev = p.previousPosition;
+      const curRanked = typeof cur === 'number' && cur >= 1;
+      const prevRanked = typeof prev === 'number' && prev >= 1;
+      if (curRanked && prevRanked) {
+        if (cur < prev) improved += 1;
+        else if (cur > prev) declined += 1;
+      } else if (curRanked && !prevRanked) {
+        newlyRanking += 1;
+      } else if (!curRanked && prevRanked) {
+        lost += 1;
+      }
+    }
+    const movements = { improved, declined, new: newlyRanking, lost };
+
     const declinedFeedback = keywordFeedbackRows.filter(row => row.status === 'declined');
     const requestedFeedback = keywordFeedbackRows.filter(row => row.status === 'requested');
     const approvedFeedback = keywordFeedbackRows.filter(row => row.status === 'approved');
@@ -78,6 +100,7 @@ export function useStrategyMetrics(
       notRankingCount,
       lowHangingFruit,
       intentCounts,
+      movements,
       declinedFeedback,
       requestedFeedback,
       approvedFeedback,

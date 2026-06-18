@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **516 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **517 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 517. Strategy Page — Rankings tab: position distribution + movements summary (Phase 4, behind `strategy-command-center`)
+
+**What it does:** Adds the **Rankings** interior tab to the v2 "command center" Strategy page (third tab after Overview / Content, behind `strategy-command-center`). It is a deliberate *summary that deep-links* the Keyword Hub, not a rebuild of it: the interactive ranking-position distribution (top-3 / top-10 / 11–20 striking-distance / beyond-20 / not-ranking, with the striking-distance band deep-linking to the Hub's `striking_distance` view), a **Position movements** card (Improved / Declined / New / Lost since the previous refresh, Four-Laws colors), and an "Open the Keyword Hub" deep-link for full tracking, history & alerts. The distribution moves off the Overview tab into Rankings (flag-ON only). The movements card is gated to render only when there is real movement data — `previousPosition` is not yet rotated on write server-side, so rather than show an all-zero / all-"New" panel the card stays hidden until that producer lands (tracked follow-up). Flag-OFF is byte-identical (the legacy Analysis layout still renders the distribution inline).
+
+**Agency value:** A one-glance "where do we rank and what moved" summary that hands off to the Keyword Hub for the deep work — the operator orients on Strategy and drills into the Hub for management, instead of two surfaces competing to own ranking data.
+
+**Client value:** Indirect (admin-only). The client reframe (Phase 6) inherits the same tab.
+
+**Mutual:** Reuses the existing `RankingDistribution` leaf (with its Hub deep-link), the `SectionCard` / `CompactStatBar` / `ClickableRow` / `EmptyState` primitives, and the `useStrategyMetrics` hook (movements added as a purely-additive field, so the flag-OFF legacy layout is unaffected). Dark-launched behind `strategy-command-center` (default OFF).
+
+**Files:** `src/components/strategy/StrategyRankingsTab.tsx` (new), `src/components/strategy/hooks/useStrategyMetrics.ts` (+`movements`), `src/components/strategy/types.ts` (+`movements` on `StrategyMetrics`, +`previousPosition?` on the strategy-local `PageKeywordMap`), `src/components/KeywordStrategy.tsx` (Rankings tab wiring; distribution moved off Overview), `src/components/strategy/index.ts`. Tests: `tests/component/strategy/StrategyRankingsTab.test.tsx`, `tests/unit/strategy/useStrategyMetrics-movements.test.tsx`. Adversarial review: 2-agent (movements/parity + Rankings-tab conformance) — caught that `previousPosition` has no server-side producer (movements gated as a result) and a surface-in-surface blend (fixed with `--surface-3` override). Deferred: the `previousPosition` producer (rotate `current → previous` on the strategy-refresh write, or source from rank history) — tracked follow-up. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 4).
 
 ---
 

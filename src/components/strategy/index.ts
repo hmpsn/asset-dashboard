@@ -18,6 +18,7 @@ export * from './StrategyEmptyState';
 export * from './StrategyStatGrid';
 export * from './OrientZone';
 export * from './ActQueue';
+export * from './StrategyRankingsTab';
 export * from './RankingDistribution';
 export * from './SiteTargetKeywords';
 export * from './KeywordOpportunities';
