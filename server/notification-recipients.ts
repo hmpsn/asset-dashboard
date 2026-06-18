@@ -37,6 +37,7 @@ export type ClientNotificationEventType = Extract<
   | 'audit_complete'
   | 'client_briefing_ready'
   | 'work_order_comment_client'
+  | 'curated_recs_sent'
   | 'trial_expiry_warning'
   | 'client_welcome'
   | 'password_reset'
@@ -117,6 +118,11 @@ export const CLIENT_NOTIFICATION_RECIPIENT_POLICIES = {
     authority: 'explicit_recipient',
     source: 'caller',
     note: 'The submitted and verified client-user email is the only intended recipient.',
+  },
+  curated_recs_sent: {
+    authority: 'workspace_primary',
+    source: 'workspace.clientEmail',
+    note: 'Curated recommendation sends notify the primary workspace client contact — the doorbell back to the hub.',
   },
 } as const satisfies Record<ClientNotificationEventType, ClientNotificationRecipientPolicy>;
 

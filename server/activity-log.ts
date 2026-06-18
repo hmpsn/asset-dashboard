@@ -146,6 +146,14 @@ export type ActivityType =
   // recommendation triage is an internal admin-facing audit trail, not a client deliverable.
   | 'rec_status_updated'   // client triage: pending/in_progress/completed
   | 'rec_dismissed'        // client dismissed a recommendation
+  // Strategy v3 curation lifecycle (spec §7.5). rec_sent + rec_approved are CLIENT-VISIBLE
+  // (real client-facing milestones); rec_struck + rec_throttled are ADMIN-ONLY (internal
+  // curation hygiene the client must never see — a struck rec read as activity would leak
+  // "we decided not to do this").
+  | 'rec_sent'             // CLIENT-VISIBLE: operator sent a curated rec to the client
+  | 'rec_approved'         // CLIENT-VISIBLE: client approved a sent rec
+  | 'rec_struck'           // admin-only: operator permanently suppressed a rec
+  | 'rec_throttled'        // admin-only: operator throttled a rec for 7/30/90 days
   | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
@@ -204,6 +212,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',
   'deliverable_sent', 'deliverable_responded',
+  'rec_sent', 'rec_approved',
 ]);
 
 const CLIENT_ENGAGEMENT_TYPES: ActivityType[] = [

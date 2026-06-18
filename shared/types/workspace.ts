@@ -1,6 +1,7 @@
 // ── Workspace domain types ──────────────────────────────────────
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
+import type { ImpactBand } from './impact-band.ts';
 
 export interface EventGroup {
   id: string;
@@ -126,6 +127,12 @@ export interface TopicCluster {
   topCompetitor?: string;        // competitor with highest coverage in this cluster
   topCompetitorCoverage?: number;
   gap: string[];                 // keywords in cluster without ranking or strategy/page coverage
+  /** Strategy v3 (#9) — operator/AI rationale for prioritizing this cluster. Optional: legacy
+   *  blobs and clusters minted before v3 lack it; the cluster card hides the line when absent. */
+  rationale?: string;
+  /** Strategy v3 (#9) — banded projected impact of closing this cluster's gap. Client-safe
+   *  (banded, never a raw $ figure — mirrors Recommendation.impactBand). Optional on legacy blobs. */
+  projectedImpact?: ImpactBand;
 }
 
 export interface CannibalizationItem {
@@ -154,6 +161,15 @@ export interface KeywordStrategy {
   /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
   pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  /** Typed parallel to `opportunities` (Strategy v3 §12b) — carries volume/difficulty/rationale so the
+   *  curated keyword-opportunity send (P5 #6b) and the public read can present them without re-deriving.
+   *  Optional: legacy strategies have only the bare `opportunities` string[]. */
+  opportunitiesDetailed?: Array<{
+    keyword: string;
+    volume?: number;
+    difficulty?: number;
+    rationale?: string;
+  }>;
   /** Stored separately in the content_gaps table; omitted in the workspace JSON blob. */
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   /** Stored separately in the quick_wins table; omitted in the workspace JSON blob. */

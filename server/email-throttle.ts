@@ -62,6 +62,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   work_order_comment_team: 'internal',     // client → team, admin inbox
   client_briefing_ready: 'action',
   work_order_comment_client: 'action',     // team → client reply
+  curated_recs_sent: 'action',             // Strategy v3 — batched "N recs ready for your decision"
 };
 
 export function getThrottleCategory(type: EmailEventType): ThrottleCategory {

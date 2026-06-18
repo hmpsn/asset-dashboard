@@ -188,7 +188,8 @@ export type EmailEventType =
   | 'content_changes_requested'
   | 'action_approved'
   | 'work_order_comment_team'
-  | 'work_order_comment_client';
+  | 'work_order_comment_client'
+  | 'curated_recs_sent';
 
 type PayloadRule = {
   requiredStrings?: string[];

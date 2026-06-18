@@ -157,6 +157,14 @@ export const keywordStrategySchema = z.object({
   siteKeywords: z.array(z.string()).optional(),
   pageMap: z.array(pageKeywordMapSchema).optional(),
   opportunities: z.array(z.string()).optional(),
+  // Strategy v3 §12b — typed parallel to `opportunities`; optional so legacy/sparse blobs still parse,
+  // and so parseJsonSafe preserves it once the curated keyword-opportunity path (P5 #6b) writes it.
+  opportunitiesDetailed: z.array(z.object({
+    keyword: z.string(),
+    volume: z.number().optional(),
+    difficulty: z.number().optional(),
+    rationale: z.string().optional(),
+  })).optional(),
   siteKeywordMetrics: z.array(z.object({
     keyword: z.string(),
     volume: z.number(),
@@ -397,6 +405,21 @@ export const recommendationSchema = z.object({
   targetKeyword: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed', 'dismissed']),
   assignedTo: z.enum(['team', 'client']).optional(),
+  // ── Strategy v3 lifecycle axes (lockstep with Recommendation in shared/types/recommendations.ts).
+  // All .optional(): every PRE-v3 stored blob lacks these keys, so a REQUIRED field would drop the
+  // whole rec on read (the "Schema vs stored shape" rule). Explicit (not passthrough-only) so a
+  // mistyped write — e.g. clientStatus:'snet' — is caught at the read boundary, not silently kept.
+  clientStatus: z.enum(['system', 'curated', 'sent', 'approved', 'declined', 'discussing']).optional(),
+  lifecycle: z.enum(['active', 'throttled', 'struck']).optional(),
+  throttledUntil: z.string().optional(),
+  sentAt: z.string().optional(),
+  struckAt: z.string().optional(),
+  cascade: z.object({
+    removedKeywords: z.array(z.string()).optional(),
+    removedClusters: z.array(z.string()).optional(),
+    reversible: z.boolean(),
+  }).optional(),
+  sendChannel: z.enum(['deliverable', 'rec']).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   // Unified Opportunity Value breakdown (PR1). Optional on legacy rows; a malformed

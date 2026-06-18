@@ -407,6 +407,11 @@ function adminInvalidationKeys(
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
       ] as const;
+    case WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED:
+      return [
+        queryKeys.admin.recDiscussion(workspaceId),
+        queryKeys.client.curatedRecommendations(workspaceId),
+      ] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
       return strategyMutationKeys(workspaceId);
     case WS_EVENTS.RANK_TRACKING_UPDATED:
@@ -570,6 +575,10 @@ function clientDashboardInvalidationKeys(
       ] as const;
     case WS_EVENTS.RECOMMENDATIONS_UPDATED:
       return [queryKeys.shared.recommendations(workspaceId)] as const;
+    case WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED:
+      // Client reads rec discussion via the curated read — refresh it on a discussion update
+      // (both halves of the broadcast; the curated consumer lands in Phase 4).
+      return [queryKeys.client.curatedRecommendations(workspaceId)] as const;
     case WS_EVENTS.BRIEFING_PUBLISHED:
       return [queryKeys.client.briefing(workspaceId)] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
