@@ -47,13 +47,17 @@ describe('isActiveRec', () => {
   });
 });
 
-describe('auto-resolve exemption (clientStatus in {sent,discussing,approved})', () => {
+describe('auto-resolve exemption (clientStatus in {sent,discussing,approved} OR lifecycle in {struck,throttled})', () => {
   it('exempts a sent rec from the destructive auto-resolve → completed sweep', () => {
     expect(isExemptFromAutoResolve(rec({ clientStatus: 'sent' }))).toBe(true);
   });
   it('exempts discussing + approved recs', () => {
     expect(isExemptFromAutoResolve(rec({ clientStatus: 'discussing' }))).toBe(true);
     expect(isExemptFromAutoResolve(rec({ clientStatus: 'approved' }))).toBe(true);
+  });
+  it('exempts struck + throttled recs (else unstrike/throttle reversibility breaks: a swept→completed rec stays dead)', () => {
+    expect(isExemptFromAutoResolve(rec({ lifecycle: 'struck' }))).toBe(true);
+    expect(isExemptFromAutoResolve(rec({ lifecycle: 'throttled' }))).toBe(true);
   });
   it('does NOT exempt system / curated / declined recs (they may auto-resolve normally)', () => {
     expect(isExemptFromAutoResolve(rec({ clientStatus: 'system' }))).toBe(false);

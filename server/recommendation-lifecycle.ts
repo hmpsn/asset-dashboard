@@ -1,5 +1,5 @@
 /**
- * Strategy v3 (spec §6.2, 00-contracts §11) — the SINGLE WRITER for the recommendation
+ * Strategy v3 (spec §6.2) — the SINGLE WRITER for the recommendation
  * client-facing lifecycle axis. All clientStatus / lifecycle mutations go through here so
  * the trust-critical invariant holds: strike/throttle/send NEVER write RecStatus.
  *

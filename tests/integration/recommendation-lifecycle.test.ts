@@ -140,14 +140,11 @@ describe('recommendation-lifecycle single-writer', () => {
 });
 
 describe('strike-never-completed — auto-resolve exemption + summary predicate', () => {
-  // NOTE: the full regen integration for "exempt rec whose source vanishes stays in set"
-  // has an as-built gap: the current generateRecommendations auto-resolve loop correctly
-  // skips pushing exempt recs as 'completed', but does not carry them forward into the
-  // new recs array when no matching new source exists. This means exempt sent recs whose
-  // source condition disappears are silently dropped (not completed) rather than preserved.
-  // The expected fix (adding exempt recs to the output recs when no new source matches) was
-  // not committed in Lanes 1A-1C. This test exercises the parts that ARE correctly
-  // implemented and flags the gap via the skip below (controller decision required).
+  // The full regen integration for "exempt rec whose source vanishes stays in set" is covered by
+  // tests/integration/recommendation-regen-preserves-lifecycle.test.ts (Suite B): the auto-resolve
+  // loop RETAINS an exempt rec as-is when its source is no longer detected (recommendations.ts ~2459),
+  // and the companion test proves a non-exempt rec on the same path still auto-resolves. The tests
+  // below pin the predicate-level invariant: isExemptFromAutoResolve is the gate the sweep checks.
   it('isExemptFromAutoResolve is the trust-critical gate on the auto-resolve loop (exemption unit path)', () => {
     // This tests the same invariant at the mutation level: a sent rec cannot be
     // auto-resolved to 'completed' by anything that checks isExemptFromAutoResolve.

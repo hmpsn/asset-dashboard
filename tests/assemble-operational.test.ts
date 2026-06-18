@@ -36,6 +36,19 @@ vi.mock('../server/recommendations.js', () => ({
       { id: 'r3', priority: 'fix_later', status: 'pending' },
     ],
   })),
+  // Faithful mirror of server/recommendations.ts:isActiveRec. The real module
+  // imports the DB graph, so it can't be importActual'd in this pure unit test —
+  // the active-set predicate is duplicated here. Keep in sync with the source.
+  isActiveRec: (
+    rec: { status?: string; lifecycle?: string; throttledUntil?: string; clientStatus?: string },
+    now: number = Date.now(),
+  ): boolean => {
+    if (rec.status === 'completed' || rec.status === 'dismissed') return false;
+    if (rec.lifecycle === 'struck') return false;
+    if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
+    if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
+    return true;
+  },
 }));
 
 vi.mock('../server/jobs.js', () => ({

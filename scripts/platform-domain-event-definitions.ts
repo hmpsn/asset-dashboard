@@ -221,6 +221,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   BULK_OPERATION_COMPLETE: 'seo-health',
   BULK_OPERATION_FAILED: 'seo-health',
   RECOMMENDATIONS_UPDATED: 'seo-health',
+  RECOMMENDATIONS_DISCUSSION_UPDATED: 'seo-health',
   STRATEGY_UPDATED: 'seo-health',
   RANK_TRACKING_UPDATED: 'seo-health',
   LOCAL_SEO_UPDATED: 'seo-health',

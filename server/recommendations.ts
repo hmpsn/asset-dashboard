@@ -590,7 +590,7 @@ export function resolveContentRecommendationsForPublishedPost(
   return resolved;
 }
 
-/** Strategy v3 (00-contracts §6.3) — copy the client-facing lifecycle axis from each matched
+/** Strategy v3 (spec §6.3) — copy the client-facing lifecycle axis from each matched
  *  old rec onto its freshly-minted counterpart during regen. Keyed by buildMergeKey so a
  *  re-detected issue keeps its sent/throttled/struck state (the trust-critical carry-over —
  *  a sent rec must NOT reset to 'system' on the next regen). Copies for EVERY matched oldRec
@@ -616,13 +616,17 @@ export function applyLifecycleCarryOver(newRecs: Recommendation[], oldRecs: Reco
   }
 }
 
-/** Strategy v3 (00-contracts §6.5 / spec §6.5) — recs the client has SEEN must be exempt from the
- *  destructive auto-resolve → 'completed' sweep. A sent/discussing/approved rec swept to completed
- *  would read to the client as "✓ done" even though we struck/never-did it. When such a rec's
- *  condition is genuinely fixed, a SEPARATE positive-terminal transition handles it (P2/P3) — the
- *  auto-resolve sweep simply skips it here. declined is NOT exempt (the client said no; it can resolve). */
+/** Strategy v3 (spec §6.5) — recs the client has SEEN (clientStatus sent/discussing/approved) OR that
+ *  the operator has explicitly parked (lifecycle struck/throttled) must be exempt from the destructive
+ *  auto-resolve → 'completed' sweep. A sent rec swept to completed would read to the client as "✓ done";
+ *  a struck/throttled rec swept to completed breaks strike/throttle reversibility (unstrike restores
+ *  lifecycle but NOT status → a permanently-dead, "done"-reading rec). When such a rec's condition is
+ *  genuinely fixed, a SEPARATE positive-terminal transition handles it (P2/P3); the sweep just skips it
+ *  here, and the regen loop RETAINS it as-is when its source vanishes. declined is NOT exempt — the
+ *  client said no, so it can resolve normally. */
 export function isExemptFromAutoResolve(rec: Recommendation): boolean {
-  return rec.clientStatus === 'sent' || rec.clientStatus === 'discussing' || rec.clientStatus === 'approved';
+  return rec.clientStatus === 'sent' || rec.clientStatus === 'discussing' || rec.clientStatus === 'approved'
+    || rec.lifecycle === 'struck' || rec.lifecycle === 'throttled';
 }
 
 /**

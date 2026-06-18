@@ -2,8 +2,8 @@
 
 > Feature-specific contract reference for the Strategy v3 curation cockpit. Read this before
 > touching any recommendation lifecycle code. Companion to the locked Phase-1 contracts in
-> `docs/superpowers/plans/parts/00-contracts.md` and the design spec
-> `docs/superpowers/specs/2026-06-18-strategy-v3-curation-cockpit-design.md`.
+> Part 0 of the implementation plan `docs/superpowers/plans/2026-06-18-strategy-v3-curation-cockpit.md`
+> and the design spec `docs/superpowers/specs/2026-06-18-strategy-v3-curation-cockpit-design.md`.
 
 ## The two axes (NEVER conflate them)
 
@@ -108,8 +108,10 @@ re-applies the client-facing lifecycle axis onto freshly-minted recs during a re
 `RecStatus`. Without it a sent rec resets to `system` on the next regen.
 
 Called at `generateRecommendations` after the RecStatus merge branch (~line 2441) so the two merge
-passes are additive and idempotent. The carry-over copies: `clientStatus`, `lifecycle`,
-`throttledUntil`, `sentAt`, `struckAt`, `cascade`, `sendChannel` — only when present on the old rec.
+passes are additive and idempotent. The carry-over copies the lifecycle axis (`clientStatus`,
+`lifecycle`, `throttledUntil`, `sentAt`, `struckAt`, `cascade`, `sendChannel` — only when present on
+the old rec) AND re-applies `id` + `createdAt` continuity (so a re-minted rec keeps its identity and
+sentAt lineage; idempotent with the RecStatus branch above).
 
 Exit-gate test: `tests/integration/recommendation-regen-preserves-lifecycle.test.ts`.
 
