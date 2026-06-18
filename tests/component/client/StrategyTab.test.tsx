@@ -241,16 +241,22 @@ describe('StrategyTab', () => {
     expect(screen.getByTestId('strategy-snapshot')).toHaveTextContent('healthScore:65');
   });
 
-  it('renders all major section stubs when strategy data exists', () => {
+  it('renders major section stubs across command-center tabs when strategy data exists', () => {
     render(
       <StrategyTab
         {...defaultProps}
         strategyData={makeStrategy()}
       />,
     );
+    // Overview tab (default): business-priorities and snapshot are present.
     expect(screen.getByTestId('business-priorities')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-snapshot')).toBeInTheDocument();
+    // Content tab: content-opportunities and page-improvements.
+    fireEvent.click(screen.getByText('Content'));
     expect(screen.getByTestId('content-opportunities')).toBeInTheDocument();
     expect(screen.getByTestId('page-improvements')).toBeInTheDocument();
+    // Rankings tab: strategy-keywords, page-keyword-map, declined-keywords.
+    fireEvent.click(screen.getByText('Rankings'));
     expect(screen.getByTestId('strategy-keywords')).toBeInTheDocument();
     expect(screen.getByTestId('page-keyword-map')).toBeInTheDocument();
     expect(screen.getByTestId('declined-keywords')).toBeInTheDocument();
@@ -388,6 +394,8 @@ describe('StrategyTab', () => {
         strategyData={strategyData}
       />,
     );
+    // StrategyKeywordsSection is on the Rankings tab in the command-center layout.
+    fireEvent.click(screen.getByText('Rankings'));
     // StrategyKeywordsSection receives strategyKeywordRows — confirmed non-empty
     expect(screen.getByTestId('strategy-keywords')).toBeInTheDocument();
   });
@@ -436,7 +444,7 @@ describe('StrategyTab', () => {
   });
 });
 
-describe('StrategyTab — v2 command center (flag ON)', () => {
+describe('StrategyTab — command center (v2 cutover baseline)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsRef.current = '';
@@ -453,7 +461,6 @@ describe('StrategyTab — v2 command center (flag ON)', () => {
     return render(
       <StrategyTab
         {...defaultProps}
-        commandCenterEnabled
         strategyData={makeStrategy({ strategyUx: { explanations: [], orient } })}
       />,
     );
@@ -494,11 +501,14 @@ describe('StrategyTab — v2 command center (flag ON)', () => {
     expect(screen.queryByTestId('strategy-snapshot')).not.toBeInTheDocument();
   });
 
-  it('renders the legacy flat layout when the flag is off (no Orient header, all sections at once)', () => {
-    render(<StrategyTab {...defaultProps} strategyData={makeStrategy()} />);
-    expect(screen.queryByTestId('orient-header')).not.toBeInTheDocument();
+  it('renders the command-center layout unconditionally after the v2 cutover (Orient header + interior tabs)', () => {
+    render(<StrategyTab {...defaultProps} strategyData={makeStrategy({ strategyUx: { explanations: [], orient } })} />);
+    // Orient header + interior TabBar are now the baseline (no flag to turn them off).
+    expect(screen.getByTestId('orient-header')).toBeInTheDocument();
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.getByText('Competitive')).toBeInTheDocument();
+    // Defaults to Overview; the Content tab's sections are NOT mounted until selected.
     expect(screen.getByTestId('strategy-snapshot')).toBeInTheDocument();
-    expect(screen.getByTestId('content-opportunities')).toBeInTheDocument();
-    expect(screen.getByTestId('page-keyword-map')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-opportunities')).not.toBeInTheDocument();
   });
 });

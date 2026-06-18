@@ -40,7 +40,7 @@ const positionSub = (d: number | null): string | undefined =>
  * Strategy v2 Orient zone — the "where the site sits" glance: a visibility-score
  * ring + a one-line verdict, above a 4-stat strip (clicks / impressions / ranked
  * keywords / avg position) with deltas vs the previous strategy generation.
- * Rendered in place of the legacy stat grid when the strategy-command-center flag is on.
+ * Rendered in place of the legacy stat grid (the command-center layout is the baseline post-cutover).
  */
 export function OrientZone({ orient }: OrientZoneProps) {
   if (!orient) return null;

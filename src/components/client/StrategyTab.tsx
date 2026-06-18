@@ -67,13 +67,6 @@ interface StrategyTabProps {
   onContentRequested?: () => void;
   /** When true (external billing), hide price chips on request buttons. */
   hidePrices?: boolean;
-  /**
-   * Strategy v2 "command center" reframe (Phase 6b). When true, the tab renders the Orient header +
-   * interior Overview/Content/Rankings/Competitive tabs. Defaults false → the legacy flat layout,
-   * byte-identical. Read in ClientDashboard (QueryClient in scope) and passed down so this component
-   * stays QueryClient-free for its provider-less tests.
-   */
-  commandCenterEnabled?: boolean;
 }
 
 // Strategy v2 client interior tabs (command-center layout). Mirrors the admin IA. The literal ids
@@ -119,7 +112,7 @@ function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkT
   return value != null && Object.prototype.hasOwnProperty.call(STRATEGY_TAB_SECTION_MAP, value);
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices, commandCenterEnabled = false }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: clientIntelligence } = useClientIntelligence(workspaceId ?? '');
@@ -136,8 +129,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     return initial;
   }, UNBOUNDED_TOGGLE_SET_OPTIONS);
 
-  // Strategy v2 interior tab (?tab= deep-link, two-halves contract — mirrors the admin StrategyTab).
-  // Hooks run unconditionally (rules of hooks); the tab state is only consumed when commandCenterEnabled.
+  // Strategy interior tab (?tab= deep-link, two-halves contract — mirrors the admin StrategyTab).
+  // The command-center layout is the baseline, so this tab state is always consumed.
   const [interiorTab, setInteriorTab] = useState<ClientStrategyTab>(() =>
     resolveTabSearchParam<ClientStrategyTab>(searchParams.get('tab'), {
       validValues: CLIENT_STRATEGY_TABS.map((t) => t.id),
@@ -356,19 +349,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerPreviousFocusRef = useRef<HTMLElement | null>(null);
-
-  const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement | null>) => {
-    // Ensure section is expanded before scrolling
-    setExpandedSections(prev => {
-      if (prev.has(section)) return prev;
-      const next = new Set(prev);
-      next.add(section);
-      return next;
-    });
-    setTimeout(() => {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
 
   if (!strategyData) {
     const action = onTabChange ? (
@@ -756,9 +736,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       totalPageImprovements={totalPageImprovements}
       strategyKeywordCount={strategyKeywords.length}
       showPageImprovements={quickWinsAvailable > 0 || pagesWithGrowthOpps > 0}
-      onReviewIdeas={commandCenterEnabled ? () => handleInteriorTabChange('content') : () => scrollToSection('new-content', newContentRef)}
-      onReviewPages={commandCenterEnabled ? () => handleInteriorTabChange('content') : () => scrollToSection('optimize-existing', optimizeExistingRef)}
-      onManageKeywords={commandCenterEnabled ? () => handleInteriorTabChange('rankings') : () => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      onReviewIdeas={() => handleInteriorTabChange('content')}
+      onReviewPages={() => handleInteriorTabChange('content')}
+      onManageKeywords={() => handleInteriorTabChange('rankings')}
     />
   );
 
@@ -951,61 +931,39 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     </>
   );
 
-  // ── Strategy v2 command-center layout (flag ON): Orient header + interior tabs ──
-  if (commandCenterEnabled) {
-    return (
-      <div className="space-y-8">
-        {unvalidatedNoteEl}
-        {loadErrorsEl}
-        <StrategyClientOrientHeader orient={strategyData.strategyUx?.orient} />
-        <TabBar tabs={CLIENT_STRATEGY_TABS} active={interiorTab} onChange={handleInteriorTabChange} />
-        {interiorTab === 'overview' && (
-          <div className="space-y-8">
-            {snapshotEl}
-            {refreshSummaryEl}
-            {nextStepsEl}
-            {keywordFeedbackSummaryEl}
-            {businessPrioritiesEl}
-          </div>
-        )}
-        {interiorTab === 'content' && (
-          <div className="space-y-8">
-            {contentOppsEl}
-            {pageImprovementsEl}
-          </div>
-        )}
-        {interiorTab === 'rankings' && (
-          <div className="space-y-8">
-            {pageKeywordMapEl}
-            {requestedTrendEl}
-            {keywordsSectionEl}
-            {declinedKeywordsEl}
-          </div>
-        )}
-        {interiorTab === 'competitive' && (
-          <CompetitorGapsSection workspaceId={workspaceId ?? ''} tier={effectiveTier} />
-        )}
-        {modalsEl}
-      </div>
-    );
-  }
-
-  // ── Legacy flat layout (flag OFF) — same elements, original order, byte-identical ──
+  // ── Strategy command-center layout (the v2-cutover baseline): Orient header + interior tabs ──
   return (
     <div className="space-y-8">
       {unvalidatedNoteEl}
-      {snapshotEl}
-      {refreshSummaryEl}
-      {nextStepsEl}
-      {keywordFeedbackSummaryEl}
       {loadErrorsEl}
-      {businessPrioritiesEl}
-      {contentOppsEl}
-      {pageImprovementsEl}
-      {keywordsSectionEl}
-      {requestedTrendEl}
-      {pageKeywordMapEl}
-      {declinedKeywordsEl}
+      <StrategyClientOrientHeader orient={strategyData.strategyUx?.orient} />
+      <TabBar tabs={CLIENT_STRATEGY_TABS} active={interiorTab} onChange={handleInteriorTabChange} />
+      {interiorTab === 'overview' && (
+        <div className="space-y-8">
+          {snapshotEl}
+          {refreshSummaryEl}
+          {nextStepsEl}
+          {keywordFeedbackSummaryEl}
+          {businessPrioritiesEl}
+        </div>
+      )}
+      {interiorTab === 'content' && (
+        <div className="space-y-8">
+          {contentOppsEl}
+          {pageImprovementsEl}
+        </div>
+      )}
+      {interiorTab === 'rankings' && (
+        <div className="space-y-8">
+          {pageKeywordMapEl}
+          {requestedTrendEl}
+          {keywordsSectionEl}
+          {declinedKeywordsEl}
+        </div>
+      )}
+      {interiorTab === 'competitive' && (
+        <CompetitorGapsSection workspaceId={workspaceId ?? ''} tier={effectiveTier} />
+      )}
       {modalsEl}
     </div>
   );
