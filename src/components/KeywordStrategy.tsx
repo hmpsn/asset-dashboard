@@ -39,6 +39,7 @@ import {
   ActQueue,
   DecayingPagesCard,
   RankingDistribution,
+  StrategyRankingsTab,
   SiteTargetKeywords,
   KeywordOpportunities,
   StrategyHowItWorks,
@@ -48,10 +49,11 @@ import { adminPath } from '../routes';
 // Strategy v2 interior tabs (command-center layout). Overview = Orient + Act + reference;
 // Content = the content "money page". Rankings + Competitive are added in later phases.
 // The literal ids appear here so the ?tab= deep-link contract test recognizes this receiver.
-type StrategyInteriorTab = 'overview' | 'content';
+type StrategyInteriorTab = 'overview' | 'content' | 'rankings';
 const STRATEGY_INTERIOR_TABS: { id: StrategyInteriorTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'content', label: 'Content' },
+  { id: 'rankings', label: 'Rankings' },
 ];
 
 interface Props {
@@ -428,7 +430,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   {realLeaves.keywordGaps}
                 </>
               )}
-              {realLeaves.distribution}
               {/* ── Reference & Analysis ── */}
               <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
                 <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
@@ -461,6 +462,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 />
               )}
             </div>
+          )}
+          {interiorTab === 'rankings' && (
+            <StrategyRankingsTab metrics={metrics} workspaceId={workspaceId} navigate={navigate} />
           )}
         </>
       )}

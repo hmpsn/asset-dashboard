@@ -10,6 +10,8 @@ export interface PageKeywordMap {
   secondaryKeywords: string[];
   searchIntent?: string;
   currentPosition?: number;
+  /** Prior average position from the previous enrichment — drives the v2 Rankings-tab movements. */
+  previousPosition?: number;
   impressions?: number;
   clicks?: number;
   volume?: number;
@@ -35,6 +37,8 @@ export interface StrategyMetrics {
   notRankingCount: number;
   lowHangingFruit: PageKeywordMap[];
   intentCounts: Record<string, number>;
+  /** Position movements vs each page's previousPosition (v2 Rankings tab). */
+  movements: { improved: number; declined: number; new: number; lost: number };
   declinedFeedback: AdminKeywordFeedbackListRow[];
   requestedFeedback: AdminKeywordFeedbackListRow[];
   approvedFeedback: AdminKeywordFeedbackListRow[];
