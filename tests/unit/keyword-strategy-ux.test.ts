@@ -229,8 +229,8 @@ describe('valueReasons on strategy explanations (Task 2.3)', () => {
   });
 });
 
-describe('content-gap cpc is admin-only in reason text (public-leak fix)', () => {
-  it('client content-gap reasons stay cpc-aware but never print the raw "$X CPC"; page cpc (public) may', async () => {
+describe('raw cpc is admin-only in reason text — content-gap AND page (public-leak fix)', () => {
+  it('client reasons stay cpc-aware but NEITHER content-gap NOR page reasons print the raw "$X CPC"', async () => {
     setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
     try {
       const payload = await buildKeywordStrategyUxPayload({
@@ -248,8 +248,14 @@ describe('content-gap cpc is admin-only in reason text (public-leak fix)', () =>
       expect(gapExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
       // The raw content-gap cpc must NOT leak to the public payload via reason text.
       expect(gapExp!.valueReasons!.some(r => /\$14/.test(r) || /CPC/i.test(r))).toBe(false);
-      // Page cpc IS public (in the public pageMap whitelist) — its reason may show it.
-      expect(pageExp!.valueReasons!.some(r => /\$9/.test(r))).toBe(true);
+      // Raw page cpc must ALSO stay out of the client reason text: it is admin/scoring-internal
+      // money data, same convention as content gaps (#1103). The page cpc *field* is separately
+      // tier-gated on the public read path (free omitted, paid present); the raw "$X CPC" *text*
+      // is admin-surface-only for every client tier (narrative client framing, no admin jargon).
+      // The score stays cpc-aware — only the raw dollar substring is suppressed.
+      expect(pageExp!.valueReasons).toBeDefined();
+      expect(pageExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+      expect(pageExp!.valueReasons!.some(r => /\$9/.test(r) || /CPC/i.test(r))).toBe(false);
     } finally {
       setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
     }
