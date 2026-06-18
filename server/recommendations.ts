@@ -2451,7 +2451,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       // Strategy v3 (§6.5): a rec the client has already seen (sent/discussing/approved) must
       // never be auto-swept to 'completed' (it would read as "✓ done" — the trust-critical graft).
-      if (isExemptFromAutoResolve(oldRec)) continue;
+      // It must ALSO not silently vanish when its source is no longer detected: a sent rec the
+      // client is mid-decision on has to survive regen. If its source is still detected, the matching
+      // new rec already carries its lifecycle (applyLifecycleCarryOver above) — skip to avoid a dup.
+      // If the source is gone, RETAIN the old rec as-is (preserve its sent/discussing/approved state);
+      // the positive "we handled this" terminal is a later phase (P2/P3) — here we only preserve.
+      if (isExemptFromAutoResolve(oldRec)) {
+        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
+        continue;
+      }
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
       if (!newSources.has(buildMergeKey(oldRec))) {

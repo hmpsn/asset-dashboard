@@ -351,6 +351,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/feature-flag-lifecycle.md` | Feature flag lifecycle — creation, rollout targets, stale audit cadence, removal conditions |
 | `docs/rules/keyword-hub.md` | Keyword Hub contracts — skinny vs full-model read path (local_candidates exception), cheap vs Evaluated variant split, OOM guard |
 | `docs/rules/local-seo-visibility.md` | Local SEO visibility contracts — location backfill queue, keyword enrichment, market primary |
+| `docs/rules/strategy-recommendations.md` | Strategy v3 recommendation lifecycle contracts — two-axis model, single-writer API, `isActiveRec`, carry-over, auto-resolve exemption, allow-list, policy registry |
 | `docs/rules/evidence-ledger-mvp.md` | Content review evidence ledger — grounding provenance, freshness scoring, provenance flags |
 | `docs/testing/coverage-ratchet-ci.md` | Coverage ratchet CI contract — current baselines, how to update, how to investigate regressions |
 | `docs/testing/critical-domain-coverage-baseline.md` | Critical-domain coverage baseline — minimum acceptable percentages per bounded context |
