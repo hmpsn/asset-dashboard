@@ -480,6 +480,21 @@ export interface ClientSignalsSlice {
     completed: number;
     recentDecisions: Array<{ title: string; status: string; sourceType: string; updatedAt: string }>;
   };
+  /**
+   * Strategy v3 (spec §7.5, data-flow rule #6) — the client's responses to SENT curated recs.
+   * The outcome write alone is not enough for AdminChat/strategy to "see the loop" — this slice
+   * field surfaces it. Counts derive from Recommendation.clientStatus across the rec set; the
+   * outcome (approve→TrackedAction, decline→advisory learning) is recorded separately.
+   * Populated by `assembleClientSignals` (P3 writes); read by the curated overview context (P4).
+   * Field declared here in Phase 1 Lane 1A — Track B (P3 writes) and Track C (P4 reads) both
+   * touch this file, so the shape is frozen before either dispatches.
+   */
+  recResponses?: {
+    approved: number;
+    declined: number;
+    discussing: number;
+    recentResponses: Array<{ title: string; clientStatus: string; respondedAt: string }>;
+  };
 }
 
 export interface OperationalSlice {

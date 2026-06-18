@@ -118,6 +118,8 @@ export const queryKeys = {
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
     recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
+    /** Strategy v3 — discussion thread for a workspace's recs (admin cockpit Discuss filter). */
+    recDiscussion: (wsId: string) => ['admin-rec-discussion', wsId] as const,
 
     // Brand Engine — Brandscripts
     brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
@@ -220,6 +222,10 @@ export const queryKeys = {
 
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
+    /** Strategy v3 — the curated, clientStatus='sent' recs the client actually sees (spec §7.2).
+     *  DISTINCT from shared.recommendations (the raw read) — its own key so the curated overview
+     *  invalidates independently and the byte-identical shared key is never disturbed. */
+    curatedRecommendations: (wsId: string) => ['client-curated-recommendations', wsId] as const,
     /**
      * R2-B agency "work feed" activity. DISTINCT from `activity` above: the work
      * feed query (`useClientActivityFeed`) fetches a different shape

@@ -98,10 +98,28 @@ export type ClientActionStateStatus = 'pending' | 'approved' | 'changes_requeste
 // is reversible; completed and dismissed are reopenable back to pending so a
 // regen that re-detects the issue (or a client un-dismiss) can revive it.
 export const RECOMMENDATION_TRANSITIONS: Record<string, readonly string[]> = {
+  // Internal RecStatus axis (unchanged) — admin triage.
   pending:     ['in_progress', 'completed', 'dismissed'],
   in_progress: ['pending', 'completed', 'dismissed'],
   completed:   ['pending', 'in_progress'],   // pending/in_progress = issue re-detected
   dismissed:   ['pending'],                  // un-dismiss
+  // Strategy v3 operator curation axis (clientStatus) — admin-only (validated separately
+  // from the client-side map below). 'system' is the implicit start for an absent clientStatus.
+  system:      ['curated'],
+  curated:     ['sent', 'system'],           // 'system' = operator un-curated before sending
+  // 'sent' has NO operator-side forward edge here — the client owns sent → approved|declined|
+  // discussing via CLIENT_REC_TRANSITIONS. (A re-send is a fresh sentAt, not a transition.)
+};
+
+// Strategy v3 — client-side response axis (spec §7.2). A sent rec is the only thing the
+// client can act on. Distinct from RecStatus AND from the operator curation axis: the
+// client respond route (POST /api/public/recommendations/:ws/:recId/respond) validates
+// ONLY against this map and mutates ONLY clientStatus — never RecStatus, never completion.
+export const CLIENT_REC_TRANSITIONS: Record<string, readonly string[]> = {
+  sent:       ['approved', 'declined', 'discussing'],
+  discussing: ['approved', 'declined'],   // a discussion resolves to a decision
+  approved:   [],                         // terminal (client side)
+  declined:   [],                         // terminal (client side)
 };
 
 export type RecommendationStateStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';

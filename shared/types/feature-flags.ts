@@ -57,6 +57,13 @@ export const FEATURE_FLAGS = {
   // layout. OFF = the legacy sequential layout, byte-identical.
   // See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.
   'strategy-command-center': false,
+  // Strategy v3 — staleness scan child flag. Dark-launches the runSentRecStalenessScan cron
+  // pass (sent-rec "no response 14d" nudges + supersession flags). OFF = no nudge engine.
+  'strategy-staleness-scan': false,
+  // Strategy v3 — DEFERRED paid-topic monetization spine (generic strategy_addon SKU +
+  // rec→cart bridge for keyword/topic rec types). OFF until the roadmap item lands; v3 renders
+  // Add-to-plan ONLY where rec.productType already resolves a SKU (decision 1 / spec §2 / §11).
+  'strategy-paid-topics': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -292,6 +299,32 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-17',
     },
   },
+  'strategy-staleness-scan': {
+    label: 'Strategy v3 — sent-rec staleness scan (nudge + supersession cron)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-17',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the on-read throttle resurface + nudge cron cost is validated on staging; flag removed and the scan runs unconditionally in the 24h outcome tick.',
+      linkedRoadmapItemId: 'strategy-v3-curation-cockpit',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-17',
+    },
+  },
+  'strategy-paid-topics': {
+    label: 'Strategy v3 — paid-topic monetization spine (DEFERRED roadmap)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-17',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Enable + remove once the generic strategy_addon SKU + rec→cart bridge + keyword/topic product map ship (deferred roadmap item D8). Until then v3 renders Add-to-plan only where rec.productType already resolves.',
+      linkedRoadmapItemId: 'strategy-paid-topic-monetization-spine',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-17',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -321,7 +354,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics'],
   },
 ];
 

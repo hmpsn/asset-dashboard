@@ -72,6 +72,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) =>
       invalidateRegistry(WS_EVENTS.BULK_OPERATION_COMPLETE, data),
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => invalidateRegistry(WS_EVENTS.RECOMMENDATIONS_UPDATED),
+    [WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED]: () => invalidateRegistry(WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED),
     [WS_EVENTS.STRATEGY_UPDATED]: () => invalidateRegistry(WS_EVENTS.STRATEGY_UPDATED),
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => invalidateRegistry(WS_EVENTS.RANK_TRACKING_UPDATED),
     [WS_EVENTS.LOCAL_SEO_UPDATED]: () => invalidateRegistry(WS_EVENTS.LOCAL_SEO_UPDATED),

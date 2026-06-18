@@ -42,9 +42,11 @@ const router = Router();
  * relative value + component breakdown bars, never the raw $/wk exposure
  * (`emvPerWeek`), the horizon projection (`predictedEmv`, P4 — a CPC-proxy that
  * would read as a dollar figure), nor the internal ROI quantity (`roiPerEffortDay`).
- * The rest of the OpportunityScore (value, confidence, groundedSpine, components,
- * calibration, calibrationVersion, modelVersion) is preserved so the client #1 card
- * can render its "why this is #1" breakdown.
+ * The OpportunityScore is allow-listed (value, confidence, groundedSpine, components,
+ * calibration, calibrationVersion, modelVersion pass through; the raw $/ROI fields above
+ * are dropped) so the client #1 card can still render its "why this is #1" breakdown.
+ * (The projection below is an explicit allow-list, not a strip-from-spread — see the
+ * note above stripEmvFromPublicRecs.)
  *
  * `estimatedGain` (P4, Contract 3) is a TOP-LEVEL rec field, NOT inside `opportunity`,
  * and it renders LIVE at InsightsEngine.tsx. The chosen gain form is NON-DOLLARIZED
@@ -62,24 +64,51 @@ function sanitizePublicGain(gain: string): string {
   return cleaned.length > 0 ? cleaned : 'Estimated to drive meaningful organic growth';
 }
 
+// Strategy v3 (spec §7.4 / 00-contracts §4 readers) — the public rec projection is an explicit
+// ALLOW-LIST, not a blocklist. A blocklist (`...rec` minus a few keys) silently leaks every NEW
+// admin-only field the moment it is added (the v3 lifecycle axis: throttledUntil/struckAt/sentAt/
+// cascade/lifecycle/clientStatus/sendChannel). This names ONLY client-safe fields, so a future
+// admin-only field is leak-proof by default. The OpportunityScore is itself allow-listed (raw
+// emvPerWeek/predictedEmv/roiPerEffortDay never copied), and estimatedGain is dollar-sanitized.
 function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
-  return recs.map(r => {
-    // Sanitize the top-level gain string (defense-in-depth: no raw $/wk to a client).
+  return recs.map((r) => {
     const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
-    const base: Recommendation = safeGain === r.estimatedGain ? r : { ...r, estimatedGain: safeGain };
-    if (!base.opportunity) return base;
-    const { emvPerWeek: rawEmvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = base.opportunity;
-    // D-IMPACT: project the admin/AI-only weekly EMV into a client-safe banded
-    // monthly range BEFORE it is stripped. computeImpactBand returns undefined below
-    // the display floor (no impact line shown) — in that case we drop the key entirely.
-    const impactBand = computeImpactBand(rawEmvPerWeek);
-    const next: Recommendation = {
-      ...base,
-      opportunity: publicOpportunity as Recommendation['opportunity'],
+    const out: Recommendation = {
+      id: r.id,
+      workspaceId: r.workspaceId,
+      priority: r.priority,
+      type: r.type,
+      title: r.title,
+      description: r.description,
+      insight: r.insight,
+      impact: r.impact,
+      effort: r.effort,
+      impactScore: r.impactScore,
+      source: r.source,
+      affectedPages: r.affectedPages,
+      trafficAtRisk: r.trafficAtRisk,
+      impressionsAtRisk: r.impressionsAtRisk,
+      estimatedGain: safeGain,
+      actionType: r.actionType,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
     };
-    if (impactBand) next.impactBand = impactBand;
-    else delete next.impactBand;
-    return next;
+    // Client-safe optional fields — copied only when present (preserves byte-identical absence).
+    if (r.productType !== undefined) out.productType = r.productType;
+    if (r.productPrice !== undefined) out.productPrice = r.productPrice;
+    if (r.targetKeyword !== undefined) out.targetKeyword = r.targetKeyword;
+    if (r.assignedTo !== undefined) out.assignedTo = r.assignedTo;
+    if (r.backfilled !== undefined) out.backfilled = r.backfilled;
+    // OpportunityScore: allow-list the client-safe sub-fields; raw $/ROI never copied.
+    if (r.opportunity) {
+      const { emvPerWeek: rawEmvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = r.opportunity;
+      out.opportunity = publicOpportunity as Recommendation['opportunity'];
+      // D-IMPACT: project the stripped weekly EMV into a banded monthly impactBand (undefined below floor).
+      const impactBand = computeImpactBand(rawEmvPerWeek);
+      if (impactBand) out.impactBand = impactBand;
+    }
+    return out;
   });
 }
 

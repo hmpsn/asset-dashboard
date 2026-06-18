@@ -47,6 +47,34 @@ export interface Recommendation {
    *  emails can exclude marginal backfill. Only set (to true) on the flag-ON path —
    *  absent on every legacy/flag-OFF rec, preserving byte-identical output. */
   backfilled?: boolean;
+  // ── Strategy v3 — two-axis client-facing lifecycle (SEPARATE from RecStatus) ──
+  // RecStatus (status, above) stays the INTERNAL admin triage axis (pending/in_progress/
+  // completed/dismissed). clientStatus + lifecycle are the v3 curation axes. strike/throttle/
+  // send NEVER write RecStatus — a struck rec must never be swept to 'completed' and read as
+  // "✓ done" to the client (the trust-critical graft, spec §6.1). All optional → byte-identical
+  // on every legacy/flag-OFF rec (absent ⇒ treated as clientStatus:'system', lifecycle:'active').
+  /** Curation axis: system (minted, not yet curated) → curated (operator picked) → sent
+   *  (delivered to client) → approved | declined | discussing (client responded). */
+  clientStatus?: 'system' | 'curated' | 'sent' | 'approved' | 'declined' | 'discussing';
+  /** Suppression axis, orthogonal to clientStatus: active (default) | throttled (hidden
+   *  until throttledUntil) | struck (permanently suppressed, won't be re-suggested). */
+  lifecycle?: 'active' | 'throttled' | 'struck';
+  /** ISO timestamp the throttle expires; the rec auto-resurfaces as active on-read once
+   *  Date.now() passes this (no cron — spec §8). Only set when lifecycle==='throttled'. */
+  throttledUntil?: string;
+  /** ISO timestamp the rec was sent to the client. Set when clientStatus → 'sent'. */
+  sentAt?: string;
+  /** ISO timestamp the rec was struck. Set when lifecycle → 'struck'. */
+  struckAt?: string;
+  /** Cascade metadata for keyword/topic strikes that also remove items from strategy
+   *  (spec §4.3 "removes from strategy — reversible"). Carries the reversal payload so
+   *  Undo can restore the strategy items the strike removed. Absent on non-cascading strikes. */
+  cascade?: { removedKeywords?: string[]; removedClusters?: string[]; reversible: boolean };
+  /** Where a Send routes. 'deliverable' for RecTypes with a registered deliverable adapter
+   *  (content_decay/cannibalization) — their Send goes to the deliverable spine and the rec
+   *  reads its lifecycle from client_actions, NOT an independent clientStatus (spec §6.3).
+   *  'rec' (default/absent) for all other RecTypes — Send mutates clientStatus directly. */
+  sendChannel?: 'deliverable' | 'rec';
   createdAt: string;
   updatedAt: string;
 }
@@ -171,3 +199,51 @@ export interface OpportunityWeights {
   evidence: number;
   calibrationVersion: string;
 }
+
+/** One entry in a recommendation discussion thread (spec §6.7). Backed by the rec_discussion
+ *  table (migration 138). `author` is a display role, not a user id — 'client' (the client's
+ *  question) or 'strategist' (the agency reply). Read by the cockpit Discuss filter (P2) and
+ *  the client CuratedRecDiscussThread (P4); both build against THIS shape before the substrate
+ *  exists (the pre-committed Track-B↔Track-C contract). */
+export interface RecDiscussionEntry {
+  id: string;
+  recId: string;
+  workspaceId: string;
+  author: 'client' | 'strategist';
+  body: string;
+  createdAt: string;        // ISO timestamp
+}
+
+/** Strategy v3 — the payload an adapter emits to turn a domain item (keyword opportunity,
+ *  topic cluster, content gap) INTO a sendable recommendation via the per-row Send spine.
+ *  P5 Lane 5C (#6b) builds the keyword-opportunity adapter against this; the policy registry
+ *  (below) decides routing (rec vs deliverable) per RecType. Net-new — zero prior matches. */
+export interface StrategyRecommendationPayload {
+  type: RecType;
+  title: string;
+  description: string;
+  insight: string;                        // "why this matters" — feeds the curated card's why-line
+  affectedPages: string[];
+  /** Optional pre-resolved product for the priced CTA (decision 1 — Add-to-plan only when set). */
+  productType?: string;
+  productPrice?: number;
+  /** The source domain entity id (e.g. the keyword string or cluster topic) for de-dup + lineage. */
+  sourceKey: string;
+  source: string;                         // which analysis produced it (mirrors Recommendation.source)
+}
+
+/** Per-RecType curation policy (spec §6.2 single-writer policy registry). One entry per RecType
+ *  the single-writer (server/recommendation-lifecycle.ts) knows how to mutate. `sendChannel`
+ *  decides whether Send mutates clientStatus directly ('rec') or routes to the deliverable spine
+ *  ('deliverable' — content_decay/cannibalization read lifecycle from client_actions, spec §6.3).
+ *  `cascadeOnStrike` marks RecTypes whose strike also removes strategy items (keyword/topic). */
+export interface RecPolicy {
+  sendChannel: 'rec' | 'deliverable';
+  cascadeOnStrike: boolean;
+  /** True when this RecType resolves a productType → a priced Add-to-plan CTA is allowed. */
+  monetizable: boolean;
+}
+
+/** The registry shape the single-writer consumes. Keyed by RecType; an unlisted RecType is a
+ *  bug (it cannot be curated until a policy is registered). Populated in P1 Lane 1B. */
+export type RecPolicyRegistry = Partial<Record<RecType, RecPolicy>>;

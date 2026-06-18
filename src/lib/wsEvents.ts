@@ -87,6 +87,7 @@ export const WS_EVENTS = {
 
   // Recommendations
   RECOMMENDATIONS_UPDATED: 'recommendations:updated',
+  RECOMMENDATIONS_DISCUSSION_UPDATED: 'recommendations:discussion_updated',
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',

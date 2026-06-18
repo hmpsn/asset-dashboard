@@ -58,6 +58,19 @@ vi.mock('../../server/client-actions.js', () => ({
 
 vi.mock('../../server/recommendations.js', () => ({
   loadRecommendations: mocks.loadRecommendations,
+  // Faithful mirror of server/recommendations.ts:isActiveRec — the real module pulls the DB graph,
+  // so it can't be importActual'd in this pure unit test. Keep in sync with the source (the
+  // operational slice routes its rec counter through this predicate per Strategy v3 Lane 1C).
+  isActiveRec: (
+    rec: { status?: string; lifecycle?: string; throttledUntil?: string; clientStatus?: string },
+    now: number = Date.now(),
+  ): boolean => {
+    if (rec.status === 'completed' || rec.status === 'dismissed') return false;
+    if (rec.lifecycle === 'struck') return false;
+    if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
+    if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
+    return true;
+  },
 }));
 
 vi.mock('../../server/outcome-tracking.js', () => ({
@@ -143,7 +156,11 @@ beforeEach(() => {
       { status: 'pending', priority: 'fix_now' },
       { status: 'pending', priority: 'fix_soon' },
       { status: undefined, priority: 'fix_later' },
-      { status: 'applied', priority: 'fix_now' },
+      // A done fix_now rec must NOT count toward the operational queue. Use a canonical RecStatus
+      // ('completed') that isActiveRec excludes — the prior 'applied' was non-canonical and only
+      // excluded as a side effect of the old `status === 'pending'` check (Strategy v3 Lane 1C
+      // routed this counter through isActiveRec).
+      { status: 'completed', priority: 'fix_now' },
     ],
   });
 
