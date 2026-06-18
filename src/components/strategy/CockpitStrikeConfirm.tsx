@@ -17,14 +17,7 @@ export function CockpitStrikeConfirm({ cascadeNote, onConfirm, onCancel, disable
         Strike — won&apos;t be re-suggested{cascadeNote ? ` · ${cascadeNote}` : ''}
       </span>
       <Button size="sm" variant="danger" disabled={disabled} onClick={onConfirm}>Confirm</Button>
-      {/* // button-ok — inline Cancel affordance; Button ghost adds excessive padding in tight row */}
-      <button
-        type="button"
-        className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-1"
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
+      <Button variant="ghost" size="sm" disabled={disabled} onClick={onCancel}>Cancel</Button>
     </div>
   );
 }

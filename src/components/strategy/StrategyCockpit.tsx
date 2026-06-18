@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Target } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button } from '../ui';
 import { CockpitRow } from './CockpitRow';
 import { recActCategory, ACT_CATEGORIES, type ActCategory } from '../../lib/recCategoryMap';
 import {
@@ -91,20 +91,20 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
         {/* Lifecycle segmented control (single-select) */}
         <div className="flex flex-wrap items-center gap-1 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-1 w-fit">
           {LIFECYCLE_TABS.map((t) => (
-            // button-ok — segmented-control tab; Button has no segmented-control variant
-            <button
+            <Button
               key={t.id}
-              type="button"
+              variant="ghost"
+              size="sm"
               aria-pressed={bucket === t.id}
-              className={`rounded-[var(--radius-md)] px-3 py-1.5 t-ui ${
+              className={`rounded-[var(--radius-md)] t-ui ${
                 bucket === t.id
-                  ? 'bg-[var(--teal)] text-[var(--button-primary-text)] font-semibold'
-                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+                  ? 'bg-[var(--teal)] text-[var(--button-primary-text)] font-semibold hover:bg-[var(--teal)]'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent'
               }`}
               onClick={() => setBucket(t.id)}
             >
               {t.label} {lifeCounts[t.id]}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -112,37 +112,37 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {ACT_CATEGORIES.map((cat) => (
-              // button-ok — category toggle chip; Button primitive has no chip/pill variant
-              <button
+              <Button
                 key={cat}
-                type="button"
+                variant="ghost"
+                size="sm"
                 aria-pressed={cats.has(cat)}
-                className={`rounded-[var(--radius-pill)] border px-3 py-1 t-caption-sm ${
+                className={`rounded-[var(--radius-pill)] border t-caption-sm hover:bg-transparent ${
                   cats.has(cat)
-                    ? 'border-[var(--teal)] text-accent-brand'
+                    ? 'border-[var(--teal)] text-accent-brand hover:text-accent-brand'
                     : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                 }`}
                 onClick={() => toggleCat(cat)}
               >
                 {CATEGORY_LABELS[cat]} {catCounts[cat]}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex items-center gap-1">
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Sort</span>
             {SORTS.map((s) => (
-              // button-ok — sort chip; Button primitive has no inline sort-chip variant
-              <button
+              <Button
                 key={s.id}
-                type="button"
+                variant="ghost"
+                size="sm"
                 aria-pressed={sort === s.id}
-                className={`rounded-[var(--radius-md)] px-2 py-1 t-caption-sm ${
-                  sort === s.id ? 'text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+                className={`t-caption-sm hover:bg-transparent ${
+                  sort === s.id ? 'text-accent-brand hover:text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                 }`}
                 onClick={() => setSort(s.id)}
               >
                 {s.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

@@ -129,14 +129,15 @@ export function CockpitRow({ rec, actions }: CockpitRowProps) {
             }}
             onCancel={close}
           />
-          {/* // button-ok — inline destructive link; Button variant="link" doesn't support red danger tone */}
-          <button
-            type="button"
-            className="t-caption-sm text-red-400 hover:text-red-300 px-1"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-400 hover:text-red-300"
+            disabled={actions.isPending}
             onClick={() => setMode('strike')}
           >
             Strike instead
-          </button>
+          </Button>
         </div>
       )}
       {mode === 'strike' && (
