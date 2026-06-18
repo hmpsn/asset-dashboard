@@ -303,8 +303,8 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       surface: 'admin',
     });
     strategyUx.localSync = localSync;
-    // Strategy v2 Orient-zone metrics (visibility score + clicks/impressions/position deltas).
-    // Consumed by the Orient zone when the strategy-command-center flag is on; ignored otherwise.
+    // Strategy command-center Orient-zone metrics (visibility score + clicks/impressions/position
+    // deltas). The command-center is the baseline layout (v2 cutover), so the Orient zone always reads this.
     strategyUx.orient = computeOrientMetrics(ws.id, pageMap);
     res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics, strategyUx));
   } catch (err) {

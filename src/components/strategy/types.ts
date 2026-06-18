@@ -185,15 +185,6 @@ export interface StrategyStalenessNudgesProps {
   onGenerate: () => void;
 }
 
-export interface StrategyStatGridProps {
-  filteredPageMap: PageKeywordMap[];
-  totalPageCount: number;
-  totalImpressions: number;
-  totalClicks: number;
-  ranked: PageKeywordMap[];
-  avgPos: number;
-}
-
 export interface RankingDistributionProps {
   filteredPageMap: PageKeywordMap[];
   ranked: PageKeywordMap[];

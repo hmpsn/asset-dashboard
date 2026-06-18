@@ -4,15 +4,11 @@ import { Target, FileText } from 'lucide-react';
 import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
-import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendations';
 import { useContentDecay } from '../hooks/admin/useContentDecay';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
-import { BacklinkProfile } from './strategy/BacklinkProfile';
-import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { ContentGaps } from './strategy/ContentGaps';
 import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
@@ -34,11 +30,9 @@ import {
   StrategySettings,
   StrategyStalenessNudges,
   StrategyEmptyState,
-  StrategyStatGrid,
   OrientZone,
   ActQueue,
   DecayingPagesCard,
-  RankingDistribution,
   StrategyRankingsTab,
   StrategyCompetitiveTab,
   SiteTargetKeywords,
@@ -66,11 +60,6 @@ interface Props {
 
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
-  const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
-
-  // Strategy v2 "SEO command center" — Orient zone replaces the legacy stat grid when ON.
-  const commandCenterEnabled = useFeatureFlag('strategy-command-center');
-
   // Strategy v2 interior tab (?tab= deep-link, two-halves contract — mirrors ContentPipeline).
   const [searchParams, setSearchParams] = useSearchParams();
   const [interiorTab, setInteriorTab] = useState<StrategyInteriorTab>(() =>
@@ -111,18 +100,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const metrics = useStrategyMetrics(strategy, feedback.rows, isRealStrategy);
   // The v2 Act queue reads the unified recommendation set (separately generated from the strategy
   // blob). Read it here too — sharing the React Query cache with ActQueue — to decide whether the
-  // queue actually has content yet; if not, the legacy action sections stay as a fallback. Gated on
-  // the flag so flag-OFF adds NO extra fetch (truly inert).
-  const { data: recommendationSet } = useAdminRecommendationSet(workspaceId, { enabled: commandCenterEnabled });
+  // queue actually has content yet; if not, the legacy action sections stay as a fallback.
+  const { data: recommendationSet } = useAdminRecommendationSet(workspaceId);
   const hasActiveRecommendations = (recommendationSet?.recommendations ?? []).some(
     (r) => r.status !== 'dismissed' && r.status !== 'completed',
   );
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
-  // tab when no content opportunities exist. Gated on the flag so flag-OFF adds no fetch.
-  const { data: contentDecayData } = useContentDecay(workspaceId, { enabled: commandCenterEnabled });
+  // tab when no content opportunities exist.
+  const { data: contentDecayData } = useContentDecay(workspaceId);
 
-  // Competitor domains as a clean array — shared by the legacy CompetitiveIntel leaf and the v2
-  // Competitive tab so the CSV/newline parse lives in exactly one place.
+  // Competitor domains as a clean array — consumed by the Competitive tab (StrategyCompetitiveTab)
+  // so the CSV/newline parse lives in exactly one place.
   const competitorList = settings.competitors.split(/[,\n]+/).map((c) => c.trim()).filter(Boolean);
 
   // intentColor is consumed by ContentGaps — kept in the orchestrator and passed down.
@@ -316,28 +304,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onGenerate={() => generation.generateStrategy('full')}
       />
     ),
-    statGrid: (
-      <StrategyStatGrid
-        filteredPageMap={metrics.filteredPageMap}
-        totalPageCount={strategy.pageMap?.length ?? 0}
-        totalImpressions={metrics.totalImpressions}
-        totalClicks={metrics.totalClicks}
-        ranked={metrics.ranked}
-        avgPos={metrics.avgPos}
-      />
-    ),
-    distribution: (
-      <RankingDistribution
-        filteredPageMap={metrics.filteredPageMap}
-        ranked={metrics.ranked}
-        top3={metrics.top3}
-        top10={metrics.top10}
-        top20={metrics.top20}
-        beyond20={metrics.beyond20}
-        notRankingCount={metrics.notRankingCount}
-        intentCounts={metrics.intentCounts}
-      />
-    ),
     quickWins: (
       <div id="quick-wins-section">
         <QuickWins quickWins={strategy.quickWins ?? []} />
@@ -361,15 +327,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       ? <CannibalizationAlert entries={strategy.cannibalization} />
       : null,
     strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
-    backlink: <BacklinkProfile workspaceId={workspaceId} />,
-    competitive: (
-      <CompetitiveIntel
-        workspaceId={workspaceId}
-        competitors={competitorList}
-        seoDataAvailable={settings.seoDataAvailable}
-        cachedKeywordGaps={strategy?.keywordGaps}
-      />
-    ),
     siteKeywords: (
       <SiteTargetKeywords
         workspaceId={workspaceId}
@@ -385,16 +342,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
   } : null;
 
-  // Strategy v2 Orient zone — replaces the legacy stat grid when the command-center flag is on.
-  const orientEl = commandCenterEnabled && isRealStrategy
+  // Strategy command-center Orient zone (the cutover baseline — always rendered for a real strategy).
+  const orientEl = isRealStrategy
     ? <OrientZone orient={strategy?.strategyUx?.orient} />
     : null;
-  // Strategy v2 Act zone — the unified impact-ranked recommendation queue. It replaces the legacy
-  // quick-wins / LHF / content-gaps / keyword-gaps sections (which it already unifies) ONLY once the
-  // recommendation set actually has content. Until then (fresh strategy before regen runs, a
-  // pre-engine workspace, or a fetch error) the legacy sections stay as a fallback so no actionable
-  // content is hidden behind an empty queue.
-  const useActQueue = commandCenterEnabled && isRealStrategy && hasActiveRecommendations;
+  // Act zone — the unified impact-ranked recommendation queue. It replaces the quick-wins / LHF /
+  // keyword-gaps sections ONLY once the recommendation set actually has content. Until then (fresh
+  // strategy before regen runs, a pre-engine workspace, or a fetch error) those sections stay as a
+  // fallback so no actionable content is hidden behind an empty queue.
+  const useActQueue = isRealStrategy && hasActiveRecommendations;
   const actQueueEl = useActQueue ? <ActQueue workspaceId={workspaceId} /> : null;
 
   const handleInteriorTabChange = (id: string) => {
@@ -409,8 +365,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const hasDecayingPages = (contentDecayData?.decayingPages?.length ?? 0) > 0;
   const hasContentTabContent = hasContentGaps || hasTopicClusters || hasDecayingPages;
 
-  // ── Strategy v2 command-center layout (flag ON): page chrome + interior tabs (Overview / Content) ──
-  const commandCenterAnalysis = (
+  // ── Strategy command-center layout (the baseline): page chrome + interior tabs (Overview / Content) ──
+  const strategyLayout = (
     <div className="space-y-8">
       {headerEl}
       {refreshPromptEl}
@@ -419,6 +375,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {progressEl}
       {errorEl}
       {nextStepsEl}
+      {/* clientFeedbackCombinedEl + settingsEl are rendered unconditionally so they are visible
+          even before the first strategy is generated (no-strategy state). Interim: this also shows
+          them on all interior tabs until StrategyCockpit (Phase 2) re-homes them. */}
+      {clientFeedbackCombinedEl}
+      {settingsEl}
       {emptyStateEl}
       {realLeaves && (
         <>
@@ -426,8 +387,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {interiorTab === 'overview' && (
             <div className="space-y-8">
               {feedbackNudgeEl}
-              {clientFeedbackCombinedEl}
-              {settingsEl}
               {realLeaves.stalenessNudges}
               {orientEl}
               {actQueueEl ?? (
@@ -485,66 +444,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     </div>
   );
 
-  // ── Strategy analysis layout ──
-  const legacyAnalysis = (
-    <div className="space-y-8">
-      {headerEl}
-      {refreshPromptEl}
-      {aiContextEl}
-      {localSeoEl}
-      {feedbackNudgeEl}
-      {clientFeedbackCombinedEl}
-      {settingsEl}
-      {intelligenceSignalsEl}
-      {progressEl}
-      {errorEl}
-      {nextStepsEl}
-      {emptyStateEl}
-      {realLeaves && (
-        <>
-          {realLeaves.stalenessNudges}
-          {orientEl ?? realLeaves.statGrid}
-          {actQueueEl}
-          {realLeaves.distribution}
-          {useActQueue ? null : (
-            <>
-              {realLeaves.quickWins}
-              {realLeaves.lhf}
-              {realLeaves.contentGaps}
-              {realLeaves.keywordGaps}
-            </>
-          )}
-          {/* ── Reference & Analysis ── */}
-          <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
-            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
-            <div className="flex-1 border-t border-[var(--brand-border)]" />
-          </div>
-          {realLeaves.topicClusters}
-          {realLeaves.cannibalization}
-          {realLeaves.strategyDiff}
-          {realLeaves.backlink}
-          {realLeaves.competitive}
-          {realLeaves.siteKeywords}
-          {realLeaves.opportunities}
-          {realLeaves.howItWorks}
-        </>
-      )}
-    </div>
-  );
-
-  // Strategy v2 command-center layout (flag ON) — interior ?tab= tabs, no Analysis/Guide TabBar.
-  if (commandCenterEnabled) return commandCenterAnalysis;
-
-  return (
-    <div className="space-y-8">
-      {/* tab-deeplink-ok: the legacy Analysis/Guide TabBar is state-only, not a ?tab= target; the v2 interior tabs are the receiver */}
-      <TabBar
-        tabs={[{ id: 'analysis', label: 'Analysis' }, { id: 'guide', label: 'Guide' }]}
-        active={strategyTab}
-        onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')}
-      />
-      {strategyTab === 'guide' && <KeywordStrategyGuide />}
-      {strategyTab === 'analysis' && legacyAnalysis}
-    </div>
-  );
+  // Command-center layout is the baseline (v2 cutover) — interior ?tab= tabs, no Analysis/Guide TabBar.
+  return strategyLayout;
 }

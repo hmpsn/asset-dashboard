@@ -15,7 +15,6 @@ export * from './ClientKeywordFeedback';
 export * from './StrategySettings';
 export * from './StrategyStalenessNudges';
 export * from './StrategyEmptyState';
-export * from './StrategyStatGrid';
 export * from './OrientZone';
 export * from './ActQueue';
 export * from './StrategyRankingsTab';
@@ -25,10 +24,11 @@ export * from './RankingDistribution';
 export * from './SiteTargetKeywords';
 export * from './KeywordOpportunities';
 export * from './StrategyHowItWorks';
-// Orphaned after Phase R (decision-bands removal): zero importers today, re-homed by Strategy v2.
-// Do NOT delete — re-imported by upcoming phases (Act queue: DecisionQueue/OpportunitiesList/
-// DecayingPagesCard/LostQueryRecoveryCard/CannibalizationTriage/RequestedKeywordTriage).
-// See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.
+// Act-queue candidate leaves re-homed from the legacy action sections — NOT yet wired into ActQueue
+// (zero production importers today; covered only by their own unit tests). The Strategy v2 cutover
+// (Phase 0) made the command-center layout the baseline; these stay reserved for the Strategy v3
+// cockpit (Phase 2) built behind the kept `strategy-command-center` umbrella flag. Do NOT delete.
+// See docs/superpowers/plans/2026-06-18-strategy-v3-curation-cockpit.md.
 // (AuthorityAndBacklinks was removed in Phase 5 — the Competitive tab composes BacklinkProfile +
 // CompetitiveIntel directly in research order rather than via the merged wrapper.)
 export * from './OpportunitiesList';

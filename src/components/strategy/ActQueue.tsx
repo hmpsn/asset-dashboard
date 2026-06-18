@@ -30,7 +30,7 @@ const byImpact = (a: Recommendation, b: Recommendation) =>
  * recommendation set (content gaps, decay, cannibalization, quick wins, lost queries, etc. — all
  * already first-class rec types) sorted by opportunity value, with filter chips (All / Content /
  * Technical / Quick wins) and one-click Fix CTAs. Replaces the legacy quick-wins / LHF /
- * content-gaps / keyword-gaps sections when the strategy-command-center flag is on.
+ * content-gaps / keyword-gaps sections (the command-center layout is the baseline post-cutover).
  */
 export function ActQueue({ workspaceId }: ActQueueProps) {
   const navigate = useNavigate();
