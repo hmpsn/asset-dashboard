@@ -48,6 +48,7 @@ import {
 } from '../hooks/client/useClientQueries';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
@@ -461,6 +462,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     };
   };
 
+  // Strategy v2 "command center" — gates the client StrategyTab reframe (Orient header + interior tabs).
+  // MUST be called unconditionally BEFORE the early returns below (Rules of Hooks — `loading` flips
+  // true→false across renders, so a hook placed after these returns would change the hook count and
+  // crash the dashboard). Read here because the QueryClient is in scope; threaded to StrategyTab as a
+  // prop so that component stays QueryClient-free for its provider-less tests.
+  const commandCenterEnabled = useFeatureFlag('strategy-command-center');
+
   if (loading) return (
     <div className="client-typography min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
       <header className="border-b border-[var(--brand-border)]">
@@ -720,7 +728,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             strategy: (
               <LazyClientTabPanel>
-                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} commandCenterEnabled={commandCenterEnabled} />
               </LazyClientTabPanel>
             ),
             inbox: (
