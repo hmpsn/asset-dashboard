@@ -17,6 +17,7 @@ export * from './StrategyStalenessNudges';
 export * from './StrategyEmptyState';
 export * from './OrientZone';
 export * from './ActQueue';
+export * from './StrategyCockpit';
 export * from './StrategyRankingsTab';
 export * from './StrategyCompetitiveTab';
 export * from './ShareBar';
