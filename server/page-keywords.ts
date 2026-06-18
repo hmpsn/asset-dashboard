@@ -310,8 +310,10 @@ const stmts = createStmtCache(() => ({
       -- Rankings-tab movements card has real improved/declined/lost data.
       --   rotate=1 (strategy-refresh path) + same primary keyword (preserve=1):
       --     rotate previous_position ← page_keywords.current_position. In SQLite UPSERT
-      --     the bare table name is the OLD row, so this reads the pre-update position
-      --     (and NULL when the page lost its rank this refresh → "lost").
+      --     the bare table name is the OLD row, so this reads the pre-update position.
+      --     (If the page lost its rank this refresh it's the NEW current_position from
+      --     excluded that is NULL; previous_position still holds the old real position,
+      --     so the frontend reads cur=null + prev=number → "lost".)
       --   rotate=1 + primary keyword CHANGED (preserve=0): NULL — the old position was
       --     for a different keyword, so comparing it would be misleading ("new" instead).
       --   rotate=0 (page-analysis / PATCH / MCP / migration): PRESERVE the existing value
