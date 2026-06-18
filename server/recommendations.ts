@@ -590,6 +590,59 @@ export function resolveContentRecommendationsForPublishedPost(
   return resolved;
 }
 
+/** Strategy v3 (00-contracts §6.3) — copy the client-facing lifecycle axis from each matched
+ *  old rec onto its freshly-minted counterpart during regen. Keyed by buildMergeKey so a
+ *  re-detected issue keeps its sent/throttled/struck state (the trust-critical carry-over —
+ *  a sent rec must NOT reset to 'system' on the next regen). Copies for EVERY matched oldRec
+ *  regardless of RecStatus (the pre-v3 merge only ran on in_progress/completed/dismissed). */
+export function applyLifecycleCarryOver(newRecs: Recommendation[], oldRecs: Recommendation[]): void {
+  const oldByKey = new Map<string, Recommendation>();
+  for (const oldRec of oldRecs) oldByKey.set(buildMergeKey(oldRec), oldRec);
+  for (const newRec of newRecs) {
+    const oldRec = oldByKey.get(buildMergeKey(newRec));
+    if (!oldRec) continue;
+    // Continuity: keep the old id + createdAt so the frontend + sentAt lineage stay stable.
+    newRec.id = oldRec.id;
+    newRec.createdAt = oldRec.createdAt;
+    // Copy the full client-facing lifecycle axis (only when present — absent stays absent so
+    // a never-curated rec is byte-identical).
+    if (oldRec.clientStatus !== undefined) newRec.clientStatus = oldRec.clientStatus;
+    if (oldRec.lifecycle !== undefined) newRec.lifecycle = oldRec.lifecycle;
+    if (oldRec.throttledUntil !== undefined) newRec.throttledUntil = oldRec.throttledUntil;
+    if (oldRec.sentAt !== undefined) newRec.sentAt = oldRec.sentAt;
+    if (oldRec.struckAt !== undefined) newRec.struckAt = oldRec.struckAt;
+    if (oldRec.cascade !== undefined) newRec.cascade = oldRec.cascade;
+    if (oldRec.sendChannel !== undefined) newRec.sendChannel = oldRec.sendChannel;
+  }
+}
+
+/** Strategy v3 (00-contracts §6.5 / spec §6.5) — recs the client has SEEN must be exempt from the
+ *  destructive auto-resolve → 'completed' sweep. A sent/discussing/approved rec swept to completed
+ *  would read to the client as "✓ done" even though we struck/never-did it. When such a rec's
+ *  condition is genuinely fixed, a SEPARATE positive-terminal transition handles it (P2/P3) — the
+ *  auto-resolve sweep simply skips it here. declined is NOT exempt (the client said no; it can resolve). */
+export function isExemptFromAutoResolve(rec: Recommendation): boolean {
+  return rec.clientStatus === 'sent' || rec.clientStatus === 'discussing' || rec.clientStatus === 'approved';
+}
+
+/**
+ * The ONE active-set predicate (spec §6.4). A rec is "active" — eligible to surface in the
+ * Act queue, the summary top-rec, AI context, and briefings — iff:
+ *   - RecStatus is not terminal (not completed, not dismissed), AND
+ *   - it is not permanently struck, AND
+ *   - it is not throttled into the future (throttle auto-resurfaces on-read once the date passes), AND
+ *   - the client has not already received/resolved it (clientStatus not sent/approved/declined).
+ * Absent v3 fields ⇒ legacy rec ⇒ treated as clientStatus:'system', lifecycle:'active'.
+ * Imported by EVERY reader so no surface re-implements a partial filter (the leak bug pattern).
+ */
+export function isActiveRec(rec: Recommendation, now: number = Date.now()): boolean {
+  if (rec.status === 'completed' || rec.status === 'dismissed') return false;
+  if (rec.lifecycle === 'struck') return false;
+  if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
+  if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
+  return true;
+}
+
 /**
  * Compute the RecommendationSet summary from a rec list. Shared by the full
  * regen (generateRecommendations) and the in-place resolver
@@ -597,7 +650,7 @@ export function resolveContentRecommendationsForPublishedPost(
  * drift from the rendered active list.
  */
 export function computeRecommendationSummary(recs: Recommendation[]): RecommendationSet['summary'] {
-  const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
+  const activeRecs = recs.filter(r => isActiveRec(r));
   const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
   const opportunityValue = (rec: Recommendation) => rec.opportunity?.value ?? rec.impactScore;
 
@@ -2381,6 +2434,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
 
+    // Strategy v3 — carry the client-facing lifecycle axis across regen for EVERY matched rec
+    // (the RecStatus branch above only ran on in_progress/completed/dismissed). buildMergeKey
+    // re-matches old↔new; applyLifecycleCarryOver also re-applies id+createdAt continuity (idempotent
+    // with the branch above). This is the trust-critical graft: a sent rec stays sent through regen.
+    applyLifecycleCarryOver(recs, Array.from(existingByKey.values()));
+
     // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
     // Safety: if the data source for a category failed this run (e.g. provider
     // outage, diagnostic store unavailable), skip auto-resolving recs in that
@@ -2390,6 +2449,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     const autoResolvedRecs: typeof existing.recommendations = [];
     for (const oldRec of existing.recommendations) {
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
+      // Strategy v3 (§6.5): a rec the client has already seen (sent/discussing/approved) must
+      // never be auto-swept to 'completed' (it would read as "✓ done" — the trust-critical graft).
+      if (isExemptFromAutoResolve(oldRec)) continue;
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
       if (!newSources.has(buildMergeKey(oldRec))) {
