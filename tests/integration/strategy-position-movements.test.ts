@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
 import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { upsertPageKeywordsBatch } from '../../server/page-keywords.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import type { StrategyPageMapEntry } from '../../server/keyword-strategy-ai-synthesis.js';
 
@@ -177,6 +178,40 @@ describe('incremental refresh rotates only the pages it touches', () => {
       expect(pages['/y'].previousPosition).toBeUndefined();
     } finally {
       deleteWorkspace(incWsId);
+    }
+  });
+});
+
+describe('non-refresh writes preserve the previousPosition baseline (rotate=0)', () => {
+  it('a non-rotating upsert between refreshes must not wipe previousPosition', async () => {
+    const preWsId = createWorkspace('Baseline preservation').id;
+    try {
+      // Two refreshes establish a real baseline: /p improved 8 → 5, so previousPosition=8.
+      refresh(
+        [{ pagePath: '/p', pageTitle: 'P', primaryKeyword: 'kw p', secondaryKeywords: [], currentPosition: 8, volume: 500 }],
+        { wsId: preWsId },
+      );
+      refresh(
+        [{ pagePath: '/p', pageTitle: 'P', primaryKeyword: 'kw p', secondaryKeywords: [], currentPosition: 5, volume: 500 }],
+        { wsId: preWsId },
+      );
+      const seeded = await readPageMap(preWsId);
+      expect(seeded['/p'].currentPosition).toBe(5);
+      expect(seeded['/p'].previousPosition).toBe(8);
+
+      // Simulate an intervening non-refresh writer (page-analysis job / PATCH / MCP):
+      // a plain batch upsert with rotate omitted (default false) and NO previousPosition.
+      // The ELSE branch must PRESERVE previous_position — a regression that rotated or
+      // nulled it here would silently destroy the refresh-to-refresh movement baseline.
+      upsertPageKeywordsBatch(preWsId, [
+        { pagePath: '/p', pageTitle: 'P', primaryKeyword: 'kw p', secondaryKeywords: [], currentPosition: 3 },
+      ]);
+
+      const after = await readPageMap(preWsId);
+      expect(after['/p'].currentPosition).toBe(3); // current updated by the non-refresh write
+      expect(after['/p'].previousPosition).toBe(8); // baseline preserved, NOT wiped to null or rotated to 5
+    } finally {
+      deleteWorkspace(preWsId);
     }
   });
 });
