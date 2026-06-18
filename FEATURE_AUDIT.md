@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **515 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **516 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 516. Strategy Page — interior tab shell + Content tab (Phase 3, behind `strategy-command-center`)
+
+**What it does:** Turns the v2 "command center" Strategy page into a tabbed shell. When `strategy-command-center` is on, the page chrome (header, recompute, banners) sits above an interior `?tab=` TabBar (Overview / Content), each deep-linkable (two-halves contract, mirroring the Content Pipeline). **Overview** holds the Orient zone + the Act queue + the reference cards; **Content** — the "money page" — composes the content gaps, topic-cluster coverage, and decaying-pages cards (re-homing the previously orphaned DecayingPagesCard), with an action-oriented empty state when no content opportunities exist yet. Flag-OFF is byte-identical (a separate early-return path leaves the legacy Analysis/Guide layout untouched).
+
+**Agency value:** The "one scroll" becomes a navigable surface — orient and act on the Overview, drill into content opportunities on their own tab — matching how an operator actually works the page. The foundation the Rankings (Phase 4) and Competitive (Phase 5) tabs slot into.
+
+**Client value:** Indirect (admin-only). The client reframe (Phase 6) inherits the same tab structure.
+
+**Mutual:** Reuses the proven `?tab=` deep-link helpers + the `TabBar` primitive + the existing content leaves — no new data path. Both new data reads (recommendations, content-decay) are flag-gated so flag-OFF adds zero fetches. Dark-launched behind `strategy-command-center` (default OFF).
+
+**Files:** `src/components/KeywordStrategy.tsx` (early-return v2 shell + interior `?tab=` wiring + Content tab), `src/hooks/admin/useContentDecay.ts` (gated `enabled`). Reuses `src/lib/tab-search-param.ts`, `ContentGaps`/`TopicClusters`/`DecayingPagesCard`. Adversarial review: 3-agent workflow (flag-off parity / tab wiring / leaf placement) — flag-off verified byte-identical, no content loss; fixed the blank-Content-tab empty state. Deferred: the "Create cluster" CTA (needs a batch content-request endpoint). Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 3).
 
 ---
 
