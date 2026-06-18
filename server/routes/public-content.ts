@@ -27,7 +27,7 @@ import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
-import { getWorkspace } from '../workspaces.js';
+import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { handlePublicContentPerformance } from '../domains/content/content-performance.js';
@@ -142,6 +142,10 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     if (!assembled) return res.json(null);
     const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
     // Return client-safe subset (no SEO data mode/provider internals)
+    // Raw cpc is an admin/scoring-internal money input — gate it server-side so a
+    // free-tier client cannot read it from the network payload (the drawer's
+    // client-side hide is not a security boundary). See the pageMap projection below.
+    const includeCpc = computeEffectiveTier(ws) !== 'free';
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
     const strategyUx = await buildKeywordStrategyUxPayload({
       workspaceId: ws.id,
@@ -191,11 +195,14 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         clicks: p.clicks,
         volume: p.volume,
         difficulty: p.difficulty,
-        // Task 3.2: cpc is the realized-$ input for the per-keyword "Revenue
-        // potential" block on the (Growth+ gated) strategy drawer. It is the same
-        // clicks×cpc realized value ROIDashboard already shows Growth+ clients —
-        // exposed alongside the other raw pageMap metrics (clicks/impressions/volume).
-        cpc: p.cpc,
+        // Task 3.2 / Phase 6a follow-up: cpc is the realized-$ input behind the
+        // per-keyword "Revenue potential" block on the Growth+ strategy drawer.
+        // It is admin/scoring-internal money data, so it is GENUINELY tier-gated
+        // here (omitted entirely for free tier via `includeCpc`) — not merely
+        // hidden client-side. The drawer itself renders server-computed
+        // currentMonthly/upsideMonthly (off `strategyUx`, derived from the full
+        // internal pageMap), so omitting raw cpc never breaks the paid drawer.
+        ...(includeCpc ? { cpc: p.cpc } : {}),
         metricsSource: p.metricsSource,
         validated: p.validated,
         gscKeywords: p.gscKeywords || [],

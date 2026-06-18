@@ -508,7 +508,16 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
-      valueReasons: computeValueReasons(keyword, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent }),
+      // Page-keyword cpc is admin/scoring-internal only, same as content gaps (#1103):
+      // the score stays cpc-aware, but only the admin surface may show the raw "$X CPC"
+      // in text — the client surface feeds the public payload, so suppress it there.
+      // (The raw pageMap.cpc field is separately tier-gated in public-content.ts; this
+      // closes the parallel raw-cpc-as-text path through valueReasons.)
+      valueReasons: computeValueReasons(
+        keyword,
+        { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent },
+        { exposeCpc: surface === 'admin' },
+      ),
     }));
   }
 

@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **521 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **522 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 522. Strategy — server-side tier-gate of raw `cpc` on the public read path (Phase 6a follow-up)
+
+**What it does:** Closes a pre-existing two-path data exposure on the public client read path `GET /api/public/seo-strategy/:id` (surfaced in #520's review). **(1) The raw field.** The per-page `pageMap.cpc` field — raw cost-per-click, an admin/scoring-internal **money** input — was serialized for **every** client tier, even though the only consumer (the Growth+ "Revenue potential" drawer block) is gated client-side. A free-tier client could read raw `cpc` straight from the network payload. `cpc` is now **genuinely tier-gated server-side**: included in the pageMap projection only when `computeEffectiveTier(ws) !== 'free'` (the same trial-aware resolver every other public tier check uses, so an active free-trial workspace — promoted to `growth` — still receives it). This matches the adjacent `contentGaps` projection's convention ("raw CPC is admin/scoring-internal — do NOT add it to this public list"). The Growth+ drawer is unaffected because its "Revenue potential" figures (`currentMonthly` / `upsideMonthly`) are **server-computed** off `strategyUx` from the full internal pageMap — they never depended on the raw `pageMap.cpc` projection (which, notably, is copied onto the client row but currently read nowhere). **(2) The reason text (code-review catch).** The same raw cpc value also shipped as human-readable text — the `keyword-value-scoring` `valueReasons` page-keyword branch emitted `"Commercial intent · $4.25 CPC"` to **all** client tiers (rendered unconditionally in the drawer), because that branch was missing the `{ exposeCpc: surface === 'admin' }` override the content-gap branch already had (commit `eecacd4f`, #1103). The justification recorded there ("page cpc IS public in the whitelist") was invalidated the moment the field became tier-gated. Per owner decision, raw `$X CPC` **text** is now admin-surface-only for every client tier (free and paid) — the narrative reason chips (intent / winnability / demand) and the score stay cpc-aware; only the raw dollar substring is suppressed, consistent with the client "no admin jargon" framing rule.
+
+**Agency value:** Removes a money-data leak from the client portal's public API — raw per-keyword CPC is no longer recoverable by free-tier clients inspecting the network tab, keeping the agency's monetizable revenue intelligence behind the paywall it claims.
+
+**Client value:** None visible (the drawer renders identically for paying clients); this is a correctness/trust hardening — the tier gate the UI implied is now real.
+
+**Mutual:** Single-line projection change; no UI change, no flag, no new field. The gate honors the canonical `computeEffectiveTier` (trial-aware) so it cannot drift from the rest of the portal's tier semantics.
+
+**Files:** `server/routes/public-content.ts` (import `computeEffectiveTier`; compute `includeCpc`; conditional `...(includeCpc ? { cpc: p.cpc } : {})` in the pageMap projection + corrected comment); `server/keyword-strategy-ux.ts` (page-keyword `valueReasons` now passes `{ exposeCpc: surface === 'admin' }`, mirroring the content-gap branch). Tests: `tests/integration/client-strategy-cpc-tier-gate-public-read.test.ts` (real public route — `cpc` field absent for free / present for growth / present for active-trial; plus a non-vacuous `valueReasons` guard asserting no raw `$X CPC` text for free OR growth); `tests/unit/keyword-strategy-ux.test.ts` (updated the `eecacd4f` "page cpc text is public" case to assert page cpc text is now admin-only for clients). Surfaced as the tracked follow-up in #520; path (2) caught by `superpowers:code-reviewer`.
 
 ---
 
@@ -30,7 +44,7 @@ A comprehensive value assessment of every feature in the platform — **521 feat
 
 **Mutual:** Reuses the existing `computeOrientMetrics` builder verbatim (identical inputs → the client score equals the admin score for the same workspace) — only the serialization point is new. Inert until the Phase 6b client UI renders it.
 
-**Files:** `server/routes/public-content.ts` (attach `strategyUx.orient` on the client read path), doc accuracy fixes in `shared/types/keyword-strategy-ux.ts` + `server/keyword-strategy-orient.ts` (orient is now admin + client). Test: `tests/integration/client-strategy-orient-public-read.test.ts` (leak-guard on the real public route). Adversarial review: 2-agent (leak-safety / correctness-parity-latency) — both SIGN-OFF, no Critical/Important; surfaced a pre-existing raw-`cpc`-to-all-tiers exposure (tracked follow-up). Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 6, Task 6.1).
+**Files:** `server/routes/public-content.ts` (attach `strategyUx.orient` on the client read path), doc accuracy fixes in `shared/types/keyword-strategy-ux.ts` + `server/keyword-strategy-orient.ts` (orient is now admin + client). Test: `tests/integration/client-strategy-orient-public-read.test.ts` (leak-guard on the real public route). Adversarial review: 2-agent (leak-safety / correctness-parity-latency) — both SIGN-OFF, no Critical/Important; surfaced a pre-existing raw-`cpc`-to-all-tiers exposure (resolved in #522). Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 6, Task 6.1).
 
 ---
 
