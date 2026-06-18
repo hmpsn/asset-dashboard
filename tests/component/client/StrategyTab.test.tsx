@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { StrategyTab } from '../../../src/components/client/StrategyTab';
 import type { ClientKeywordStrategy } from '../../../src/components/client/types';
 
-const { mockUseClientIntelligence } = vi.hoisted(() => ({
+const { mockUseClientIntelligence, searchParamsRef } = vi.hoisted(() => ({
   mockUseClientIntelligence: vi.fn(),
+  searchParamsRef: { current: '' },
 }));
 
 // ── React Router ──────────────────────────────────────────────────────────────
@@ -12,7 +13,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
     ...actual,
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
+    useSearchParams: () => [new URLSearchParams(searchParamsRef.current), vi.fn()],
     useNavigate: () => vi.fn(),
   };
 });
@@ -129,6 +130,17 @@ vi.mock('../../../src/components/client/strategy/StrategyKeywordDrawer', () => (
   StrategyKeywordDrawer: () => <div data-testid="keyword-drawer" />,
 }));
 
+// v2 command-center additions (flag-ON only) — stubbed for the layout tests.
+vi.mock('../../../src/components/client/CompetitorGapsSection', () => ({
+  CompetitorGapsSection: () => <div data-testid="competitor-gaps" />,
+}));
+
+vi.mock('../../../src/components/client/strategy/StrategyClientOrientHeader', () => ({
+  StrategyClientOrientHeader: ({ orient }: { orient?: { visibilityScore: number } }) => (
+    <div data-testid="orient-header">{orient ? `score:${orient.visibilityScore}` : 'no-orient'}</div>
+  ),
+}));
+
 // ── calculateStrategyHealth — return stable mock values ───────────────────────
 vi.mock('../../../src/lib/strategy-health-score', () => ({
   calculateStrategyHealth: () => ({
@@ -194,6 +206,7 @@ const defaultProps = {
 describe('StrategyTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsRef.current = '';
     mockUseClientIntelligence.mockReturnValue({ data: undefined });
   });
 
@@ -420,5 +433,72 @@ describe('StrategyTab', () => {
       />,
     );
     expect(screen.queryByTestId('decline-modal')).not.toBeInTheDocument();
+  });
+});
+
+describe('StrategyTab — v2 command center (flag ON)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsRef.current = '';
+    mockUseClientIntelligence.mockReturnValue({ data: undefined });
+  });
+
+  const orient = {
+    visibilityScore: 72, visibilityScoreDelta: 5,
+    clicks: 1200, clicksDelta: 100, impressions: 50000, impressionsDelta: 2000,
+    rankedKeywords: 80, rankedKeywordsDelta: 4, avgPosition: 12.3, avgPositionDelta: -1.1,
+  };
+
+  function renderV2() {
+    return render(
+      <StrategyTab
+        {...defaultProps}
+        commandCenterEnabled
+        strategyData={makeStrategy({ strategyUx: { explanations: [], orient } })}
+      />,
+    );
+  }
+
+  it('renders the Orient header + interior TabBar and defaults to the Overview tab', () => {
+    renderV2();
+    expect(screen.getByTestId('orient-header')).toHaveTextContent('score:72');
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.getByText('Competitive')).toBeInTheDocument();
+    // Overview tab content present; other tabs' content not mounted.
+    expect(screen.getByTestId('strategy-snapshot')).toBeInTheDocument();
+    expect(screen.getByTestId('business-priorities')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-opportunities')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('competitor-gaps')).not.toBeInTheDocument();
+  });
+
+  it('switches to the Content tab', () => {
+    renderV2();
+    fireEvent.click(screen.getByText('Content'));
+    expect(screen.getByTestId('content-opportunities')).toBeInTheDocument();
+    expect(screen.getByTestId('page-improvements')).toBeInTheDocument();
+    expect(screen.queryByTestId('strategy-snapshot')).not.toBeInTheDocument();
+  });
+
+  it('switches to the Competitive tab (Premium-gated section)', () => {
+    renderV2();
+    fireEvent.click(screen.getByText('Competitive'));
+    expect(screen.getByTestId('competitor-gaps')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-opportunities')).not.toBeInTheDocument();
+  });
+
+  it('bridges a legacy ?tab=content-gaps deep-link onto the Content tab', () => {
+    searchParamsRef.current = 'tab=content-gaps';
+    renderV2();
+    // The legacy section value resolves to the v2 Content tab (not a silent fallback to Overview).
+    expect(screen.getByTestId('content-opportunities')).toBeInTheDocument();
+    expect(screen.queryByTestId('strategy-snapshot')).not.toBeInTheDocument();
+  });
+
+  it('renders the legacy flat layout when the flag is off (no Orient header, all sections at once)', () => {
+    render(<StrategyTab {...defaultProps} strategyData={makeStrategy()} />);
+    expect(screen.queryByTestId('orient-header')).not.toBeInTheDocument();
+    expect(screen.getByTestId('strategy-snapshot')).toBeInTheDocument();
+    expect(screen.getByTestId('content-opportunities')).toBeInTheDocument();
+    expect(screen.getByTestId('page-keyword-map')).toBeInTheDocument();
   });
 });

@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **520 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **521 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 521. Client Strategy — v2 "command center" reframe: Orient header + interior tabs (Phase 6b, behind `strategy-command-center`)
+
+**What it does:** Reframes the client-facing Strategy tab into the same Orient → Act → Evidence command-center IA the admin uses, behind the `strategy-command-center` flag (default OFF; flag-OFF is byte-identical — the legacy flat layout is preserved exactly). When on, the client sees: a **plain-language Orient header** (`StrategyClientOrientHeader` — the 0–100 search-visibility score from Phase 6a in a `MetricRing`, a narrative verdict like "Your search visibility is strong and growing," and a clicks/impressions/ranked-keywords/avg-position strip with "vs last refresh" deltas — warmer copy than the admin, no admin jargon, no purple), above an interior `?tab=` **TabBar** (Overview / Content / Rankings / Competitive). Each tab re-homes the existing client sections: **Overview** (snapshot + next steps + priorities + feedback), **Content** the money page (content opportunities + page improvements, with the existing Approve / Add·$price CTAs intact), **Rankings** (page-keyword map + requested-keyword trend + strategy keywords + declined), and **Competitive** — Premium-gated, reusing the existing `CompetitorGapsSection` whose endpoint 402s non-Premium so no real competitor data ever reaches a non-Premium client (the gate is real, not cosmetic). Legacy `?tab=content-gaps`-style deep-links (e.g. from the Insights briefing page) are bridged onto the v2 tabs so they still land correctly.
+
+**Agency value:** The client now reads their SEO story the same way the agency does — one visibility number, what to do (priced), where they rank, who they're up against — which makes the monetization path (Approve / Add·$price / Premium competitive) feel like a natural next step rather than a separate upsell screen.
+
+**Client value:** A clear "where do I stand and what's next" narrative instead of a long scroll of sections — the visibility score answers "is my SEO working?" at a glance, and the tabs let them drill into exactly the part they care about.
+
+**Mutual:** A thin reframe of the SAME data, not a second system — every existing client section + money flow (content-request approve, cart-checkout, the Growth/Premium TierGates) is reused as-is; the only net-new piece is the client Orient header. The flag is read in `ClientDashboard` (QueryClient in scope) and threaded as a prop so `StrategyTab` stays QueryClient-free for its tests. Dark-launched behind `strategy-command-center` (default OFF).
+
+**Files:** `src/components/client/strategy/StrategyClientOrientHeader.tsx` (new), `src/components/client/StrategyTab.tsx` (flag branch + section-const refactor + interior tabs + legacy deep-link alias bridge), `src/components/ClientDashboard.tsx` (read flag + pass prop). Reuses `CompetitorGapsSection`, `TabBar`, `MetricRing`, the `?tab=` helpers. Tests: `StrategyTab.test.tsx` (v2 layout + tab switching + legacy `?tab=` alias + flag-OFF parity), `StrategyClientOrientHeader.test.tsx`. Adversarial review: 3-agent (parity+refactor / v2-layout+gating / client-design-laws) — caught + fixed a **Critical** Rules-of-Hooks violation (flag read placed after ClientDashboard's early returns — would have white-screened every client) and an **Important** broken legacy `?tab=` deep-link under flag-ON. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 6, Task 6.2).
 
 ---
 
