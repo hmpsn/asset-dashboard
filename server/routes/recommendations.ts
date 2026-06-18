@@ -14,11 +14,20 @@ import {
   dismissRecommendation,
   recommendationOutcomeActionType,
 } from '../recommendations.js';
+import {
+  sendRecommendation,
+  strikeRecommendation,
+  unstrikeRecommendation,
+  throttleRecommendation,
+  fixRecommendation,
+} from '../recommendation-lifecycle.js';
+import { addRecDiscussionEntry, listRecDiscussion } from '../rec-discussion.js';
+import { notifyClientCuratedRecsSent } from '../email.js';
 import { createJob, hasActiveJob } from '../jobs.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
-import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
+import { updatePageState, getPageIdBySlug, getWorkspace, buildClientPortalUrl } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -384,6 +393,147 @@ router.patch('/api/recommendations/:workspaceId/:recId/undismiss', requireWorksp
     `Status restored to "pending"`,
   );
   res.json(updated);
+});
+
+// ─── Strategy v3 curation lifecycle (admin-only) ─────────────────────────────
+// All routes mutate the SEPARATE clientStatus/lifecycle axes via the single-writer
+// (server/recommendation-lifecycle.ts) — NEVER RecStatus. A struck rec must never be
+// swept to 'completed' and read as "✓ done" to the client (the trust-critical graft).
+// They are admin-only (no /api/public/ prefix → covered by the global APP_PASSWORD HMAC
+// gate; requireWorkspaceAccess passes through for HMAC callers).
+
+// Send a curated rec to the client (clientStatus: curated/system → sent; stamps sentAt).
+// Fires the curated_recs_sent doorbell email (spec §7.1). An optional note-on-send is
+// recorded as a strategist discussion entry so it lands above the rec on the client overview.
+router.patch('/api/recommendations/:workspaceId/:recId/send', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+  let rec: Recommendation | null;
+  try {
+    rec = sendRecommendation(workspaceId, recId);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  // Optional note-on-send → a strategist discussion entry (the narrative lever).
+  if (note) addRecDiscussionEntry(workspaceId, recId, 'strategist', note);
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'sent' });
+  addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
+  // Doorbell email — batched per curation session by the 'action' throttle bucket. CTA deep-links to
+  // the client curated hub (the overview where sent recs surface). Per-rec ?rec= auto-open is a Phase-4
+  // enhancement (the receiver lands in P4); a batched "N recs ready" email correctly points at the hub.
+  const ws = getWorkspace(workspaceId);
+  if (ws?.clientEmail) {
+    const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+    notifyClientCuratedRecsSent({
+      clientEmail: ws.clientEmail,
+      workspaceName: ws.name,
+      workspaceId,
+      recCount: 1,
+      dashboardUrl: buildClientPortalUrl(origin, workspaceId),
+    });
+  }
+  res.json(rec);
+});
+
+// Strike a rec (lifecycle: active → struck; stamps struckAt). Permanent suppression — the rec
+// won't be re-suggested. rec_struck is ADMIN-ONLY activity (must never read as "we decided not
+// to do this" to the client). The arm-then-confirm UX is client-side (Lane B); the server
+// commits a single struck transition + keeps Undo open via /unstrike.
+router.patch('/api/recommendations/:workspaceId/:recId/strike', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  let rec: Recommendation | null;
+  try {
+    rec = strikeRecommendation(workspaceId, recId);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, lifecycle: 'struck' });
+  addActivity(workspaceId, 'rec_struck', `Recommendation struck: ${rec.title}`, rec.description);
+  res.json(rec);
+});
+
+// Undo a strike (lifecycle: struck → active). Clears the lifecycle suppression + cascade
+// metadata; the strategy-item restore for reversible cascade is a Phase-5 caller concern.
+router.patch('/api/recommendations/:workspaceId/:recId/unstrike', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  let rec: Recommendation | null;
+  try {
+    rec = unstrikeRecommendation(workspaceId, recId);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, lifecycle: 'active' });
+  addActivity(workspaceId, 'rec_status_updated', `Recommendation strike undone: ${rec.title}`, 'Restored to active');
+  res.json(rec);
+});
+
+// Throttle a rec (lifecycle: active → throttled) for 7/30/90 days. Resurface is ON-READ
+// (no cron) — isActiveRec re-includes it once throttledUntil passes.
+router.patch('/api/recommendations/:workspaceId/:recId/throttle', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  const days = req.body?.days;
+  if (days !== 7 && days !== 30 && days !== 90) {
+    return res.status(400).json({ error: 'days must be one of 7, 30, 90' });
+  }
+  let rec: Recommendation | null;
+  try {
+    rec = throttleRecommendation(workspaceId, recId, days);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, lifecycle: 'throttled' });
+  addActivity(workspaceId, 'rec_throttled', `Recommendation throttled ${days}d: ${rec.title}`, rec.description);
+  res.json(rec);
+});
+
+// Fix — mark the rec as agency-executed work (routes to the existing RecStatus completion spine
+// via the single-writer). Distinct from Send; this is "we'll do it ourselves" on the INTERNAL
+// triage axis — NOT a clientStatus change.
+router.patch('/api/recommendations/:workspaceId/:recId/fix', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  let rec: Recommendation | null;
+  try {
+    rec = fixRecommendation(workspaceId, recId);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: rec.status });
+  addActivity(workspaceId, 'rec_status_updated', `Recommendation marked as agency work: ${rec.title}`, rec.description);
+  res.json(rec);
+});
+
+// Read a rec's discussion thread (admin cockpit Discuss filter). Read-only — no mutation,
+// no broadcast, no activity log entry.
+router.get('/api/recommendations/:workspaceId/:recId/discussion', requireWorkspaceAccess('workspaceId'), (req, res) => { // activity-ok: read-only
+  const { workspaceId, recId } = req.params;
+  res.json(listRecDiscussion(workspaceId, recId));
+});
+
+// Append a strategist reply to a rec's discussion thread. Broadcasts the discussion-specific
+// event so the cockpit Discuss filter + the client thread re-fetch.
+router.post('/api/recommendations/:workspaceId/:recId/discussion', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId, recId } = req.params;
+  const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+  if (!body) return res.status(400).json({ error: 'body must be a non-empty string' });
+  const entry = addRecDiscussionEntry(workspaceId, recId, 'strategist', body);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED, { recId });
+  addActivity(workspaceId, 'rec_status_updated', `Strategist replied on: ${recId}`, body);
+  res.json(entry);
 });
 
 export default router;

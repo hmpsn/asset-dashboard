@@ -216,6 +216,7 @@ const CLIENT_EMAIL_PAYLOAD_RULES: Partial<Record<EmailEventType, PayloadRule>> =
   },
   client_briefing_ready: { requiredStrings: ['weekOf', 'heroHeadline'], requiredNumbers: ['storyCount'] },
   work_order_comment_client: { requiredStrings: ['orderTitle', 'message'] },
+  curated_recs_sent: { requiredNumbers: ['recCount'] },
 };
 
 function isNonEmptyString(value: unknown): value is string {
@@ -346,6 +347,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderWorkOrderCommentTeam(events, count, ws, dashUrl, logoUrl); break;
     case 'work_order_comment_client':
       result = renderWorkOrderCommentClient(events, count, ws, dashUrl, logoUrl); break;
+    case 'curated_recs_sent':
+      result = renderCuratedRecsSent(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -1008,6 +1011,26 @@ function renderRecommendationsReady(_events: EmailEvent[], _count: number, ws: s
       subtitle: ws,
       body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">${recCount} prioritized recommendation${recCount !== 1 ? 's' : ''} based on your latest audit are ready for review.</div>`,
       cta: dashUrl ? { label: 'View Recommendations', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+// Strategy v3 (spec §7.1) — the curation doorbell. Sent from the admin send endpoint when an
+// operator delivers curated rec(s) to the client. Decision-framed (NOT "recommendations_ready",
+// whose 14-day audit cooldown would swallow curated sends — see email-throttle CATEGORY_MAP).
+function renderCuratedRecsSent(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  // Sum recCount across batched events from one curation session (spec §7.1).
+  const recCount = _events.reduce((s, e) => s + ((e.data.recCount as number) || 0), 0);
+  const plural = recCount !== 1;
+  return {
+    subject: `${recCount} recommendation${plural ? 's' : ''} ready for your decision — ${ws}`,
+    html: layout({
+      preheader: `${recCount} recommendation${plural ? 's' : ''} need${plural ? '' : 's'} your decision`,
+      headline: 'Ready for your decision',
+      subtitle: ws,
+      body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">Your strategist curated ${recCount} recommendation${plural ? 's' : ''} for you. Review the why, the projected result, and approve or ask a question — right from your dashboard.</div>`,
+      cta: dashUrl ? { label: 'Review recommendations', url: dashUrl } : undefined,
       logoUrl,
     }),
   };
