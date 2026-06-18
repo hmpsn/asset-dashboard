@@ -199,7 +199,16 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
   return m;
 }
 
-function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisFields = false) {
+function modelToParams(
+  workspaceId: string,
+  m: PageKeywordMap,
+  preserveAnalysisFields = false,
+  // When 1, the upsert ROTATES previous_position ← the row's OLD current_position
+  // (strategy-refresh path only). When 0 (every other writer), previous_position is
+  // PRESERVED untouched so intervening page-analysis / PATCH / MCP writes between
+  // refreshes can't wipe the rotated baseline. See the upsert ON CONFLICT clause.
+  rotatePreviousPosition = false,
+) {
   return {
     workspace_id: workspaceId,
     page_path: normalizePageUrl(m.pagePath),
@@ -237,6 +246,7 @@ function modelToParams(workspaceId: string, m: PageKeywordMap, preserveAnalysisF
     missing_trust_signals: m.missingTrustSignals ? JSON.stringify(m.missingTrustSignals) : null,
     eeat_asset_recommendations: m.eeatAssetRecommendations ? JSON.stringify(m.eeatAssetRecommendations) : null,
     preserve_analysis_fields: preserveAnalysisFields ? 1 : 0,
+    rotate_previous_position: rotatePreviousPosition ? 1 : 0,
   };
 }
 
@@ -296,7 +306,21 @@ const stmts = createStmtCache(() => ({
       secondary_keywords = excluded.secondary_keywords,
       search_intent = excluded.search_intent,
       current_position = excluded.current_position,
-      previous_position = excluded.previous_position,
+      -- previous_position carries the position from the PRIOR strategy refresh so the
+      -- Rankings-tab movements card has real improved/declined/lost data.
+      --   rotate=1 (strategy-refresh path) + same primary keyword (preserve=1):
+      --     rotate previous_position ← page_keywords.current_position. In SQLite UPSERT
+      --     the bare table name is the OLD row, so this reads the pre-update position
+      --     (and NULL when the page lost its rank this refresh → "lost").
+      --   rotate=1 + primary keyword CHANGED (preserve=0): NULL — the old position was
+      --     for a different keyword, so comparing it would be misleading ("new" instead).
+      --   rotate=0 (page-analysis / PATCH / MCP / migration): PRESERVE the existing value
+      --     so non-refresh writes never clobber the refresh-to-refresh baseline.
+      previous_position = CASE
+        WHEN @rotate_previous_position = 1 AND @preserve_analysis_fields = 1 THEN page_keywords.current_position
+        WHEN @rotate_previous_position = 1 THEN NULL
+        ELSE page_keywords.previous_position
+      END,
       impressions = excluded.impressions,
       clicks = excluded.clicks,
       gsc_keywords = excluded.gsc_keywords,
@@ -551,13 +575,22 @@ export function upsertPageKeyword(workspaceId: string, entry: PageKeywordMap): v
   run.immediate();
 }
 
-/** Upsert multiple page keyword entries in a single transaction. */
-export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywordMap[]): void {
+/**
+ * Upsert multiple page keyword entries in a single transaction.
+ * Pass `rotatePreviousPosition` (strategy-refresh path only) to rotate the prior
+ * current_position into previous_position; all other callers leave it false so
+ * the refresh-to-refresh movement baseline is preserved.
+ */
+export function upsertPageKeywordsBatch(
+  workspaceId: string,
+  entries: PageKeywordMap[],
+  rotatePreviousPosition = false,
+): void {
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
       const preserveAnalysisFields = preparePrimaryKeywordUpdate(workspaceId, entry);
-      stmt.run(modelToParams(workspaceId, entry, preserveAnalysisFields));
+      stmt.run(modelToParams(workspaceId, entry, preserveAnalysisFields, rotatePreviousPosition));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
   });
@@ -568,13 +601,19 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
  * Upsert new page keyword entries AND delete any stale rows no longer in the batch.
  * Preserves Page Intelligence analysis fields on surviving rows (via COALESCE in upsertStmt).
  * Use this for strategy generation/updates where the incoming batch is the complete desired set.
+ * Pass `rotatePreviousPosition` (strategy-refresh path only) to rotate the prior
+ * current_position into previous_position for surviving rows.
  */
-export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
+export function upsertAndCleanPageKeywords(
+  workspaceId: string,
+  entries: PageKeywordMap[],
+  rotatePreviousPosition = false,
+): void {
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
       const preserveAnalysisFields = preparePrimaryKeywordUpdate(workspaceId, entry);
-      stmt.run(modelToParams(workspaceId, entry, preserveAnalysisFields));
+      stmt.run(modelToParams(workspaceId, entry, preserveAnalysisFields, rotatePreviousPosition));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
     if (entries.length === 0) {

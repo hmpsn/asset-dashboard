@@ -44,9 +44,10 @@ export function StrategyRankingsTab({ metrics, workspaceId, navigate }: Strategy
         navigate={navigate}
       />
 
-      {/* Movements only render when there is REAL movement data. `previousPosition` is not yet
-          rotated on write server-side (improved/declined/lost would be 0), so this gate avoids a
-          misleading all-zero / all-"New" card until that producer lands (see spawned follow-up). */}
+      {/* Movements only render when there is REAL movement data. `previousPosition` is rotated on
+          each strategy refresh server-side (persistKeywordStrategy → page_keywords), so the first
+          refresh has no prior to compare against and every page is "New" — this gate hides the
+          misleading all-zero / all-"New" card until a second refresh produces real improved/declined/lost. */}
       {(m.improved + m.declined + m.lost) > 0 && (
         <SectionCard
           title="Position movements"

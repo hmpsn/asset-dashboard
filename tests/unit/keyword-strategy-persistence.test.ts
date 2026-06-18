@@ -254,9 +254,12 @@ describe('persistKeywordStrategy', () => {
       searchData: makeSearchData(),
     });
 
+    // Third arg `true` = rotatePreviousPosition: the refresh boundary rotates each
+    // surviving page's prior current_position into previous_position (Rankings movements).
     expect(mockUpsertAndCleanPageKeywords).toHaveBeenCalledWith(
       'ws_persist',
       expect.arrayContaining([expect.objectContaining({ pagePath: '/services' })]),
+      true,
     );
     expect(mockUpsertPageKeywordsBatch).not.toHaveBeenCalled();
   });
@@ -283,7 +286,12 @@ describe('persistKeywordStrategy', () => {
       searchData: makeSearchData(),
     });
 
-    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalled();
+    // Incremental is still a refresh boundary for the pages it touches → rotate flag true.
+    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalledWith(
+      'ws_persist',
+      expect.any(Array),
+      true,
+    );
     expect(mockUpsertAndCleanPageKeywords).not.toHaveBeenCalled();
   });
 
