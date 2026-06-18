@@ -375,6 +375,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {progressEl}
       {errorEl}
       {nextStepsEl}
+      {/* clientFeedbackCombinedEl + settingsEl are rendered unconditionally so they are visible
+          even before the first strategy is generated (no-strategy state). Interim: this also shows
+          them on all interior tabs until StrategyCockpit (Phase 2) re-homes them. */}
+      {clientFeedbackCombinedEl}
+      {settingsEl}
       {emptyStateEl}
       {realLeaves && (
         <>
@@ -382,8 +387,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {interiorTab === 'overview' && (
             <div className="space-y-8">
               {feedbackNudgeEl}
-              {clientFeedbackCombinedEl}
-              {settingsEl}
               {realLeaves.stalenessNudges}
               {orientEl}
               {actQueueEl ?? (

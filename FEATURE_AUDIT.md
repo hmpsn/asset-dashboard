@@ -32,6 +32,8 @@ A comprehensive value assessment of every feature in the platform — **522 feat
 
 **Files:** `src/components/client/strategy/StrategyClientOrientHeader.tsx` (new), `src/components/client/StrategyTab.tsx` (flag branch + section-const refactor + interior tabs + legacy deep-link alias bridge), `src/components/ClientDashboard.tsx` (read flag + pass prop). Reuses `CompetitorGapsSection`, `TabBar`, `MetricRing`, the `?tab=` helpers. Tests: `StrategyTab.test.tsx` (v2 layout + tab switching + legacy `?tab=` alias + flag-OFF parity), `StrategyClientOrientHeader.test.tsx`. Adversarial review: 3-agent (parity+refactor / v2-layout+gating / client-design-laws) — caught + fixed a **Critical** Rules-of-Hooks violation (flag read placed after ClientDashboard's early returns — would have white-screened every client) and an **Important** broken legacy `?tab=` deep-link under flag-ON. Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 6, Task 6.2).
 
+**v3 Phase 0 update (2026-06-18):** the legacy flat layout was deleted; the command-center is now the unconditional baseline. `commandCenterEnabled` prop threading removed (`ClientDashboard` → `StrategyTab`); the `strategy-command-center` flag is KEPT as the v3 umbrella (REUSE — no retirement migration).
+
 ---
 
 ### 520. Strategy — client-safe visibility score on the public read path (Phase 6a)

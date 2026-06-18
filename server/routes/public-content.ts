@@ -175,8 +175,8 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     // clicks / impressions / ranked-keywords / avg-position and their deltas. OrientMetrics is
     // money-free by construction (its only inputs are per-page {position, volume}; there is NO emv,
     // opportunity.value, or per-keyword $ breakdown anywhere in it), so it is safe to expose on the
-    // public client path. Consumed by the client Strategy v2 Orient header (Phase 6b) when the
-    // strategy-command-center flag is on; ignored otherwise. The no-money-field invariant is locked by
+    // public client path. Consumed by the client Strategy command-center Orient header — the baseline
+    // layout after the v2 cutover (always read). The no-money-field invariant is locked by
     // tests/integration/client-strategy-orient-public-read.test.ts.
     strategyUx.orient = computeOrientMetrics(ws.id, fullPageMap);
     res.json({

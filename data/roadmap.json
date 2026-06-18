@@ -1,25 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-strategy-v2-command-center-2026-06-17",
-      "name": "Strategy v2 — SEO Command Center",
-      "hours": "TBD — phased, one PR per phase, staging-first",
-      "rationale": "Rebuild the admin Strategy page into a decision-first 'SEO command center' (Orient → Act → Evidence + interior Content/Rankings/Competitive tabs), monetization-led. Supersedes the retired decision-bands layout. Spec: docs/superpowers/specs/2026-06-17-strategy-v2-command-center.md; plan: docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.",
-      "notes": "Behind the strategy-command-center flag (default OFF). Flag OFF = legacy sequential layout, byte-identical, until v2 is the default — then legacy is deleted.",
-      "items": [
-        {
-          "id": "strategy-redesign-v2-command-center",
-          "title": "Strategy v2 — command-center IA (Orient/Act/Evidence + interior tabs)",
-          "source": "Strategy v2 spec 2026-06-17",
-          "est": "XL",
-          "priority": "P2",
-          "status": "in_progress",
-          "createdAt": "2026-06-17",
-          "notes": "Merged to staging: Phase R (#1266), Phase 0 (#1267), Phase 1 (Orient, #1268), Phase 2 (Act queue, #1269), Phase 3 (interior ?tab= shell — Overview/Content tabs + Content money page, #1270), Phase 4 (Rankings tab — interactive position distribution moved off Overview + a 'Position movements' summary; deep-links to Keyword Hub, #1271). Phase 4 follow-up: the previousPosition producer landed (FEATURE_AUDIT #518) — page_keywords.previous_position now rotates current→previous on the strategy-refresh write (gated, persistKeywordStrategy only), so the movements card surfaces real data from the 2nd refresh on. Phase 5 (Competitive tab — net-new ShareBar share-of-voice + CompetitiveIntel merged head-to-head + KeywordGaps with a Create-brief CTA + BacklinkProfile, composed in research order; backlink/competitive moved off Overview; orphaned AuthorityAndBacklinks wrapper retired; admin tab ungated, Premium gating deferred to Phase 6) merged to staging (#1272). Phase 6 SPLIT into 6a + 6b for focused PRs: Phase 6a (client-safe visibility score — attach strategyUx.orient to the public GET /api/public/seo-strategy/:id read path; OrientMetrics is money-free by construction so no EMV leak; leak-guard integration test; ungated; FEATURE_AUDIT #520) merged to staging (#1273). Phase 6a follow-up: closed a pre-existing raw-cpc-to-all-tiers exposure on the same public read path — pageMap.cpc (admin/scoring-internal money input) is now server-side tier-gated via computeEffectiveTier(ws) !== 'free' (trial-aware), matching the contentGaps no-raw-cpc convention; the Growth+ Revenue-potential drawer is unaffected (it renders server-computed currentMonthly/upsideMonthly, not raw pageMap.cpc). Code review caught a parallel raw-cpc-as-text leak: the keyword-value-scoring valueReasons page-keyword branch emitted '$X CPC' to all client tiers (missing the exposeCpc:surface==='admin' guard the content-gap branch already had, eecacd4f/#1103); owner decision = raw cpc text is admin-surface-only for every client tier. FEATURE_AUDIT #522. Phase 6b (client StrategyTab reframe — flag branch + section-const refactor → Orient header [StrategyClientOrientHeader] + interior Overview/Content/Rankings/Competitive tabs behind strategy-command-center, flag-OFF byte-identical; reuses existing sections + money flows; Competitive reuses the server-402-gated CompetitorGapsSection [no leak]; legacy ?tab= deep-links bridged via legacyAliases; flag read in ClientDashboard + passed as a prop so StrategyTab stays QueryClient-free; FEATURE_AUDIT #521; 3-reviewer pass caught+fixed a Critical Rules-of-Hooks bug + an Important broken deep-link) in PR. Phases: 0 contracts/score → 1 Orient → 2 Act queue → 3 tab shell + Content → 4 Rankings → 5 Competitive → 6a client-score + 6b client reframe → FINAL: delete legacyAnalysis (admin) + the flag-OFF legacy StrategyTab branch (client) once validated on staging, leaving one layout."
-        }
-      ]
-    },
-    {
       "id": "sprint-strategy-decision-first-redesign-2026-06-16",
       "name": "Strategy Page — Decision-First Redesign",
       "hours": "TBD — phased, one PR per phase",
@@ -1331,6 +1312,26 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-strategy-v2-command-center-2026-06-17",
+      "name": "✅ SHIPPED — Strategy v2 — SEO Command Center",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "Rebuild the admin Strategy page into a decision-first 'SEO command center' (Orient → Act → Evidence + interior Content/Rankings/Competitive tabs), monetization-led. Supersedes the retired decision-bands layout. Spec: docs/superpowers/specs/2026-06-17-strategy-v2-command-center.md; plan: docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.",
+      "notes": "Behind the strategy-command-center flag (default OFF). Flag OFF = legacy sequential layout, byte-identical, until v2 is the default — then legacy is deleted.",
+      "items": [
+        {
+          "id": "strategy-redesign-v2-command-center",
+          "title": "Strategy v2 — command-center IA (Orient/Act/Evidence + interior tabs)",
+          "source": "Strategy v2 spec 2026-06-17",
+          "est": "XL",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-17",
+          "notes": "Merged to staging: Phase R (#1266), Phase 0 (#1267), Phase 1 (Orient, #1268), Phase 2 (Act queue, #1269), Phase 3 (interior ?tab= shell — Overview/Content tabs + Content money page, #1270), Phase 4 (Rankings tab — interactive position distribution moved off Overview + a 'Position movements' summary; deep-links to Keyword Hub, #1271). Phase 4 follow-up: the previousPosition producer landed (FEATURE_AUDIT #518) — page_keywords.previous_position now rotates current→previous on the strategy-refresh write (gated, persistKeywordStrategy only), so the movements card surfaces real data from the 2nd refresh on. Phase 5 (Competitive tab — net-new ShareBar share-of-voice + CompetitiveIntel merged head-to-head + KeywordGaps with a Create-brief CTA + BacklinkProfile, composed in research order; backlink/competitive moved off Overview; orphaned AuthorityAndBacklinks wrapper retired; admin tab ungated, Premium gating deferred to Phase 6) merged to staging (#1272). Phase 6 SPLIT into 6a + 6b for focused PRs: Phase 6a (client-safe visibility score — attach strategyUx.orient to the public GET /api/public/seo-strategy/:id read path; OrientMetrics is money-free by construction so no EMV leak; leak-guard integration test; ungated; FEATURE_AUDIT #520) merged to staging (#1273). Phase 6a follow-up: closed a pre-existing raw-cpc-to-all-tiers exposure on the same public read path — pageMap.cpc (admin/scoring-internal money input) is now server-side tier-gated via computeEffectiveTier(ws) !== 'free' (trial-aware), matching the contentGaps no-raw-cpc convention; the Growth+ Revenue-potential drawer is unaffected (it renders server-computed currentMonthly/upsideMonthly, not raw pageMap.cpc). Code review caught a parallel raw-cpc-as-text leak: the keyword-value-scoring valueReasons page-keyword branch emitted '$X CPC' to all client tiers (missing the exposeCpc:surface==='admin' guard the content-gap branch already had, eecacd4f/#1103); owner decision = raw cpc text is admin-surface-only for every client tier. FEATURE_AUDIT #522. Phase 6b (client StrategyTab reframe — flag branch + section-const refactor → Orient header [StrategyClientOrientHeader] + interior Overview/Content/Rankings/Competitive tabs behind strategy-command-center, flag-OFF byte-identical; reuses existing sections + money flows; Competitive reuses the server-402-gated CompetitorGapsSection [no leak]; legacy ?tab= deep-links bridged via legacyAliases; flag read in ClientDashboard + passed as a prop so StrategyTab stays QueryClient-free; FEATURE_AUDIT #521; 3-reviewer pass caught+fixed a Critical Rules-of-Hooks bug + an Important broken deep-link) merged to staging. DONE 2026-06-18 (Strategy v3 Phase 0 — v2 cutover): deleted legacyAnalysis (admin) + the flag-OFF legacy StrategyTab branch (client); command-center is now the unconditional baseline. commandCenterEnabled prop threading removed (ClientDashboard → StrategyTab); strategy-command-center flag KEPT as v3 umbrella (REUSE — no retirement migration). Orphaned StrategyStatGrid + KeywordStrategyGuide deleted. FEATURE_AUDIT #521 updated."
+        }
+      ],
+      "shippedAt": "2026-06-18"
     },
     {
       "id": "sprint-platform-health-cleanup-followups-2026-06-11",
