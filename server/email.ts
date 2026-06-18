@@ -347,6 +347,23 @@ export function notifyClientRecommendationsReady(opts: {
   }));
 }
 
+// Strategy v3 (spec §7.1) — the curation doorbell. Fired from the admin send endpoint when an
+// operator sends curated rec(s) to the client. Batched per curation session by the 'action'
+// throttle bucket (server/email-throttle.ts CATEGORY_MAP). Distinct from recommendations_ready,
+// whose 14-day audit cooldown would silently swallow curated sends.
+export function notifyClientCuratedRecsSent(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  recCount: number;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('curated_recs_sent', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    recCount: opts.recCount,
+  }));
+}
+
 export function notifyClientAuditComplete(opts: {
   clientEmail: string;
   workspaceName: string;

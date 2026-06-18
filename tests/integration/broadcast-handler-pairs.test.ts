@@ -104,12 +104,6 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
   'job:created',
   'job:update',
 
-  // recommendations:discussion_updated — Strategy v3 forward-contract. The WS event constant + its
-  // client invalidation handler land in Phase 1 (the lifecycle substrate); the server
-  // broadcastToWorkspace() producer is the rec_discussion substrate built in Phase 2. Remove this entry
-  // when Phase 2 adds the broadcast (the "KNOWN_UNHANDLED_HANDLERS is stale" test will then flag it).
-  'recommendations:discussion_updated',
-
   // lg:grid-cols-5 — Tailwind responsive-prefix class used in a ternary
   // expression inside a template literal in WorkspaceHome.tsx:
   //   `... ? 'lg:grid-cols-5' : 'lg:grid-cols-4' ...`
@@ -243,9 +237,6 @@ describe('broadcast ↔ handler pairing audit', () => {
     // see the producer even though the events are live.
     'job:created',
     'job:update',
-    // recommendations:discussion_updated — Strategy v3 forward-contract: the constant + client handler
-    // ship in Phase 1; the broadcastToWorkspace() producer (rec_discussion substrate) lands in Phase 2.
-    'recommendations:discussion_updated',
   ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
