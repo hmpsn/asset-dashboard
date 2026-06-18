@@ -1,9 +1,11 @@
 // ── Strategy v2 Orient-zone metrics ───────────────────────────────
 // The top-line "where the site sits" glance: a 0–100 visibility score plus
 // clicks / impressions / ranked-keywords / avg-position, each with a delta vs the
-// previous strategy generation. Computed server-side (admin GET) because the score
-// uses the CTR-decay curve and the deltas need the prior strategy_history snapshot.
-// See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md (Phase 1).
+// previous strategy generation. Computed server-side on the admin GET and the public
+// client read (Phase 6a) because the score uses the CTR-decay curve and the deltas
+// need the prior strategy_history snapshot. The metric is client-safe by construction
+// (its only inputs are per-page {position, volume} — no emv / opportunity / $ breakdown).
+// See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md (Phases 1, 6a).
 
 import db from './db/index.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
@@ -104,7 +106,8 @@ export function buildOrientMetrics(currentPages: OrientPage[], priorPages: Orien
 
 /**
  * Orient-zone metrics for a workspace's current pageMap, reading the latest
- * strategy_history snapshot to derive deltas. Admin GET read path only.
+ * strategy_history snapshot to derive deltas. Consumed by the admin GET and the
+ * public client read (`/api/public/seo-strategy/:id`, Phase 6a) — client-safe (see OrientMetrics).
  */
 export function computeOrientMetrics(workspaceId: string, currentPageMap: OrientPage[]): OrientMetrics {
   const prevRow = db

@@ -39,6 +39,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import { computeOpportunityScore } from './keyword-strategy.js';
 import { buildKeywordStrategyUxPayload, buildLatestKeywordStrategyRefreshSummary } from '../keyword-strategy-ux.js';
+import { computeOrientMetrics } from '../keyword-strategy-orient.js';
 import { buildPageRankStories } from '../page-rank-stories.js';
 import {
   createContentRequestSchema,
@@ -166,6 +167,14 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         trackedKeywords,
       }),
     });
+    // Strategy v2 client Orient metrics — the CTR-weighted visibility score (0–100) plus aggregate
+    // clicks / impressions / ranked-keywords / avg-position and their deltas. OrientMetrics is
+    // money-free by construction (its only inputs are per-page {position, volume}; there is NO emv,
+    // opportunity.value, or per-keyword $ breakdown anywhere in it), so it is safe to expose on the
+    // public client path. Consumed by the client Strategy v2 Orient header (Phase 6b) when the
+    // strategy-command-center flag is on; ignored otherwise. The no-money-field invariant is locked by
+    // tests/integration/client-strategy-orient-public-read.test.ts.
+    strategyUx.orient = computeOrientMetrics(ws.id, fullPageMap);
     res.json({
       siteKeywords: strategy?.siteKeywords || [],
       // #19b dual-read: table-first via the assembler, blob fallback. Strip is 3b-ii.

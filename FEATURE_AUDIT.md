@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **519 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **520 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 520. Strategy — client-safe visibility score on the public read path (Phase 6a)
+
+**What it does:** Exposes the Strategy v2 **visibility score** (the 0–100 CTR-weighted "where the site sits" metric, plus aggregate clicks / impressions / ranked-keywords / avg-position and their deltas) to the **client** by attaching `strategyUx.orient` to the public read path `GET /api/public/seo-strategy/:id` (it was previously computed on the admin GET only). This is the data foundation for the client Strategy reframe's Orient header (Phase 6b). The metric is **client-safe by construction** — its only inputs are per-page `{position, volume}`; there is no EMV, `opportunity.value`, or per-keyword `$` anywhere in it — so exposing it opens no money/EMV leak. A leak-guard integration test on the real public route asserts the Orient payload contains a valid 0–100 score and that its keys never stray outside a money-free allow-list (so a future `$`-valued field added to the shared `OrientMetrics` type fails the test rather than silently reaching the client). Ungated across client tiers — the orienting "where you sit" glance is a free upsell hook (the Premium gate in Phase 6b is the Competitive section, not this score).
+
+**Agency value:** Lets the client dashboard show the same top-line visibility number the agency uses to orient — one shared truth, no separate client metric to maintain or explain.
+
+**Client value:** A single plain-number answer to "is my SEO working / where do I stand," available to every tier as the entry point into the strategy story.
+
+**Mutual:** Reuses the existing `computeOrientMetrics` builder verbatim (identical inputs → the client score equals the admin score for the same workspace) — only the serialization point is new. Inert until the Phase 6b client UI renders it.
+
+**Files:** `server/routes/public-content.ts` (attach `strategyUx.orient` on the client read path), doc accuracy fixes in `shared/types/keyword-strategy-ux.ts` + `server/keyword-strategy-orient.ts` (orient is now admin + client). Test: `tests/integration/client-strategy-orient-public-read.test.ts` (leak-guard on the real public route). Adversarial review: 2-agent (leak-safety / correctness-parity-latency) — both SIGN-OFF, no Critical/Important; surfaced a pre-existing raw-`cpc`-to-all-tiers exposure (tracked follow-up). Plan: `docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md` (Phase 6, Task 6.1).
 
 ---
 
