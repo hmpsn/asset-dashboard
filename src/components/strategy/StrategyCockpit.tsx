@@ -135,6 +135,7 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
               <button
                 key={s.id}
                 type="button"
+                aria-pressed={sort === s.id}
                 className={`rounded-[var(--radius-md)] px-2 py-1 t-caption-sm ${
                   sort === s.id ? 'text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                 }`}

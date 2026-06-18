@@ -86,11 +86,19 @@ export function toCockpitRow(rec: Recommendation): CockpitRowModel {
   };
 }
 
+/** A rec is "throttled" only while its snooze window is still open — an EXPIRED throttle
+ *  auto-resurfaces to Active on read (matches the server's isActiveRec throttle clause). The
+ *  canonical predicate lives in server/recommendations.ts and can't be imported into the client
+ *  bundle, so this mirrors only the throttle-expiry rule both classifiers need. */
+function isThrottledOpen(rec: Recommendation): boolean {
+  return rec.lifecycle === 'throttled' && !!rec.throttledUntil && Date.parse(rec.throttledUntil) > Date.now();
+}
+
 /** Counts for the lifecycle segmented control. A rec lands in exactly one bucket. */
 export function partitionByLifecycle(recs: Recommendation[]): Record<LifecycleBucket, number> {
   const out: Record<LifecycleBucket, number> = { active: 0, sent: 0, approved: 0, throttled: 0 };
   for (const r of recs) {
-    if (r.lifecycle === 'throttled') out.throttled += 1;
+    if (isThrottledOpen(r)) out.throttled += 1;
     else if (r.clientStatus === 'approved') out.approved += 1;
     else if (r.clientStatus === 'sent') out.sent += 1;
     else out.active += 1;
@@ -99,7 +107,7 @@ export function partitionByLifecycle(recs: Recommendation[]): Record<LifecycleBu
 }
 
 export function bucketOf(rec: Recommendation): LifecycleBucket {
-  if (rec.lifecycle === 'throttled') return 'throttled';
+  if (isThrottledOpen(rec)) return 'throttled';
   if (rec.clientStatus === 'approved') return 'approved';
   if (rec.clientStatus === 'sent') return 'sent';
   return 'active';

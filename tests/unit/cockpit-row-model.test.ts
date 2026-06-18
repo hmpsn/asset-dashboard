@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toCockpitRow, partitionByLifecycle, FIX_NOW_CAP } from '../../src/components/strategy/cockpitRowModel';
+import { toCockpitRow, partitionByLifecycle, bucketOf, FIX_NOW_CAP } from '../../src/components/strategy/cockpitRowModel';
 import type { Recommendation } from '../../shared/types/recommendations';
 
 function rec(overrides: Partial<Recommendation> = {}): Recommendation {
@@ -47,6 +47,16 @@ describe('cockpitRowModel', () => {
     expect(p.approved).toBe(1);
     expect(p.throttled).toBe(1);
     expect(FIX_NOW_CAP).toBe(5);
+  });
+
+  it('resurfaces an expired-throttle rec to Active on read (throttledUntil in the past)', () => {
+    const expired = rec({ id: 'e', lifecycle: 'throttled', throttledUntil: new Date(Date.now() - 1000).toISOString() });
+    const open = rec({ id: 'o', lifecycle: 'throttled', throttledUntil: new Date(Date.now() + 1e9).toISOString() });
+    expect(bucketOf(expired)).toBe('active'); // snooze window passed → resurfaced
+    expect(bucketOf(open)).toBe('throttled');
+    const p = partitionByLifecycle([expired, open]);
+    expect(p.throttled).toBe(1);
+    expect(p.active).toBe(1);
   });
 
   it('sets isFixNow=true for fix_now priority active unsent recs', () => {
