@@ -138,6 +138,19 @@ vi.mock('../../server/cannibalization-issues.js', () => ({
 const mockLoadRecommendations = vi.fn(() => null as RecommendationSet | null);
 vi.mock('../../server/recommendations.js', () => ({
   loadRecommendations: (...args: unknown[]) => mockLoadRecommendations(...args),
+  // Faithful mirror of server/recommendations.ts:isActiveRec — the real module pulls the DB graph,
+  // so it can't be importActual'd in this pure unit test. Keep in sync with the source (the
+  // seo-context slice resolves topOpportunity through this predicate per Strategy v3 Lane 1C).
+  isActiveRec: (
+    rec: { status?: string; lifecycle?: string; throttledUntil?: string; clientStatus?: string },
+    now: number = Date.now(),
+  ): boolean => {
+    if (rec.status === 'completed' || rec.status === 'dismissed') return false;
+    if (rec.lifecycle === 'struck') return false;
+    if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
+    if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
+    return true;
+  },
 }));
 
 // ── Real import (after all mocks) ─────────────────────────────────────────────
