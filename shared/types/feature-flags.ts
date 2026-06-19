@@ -72,6 +72,11 @@ export const FEATURE_FLAGS = {
   'strategy-competitor-send': false,
   // Strategy redesign — fold Intelligence Signals into the cockpit as real recs. Activated P4.
   'strategy-signal-fold': false,
+  // The Issue — system-drafted curated POV cockpit (admin) + evergreen content-led V2 client
+  // feed. Master flag for the reimagined Strategy surface; composes with strategy-command-center
+  // (theIssueEnabled = commandCenterEnabled && this). OFF = the current command-center cockpit,
+  // byte-identical. See docs/superpowers/specs/2026-06-19-strategy-the-issue-design.md.
+  'strategy-the-issue': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -372,6 +377,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-18',
     },
   },
+  'strategy-the-issue': {
+    label: 'The Issue — curated POV cockpit + evergreen V2 client feed',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-19',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the Issue cockpit + client feed + closed loop are validated on staging; the prior command-center cockpit layout is then retired.',
+      linkedRoadmapItemId: 'strategy-the-issue',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-19',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -401,7 +419,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue'],
   },
 ];
 
