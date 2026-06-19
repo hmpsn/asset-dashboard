@@ -74,6 +74,12 @@ function parseFrontendWsEvents(): Map<string, string> {
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
+  // strategy:keyword-set-updated — forward-declared in the Strategy-redesign P2
+  // pre-commit. The broadcast producer (managed-keyword-set mutations) AND the
+  // useWorkspaceEvents handler both land in P3 (the managed-set write path).
+  // REMOVE this entry in P3 once the handler is wired.
+  'strategy:keyword-set-updated',
+
   // deliverable:sent / deliverable:updated are now HANDLED by the PR-2a client unified inbox
   // (src/components/client/inbox/UnifiedInbox.tsx wires useWorkspaceEvents for both, invalidating
   // the unified-inbox query). They are intentionally NOT listed here anymore. (The admin inbox
@@ -237,6 +243,10 @@ describe('broadcast ↔ handler pairing audit', () => {
     // see the producer even though the events are live.
     'job:created',
     'job:update',
+    // strategy:keyword-set-updated — forward-declared in the Strategy-redesign P2
+    // pre-commit; its broadcastToWorkspace() producer lands in P3 (managed-set
+    // write path). REMOVE this entry in P3 once the producer is wired.
+    'strategy:keyword-set-updated',
   ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
