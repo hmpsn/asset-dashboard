@@ -16,7 +16,15 @@ export type ActionType =
   | 'cluster_published'
   | 'cannibalization_resolved'
   | 'local_visibility_won'
-  | 'local_service_added';
+  | 'local_service_added'
+  // Strategy redesign P2 pre-commit (consumed in P3 Lane E) — durable `tracked_actions`
+  // keep markers for the managed Topic Clusters / Content Gaps sets (delete-then-reinsert
+  // tables; keep state is inferred from these tracked_actions rows, per the
+  // CannibalizationTriage precedent). NOTE: `strategy_keyword_added` already exists above;
+  // the `strategy_keyword_*` ACTIVITY types live in server/activity-log.ts (ActivityType),
+  // NOT here.
+  | 'topic_cluster_keep'
+  | 'content_gap_keep';
 
 export type Attribution =
   | 'platform_executed'

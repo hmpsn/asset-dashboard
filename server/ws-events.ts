@@ -137,6 +137,10 @@ export const WS_EVENTS = {
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  // Strategy redesign P2 pre-commit (consumed in P3) — broadcast on every managed
+  // keyword working-set mutation (add/remove/keep/reconcile). Hyphen-in-segment form is
+  // canonical (execution-map §1.4), matching the STRATEGY_SIGNAL_FOLD_UPDATED sibling.
+  STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
 
   // Local SEO

@@ -75,6 +75,19 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'position',
     thresholds: { strong_win: 10, win: 5, neutral_band: 3 },
   },
+  // ── Strategy redesign P2 pre-commit — managed-set keep markers ──
+  // topic_cluster_keep / content_gap_keep are curation decisions (operator kept the item in
+  // the managed set), NOT measurable SEO outcomes — they are never recorded as tracked
+  // actions and therefore never scored. These entries exist only to keep ScoringConfig
+  // (Record<ActionType, …>) exhaustive; they mirror the non-metric `brief_created` shape.
+  topic_cluster_keep: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+  },
+  content_gap_keep: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+  },
 };
 
 export function resolveScoringConfig(

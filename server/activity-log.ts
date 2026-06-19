@@ -161,7 +161,16 @@ export type ActivityType =
   | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
-  | 'post_voice_scored';         // admin-only: voice score persisted for a post
+  | 'post_voice_scored'          // admin-only: voice score persisted for a post
+  // Strategy redesign P2 pre-commit (consumed in P3 Lane A) — managed keyword working-set
+  // mutations (strategy_keyword_set table). Admin-only curation hygiene; deliberately NOT
+  // in CLIENT_VISIBLE_TYPES — keyword-set add/remove/keep is an internal operator audit
+  // trail, never a client-facing milestone. The matching `tracked_actions` keep markers
+  // (topic_cluster_keep / content_gap_keep) live in shared/types/outcome-tracking.ts
+  // (ActionType), a SEPARATE union — do not conflate.
+  | 'strategy_keyword_kept'      // admin-only: operator explicitly kept a keyword (survives regen)
+  | 'strategy_keyword_removed'   // admin-only: operator removed a keyword from the managed set
+  | 'strategy_keyword_added';    // admin-only: keyword added to the managed set (client_request / manual_add)
 
 export interface ActivityEntry {
   id: string;

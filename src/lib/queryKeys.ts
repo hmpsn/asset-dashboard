@@ -89,6 +89,9 @@ export const queryKeys = {
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     strategyDiff: (wsId: string) => ['admin-strategy-diff', wsId] as const,
+    /** Strategy redesign P2 pre-commit (consumed in P3) — the managed keyword working set
+     *  (strategy_keyword_set). Invalidated by the STRATEGY_KEYWORD_SET_UPDATED handler. */
+    strategyKeywordSet: (wsId: string) => ['admin-strategy-keyword-set', wsId] as const,
     contentDecay: (wsId: string) => ['admin-content-decay', wsId] as const,
     backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
