@@ -22,7 +22,9 @@ import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { StrategyConfigPanel } from './strategy/StrategyConfigPanel';
+import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
+import { adminPath } from '../routes';
 import {
   useStrategyMetrics,
   useStrategySettings,
@@ -272,10 +274,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ? <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
     : null;
 
-  // P4 Lane B: LocalSeoVisibilityPanel (results) removed from Strategy entirely.
-  // Local SEO visibility results now live in KeywordHub only (mode='keywords' unchanged there).
-  // Local market config is accessible via StrategyConfigPanel (flag-ON) or the existing
-  // setup flow that can be reached from the Keywords tab. No outside-tabs localSeoEl any more.
+  // flag-OFF only: LocalSeoVisibilityPanel (results) rendered outside tabs (today's behaviour,
+  // byte-identical). flag-ON (P4 Lane B): Local SEO results de-dup to KeywordHub (mode='keywords')
+  // and local market config moves into StrategyConfigPanel — so localSeoEl is null here when ON.
+  const localSeoEl = !commandCenterEnabled ? (
+    <LocalSeoVisibilityPanel
+      workspaceId={workspaceId}
+      mode="strategy"
+      onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+    />
+  ) : null;
 
   const feedbackNudgeEl = metrics.feedbackNewerThanStrategy ? (
     <StrategyFeedbackNudge
@@ -468,6 +476,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {headerEl}
       {refreshPromptEl}
       {aiContextEl}
+      {localSeoEl}
       {progressEl}
       {errorEl}
       {nextStepsEl}
