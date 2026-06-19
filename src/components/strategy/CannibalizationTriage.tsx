@@ -63,7 +63,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
   const sendMutation = useMutation({
     mutationFn: (item: CannibalizationItem) => {
       const canonicalPath = keeperPathOf(item);
-      return clientActions.create(workspaceId, {
+      return clientActions.create(workspaceId, { // strategy-send-must-route-through-lifecycle-ok: cannibalization deliverable spine — bespoke client card requires dedicated renderer
         sourceType: 'cannibalization',
         sourceId: cannibalizationSourceId(item.keyword),
         title: `Keyword cannibalization: “${item.keyword}”`,

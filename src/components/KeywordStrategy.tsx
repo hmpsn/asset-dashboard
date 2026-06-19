@@ -49,7 +49,16 @@ import { adminPath } from '../routes';
 // Content = the content "money page"; Rankings = position distribution + movements;
 // Competitive = share of voice + keyword gaps + backlinks (the "research mode" surface).
 // The literal ids appear here so the ?tab= deep-link contract test recognizes this receiver.
+// NOTE: tab id 'rankings' is intentionally unchanged so ?tab=rankings deep-links keep working.
+// flag-ON renames the label to 'Keywords & Rankings'; flag-OFF keeps 'Rankings'. id never changes.
 type StrategyInteriorTab = 'overview' | 'content' | 'rankings' | 'competitive';
+const makeStrategyInteriorTabs = (commandCenterEnabled: boolean): { id: StrategyInteriorTab; label: string }[] => [
+  { id: 'overview', label: 'Overview' },
+  { id: 'content', label: 'Content' },
+  { id: 'rankings', label: commandCenterEnabled ? 'Keywords & Rankings' : 'Rankings' },
+  { id: 'competitive', label: 'Competitive' },
+];
+// Stable reference used only for id-lookup (deep-link resolution, tab validation) — labels irrelevant here.
 const STRATEGY_INTERIOR_TABS: { id: StrategyInteriorTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'content', label: 'Content' },
@@ -407,6 +416,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const hasDecayingPages = (contentDecayData?.decayingPages?.length ?? 0) > 0;
   const hasContentTabContent = hasContentGaps || hasTopicClusters || hasDecayingPages;
 
+  // flag-ON: tab labels rendered with 'Keywords & Rankings'; flag-OFF: 'Rankings'.
+  // Tab ids are always from the stable STRATEGY_INTERIOR_TABS constant so deep-link resolution is unaffected.
+  const displayedTabs = makeStrategyInteriorTabs(commandCenterEnabled);
+
   // ── Strategy command-center layout (the baseline): page chrome + interior tabs (Overview / Content) ──
   const strategyLayout = (
     <div className="space-y-8">
@@ -417,23 +430,22 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {progressEl}
       {errorEl}
       {nextStepsEl}
-      {/* clientFeedbackCombinedEl + settingsEl are rendered unconditionally so they are visible
-          even before the first strategy is generated (no-strategy state). Interim: this also shows
-          them on all interior tabs until StrategyCockpit (Phase 2) re-homes them. */}
-      {clientFeedbackCombinedEl}
+      {/* flag-OFF: clientFeedbackCombinedEl rendered unconditionally above tabs (today's behaviour, byte-identical).
+          flag-ON: clientFeedbackCombinedEl moves INTO the Keywords & Rankings tab — not rendered here. */}
+      {!commandCenterEnabled && clientFeedbackCombinedEl}
       {settingsEl}
       {emptyStateEl}
       {realLeaves && (
         <>
-          <TabBar tabs={STRATEGY_INTERIOR_TABS} active={interiorTab} onChange={handleInteriorTabChange} />
+          <TabBar tabs={displayedTabs} active={interiorTab} onChange={handleInteriorTabChange} />
           {interiorTab === 'overview' && (
             commandCenterEnabled ? (
               // ── flag-ON: decision-pipeline IA (graft 3) ──
-              // Order: nudges → Orient → What Changed (promoted) → cockpit → reference leaves.
+              // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → IntelligenceSignals.
               // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).
               // CannibalizationTriage used (actionable) instead of passive CannibalizationAlert.
-              // maxVisible={5} passed to SiteTargetKeywords + KeywordOpportunities (Overview scannable
-              // leaves). ContentGaps + TopicClusters live in the Content tab — capped there below.
+              // SiteTargetKeywords + KeywordOpportunities + clientFeedback moved to the "Keywords & Rankings"
+              // tab (P2 Lane A). IntelligenceSignals stays on Overview until P4 signal-fold owns it.
               // StrategyHowItWorks demoted to ? tooltip in PageHeader; NOT rendered inline here.
               <div className="space-y-8">
                 {feedbackNudgeEl}
@@ -448,17 +460,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   </>
                 )}
                 {realLeaves.cannibalization}
-                <SiteTargetKeywords
-                  workspaceId={workspaceId}
-                  siteKeywords={strategy?.siteKeywords ?? []}
-                  siteKeywordMetrics={strategy?.siteKeywordMetrics}
-                  trackedKeywords={tracking.trackedKeywords}
-                  trackingPending={tracking.trackingPending}
-                  trackingErrors={tracking.trackingErrors}
-                  onTrack={tracking.trackKeyword}
-                  maxVisible={5}
-                />
-                <KeywordOpportunities opportunities={strategy?.opportunities ?? []} maxVisible={5} />
                 {intelligenceSignalsEl}
               </div>
             ) : (
@@ -521,7 +522,36 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             </div>
           )}
           {interiorTab === 'rankings' && (
-            <StrategyRankingsTab metrics={metrics} workspaceId={workspaceId} navigate={navigate} />
+            commandCenterEnabled && isRealStrategy && strategy ? (
+              // flag-ON: "Keywords & Rankings" tab — Hub deep-link at top, then keyword surfaces,
+              // then existing distribution/movements content from StrategyRankingsTab.
+              <StrategyRankingsTab
+                metrics={metrics}
+                workspaceId={workspaceId}
+                navigate={navigate}
+                keywordSurfaces={{
+                  siteKeywords: (
+                    <SiteTargetKeywords
+                      workspaceId={workspaceId}
+                      siteKeywords={strategy.siteKeywords ?? []}
+                      siteKeywordMetrics={strategy.siteKeywordMetrics}
+                      trackedKeywords={tracking.trackedKeywords}
+                      trackingPending={tracking.trackingPending}
+                      trackingErrors={tracking.trackingErrors}
+                      onTrack={tracking.trackKeyword}
+                      maxVisible={5}
+                    />
+                  ),
+                  opportunities: (
+                    <KeywordOpportunities opportunities={strategy.opportunities ?? []} maxVisible={5} />
+                  ),
+                  clientFeedback: clientFeedbackCombinedEl,
+                }}
+              />
+            ) : (
+              // flag-OFF: today's Rankings tab, byte-identical.
+              <StrategyRankingsTab metrics={metrics} workspaceId={workspaceId} navigate={navigate} />
+            )
           )}
           {interiorTab === 'competitive' && (
             <StrategyCompetitiveTab
