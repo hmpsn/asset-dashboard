@@ -85,7 +85,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
   // Resolution is inferred from durable tracked_actions (the cannibalization_issues row is
   // delete-then-reinsert on regen, so it can't hold the flag). Filter to OUR source type so
   // recommendation-sourced cannibalization_resolved actions don't collide. Resolved issues drop out
-  // of the queue (mirrors DecisionQueue's server-backed status filter — no local optimistic toggles).
+  // of the visible list (no local optimistic toggles — server status is authoritative).
   const resolvedKeys = new Set(
     (resolvedActions ?? [])
       .filter(a => a.sourceType === 'cannibalization')

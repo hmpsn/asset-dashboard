@@ -8,8 +8,6 @@ export * from './hooks/useTrackKeyword';
 export * from './hooks/useKeywordFeedback';
 
 export * from './StrategyHeaderActions';
-export * from './DecisionQueue';
-export * from './RequestedKeywordTriage';
 export * from './strategySummaryLine';
 export * from './StrategyFeedbackNudge';
 export * from './ClientKeywordFeedback';
@@ -33,7 +31,6 @@ export * from './StrategyHowItWorks';
 // See docs/superpowers/plans/2026-06-18-strategy-v3-curation-cockpit.md.
 // (AuthorityAndBacklinks was removed in Phase 5 — the Competitive tab composes BacklinkProfile +
 // CompetitiveIntel directly in research order rather than via the merged wrapper.)
-export * from './OpportunitiesList';
 export * from './DecayingPagesCard';
 export * from './LostQueryRecoveryCard';
 export * from './CannibalizationTriage';
