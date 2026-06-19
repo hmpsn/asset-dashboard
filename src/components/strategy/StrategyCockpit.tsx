@@ -1,13 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Target } from 'lucide-react';
 import { SectionCard, Icon, Button } from '../ui';
 import { CockpitRow } from './CockpitRow';
+import { CurationMeter } from './CurationMeter';
+import { NeedsAttentionStrip, type AttentionKind } from './NeedsAttentionStrip';
+import { CurationBulkActionBar } from './CurationBulkActionBar';
+import { buildAttentionItems, countSentThisCycle } from './cockpitAttention';
 import { recActCategory, ACT_CATEGORIES, type ActCategory } from '../../lib/recCategoryMap';
 import {
   toCockpitRow, partitionByLifecycle, bucketOf, sortRecs, FIX_NOW_CAP,
   type LifecycleBucket, type CockpitSort,
 } from './cockpitRowModel';
 import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../../hooks/useToggleSet';
+import { useCurationSelection } from './hooks/useCurationSelection';
+import { useRecBulkMutation } from '../../hooks/admin/useRecBulkMutation';
 import type { Recommendation } from '../../../shared/types/recommendations';
 
 export interface CockpitActions {
@@ -20,6 +26,7 @@ export interface CockpitActions {
 }
 
 interface StrategyCockpitProps {
+  workspaceId: string;
   recs: Recommendation[];
   actions: CockpitActions;
 }
@@ -46,13 +53,25 @@ const SORTS: ReadonlyArray<{ id: CockpitSort; label: string }> = [
 /** Strategy v3 admin Curation Cockpit (spec §4) — the Overview-tab hero. Fix-now pin +
  *  lifecycle segmented control + category toggle chips + sort, rendering the v3 CockpitRow.
  *  Pure: recs + lifecycle actions are injected by the host (Lane C wiring). */
-export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
+export function StrategyCockpit({ workspaceId, recs, actions }: StrategyCockpitProps) {
   const [bucket, setBucket] = useState<LifecycleBucket>('active');
   // useToggleSet with min:0 (all categories optional = "show all"), max:unbounded.
-  const [cats, toggleCat] = useToggleSet<ActCategory>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [cats, toggleCat, setCats] = useToggleSet<ActCategory>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [sort, setSort] = useState<CockpitSort>('value');
 
   const lifeCounts = useMemo(() => partitionByLifecycle(recs), [recs]);
+
+  // Self-managing attention strip + curation meter — derived client-side from the rec set.
+  const attentionItems = useMemo(() => buildAttentionItems(recs), [recs]);
+  const sentThisCycle = useMemo(() => countSentThisCycle(recs), [recs]);
+
+  // Jump the operator to the rec so the attention CTA lands on it in the faceted list.
+  const handleAttentionAct = (recId: string, _kind: AttentionKind) => {
+    const rec = recs.find((r) => r.id === recId);
+    if (!rec) return;
+    setBucket(bucketOf(rec));
+    if (cats.size > 0) setCats(new Set());
+  };
 
   // Fix-now pin: capped, by value, visible regardless of the active bucket/category chip.
   const fixNow = useMemo(
@@ -73,11 +92,28 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
     return sortRecs(filtered, sort);
   }, [inBucket, cats, sort]);
 
+  // Bulk-curation selection is scoped to the faceted (visible) set — the "all-in-filter" predicate
+  // resolves against exactly these ids, so it stays in sync with the active bucket + category + sort.
+  const visibleIds = useMemo(() => visible.map((r) => r.id), [visible]);
+  const sel = useCurationSelection(visibleIds);
+
+  // Clear selection when the filter basis (bucket or category set) changes — but NOT on every
+  // visibleIds identity change (it re-identifies on every recs refetch, nuking in-progress work).
+  const catsKey = useMemo(() => [...cats].sort().join(','), [cats]);
+  useEffect(() => { sel.clear(); }, [bucket, catsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- reset selection only when the filter basis (bucket/cats) changes; sel.clear is a stable useCallback
+
+  const bulk = useRecBulkMutation(workspaceId);
+
   const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
 
   return (
+    <>
     <SectionCard title="Curate recommendations" titleIcon={titleIcon}>
       <div className="space-y-4">
+        {/* Self-managing header: curation meter + needs-attention strip (both render null when empty) */}
+        <CurationMeter sentThisCycle={sentThisCycle} />
+        <NeedsAttentionStrip items={attentionItems} onAct={handleAttentionAct} />
+
         {/* Fix now pin */}
         {fixNow.length > 0 && (
           <div className="space-y-2">
@@ -89,7 +125,7 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
         )}
 
         {/* Lifecycle segmented control (single-select) */}
-        <div className="flex flex-wrap items-center gap-1 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-1 w-fit">
+        <div className="flex flex-wrap items-center gap-1 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)] p-1 w-fit">
           {LIFECYCLE_TABS.map((t) => (
             <Button
               key={t.id}
@@ -149,7 +185,40 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
 
         {/* The faceted list */}
         <div className="space-y-2">
-          {visible.map((r) => <CockpitRow key={r.id} rec={r} actions={actions} />)}
+          {visible.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-pressed={sel.isAllInFilter}
+                className={`t-caption-sm hover:bg-transparent ${
+                  sel.isAllInFilter ? 'text-accent-brand hover:text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+                }`}
+                onClick={sel.selectAllInFilter}
+              >
+                Select all {visible.length}
+              </Button>
+              {sel.selectedCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
+                  onClick={sel.clear}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          )}
+          {visible.map((r) => (
+            <CockpitRow
+              key={r.id}
+              rec={r}
+              actions={actions}
+              selected={sel.isSelected(r.id)}
+              onToggleSelect={sel.toggle}
+            />
+          ))}
           {visible.length === 0 && (
             <p className="t-caption-sm text-[var(--brand-text-muted)] py-6 text-center">
               Nothing in this view. Switch lifecycle or clear a category filter.
@@ -158,5 +227,22 @@ export function StrategyCockpit({ recs, actions }: StrategyCockpitProps) {
         </div>
       </div>
     </SectionCard>
+
+    {/* Sticky bulk-action bar — outside the SectionCard so its fixed positioning isn't clipped. */}
+    <CurationBulkActionBar
+      selectedCount={sel.selectedCount}
+      isAllInFilter={sel.isAllInFilter}
+      isPending={bulk.isPending}
+      onClear={sel.clear}
+      onAction={(action, throttleDays) =>
+        bulk.mutate({
+          recIds: sel.resolveSelectedIds(),
+          action,
+          throttleDays,
+          confirmStrike: action === 'strike',
+        })
+      }
+    />
+    </>
   );
 }

@@ -1,8 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
+import type React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrategyCockpit } from '../../../src/components/strategy/StrategyCockpit';
 import type { Recommendation } from '../../../shared/types/recommendations';
 import type { CockpitActions } from '../../../src/components/strategy/StrategyCockpit';
+
+// Top-level mock so vitest hoisting works correctly — the spy is replaced per-test in beforeEach.
+const mutateSpy = vi.fn();
+vi.mock('../../../src/hooks/admin/useRecBulkMutation', () => ({
+  useRecBulkMutation: () => ({ mutate: mutateSpy, isPending: false }),
+}));
+
+/** The cockpit now owns a React Query bulk mutation — wrap in a fresh client (retries off). No
+ *  mutation fires unless a bulk action is clicked, so the network boundary needs no mock here. */
+function renderCockpit(ui: React.ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 function makeActions(overrides: Partial<CockpitActions> = {}): CockpitActions {
   return {
@@ -34,13 +49,13 @@ function makeRec(overrides: Partial<Recommendation> = {}): Recommendation {
 describe('StrategyCockpit', () => {
   it('renders the Fix-now pin for fix_now unsent recs', () => {
     const recs = [makeRec({ priority: 'fix_now', lifecycle: 'active', clientStatus: 'system' })];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     expect(screen.getByText(/fix now · 1/i)).toBeInTheDocument();
   });
 
   it('does NOT render Fix-now pin for sent recs', () => {
     const recs = [makeRec({ priority: 'fix_now', clientStatus: 'sent' })];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     expect(screen.queryByText(/fix now/i)).not.toBeInTheDocument();
   });
 
@@ -51,7 +66,7 @@ describe('StrategyCockpit', () => {
       makeRec({ id: 'c', lifecycle: 'active', clientStatus: 'approved' }),
       makeRec({ id: 'd', lifecycle: 'throttled', clientStatus: 'system' }),
     ];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     expect(screen.getByRole('button', { name: /active/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sent/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /approved/i })).toBeInTheDocument();
@@ -63,7 +78,7 @@ describe('StrategyCockpit', () => {
       makeRec({ id: 'a', title: 'Active rec', lifecycle: 'active', clientStatus: 'system', priority: 'fix_soon' }),
       makeRec({ id: 'b', title: 'Sent rec', lifecycle: 'active', clientStatus: 'sent', priority: 'fix_soon' }),
     ];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     // Initially shows active bucket (default)
     expect(screen.getAllByText('Active rec').length).toBeGreaterThanOrEqual(1);
     // Switch to Sent
@@ -75,23 +90,72 @@ describe('StrategyCockpit', () => {
     const recs = [
       makeRec({ id: 'b', lifecycle: 'active', clientStatus: 'sent', priority: 'fix_soon' }),
     ];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     // Active bucket has 0 recs
     expect(screen.getByText(/nothing in this view/i)).toBeInTheDocument();
   });
 
   it('renders category toggle chips', () => {
     const recs = [makeRec()];
-    render(<StrategyCockpit recs={recs} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
     expect(screen.getByRole('button', { name: /content/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /technical/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /quick wins/i })).toBeInTheDocument();
   });
 
   it('renders sort buttons', () => {
-    render(<StrategyCockpit recs={[]} actions={makeActions()} />);
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={[]} actions={makeActions()} />);
     expect(screen.getByRole('button', { name: /value/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /impact/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /age/i })).toBeInTheDocument();
+  });
+
+  it('clears selection when lifecycle bucket changes (FIX-4 regression lock)', () => {
+    // Two recs: one in active bucket (clientStatus 'system'), one in sent bucket (clientStatus 'sent').
+    const recs = [
+      makeRec({ id: 'a', title: 'Active rec', lifecycle: 'active', clientStatus: 'system', priority: 'fix_soon' }),
+      makeRec({ id: 'b', title: 'Sent rec',   lifecycle: 'active', clientStatus: 'sent',   priority: 'fix_soon' }),
+    ];
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
+
+    // Active bucket is default — select-all lands on the active rec.
+    const selectAllBtn = screen.getByRole('button', { name: /select all/i });
+    fireEvent.click(selectAllBtn);
+    // Bulk action bar should appear (selectedCount > 0).
+    expect(screen.getByRole('toolbar', { name: /bulk actions/i })).toBeInTheDocument();
+
+    // Now switch to the Sent bucket — selection should clear.
+    fireEvent.click(screen.getByRole('button', { name: /^sent/i }));
+    expect(screen.queryByRole('toolbar', { name: /bulk actions/i })).not.toBeInTheDocument();
+  });
+
+  describe('confirm-strike fires mutation with resolved ids (FIX-5)', () => {
+    beforeEach(() => {
+      mutateSpy.mockReset();
+    });
+
+    it('calls mutate with correct payload after arm-then-confirm-strike', async () => {
+      const recs = [
+        makeRec({ id: 'rec-x', title: 'Rec X', lifecycle: 'active', clientStatus: 'system', priority: 'fix_soon' }),
+      ];
+      renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
+
+      // Select the single visible rec via select-all.
+      fireEvent.click(screen.getByRole('button', { name: /select all/i }));
+      const toolbar = screen.getByRole('toolbar', { name: /bulk actions/i });
+      expect(toolbar).toBeInTheDocument();
+
+      // Arm the strike (first click shows "Strike N").
+      fireEvent.click(screen.getByRole('button', { name: /^strike/i }));
+
+      // Confirm the armed strike ("Confirm strike N").
+      fireEvent.click(screen.getByRole('button', { name: /confirm strike/i }));
+
+      expect(mutateSpy).toHaveBeenCalledWith({
+        recIds: ['rec-x'],
+        action: 'strike',
+        confirmStrike: true,
+      });
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { AlertTriangle, Send, RefreshCw, MessageSquare } from 'lucide-react';
 
-import { SectionCard, Button, Icon } from '../ui';
+import { Button, Icon } from '../ui';
 
 export type AttentionKind = 'stale_sent' | 'superseded' | 'new_reply';
 
@@ -27,10 +27,10 @@ export function NeedsAttentionStrip({ items, onAct }: NeedsAttentionStripProps) 
   if (items.length === 0) return null;
 
   return (
-    <SectionCard>
-      <div className="flex items-center gap-2 mb-3">
-        <Icon as={AlertTriangle} size="md" className="text-accent-warning" />
-        <h3 className="t-h2 text-[var(--brand-text-bright)]">
+    <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0" />
+        <h3 className="t-h2 text-accent-warning">
           Needs your attention · {items.length}
         </h3>
       </div>
@@ -40,7 +40,7 @@ export function NeedsAttentionStrip({ items, onAct }: NeedsAttentionStripProps) 
           return (
             <li
               key={`${item.recId}-${item.kind}`}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/20 bg-[var(--surface-3)] px-3 py-2"
             >
               <div className="flex items-start gap-2 min-w-0">
                 <Icon as={meta.icon} size="sm" className="text-[var(--brand-text-muted)] mt-0.5 flex-shrink-0" />
@@ -56,6 +56,6 @@ export function NeedsAttentionStrip({ items, onAct }: NeedsAttentionStripProps) 
           );
         })}
       </ul>
-    </SectionCard>
+    </div>
   );
 }

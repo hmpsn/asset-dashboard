@@ -36,3 +36,6 @@ export * from './OpportunitiesList';
 export * from './DecayingPagesCard';
 export * from './LostQueryRecoveryCard';
 export * from './CannibalizationTriage';
+export * from './NeedsAttentionStrip';
+export * from './CurationMeter';
+export * from './CurationBulkActionBar';

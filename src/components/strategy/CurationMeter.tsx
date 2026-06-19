@@ -18,7 +18,7 @@ export function CurationMeter({ sentThisCycle }: CurationMeterProps) {
   const tone = overSending ? 'text-accent-warning' : 'text-teal-400';
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-[var(--radius-full)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-1">
+    <div className="inline-flex items-center gap-1.5 rounded-[var(--radius-full)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-3 py-1">
       <Icon as={Sparkles} size="sm" className={tone} />
       <span className="t-caption text-[var(--brand-text-bright)]">{sentThisCycle} sent</span>
       <span className={`t-caption-sm ${tone}`}>· {phrase}</span>
