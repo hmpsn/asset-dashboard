@@ -19,14 +19,17 @@
 3. **`normalizeRecommendation` is DROPPED for now.** The client feed reads the public rec projection + the already-working content-request/deliverable projections; recs do not enter the unified Inbox Decisions section in this scope. (Removes a MEDIUM.)
 4. **Act-on endpoint** = `POST /api/public/recommendations/:ws/:recId/act-on`; fix the stale `state-machines.ts` comment referencing `/respond` in the same commit it's first touched (Phase 2).
 5. **`OverviewTab` precedence:** when both `client-briefing-v2` and `strategy-the-issue` are ON, `strategy-the-issue` wins (Phase 2).
-6. **Phase 0 ships as its own PR** (additive contracts, flag OFF, zero behavior change) → merge to staging → Phase 1 branches off updated staging.
+6. **Base = `strategy-redesign-phase-4`** (the redesign integration line — it carries the full substrate incl. P4; `origin/staging` does NOT yet). Phase 0 ships as its own PR into that line (additive, flag OFF, byte-identical), then Phase 1 branches off it. See Branch / PR strategy.
 
 ## Branch / PR strategy
 
-- Base all implementation branches off **`staging`** (per CLAUDE.md staging-first), not `strategy-redesign-phase-4` (which holds the planning docs).
-- Phase 0 branch: `the-issue/phase-0-contracts` → PR into `staging`.
-- Phase 1 branch: `the-issue/phase-1-cockpit` (off staging after P0 merges) → PR into `staging`.
-- Every PR: local gates green → `scaled-code-review` (fix Critical/Important) → push → CI green → merge. Surface to owner before any `staging → main`.
+**Reality check (verified 2026-06-19 against `origin/staging`):** the command-center + cockpit + recommendation-lifecycle substrate "The Issue" builds on lives on **`strategy-redesign-phase-4`**, NOT on `origin/staging` (which has v2/v3 + P1–P3 but NOT P4 signal-fold/config/competitor-send, nor the reimagination docs). Local `staging` was 47 commits stale. Therefore:
+
+- Base all implementation branches off **`strategy-redesign-phase-4`** (current checkout — full substrate + `node_modules` + planning docs present; no working-tree swap).
+- "The Issue" phase PRs target **`strategy-redesign-phase-4`** (the redesign integration branch). The whole redesign (P1–P4 + The Issue) promotes `→ staging → main` as a unit per the redesign's existing cadence.
+- **Open (non-blocking, owner): ** whether to merge phase-4 → staging first and re-base The Issue onto staging. Building on phase-4 is correct either way.
+- Phase 0 branch: `the-issue/phase-0-contracts` (off phase-4) → PR into phase-4. Phase 1 branch: `the-issue/phase-1-cockpit` off phase-4 after P0 merges.
+- Every PR: local gates green → `scaled-code-review` (fix Critical/Important) → push → CI green → merge into the integration line. Surface to owner before any promotion to `main`.
 
 ---
 
