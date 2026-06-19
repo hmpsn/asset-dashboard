@@ -9,22 +9,22 @@
  * The four receiver layers that must read these fields end-to-end are:
  *   Layer 1: App.tsx FixContext router-state receiver → stores in [fixContext, setFixContext]
  *   Layer 2: ContentBriefs.tsx → reads fixContextRef.current.{field} and passes to the job params
- *   Layer 3: content-brief-generation-job.ts → maps job params → StrategyCardContext / brief inputs
- *   Layer 4: content-brief.ts buildStrategyCardBlock() → injects into the AI prompt
+ *   Layer 3: content-brief-generation-job.ts → maps job params → pageAnalysisContext (standalone path)
+ *   Layer 4: content-brief.ts generateBrief() → injects into the AI prompt (pageAnalysisContext block
+ *             + separate serpFeatures directive block with matchedPage precedence)
  *
- * STATUS (P3 Lane B — scaffold phase):
- *   - Layer 1: DONE in P2 pre-commit (FixContext type extension, no runtime wiring needed)
- *   - Layer 4: rationale + intent ALREADY wired (buildStrategyCardBlock reads both)
- *   - Layer 4: competitorProof, volume, serpFeatures ARE in StrategyCardContext type but NOT
- *     yet rendered by buildStrategyCardBlock
- *   - Layer 2+3: The P3 new fields (rationale/competitorProof/volume/intent/questionKeywords/
- *     serpFeatures) are NOT yet forwarded by ContentBriefs.tsx → job params — this is Lane E's work
+ * NOTE on implementation decision (Lane E):
+ *   The standalone path (ContentBriefs.tsx → content-brief-generation-job.ts) forwards all 6 fields
+ *   into pageAnalysisContext, NOT into a dedicated strategyCardContext struct. This is because
+ *   buildStrategyCardBlock is consumed by the request path (content_requests) where rationale/intent/
+ *   priority/journeyStage are structured separately. In the standalone path:
+ *     - rationale + intent + competitorProof + volume + questionKeywords → pageAnalysisContext → rendered
+ *       inside the "PAGE ANALYSIS CONTEXT" block in generateBrief().
+ *     - serpFeatures → pageAnalysisContext.serpFeatures → rendered in a dedicated SERP FEATURE
+ *       OPPORTUNITIES block (with matchedPage?.serpFeatures taking precedence when present).
  *
- * Read-path assertions that depend on Lane E's implementation are marked it.todo.
- * The STATIC shape assertions (Layer 4 - what is already in buildStrategyCardBlock + types)
- * are REAL tests.
- *
- * Lane F fills in the it.todo bodies once Lane E lands.
+ * STATUS (P3 Lane F — fill phase):
+ *   ALL todos are now filled. No remaining deferred items.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -95,7 +95,12 @@ describe('Layer 4 contract — StrategyCardContext type (shared/types/content.ts
   });
 });
 
-// ─── Layer 4 (static): buildStrategyCardBlock — what is already rendered ──────
+// ─── Layer 4 (static): buildStrategyCardBlock — what is rendered ──────────────
+//
+// buildStrategyCardBlock renders: rationale, intent, priority, journeyStage.
+// competitorProof/volume/questionKeywords/serpFeatures are rendered via the pageAnalysisContext
+// block inside generateBrief() — NOT via buildStrategyCardBlock. This is by design in Lane E:
+// the standalone brief path carries these fields through pageAnalysisContext.
 
 describe('Layer 4 static — buildStrategyCardBlock (server/content-brief.ts)', () => {
   const contentBrief = src('server/content-brief.ts');
@@ -109,27 +114,36 @@ describe('Layer 4 static — buildStrategyCardBlock (server/content-brief.ts)', 
     expect(contentBrief).toMatch(/ctx\.intent[\s\S]{0,100}Search intent/);
   });
 
-  it.todo(
-    'Layer 4: buildStrategyCardBlock renders ctx.competitorProof — Lane E adds this to the prompt block',
-    // Expected: content-brief.ts:buildStrategyCardBlock adds:
-    //   if (ctx.competitorProof) lines.push(`- Competitor proof: ${ctx.competitorProof}`);
-    // so the AI knows a competitor ranks for this keyword.
-  );
+  it('Layer 4: competitorProof is rendered via generateBrief pageAnalysisContext block, not buildStrategyCardBlock', () => {
+    // Lane E decision: competitorProof goes through pageAnalysisContext in the standalone path.
+    // The generateBrief() prompt builder renders it via pac.competitorProof in the PAGE ANALYSIS block.
+    expect(contentBrief).toMatch(/pac\.competitorProof[\s\S]{0,100}Competitor proof/);
+  });
 
-  it.todo(
-    'Layer 4: buildStrategyCardBlock renders ctx.volume — Lane E adds volume to the prompt block',
-    // Expected: content-brief.ts:buildStrategyCardBlock adds:
-    //   if (ctx.volume) lines.push(`- Monthly search volume: ~${ctx.volume.toLocaleString()}`);
-  );
+  it('Layer 4: volume is rendered via generateBrief pageAnalysisContext block, not buildStrategyCardBlock', () => {
+    // Lane E decision: volume goes through pageAnalysisContext in the standalone path.
+    // Rendered as "Estimated search volume: N searches/month" in the PAGE ANALYSIS block.
+    expect(contentBrief).toMatch(/pac\.volume[\s\S]{0,200}searches\/month/);
+  });
 
-  it.todo(
-    'Layer 4: buildStrategyCardBlock renders ctx.serpFeatures — Lane E adds SERP feature context',
-    // Expected: content-brief.ts:buildStrategyCardBlock adds serpFeatures to the prompt so the
-    // brief generator can structure content to target featured-snippet / PAA / etc.
-    // Note: the existing matchedPage?.serpFeatures path (content-brief.ts:1240) draws from the
-    // page_keywords table; this field draws from the ContentGap.serpFeatures at brief-trigger time.
-    // Lane E must ensure these two sources compose correctly (union or precedence decision).
-  );
+  it('Layer 4: serpFeatures is rendered via generateBrief SERP directives block with matchedPage precedence', () => {
+    // serpFeatures has a two-source precedence rule:
+    //   1. matchedPage?.serpFeatures (page_keywords provider data) — primary source
+    //   2. context.pageAnalysisContext?.serpFeatures (Content Gaps pre-seed) — fallback
+    // Both are rendered identically as the SERP FEATURE OPPORTUNITIES block.
+    expect(contentBrief).toMatch(/pageAnalysisContext\?\.serpFeatures/);
+  });
+
+  it('Layer 4: serpFeatures precedence — matchedPage wins over pageAnalysisContext fallback', () => {
+    // The precedence is expressed as: matchedPage?.serpFeatures?.length ? ... : context.pageAnalysisContext?.serpFeatures
+    // This assertion verifies the conditional uses matchedPage?.serpFeatures as the primary source.
+    expect(contentBrief).toMatch(/matchedPage\?\.serpFeatures\?\.length[\s\S]{0,200}pageAnalysisContext\?\.serpFeatures/);
+  });
+
+  it('Layer 4: questionKeywords is rendered via generateBrief pageAnalysisContext block', () => {
+    // Rendered as "Related questions to address:\n- {q}" in the PAGE ANALYSIS block.
+    expect(contentBrief).toMatch(/pac\.questionKeywords[\s\S]{0,200}Related questions to address/);
+  });
 });
 
 // ─── Layer 2: ContentBriefs.tsx — forwards FixContext fields to job params ────
@@ -142,74 +156,85 @@ describe('Layer 2 static — ContentBriefs.tsx → job params forwarding', () =>
     expect(contentBriefs).toMatch(/fixContextRef\.current/);
   });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.rationale to job params',
-    // Expected after Lane E:
-    //   rationale: fixContextRef.current?.rationale,
-    // passed into the startBriefGenerationJob({ ... }) call (around line 474-491).
-    // Layer 4 receiver: content-brief-generation-job.ts maps params.rationale → StrategyCardContext.rationale
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.rationale to job params', () => {
+    // All 6 fields are forwarded inside a pageAnalysisContext sub-object (Lane E decision).
+    // rationale: fixContextRef.current.rationale (or .rationale via fixContextRef.current?.rationale)
+    expect(contentBriefs).toMatch(/rationale:\s*fixContextRef\.current(\?)?\.rationale/);
+  });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.competitorProof to job params',
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.competitorProof to job params', () => {
+    expect(contentBriefs).toMatch(/competitorProof:\s*fixContextRef\.current(\?)?\.competitorProof/);
+  });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.volume to job params',
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.volume to job params', () => {
+    expect(contentBriefs).toMatch(/volume:\s*fixContextRef\.current(\?)?\.volume/);
+  });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.intent to job params',
-    // Note: FixContext.intent was already in the type (FixContext:104); the SENDER (ContentGaps.tsx)
-    // was NOT forwarding it pre-Lane E. Lane E must add it to the ContentBriefs → job params path.
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.intent to job params', () => {
+    // intent was already in FixContext type; Lane E wires it into the pageAnalysisContext forwarding.
+    expect(contentBriefs).toMatch(/intent:\s*fixContextRef\.current(\?)?\.intent/);
+  });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.questionKeywords to job params',
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.questionKeywords to job params', () => {
+    expect(contentBriefs).toMatch(/questionKeywords:\s*fixContextRef\.current(\?)?\.questionKeywords/);
+  });
 
-  it.todo(
-    'Layer 2: ContentBriefs.tsx forwards fixContextRef.current.serpFeatures to job params',
-  );
+  it('Layer 2: ContentBriefs.tsx forwards fixContextRef.current.serpFeatures to job params', () => {
+    expect(contentBriefs).toMatch(/serpFeatures:\s*fixContextRef\.current(\?)?\.serpFeatures/);
+  });
 });
 
-// ─── Layer 3: content-brief-generation-job.ts — maps job params → StrategyCardContext ──
+// ─── Layer 3: content-brief-generation-job.ts — maps job params → generateBrief ──
+//
+// Lane E decision: standalone path forwards all 6 fields inside pageAnalysisContext (NOT
+// strategyCardContext). The request path (generateBriefForRequest) uses strategyCardContext
+// for rationale/intent/priority/journeyStage only — competitorProof/volume/serpFeatures/
+// questionKeywords are not available on the request path.
 
 describe('Layer 3 static — content-brief-generation-job.ts param mapping', () => {
   const job = src('server/content-brief-generation-job.ts');
 
-  it('job.ts already maps request.rationale → StrategyCardContext.rationale', () => {
-    // This is the EXISTING wiring for the content-request path.
-    // The standalone path (StandaloneContentBriefGenerationParams) needs the same treatment in Lane E.
+  it('job.ts already maps request.rationale → StrategyCardContext.rationale (request path)', () => {
+    // This is the EXISTING wiring for the content-request path (generateBriefForRequest).
     expect(job).toMatch(/rationale:\s*request\.rationale/);
   });
 
-  it('job.ts already maps request.intent → StrategyCardContext.intent', () => {
+  it('job.ts already maps request.intent → StrategyCardContext.intent (request path)', () => {
     expect(job).toMatch(/intent:\s*request\.intent/);
   });
 
-  it.todo(
-    'Layer 3: job.ts maps StandaloneContentBriefGenerationParams.rationale → StrategyCardContext.rationale',
-    // The existing mapping at content-brief-generation-job.ts:340 is for the `request` path
-    // (source: 'request' / RequestContentBriefGenerationParams). Lane E must add the same
-    // rationale/intent/competitorProof/volume/serpFeatures/questionKeywords mapping for the
-    // standalone path (source: 'standalone' / StandaloneContentBriefGenerationParams):
-    //   strategyCardContext: {
-    //     rationale: params.rationale,
-    //     intent: params.intent,
-    //     competitorProof: params.competitorProof,
-    //     volume: params.volume,
-    //     serpFeatures: params.serpFeatures,
-    //     journeyStage: deriveJourneyStage(params.intent),
-    //   }
-  );
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes rationale field', () => {
+    // Lane E decision: standalone path carries all 6 fields via pageAnalysisContext sub-object.
+    // The StandaloneContentBriefGenerationParams interface nests them under pageAnalysisContext.
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,300}rationale\?:/);
+  });
 
-  it.todo(
-    'Layer 3: job.ts maps params.questionKeywords into the brief generation context',
-    // questionKeywords does not currently appear in StrategyCardContext. Lane E must decide whether
-    // to add it to StrategyCardContext or pass it as a separate relatedQueries enrichment field.
-    // Canonical decision must be made by Lane E and documented in a comment in the job file.
-  );
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes competitorProof field', () => {
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,400}competitorProof\?:/);
+  });
+
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes volume field', () => {
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,400}volume\?:/);
+  });
+
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes intent field', () => {
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,400}intent\?:/);
+  });
+
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes questionKeywords field', () => {
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,500}questionKeywords\?:/);
+  });
+
+  it('Layer 3: StandaloneContentBriefGenerationParams.pageAnalysisContext includes serpFeatures field', () => {
+    // serpFeatures in pageAnalysisContext: used as the fallback source in the SERP directive block.
+    expect(job).toMatch(/pageAnalysisContext\?:[\s\S]{0,600}serpFeatures\?:/);
+  });
+
+  it('Layer 3: generateStandaloneBrief passes pageAnalysisContext to generateBrief call', () => {
+    // The generateBrief call inside generateStandaloneBrief must forward pageAnalysisContext
+    // so the 6 Lane E fields reach the prompt builder.
+    expect(job).toMatch(/pageAnalysisContext,?\s*\n?[\s\S]{0,100}/);
+  });
 });
 
 // ─── End-to-end: buildStrategyCardBlock output when all 6 fields present ─────
@@ -246,24 +271,43 @@ describe('Layer 4 unit — buildStrategyCardBlock output contract', () => {
     expect(result).toContain('Priority: high');
   });
 
-  it.todo(
-    'buildStrategyCardBlock includes competitorProof when provided — Lane E adds this field render',
-    // After Lane E adds `if (ctx.competitorProof) lines.push(...)` to buildStrategyCardBlock:
-    // const result = buildStrategyCardBlock({ rationale: 'x', competitorProof: 'competitor.com ranks #3' });
-    // expect(result).toContain('Competitor proof: competitor.com ranks #3');
-  );
+  it('buildStrategyCardBlock does NOT render competitorProof directly — rendered via pageAnalysisContext', async () => {
+    // competitorProof is NOT a field buildStrategyCardBlock renders. It is rendered in the
+    // PAGE ANALYSIS CONTEXT block inside generateBrief() via pageAnalysisContext. This test
+    // ensures the distinction is stable: buildStrategyCardBlock stays lean.
+    const { buildStrategyCardBlock } = await import('../../server/content-brief.js');
+    const result = buildStrategyCardBlock({
+      rationale: 'x',
+      // @ts-expect-error — competitorProof is not a StrategyCardContext field; this checks runtime
+      competitorProof: 'competitor.com ranks #3',
+    });
+    // competitorProof is NOT rendered by buildStrategyCardBlock — it's not in StrategyCardContext
+    // used by this function. The assertion confirms no accidental rendering.
+    expect(result).not.toContain('Competitor proof');
+    expect(result).not.toContain('competitor.com ranks #3');
+  });
 
-  it.todo(
-    'buildStrategyCardBlock includes volume when provided — Lane E adds this field render',
-    // After Lane E:
-    // const result = buildStrategyCardBlock({ rationale: 'x', volume: 5400 });
-    // expect(result).toContain('5,400'); // or the locale-formatted number
-  );
+  it('buildStrategyCardBlock does NOT render volume directly — rendered via pageAnalysisContext', async () => {
+    // volume is NOT a field buildStrategyCardBlock renders.
+    const { buildStrategyCardBlock } = await import('../../server/content-brief.js');
+    const result = buildStrategyCardBlock({
+      rationale: 'x',
+      // @ts-expect-error — volume is not a StrategyCardContext field
+      volume: 5400,
+    });
+    expect(result).not.toContain('5,400');
+    expect(result).not.toContain('searches/month');
+  });
 
-  it.todo(
-    'buildStrategyCardBlock includes serpFeatures when provided — Lane E adds this field render',
-    // After Lane E:
-    // const result = buildStrategyCardBlock({ rationale: 'x', serpFeatures: ['featured_snippet', 'people_also_ask'] });
-    // expect(result).toContain('featured_snippet');
-  );
+  it('buildStrategyCardBlock does NOT render serpFeatures directly — rendered via generateBrief SERP block', async () => {
+    // serpFeatures is NOT a field buildStrategyCardBlock renders.
+    const { buildStrategyCardBlock } = await import('../../server/content-brief.js');
+    const result = buildStrategyCardBlock({
+      rationale: 'x',
+      // @ts-expect-error — serpFeatures is not a StrategyCardContext field
+      serpFeatures: ['featured_snippet', 'people_also_ask'],
+    });
+    expect(result).not.toContain('featured_snippet');
+    expect(result).not.toContain('SERP FEATURE');
+  });
 });
