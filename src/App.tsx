@@ -95,6 +95,15 @@ export interface FixContext {
   autoGenerate?: boolean;
   /** Suggested page type from content gaps (e.g. 'blog', 'service', 'landing'). */
   pageType?: string;
+  // Strategy redesign P2 pre-commit (read by the P3 brief pre-seed receiver layers) —
+  // content-gap evidence carried into the brief generator. All optional so existing
+  // callers compile unchanged; the four receiver layers that READ these are P3, not here.
+  rationale?: string;
+  competitorProof?: string;
+  volume?: number;
+  intent?: string;
+  questionKeywords?: string[];
+  serpFeatures?: string[];
 }
 
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */

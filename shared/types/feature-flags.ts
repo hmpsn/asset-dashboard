@@ -64,6 +64,14 @@ export const FEATURE_FLAGS = {
   // rec→cart bridge for keyword/topic rec types). OFF until the roadmap item lands; v3 renders
   // Add-to-plan ONLY where rec.productType already resolves a SKU (decision 1 / spec §2 / §11).
   'strategy-paid-topics': false,
+  // Strategy redesign (child flags under strategy-command-center) — declared once in the P2
+  // pre-commit, activated in later phases. P3 activates managed-set; P4 activates the other two.
+  // Strategy redesign — managed keyword working set (add/remove/keep/replenish). Activated P3.
+  'strategy-keywords-managed-set': false,
+  // Strategy redesign — competitor RecType send-to-client. Activated P4.
+  'strategy-competitor-send': false,
+  // Strategy redesign — fold Intelligence Signals into the cockpit as real recs. Activated P4.
+  'strategy-signal-fold': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -325,6 +333,45 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-17',
     },
   },
+  'strategy-keywords-managed-set': {
+    label: 'Strategy redesign — managed keyword working set (add/remove/keep/replenish)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-18',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the dedicated strategy_keyword_set table, reconciler, and managed-set UI are validated on staging.',
+      linkedRoadmapItemId: 'strategy-redesign-phase-3-managed-set',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-18',
+    },
+  },
+  'strategy-competitor-send': {
+    label: 'Strategy redesign — competitor RecType send-to-client (Phase 4)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-18',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once competitor client renderer + send spine are validated on staging.',
+      linkedRoadmapItemId: 'strategy-redesign-phase-4-competitor-send',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-18',
+    },
+  },
+  'strategy-signal-fold': {
+    label: 'Strategy redesign — fold Intelligence Signals into cockpit as real recs at gen time (Phase 4)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-18',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once mintSignalRecs + carry-over perf audit are validated on staging and the standalone IntelligenceSignals card is deleted.',
+      linkedRoadmapItemId: 'strategy-redesign-phase-4-signal-fold',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-18',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -354,7 +401,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold'],
   },
 ];
 

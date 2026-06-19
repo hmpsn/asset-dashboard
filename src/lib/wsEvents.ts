@@ -91,6 +91,9 @@ export const WS_EVENTS = {
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  // Forward-declared in the Strategy-redesign P2 pre-commit; the broadcast producer
+  // (managed-keyword-set mutations) + the useWorkspaceEvents handler land in P3.
+  STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
 
   // Local SEO

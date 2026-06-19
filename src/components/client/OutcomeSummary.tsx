@@ -26,6 +26,10 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   cannibalization_resolved: 'Cannibalization resolved',
   local_visibility_won: 'Local visibility won',
   local_service_added: 'Local service targeted',
+  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never
+  // recorded as a client-facing outcome; present only to keep this Record exhaustive).
+  topic_cluster_keep: 'Topic cluster prioritized',
+  content_gap_keep: 'Content opportunity prioritized',
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {

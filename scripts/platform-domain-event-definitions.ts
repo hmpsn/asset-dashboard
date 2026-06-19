@@ -223,6 +223,10 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   RECOMMENDATIONS_UPDATED: 'seo-health',
   RECOMMENDATIONS_DISCUSSION_UPDATED: 'seo-health',
   STRATEGY_UPDATED: 'seo-health',
+  // P2 pre-commit forward declaration: producer (managed-keyword-set mutations in
+  // server/domains/strategy/managed-keyword-set.ts + server/routes/keyword-strategy.ts)
+  // lands in P3 — remove this comment in P3 when the producer route ships.
+  STRATEGY_KEYWORD_SET_UPDATED: 'seo-health',
   RANK_TRACKING_UPDATED: 'seo-health',
   LOCAL_SEO_UPDATED: 'seo-health',
   EEAT_ASSETS_UPDATED: 'analytics-intelligence',

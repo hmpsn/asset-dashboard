@@ -175,6 +175,36 @@
           "status": "pending",
           "createdAt": "2026-06-18",
           "notes": "DEFERRED. Gated behind the strategy-paid-topics child flag (default OFF). Until this lands, v3 renders Add-to-plan only where rec.productType already resolves a SKU. Enables a generic strategy_addon SKU + a rec→cart bridge for keyword/topic rec types so keyword/topic opportunities become purchasable add-ons."
+        },
+        {
+          "id": "strategy-redesign-phase-3-managed-set",
+          "title": "Strategy redesign Phase 3 — managed keyword working set (add/remove/keep/replenish)",
+          "source": "Strategy redesign synthesized plan 2026-06-18 §3.1, §7 Phase 3",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-18",
+          "notes": "Gated behind the strategy-keywords-managed-set child flag (default OFF, declared in the P2 pre-commit). Dedicated strategy_keyword_set table (migration 139) whose SOLE writer is reconcileStrategyKeywordSet, grafted into persistKeywordStrategy's writeKeywordStrategy transaction (NOT saveRecommendations, which has no db.transaction) — the one storage design provably immune to the tracked_keywords delete-then-reinsert clobber. Adds add/remove/keep + auto-replenish + search-and-add + add-from-client-requests, the three-visual-state managed-set UI, and managed Topic Clusters/Content Gaps via tracked_actions keep markers. P2 pre-commits the contracts (table, domain stub, shared types, FixContext extension, WS event, query key, ActivityType/ActionType enum values). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+        },
+        {
+          "id": "strategy-redesign-phase-4-competitor-send",
+          "title": "Strategy redesign Phase 4 — competitor RecType send-to-client",
+          "source": "Strategy redesign synthesized plan 2026-06-18 §3.3, §7 Phase 4",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-18",
+          "notes": "Gated behind the strategy-competitor-send child flag (default OFF, declared in the P2 pre-commit). Adds the competitor RecType (one-commit 5-map + REC_POLICY_REGISTRY lockstep) and per-row 'act on this gap' send in CompetitiveIntel via sendRecommendation(); the client-visible competitor renderer in InsightsEngine.tsx ships gated so a deliverable can't land before its renderer exists. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+        },
+        {
+          "id": "strategy-redesign-phase-4-signal-fold",
+          "title": "Strategy redesign Phase 4 — fold Intelligence Signals into the cockpit as real recs",
+          "source": "Strategy redesign synthesized plan 2026-06-18 §3.4, §7 Phase 4",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-18",
+          "notes": "Gated behind the strategy-signal-fold child flag (default OFF, declared in the P2 pre-commit). Mints Intelligence Signals as real recs at strategy-gen time (mintSignalRecs inside generateRecommendations) so the existing RECOMMENDATIONS_UPDATED broadcast + applyLifecycleCarryOver cover folded signals automatically; deletes the standalone IntelligenceSignals card. Includes a carry-over O(n²) perf audit before the fold ships. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
         }
       ]
     },

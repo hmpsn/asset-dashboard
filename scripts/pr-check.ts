@@ -8889,6 +8889,52 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ─── Strategy v3 lifecycle rules ────────────────────────────────────────────
+
+  {
+    name: 'Incomplete rec filter (raw status without isActiveRec)',
+    pattern: "status\\s*[!=]==\\s*['\"]dismissed['\"]",
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/strategy/',
+    excludeLines: ['// incomplete-rec-filter-ok'],
+    message:
+      'Raw `status === \'dismissed\'` / `status !== \'dismissed\'` filtering in a ' +
+      'strategy component bypasses the v3 lifecycle axes (struck/throttled/sent). ' +
+      'Route through `isActiveRec(rec)` as the single active-set predicate instead. ' +
+      'Add // incomplete-rec-filter-ok on the line if this is a genuinely pre-lifecycle ' +
+      'component that cannot yet import isActiveRec (with justification).',
+    severity: 'warn',
+    rationale:
+      'Raw status filtering misses the struck, throttled, and sent axes introduced ' +
+      'in the v3 recommendation lifecycle, causing dismissed recs to re-surface or ' +
+      'active recs to be hidden.',
+    claudeMdRef: '#code-conventions',
+  },
+
+  {
+    name: 'Strategy send must route through lifecycle',
+    pattern: 'clientActions\\.create\\(|ClientActionSourceType',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/strategy/',
+    excludeLines: ['// strategy-send-must-route-through-lifecycle-ok'],
+    message:
+      'A `clientActions.create()` call inside a strategy component bypasses the ' +
+      'rec lifecycle (sendRecommendation / REC_POLICY_REGISTRY send channel). ' +
+      'Route sends through `sendRecommendation()` so clientStatus is managed by ' +
+      'the single authoritative lifecycle engine. ' +
+      'The ONLY acceptable exception: a surface that genuinely needs a bespoke ' +
+      'client-side renderer the deliverable spine cannot serve (e.g. the ' +
+      'cannibalization card). In that case add ' +
+      '// strategy-send-must-route-through-lifecycle-ok: <renderer-name> on the ' +
+      'same line with the renderer name as justification.',
+    severity: 'warn',
+    rationale:
+      'Direct clientActions.create() calls in strategy components create sends ' +
+      'that are invisible to isActiveRec / clientStatus tracking, fragmenting ' +
+      'the single-authoritative-queue invariant the v3 lifecycle enforces.',
+    claudeMdRef: '#code-conventions',
+  },
+
   {
     name: 'Hardcoded nav metadata outside the nav registry',
     pattern: '',

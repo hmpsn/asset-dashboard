@@ -44,7 +44,7 @@ export function DecisionQueue({ workspaceId }: DecisionQueueProps) {
   // Active = not dismissed AND not completed — matches the server's computeRecommendationSummary
   // contract. (Completing a rec sets status but leaves priority fix_now/fix_soon, so a
   // status-only filter would surface a done item with a live Fix CTA.)
-  const active = (set?.recommendations ?? []).filter(r => r.status !== 'dismissed' && r.status !== 'completed');
+  const active = (set?.recommendations ?? []).filter(r => r.status !== 'dismissed' && r.status !== 'completed'); // incomplete-rec-filter-ok — pre-v3-lifecycle component; cut in P4 cleanup
   const topRec = set?.summary.topRecommendationId
     ? active.find(r => r.id === set.summary.topRecommendationId)
     : undefined;

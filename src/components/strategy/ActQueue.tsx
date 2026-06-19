@@ -46,7 +46,7 @@ export function ActQueue({ workspaceId }: ActQueueProps) {
   // impact-sorted. .filter() returns a fresh array, so sorting it never mutates the cached set.
   const active = useMemo(
     () => (set?.recommendations ?? [])
-      .filter((r) => r.status !== 'dismissed' && r.status !== 'completed')
+      .filter((r) => r.status !== 'dismissed' && r.status !== 'completed') // incomplete-rec-filter-ok — pre-v3-lifecycle component; migrate to isActiveRec in P3/P4
       .sort(byImpact),
     [set],
   );

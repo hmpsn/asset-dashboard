@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **182** — 162 error, 20 warn.
+Total rules: **184** — 162 error, 22 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -205,6 +205,8 @@ advisory but tracked.
 | 18 | Workspace mutation route missing broadcastToWorkspace | warn | custom | `server/routes/` | `no-broadcast-ok` | Silent mutations mean UI never refreshes without a manual reload. |
 | 19 | inline-toLocaleDateString | warn | pattern | `src/` | `format-date-inline-ok` | Scattered toLocaleDateString() calls produce inconsistent date formatting and break in non-en-US locales. Shared helpers ensure uniform output. |
 | 20 | every-active-type-has-an-adapter | warn | custom | `shared/types/client-deliverable.ts` | `deliverable-adapter-ok` | sendToClient() resolves an adapter per type; any deliverable type without one throws at send time. |
+| 21 | Incomplete rec filter (raw status without isActiveRec) | warn | pattern | `src/components/strategy/` | `// incomplete-rec-filter-ok` | Raw status filtering misses the struck, throttled, and sent axes introduced in the v3 recommendation lifecycle, causing dismissed recs to re-surface or active recs to be hidden. |
+| 22 | Strategy send must route through lifecycle | warn | pattern | `src/components/strategy/` | `// strategy-send-must-route-through-lifecycle-ok` | Direct clientActions.create() calls in strategy components create sends that are invisible to isActiveRec / clientStatus tracking, fragmenting the single-authoritative-queue invariant the v3 lifecycle enforces. |
 
 ---
 

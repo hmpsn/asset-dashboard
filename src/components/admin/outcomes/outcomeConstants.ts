@@ -29,4 +29,8 @@ export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   cannibalization_resolved: 'Cannibalization Resolved',
   local_visibility_won: 'Local Visibility Won',
   local_service_added: 'Local Service Targeted',
+  // Strategy redesign P2 pre-commit — managed-set keep markers (never scored as outcomes;
+  // present only to keep this Record<ActionType,…> exhaustive).
+  topic_cluster_keep: 'Topic Cluster Kept',
+  content_gap_keep: 'Content Gap Kept',
 };
