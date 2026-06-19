@@ -192,9 +192,9 @@
           "source": "Strategy redesign synthesized plan 2026-06-18 §3.3, §7 Phase 4",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-18",
-          "notes": "Gated behind the strategy-competitor-send child flag (default OFF, declared in the P2 pre-commit). Adds the competitor RecType (one-commit 5-map + REC_POLICY_REGISTRY lockstep) and per-row 'act on this gap' send in CompetitiveIntel via sendRecommendation(); the client-visible competitor renderer in InsightsEngine.tsx ships gated so a deliverable can't land before its renderer exists. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane C). Gated behind the strategy-competitor-send child flag (default OFF). Adds the competitor RecType via a one-commit 5-map + Zod recommendationSchema + REC_POLICY_REGISTRY lockstep (review caught the Zod enum as a silent-drop risk — the P3 actionTypeEnum bug class — and it's covered). Holistic review found the per-row 'Send to client' button was permanently disabled because nothing ever minted a type:'competitor' rec, so this ships a NEW idempotent POST /:ws/competitor-rec mint endpoint: CompetitiveIntel mints-then-sends via sendRecommendation() (two-axis invariant: clientStatus only, never RecStatus). Client-visible competitor renderer in InsightsEngine.tsx ships gated. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
         },
         {
           "id": "strategy-redesign-phase-4-signal-fold",
@@ -202,9 +202,29 @@
           "source": "Strategy redesign synthesized plan 2026-06-18 §3.4, §7 Phase 4",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-18",
-          "notes": "Gated behind the strategy-signal-fold child flag (default OFF, declared in the P2 pre-commit). Mints Intelligence Signals as real recs at strategy-gen time (mintSignalRecs inside generateRecommendations) so the existing RECOMMENDATIONS_UPDATED broadcast + applyLifecycleCarryOver cover folded signals automatically; deletes the standalone IntelligenceSignals card. Includes a carry-over O(n²) perf audit before the fold ships. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane A). Gated behind the strategy-signal-fold child flag (default OFF). Mints Intelligence Signals as real recs at strategy-gen time (mintSignalRecs inside generateRecommendations, AFTER carry-over) so the existing RECOMMENDATIONS_UPDATED broadcast + applyLifecycleCarryOver cover folded signals automatically; dedup via signal:<insightId> merge key. CRITICAL fix (caught in review): signal-sourced recs are exempted from the auto-resolve sweep — their producer never re-emits them, so 'absent from newSources' is always a false positive; without the exemption every un-actioned folded signal flipped to '✓ Auto-resolved' on the next daily/on-mutation recompute. Guarded by a status-continuity regression test (server/__tests__/signal-fold-carry-over.test.ts). Carry-over confirmed O(n). flag-OFF keeps the standalone IntelligenceSignals card (deletion deferred to the strategy-command-center cutover). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+        },
+        {
+          "id": "strategy-redesign-phase-4-config-consolidation",
+          "title": "Strategy redesign Phase 4 — config consolidation (StrategyConfigPanel) + Local SEO de-dup",
+          "source": "Strategy redesign synthesized plan 2026-06-18 §7 Phase 4 (Lane B)",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-19",
+          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane B). Ships under strategy-command-center (no separate flag). New StrategyConfigPanel collapses StrategySettings + Local SEO market config into one disclosure at the foot of the flag-ON Overview, wired to the LocalSeoMarketSetupDrawer + a market summary; removes the outside-tabs config leak. flag-ON de-dups Local SEO RESULTS to KeywordHub (mode='keywords'). flag-OFF preserves LocalSeoVisibilityPanel mode='strategy' byte-identical — the de-dup is scoped flag-ON only (holistic review caught an over-broad deletion that had dropped it for everyone; restored in commit a6ca7b5ae). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+        },
+        {
+          "id": "strategy-redesign-phase-4-orphan-cleanup",
+          "title": "Strategy redesign Phase 4 — delete dead Strategy orphans (Lane D)",
+          "source": "Strategy redesign synthesized plan 2026-06-18 §7 Phase 4 (Lane D)",
+          "est": "S",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-06-19",
+          "notes": "Done 2026-06-19 (PR #1286, P4 Lane D). Deleted 3 components with zero live render sites after the tab redesign + folded-signal recs — OpportunitiesList, RequestedKeywordTriage, DecisionQueue — plus the cascade orphan buildOpportunityRows (its sole consumer) and their 4 unit tests. Cleaned barrel exports, the OpportunityRow union + props interfaces in types.ts, and stale 'decision-bands layout' comments. Kept IntelligenceSignals (flag-OFF render) + LostQueryRecoveryCard (keep-reserve). New orphan-cuts.test.ts guards both the deletions and the two intentional keeps. Supersedes the OpportunitiesList/buildOpportunityRows references in FEATURE_AUDIT #504."
         }
       ]
     },
