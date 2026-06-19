@@ -480,13 +480,20 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         pageType: pageType || undefined,
         generationStyle,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
-        pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps
+        pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps || fixContextRef.current?.rationale
           ? {
               optimizationScore: fixContextRef.current.optimizationScore,
               optimizationIssues: fixContextRef.current.optimizationIssues,
               recommendations: fixContextRef.current.recommendations,
               contentGaps: fixContextRef.current.contentGaps,
               searchIntent: fixContextRef.current.searchIntent,
+              // Brief pre-seed: 6 new fields from Content Gaps / strategy layer (Lane E)
+              rationale: fixContextRef.current.rationale,
+              competitorProof: fixContextRef.current.competitorProof,
+              volume: fixContextRef.current.volume,
+              intent: fixContextRef.current.intent,
+              questionKeywords: fixContextRef.current.questionKeywords,
+              serpFeatures: fixContextRef.current.serpFeatures,
             }
           : undefined,
       });

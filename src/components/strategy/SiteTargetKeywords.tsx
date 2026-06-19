@@ -1,6 +1,7 @@
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Target, Loader2, Check, Plus, ArrowUpRight } from 'lucide-react';
-import { Badge, Button, SectionCard, Icon, IconButton, InlineBanner } from '../ui';
+import { Target, Loader2, Check, Plus, ArrowUpRight, X, Heart, BookmarkPlus } from 'lucide-react';
+import { Badge, Button, SectionCard, Icon, IconButton, InlineBanner, FormInput } from '../ui';
 import { kdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
 import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
@@ -45,15 +46,62 @@ export function SiteTargetKeywords({
   onTrack,
   maxVisible,
   managedKeywordSet,
+  onRemoveFromSet,
+  onKeepInSet,
+  onAddToSet,
+  managedSetEnabled,
 }: SiteTargetKeywordsProps) {
   const navigate = useNavigate();
   const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(siteKeywords, maxVisible);
+
+  // Search-and-add state — only rendered when managedSetEnabled is true (Lane D mutation controls).
+  const [addInput, setAddInput] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const handleAddKeyword = () => {
+    const kw = addInput.trim();
+    if (!kw) {
+      setAddError('Enter a keyword to add.');
+      return;
+    }
+    setAddError(null);
+    onAddToSet?.(kw, 'manual_add');
+    setAddInput('');
+  };
 
   return (
     <SectionCard
       title="Site Target Keywords"
       titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
     >
+      {/* Lane D — Search-and-add input (flag-ON only, mutation control) */}
+      {managedSetEnabled && (
+        <div className="mb-3 flex items-center gap-2">
+          <FormInput
+            value={addInput}
+            onChange={(val: string) => { setAddInput(val); setAddError(null); }}
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleAddKeyword(); }}
+            placeholder="Add keyword to set…"
+            aria-label="Add keyword to managed set"
+            className="flex-1 t-caption-sm"
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleAddKeyword}
+            aria-label="Add keyword"
+          >
+            <Icon as={BookmarkPlus} size="sm" className="mr-1" />
+            Add
+          </Button>
+          {addError && (
+            <InlineBanner size="sm" icon={false} className="ml-2">
+              {addError}
+            </InlineBanner>
+          )}
+        </div>
+      )}
+
       <div className="space-y-1">
         {visible.map((kw: string, i: number) => {
           const key = keywordTrackingKey(kw);
@@ -62,6 +110,10 @@ export function SiteTargetKeywords({
           const isPendingTrack = trackingPending.has(key);
           const trackError = trackingErrors.get(key);
           const managedState: ManagedState = getManagedState(kw, managedKeywordSet);
+
+          // Lane C: look up source annotation for 'regen_computed' keywords
+          const setRow = managedKeywordSet?.find(r => r.keyword === kw.toLowerCase().trim());
+          const isRegenComputed = setRow?.source === 'regen_computed';
 
           return (
             <div key={i} className="flex flex-col gap-0.5">
@@ -72,10 +124,17 @@ export function SiteTargetKeywords({
                     {/* Teal dot — Four Laws: teal for active/in-set state */}
                     <span
                       className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400 flex-shrink-0"
-                      aria-label="In managed set"
+                      aria-hidden="true"
+                      data-testid="managed-set-dot"
                     />
                     <Badge label="In Set" tone="teal" size="sm" variant="soft" />
                   </>
+                )}
+                {/* Lane D — "Added from opportunities" annotation for regen_computed source */}
+                {managedSetEnabled && managedState === 'in_set' && isRegenComputed && (
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] italic">
+                    Added from opportunities
+                  </span>
                 )}
                 {/* Lane D widens managedKeywordSet to include removed rows when 'removed' state is needed */}
 
@@ -105,6 +164,48 @@ export function SiteTargetKeywords({
                   variant="ghost"
                   className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
                 />
+
+                {/* Lane D — mutation controls (flag-ON only) */}
+                {managedSetEnabled && (
+                  <>
+                    {managedState === 'in_set' ? (
+                      <>
+                        {/* Keep: stamps keptAt — survives regen */}
+                        <IconButton
+                          onClick={() => onKeepInSet?.(kw)}
+                          title={setRow?.keptAt ? 'Kept' : 'Keep in set'}
+                          label={setRow?.keptAt ? 'Kept' : 'Keep in set'}
+                          icon={Heart}
+                          size="sm"
+                          variant="ghost"
+                          className={`ml-0.5 ${setRow?.keptAt ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
+                          aria-pressed={!!setRow?.keptAt}
+                        />
+                        {/* Remove: soft-delete from set */}
+                        <IconButton
+                          onClick={() => onRemoveFromSet?.(kw)}
+                          title="Remove from set"
+                          label="Remove from set"
+                          icon={X}
+                          size="sm"
+                          variant="ghost"
+                          className="ml-0.5 text-[var(--brand-text-muted)] hover:text-red-400"
+                        />
+                      </>
+                    ) : (
+                      /* Candidate → add to set (manual_add) */
+                      <IconButton
+                        onClick={() => onAddToSet?.(kw, 'manual_add')}
+                        title="Add to set"
+                        label="Add to set"
+                        icon={BookmarkPlus}
+                        size="sm"
+                        variant="ghost"
+                        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
+                      />
+                    )}
+                  </>
+                )}
               </div>
               {trackError && (
                 <InlineBanner size="sm" icon={false} className="mt-1">

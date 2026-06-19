@@ -224,9 +224,36 @@ export interface SiteTargetKeywordsProps {
    *
    * Pass the full activeKeywordSet array from useStrategyKeywordSet (Lane D).
    * When absent/undefined, behavior is byte-identical to the pre-P3 display (no states shown).
-   * DISPLAY ONLY — mutation controls are Lane D's exclusive concern.
    */
   managedKeywordSet?: ActiveStrategyKeyword[];
+  /**
+   * P3 Lane D — feature flag gate. When true, mutation controls (add/remove/keep buttons +
+   * search-and-add input) are rendered. When false or absent, the component renders Lane C's
+   * display-only states — byte-identical to the pre-P3 behavior.
+   * Must be `strategy-keywords-managed-set` flag value from the orchestrator.
+   */
+  managedSetEnabled?: boolean;
+  /**
+   * P3 Lane D — called when the operator clicks "Remove from set" on a keyword row.
+   * Routes to POST /keyword-set/remove via useStrategyKeywordSet.removeStrategyKeyword.
+   * No-op when managedSetEnabled is false.
+   */
+  onRemoveFromSet?: (keyword: string) => void;
+  /**
+   * P3 Lane D — called when the operator clicks "Keep in set" on a keyword row.
+   * Routes to POST /keyword-set/keep via useStrategyKeywordSet.keepStrategyKeyword.
+   * Stamps keptAt so the keyword survives regen.
+   * No-op when managedSetEnabled is false.
+   */
+  onKeepInSet?: (keyword: string) => void;
+  /**
+   * P3 Lane D — called when the operator adds a keyword via the search-and-add input or
+   * the per-row "Add to set" button. source is always 'manual_add' from this component;
+   * 'client_request' is routed via KeywordStrategy.tsx's client feedback path.
+   * Routes to POST /keyword-set via useStrategyKeywordSet.addStrategyKeyword.
+   * No-op when managedSetEnabled is false.
+   */
+  onAddToSet?: (keyword: string, source: 'client_request' | 'manual_add') => void;
 }
 
 export interface KeywordOpportunitiesProps {

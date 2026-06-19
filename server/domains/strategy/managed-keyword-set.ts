@@ -230,11 +230,14 @@ export function addStrategyKeyword(
   }
   const run = db.transaction((): StrategyKeywordSetRow => {
     const existing = stmts().getByKeyword.get(workspaceId, normalized) as StrategyKeywordSetDbRow | undefined;
+    let didWrite = false;
     if (existing) {
       // Re-activate a soft-removed row rather than violate the UNIQUE constraint.
       if (existing.removed_at != null) {
         stmts().reactivate.run(workspaceId, normalized);
+        didWrite = true;
       }
+      // existing && removed_at == null → keyword already active; no-op, no log.
     } else {
       const nextSlot = (stmts().maxSlot.get(workspaceId) as { maxSlot: number }).maxSlot + 1;
       stmts().insert.run({
@@ -243,15 +246,18 @@ export function addStrategyKeyword(
         source,
         slot_order: nextSlot,
       });
+      didWrite = true;
     }
     const row = stmts().getByKeyword.get(workspaceId, normalized) as StrategyKeywordSetDbRow;
-    addActivity(
-      workspaceId,
-      'strategy_keyword_added',
-      'Keyword added to strategy',
-      `"${normalized}" added to the managed keyword set (${source === 'client_request' ? 'client request' : 'manual add'})`,
-      { keyword: normalized, source },
-    );
+    if (didWrite) {
+      addActivity(
+        workspaceId,
+        'strategy_keyword_added',
+        'Keyword added to strategy',
+        `"${normalized}" added to the managed keyword set (${source === 'client_request' ? 'client request' : 'manual add'})`,
+        { keyword: normalized, source },
+      );
+    }
     return rowToManagedKeyword(row);
   });
   return run();

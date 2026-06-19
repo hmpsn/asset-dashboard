@@ -97,7 +97,7 @@ describe('SiteTargetKeywords — managed-set visual states (P3 Lane C)', () => {
       managedKeywordSet: [makeActiveKw('react hooks')],
     });
     expect(screen.getByText('In Set')).toBeInTheDocument();
-    expect(screen.getByLabelText('In managed set')).toBeInTheDocument();
+    expect(screen.getByTestId('managed-set-dot')).toBeInTheDocument();
   });
 
   it('does NOT show "In Set" badge for keywords absent from managedKeywordSet', () => {
@@ -114,7 +114,7 @@ describe('SiteTargetKeywords — managed-set visual states (P3 Lane C)', () => {
     renderComponent({ siteKeywords: ['react hooks'] });
     expect(screen.queryByText('In Set')).not.toBeInTheDocument();
     expect(screen.queryByText('Removed')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('In managed set')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('managed-set-dot')).not.toBeInTheDocument();
   });
 
   it('matches keywords case-insensitively (normalized comparison)', () => {
@@ -138,8 +138,8 @@ describe('SiteTargetKeywords — managed-set visual states (P3 Lane C)', () => {
     // "typescript" must not have any managed-set annotation
     const allBadges = screen.queryAllByText('Removed');
     expect(allBadges).toHaveLength(0);
-    // The teal dot aria-label should also appear exactly once (for react hooks only)
-    const dots = screen.getAllByLabelText('In managed set');
+    // The teal dot (aria-hidden, data-testid) should appear exactly once (for react hooks only)
+    const dots = screen.getAllByTestId('managed-set-dot');
     expect(dots).toHaveLength(1);
   });
 });

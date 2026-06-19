@@ -13,6 +13,7 @@ export const actionTypeEnum = z.enum([
   'content_refreshed', 'internal_link_added', 'meta_updated',
   'voice_calibrated', 'competitor_gap_closed', 'cluster_published',
   'cannibalization_resolved', 'local_visibility_won', 'local_service_added',
+  'content_gap_keep', 'topic_cluster_keep',
 ]);
 
 export const attributionEnum = z.enum([

@@ -8,6 +8,7 @@ import { useKeywordStrategy } from '../hooks/admin';
 import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendations';
 import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLifecycle';
 import { useContentDecay } from '../hooks/admin/useContentDecay';
+import { useStrategyKeywordSet } from '../hooks/admin/useStrategyKeywordSet';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
@@ -114,6 +115,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Flag gate: flag-ON renders v3 StrategyCockpit; flag-OFF preserves the v2 Act queue exactly.
   // Called unconditionally here (before all early returns) — Rules of Hooks.
   const commandCenterEnabled = useFeatureFlag('strategy-command-center');
+  // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
+  // enabled is gated inside the hook on both this flag AND workspaceId.
+  const managedSetEnabled = useFeatureFlag('strategy-keywords-managed-set');
+  const {
+    managedKeywordSet,
+    addStrategyKeyword,
+    removeStrategyKeyword,
+    keepStrategyKeyword,
+  } = useStrategyKeywordSet(workspaceId, managedSetEnabled);
   // The v2 Act queue reads the unified recommendation set (separately generated from the strategy
   // blob). Read it here too — sharing the React Query cache with ActQueue — to decide whether the
   // queue actually has content yet; if not, the legacy action sections stay as a fallback.
@@ -320,6 +330,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   const emptyStateEl = !isRealStrategy && !generation.generating ? <StrategyEmptyState /> : null;
 
+  // P3 Lane D — client-request approve handler: goes through the existing
+  // feedback.addRequestedKeyword → KCC ADD_TO_STRATEGY path, then additionally
+  // writes to the managed set when managedSetEnabled. Per plan: do NOT create
+  // a parallel promotion handler — use the existing KCC path as the primary.
+  const handleApproveClientKeyword = (keyword: string) => {
+    feedback.addRequestedKeyword(keyword);
+    if (managedSetEnabled) {
+      addStrategyKeyword(keyword, 'client_request');
+    }
+  };
+
   const clientFeedbackCombinedEl = (
     <ClientKeywordFeedback
       rows={feedback.rows}
@@ -328,7 +349,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       approved={metrics.approvedFeedback}
       addPending={feedback.addPending}
       addError={feedback.addError}
-      onAdd={feedback.addRequestedKeyword}
+      onAdd={handleApproveClientKeyword}
       onDismissError={() => feedback.setAddError(null)}
     />
   );
@@ -363,7 +384,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       />
     ),
     topicClusters: strategy.topicClusters && strategy.topicClusters.length > 0
-      ? <TopicClusters clusters={strategy.topicClusters} />
+      ? <TopicClusters clusters={strategy.topicClusters} workspaceId={workspaceId} />
       : null,
     decayingPages: <DecayingPagesCard workspaceId={workspaceId} />,
     // flag-ON: actionable CannibalizationTriage (send-to-client, mark-resolved, fix-in-editor).
@@ -383,6 +404,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         trackingPending={tracking.trackingPending}
         trackingErrors={tracking.trackingErrors}
         onTrack={tracking.trackKeyword}
+        managedKeywordSet={managedSetEnabled ? managedKeywordSet : undefined}
+        managedSetEnabled={managedSetEnabled}
+        onAddToSet={managedSetEnabled ? addStrategyKeyword : undefined}
+        onRemoveFromSet={managedSetEnabled ? removeStrategyKeyword : undefined}
+        onKeepInSet={managedSetEnabled ? keepStrategyKeyword : undefined}
       />
     ),
     opportunities: <KeywordOpportunities opportunities={strategy.opportunities} />,
@@ -499,7 +525,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <>
                       <ContentGaps contentGaps={strategy?.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} maxVisible={5} />
                       {strategy?.topicClusters && strategy.topicClusters.length > 0 && (
-                        <TopicClusters clusters={strategy.topicClusters} maxVisible={5} />
+                        <TopicClusters clusters={strategy.topicClusters} workspaceId={workspaceId} maxVisible={5} />
                       )}
                       {realLeaves.decayingPages}
                     </>
@@ -540,10 +566,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       trackingErrors={tracking.trackingErrors}
                       onTrack={tracking.trackKeyword}
                       maxVisible={5}
+                      managedKeywordSet={managedSetEnabled ? managedKeywordSet : undefined}
+                      managedSetEnabled={managedSetEnabled}
+                      onAddToSet={managedSetEnabled ? addStrategyKeyword : undefined}
+                      onRemoveFromSet={managedSetEnabled ? removeStrategyKeyword : undefined}
+                      onKeepInSet={managedSetEnabled ? keepStrategyKeyword : undefined}
                     />
                   ),
                   opportunities: (
-                    <KeywordOpportunities opportunities={strategy.opportunities ?? []} maxVisible={5} />
+                    <KeywordOpportunities
+                      opportunities={strategy.opportunities ?? []}
+                      maxVisible={5}
+                      onAddToStrategySet={managedSetEnabled
+                        ? (kw: string) => addStrategyKeyword(kw, 'manual_add')
+                        : undefined}
+                    />
                   ),
                   clientFeedback: clientFeedbackCombinedEl,
                 }}
