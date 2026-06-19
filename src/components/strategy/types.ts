@@ -1,6 +1,7 @@
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
+import type { ActiveStrategyKeyword } from '../../../shared/types/strategy-keyword-set';
 
 /** Page→keyword mapping row as rendered by the Strategy page. Moved verbatim from KeywordStrategy.tsx. */
 export interface PageKeywordMap {
@@ -214,6 +215,18 @@ export interface SiteTargetKeywordsProps {
   /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
    *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
   maxVisible?: number;
+  /**
+   * P3 Lane C — managed-set display state for each keyword row.
+   * When provided, each row is annotated with one of three visual states:
+   *   In Set    → teal dot + "In Set" badge (removedAt is null, row exists)
+   *   Removed   → zinc/muted styling (removedAt is non-null — row exists but was removed)
+   *   Candidate → no annotation (keyword not in the managed set at all)
+   *
+   * Pass the full activeKeywordSet array from useStrategyKeywordSet (Lane D).
+   * When absent/undefined, behavior is byte-identical to the pre-P3 display (no states shown).
+   * DISPLAY ONLY — mutation controls are Lane D's exclusive concern.
+   */
+  managedKeywordSet?: ActiveStrategyKeyword[];
 }
 
 export interface KeywordOpportunitiesProps {
@@ -228,6 +241,19 @@ export interface KeywordOpportunitiesProps {
   /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
    *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
   maxVisible?: number;
+  /**
+   * P3 Lane C — when true, each opportunity row shows an "Interested in this one?" inline confirm
+   * that routes through the rec-lifecycle send path (recommendations.send) for the keyword_gap rec
+   * minted at regen. Send UX is only rendered when workspaceId is also provided.
+   * When absent/false, behavior is byte-identical to the pre-P3 display.
+   */
+  enableSend?: boolean;
+  /**
+   * P3/Lane D seam — called after a successful send with the keyword string (rec.targetKeyword ?? opp).
+   * Lane D wires this to addStrategyKeyword so "interested→yes→send" also adds the keyword to the managed
+   * set. Lane C (KeywordOpportunities) owns no add hook — the callback is the seam.
+   */
+  onAddToStrategySet?: (keyword: string) => void;
 }
 
 export interface StrategyHowItWorksProps {

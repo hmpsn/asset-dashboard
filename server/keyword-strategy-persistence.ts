@@ -8,6 +8,7 @@ import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
 import { replaceAllSiteKeywordMetrics } from './site-keyword-metrics.js';
+import { reconcileStrategyKeywordSet } from './domains/strategy/managed-keyword-set.js';
 import db from './db/index.js';
 import {
   recordAction,
@@ -212,6 +213,18 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     replaceAllKeywordGaps(ws.id, keywordGaps);
     replaceAllTopicClusters(ws.id, topicClusters);
     replaceAllCannibalizationIssues(ws.id, cannibalization);
+    // Strategy redesign (graft 1) — reconcile the managed keyword working-set IN this same
+    // transaction so it is atomic with the strategy write (a regen + its set update commit or
+    // roll back together). The reconciler is PURE read-diff-insert (NO AI) and runs inside this
+    // txn (does NOT open its own). It seeds net-new siteKeywords as 'regen_computed' and
+    // auto-replenishes operator-removed slots from the freshly-computed opportunity pool
+    // (contentGaps/keywordGaps/opportunities). Kept/active rows survive; soft-removed rows stay
+    // removed. The STRATEGY_KEYWORD_SET_UPDATED broadcast fires AFTER commit (outside this body).
+    reconcileStrategyKeywordSet(ws.id, {
+      ...keywordStrategy,
+      keywordGaps,
+      contentGaps: newContentGaps,
+    } as KeywordStrategy);
     // SOLE STORE (#19b, Wave 3b-ii strip; table-as-truth): the
     // site_keyword_metrics table is now the only persisted home for
     // siteKeywordMetrics. The blob siteKeywordMetrics write was cut above
@@ -307,6 +320,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: pageMap.length,
     siteKeywords: keywordStrategy.siteKeywords?.length || 0,
+  });
+  // Strategy redesign (graft 1) — the managed keyword set was reconciled inside the txn above
+  // (atomic with the strategy write). Broadcast its update AFTER the commit so the
+  // useStrategyKeywordSet hook invalidates and refetches the curated working-set.
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, {
+    reason: 'regen',
   });
   invalidateIntelligenceCache(ws.id);
   debouncedStrategyInvalidate(ws.id, () => {

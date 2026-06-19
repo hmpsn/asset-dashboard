@@ -63,6 +63,12 @@ import {
 } from '../keyword-strategy-ux.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { getLocalStrategySyncStatus } from '../local-strategy-sync.js';
+import {
+  getStrategyKeywordSet,
+  addStrategyKeyword,
+  removeStrategyKeyword,
+  keepStrategyKeyword,
+} from '../domains/strategy/managed-keyword-set.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -742,6 +748,73 @@ router.post('/api/webflow/keyword-strategy/:workspaceId/signals/recompute', requ
   const job = createJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, { workspaceId: ws.id, message: 'Refreshing signals...' });
   res.json({ jobId: job.id });
   setTimeout(() => { void runIntelligenceRecomputeJob(job.id, ws.id); }, 100);
+});
+
+// --- Managed Keyword Set (Strategy redesign graft 1) ---
+// The curated working-set of target keywords, backed by the dedicated strategy_keyword_set
+// table (migration 139). Survives both strategy regen and rank-tracking sync. The domain
+// functions (server/domains/strategy/managed-keyword-set.ts) are the sole writers and already
+// call addActivity; the routes own the WS broadcast.
+
+const addKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+  // 'regen_computed' is reconciler-only — operators add via client_request or manual_add.
+  source: z.enum(['client_request', 'manual_add']),
+});
+
+const removeKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+});
+
+const keepKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+});
+
+// GET the active managed set (removed_at IS NULL), ordered by slot_order.
+router.get('/api/webflow/keyword-strategy/:workspaceId/keyword-set', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// POST add a keyword to the managed set (client_request | manual_add).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set', requireWorkspaceAccess('workspaceId'), validate(addKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword, source } = req.body as z.infer<typeof addKeywordSchema>;
+  const row = addStrategyKeyword(ws.id, keyword, source);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'add', keyword: row.keyword });
+  res.json({ keyword: row });
+});
+
+// POST keep a keyword (stamps kept_at — survives regen AND the tracked-keywords clobber).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set/keep', requireWorkspaceAccess('workspaceId'), validate(keepKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword } = req.body as z.infer<typeof keepKeywordSchema>;
+  keepStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'keep', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// POST remove (body-based) — soft delete (sets removed_at; survives regen, excluded from replenish).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set/remove', requireWorkspaceAccess('workspaceId'), validate(removeKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword } = req.body as z.infer<typeof removeKeywordSchema>;
+  removeStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'remove', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// DELETE remove (path-param) — same soft delete, RESTful variant mirroring keyword-feedback DELETE.
+router.delete('/api/webflow/keyword-strategy/:workspaceId/keyword-set/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const keyword = decodeURIComponent(req.params.keyword);
+  removeStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'remove', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
 });
 
 export default router;
