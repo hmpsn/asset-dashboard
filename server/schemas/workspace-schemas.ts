@@ -385,6 +385,9 @@ export const recommendationSchema = z.object({
     // SEO Gen-Quality P7.1 — first-class local-visibility rec types. Same lockstep rule:
     // omitting either of these drops every local rec on the next reload (P5's hard-won lesson).
     'local_visibility', 'local_service_gap',
+    // P4 Lane C — competitor gap send. Same lockstep rule: absent here → every competitor
+    // rec silently dropped on reload (Schema vs stored shape rule, CLAUDE.md).
+    'competitor',
   ]),
   title: z.string(),
   description: z.string(),

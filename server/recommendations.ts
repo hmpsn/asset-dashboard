@@ -21,7 +21,8 @@ import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
 import { loadDecayAnalysis } from './content-decay.js';
-import { getDeclinedKeywords } from './keyword-feedback.js';
+import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
 import { listQuickWins } from './quick-wins.js';
@@ -38,6 +39,8 @@ import {
 } from './local-seo.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { getInsights } from './analytics-insights-store.js';
+import { buildStrategySignals } from './insight-feedback.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -67,6 +70,7 @@ import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-l
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet, OpportunityScore } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
+import type { StrategySignal } from '../shared/types/insights.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 import {
   LOCAL_SEO_POSTURE,
@@ -212,6 +216,10 @@ export function recommendationOutcomeActionType(type: RecType, source: string): 
     // Distinct ActionTypes (NOT the audit_fix_applied family) so winRateByActionType stays
     // honestly calibrated for each subsystem (the contract's "honest calibration" requirement).
     case 'keyword_gap':
+    // P4 competitor send (Lane C) extends the RecType union with `competitor`; a competitor rec
+    // succeeds when the competitor gap is closed — the same outcome as keyword_gap. Mapped here
+    // (in recommendations.ts, the owner of this exhaustive switch) so the union stays exhaustive.
+    case 'competitor':
       return 'competitor_gap_closed';
     case 'topic_cluster':
       return 'cluster_published';
@@ -268,7 +276,12 @@ export type RecSourceCategory =
   | 'topic_cluster'
   | 'cannibalization'
   | 'local_visibility'
-  | 'local_service_gap';
+  | 'local_service_gap'
+  // Strategy redesign P4 (signal-fold): IntelligenceSignals folded into the cockpit as
+  // real recs minted at generation time. The source category is keyed off the originating
+  // insightId (signal:<insightId>) so a signal already minted as a rec carries over
+  // status/lifecycle across regen and resolving one signal never auto-resolves another.
+  | 'signal';
 
 const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'audit',
@@ -282,6 +295,7 @@ const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'cannibalization',
   'local_visibility',
   'local_service_gap',
+  'signal',
 ];
 
 /** Returns the category prefix for a given source string, or `null` when
@@ -327,6 +341,10 @@ export const RecSource = {
   // so buildMergeKey keys on the source alone.
   localVisibility:        (marketKey: string): string => `local_visibility:${marketKey}`,
   localServiceGap:        (serviceId: string): string => `local_service_gap:${serviceId}`,
+  // ── Strategy redesign P4 · signal-fold ──
+  // Keyed off the originating insightId so the minted rec dedups against itself across
+  // regen (buildMergeKey returns this source unchanged — it is not `strategy:`-prefixed).
+  signal:                 (insightId: string): string => `signal:${insightId}`,
 };
 
 /** Infer page type from slug path.
@@ -1186,6 +1204,111 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
   } catch { // catch-ok: non-critical — failure degrades to "authority unknown" and the KD classifier treats 0 as unknown
     return 0;
   }
+}
+
+// ─── Strategy redesign P4 · signal-fold ───────────────────────────
+//
+// Maps the standalone IntelligenceSignals feed (the `buildStrategySignals` read the
+// dedicated `…/signals` card consumed) into first-class Recommendation rows minted at
+// generation time. The card is being deleted; signals-as-recs ride the existing
+// RECOMMENDATIONS_UPDATED broadcast (signals ARE recs — no new WS event). Gated behind
+// `strategy-signal-fold`, checked server-side per-workspace; flag-OFF mints nothing so the
+// rec set stays byte-identical.
+
+/** Map a StrategySignal's `type` to a RecType. `momentum` (a keyword that gained positions —
+ *  "consider adding to strategy") maps to `keyword_gap`; `content_gap` (competitor coverage we
+ *  lack) maps to `topic_cluster`; everything else (`misalignment`) maps to the generic
+ *  `strategy`. NEVER `competitor` — that RecType is Lane C's and signals don't map to it. */
+function signalToRecType(signalType: StrategySignal['type']): RecType {
+  switch (signalType) {
+    case 'momentum':    return 'keyword_gap';
+    case 'content_gap': return 'topic_cluster';
+    case 'misalignment':
+    default:            return 'strategy';
+  }
+}
+
+/** Band a signal's score into a RecPriority (the minted signal rec carries no OV
+ *  `opportunity` — it is a pure map of the feed, so the canonical OV post-pass skips it and
+ *  the score flows straight from the signal). Thresholds mirror the impact bands used
+ *  by the keyword_gap / topic_cluster producers above. */
+function signalPriority(score: number): RecPriority {
+  if (score >= 70) return 'fix_now';
+  if (score >= 40) return 'fix_soon';
+  return 'fix_later';
+}
+
+/**
+ * Mint StrategySignals as Recommendation rows, appending to `recs` in place.
+ *
+ * Dedup contract: a signal is skipped when its `signal:<insightId>` merge key already exists
+ * in `recs` (covers BOTH a different producer that already minted the same source AND a
+ * carried-over signal rec re-pushed by the merge phase). buildMergeKey is the single keying
+ * authority — `signal:` sources are not `strategy:`-prefixed, so the key is the source string,
+ * exactly the per-`insightId` dedup the spec requires. Carry-over semantics are respected:
+ * mintSignalRecs runs AFTER applyLifecycleCarryOver, so a previously-minted signal rec that
+ * survived regen is already in `recs` with its preserved id/status/lifecycle, and this dedup
+ * prevents a second copy — no re-mint, no duplication.
+ *
+ * Pure map (no AI, no DB write): the caller persists the assembled set.
+ */
+function mintSignalRecs(
+  signals: StrategySignal[],
+  recs: Recommendation[],
+  ctx: { workspaceId: string; now: string; assignedTo: 'team' | 'client' },
+): number {
+  // O(n) dedup: one Set of existing merge keys, then a single pass over signals. No nested
+  // scan over `recs` per signal (the carry-over O(n²) hazard the plan flags) — the lookup is
+  // Set-backed.
+  const existingKeys = new Set<string>();
+  for (const rec of recs) existingKeys.add(buildMergeKey(rec));
+
+  let minted = 0;
+  for (const signal of signals) {
+    const source = RecSource.signal(signal.insightId);
+    // buildMergeKey on a `signal:`-prefixed source returns the source unchanged (not
+    // strategy-prefixed) → per-insightId dedup.
+    const key = buildMergeKey({ source, affectedPages: [], title: '' });
+    if (existingKeys.has(key)) continue; // already minted (this run or carried over) — don't double-mint
+    existingKeys.add(key);
+
+    const type = signalToRecType(signal.type);
+    // Signal recs are a pure map of the IntelligenceSignals feed — the feed already carries the
+    // insight's score and there are no OV inputs (volume/KD/position) to ground a
+    // computeOpportunityValue() call. This mirrors the standalone card, which rendered the
+    // signal score verbatim. No `opportunity` attached → the canonical OV post-pass leaves this
+    // rec alone (it guards on `if (r.opportunity)`).
+    const impactScore = signal.impactScore; // rec-impactscore-ok: pure feed map, no OV inputs to ground a scorer call (see comment above)
+    const pageSlug = signal.pageUrl ? toPageSlug(signal.pageUrl) : undefined;
+    recs.push({
+      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+      workspaceId: ctx.workspaceId,
+      priority: signalPriority(impactScore),
+      type,
+      title: `${signal.keyword ? `"${signal.keyword}"` : 'Intelligence signal'}: ${signal.detail}`,
+      description: signal.detail,
+      insight: signal.detail,
+      impact: impactScore >= 70 ? 'high' : impactScore >= 40 ? 'medium' : 'low',
+      effort: 'medium',
+      impactScore,
+      // No `opportunity` — the mint is a pure map of the feed (no OV inputs to ground it),
+      // so the canonical OV post-pass (which guards on `if (r.opportunity)`) leaves it alone
+      // and impactScore flows straight from the signal.
+      source,
+      affectedPages: pageSlug ? [pageSlug] : [],
+      targetKeyword: signal.keyword || undefined,
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: signal.detail,
+      actionType: 'manual',
+      status: 'pending',
+      assignedTo: ctx.assignedTo,
+      createdAt: ctx.now,
+      updatedAt: ctx.now,
+    });
+    minted++;
+  }
+  return minted;
 }
 
 // ─── Main Engine ──────────────────────────────────────────────────
@@ -2468,6 +2591,19 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         continue;
       }
       const category = getRecSourceCategory(oldRec.source);
+      // Strategy redesign P4 · signal-fold — signal recs have NO producer in the merge phase:
+      // mintSignalRecs runs AFTER this loop, so a `signal:<insightId>` key is never added to
+      // `newSources`. Its absence is therefore ALWAYS a false positive, not a genuine "no longer
+      // detected" fix. Without this exemption every un-actioned folded signal flips to a false
+      // "✓ Auto-resolved — completed" on the next regen, and the post-loop mintSignalRecs then
+      // dedups against that now-completed rec and never re-mints it. RETAIN the old signal rec
+      // as-is (preserve status/lifecycle) when its mint key is absent so the subsequent
+      // mintSignalRecs dedup sees it and skips the re-mint (no duplicate). Struck/sent signal
+      // recs are already handled by the isExemptFromAutoResolve branch above.
+      if (category === 'signal') {
+        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
+        continue;
+      }
       if (category && failedCategories.has(category)) continue;
       if (!newSources.has(buildMergeKey(oldRec))) {
         // D2: a content-gap rec suppressed because the pipeline already has an in-flight
@@ -2516,6 +2652,51 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           autoResolvedPageStateIds.push(resolvedPageId);
         }
       }
+    }
+  }
+
+  // ── Strategy redesign P4 · signal-fold (flag-gated, runs AFTER carry-over) ──
+  // Mint the IntelligenceSignals feed as real recs. Placed here, after the entire merge/
+  // carry-over block, so dedup sees BOTH this run's producer recs AND any carried-over
+  // signal rec that survived regen (applyLifecycleCarryOver re-applied its id/lifecycle into
+  // `recs` already) — buildMergeKey on `signal:<insightId>` keeps the dedup per-insight, so a
+  // sent/struck signal rec is respected and never re-minted. Flag-OFF: mints nothing → the
+  // rec set is byte-identical. Reuses the exact read path the standalone card used
+  // (getInsights → buildStrategySignals).
+  if (isFeatureEnabled('strategy-signal-fold', workspaceId)) {
+    try {
+      // Parity with the standalone IntelligenceSignals card (server/routes/keyword-strategy.ts):
+      // it threaded a keywordEvaluationContext into buildStrategySignals to suppress
+      // declined/business-misfit keywords. Reuse the SAME read path here so the mint never emits
+      // recs for keywords the card would have suppressed. The seoContext + clientSignals slices
+      // were already assembled into `recommendationContext` above (slices: [...'seoContext',
+      // 'clientSignals'...]) — no extra intelligence build. If that context was unavailable
+      // (build failed → null), fall back to the unfiltered feed (same fail-open direction the
+      // route uses in its catch).
+      const intel = recommendationContext?.intelligence;
+      const keywordEvaluationContext = intel
+        ? buildStrategyKeywordEvaluationContext({
+            workspaceId,
+            workspaceName: ws.name,
+            businessContext: ws.keywordStrategy?.businessContext,
+            seoContext: intel.seoContext,
+            clientSignals: intel.clientSignals,
+            declinedKeywords: [...new Set([
+              ...(intel.clientSignals?.keywordFeedback.rejected ?? []),
+              ...getDeclinedKeywords(workspaceId),
+            ])],
+            requestedKeywords: getRequestedKeywords(workspaceId),
+            approvedKeywords: intel.clientSignals?.keywordFeedback.approved ?? [],
+            strictBusinessFit: true,
+          })
+        : undefined;
+      const signals = buildStrategySignals(getInsights(workspaceId), { keywordEvaluationContext });
+      const mintedSignalRecs = mintSignalRecs(signals, recs, { workspaceId, now, assignedTo });
+      if (mintedSignalRecs > 0) {
+        log.info({ workspaceId, mintedSignalRecs }, 'signal-fold: minted intelligence signals as recommendations');
+      }
+    } catch (err) { // non-fatal — a signal-fold failure must never block the rest of the rec set
+      log.warn({ err, workspaceId }, 'signal-fold: failed to mint signal recs — continuing without them');
     }
   }
 

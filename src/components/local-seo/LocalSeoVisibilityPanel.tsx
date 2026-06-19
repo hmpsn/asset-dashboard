@@ -10,7 +10,10 @@ import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn 
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 import { LocalSeoVisibilityTrend } from './LocalSeoVisibilityTrend';
 
-type LocalSeoVisibilityPanelMode = 'strategy' | 'keywords' | 'page';
+// 'strategy' mode was removed in P4 Lane B — LocalSeoVisibilityPanel no longer mounts in
+// KeywordStrategy.tsx. Strategy now shows local market config via StrategyConfigPanel only.
+// KeywordHub.tsx (mode='keywords') and Page Intelligence (mode='page') remain unchanged.
+type LocalSeoVisibilityPanelMode = 'keywords' | 'page';
 
 interface LocalSeoVisibilityPanelProps {
   workspaceId: string;
@@ -191,21 +194,14 @@ function LocalSeoSetupCallout({
   );
 }
 
-function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mode: 'strategy' | 'keywords' }) {
-  const columns = mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
+function LocalSeoStatGrid({ report }: { report: LocalSeoReportSummary }) {
   return (
-    <div className={`grid ${columns} gap-3`}>
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <StatCard label="Markets" value={report.activeMarketCount} icon={MapPin} iconColor="#60a5fa" valueColor="text-blue-400" sub={`${report.configuredMarketCount} configured`} />
       <StatCard label="Checked" value={report.checkedKeywordCount} icon={Search} iconColor="#60a5fa" valueColor="text-blue-400" sub={formatDate(report.lastCapturedAt)} />
       <StatCard label="Visible" value={report.visibleCount} icon={CheckCircle2} iconColor="#34d399" valueColor="text-emerald-400" sub="verified matches" />
-      {mode === 'keywords' ? (
-        <>
-          <StatCard label="Possible" value={report.possibleMatchCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="needs review" />
-          <StatCard label="Not Found" value={report.notVisibleCount} icon={XCircle} iconColor="#f87171" valueColor="text-red-400/80" sub={`${report.localPackPresentCount} local packs`} />
-        </>
-      ) : (
-        <StatCard label="Needs Review" value={report.possibleMatchCount + report.notVisibleCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub={`${report.localPackPresentCount} local packs`} />
-      )}
+      <StatCard label="Possible" value={report.possibleMatchCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="needs review" />
+      <StatCard label="Not Found" value={report.notVisibleCount} icon={XCircle} iconColor="#f87171" valueColor="text-red-400/80" sub={`${report.localPackPresentCount} local packs`} />
     </div>
   );
 }
@@ -323,11 +319,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
     workspaceId,
   });
   const refreshing = refresh.isPending || Boolean(activeRefreshJob);
-  const title = mode === 'strategy'
-    ? 'Local SEO Setup'
-    : mode === 'page'
-      ? 'Local visibility annotation'
-      : 'Local Keyword Visibility';
+  const title = mode === 'page' ? 'Local visibility annotation' : 'Local Keyword Visibility';
 
   if (isLoading) {
     return (
@@ -411,15 +403,8 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
     >
       <div className="space-y-4">
         <LocalSeoSetupCallout report={report} error={error} refreshError={refresh.error} />
-        <LocalSeoStatGrid report={report} mode={mode} />
+        <LocalSeoStatGrid report={report} />
         <LocalSeoVisibilityTrend series={data.visibilityTrend} />
-
-        {mode === 'strategy' && (
-          <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4">
-            <LocalSeoMarketSummary data={data} />
-            <LocalSeoKeywordHandoff compact />
-          </div>
-        )}
 
         {mode === 'keywords' && (
           <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4">

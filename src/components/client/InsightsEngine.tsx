@@ -5,8 +5,9 @@ import {
   TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
   CheckCircle2, MousePointerClick, Eye,
   FileText, Code2, Image, Wrench, Target, PenTool, Sparkles,
-  Loader2, XCircle, ArrowUpRight, Shield, MapPin,
+  Loader2, XCircle, ArrowUpRight, Shield, MapPin, Globe,
 } from 'lucide-react';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
@@ -51,6 +52,7 @@ const REC_TYPE_TAB: Record<RecType, string> = {
   cannibalization: 'seo-audit',
   local_visibility: 'seo-strategy',
   local_service_gap: 'seo-strategy',
+  competitor: 'seo-strategy',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -111,6 +113,7 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
   cannibalization: Wrench,
   local_visibility: MapPin,
   local_service_gap: MapPin,
+  competitor: Globe,
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -130,6 +133,9 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotify }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
+  // strategy-competitor-send: gates the client-side renderer for `competitor` rec rows.
+  // A sent competitor rec must not surface to the client before this renderer is ready.
+  const competitorSendEnabled = useFeatureFlag('strategy-competitor-send');
   const { toast: ctxToast } = useToast();
   // Prefer the threaded onNotify prop (client-portal mount has no ToastProvider);
   // fall back to the context toast (admin mount has ToastProvider).
@@ -231,6 +237,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
     for (const p of priorities) map.set(p, []);
     for (const rec of data.recommendations) {
       if (rec.status === 'dismissed') continue;
+      // strategy-competitor-send: competitor rec rows are gated — hide them from the
+      // client until the flag is ON. A sent competitor rec cannot surface before its
+      // renderer is ready (spec §LC.7 client-renderer gate).
+      if (rec.type === 'competitor' && !competitorSendEnabled) continue;
       map.get(rec.priority)?.push(rec);
     }
     return map;

@@ -1,6 +1,7 @@
 /**
  * recommendations routes — extracted from server/index.ts
  */
+import crypto from 'crypto';
 import { Router } from 'express';
 
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
@@ -11,6 +12,7 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
   loadRecommendations,
+  saveRecommendations,
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
@@ -500,6 +502,102 @@ router.post(
     }
 
     return res.json({ modified: mutated.length });
+  },
+);
+
+// ── P4 Lane C — competitor-gap rec mint (idempotent) ────────────────────────────
+// Mints a `type:'competitor'` Recommendation from a keyword gap so the per-row
+// "Send to client" affordance in CompetitiveIntel has something to send. NOTHING else
+// in the platform mints a competitor rec (the generators never do), so without this the
+// send button could never fire. Idempotent: if a competitor rec for the same
+// targetKeyword already exists, it is RETURNED rather than duplicated (safe on
+// double-click). The minted rec satisfies recommendationSchema (else it would be
+// silently dropped on the next loadRecommendations) — the field set + types mirror the
+// keyword_gap branch in server/recommendations.ts.
+//
+// LITERAL route placed before the `:recId/*` param routes below so 'competitor-rec' is
+// never swallowed as a :recId segment (route-ordering rule).
+//
+// Admin-only (no /api/public/ prefix → global APP_PASSWORD HMAC gate; requireWorkspaceAccess
+// passes through for HMAC callers).
+const competitorRecMintSchema = z.object({
+  keyword: z.string().min(1).max(200),
+  competitorDomain: z.string().max(255).optional(),
+  title: z.string().max(300).optional(),
+  description: z.string().max(2000).optional(),
+  insight: z.string().max(2000).optional(),
+});
+
+router.post(
+  '/api/recommendations/:workspaceId/competitor-rec',
+  requireWorkspaceAccess('workspaceId'),
+  validate(competitorRecMintSchema),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const { keyword, competitorDomain, title, description, insight } =
+      req.body as z.infer<typeof competitorRecMintSchema>;
+
+    const set = loadRecommendations(workspaceId) ?? {
+      workspaceId,
+      generatedAt: new Date().toISOString(),
+      recommendations: [] as Recommendation[],
+      summary: computeRecommendationSummary([]),
+    };
+
+    // Idempotent: a competitor rec for the same targetKeyword already exists → return it (no dup).
+    const existing = set.recommendations.find(
+      r => r.type === 'competitor' && r.targetKeyword === keyword,
+    );
+    if (existing) return res.json(existing);
+
+    const now = new Date().toISOString();
+    const competitorLabel = competitorDomain ? `${competitorDomain} ` : 'A competitor ';
+    const rec: Recommendation = {
+      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+      workspaceId,
+      type: 'competitor',
+      priority: 'fix_soon',
+      title: title || `Target "${keyword}" (competitor gap)`,
+      description:
+        description ||
+        `${competitorLabel}ranks for "${keyword}" — you don't. Targeting this term captures demand a competitor already owns.`,
+      insight:
+        insight ||
+        `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${keyword}" lets you compete for a term with proven search demand.`,
+      impact: 'medium',
+      effort: 'medium',
+      impactScore: 60,
+      source: `competitor:${keyword}`,
+      affectedPages: [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: `Capturing "${keyword}" targets a term a competitor already ranks for`,
+      actionType: 'manual',
+      targetKeyword: keyword,
+      status: 'pending',
+      clientStatus: 'system',
+      lifecycle: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set.recommendations.push(rec);
+    set.summary = computeRecommendationSummary(set.recommendations);
+    saveRecommendations(set);
+    invalidateIntelligenceCache(workspaceId);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
+      recId: rec.id,
+      type: 'competitor',
+      reason: 'mint',
+    });
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Competitor recommendation created: ${rec.title}`,
+      rec.description,
+    );
+    res.json(rec);
   },
 );
 

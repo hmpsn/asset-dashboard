@@ -3,7 +3,7 @@
 import type { ImpactBand } from './impact-band.js';
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap';
+export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap' | 'competitor';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';
 

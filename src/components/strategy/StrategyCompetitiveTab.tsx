@@ -23,6 +23,10 @@ interface StrategyCompetitiveTabProps {
   seoDataAvailable: boolean;
   keywordGaps: KeywordGapItem[];
   navigate: NavigateFunction;
+  /** Passed through from KeywordStrategy (strategy-command-center flag). */
+  commandCenterEnabled?: boolean;
+  /** Passed through from KeywordStrategy (strategy-competitor-send doubly-gated flag). */
+  competitorSendEnabled?: boolean;
 }
 
 /**
@@ -32,7 +36,7 @@ interface StrategyCompetitiveTabProps {
  * with a per-row Create-brief CTA → backlink/authority profile. Admin-only and ungated — the operator
  * sees the full competitive picture; the Premium gate is a Phase 6 client-reframe concern, not here.
  */
-export function StrategyCompetitiveTab({ workspaceId, competitors, seoDataAvailable, keywordGaps, navigate }: StrategyCompetitiveTabProps) {
+export function StrategyCompetitiveTab({ workspaceId, competitors, seoDataAvailable, keywordGaps, navigate, commandCenterEnabled, competitorSendEnabled }: StrategyCompetitiveTabProps) {
   if (!seoDataAvailable) {
     return (
       <EmptyState
@@ -55,7 +59,14 @@ export function StrategyCompetitiveTab({ workspaceId, competitors, seoDataAvaila
   return (
     <div className="space-y-8">
       <ShareBar workspaceId={workspaceId} competitors={competitors} seoDataAvailable={seoDataAvailable} />
-      <CompetitiveIntel workspaceId={workspaceId} competitors={competitors} seoDataAvailable={seoDataAvailable} variant="merged" />
+      <CompetitiveIntel
+        workspaceId={workspaceId}
+        competitors={competitors}
+        seoDataAvailable={seoDataAvailable}
+        variant="merged"
+        commandCenterEnabled={commandCenterEnabled}
+        competitorSendEnabled={competitorSendEnabled}
+      />
       <KeywordGaps
         keywordGaps={keywordGaps}
         difficultyColor={kdColor}

@@ -186,6 +186,13 @@ export const recommendations = {
   remove: (wsId: string, recId: string) =>
     del(`/api/public/recommendations/${wsId}/${recId}`),
 
+  // P4 Lane C — mint a competitor-gap rec (idempotent on targetKeyword). Returns the
+  // existing rec when one already exists for the keyword (safe on double-click). Admin-only.
+  mintCompetitor: (
+    wsId: string,
+    body: { keyword: string; competitorDomain?: string; title?: string; description?: string; insight?: string },
+  ) => post<Recommendation>(`/api/recommendations/${wsId}/competitor-rec`, body),
+
   // Strategy v3 admin curation lifecycle (admin-only routes).
   send: (wsId: string, recId: string, note?: string) =>
     patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/send`, { note }),
