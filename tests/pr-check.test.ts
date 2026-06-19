@@ -36,6 +36,9 @@ import {
   extractDbPrepareArg,
   findUnrenderedSliceFields,
   compareStudioConstants,
+  getChangedFiles,
+  getUntrackedFiles,
+  mergeChangedFiles,
   BRAND_ENGINE_ROUTE_BASENAMES,
   REQUIRE_AUTH_ALLOWED_BASENAMES,
   GLOBALLY_APPLIED_LIMITERS,
@@ -11605,5 +11608,101 @@ describe('Rule: Hardcoded nav metadata outside the nav registry', () => {
       lines("  { id: 'analytics-hub', label: 'Search & Traffic', icon: X, needsSite: true },")
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getChangedFiles() must fold untracked (net-new, not-yet-`git add`-ed) files
+// into the default diff-only scan. `git diff --name-only <base>` EXCLUDES
+// untracked files, so a PR/change composed wholly or partly of new files would
+// otherwise report "0 errors" by default — a silent false-green. (Caught during
+// Strategy v3 Phase 2: 10 new cockpit-UI files scanned clean by default while
+// `--all` revealed 5 real error-severity violations.)
+//
+// These run against throwaway temp git repos OUTSIDE the project tree so they
+// exercise the real `git` invocations without touching this repo's state.
+describe('getChangedFiles: untracked-file coverage (net-new-file false-green)', () => {
+  const ORIGINAL_GH_BASE = process.env.GITHUB_BASE_REF;
+  const repos: string[] = [];
+
+  beforeAll(() => {
+    // getChangedFiles consults GITHUB_BASE_REF first. Our temp repos have no
+    // `origin` remote, so a set value would just make that branch throw and
+    // fall through — harmless, but we clear it so the tests are deterministic
+    // regardless of whether they run under GitHub Actions.
+    delete process.env.GITHUB_BASE_REF;
+  });
+
+  afterAll(() => {
+    if (ORIGINAL_GH_BASE === undefined) delete process.env.GITHUB_BASE_REF;
+    else process.env.GITHUB_BASE_REF = ORIGINAL_GH_BASE;
+    for (const repo of repos) rmSync(repo, { recursive: true, force: true });
+  });
+
+  function git(cwd: string, ...args: string[]): string {
+    return execFileSync('git', args, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  }
+
+  // Isolated temp git repo (in the OS tmpdir, outside this project) with one
+  // initial commit so HEAD exists. Returns its absolute path.
+  function makeTempRepo(): string {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-gitrepo-'));
+    repos.push(dir);
+    git(dir, 'init');
+    git(dir, 'config', 'user.email', 'test@example.com');
+    git(dir, 'config', 'user.name', 'pr-check test');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(path.join(dir, 'baseline.ts'), 'export const baseline = 1;\n', 'utf-8');
+    git(dir, 'add', 'baseline.ts');
+    git(dir, 'commit', '-m', 'initial');
+    return dir;
+  }
+
+  it('mergeChangedFiles unions tracked + untracked, tracked-first, de-duplicated', () => {
+    expect(mergeChangedFiles(['a.ts', 'b.ts'], ['b.ts', 'c.ts'])).toEqual(['a.ts', 'b.ts', 'c.ts']);
+    expect(mergeChangedFiles([], ['x.ts'])).toEqual(['x.ts']);
+    expect(mergeChangedFiles(['x.ts'], [])).toEqual(['x.ts']);
+  });
+
+  it('getUntrackedFiles returns new files not yet git-added, and excludes committed files', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, 'brand-new.ts'), 'export const x = 1;\n', 'utf-8');
+    const untracked = getUntrackedFiles(repo);
+    expect(untracked).toContain('brand-new.ts');
+    expect(untracked).not.toContain('baseline.ts'); // committed → tracked, not untracked
+  });
+
+  it('getUntrackedFiles honours .gitignore (no build-artifact flood)', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, '.gitignore'), 'ignored.ts\n', 'utf-8');
+    writeFileSync(path.join(repo, 'ignored.ts'), 'export const x = 1;\n', 'utf-8');
+    writeFileSync(path.join(repo, 'kept.ts'), 'export const y = 1;\n', 'utf-8');
+    const untracked = getUntrackedFiles(repo);
+    expect(untracked).toContain('kept.ts');
+    expect(untracked).not.toContain('ignored.ts');
+  });
+
+  it('getChangedFiles includes an untracked new file even with no tracked diff (the false-green bug)', () => {
+    const repo = makeTempRepo();
+    // The sole change is a net-new file; nothing is git-added or committed.
+    writeFileSync(path.join(repo, 'cockpit-ui.tsx'), 'export const C = () => null;\n', 'utf-8');
+    expect(getChangedFiles(repo)).toContain('cockpit-ui.tsx');
+  });
+
+  it('getChangedFiles unions a tracked modification with an untracked new file', () => {
+    const repo = makeTempRepo();
+    // Tracked modification, committed → a second commit so the HEAD~1 diff path
+    // (used when no origin/staging|main exists) reports baseline.ts.
+    writeFileSync(path.join(repo, 'baseline.ts'), 'export const baseline = 2;\n', 'utf-8');
+    git(repo, 'commit', '-am', 'modify baseline');
+    // Untracked new file created after the commit.
+    writeFileSync(path.join(repo, 'added.ts'), 'export const a = 1;\n', 'utf-8');
+    const changed = getChangedFiles(repo);
+    expect(changed).toContain('baseline.ts'); // tracked (HEAD~1 diff)
+    expect(changed).toContain('added.ts'); // untracked
   });
 });
