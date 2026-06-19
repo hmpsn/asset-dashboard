@@ -20,6 +20,7 @@
 4. **Act-on endpoint** = `POST /api/public/recommendations/:ws/:recId/act-on`; fix the stale `state-machines.ts` comment referencing `/respond` in the same commit it's first touched (Phase 2).
 5. **`OverviewTab` precedence:** when both `client-briefing-v2` and `strategy-the-issue` are ON, `strategy-the-issue` wins (Phase 2).
 6. **Base = `strategy-redesign-phase-4`** (the redesign integration line — it carries the full substrate incl. P4; `origin/staging` does NOT yet). Phase 0 ships as its own PR into that line (additive, flag OFF, byte-identical), then Phase 1 branches off it. See Branch / PR strategy.
+7. **`isCuratedForClient` OVERLAPS `isActiveRec` on `discussing`** (they are NOT complements). A `discussing` rec is both active (operator still working it) and curated (client sees it). Phase 1 Act-queue / "what the client sees" preview lanes must NOT assume `isActiveRec(rec) === !isCuratedForClient(rec)`. (Confirmed by the P0 adversarial review.)
 
 ## Branch / PR strategy
 

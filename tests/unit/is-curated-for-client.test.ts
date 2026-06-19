@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCuratedForClient } from '../../server/recommendations.js';
+import { isCuratedForClient, isActiveRec } from '../../server/recommendations.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
 
 const rec = (clientStatus: string, lifecycle: string = 'active'): Recommendation =>
@@ -22,8 +22,13 @@ describe('isCuratedForClient (the client-curated set)', () => {
     expect(isCuratedForClient(rec('sent', 'struck'))).toBe(false);
   });
 
-  it('is the inverse of the active set for sent recs', () => {
-    // a sent rec is curated-for-client but NOT active
+  it('relates to the active set correctly — sent is curated-not-active; discussing is BOTH (deliberate overlap, NOT complements)', () => {
+    // a sent rec leaves the active set but enters the curated set
+    expect(isActiveRec(rec('sent'))).toBe(false);
     expect(isCuratedForClient(rec('sent'))).toBe(true);
+    // a discussing rec is BOTH active (operator still working it) AND curated (client sees it) —
+    // the two predicates are NOT complements; never assume isActiveRec === !isCuratedForClient
+    expect(isActiveRec(rec('discussing'))).toBe(true);
+    expect(isCuratedForClient(rec('discussing'))).toBe(true);
   });
 });
