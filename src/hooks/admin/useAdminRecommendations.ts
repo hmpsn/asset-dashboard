@@ -39,3 +39,15 @@ export function useAdminUndismissRecommendation(workspaceId: string) {
     },
   });
 }
+
+/**
+ * Derives the ordered id list of a workspace's recommendations for predicate selection
+ * (Strategy v3 P3 — feeds useCurationSelection). Returns [] while loading. The cockpit
+ * narrows this to the active filter before passing it to the selection hook; this hook is
+ * intentionally filter-agnostic (it returns ALL rec ids in set order) so the cockpit owns
+ * the filter predicate in one place.
+ */
+export function useAdminRecommendationIds(workspaceId: string | undefined): string[] {
+  const { data } = useAdminRecommendationSet(workspaceId, { enabled: !!workspaceId });
+  return (data?.recommendations ?? []).map(r => r.id);
+}
