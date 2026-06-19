@@ -25,6 +25,8 @@ export const REC_TYPE_ACT_CATEGORY: Record<RecType, ActCategory> = {
   strategy: 'quick-win',
   // Local-visibility gaps are local content/landing-page work, not low-effort quick wins.
   local_visibility: 'content',
+  // Competitive gap analysis is research/technical work — no content deliverable, no quick win.
+  competitor: 'technical',
 };
 
 export function recActCategory(type: RecType): ActCategory {

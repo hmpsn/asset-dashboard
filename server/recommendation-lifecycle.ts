@@ -49,6 +49,7 @@ export const REC_POLICY_REGISTRY: RecPolicyRegistry = {
   cannibalization:  { sendChannel: 'deliverable', cascadeOnStrike: false, monetizable: false },
   local_visibility: { sendChannel: 'rec', cascadeOnStrike: false, monetizable: false },
   local_service_gap:{ sendChannel: 'rec', cascadeOnStrike: false, monetizable: false },
+  competitor:        { sendChannel: 'rec', cascadeOnStrike: false, monetizable: false },
 };
 
 /** Run a lifecycle mutation transactionally: re-read inside the txn, mutate the matched rec,

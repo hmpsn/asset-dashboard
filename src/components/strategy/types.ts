@@ -64,24 +64,6 @@ export interface StrategyQuickWin {
   roiScore?: number;
 }
 
-/**
- * One actionable row in the Act band's OpportunitiesList. Discriminated by `kind`:
- * - 'quick_win'   → an AI-suggested page action (from strategy.quickWins)
- * - 'low_hanging' → a page ranking #4–20 with impressions (from metrics.lowHangingFruit)
- * Both carry a pagePath so a per-row Fix CTA can deep-link into Page Intelligence.
- */
-export type OpportunityRow =
-  | { kind: 'quick_win'; pagePath: string; action: string; estimatedImpact: string; rationale: string; roiScore?: number }
-  | {
-      kind: 'low_hanging';
-      pagePath: string;
-      pageTitle: string;
-      primaryKeyword: string;
-      currentPosition?: number;
-      impressions?: number;
-      clicks?: number;
-      volume?: number;
-    };
 
 // ── Leaf component prop contracts (pre-committed; leaves import from here) ──
 
@@ -112,21 +94,9 @@ export interface ClientKeywordFeedbackProps {
   onDismissError: () => void;
   /**
    * When false, the "Requested by client" triage block is suppressed (declined-only log).
-   * Used by the decision-bands layout, which hoists requested keywords into <RequestedKeywordTriage>
-   * in the Decide band. Defaults to true so the legacy (flag-off) combined card is unchanged.
+   * Defaults to true so the combined card is unchanged.
    */
   showRequested?: boolean;
-}
-
-export interface DecisionQueueProps {
-  workspaceId: string;
-}
-
-/** Act band: merged Quick Wins + Low-Hanging Fruit with per-row Fix CTAs. */
-export interface OpportunitiesListProps {
-  quickWins: StrategyQuickWin[];
-  lowHangingFruit: PageKeywordMap[];
-  workspaceId: string;
 }
 
 /** Act band: top decaying pages (content_decay) with Refresh-brief / Review-page CTAs. */
@@ -145,13 +115,6 @@ export interface CannibalizationTriageProps {
   workspaceId: string;
 }
 
-export interface RequestedKeywordTriageProps {
-  requested: AdminKeywordFeedbackListRow[];
-  addPending: boolean;
-  addError: string | null;
-  onAdd: (keyword: string) => void;
-  onDismissError: () => void;
-}
 
 export interface StrategySettingsProps {
   workspaceId: string;

@@ -4,7 +4,7 @@ import { Target, FileText, HelpCircle } from 'lucide-react';
 import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
-import { useKeywordStrategy } from '../hooks/admin';
+import { useKeywordStrategy, useLocalSeo } from '../hooks/admin';
 import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendations';
 import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLifecycle';
 import { useContentDecay } from '../hooks/admin/useContentDecay';
@@ -21,7 +21,10 @@ import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
+import { StrategyConfigPanel } from './strategy/StrategyConfigPanel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
+import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
+import { adminPath } from '../routes';
 import {
   useStrategyMetrics,
   useStrategySettings,
@@ -44,7 +47,6 @@ import {
   KeywordOpportunities,
   StrategyHowItWorks,
 } from './strategy';
-import { adminPath } from '../routes';
 
 // Strategy v2 interior tabs (command-center layout). Overview = Orient + Act + reference;
 // Content = the content "money page"; Rankings = position distribution + movements;
@@ -123,6 +125,18 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // workspaceId.
   const managedSetFlag = useFeatureFlag('strategy-keywords-managed-set');
   const managedSetEnabled = commandCenterEnabled && managedSetFlag;
+  // P4 Lane C — competitor send. Doubly gated: requires both flags ON (same composition rule as
+  // managedSetEnabled above). Called unconditionally (Rules of Hooks).
+  const competitorSendFlag = useFeatureFlag('strategy-competitor-send');
+  const competitorSendEnabled = commandCenterEnabled && competitorSendFlag;
+  // P4 Lane B — local market label + setup drawer. Called unconditionally (Rules of Hooks).
+  // flag-ON: passes localMarketLabel + onOpenLocalSeoSetup to StrategyConfigPanel so the
+  // collapsed summary shows the active market and the config buttons are reachable.
+  // flag-OFF: hook still runs (Rules of Hooks), but localSeoSetupOpen state is never set
+  // and LocalSeoMarketSetupDrawer is not rendered (commandCenterEnabled gate below).
+  const localSeo = useLocalSeo(workspaceId);
+  const [localSeoSetupOpen, setLocalSeoSetupOpen] = useState(false);
+  const primaryMarket = localSeo.data?.markets?.find((m) => m.status === 'active');
   const {
     managedKeywordSet,
     addStrategyKeyword,
@@ -260,13 +274,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ? <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
     : null;
 
-  const localSeoEl = (
+  // flag-OFF only: LocalSeoVisibilityPanel (results) rendered outside tabs (today's behaviour,
+  // byte-identical). flag-ON (P4 Lane B): Local SEO results de-dup to KeywordHub (mode='keywords')
+  // and local market config moves into StrategyConfigPanel — so localSeoEl is null here when ON.
+  const localSeoEl = !commandCenterEnabled ? (
     <LocalSeoVisibilityPanel
       workspaceId={workspaceId}
       mode="strategy"
       onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
     />
-  );
+  ) : null;
 
   const feedbackNudgeEl = metrics.feedbackNewerThanStrategy ? (
     <StrategyFeedbackNudge
@@ -275,7 +292,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     />
   ) : null;
 
-  const settingsEl = (
+  // flag-OFF only: settingsEl rendered outside tabs (today's behaviour, byte-identical).
+  // flag-ON: settings are consolidated into StrategyConfigPanel at the bottom of the Overview tab.
+  const settingsEl = !commandCenterEnabled ? (
     <StrategySettings
       workspaceId={workspaceId}
       isAuxLoading={isAuxLoading}
@@ -296,7 +315,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       discoverError={settings.discoverError}
       onDiscoverCompetitors={settings.discoverCompetitors}
     />
-  );
+  ) : null;
 
   const intelligenceSignalsEl = <IntelligenceSignals workspaceId={workspaceId} />;
 
@@ -472,12 +491,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {interiorTab === 'overview' && (
             commandCenterEnabled ? (
               // ── flag-ON: decision-pipeline IA (graft 3) ──
-              // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → IntelligenceSignals.
+              // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → StrategyConfigPanel.
               // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).
               // CannibalizationTriage used (actionable) instead of passive CannibalizationAlert.
               // SiteTargetKeywords + KeywordOpportunities + clientFeedback moved to the "Keywords & Rankings"
-              // tab (P2 Lane A). IntelligenceSignals stays on Overview until P4 signal-fold owns it.
+              // tab (P2 Lane A). IntelligenceSignals removed (P4 Lane A folds signals into cockpit recs).
               // StrategyHowItWorks demoted to ? tooltip in PageHeader; NOT rendered inline here.
+              // StrategyConfigPanel replaces the outside-tabs settingsEl + localSeoEl (P4 Lane B).
               <div className="space-y-8">
                 {feedbackNudgeEl}
                 {realLeaves.stalenessNudges}
@@ -491,7 +511,29 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   </>
                 )}
                 {realLeaves.cannibalization}
-                {intelligenceSignalsEl}
+                <StrategyConfigPanel
+                  workspaceId={workspaceId}
+                  isAuxLoading={isAuxLoading}
+                  settingsOpen={settings.settingsOpen}
+                  setSettingsOpen={settings.setSettingsOpen}
+                  seoDataAvailable={settings.seoDataAvailable}
+                  seoDataMode={settings.seoDataMode}
+                  setSeoDataMode={settings.setSeoDataMode}
+                  maxPages={settings.maxPages}
+                  setMaxPages={settings.setMaxPages}
+                  competitors={settings.competitors}
+                  setCompetitors={settings.setCompetitors}
+                  businessContext={settings.businessContext}
+                  setBusinessContext={settings.setBusinessContext}
+                  contextOpen={settings.contextOpen}
+                  setContextOpen={settings.setContextOpen}
+                  discoveringCompetitors={settings.discoveringCompetitors}
+                  discoverError={settings.discoverError}
+                  onDiscoverCompetitors={settings.discoverCompetitors}
+                  providerName={settings.selectedSeoDataProvider === 'dataforseo' ? 'DataForSEO' : settings.selectedSeoDataProvider}
+                  localMarketLabel={primaryMarket?.label}
+                  onOpenLocalSeoSetup={() => setLocalSeoSetupOpen(true)}
+                />
               </div>
             ) : (
               // ── flag-OFF: today's render order — byte-identical ──
@@ -610,9 +652,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               seoDataAvailable={settings.seoDataAvailable}
               keywordGaps={strategy?.keywordGaps || []}
               navigate={navigate}
+              commandCenterEnabled={commandCenterEnabled}
+              competitorSendEnabled={competitorSendEnabled}
             />
           )}
         </>
+      )}
+      {/* P4 Lane B — local market setup drawer, only mounted when flag is ON and data is available.
+          Controlled by localSeoSetupOpen; opened via onOpenLocalSeoSetup passed to StrategyConfigPanel. */}
+      {commandCenterEnabled && localSeo.data && (
+        <LocalSeoMarketSetupDrawer
+          workspaceId={workspaceId}
+          data={localSeo.data}
+          open={localSeoSetupOpen}
+          onClose={() => setLocalSeoSetupOpen(false)}
+        />
       )}
     </div>
   );

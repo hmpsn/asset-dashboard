@@ -129,6 +129,21 @@ the exemption check sees the correct `clientStatus`.
 Exit-gate test: `tests/integration/recommendation-lifecycle.test.ts`
 (the `strike-never-completed — auto-resolve exemption survives a real regen` describe block).
 
+### Signal-sourced recs are also exempt (separate guard)
+
+In addition to the `clientStatus` exemption above, recs whose source category is `'signal'`
+(merge key prefixed `signal:`, minted by `mintSignalRecs` under the `strategy-signal-fold` flag)
+are exempt from the auto-resolve sweep via a **separate guard immediately before the auto-resolve
+loop** in `generateRecommendations`. The reason is structural, not status-based: `mintSignalRecs`
+runs once per generation *after* the merge/auto-resolve block, so a `signal:<insightId>` key is
+**never** added to `newSources`. For a signal rec, "absent from `newSources`" is therefore always a
+false positive — without the guard every un-actioned folded signal would be rewritten to
+`completed` ("✓ Auto-resolved") on the next daily/on-mutation recompute, silently erasing the feed.
+The guard retains the existing signal rec unchanged so the post-loop mint dedups against it (no
+duplicate, no false completion). **Do not remove or bypass this guard** when refactoring the
+auto-resolve loop. Exit-gate test: `server/__tests__/signal-fold-carry-over.test.ts` (the
+status-continuity assertion: a plain folded signal rec stays `pending` across ≥2 regens).
+
 ## Public read = allow-list
 
 `stripEmvFromPublicRecs(recs)` in `server/routes/recommendations.ts` is an explicit allow-list of
@@ -157,7 +172,7 @@ Exit-gate tests: `tests/integration/recommendations-public-allowlist.test.ts`
 
 An unlisted `RecType` cannot be curated until a policy entry is registered here.
 
-Current registry (as built, Phase 1):
+Current registry (Phase 1, + `competitor` added in P4 / PR #1286):
 
 | RecType | sendChannel | cascadeOnStrike | monetizable |
 |---|---|---|---|
@@ -175,6 +190,11 @@ Current registry (as built, Phase 1):
 | `cannibalization` | **`deliverable`** | false | false |
 | `local_visibility` | `rec` | false | false |
 | `local_service_gap` | `rec` | false | false |
+| `competitor` | `rec` | false | false |
+
+`competitor` recs are minted on demand from a competitive gap by `POST /:ws/competitor-rec`
+(`CompetitiveIntel` "Send to client", flag `strategy-competitor-send`); the generation engine emits
+none, and `signalToRecType` never maps to `competitor`.
 
 ## Deferred items (do not implement early)
 

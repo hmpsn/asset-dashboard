@@ -33,9 +33,8 @@ export function useStrategySettings(
   strategy: StrategyShape | null,
   workspaceId: string,
   /**
-   * Collapse the Settings panel initially. Defaults to false (open) to preserve the legacy
-   * flag-off layout byte-identically; the decision-bands layout passes true so Settings starts
-   * collapsed in the Decide band.
+   * Collapse the Settings panel initially. Defaults to false (open) to preserve legacy
+   * byte-identical behavior; pass true to start Settings collapsed on initial render.
    */
   collapsedByDefault = false,
 ) {
@@ -80,10 +79,10 @@ export function useStrategySettings(
   // background refetch (new strategy object identity) never clobbers an in-session user edit.
   const maxPagesHydratedRef = useRef(false);
   const seoDataModeHydratedRef = useRef(false);
-  // settingsOpen is initialized once from collapsedByDefault (= the decision-bands flag), but that flag
-  // is async (React Query): on a cold cache it's `false` on first render, so the bands-layout Decide-band
-  // panel would mount EXPANDED. Force-collapse ONCE when the flag resolves on; never re-collapse after,
-  // so a manual toggle sticks. Flag-OFF (collapsedByDefault stays false) never fires this → legacy parity.
+  // settingsOpen is initialized once from collapsedByDefault, but the value may arrive async
+  // (React Query): on a cold cache it's `false` on first render, so the panel would mount EXPANDED.
+  // Force-collapse ONCE when collapsedByDefault resolves to true; never re-collapse after, so a
+  // manual toggle sticks. When collapsedByDefault stays false this ref never fires → parity.
   const collapsedAppliedRef = useRef(false);
 
   // Sync business context + competitors from loaded strategy

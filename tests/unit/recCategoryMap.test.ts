@@ -5,7 +5,7 @@ import type { RecType } from '../../shared/types/recommendations';
 const ALL_REC_TYPES: RecType[] = [
   'technical', 'content', 'content_refresh', 'schema', 'metadata', 'performance',
   'accessibility', 'strategy', 'aeo', 'keyword_gap', 'topic_cluster', 'cannibalization',
-  'local_visibility', 'local_service_gap',
+  'local_visibility', 'local_service_gap', 'competitor',
 ];
 
 describe('recCategoryMap', () => {

@@ -27,6 +27,7 @@ export const REC_TYPE_ADMIN_TAB: Record<RecType, Page> = {
   cannibalization: 'seo-audit',
   local_visibility: 'seo-strategy',
   local_service_gap: 'seo-strategy',
+  competitor: 'seo-strategy',
 };
 
 /** The fixContext payload an admin fix-CTA carries (a subset of App.tsx FixContext). */
