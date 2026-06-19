@@ -154,6 +154,10 @@ export type ActivityType =
   | 'rec_approved'         // CLIENT-VISIBLE: client approved a sent rec
   | 'rec_struck'           // admin-only: operator permanently suppressed a rec
   | 'rec_throttled'        // admin-only: operator throttled a rec for 7/30/90 days
+  // Strategy v3 P3 — admin-only staleness nudge (a sent rec waiting >14d with no client
+  // response, or superseded by a newer rec). Internal curation hygiene; deliberately NOT
+  // in CLIENT_VISIBLE_TYPES — a stale-rec nudge must never surface in the client activity feed.
+  | 'rec_nudge_stale'      // admin-only: a sent rec is stale (waiting >14d) or superseded
   | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
@@ -245,6 +249,9 @@ const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
     'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
   ),
+  selectByWorkspaceAndType: db.prepare(
+    'SELECT * FROM activity_log WHERE workspace_id = ? AND type = ? ORDER BY created_at DESC LIMIT ?',
+  ),
   selectAll: db.prepare(
     'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
   ),
@@ -324,6 +331,17 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   } else {
     rows = stmts().selectAll.all(limit) as ActivityRow[];
   }
+  return rows.map(rowToEntry);
+}
+
+/**
+ * List the most-recent activity entries of a SINGLE type for a workspace.
+ * Unlike listActivity (which caps the most-recent N rows across ALL types), the
+ * LIMIT here applies only to rows of `type`, so a type-scoped dedup read cannot
+ * be pushed past the cap by unrelated high-volume activity (portal_session, etc.).
+ */
+export function listActivityByType(workspaceId: string, type: ActivityType, limit = 50): ActivityEntry[] {
+  const rows = stmts().selectByWorkspaceAndType.all(workspaceId, type, limit) as ActivityRow[];
   return rows.map(rowToEntry);
 }
 

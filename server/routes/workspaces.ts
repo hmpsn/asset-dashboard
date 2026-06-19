@@ -34,6 +34,7 @@ import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listClientSignals } from '../client-signals-store.js';
 import { summarizeClientActions } from '../client-actions.js';
+import { loadRecommendations } from '../recommendations.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -180,6 +181,19 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActionChangesRequested = actionSummary.changesRequested;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
+    // Strategy v3 P3 — client responses to sent recs (counts for the NotificationBell entry).
+    let recApproved = 0;
+    let recDeclined = 0;
+    let recDiscussing = 0;
+    try {
+      const recSet = loadRecommendations(ws.id);
+      for (const r of recSet?.recommendations ?? []) {
+        if (r.clientStatus === 'approved') recApproved++;
+        else if (r.clientStatus === 'declined') recDeclined++;
+        else if (r.clientStatus === 'discussing') recDiscussing++;
+      }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
+
     const { isTrial, trialDaysRemaining } = computeTrialState(ws);
 
     return {
@@ -216,6 +230,11 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActions: {
         approved: clientActionApproved,
         changesRequested: clientActionChangesRequested,
+      },
+      recResponses: {
+        approved: recApproved,
+        declined: recDeclined,
+        discussing: recDiscussing,
       },
       pageStates,
     };

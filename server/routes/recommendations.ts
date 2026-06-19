@@ -5,6 +5,8 @@ import { Router } from 'express';
 
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
+import db from '../db/index.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
@@ -401,6 +403,105 @@ router.patch('/api/recommendations/:workspaceId/:recId/undismiss', requireWorksp
 // swept to 'completed' and read as "✓ done" to the client (the trust-critical graft).
 // They are admin-only (no /api/public/ prefix → covered by the global APP_PASSWORD HMAC
 // gate; requireWorkspaceAccess passes through for HMAC callers).
+
+// ── Strategy v3 P3 — bulk lifecycle (Send / Throttle / Strike over N recs) ──────
+// Applies the per-rec single-writer (sendRecommendation/throttleRecommendation/
+// strikeRecommendation) to all N recs in ONE db.transaction() so the batch is atomic
+// (spec §4.4). The single-writer functions DO NOT broadcast or log activity (that is the
+// route's job, like the per-row routes above) — so this route logs one rec_* activity per
+// successfully-mutated rec and fires ONE RECOMMENDATIONS_UPDATED broadcast after the txn
+// (not N). InvalidTransitionError on an individual rec (e.g. already approved/declined) is
+// swallowed per-rec inside the txn so one illegal rec does not roll back the whole batch —
+// it is simply not counted in `modified`. Bulk Strike still arm-then-confirms (confirmStrike).
+const bulkRecActionSchema = z.object({
+  recIds: z.array(z.string()).min(1).max(200),
+  action: z.enum(['send', 'throttle', 'strike']),
+  throttleDays: z.union([z.literal(7), z.literal(30), z.literal(90)]).optional(),
+  note: z.string().max(2000).optional(),
+  confirmStrike: z.boolean().optional(),
+});
+
+router.post(
+  '/api/recommendations/:workspaceId/bulk',
+  requireWorkspaceAccess('workspaceId'),
+  validate(bulkRecActionSchema),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    const { recIds, action, throttleDays, note, confirmStrike } = req.body as z.infer<typeof bulkRecActionSchema>;
+
+    // Bulk Strike still arm-then-confirms (spec §4.4) — refuse without explicit confirmation.
+    if (action === 'strike' && !confirmStrike) {
+      return res.status(400).json({ error: 'Bulk strike requires confirmStrike' });
+    }
+    if (action === 'throttle' && !throttleDays) {
+      return res.status(400).json({ error: 'Throttle requires throttleDays (7, 30, or 90)' });
+    }
+
+    // ONE transaction over all N (spec §4.4). The single-writer re-reads the set inside its own
+    // txn per rec; better-sqlite3 nests these into this outer txn so the batch commits atomically.
+    // Collect mutated recs so activity logging happens AFTER commit (no logs on a rolled-back batch).
+    const mutated: Recommendation[] = [];
+    const apply = db.transaction(() => {
+      for (const recId of recIds) {
+        let rec: Recommendation | null = null;
+        try {
+          if (action === 'send') rec = sendRecommendation(workspaceId, recId);
+          else if (action === 'throttle') rec = throttleRecommendation(workspaceId, recId, throttleDays!);
+          else rec = strikeRecommendation(workspaceId, recId);
+        } catch (err) {
+          // An illegal edge for one rec (e.g. already approved/declined on Send) must not roll
+          // back the whole batch — skip it. Non-transition errors still propagate (real failures).
+          if (err instanceof InvalidTransitionError) continue;
+          throw err;
+        }
+        if (rec) mutated.push(rec);
+      }
+    });
+    apply();
+
+    // Post-commit side effects (one broadcast, per-rec activity) — mirror the per-row routes.
+    for (const rec of mutated) {
+      if (action === 'send') {
+        // Bulk note is intentionally replicated per-rec: each rec owns its own discussion thread,
+        // so the shared rationale must land on each (a 30-rec send with one note → 30 entries).
+        if (note) addRecDiscussionEntry(workspaceId, rec.id, 'strategist', note);
+        addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
+      } else if (action === 'throttle') {
+        addActivity(workspaceId, 'rec_throttled', `Recommendation throttled ${throttleDays}d: ${rec.title}`, rec.description);
+      } else {
+        addActivity(workspaceId, 'rec_struck', `Recommendation struck: ${rec.title}`, rec.description);
+      }
+    }
+    if (mutated.length > 0) {
+      invalidateIntelligenceCache(workspaceId);
+      broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { action, count: mutated.length, reason: 'bulk' });
+    }
+
+    // Doorbell email (spec §7.1) — bulk Send is the canonical "recs are ready in your hub"
+    // scenario, so fire ONE curated_recs_sent for the WHOLE batch (recCount: mutated.length),
+    // never one-per-rec. Mirrors the per-row /send route's call signature + URL construction.
+    // Wrapped so a transient mail failure never fails an already-committed bulk transition.
+    if (action === 'send' && mutated.length > 0) {
+      try {
+        const ws = getWorkspace(workspaceId);
+        if (ws?.clientEmail) {
+          const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+          notifyClientCuratedRecsSent({
+            clientEmail: ws.clientEmail,
+            workspaceName: ws.name,
+            workspaceId,
+            recCount: mutated.length,
+            dashboardUrl: buildClientPortalUrl(origin, workspaceId),
+          });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId }, 'Failed to send curated_recs_sent doorbell email for bulk send');
+      }
+    }
+
+    return res.json({ modified: mutated.length });
+  },
+);
 
 // Send a curated rec to the client (clientStatus: curated/system → sent; stamps sentAt).
 // Fires the curated_recs_sent doorbell email (spec §7.1). An optional note-on-send is
