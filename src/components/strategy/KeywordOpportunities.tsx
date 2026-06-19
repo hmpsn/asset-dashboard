@@ -1,10 +1,13 @@
 import { Sparkles, ArrowUpRight } from 'lucide-react';
-import { Badge, SectionCard, Icon, IconButton } from '../ui';
+import { Badge, Button, SectionCard, Icon, IconButton } from '../ui';
 import { adminPath } from '../../routes';
 import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
+import { useShowMore } from '../../hooks/useShowMore';
 import type { KeywordOpportunitiesProps } from './types';
 
-export function KeywordOpportunities({ opportunities, workspaceId, navigate }: KeywordOpportunitiesProps) {
+export function KeywordOpportunities({ opportunities, workspaceId, navigate, maxVisible }: KeywordOpportunitiesProps) {
+  const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(opportunities, maxVisible);
+
   if (opportunities.length === 0) return null;
 
   const showExplore = !!(workspaceId && navigate);
@@ -18,7 +21,7 @@ export function KeywordOpportunities({ opportunities, workspaceId, navigate }: K
         These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
       </p>
       <div className="space-y-1.5">
-        {opportunities.map((opp: string, i: number) => {
+        {visible.map((opp: string, i: number) => {
           if (!showExplore) {
             return (
               <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
@@ -44,6 +47,17 @@ export function KeywordOpportunities({ opportunities, workspaceId, navigate }: K
           );
         })}
       </div>
+      {canExpand && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggle}
+          aria-expanded={expanded}
+          className="mt-3 w-full text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        >
+          {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+        </Button>
+      )}
     </SectionCard>
   );
 }

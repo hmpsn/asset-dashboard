@@ -3,6 +3,7 @@ import { Badge, Button, Icon, SectionCard, StatusBadge, type BadgeTone } from '.
 import { FileText, Sparkles } from 'lucide-react';
 import { ContentGapRow } from '../shared/ContentGapRow';
 import { adminPath } from '../../routes';
+import { useShowMore } from '../../hooks/useShowMore';
 
 interface ContentGap {
   topic: string;
@@ -37,9 +38,12 @@ export interface ContentGapsProps {
   contentGaps: ContentGap[];
   workspaceId?: string;
   intentColor: (intent?: string) => string;
+  /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
+   *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
+  maxVisible?: number;
 }
 
-export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
+export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGapsProps) {
   const navigate = useNavigate();
 
   // Sort by opportunity score (server-computed), falling back to volume then priority
@@ -52,6 +56,8 @@ export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
     return prioW(b.priority) - prioW(a.priority);
   });
 
+  const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(sorted, maxVisible);
+
   if (sorted.length === 0) return null;
 
   return (
@@ -61,7 +67,7 @@ export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
     >
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
-        {sorted.map((gap, i) => {
+        {visible.map((gap, i) => {
           // Header-right widgets after the shared intent badge: priority (StatusBadge) + page-type (admin chrome).
           const headerRight = (
             <>
@@ -104,6 +110,17 @@ export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
           );
         })}
       </div>
+      {canExpand && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggle}
+          aria-expanded={expanded}
+          className="mt-3 w-full text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        >
+          {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+        </Button>
+      )}
     </SectionCard>
   );
 }

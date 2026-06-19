@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { Target, Loader2, Check, Plus, ArrowUpRight } from 'lucide-react';
-import { Badge, SectionCard, Icon, IconButton, InlineBanner } from '../ui';
+import { Badge, Button, SectionCard, Icon, IconButton, InlineBanner } from '../ui';
 import { kdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
 import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
 import { adminPath } from '../../routes';
+import { useShowMore } from '../../hooks/useShowMore';
 import type { SiteTargetKeywordsProps } from './types';
 
 export function SiteTargetKeywords({
@@ -15,8 +16,10 @@ export function SiteTargetKeywords({
   trackingPending,
   trackingErrors,
   onTrack,
+  maxVisible,
 }: SiteTargetKeywordsProps) {
   const navigate = useNavigate();
+  const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(siteKeywords, maxVisible);
 
   return (
     <SectionCard
@@ -24,7 +27,7 @@ export function SiteTargetKeywords({
       titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
     >
       <div className="space-y-1">
-        {siteKeywords.map((kw: string, i: number) => {
+        {visible.map((kw: string, i: number) => {
           const key = keywordTrackingKey(kw);
           const metrics = siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => keywordTrackingKey(m.keyword) === key);
           const tracked = trackedKeywords.has(key);
@@ -69,6 +72,17 @@ export function SiteTargetKeywords({
           );
         })}
       </div>
+      {canExpand && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggle}
+          aria-expanded={expanded}
+          className="mt-3 w-full text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        >
+          {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+        </Button>
+      )}
     </SectionCard>
   );
 }
