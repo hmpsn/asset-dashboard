@@ -667,6 +667,18 @@ export function isActiveRec(rec: Recommendation, now: number = Date.now()): bool
 }
 
 /**
+ * The Issue — the client-curated set (spec §16 / §7). A rec is "curated for the client" iff the
+ * operator has sent it and it is not struck: clientStatus ∈ {sent, approved, discussing}. This is
+ * the INVERSE membership to isActiveRec (which EXCLUDES sent/approved) and powers the client feed
+ * projection, the admin "what the client sees" preview, and the loop strip. `declined` is NOT
+ * curated (the client said no). Imported by every reader of the curated set — never re-implement.
+ */
+export function isCuratedForClient(rec: Recommendation): boolean {
+  if (rec.lifecycle === 'struck') return false;
+  return rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'discussing';
+}
+
+/**
  * Compute the RecommendationSet summary from a rec list. Shared by the full
  * regen (generateRecommendations) and the in-place resolver
  * (resolveRecommendationsForChange) so client-facing headline numbers never
