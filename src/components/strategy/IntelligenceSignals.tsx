@@ -46,7 +46,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     <div className="flex items-center gap-2">
       {data?.computedAt && (
         <span className="t-caption-sm text-[var(--brand-text-muted)]">
-          Computed {timeAgo(data.computedAt, { style: 'long' })} ago
+          Computed {timeAgo(data.computedAt, { style: 'long' })}
         </span>
       )}
       <Button variant="link" size="sm" icon={RefreshCw} loading={recompute.isPending} onClick={() => recompute.mutate()}>

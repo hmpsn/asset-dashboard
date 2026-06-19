@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Target, FileText } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon } from './ui';
+import { Target, FileText, HelpCircle } from 'lucide-react';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { useKeywordStrategy } from '../hooks/admin';
@@ -17,6 +17,7 @@ import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './ui/CannibalizationAlert';
+import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
@@ -179,7 +180,30 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     />
   );
 
-  const headerEl = (
+  // flag-ON: a `?` icon button in the PageHeader actions area shows StrategyHowItWorks content
+  // as a Tooltip (the "About this page" affordance replaces the inline section).
+  // flag-OFF: plain PageHeader with no tooltip — byte-identical to today's render.
+  const howItWorksTooltipContent = commandCenterEnabled && isRealStrategy ? (
+    <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />
+  ) : null;
+
+  const headerEl = commandCenterEnabled ? (
+    <PageHeader
+      title="Keyword Strategy"
+      subtitle={headerSubtitle}
+      icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      actions={
+        <div className="flex items-center gap-2">
+          {howItWorksTooltipContent && (
+            <Tooltip content={howItWorksTooltipContent} placement="bottom" contentClassName="max-w-sm">
+              <IconButton icon={HelpCircle} label="About this page" variant="ghost" size="sm" />
+            </Tooltip>
+          )}
+          {headerActions}
+        </div>
+      }
+    />
+  ) : (
     <PageHeader
       title="Keyword Strategy"
       subtitle={headerSubtitle}
@@ -333,8 +357,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       ? <TopicClusters clusters={strategy.topicClusters} />
       : null,
     decayingPages: <DecayingPagesCard workspaceId={workspaceId} />,
+    // flag-ON: actionable CannibalizationTriage (send-to-client, mark-resolved, fix-in-editor).
+    // flag-OFF: passive CannibalizationAlert — byte-identical to today's render.
     cannibalization: strategy.cannibalization && strategy.cannibalization.length > 0
-      ? <CannibalizationAlert entries={strategy.cannibalization} />
+      ? (commandCenterEnabled
+          ? <CannibalizationTriage entries={strategy.cannibalization} workspaceId={workspaceId} />
+          : <CannibalizationAlert entries={strategy.cannibalization} />)
       : null,
     strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
     siteKeywords: (
@@ -399,38 +427,89 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <>
           <TabBar tabs={STRATEGY_INTERIOR_TABS} active={interiorTab} onChange={handleInteriorTabChange} />
           {interiorTab === 'overview' && (
-            <div className="space-y-8">
-              {feedbackNudgeEl}
-              {realLeaves.stalenessNudges}
-              {orientEl}
-              {(commandCenterEnabled ? cockpitEl : actQueueEl) ?? (
-                <>
-                  {realLeaves.quickWins}
-                  {realLeaves.lhf}
-                  {realLeaves.keywordGaps}
-                </>
-              )}
-              {/* ── Reference & Analysis ── */}
-              <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
-                <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
-                <div className="flex-1 border-t border-[var(--brand-border)]" />
+            commandCenterEnabled ? (
+              // ── flag-ON: decision-pipeline IA (graft 3) ──
+              // Order: nudges → Orient → What Changed (promoted) → cockpit → reference leaves.
+              // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).
+              // CannibalizationTriage used (actionable) instead of passive CannibalizationAlert.
+              // maxVisible={5} passed to SiteTargetKeywords + KeywordOpportunities (Overview scannable
+              // leaves). ContentGaps + TopicClusters live in the Content tab — capped there below.
+              // StrategyHowItWorks demoted to ? tooltip in PageHeader; NOT rendered inline here.
+              <div className="space-y-8">
+                {feedbackNudgeEl}
+                {realLeaves.stalenessNudges}
+                {orientEl}
+                {realLeaves.strategyDiff}
+                {cockpitEl ?? (
+                  <>
+                    {realLeaves.quickWins}
+                    {realLeaves.lhf}
+                    {realLeaves.keywordGaps}
+                  </>
+                )}
+                {realLeaves.cannibalization}
+                <SiteTargetKeywords
+                  workspaceId={workspaceId}
+                  siteKeywords={strategy?.siteKeywords ?? []}
+                  siteKeywordMetrics={strategy?.siteKeywordMetrics}
+                  trackedKeywords={tracking.trackedKeywords}
+                  trackingPending={tracking.trackingPending}
+                  trackingErrors={tracking.trackingErrors}
+                  onTrack={tracking.trackKeyword}
+                  maxVisible={5}
+                />
+                <KeywordOpportunities opportunities={strategy?.opportunities ?? []} maxVisible={5} />
+                {intelligenceSignalsEl}
               </div>
-              {realLeaves.cannibalization}
-              {realLeaves.strategyDiff}
-              {realLeaves.siteKeywords}
-              {realLeaves.opportunities}
-              {intelligenceSignalsEl}
-              {realLeaves.howItWorks}
-            </div>
+            ) : (
+              // ── flag-OFF: today's render order — byte-identical ──
+              <div className="space-y-8">
+                {feedbackNudgeEl}
+                {realLeaves.stalenessNudges}
+                {orientEl}
+                {actQueueEl ?? (
+                  <>
+                    {realLeaves.quickWins}
+                    {realLeaves.lhf}
+                    {realLeaves.keywordGaps}
+                  </>
+                )}
+                {/* ── Reference & Analysis ── */}
+                <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
+                  <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
+                  <div className="flex-1 border-t border-[var(--brand-border)]" />
+                </div>
+                {realLeaves.cannibalization}
+                {realLeaves.strategyDiff}
+                {realLeaves.siteKeywords}
+                {realLeaves.opportunities}
+                {intelligenceSignalsEl}
+                {realLeaves.howItWorks}
+              </div>
+            )
           )}
           {interiorTab === 'content' && (
             <div className="space-y-8">
               {hasContentTabContent ? (
                 <>
                   <p className="t-caption text-[var(--brand-text-muted)]">Reference view — actionable content items also surface in the Act queue on Overview.</p>
-                  {realLeaves.contentGaps}
-                  {realLeaves.topicClusters}
-                  {realLeaves.decayingPages}
+                  {commandCenterEnabled ? (
+                    // flag-ON: maxVisible={5} caps both scannable leaves.
+                    <>
+                      <ContentGaps contentGaps={strategy?.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} maxVisible={5} />
+                      {strategy?.topicClusters && strategy.topicClusters.length > 0 && (
+                        <TopicClusters clusters={strategy.topicClusters} maxVisible={5} />
+                      )}
+                      {realLeaves.decayingPages}
+                    </>
+                  ) : (
+                    // flag-OFF: byte-identical to today
+                    <>
+                      {realLeaves.contentGaps}
+                      {realLeaves.topicClusters}
+                      {realLeaves.decayingPages}
+                    </>
+                  )}
                 </>
               ) : (
                 <EmptyState

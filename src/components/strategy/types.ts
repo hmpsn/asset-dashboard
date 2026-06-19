@@ -211,6 +211,9 @@ export interface SiteTargetKeywordsProps {
   trackingPending: Set<string>;
   trackingErrors: Map<string, string>;
   onTrack: (kw: string) => void;
+  /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
+   *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
+  maxVisible?: number;
 }
 
 export interface KeywordOpportunitiesProps {
@@ -222,6 +225,9 @@ export interface KeywordOpportunitiesProps {
    */
   workspaceId?: string;
   navigate?: (path: string) => void;
+  /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
+   *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
+  maxVisible?: number;
 }
 
 export interface StrategyHowItWorksProps {

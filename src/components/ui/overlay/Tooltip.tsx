@@ -33,6 +33,8 @@ interface TooltipProps {
   placement?: TooltipPlacement;
   /** Delay (ms) before showing on hover. Focus shows instantly. Defaults to 500. */
   delay?: number;
+  /** Optional extra classes applied to the tooltip content node. Use to override max-w-xs for wider content (e.g. contentClassName="max-w-sm"). */
+  contentClassName?: string;
   children: ReactElement;
 }
 
@@ -84,6 +86,7 @@ export function Tooltip({
   content,
   placement = 'top',
   delay = 500,
+  contentClassName,
   children,
 }: TooltipProps): React.ReactElement {
   const [visible, setVisible] = useState(false);
@@ -194,7 +197,7 @@ export function Tooltip({
               zIndex: 'var(--z-tooltip)' as unknown as number,
               pointerEvents: 'none',
             }}
-            className={cn('bg-[var(--surface-1)] text-[var(--brand-text-bright)] text-xs px-2 py-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] shadow-lg max-w-xs', motionClass)}
+            className={cn('bg-[var(--surface-1)] text-[var(--brand-text-bright)] text-xs px-2 py-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] shadow-lg max-w-xs', motionClass, contentClassName)}
           >
             {content}
           </div>,

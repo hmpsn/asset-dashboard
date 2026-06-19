@@ -1,5 +1,6 @@
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 import { Layers, BarChart3, AlertTriangle } from 'lucide-react';
+import { useShowMore } from '../../hooks/useShowMore';
 
 interface TopicCluster {
   topic: string;
@@ -15,6 +16,9 @@ interface TopicCluster {
 
 export interface TopicClustersProps {
   clusters: TopicCluster[];
+  /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
+   *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
+  maxVisible?: number;
 }
 
 const coverageColor = (pct: number) =>
@@ -25,7 +29,12 @@ const coverageColor = (pct: number) =>
 const coverageBarColor = (pct: number) =>
   pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
 
-export function TopicClusters({ clusters }: TopicClustersProps) {
+export function TopicClusters({ clusters, maxVisible }: TopicClustersProps) {
+  // When maxVisible is absent: preserve original hard cap at 10 with no toggle (byte-identical).
+  // When maxVisible is provided: use useShowMore for the cap + toggle affordance.
+  const capped = maxVisible === undefined ? clusters.slice(0, 10) : clusters;
+  const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(capped, maxVisible);
+
   if (clusters.length === 0) return null;
 
   return (
@@ -37,7 +46,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
         Topic clusters ranked by coverage gap. Coverage includes ranked keywords plus mapped page/title matches; avg position only reflects ranked terms.
       </p>
       <div className="space-y-2">
-        {clusters.slice(0, 10).map((cluster, i) => (
+        {visible.map((cluster, i) => (
           <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
             <div className="flex items-center justify-between">
               <span className="t-body font-medium text-[var(--brand-text-bright)] capitalize">{cluster.topic}</span>
@@ -81,6 +90,17 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
           </div>
         ))}
       </div>
+      {canExpand && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggle}
+          aria-expanded={expanded}
+          className="mt-3 w-full text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        >
+          {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+        </Button>
+      )}
     </div>
   );
 }
