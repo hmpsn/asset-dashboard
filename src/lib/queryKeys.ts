@@ -120,6 +120,7 @@ export const queryKeys = {
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
+    strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
     recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
     /** Strategy v3 — discussion thread for a workspace's recs (admin cockpit Discuss filter). */
     recDiscussion: (wsId: string) => ['admin-rec-discussion', wsId] as const,

@@ -37,6 +37,8 @@
 
 > Every item is touched by ≥2 Phase-1 lanes. All additive; flag is OFF so behavior is unchanged. Gate: `npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts && npm run verify:feature-flags`.
 
+> **RE-SCOPE (2026-06-19, during execution):** Phase 0 freezes only the contracts Phase 1's parallel lanes actually share. Tasks **0.4 (`recommendation` deliverable type), 0.5 (content-request migration 140), and 0.7 (`ContentGapAudience += 'issue'`)** are used ONLY by Phase 2 (the loop + client surface), not Phase 1, and adding the deliverable type without its adapter (Phase 2) would break the adapter-coverage test. They MOVE to a **Phase 2 pre-commit batch**. Phase 0 = 0.1 flag ✓, 0.2 archetype ✓, 0.3 isCuratedForClient ✓, and 0.6 POV contracts (admin-only subset: `StrategyPov` type + `strategy-pov` op + `STRATEGY_POV_GENERATED` + `admin.strategyPov` query key; the `client.*` query keys move to Phase 2).
+
 ### Task 0.1: Register the `strategy-the-issue` feature flag
 
 **Files:**
