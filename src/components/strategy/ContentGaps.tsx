@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Icon, SectionCard, StatusBadge, type BadgeTone } from '../ui';
-import { FileText, Sparkles } from 'lucide-react';
+import { Check, FileText, Sparkles } from 'lucide-react';
 import { ContentGapRow } from '../shared/ContentGapRow';
 import { adminPath } from '../../routes';
 import { useShowMore } from '../../hooks/useShowMore';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useOutcomeActions, useRecordOutcomeAction } from '../../hooks/admin/useOutcomes';
 
 interface ContentGap {
   topic: string;
@@ -45,6 +47,19 @@ export interface ContentGapsProps {
 
 export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGapsProps) {
   const navigate = useNavigate();
+  const keepEnabled = useFeatureFlag('strategy-keywords-managed-set');
+
+  // Keep affordance: durable via tracked_actions (NOT a column on content_gaps — that table is
+  // delete-then-reinsert on regen). Filter to sourceType='content_gap' so other action types don't
+  // collide. Hooks must stay above any early-return (Rules of Hooks).
+  const { data: keptActions } = useOutcomeActions(workspaceId ?? '', 'content_gap_keep');
+  const keepMutation = useRecordOutcomeAction(workspaceId ?? '');
+  const keptKeys = new Set(
+    (keptActions ?? [])
+      .filter(a => a.sourceType === 'content_gap')
+      .map(a => a.sourceId)
+      .filter((id): id is string => id != null),
+  );
 
   // Sort by opportunity score (server-computed), falling back to volume then priority
   const sorted = [...contentGaps].sort((a, b) => {
@@ -77,11 +92,33 @@ export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGap
               )}
             </>
           );
-          // Admin nav-button footer (Draft Brief / Generate Brief).
+          // Admin nav-button footer (Draft Brief / Generate Brief / Keep).
+          // Brief pre-seed: both senders now carry the full computed context so the brief
+          // generator can reference rationale, competitor proof, volume, intent, question
+          // keywords, and SERP features without re-fetching from the strategy layer.
+          // Field-name divergence fix: the :86 seo-briefs sender previously used `pageName`
+          // but ContentBriefs reads `primaryKeyword` — both senders now use `primaryKeyword`.
+          const gapSourceId = `gap:${gap.targetKeyword}`;
+          const isKept = keptKeys.has(gapSourceId);
           const footer = workspaceId ? (
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <Button
-                onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
+                onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), {
+                  state: {
+                    fixContext: {
+                      targetRoute: 'content-pipeline',
+                      primaryKeyword: gap.targetKeyword,
+                      pageType: gap.suggestedPageType || undefined,
+                      autoGenerate: true,
+                      rationale: gap.rationale,
+                      competitorProof: gap.competitorProof,
+                      volume: gap.volume,
+                      intent: gap.intent,
+                      questionKeywords: gap.questionKeywords,
+                      serpFeatures: gap.serpFeatures,
+                    },
+                  },
+                })}
                 variant="ghost"
                 size="sm"
                 className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
@@ -89,13 +126,52 @@ export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGap
                 <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
               </Button>
               <Button
-                onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
+                onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), {
+                  state: {
+                    fixContext: {
+                      targetRoute: 'seo-briefs',
+                      primaryKeyword: gap.targetKeyword,
+                      pageType: gap.suggestedPageType || undefined,
+                      rationale: gap.rationale,
+                      competitorProof: gap.competitorProof,
+                      volume: gap.volume,
+                      intent: gap.intent,
+                      questionKeywords: gap.questionKeywords,
+                      serpFeatures: gap.serpFeatures,
+                    },
+                  },
+                })}
                 variant="ghost"
                 size="sm"
                 className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
               >
                 <Icon as={Sparkles} size="sm" className="text-teal-300" /> Generate Brief
               </Button>
+              {keepEnabled && (
+                <Button
+                  onClick={() => {
+                    if (!isKept) {
+                      keepMutation.mutate({
+                        actionType: 'content_gap_keep',
+                        sourceType: 'content_gap',
+                        sourceId: gapSourceId,
+                        targetKeyword: gap.targetKeyword,
+                      });
+                    }
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  disabled={isKept || keepMutation.isPending}
+                  aria-label={isKept ? 'Kept' : 'Keep this gap'}
+                  className={`gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-colors ${
+                    isKept
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default'
+                      : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]'
+                  }`}
+                >
+                  <Icon as={Check} size="sm" /> {isKept ? 'Kept' : 'Keep'}
+                </Button>
+              )}
             </div>
           ) : undefined;
           return (

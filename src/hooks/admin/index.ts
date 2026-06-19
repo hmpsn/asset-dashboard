@@ -18,6 +18,7 @@ export { useCmsEditor } from './useCmsEditor';
 export { useContentPipeline } from './useContentPipeline';
 export { useAnomalyAlerts } from './useAnomalyAlerts';
 export { useKeywordStrategy } from './useKeywordStrategy';
+export { useStrategyKeywordSet } from './useStrategyKeywordSet';
 export { useSeoEditor } from './useSeoEditor';
 export { useAdminROI } from './useAdminROI';
 export { useIntelligenceSignals } from './useIntelligenceSignals';

@@ -1,6 +1,7 @@
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import type { CannibalizationItem } from '../../../shared/types/workspace';
+import type { ActiveStrategyKeyword } from '../../../shared/types/strategy-keyword-set';
 
 /** Page→keyword mapping row as rendered by the Strategy page. Moved verbatim from KeywordStrategy.tsx. */
 export interface PageKeywordMap {
@@ -214,6 +215,45 @@ export interface SiteTargetKeywordsProps {
   /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
    *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
   maxVisible?: number;
+  /**
+   * P3 Lane C — managed-set display state for each keyword row.
+   * When provided, each row is annotated with one of three visual states:
+   *   In Set    → teal dot + "In Set" badge (removedAt is null, row exists)
+   *   Removed   → zinc/muted styling (removedAt is non-null — row exists but was removed)
+   *   Candidate → no annotation (keyword not in the managed set at all)
+   *
+   * Pass the full activeKeywordSet array from useStrategyKeywordSet (Lane D).
+   * When absent/undefined, behavior is byte-identical to the pre-P3 display (no states shown).
+   */
+  managedKeywordSet?: ActiveStrategyKeyword[];
+  /**
+   * P3 Lane D — feature flag gate. When true, mutation controls (add/remove/keep buttons +
+   * search-and-add input) are rendered. When false or absent, the component renders Lane C's
+   * display-only states — byte-identical to the pre-P3 behavior.
+   * Must be `strategy-keywords-managed-set` flag value from the orchestrator.
+   */
+  managedSetEnabled?: boolean;
+  /**
+   * P3 Lane D — called when the operator clicks "Remove from set" on a keyword row.
+   * Routes to POST /keyword-set/remove via useStrategyKeywordSet.removeStrategyKeyword.
+   * No-op when managedSetEnabled is false.
+   */
+  onRemoveFromSet?: (keyword: string) => void;
+  /**
+   * P3 Lane D — called when the operator clicks "Keep in set" on a keyword row.
+   * Routes to POST /keyword-set/keep via useStrategyKeywordSet.keepStrategyKeyword.
+   * Stamps keptAt so the keyword survives regen.
+   * No-op when managedSetEnabled is false.
+   */
+  onKeepInSet?: (keyword: string) => void;
+  /**
+   * P3 Lane D — called when the operator adds a keyword via the search-and-add input or
+   * the per-row "Add to set" button. source is always 'manual_add' from this component;
+   * 'client_request' is routed via KeywordStrategy.tsx's client feedback path.
+   * Routes to POST /keyword-set via useStrategyKeywordSet.addStrategyKeyword.
+   * No-op when managedSetEnabled is false.
+   */
+  onAddToSet?: (keyword: string, source: 'client_request' | 'manual_add') => void;
 }
 
 export interface KeywordOpportunitiesProps {
@@ -228,6 +268,19 @@ export interface KeywordOpportunitiesProps {
   /** When provided, caps the list at N items with a "Show N more / Show less" toggle.
    *  When absent/undefined, renders the full list — byte-identical to the previous behavior. */
   maxVisible?: number;
+  /**
+   * P3 Lane C — when true, each opportunity row shows an "Interested in this one?" inline confirm
+   * that routes through the rec-lifecycle send path (recommendations.send) for the keyword_gap rec
+   * minted at regen. Send UX is only rendered when workspaceId is also provided.
+   * When absent/false, behavior is byte-identical to the pre-P3 display.
+   */
+  enableSend?: boolean;
+  /**
+   * P3/Lane D seam — called after a successful send with the keyword string (rec.targetKeyword ?? opp).
+   * Lane D wires this to addStrategyKeyword so "interested→yes→send" also adds the keyword to the managed
+   * set. Lane C (KeywordOpportunities) owns no add hook — the callback is the seam.
+   */
+  onAddToStrategySet?: (keyword: string) => void;
 }
 
 export interface StrategyHowItWorksProps {

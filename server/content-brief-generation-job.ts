@@ -39,6 +39,13 @@ export interface StandaloneContentBriefGenerationParams {
     recommendations?: string[];
     contentGaps?: string[];
     searchIntent?: string;
+    // Brief pre-seed fields from Content Gaps / strategy layer (Lane E)
+    rationale?: string;
+    competitorProof?: string;
+    volume?: number;
+    intent?: string;
+    questionKeywords?: string[];
+    serpFeatures?: string[];
   };
   generationStyle?: ContentGenerationStyle;
   /** W2.5 Bug 1 fix: Page Intelligence "Draft Brief" flow — the page being refreshed/updated */

@@ -19,6 +19,19 @@ export function normalizePageUrl(value: string): string {
   return normalizePathValue(value);
 }
 
+/**
+ * Normalise any URL or path value to a bare slug (no leading slash, no domain).
+ * Canonical slug form shared by the recommendation generator (`affectedPages`) and
+ * the admin Strategy cards that match a rec back to a page/keyword. Both sides MUST
+ * use this so leading-slash drift can never break the match. Pure / deterministic.
+ *
+ * Examples: `/blog/foo` → `blog/foo`, `blog/foo` → `blog/foo`,
+ * `https://x.com/blog/foo` → `blog/foo`, `/` → ``.
+ */
+export function toPageSlug(url: string): string {
+  return normalizePageUrl(url).replace(/^\//, '');
+}
+
 function buildCanonicalUrl(baseUrl: string | null | undefined, canonicalPath: string): string | undefined {
   if (!baseUrl) return undefined;
   const normalizedBase = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;

@@ -100,6 +100,9 @@ vi.mock('../../server/helpers.js', () => ({ normalizePageUrl: mockNormalizePageU
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn() }),
 }));
+vi.mock('../../server/domains/strategy/managed-keyword-set.js', () => ({
+  reconcileStrategyKeywordSet: vi.fn(),
+}));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 export * from './types';
+export * from './shared/WhyHowResult';
 
 export * from './hooks/useStrategyMetrics';
 export * from './hooks/useStrategySettings';

@@ -1109,13 +1109,22 @@ export async function generateBrief(
     keywordLocked?: boolean;
     keywordSource?: ContentBrief['keywordSource'];
     keywordValidation?: ContentBrief['keywordValidation'];
-    // Pre-computed page analysis from Page Intelligence (avoids re-lookup)
+    // Pre-computed page analysis from Page Intelligence (avoids re-lookup) or strategy-layer
+    // context from Content Gaps brief pre-seed (Lane E). Both populate the same context shape;
+    // the 6 extra fields below are absent for Page Intelligence paths and are simply ignored.
     pageAnalysisContext?: {
       optimizationScore?: number;
       optimizationIssues?: string[];
       recommendations?: string[];
       contentGaps?: string[];
       searchIntent?: string;
+      // Brief pre-seed fields from Content Gaps / strategy layer (Lane E)
+      rationale?: string;
+      competitorProof?: string;
+      volume?: number;
+      intent?: string;
+      questionKeywords?: string[];
+      serpFeatures?: string[];
     };
     /** Blueprint entry ID that triggered this brief (Phase 3 — used to backlink the brief to its entry via updateEntry(blueprintId, entryId, { briefId })). Not read in this function. */
     blueprintEntryId?: string;
@@ -1216,14 +1225,23 @@ export async function generateBrief(
   }
 
   // If no match found via keyword lookup, use pre-computed analysis from Page Intelligence
+  // or strategy-layer context (Content Gaps brief pre-seed). Both paths populate pageAnalysisContext;
+  // the 6 new fields (rationale, competitorProof, volume, intent, questionKeywords, serpFeatures)
+  // are additive — they are emitted when present regardless of the 5 existing Page Intelligence fields.
   if (!pageAnalysisBlock && context.pageAnalysisContext) {
     const pac = context.pageAnalysisContext;
     const parts: string[] = [];
     if (pac.optimizationScore !== undefined) parts.push(`Optimization score: ${pac.optimizationScore}/100`);
     if (pac.searchIntent) parts.push(`Search intent: ${pac.searchIntent}`);
+    if (pac.intent && pac.intent !== pac.searchIntent) parts.push(`Keyword intent: ${pac.intent}`);
     if (pac.optimizationIssues?.length) parts.push(`Issues to address:\n${pac.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
     if (pac.contentGaps?.length) parts.push(`Content gaps to fill:\n${pac.contentGaps.map(g => `- ${g}`).join('\n')}`);
     if (pac.recommendations?.length) parts.push(`Recommendations from page analysis:\n${pac.recommendations.map(r => `- ${r}`).join('\n')}`);
+    // Brief pre-seed: strategy-layer signals from Content Gaps (Lane E)
+    if (pac.rationale) parts.push(`Why this topic matters: ${pac.rationale}`);
+    if (pac.competitorProof) parts.push(`Competitor proof: ${pac.competitorProof}`);
+    if (pac.volume !== undefined) parts.push(`Estimated search volume: ${pac.volume.toLocaleString()} searches/month`);
+    if (pac.questionKeywords?.length) parts.push(`Related questions to address:\n${pac.questionKeywords.map(q => `- ${q}`).join('\n')}`);
     if (parts.length > 0) {
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
     }
@@ -1236,9 +1254,16 @@ export async function generateBrief(
   // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
   // Provider flags which SERP features are present for the primary keyword; we translate
   // those signals into concrete structural directives for the brief writer.
+  // Precedence: matchedPage?.serpFeatures (page_keywords-derived, live provider data) WINS when
+  // present. context.pageAnalysisContext?.serpFeatures (strategy-layer fallback from Content Gaps)
+  // is used only when no matched page was found — so we get SERP directives even on gap keywords
+  // that don't yet have a matching page in page_keywords.
   let serpFeaturesDirectiveBlock = '';
-  if (matchedPage?.serpFeatures?.length) {
-    const feats = matchedPage.serpFeatures;
+  const serpFeaturesSource = matchedPage?.serpFeatures?.length
+    ? matchedPage.serpFeatures
+    : context.pageAnalysisContext?.serpFeatures ?? [];
+  if (serpFeaturesSource.length > 0) {
+    const feats = serpFeaturesSource;
     const directives: string[] = [];
     if (feats.includes('featured_snippet')) {
       directives.push('FEATURED SNIPPET OPPORTUNITY: Structure a clear, concise definition or numbered step list in the first 100 words. The opening paragraph should directly answer the target query in 40-60 words.');
