@@ -97,6 +97,7 @@ export type ActivityType =
   | 'deliverable_responded'
   | 'deliverable_reminded'   // operator: admin re-nudged the client about a pending deliverable (NOT client-visible)
   | 'meeting_brief_generated'
+  | 'strategy_pov_generated'   // The Issue (Lane B): admin generated/regenerated/edited the curated POV
   | 'brandscript_created'
   | 'brandscript_deleted'
   | 'brandscript_imported'
@@ -170,7 +171,9 @@ export type ActivityType =
   // (ActionType), a SEPARATE union — do not conflate.
   | 'strategy_keyword_kept'      // admin-only: operator explicitly kept a keyword (survives regen)
   | 'strategy_keyword_removed'   // admin-only: operator removed a keyword from the managed set
-  | 'strategy_keyword_added';    // admin-only: keyword added to the managed set (client_request / manual_add)
+  | 'strategy_keyword_added'     // admin-only: keyword added to the managed set (client_request / manual_add)
+  // The Issue — Lane 1E: cannibalization keeper-override (operator sets the canonical page).
+  | 'cannibalization_keeper_set'; // admin-only: operator set the keeper page for a cannibalization URL set
 
 export interface ActivityEntry {
   id: string;
