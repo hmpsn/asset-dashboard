@@ -364,7 +364,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const actQueueEl = useActQueue ? <ActQueue workspaceId={workspaceId} /> : null;
   // v3 cockpit element — only constructed when the flag is on, reuses the already-fetched rec set.
   const cockpitEl = (commandCenterEnabled && isRealStrategy)
-    ? <StrategyCockpit recs={cockpitRecs} actions={lifecycleActions} />
+    ? <StrategyCockpit workspaceId={workspaceId} recs={cockpitRecs} actions={lifecycleActions} />
     : null;
 
   const handleInteriorTabChange = (id: string) => {

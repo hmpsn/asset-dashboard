@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
-import { Button, IconButton } from '../ui';
+import { Button, IconButton, Checkbox } from '../ui';
 import { CockpitSendPanel } from './CockpitSendPanel';
 import { CockpitThrottlePicker } from './CockpitThrottlePicker';
 import { CockpitStrikeConfirm } from './CockpitStrikeConfirm';
@@ -11,6 +11,10 @@ import type { Recommendation } from '../../../shared/types/recommendations';
 interface CockpitRowProps {
   rec: Recommendation;
   actions: CockpitActions;
+  /** Bulk-curation selection state. When `onToggleSelect` is provided the row renders a
+   *  left-edge selection checkbox; when absent (flag-OFF / other consumers) the row is unchanged. */
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 type RowMode = 'idle' | 'send' | 'throttle' | 'strike';
@@ -42,7 +46,7 @@ function resurfaceLabel(rec: Recommendation): string | null {
 /** Strategy v3 cockpit row — fixed [severity][value][lifecycle] tag slots + single-line-clamped
  *  why-line + left-edge lifecycle accent rail + the four row actions. NOT the shared
  *  admin/recommendations/RecommendationRow (3 consumers) — this is the v3 curation row. */
-export function CockpitRow({ rec, actions }: CockpitRowProps) {
+export function CockpitRow({ rec, actions, selected, onToggleSelect }: CockpitRowProps) {
   const [mode, setMode] = useState<RowMode>('idle');
   const model = toCockpitRow(rec);
   const isStruck = rec.lifecycle === 'struck';
@@ -62,6 +66,15 @@ export function CockpitRow({ rec, actions }: CockpitRowProps) {
         aria-hidden
       />
       <div className="flex items-start justify-between gap-3">
+        {onToggleSelect && (
+          <Checkbox
+            checked={selected ?? false}
+            onChange={() => onToggleSelect(rec.id)}
+            label={`Select: ${rec.title}`}
+            srOnlyLabel
+            className="mt-0.5 shrink-0"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="t-ui font-semibold text-[var(--brand-text)] truncate">{rec.title}</span>

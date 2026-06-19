@@ -27,6 +27,7 @@ interface WorkspaceSummary {
   contentPlan?: { review: number };
   clientSignals?: { new: number };
   clientActions?: { approved?: number; changesRequested?: number };
+  recResponses?: { approved?: number; declined?: number; discussing?: number };
 }
 
 interface AnomalySummary {
@@ -238,6 +239,20 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         workspaceId: ws.id,
         workspaceName: ws.name,
         tab: 'requests',
+      });
+    }
+    const recResponseTotal =
+      (ws.recResponses?.approved || 0) + (ws.recResponses?.declined || 0) + (ws.recResponses?.discussing || 0);
+    if (recResponseTotal > 0) {
+      notifications.push({
+        id: `rec-responses-${ws.id}`,
+        label: `${recResponseTotal} client recommendation response${recResponseTotal === 1 ? '' : 's'}`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: MessageSquare,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'seo-strategy',
       });
     }
   }

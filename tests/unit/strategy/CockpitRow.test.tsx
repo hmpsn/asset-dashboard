@@ -130,4 +130,18 @@ describe('CockpitRow', () => {
     );
     expect(container.innerHTML).not.toMatch(/purple-|violet-/);
   });
+
+  it('renders no selection checkbox when onToggleSelect is absent', () => {
+    render(<CockpitRow rec={makeRec()} actions={makeActions()} />);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('renders a selection checkbox that toggles when onToggleSelect is provided', () => {
+    const onToggleSelect = vi.fn();
+    render(<CockpitRow rec={makeRec()} actions={makeActions()} selected={false} onToggleSelect={onToggleSelect} />);
+    const checkbox = screen.getByRole('checkbox', { name: /select: write the pricing post/i });
+    expect(checkbox).toBeInTheDocument();
+    fireEvent.click(checkbox);
+    expect(onToggleSelect).toHaveBeenCalledWith('r1');
+  });
 });
