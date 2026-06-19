@@ -382,12 +382,12 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Strategy',
     lifecycle: {
       owner: 'analytics-intelligence',
-      createdAt: '2026-06-19',
+      createdAt: '2026-06-18',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Promote to default once the Issue cockpit + client feed + closed loop are validated on staging; the prior command-center cockpit layout is then retired.',
       linkedRoadmapItemId: 'strategy-the-issue',
       staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-19',
+      lastReviewedAt: '2026-06-18',
     },
   },
 };

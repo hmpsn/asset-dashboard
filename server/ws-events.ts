@@ -97,8 +97,6 @@ export const WS_EVENTS = {
 
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
-  // The Issue — strategy POV draft (re)generated or operator-edited; FE invalidates queryKeys.admin.strategyPov
-  STRATEGY_POV_GENERATED: 'strategy:pov-generated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
