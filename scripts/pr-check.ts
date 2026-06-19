@@ -1,7 +1,10 @@
 /**
  * pr-check.ts — Automated pre-PR checklist
  *
- * Default: only checks files changed in the current branch (git diff vs main/staging).
+ * Default: only checks files changed in the current branch — both tracked
+ * changes (git diff vs main/staging) AND untracked net-new files not yet
+ * `git add`-ed. Untracked files are folded in deliberately: a change made
+ * entirely of new files would otherwise scan clean by default (false green).
  * Use --all to scan the entire codebase.
  *
  * Run:
@@ -55,14 +58,19 @@ function getFiles(dir: string, pattern: string): string[] {
 
 // ─── Determine changed files ──────────────────────────────────────────────────
 
-function getChangedFiles(): string[] {
+// Tracked changes vs the appropriate base: the GitHub PR base in CI, then
+// origin/staging|main locally, then the previous commit on a squash-merge push.
+// Returns paths relative to the repo root. NOTE: `git diff` reports only
+// *tracked* changes — untracked new files are handled separately by
+// getUntrackedFiles() and folded in by getChangedFiles().
+function getTrackedChangedFiles(cwd: string = ROOT): string[] {
   try {
     // In GitHub Actions PR context, GITHUB_BASE_REF is set (e.g., "main")
     const ghBase = process.env.GITHUB_BASE_REF;
     if (ghBase) {
       try {
         const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
-          cwd: ROOT,
+          cwd,
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
         }).trim();
@@ -76,7 +84,7 @@ function getChangedFiles(): string[] {
     for (const base of ['origin/staging', 'origin/main']) {
       try {
         const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
-          cwd: ROOT,
+          cwd,
           encoding: 'utf-8',
         }).trim();
         if (out) return out.split('\n').filter(Boolean);
@@ -88,7 +96,7 @@ function getChangedFiles(): string[] {
     // On a push to main/staging (squash merge): diff against previous commit
     try {
       const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
-        cwd: ROOT,
+        cwd,
         encoding: 'utf-8',
       }).trim();
       if (out) return out.split('\n').filter(Boolean);
@@ -99,6 +107,42 @@ function getChangedFiles(): string[] {
   } catch {
     return [];
   }
+}
+
+// Untracked, non-ignored files — i.e. net-new files not yet `git add`-ed.
+// `git diff --name-only <base>` EXCLUDES these, so a change composed wholly or
+// partly of new files would otherwise be invisible to the default (diff-only)
+// scan: pr-check would report "0 errors" on files it never opened — a silent
+// false-green. `--exclude-standard` honours .gitignore / .git/info/exclude /
+// global excludes, so build artifacts and node_modules never leak in. Returns
+// paths relative to the repo root, matching the `git diff` output format.
+export function getUntrackedFiles(cwd: string = ROOT): string[] {
+  try {
+    const out = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return out ? out.split('\n').filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Union of tracked changes and untracked new files, de-duplicated with tracked
+// paths first (stable, predictable ordering for downstream filtering/logging).
+// Exported so its set semantics are unit-testable without spawning git.
+export function mergeChangedFiles(tracked: string[], untracked: string[]): string[] {
+  return Array.from(new Set([...tracked, ...untracked]));
+}
+
+// The complete set of files a diff-only pr-check run must scan: everything that
+// differs from the base PLUS every untracked new file. Folding in untracked
+// files closes the net-new-file false-green (see getUntrackedFiles). The `cwd`
+// parameter exists for testing against throwaway temp repos; production callers
+// use the default (repo root).
+export function getChangedFiles(cwd: string = ROOT): string[] {
+  return mergeChangedFiles(getTrackedChangedFiles(cwd), getUntrackedFiles(cwd));
 }
 
 // Lazy-memoised so that `import { CHECKS }` from the test harness does NOT
