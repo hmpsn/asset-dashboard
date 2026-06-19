@@ -129,6 +129,22 @@ describe('StrategyCockpit', () => {
     expect(screen.queryByRole('toolbar', { name: /bulk actions/i })).not.toBeInTheDocument();
   });
 
+  it('clears selection when the category filter changes (FIX-4 lock, cats axis)', () => {
+    // Two active-bucket content recs (fix_soon keeps them out of the non-selectable Fix-now pin).
+    const recs = [
+      makeRec({ id: 'a', title: 'Active one', lifecycle: 'active', clientStatus: 'system', priority: 'fix_soon', type: 'content' }),
+      makeRec({ id: 'c', title: 'Active two', lifecycle: 'active', clientStatus: 'system', priority: 'fix_soon', type: 'content' }),
+    ];
+    renderCockpit(<StrategyCockpit workspaceId="ws-test" recs={recs} actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /select all/i }));
+    expect(screen.getByRole('toolbar', { name: /bulk actions/i })).toBeInTheDocument();
+
+    // Toggle a category chip — catsKey changes, so the [bucket, catsKey] effect must clear selection.
+    fireEvent.click(screen.getByRole('button', { name: /^content/i }));
+    expect(screen.queryByRole('toolbar', { name: /bulk actions/i })).not.toBeInTheDocument();
+  });
+
   describe('confirm-strike fires mutation with resolved ids (FIX-5)', () => {
     beforeEach(() => {
       mutateSpy.mockReset();

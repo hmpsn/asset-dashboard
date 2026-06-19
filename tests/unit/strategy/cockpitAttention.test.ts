@@ -100,4 +100,13 @@ describe('countSentThisCycle', () => {
     ];
     expect(countSentThisCycle(recs)).toBe(2);
   });
+
+  it('excludes throttled-open sent recs so it agrees with the Sent lifecycle bucket', () => {
+    const recs = [
+      makeRec({ id: 'a', clientStatus: 'sent' }),
+      makeRec({ id: 'b', clientStatus: 'sent', lifecycle: 'throttled', throttledUntil: daysAgo(-30) }), // open throttle (future) → excluded
+      makeRec({ id: 'c', clientStatus: 'sent', lifecycle: 'throttled', throttledUntil: daysAgo(30) }),  // expired throttle (past) → still counts
+    ];
+    expect(countSentThisCycle(recs, NOW)).toBe(2);
+  });
 });

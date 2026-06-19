@@ -30,7 +30,7 @@ export function NeedsAttentionStrip({ items, onAct }: NeedsAttentionStripProps) 
     <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0" />
-        <h3 className="t-h2 text-accent-warning">
+        <h3 className="t-caption font-semibold text-accent-warning">
           Needs your attention · {items.length}
         </h3>
       </div>

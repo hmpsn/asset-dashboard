@@ -15,7 +15,7 @@ export function CurationMeter({ sentThisCycle }: CurationMeterProps) {
 
   const overSending = sentThisCycle > HEALTHY_SEND_CEILING;
   const phrase = overSending ? 'curate, don’t just send' : 'a healthy curated set';
-  const tone = overSending ? 'text-accent-warning' : 'text-teal-400';
+  const tone = overSending ? 'text-accent-warning' : 'text-accent-brand';
 
   return (
     <div className="inline-flex items-center gap-1.5 rounded-[var(--radius-full)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-3 py-1">

@@ -97,7 +97,16 @@ export function buildAttentionItems(recs: Recommendation[], now: number = Date.n
   return items;
 }
 
-/** Count of recs currently sent to the client — matches partitionByLifecycle(recs).sent. */
-export function countSentThisCycle(recs: Recommendation[]): number {
-  return recs.filter((r) => r.clientStatus === 'sent').length;
+/** Count of recs currently live-sent to the client (clientStatus 'sent', excluding any since
+ *  throttled-open) — drives the CurationMeter "N sent" nudge. Excludes throttled-open sent recs
+ *  so the meter agrees with the cockpit's 'sent' lifecycle-tab count: partitionByLifecycle
+ *  reclassifies a throttled-open sent rec under 'throttled' (its isThrottledOpen check runs
+ *  first), so counting all 'sent' here would overshoot the tab. `now` injected for tests. */
+export function countSentThisCycle(recs: Recommendation[], now: number = Date.now()): number {
+  return recs.filter(
+    (r) =>
+      r.clientStatus === 'sent' &&
+      // throttled-open mirror of cockpitRowModel.isThrottledOpen (kept inline to stay deterministic via `now`)
+      !(r.lifecycle === 'throttled' && r.throttledUntil != null && Date.parse(r.throttledUntil) > now),
+  ).length;
 }

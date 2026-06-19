@@ -28,7 +28,19 @@ describe('useRecBulkMutation', () => {
     ));
   });
 
-  it('exposes the queryKeys it invalidates for the cockpit', () => {
-    expect(queryKeys.admin.recommendations('ws-1')).toEqual(['admin-recommendations', 'ws-1']);
+  it('invalidates BOTH the admin and shared recommendations caches on success', async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    const wrap = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useRecBulkMutation('ws-1'), { wrapper: wrap });
+    await act(async () => {
+      await result.current.mutateAsync({ recIds: ['r1'], action: 'send' });
+    });
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.admin.recommendations('ws-1') });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.shared.recommendations('ws-1') });
+    });
   });
 });
