@@ -7,7 +7,9 @@
  *
  * P3 Lane C — adds a "Send to client" button per row that routes through the rec-lifecycle
  * API wrapper (recommendations.send). The button calls sendRecommendation for the page's
- * content_refresh rec (rec must be pre-minted by Lane A's reconciler).
+ * content_refresh rec. That rec is minted by `generateRecommendations` (server/recommendations.ts),
+ * fired best-effort via the delayed post-update regen (~30s latency window) — NOT by a Lane A
+ * reconciler. The "Send to client" button only renders once that regen has produced the rec.
  *
  * After send: a muted-teal "Sent" pill + disabled state. Client response is rendered inline:
  *   approved  → emerald "Client approved"
@@ -25,6 +27,7 @@ import { useAdminRecommendationSet } from '../../hooks/admin/useAdminRecommendat
 import { recommendations } from '../../api/misc';
 import { queryKeys } from '../../lib/queryKeys';
 import { WhyHowResult, isSendable } from './shared/WhyHowResult';
+import { toPageSlug } from '../../../shared/page-address-utils';
 import type { DecayingPagesCardProps } from './types';
 import type { Recommendation } from '../../../shared/types/recommendations';
 
@@ -59,11 +62,19 @@ export function DecayingPagesCard({ workspaceId }: DecayingPagesCardProps) {
 
   /**
    * Find the content_refresh rec for a given page path.
-   * Matches affectedPages — the rec must be minted by Lane A's reconciler.
+   *
+   * The rec is minted best-effort by `generateRecommendations` (fired via the delayed
+   * post-update regen, ~30s after the decay analysis writes) — NOT synchronously, so a
+   * freshly-decayed page has no sendable rec until that regen lands.
+   *
+   * The generator stores `affectedPages: [toPageSlug(dp.page)]` (no leading slash) while the
+   * decay page keeps its leading slash, so a raw `includes()` never matches. Normalize BOTH
+   * sides through the shared `toPageSlug` so the leading-slash drift can't break the match.
    */
   function findContentRefreshRec(pagePath: string): Recommendation | undefined {
+    const target = toPageSlug(pagePath);
     return recSet?.recommendations.find(
-      r => r.type === 'content_refresh' && r.affectedPages.includes(pagePath)
+      r => r.type === 'content_refresh' && r.affectedPages.some(p => toPageSlug(p) === target)
     );
   }
 

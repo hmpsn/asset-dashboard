@@ -116,8 +116,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Called unconditionally here (before all early returns) — Rules of Hooks.
   const commandCenterEnabled = useFeatureFlag('strategy-command-center');
   // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
-  // enabled is gated inside the hook on both this flag AND workspaceId.
-  const managedSetEnabled = useFeatureFlag('strategy-keywords-managed-set');
+  // M1 — the managed-set UI is part of the v3 command-center redesign, so it must be gated on
+  // BOTH flags. Without the `commandCenterEnabled &&` composition the managed UI would leak into
+  // the command-center-OFF Overview whenever the child flag is on; gating on both keeps the
+  // flag-OFF Overview display-only / byte-identical. enabled is also re-gated inside the hook on
+  // workspaceId.
+  const managedSetFlag = useFeatureFlag('strategy-keywords-managed-set');
+  const managedSetEnabled = commandCenterEnabled && managedSetFlag;
   const {
     managedKeywordSet,
     addStrategyKeyword,
@@ -577,6 +582,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <KeywordOpportunities
                       opportunities={strategy.opportunities ?? []}
                       maxVisible={5}
+                      // C3 — the v3 send spine: passing enableSend + workspaceId + navigate is what
+                      // makes the "Interested?"→send path AND the onAddToStrategySet seam reachable.
+                      // Without these props showSend stays false and the whole send affordance is dead
+                      // code. Gated on commandCenterEnabled (v3-redesign feature); the flag-OFF Overview
+                      // mount keeps enableSend off so it stays byte-identical.
+                      enableSend={commandCenterEnabled}
+                      workspaceId={workspaceId}
+                      navigate={navigate}
                       onAddToStrategySet={managedSetEnabled
                         ? (kw: string) => addStrategyKeyword(kw, 'manual_add')
                         : undefined}

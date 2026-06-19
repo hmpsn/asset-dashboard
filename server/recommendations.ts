@@ -44,6 +44,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
+import { toPageSlug as toPageSlugShared } from '../shared/page-address-utils.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
@@ -895,13 +896,11 @@ function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number;
  * Decay analysis also stores absolute URLs in some code paths.
  * All other callers pass relative paths (/foo or foo) — those work unchanged.
  */
-/** @internal exported for unit testing */
+/** @internal exported for unit testing. Delegates to the canonical shared slug
+ *  helper so the generator's `affectedPages` and the admin Strategy cards that
+ *  match recs back to a page share ONE normalization (no leading-slash drift). */
 export function toPageSlug(url: string): string {
-  let path = url;
-  if (url.startsWith('http')) {
-    try { path = new URL(url).pathname; } catch { /* fall through */ }
-  }
-  return normalizePageUrl(path).replace(/^\//, '');
+  return toPageSlugShared(url);
 }
 
 /** SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization
@@ -1748,6 +1747,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             opportunity,
             source,
             affectedPages: [],
+            // Match key for the admin Strategy KeywordOpportunities card — without this the
+            // keyword_gap rec has NO matchable field (affectedPages is empty) and the
+            // "Interested?" send affordance can never render. Normalized-compared client-side.
+            targetKeyword: kg.keyword,
             trafficAtRisk: 0,
             impressionsAtRisk: 0,
             estimatedGain: `Capturing "${kg.keyword}" targets a term with ${kg.volume.toLocaleString()} monthly searches a competitor already ranks for`,

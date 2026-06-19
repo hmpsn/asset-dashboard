@@ -3,7 +3,11 @@
  *
  * P3 Lane C — adds an "Interested in this one?" inline confirm per row when
  * `enableSend={true}` and `workspaceId` are provided. Calls recommendations.send()
- * (the rec-lifecycle API wrapper) for the keyword_gap rec minted at regen.
+ * (the rec-lifecycle API wrapper) for the keyword_gap rec minted by
+ * `generateRecommendations` (server/recommendations.ts) — fired best-effort via the delayed
+ * post-update regen (~30s latency window), NOT by a Lane A reconciler. The match is by the
+ * rec's `targetKeyword` (the generator sets `targetKeyword: kg.keyword`); the affordance only
+ * renders once that regen has produced the rec.
  *
  * After send: muted-teal "Sent" pill. Client response shown inline:
  *   approved  → emerald "Client approved"
