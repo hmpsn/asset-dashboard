@@ -48,6 +48,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
 import { toPageSlug as toPageSlugShared, cannibalizationUrlSetKey as cannibalizationUrlSetKeyShared } from '../shared/page-address-utils.js';
+import { isActiveRec, isCuratedForClient } from '../shared/recommendation-predicates.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
@@ -649,39 +650,11 @@ export function isExemptFromAutoResolve(rec: Recommendation): boolean {
     || rec.lifecycle === 'struck' || rec.lifecycle === 'throttled';
 }
 
-/**
- * The ONE active-set predicate (spec §6.4). A rec is "active" — eligible to surface in the
- * Act queue, the summary top-rec, AI context, and briefings — iff:
- *   - RecStatus is not terminal (not completed, not dismissed), AND
- *   - it is not permanently struck, AND
- *   - it is not throttled into the future (throttle auto-resurfaces on-read once the date passes), AND
- *   - the client has not already received/resolved it (clientStatus not sent/approved/declined).
- * Absent v3 fields ⇒ legacy rec ⇒ treated as clientStatus:'system', lifecycle:'active'.
- * Imported by EVERY reader so no surface re-implements a partial filter (the leak bug pattern).
- */
-export function isActiveRec(rec: Recommendation, now: number = Date.now()): boolean {
-  if (rec.status === 'completed' || rec.status === 'dismissed') return false;
-  if (rec.lifecycle === 'struck') return false;
-  if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
-  if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
-  return true;
-}
-
-/**
- * The Issue — the client-curated (client-seen) set (spec §16 / §7). A rec is "curated for the
- * client" iff the operator has sent it and it is not struck: clientStatus ∈ {sent, approved,
- * discussing}. Powers the client feed projection, the admin "what the client sees" preview, and
- * the loop strip. `declined` is excluded (the client said no).
- *
- * NOTE: this is NOT the complement of isActiveRec. They DELIBERATELY OVERLAP on `discussing` — a
- * discussing rec is both still-active for the operator (isActiveRec → true) AND visible to the
- * client (isCuratedForClient → true). Never assume isActiveRec(rec) === !isCuratedForClient(rec).
- * Imported by every reader of the curated set — never re-implement.
- */
-export function isCuratedForClient(rec: Recommendation): boolean {
-  if (rec.lifecycle === 'struck') return false;
-  return rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'discussing';
-}
+// isActiveRec + isCuratedForClient moved to shared/recommendation-predicates.ts (the SINGLE source,
+// shared with the client so the admin send counter and the projection key off ONE implementation).
+// Imported at the top of this file (local binding for internal callers) and re-exported here so every
+// existing server importer is unchanged. The `discussing`-overlap red-line lives with the impl there.
+export { isActiveRec, isCuratedForClient };
 
 /**
  * Compute the RecommendationSet summary from a rec list. Shared by the full

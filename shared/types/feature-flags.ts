@@ -77,6 +77,11 @@ export const FEATURE_FLAGS = {
   // (theIssueEnabled = commandCenterEnabled && this). OFF = the current command-center cockpit,
   // byte-identical. See docs/superpowers/specs/2026-06-19-strategy-the-issue-design.md.
   'strategy-the-issue': false,
+  // The Issue — child flag gating the trust-ladder AUTO-SEND leg (per-archetype auto-send during the
+  // weekly cron). OFF by default and dark-launched: the audit found auto-send fired in the same tick
+  // that rings the operator doorbell (no review window). With this OFF, the cron still pushes + rings
+  // the doorbell but never auto-sends — nothing reaches a client without a manual operator send.
+  'strategy-trust-ladder-autosend': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -390,6 +395,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-18',
     },
   },
+  'strategy-trust-ladder-autosend': {
+    label: 'The Issue — trust-ladder auto-send (dark-launched OFF)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Enable per-workspace only after a decoupled-tick auto-send with an operator veto/review window ships; until then the weekly cron never auto-sends (manual operator send only).',
+      linkedRoadmapItemId: 'strategy-the-issue',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -419,7 +437,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
   },
 ];
 

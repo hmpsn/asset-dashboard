@@ -319,6 +319,16 @@ export interface ClientFacingRecommendation {
    * Powers the "what's working" section: the client's own greenlit-and-won moves.
    */
   delivered: boolean;
+  /**
+   * The Issue — server-authoritative "Request this" descriptor (audit blocker #1). Computed once in
+   * `stripEmvFromPublicRecs` from the workspace's effective tier + the rec's monetizable policy, so
+   * the client can never be tricked by a hidden button. `locked` → render a <TierGate> upsell (the
+   * request route also 403s); `included` → the request is covered by the client's plan (confirm,
+   * no charge at click); `priced` → reserved for the future à-la-carte path (fast-follow). The
+   * `requiredTier` names the upgrade for a `locked` rec. ABSENT when strategy-the-issue is OFF
+   * (gated exactly like the restricted clientStatus projection — keeps flag-OFF byte-identical).
+   */
+  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth' };
 }
 
 /**
