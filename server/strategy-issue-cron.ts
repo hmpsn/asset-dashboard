@@ -34,8 +34,15 @@ import {
   markIssuePushedWeek,
 } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
-import { loadRecommendations, isActiveRec } from './recommendations.js';
+import {
+  loadRecommendations,
+  isActiveRec,
+} from './recommendations.js';
 import { generateStrategyPov, POV_UNCHANGED } from './strategy-pov-generator.js';
+import { sendRecommendation, markRecommendationAutoSent } from './recommendation-lifecycle.js';
+import { mirrorRecommendationToDeliverable } from './domains/inbox/recommendation-dual-write.js';
+import { getEarnedEnabledArchetypes } from './strategy-autosend-store.js';
+import { recArchetype } from '../shared/types/strategy-archetype.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
@@ -174,22 +181,115 @@ async function runIssuePushForWorkspaceInner(
   markIssuePushedWeek(workspaceId, weekOf);
 
   // ── Ring the operator doorbell (reuse the existing admin notification rail) ──
-  // 1) Operator-only activity entry (strategy_issue_pushed is NOT in
-  //    CLIENT_VISIBLE_TYPES, so the client never sees it).
-  addActivity(
-    workspaceId,
-    'strategy_issue_pushed',
-    `The weekly Issue for ${ws.name} is drafted and ready to curate`,
-    unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
-    { weekOf, unchanged },
-  );
-  // 2) Workspace broadcast — the admin NotificationBell invalidates its
-  //    notifications cache on this event so the bell entry (derived from the
-  //    workspace-overview `issuePushedWeekOf` field) appears without a full poll.
-  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_ISSUE_PUSHED, { weekOf });
+  // Best-effort: the week is already stamped (the visible `issue.ready` bell derives from that
+  // stamp, not from this activity row), so a doorbell failure must NOT propagate — it would skip the
+  // Phase-4 auto-send step below (the cron is the ONLY writer of autoSent), silently dropping a
+  // whole week's earned auto-sends with no retry. Swallow + log so auto-send stays reachable.
+  try {
+    // 1) Operator-only activity entry (strategy_issue_pushed is NOT in
+    //    CLIENT_VISIBLE_TYPES, so the client never sees it).
+    addActivity(
+      workspaceId,
+      'strategy_issue_pushed',
+      `The weekly Issue for ${ws.name} is drafted and ready to curate`,
+      unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
+      { weekOf, unchanged },
+    );
+    // 2) Workspace broadcast — the admin NotificationBell invalidates its
+    //    notifications cache on this event so the bell entry (derived from the
+    //    workspace-overview `issuePushedWeekOf` field) appears without a full poll.
+    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_ISSUE_PUSHED, { weekOf });
+  } catch (err) {
+    log.error({ err, workspaceId, weekOf }, 'issue doorbell failed (swallowed) — push stands, auto-send proceeds');
+  }
+
+  // ── Trust-ladder auto-send (Phase 4) ───────────────────────────────────────
+  // After the Issue is pushed + stamped + the doorbell rung, auto-send the active recs of every
+  // earned+enabled+eligible archetype. Flag-eligibility already gated upstream (isEligible). The
+  // whole step is best-effort: a failure must not roll back the push (the Issue is already drafted
+  // and the operator doorbell already queued). Idempotent within the week — a rec sent this cycle is
+  // no longer isActiveRec, so a re-run skips it.
+  try {
+    runAutoSendForWorkspace(workspaceId, weekOf, ws.name);
+  } catch (err) {
+    log.error({ err, workspaceId, weekOf }, 'auto-send step failed (swallowed) — Issue push stands');
+  }
 
   log.info({ workspaceId, weekOf, unchanged }, 'weekly Issue pushed — operator doorbell rung');
   return { status: unchanged ? 'unchanged' : 'pushed', weekOf };
+}
+
+/**
+ * The Issue — Phase 4 trust-ladder auto-send. For each EARNED + ENABLED + eligible archetype
+ * (getEarnedEnabledArchetypes), auto-send every ACTIVE rec of that archetype via the EXACT manual
+ * send path: sendRecommendation (the single-writer; also credits the cycle via its chokepoint) →
+ * mark autoSent=true (persisted by re-saving the set) → mirrorRecommendationToDeliverable (the
+ * client-reaching dual-write). Best-effort per rec: a single rec failure is logged and skipped, the
+ * rest proceed. On count>0: an operator-only `strategy_autosent` doorbell activity + a
+ * RECOMMENDATIONS_UPDATED broadcast (so the cockpit refreshes). The per-workspace cron mutex already
+ * serializes this against a racing push-now.
+ *
+ * autoSent persistence: sendRecommendation flips clientStatus→sent + stamps sentAt inside its own
+ * txn; markRecommendationAutoSent then stamps autoSent through the SAME single-writer (a db.transaction
+ * that re-reads the set), so neither write can be clobbered by a concurrent regen.
+ */
+export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsName: string): void {
+  const archetypes = getEarnedEnabledArchetypes(workspaceId);
+  if (archetypes.length === 0) return;
+  const earned = new Set<string>(archetypes);
+
+  // Snapshot the candidate rec ids up front (active recs whose archetype is earned+enabled). We
+  // re-resolve isActiveRec per rec at send time via sendRecommendation's transition guard, so a
+  // concurrently-sent rec simply fails its transition and is skipped.
+  const set = loadRecommendations(workspaceId);
+  if (!set) return;
+  const candidateIds = set.recommendations
+    .filter((r) => isActiveRec(r) && earned.has(recArchetype(r.type)))
+    .map((r) => r.id);
+  if (candidateIds.length === 0) return;
+
+  let count = 0;
+  const sentArchetypes = new Set<string>();
+  for (const recId of candidateIds) {
+    try {
+      const sent = sendRecommendation(workspaceId, recId);
+      if (!sent) continue;
+      // Stamp autoSent on the freshly-sent rec through the single-writer (markRecommendationAutoSent
+      // re-reads the set INSIDE a db.transaction), so a regen committing between the send and this
+      // flip cannot clobber the stamp — the same atomicity guard sendRecommendation uses for
+      // clientStatus. Returns the updated rec for the mirror.
+      const marked = markRecommendationAutoSent(workspaceId, recId);
+      // Mirror to the client-deliverable spine — identical to the manual send path. Best-effort
+      // (never throws; the send already stands).
+      mirrorRecommendationToDeliverable(workspaceId, marked ?? sent);
+      count++;
+      sentArchetypes.add(recArchetype(sent.type));
+    } catch (err) {
+      // A single rec's send/transition can fail (e.g. it was sent concurrently between snapshot and
+      // here → InvalidTransitionError). Skip it; the rest proceed.
+      log.warn({ err, workspaceId, recId }, 'auto-send skipped one rec (swallowed)');
+    }
+  }
+
+  if (count > 0) {
+    const archetypeList = [...sentArchetypes];
+    // Operator-only doorbell (strategy_autosent is NOT in CLIENT_VISIBLE_TYPES).
+    addActivity(
+      workspaceId,
+      'strategy_autosent',
+      `${count} low-risk move${count === 1 ? '' : 's'} auto-sent for ${wsName}`,
+      undefined,
+      { weekOf, count, archetypes: archetypeList },
+    );
+    // The cockpit + client feed read the rec set; a RECOMMENDATIONS_UPDATED broadcast refreshes the
+    // admin views (DELIVERABLE_SENT, fired per-rec by the mirror, refreshes the client feed).
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
+      reason: 'auto-send',
+      weekOf,
+      count,
+    });
+    log.info({ workspaceId, weekOf, count, archetypes: archetypeList }, 'trust-ladder auto-send complete');
+  }
 }
 
 // ── Cron loop ────────────────────────────────────────────────────────────────

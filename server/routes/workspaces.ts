@@ -199,6 +199,11 @@ router.get('/api/workspace-overview', (req, res) => {
     // `useNotifications` surfaces the bell entry from `issue.ready`, deep-linking to the Strategy page.
     let issueReady = false;
     let issueIsCurrentWeek = false;
+    // The Issue (Phase 4) — trust-ladder doorbell. Count of recs auto-sent THIS ISO week
+    // (autoSent && sentAt in the current week). Drives the "N moves auto-sent this cycle" bell;
+    // clears next week naturally (mirror of the Phase 3 doorbell). Cheap (in-memory filter).
+    let issueAutoSentCount = 0;
+    const issueAutoSentWeekOf = currentWeekOfUTC();
     try {
       const recSet = loadRecommendations(ws.id);
       const recs = recSet?.recommendations ?? [];
@@ -210,6 +215,18 @@ router.get('/api/workspace-overview', (req, res) => {
       const flagOn = isFeatureEnabled('strategy-the-issue', ws.id);
       const hasActiveIssue = flagOn && recs.some((r) => isActiveRec(r));
       const weekOf = currentWeekOfUTC();
+      // autoSent count is meaningful only when the flag is on (the cron is the only writer of
+      // autoSent=true, and it is flag-gated) — keep it 0 otherwise so the bell stays dark.
+      if (flagOn) {
+        issueAutoSentCount = recs.filter((r) => {
+          if (!r.autoSent || !r.sentAt) return false;
+          // Guard a malformed sentAt: new Date('garbage').toISOString() throws (RangeError), which
+          // the outer catch would swallow — zeroing issueReady + the count for the WHOLE workspace.
+          const sentDate = new Date(r.sentAt);
+          if (Number.isNaN(sentDate.getTime())) return false;
+          return currentWeekOfUTC(sentDate) === weekOf;
+        }).length;
+      }
       issueIsCurrentWeek = ws.lastIssuePushedWeekOf === weekOf;
       // "Acted on" signal: the POV was edited within the current ISO week (editedAt on/after the
       // Monday anchor of `weekOf`). currentWeekOfUTC returns the YYYY-MM-DD Monday; comparing the
@@ -268,6 +285,7 @@ router.get('/api/workspace-overview', (req, res) => {
         ready: issueReady,
         pushedWeekOf: ws.lastIssuePushedWeekOf ?? null,
         isCurrentWeek: issueIsCurrentWeek,
+        autoSent: { weekOf: issueAutoSentWeekOf, count: issueAutoSentCount },
       },
       pageStates,
     };

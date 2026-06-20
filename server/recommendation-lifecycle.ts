@@ -26,6 +26,7 @@ import {
   updateRecommendationStatus,
 } from './recommendations.js';
 import { validateTransition, RECOMMENDATION_TRANSITIONS, CLIENT_REC_TRANSITIONS } from './state-machines.js';
+import { creditArchetypeCycleOnSend } from './strategy-autosend-store.js';
 import { createLogger } from './logger.js';
 import type { Recommendation, RecPolicyRegistry } from '../shared/types/recommendations.js';
 
@@ -80,7 +81,7 @@ function mutateRec(
  *  (P2 route) handles the deliverable-spine branch for sendChannel==='deliverable' RecTypes
  *  before reaching here. Returns null when the rec id is absent. */
 export function sendRecommendation(workspaceId: string, recId: string): Recommendation | null {
-  return mutateRec(workspaceId, recId, (rec) => {
+  const sent = mutateRec(workspaceId, recId, (rec) => {
     const from = rec.clientStatus ?? 'system';
     // curated→sent is the blessed edge; allow system→sent (operator skips the curate step) by
     // first validating system→curated then curated→sent, mirroring the two-edge path. An
@@ -92,6 +93,24 @@ export function sendRecommendation(workspaceId: string, recId: string): Recommen
     // Stamp the routing channel from the policy so downstream readers know where this Send went.
     const policy = REC_POLICY_REGISTRY[rec.type];
     rec.sendChannel = policy?.sendChannel ?? 'rec';
+  });
+  // Trust-ladder cycle credit (The Issue Phase 4). The SINGLE chokepoint covering every send —
+  // manual AND the cron's auto-send. Fires only after the send txn committed (sent !== null). The
+  // helper is flag-guarded internally (a full no-op when strategy-the-issue is off), only credits
+  // the two eligible archetypes, dedupes once-per-ISO-week, and NEVER throws into the send.
+  if (sent) creditArchetypeCycleOnSend(workspaceId, sent.type);
+  return sent;
+}
+
+/** The Issue Phase 4 — stamp `autoSent=true` on a rec the trust-ladder cron just auto-sent.
+ *  Transactional via mutateRec (re-reads the set INSIDE the txn), so it cannot clobber a concurrent
+ *  regen — the SAME single-writer guard that protects clientStatus. Without this the cron's plain
+ *  load→mutate→save would lose the autoSent stamp (or clobber a regen) on an interleave. Pure
+ *  bookkeeping: does NOT re-credit the cycle (sendRecommendation already did) and NEVER writes
+ *  RecStatus. Returns the updated rec, or null when the rec id is absent. */
+export function markRecommendationAutoSent(workspaceId: string, recId: string): Recommendation | null {
+  return mutateRec(workspaceId, recId, (rec) => {
+    rec.autoSent = true;
   });
 }
 

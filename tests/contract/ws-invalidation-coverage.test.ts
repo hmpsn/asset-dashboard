@@ -83,6 +83,13 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // STRATEGY_POV_GENERATED broadcast (and only on the changed path — POV_UNCHANGED does not
   // broadcast), not by this event. No centralized React Query cache keys off STRATEGY_ISSUE_PUSHED.
   'STRATEGY_ISSUE_PUSHED',
+
+  // STRATEGY_AUTOSEND_POLICY_UPDATED (The Issue, Phase 4 trust ladder): handled locally by
+  // src/hooks/admin/useAutoSendPolicy.ts via useWorkspaceEvents (invalidates
+  // queryKeys.admin.autoSendPolicy(workspaceId)). Only that hook's query — the TrustLadderPanel's
+  // per-workspace policy fetch — consumes it, so a centralized useWsInvalidation.ts handler would
+  // invalidate nothing else. Mirrors the STRATEGY_POV_GENERATED local-handler pattern above.
+  'STRATEGY_AUTOSEND_POLICY_UPDATED',
 ]);
 
 // ---------------------------------------------------------------------------

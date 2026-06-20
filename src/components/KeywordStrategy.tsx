@@ -28,6 +28,7 @@ import { IssueHeader } from './strategy/issue/IssueHeader';
 import { StanceBar } from './strategy/issue/StanceBar';
 import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
 import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
+import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
 import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
@@ -557,6 +558,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onCut={(id) => setStruckRecIds((s) => [...s, id])}
         shortlistCap={5}
       />
+      {/* Trust ladder (Phase 4) — per-archetype auto-send rewards for the 2 low-risk buckets. */}
+      <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
       {/* Existing supporting surfaces — reused verbatim from the command-center branch. */}
       {orientEl}
       {realLeaves?.cannibalization}

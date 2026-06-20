@@ -28,7 +28,12 @@ interface WorkspaceSummary {
   clientSignals?: { new: number };
   clientActions?: { approved?: number; changesRequested?: number };
   recResponses?: { approved?: number; declined?: number; discussing?: number };
-  issue?: { ready?: boolean; pushedWeekOf?: string | null; isCurrentWeek?: boolean };
+  issue?: {
+    ready?: boolean;
+    pushedWeekOf?: string | null;
+    isCurrentWeek?: boolean;
+    autoSent?: { weekOf?: string | null; count?: number };
+  };
 }
 
 interface AnomalySummary {
@@ -265,6 +270,24 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
       notifications.push({
         id: `strategy-issue-${ws.id}`,
         label: 'Weekly Issue drafted and ready to curate',
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: Newspaper,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'seo-strategy',
+      });
+    }
+    // The Issue (Phase 4) — trust-ladder auto-send doorbell. The server stamps
+    // `issue.autoSent: { weekOf, count }` (count of recs the cron auto-sent this cycle).
+    // The bell lights when the cron auto-sent ≥1 low-risk move so the operator can
+    // review/recall, mirroring the Phase 3 doorbell. It clears next week naturally
+    // (the count resets when the new cycle's autoSent block is recomputed).
+    const autoSentCount = ws.issue?.autoSent?.count || 0;
+    if (autoSentCount > 0) {
+      notifications.push({
+        id: `strategy-autosent-${ws.id}`,
+        label: `${autoSentCount} low-risk move${autoSentCount === 1 ? '' : 's'} auto-sent this cycle — review`,
         sub: ws.name,
         color: 'text-teal-400',
         icon: Newspaper,

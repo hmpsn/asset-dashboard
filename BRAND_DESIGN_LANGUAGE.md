@@ -794,3 +794,9 @@ When shipping UI changes that affect color or design patterns:
 - CompetitorGapsSection: Premium chip in teal (confirmed-access, never amber); banded chips only
 - StrategyPageRankStoriesSection: ranked chips blue (data), gap chips amber/10 pill ("worth adding" = attention semantics)
 - Cart content items: strikethrough original + discounted price for Premium (MONETIZATION §261 pattern)
+
+### The Issue — TrustLadderPanel (Phase 4, June 2026)
+- `src/components/strategy/issue/TrustLadderPanel.tsx` — operator-facing trust ladder, admin-only (mounted inside `KeywordStrategy.tsx` issueOverviewEl after `BackingMovesQueue`, theIssueEnabled-gated). No purple, no TierGate.
+- `<SectionCard title="Trust ladder">` with `ShieldCheck` titleIcon (`text-accent-brand`). One row per auto-send-eligible archetype (quick_win, technical).
+- Each row uses the shared `<Toggle>` (Law 1 — teal track `--brand-mint` when on). The toggle is **disabled until the archetype is `earned`** (`disabled={!row.earned || isUpdating}`) — disabled-until-earned reuses Toggle's built-in `opacity-50 cursor-not-allowed`; the toggle is the reward for 3 consecutive cycles.
+- Progress/state caption is `t-caption-sm`: `--brand-text-muted` while building (`{n}/{threshold} cycles`), `--brand-text` once earned ("Auto-sends each cycle" / "Ready — flip on to automate"). Rows separated by `divide-y divide-[var(--brand-border)]`.
