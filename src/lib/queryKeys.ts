@@ -123,6 +123,7 @@ export const queryKeys = {
     strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
     autoSendPolicy: (wsId: string) => ['admin-auto-send-policy', wsId] as const,
     issueLenses: (wsId: string) => ['admin-issue-lenses', wsId] as const,
+    competitorAlerts: (wsId: string) => ['admin-competitor-alerts', wsId] as const,
     recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
     /** Strategy v3 — discussion thread for a workspace's recs (admin cockpit Discuss filter). */
     recDiscussion: (wsId: string) => ['admin-rec-discussion', wsId] as const,
