@@ -12,14 +12,16 @@ export type {
   ContentGap, QuickWin, KeywordStrategy, PageEditStatus, PageEditState,
   AudiencePersona, Workspace,
 } from '../shared/types/workspace.ts';
-import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
+import type { PageEditStatus, PageEditState, Workspace, ClientSegment, ResolvedSegmentProfile } from '../shared/types/workspace.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { getClientLocations } from './client-locations.js';
 import {
   eventDisplayConfigSchema, eventGroupSchema,
   keywordStrategySchema,
   contentPricingSchema, portalContactSchema, auditSuppressionSchema,
   publishTargetSchema, businessProfileSchema, audiencePersonaSchema, intelligenceProfileSchema,
+  outcomeValueSchema, segmentConfigSchema,
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { normalizeSocialProfiles } from './social-profiles.js';
@@ -63,6 +65,44 @@ export function computeEffectiveTier(ws: Pick<Workspace, 'tier' | 'trialEndsAt'>
     if (!Number.isNaN(trialEnd.getTime()) && trialEnd.getTime() > nowMs) return 'growth';
   }
   return base;
+}
+
+// ── The Issue (Client) — segment resolution ──
+// Sibling to computeEffectiveTier. The local axis is DETERMINISTIC + authoritative from the
+// client_locations count; the non-local 3-way is ADVISORY (read from an admin-confirmed
+// segmentConfig, defaulting to a safe non-local segment so a misclassification can't fabricate
+// a verdict noun). Returns one pre-resolved representation injected directly into the client
+// surface (authority-layered-fields rule) — callers read the boolean flags, never the raw segment.
+
+const SEGMENT_DEFAULTS: Record<ClientSegment, Omit<ResolvedSegmentProfile, 'segment' | 'outcomeNounSingular' | 'outcomeNounPlural'>> = {
+  local_smb:             { moneyFrameAltitude: 'production_vs_retainer',  showCompetitorAuthority: false, showPortfolioRollup: false, showLocalMapAndReviews: true,  exportProfile: 'sms_recap' },
+  b2b_saas:              { moneyFrameAltitude: 'pipeline_ratio',          showCompetitorAuthority: true,  showPortfolioRollup: false, showLocalMapAndReviews: false, exportProfile: 'board_one_pager' },
+  board_vc:              { moneyFrameAltitude: 'cac_vs_paid',             showCompetitorAuthority: true,  showPortfolioRollup: false, showLocalMapAndReviews: false, exportProfile: 'board_one_pager' },
+  professional_services: { moneyFrameAltitude: 'pipeline_ratio',          showCompetitorAuthority: true,  showPortfolioRollup: false, showLocalMapAndReviews: false, exportProfile: 'partner_summary' },
+  multi_location:        { moneyFrameAltitude: 'portfolio_cost_per_lead', showCompetitorAuthority: false, showPortfolioRollup: true,  showLocalMapAndReviews: true,  exportProfile: 'owner_portfolio' },
+};
+
+const DEFAULT_NOUN_SINGULAR: Record<ClientSegment, string> = {
+  local_smb: 'lead', b2b_saas: 'qualified lead', board_vc: 'qualified lead',
+  professional_services: 'qualified inquiry', multi_location: 'lead',
+};
+
+/**
+ * Resolve the single client-facing segment profile (sibling to computeEffectiveTier).
+ * Local axis is DETERMINISTIC + authoritative from client_locations count; the non-local 3-way
+ * is ADVISORY — read from an admin-confirmed segmentConfig, defaulting to a safe non-local
+ * segment (never a local noun) so a misclassification can't fabricate a verdict.
+ */
+export function resolveSegmentProfile(ws: Workspace): ResolvedSegmentProfile {
+  const locationCount = getClientLocations(ws.id).length;
+  let segment: ClientSegment;
+  if (locationCount >= 2) segment = 'multi_location';
+  else if (locationCount === 1) segment = 'local_smb';
+  else segment = ws.segmentConfig?.segment ?? 'b2b_saas';
+  const base = SEGMENT_DEFAULTS[segment];
+  const singular = ws.segmentConfig?.outcomeNounSingular ?? ws.outcomeValue?.unitLabel ?? DEFAULT_NOUN_SINGULAR[segment];
+  const plural = ws.segmentConfig?.outcomeNounPlural ?? `${singular}s`;
+  return { segment, outcomeNounSingular: singular, outcomeNounPlural: plural, ...base };
 }
 
 // ── Prepared statements (lazy) ──
@@ -113,6 +153,8 @@ interface WorkspaceRow {
   seo_data_provider: string | null;
   scoring_config: string | null;
   intelligence_profile: string | null;
+  segment_config: string | null;
+  outcome_value: string | null;
   business_priorities: string | null;
   custom_prompt_notes: string | null;
   // NOT NULL DEFAULT 0 / 24 in migration 077 — never null on read
@@ -213,6 +255,14 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.intelligence_profile) {
     const ip = parseJsonSafe(row.intelligence_profile, intelligenceProfileSchema, null, { workspaceId: row.id, field: 'intelligence_profile', table: 'workspaces' });
     if (ip) ws.intelligenceProfile = ip;
+  }
+  if (row.segment_config) {
+    const sc = parseJsonSafe(row.segment_config, segmentConfigSchema, null, { workspaceId: row.id, field: 'segment_config', table: 'workspaces' });
+    if (sc) ws.segmentConfig = sc;
+  }
+  if (row.outcome_value) {
+    const ov = parseJsonSafe(row.outcome_value, outcomeValueSchema, null, { workspaceId: row.id, field: 'outcome_value', table: 'workspaces' });
+    if (ov) ws.outcomeValue = ov;
   }
   // Use loose != null (not !==) so undefined (column not yet in DB before migration 049) is also excluded,
   // preserving the "undefined = enabled by default" intent until migration 049 lands in Group 3.
@@ -357,6 +407,8 @@ function workspaceToParams(ws: Workspace) {
     seo_data_provider: ws.seoDataProvider ? normalizeRuntimeSeoDataProvider(ws.seoDataProvider) : null,
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
+    segment_config: ws.segmentConfig ? JSON.stringify(ws.segmentConfig) : null,
+    outcome_value: ws.outcomeValue ? JSON.stringify(ws.outcomeValue) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     custom_prompt_notes: ws.customPromptNotes ?? null,
     // Mirror migration 077 DEFAULTs (NOT NULL columns) so future INSERT-statement updates don't trip
@@ -442,7 +494,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -482,6 +534,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
+    segmentConfig: 'segment_config', outcomeValue: 'outcome_value',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
     autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
     lastIssuePushedWeekOf: 'last_issue_pushed_week_of',

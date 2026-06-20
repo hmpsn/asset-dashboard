@@ -1,6 +1,55 @@
 {
   "sprints": [
     {
+      "id": "sprint-the-issue-client-redesign-2026-06-20",
+      "name": "The Issue (Client) — Verdict-First Trust Spine",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "Invert the client The Issue dashboard from a 0-100 vanity-ring/content-plan hero into a verdict-first trust spine that leads with a dollarized, baseline-anchored, GA4-grounded outcome verdict. P0 = the trust spine on GA4 estimates (verdict + outcome count + money frame, baseline-anchored to workspace.createdAt, eventConfig-pinned), shipped behind the-issue-client-spine master flag (OFF = byte-identical). P1 = reconciliation/return-hook/segment-inserts/next-bets, declared OFF and deferred until P0 is merged + green on staging.",
+      "notes": "Additive + flag-gated. Every new field optional/unread on the OFF path; computeROI omits outcomeVerdict and toPublicWorkspaceView omits segmentProfile when the flag is OFF. Spec: docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md. Plan: docs/superpowers/plans/2026-06-20-the-issue-client-dashboard-p0-plan.md.",
+      "items": [
+        {
+          "id": "the-issue-client-redesign-p1-reconciliation",
+          "title": "The Issue (Client) P1 — named-record reconciliation (call tracking + CRM + form capture → actual_reconciled, clickable named records, junk quality-scored)",
+          "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
+          "est": "TBD",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF)."
+        },
+        {
+          "id": "the-issue-client-redesign-p1-return-hook",
+          "title": "The Issue (Client) P1 — return hook (event-driven SMS/email push + forwardable board/QBR one-pager export)",
+          "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
+          "est": "TBD",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "Deferred. Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first)."
+        },
+        {
+          "id": "the-issue-client-redesign-p1-segments",
+          "title": "The Issue (Client) P1 — segment-conditional inserts (competitor/authority + local map-pack/reviews + portfolio rollup) + AI segment derivation",
+          "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
+          "est": "TBD",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "Deferred. Flag: the-issue-client-segment-inserts (declared OFF). P0 ships only the manual segment confirm/override; the non-local AI 3-way derivation op + endpoint are P1."
+        },
+        {
+          "id": "the-issue-client-redesign-p1-next-bets",
+          "title": "The Issue (Client) P1 — next-bets $-forecast reframe from recommendation estimatedGain via outcomeValue",
+          "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
+          "est": "TBD",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "Deferred. Flag: the-issue-client-next-bets (declared OFF)."
+        }
+      ]
+    },
+    {
       "id": "sprint-strategy-decision-first-redesign-2026-06-16",
       "name": "Strategy Page — Decision-First Redesign",
       "hours": "TBD — phased, one PR per phase",

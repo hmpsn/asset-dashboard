@@ -82,6 +82,23 @@ export const FEATURE_FLAGS = {
   // that rings the operator doorbell (no review window). With this OFF, the cron still pushes + rings
   // the doorbell but never auto-sends — nothing reaches a client without a manual operator send.
   'strategy-trust-ladder-autosend': false,
+
+  // The Issue (Client) — P0 master flag for the verdict-first trust spine on GA4 estimates.
+  // OFF = today's TheIssueClientPage (ring headline, plan-as-hero, collapsed proof) byte-identical.
+  // Every new field is additive/optional and unread on the OFF path; computeROI omits outcomeVerdict
+  // and toPublicWorkspaceView omits segmentProfile when OFF.
+  // See docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md.
+  'the-issue-client-spine': false,
+  // P1 children — DECLARED OFF + unread in P0 so the flag family/group is stable. Do not start P1
+  // until P0 is merged + green on staging.
+  // P1: named-record reconciliation (call tracking + CRM + form capture → actual_reconciled).
+  'the-issue-client-reconciliation': false,
+  // P1: event-driven SMS/email push + forwardable one-pager export (the return hook).
+  'the-issue-client-return-hook': false,
+  // P1: segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts.
+  'the-issue-client-segment-inserts': false,
+  // P1: "next bets" $-forecast reframe from existing recommendation estimatedGain.
+  'the-issue-client-next-bets': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -133,6 +150,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Client Insights Briefing',
   'Keyword Hub',
   'Strategy',
+  'The Issue (Client)',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -408,6 +426,71 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-18',
     },
   },
+  'the-issue-client-spine': {
+    label: 'The Issue (Client) — verdict-first trust spine (P0, GA4 estimates)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'pilot-clients',
+      removalCondition: 'Promote to default once the verdict-first spine is validated with pilot clients on staging; the legacy ring-headline / plan-as-hero TheIssueClientPage layout is then deleted.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p0',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'the-issue-client-reconciliation': {
+    label: 'The Issue (Client) — named-record reconciliation (P1, actual_reconciled)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'pilot-clients',
+      removalCondition: 'Enable + remove once call-tracking + CRM + form-capture reconciliation graduates provenance to actual_reconciled and the count becomes clickable to named records.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p1-reconciliation',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'the-issue-client-return-hook': {
+    label: 'The Issue (Client) — push/export return hook (P1)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once the event-driven push + forwardable one-pager export delivery cost is validated on staging.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p1-return-hook',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'the-issue-client-segment-inserts': {
+    label: 'The Issue (Client) — segment-conditional inserts (P1)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'pilot-clients',
+      removalCondition: 'Promote to default once segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts are validated with pilot clients on staging.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p1-segments',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'the-issue-client-next-bets': {
+    label: 'The Issue (Client) — next-bets $-forecast (P1)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'pilot-clients',
+      removalCondition: 'Promote to default once the next-bets $-forecast reframe from recommendation estimatedGain is validated with pilot clients on staging.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p1-next-bets',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -438,6 +521,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Strategy',
     keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
+  },
+  {
+    label: 'The Issue (Client)',
+    keys: ['the-issue-client-spine', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets'],
   },
 ];
 

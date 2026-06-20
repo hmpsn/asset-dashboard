@@ -14,6 +14,10 @@ import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { loadGa4SnapshotHistory } from './ga4-snapshots.js';
+import { aggregatePinnedOutcomes, computeOutcomeBaseline } from './the-issue-outcome.js';
+import type { OutcomeBaseline, OutcomeProvenance } from '../shared/types/the-issue.js';
 
 
 const log = createLogger('roi');
@@ -105,6 +109,21 @@ export interface ROIData {
   contentItems: ContentItemROI[];
   /** Computed at */
   computedAt: string;
+  /**
+   * The Issue (Client) P0 — outcome-denominated verdict. Present ONLY when the spine flag is ON,
+   * GA4 conversions exist, AND workspace.outcomeValue is set; additive + optional → legacy callers
+   * and the flag-OFF path are unaffected. provenance is ALWAYS 'estimate_ga4' in P0.
+   */
+  outcomeVerdict?: {
+    outcomeCount: number;
+    outcomeUnitLabel: string;
+    valuePerOutcome: number;
+    estimatedValue: number;
+    monthlyRetainer: number | null;
+    baseline: OutcomeBaseline;
+    baselineDeltaCount: number | null;
+    provenance: OutcomeProvenance;
+  };
 }
 
 export interface PageROI {
@@ -326,6 +345,34 @@ export function computeROI(workspaceId: string): ROIData | null {
 
   // Save snapshot for future MoM comparison
   saveSnapshot(workspaceId, result.organicTrafficValue);
+
+  // The Issue (Client) P0 — additive outcome-denominated verdict. Hydrated ONLY when the spine flag
+  // is ON for this workspace AND outcomeValue is set AND a GA4 conversion snapshot exists. Otherwise
+  // left undefined so the flag-OFF / legacy path is byte-identical (no fabricated number).
+  if (isFeatureEnabled('the-issue-client-spine', workspaceId) && ws.outcomeValue) {
+    const history = loadGa4SnapshotHistory(ws.id);
+    const latest = history.length > 0 ? history[history.length - 1] : null;
+    if (latest) {
+      const agg = aggregatePinnedOutcomes(ws, latest.byEvent);
+      const baseline = computeOutcomeBaseline(ws);
+      const baselineDeltaCount =
+        baseline.state === 'ready' && baseline.baselineConversions != null
+          ? agg.totalConversions - baseline.baselineConversions
+          : null;
+      const provenance: OutcomeProvenance = 'estimate_ga4';
+      const verdictBaseline: OutcomeBaseline = baseline;
+      result.outcomeVerdict = {
+        outcomeCount: agg.totalConversions,
+        outcomeUnitLabel: ws.outcomeValue.unitLabel,
+        valuePerOutcome: ws.outcomeValue.valuePerOutcome,
+        estimatedValue: agg.totalConversions * ws.outcomeValue.valuePerOutcome,
+        monthlyRetainer: ws.outcomeValue.monthlyRetainer ?? null,
+        baseline: verdictBaseline,
+        baselineDeltaCount,
+        provenance,
+      };
+    }
+  }
 
   return result;
 }

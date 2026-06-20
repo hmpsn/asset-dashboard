@@ -689,6 +689,16 @@
       "tier": "free",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 70,
+      "title": "Dollar-Verdict Outcome Spine (GA4-grounded)",
+      "oneLiner": "Leads the client dashboard with a checkable dollar verdict and outcome count — GA4 key-event conversions times your lead value, baseline-anchored to 'when we started,' honestly labeled as an estimate",
+      "category": "reporting",
+      "painPoints": ["proof-of-value", "reporting", "retention", "trust"],
+      "tier": "free",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

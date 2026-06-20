@@ -19,6 +19,39 @@ export interface EventDisplayConfig {
   group?: string;
 }
 
+// ── The Issue (Client) — segment model (P0) ──────────────────────
+// Backing column: segment_config (typed JSON, parseJsonSafe at the read boundary).
+
+export type ClientSegment =
+  | 'local_smb'             // single-location service: calls/forms/bookings
+  | 'b2b_saas'              // pipeline-led: leads/demos → pipeline $ → influenced revenue
+  | 'board_vc'              // efficiency-led: organic CAC vs paid
+  | 'professional_services' // authority-led: qualified inbound by title/firm
+  | 'multi_location';       // portfolio/triage: roll-up + ranked needs-attention
+
+export interface SegmentConfig {
+  segment: ClientSegment;
+  outcomeNounSingular?: string;   // admin override, e.g. "new patient"
+  outcomeNounPlural?: string;     // "new patients"
+  reportingAudience?: 'self' | 'board' | 'partners' | 'owners';
+}
+
+/**
+ * Single pre-resolved representation injected directly into the client surface
+ * (authority-layered-fields rule). Sections read the boolean flags, never the raw segment,
+ * so segment logic lives in one place (resolveSegmentProfile in server/workspaces.ts).
+ */
+export interface ResolvedSegmentProfile {
+  segment: ClientSegment;
+  outcomeNounSingular: string;
+  outcomeNounPlural: string;
+  moneyFrameAltitude: 'production_vs_retainer' | 'pipeline_ratio' | 'cac_vs_paid' | 'portfolio_cost_per_lead';
+  showCompetitorAuthority: boolean;   // gates the B2B/services insert
+  showPortfolioRollup: boolean;       // gates the multi-location inversion
+  showLocalMapAndReviews: boolean;    // gates the local-only first-screen insert
+  exportProfile: 'sms_recap' | 'board_one_pager' | 'partner_summary' | 'owner_portfolio' | null;
+}
+
 export interface PageKeywordMap {
   pagePath: string;
   pageTitle: string;
@@ -358,6 +391,17 @@ export interface Workspace {
     briefDescription?: string;
     fullPostDescription?: string;
   };
+  /**
+   * The Issue (Client) P0: per-workspace converted-outcome value powering the dollar verdict.
+   * Absent = count-only (no dollar verdict). Backing column: outcome_value (typed JSON).
+   */
+  outcomeValue?: {
+    valuePerOutcome: number;
+    unitLabel: string;                 // 'new patient' | 'qualified lead' | 'booking' …
+    currency: string;                  // reuse contentPricing currency convention
+    basis: 'client_provided' | 'agency_estimate' | 'ai_enriched';
+    monthlyRetainer?: number;          // optional — enables value-vs-spend in one line
+  };
   // SEO data provider preference
   seoDataProvider?: 'dataforseo';
   // Verified business contact info for schema generation (bypasses page-content verification)
@@ -378,6 +422,13 @@ export interface Workspace {
     goals?: string[];
     targetAudience?: string;
   };
+  /**
+   * The Issue (Client) P0/P1: admin-confirmed segment classification override.
+   * Backing column: segment_config (typed JSON, parseJsonSafe at read boundary).
+   * resolveSegmentProfile() reads this for the non-local 3-way; the local/multi axis is
+   * deterministic from client_locations count and ignores this override.
+   */
+  segmentConfig?: SegmentConfig;
   // Client Briefing (weekly editorial)
   /** Auto-publish briefings without admin review after N hours */
   autoPublishBriefings?: boolean;
@@ -429,12 +480,14 @@ export interface AdminWorkspaceView {
   pageEditStates?: Record<string, PageEditState>;
   publishTarget?: Workspace['publishTarget'];
   contentPricing?: Workspace['contentPricing'];
+  outcomeValue?: Workspace['outcomeValue'];
   seoDataProvider?: 'dataforseo';
   businessProfile?: BusinessProfileContact | null;
   businessPriorities?: string[];
   customPromptNotes?: string;
   scoringConfig?: Workspace['scoringConfig'];
   intelligenceProfile?: Workspace['intelligenceProfile'];
+  segmentConfig?: Workspace['segmentConfig'];
   autoPublishBriefings?: boolean;
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;

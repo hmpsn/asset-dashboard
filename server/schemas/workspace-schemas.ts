@@ -551,3 +551,22 @@ export const actionItemSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 }).passthrough();
+
+// ── The Issue (Client) — outcome value + segment config (P0) ──────
+
+/** Per-workspace converted-outcome value powering the dollar verdict. */
+export const outcomeValueSchema = z.object({
+  valuePerOutcome: z.number().nonnegative(),
+  unitLabel: z.string().min(1),
+  currency: z.string().min(1),
+  basis: z.enum(['client_provided', 'agency_estimate', 'ai_enriched']),
+  monthlyRetainer: z.number().nonnegative().optional(),
+}).passthrough();
+
+/** Admin-confirmed segment classification override (non-local 3-way). */
+export const segmentConfigSchema = z.object({
+  segment: z.enum(['local_smb', 'b2b_saas', 'board_vc', 'professional_services', 'multi_location']),
+  outcomeNounSingular: z.string().optional(),
+  outcomeNounPlural: z.string().optional(),
+  reportingAudience: z.enum(['self', 'board', 'partners', 'owners']).optional(),
+}).passthrough();

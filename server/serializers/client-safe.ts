@@ -4,7 +4,8 @@ import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 import type { SchemaPageSuggestion } from '../schema-suggester.js';
 import type { SchemaSnapshot } from '../schema-store.js';
 import type { Workspace } from '../workspaces.js';
-import { computeEffectiveTier } from '../workspaces.js';
+import type { ResolvedSegmentProfile } from '../../shared/types/workspace.js';
+import { computeEffectiveTier, resolveSegmentProfile } from '../workspaces.js';
 import { computeTrialState } from '../billing/trial-state.js';
 
 export interface PublicWorkspaceView {
@@ -38,6 +39,12 @@ export interface PublicWorkspaceView {
   onboardingCompleted: boolean;
   hasClientUsers: boolean;
   bookingUrl: string | null;
+  /**
+   * The Issue (Client) P0 — pre-resolved segment profile. Present ONLY when the spine flag is ON
+   * for this workspace (opts.theIssueClientSpine); optional → flag-OFF byte-identical.
+   * Pre-resolved (authority-layered-fields rule): the client reads the boolean flags, never raw industry.
+   */
+  segmentProfile?: ResolvedSegmentProfile;
 }
 
 export function toPublicWorkspaceView(
@@ -47,6 +54,8 @@ export function toPublicWorkspaceView(
     hasClientUsers: boolean;
     bookingUrl: string | null;
     nowMs?: number;
+    /** The Issue (Client) P0 — when true, attach the pre-resolved segmentProfile. */
+    theIssueClientSpine?: boolean;
   },
 ): PublicWorkspaceView {
   const nowMs = opts.nowMs ?? Date.now();
@@ -83,6 +92,9 @@ export function toPublicWorkspaceView(
     onboardingCompleted: ws.onboardingCompleted ?? false,
     hasClientUsers: opts.hasClientUsers,
     bookingUrl: opts.bookingUrl ?? null,
+    // The Issue (Client) P0 — flag-gated: attach the pre-resolved segment profile only when ON,
+    // so the OFF path is byte-identical (field absent from the payload entirely).
+    ...(opts.theIssueClientSpine ? { segmentProfile: resolveSegmentProfile(ws) } : {}),
   };
 }
 

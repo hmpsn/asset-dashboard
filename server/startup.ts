@@ -13,6 +13,7 @@ import { startDataRetentionCrons } from './data-retention.js';
 import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelligence-crons.js';
 import { startInsightRecomputeCron } from './insight-recompute-cron.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
+import { startGa4ConversionSnapshotScheduler } from './ga4-conversion-snapshot-scheduler.js';
 import { startBriefingCron } from './briefing-cron.js';
 import { startStrategyIssueCron } from './strategy-issue-cron.js';
 
@@ -38,6 +39,7 @@ export function startSchedulers() {
   startCompetitorMonitoringCron();
   startInsightRecomputeCron();
   startRankTrackingScheduler();
+  startGa4ConversionSnapshotScheduler();
   startBriefingCron();
   startStrategyIssueCron();
 }

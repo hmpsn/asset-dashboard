@@ -47,6 +47,16 @@ export type PlaybookConfidence = 'high' | 'medium' | 'low';
 export type DeltaDirection = 'improved' | 'declined' | 'stable';
 export type EarlySignal = 'on_track' | 'no_movement' | 'too_early';
 
+/**
+ * Single confidence/provenance source carried on EVERY client-facing outcome and money number
+ * across The Issue client surface. P0 hard-codes 'estimate_ga4'; P1 graduates to
+ * 'actual_reconciled' once named records reconcile the count. The render contract derives the
+ * human "estimate" label + rounding precision from this field — see fmtEstimateMoney/Ratio (Lane B).
+ */
+export type OutcomeProvenance =
+  | 'estimate_ga4'        // GA4 key-event aggregate × client lead value. Renders an "estimate" label.
+  | 'actual_reconciled';  // Reconciled to call-tracking / CRM / form capture. Renders "actual".
+
 /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
 export interface BaselineSnapshot {
   captured_at: string;

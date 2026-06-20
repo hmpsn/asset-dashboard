@@ -587,6 +587,29 @@ export const AI_OPERATION_REGISTRY = {
     defaultTimeoutMs: 90_000,
     defaultResearchMode: false,
   },
+  'the-issue-lead-value-enrich': {
+    id: 'the-issue-lead-value-enrich',
+    domain: 'analytics-intelligence',
+    feature: 'the-issue-lead-value-enrich',
+    providerIntent: 'openai',
+    // The Issue (Client) P0 — single AI op: a low-confidence per-workspace lead/customer-value
+    // estimate used ONLY as the basis='ai_enriched' fallback when no client_provided/agency_estimate
+    // value exists. The advisory estimate never persists itself; the admin confirms via the standard
+    // workspace PATCH (basis stamped in code, not by the model). Segment derivation is P1.
+    modelIntent: 'small structured per-workspace lead/customer-value estimate (advisory, lowest confidence)',
+    outputMode: 'json',
+    parserExpectation: 'parseAIJson + leadValueEnrichSchema.safeParse → null on failure',
+    researchMode: 'forbidden',
+    executionMode: 'sync-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'short',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4-nano',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 2,
+    defaultTimeoutMs: 20_000,
+    defaultResearchMode: false,
+  },
 } as const satisfies Record<string, AIOperationContract>;
 
 export type AIOperationId = keyof typeof AI_OPERATION_REGISTRY;

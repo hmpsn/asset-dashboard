@@ -1,3 +1,5 @@
+import type { OutcomeBaseline, OutcomeProvenance } from './the-issue.js';
+
 export interface PageROI {
   pagePath: string;
   pageTitle: string;
@@ -46,4 +48,19 @@ export interface ROIData {
   } | null;
   contentItems: ContentItemROI[];
   computedAt: string;
+  /**
+   * The Issue (Client) P0 — outcome-denominated verdict. Present ONLY when the spine flag is ON,
+   * GA4 conversions exist, AND workspace.outcomeValue is set; additive + optional → legacy callers
+   * and the flag-OFF path are unaffected (byte-identical). provenance is ALWAYS 'estimate_ga4' in P0.
+   */
+  outcomeVerdict?: {
+    outcomeCount: number;
+    outcomeUnitLabel: string;
+    valuePerOutcome: number;
+    estimatedValue: number;            // outcomeCount × valuePerOutcome
+    monthlyRetainer: number | null;
+    baseline: OutcomeBaseline;
+    baselineDeltaCount: number | null; // null while establishing
+    provenance: OutcomeProvenance;     // ALWAYS 'estimate_ga4' in P0
+  };
 }
