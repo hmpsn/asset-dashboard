@@ -64,6 +64,10 @@ export interface Recommendation {
   throttledUntil?: string;
   /** ISO timestamp the rec was sent to the client. Set when clientStatus → 'sent'. */
   sentAt?: string;
+  /** The Issue Phase 4 (trust ladder): true when this rec was AUTO-sent by the weekly cron
+   *  (an earned + enabled low-risk archetype), NOT operator-sent. Carried over on regen.
+   *  Powers the auto-send doorbell count + the cockpit's auto-sent badge / recall affordance. */
+  autoSent?: boolean;
   /** ISO timestamp the rec was struck. Set when lifecycle → 'struck'. */
   struckAt?: string;
   /** Cascade metadata for keyword/topic strikes that also remove items from strategy

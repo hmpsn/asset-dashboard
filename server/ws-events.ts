@@ -107,6 +107,11 @@ export const WS_EVENTS = {
   // cache on this so the "Issue drafted and ready to curate" entry appears without a full poll.
   STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
 
+  // The Issue — trust ladder (Phase 4). Broadcast when an operator toggles a per-archetype
+  // auto-send policy; handled locally by src/hooks/admin/useAutoSendPolicy.ts via
+  // useWorkspaceEvents (invalidates queryKeys.admin.autoSendPolicy).
+  STRATEGY_AUTOSEND_POLICY_UPDATED: 'strategy:autosend-policy-updated',
+
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
   DISCOVERY_UPDATED: 'discovery:updated',

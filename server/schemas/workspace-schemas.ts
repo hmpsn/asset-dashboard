@@ -416,6 +416,7 @@ export const recommendationSchema = z.object({
   lifecycle: z.enum(['active', 'throttled', 'struck']).optional(),
   throttledUntil: z.string().optional(),
   sentAt: z.string().optional(),
+  autoSent: z.boolean().optional(),
   struckAt: z.string().optional(),
   cascade: z.object({
     removedKeywords: z.array(z.string()).optional(),

@@ -629,6 +629,7 @@ export function applyLifecycleCarryOver(newRecs: Recommendation[], oldRecs: Reco
     if (oldRec.lifecycle !== undefined) newRec.lifecycle = oldRec.lifecycle;
     if (oldRec.throttledUntil !== undefined) newRec.throttledUntil = oldRec.throttledUntil;
     if (oldRec.sentAt !== undefined) newRec.sentAt = oldRec.sentAt;
+    if (oldRec.autoSent !== undefined) newRec.autoSent = oldRec.autoSent;
     if (oldRec.struckAt !== undefined) newRec.struckAt = oldRec.struckAt;
     if (oldRec.cascade !== undefined) newRec.cascade = oldRec.cascade;
     if (oldRec.sendChannel !== undefined) newRec.sendChannel = oldRec.sendChannel;

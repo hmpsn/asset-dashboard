@@ -62,6 +62,9 @@ export const WS_EVENTS = {
   // src/hooks/admin/useStrategyPov.ts (useWorkspaceEvents → invalidate queryKeys.admin.strategyPov).
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',
   STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
+  // The Issue — trust ladder (Phase 4). Operator toggled a per-archetype auto-send policy; handled
+  // locally by src/hooks/admin/useAutoSendPolicy.ts (useWorkspaceEvents → invalidate admin.autoSendPolicy).
+  STRATEGY_AUTOSEND_POLICY_UPDATED: 'strategy:autosend-policy-updated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
