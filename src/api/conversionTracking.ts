@@ -7,7 +7,7 @@
  * forms → map each to a typed outcome → save. PII (lead identity) is admin-internal (D7) and never
  * crosses this boundary; the status readout exposes counts + freshness only.
  */
-import { getSafe, put } from './client';
+import { get, getSafe, put } from './client';
 import type { OutcomeType } from '../../shared/types/the-issue.ts';
 import type { WebflowFormMapping } from '../../shared/types/form-submission.ts';
 
@@ -56,11 +56,13 @@ export const conversionTrackingApi = {
       STATUS_FALLBACK,
     ),
 
-  /** GET the site's Webflow forms for the picker. Returns [] on any error / flag-OFF / unlinked site. */
+  /** GET the site's Webflow forms for the picker. THROWS on any error (502 Webflow-unreachable / 400
+   *  no-site-linked / flag-OFF 404) so the caller can distinguish a real failure from a genuinely
+   *  zero-form site (an empty `forms` array on a 200). Using the swallowing getSafe here would collapse
+   *  both cases into the same empty state and make the component's error toast dead code. */
   getWebflowForms: (workspaceId: string) =>
-    getSafe<{ forms: WebflowFormOption[] }>(
+    get<{ forms: WebflowFormOption[] }>(
       `/api/workspaces/${workspaceId}/webflow-forms`,
-      { forms: [] },
     ).then((r) => r.forms),
 
   /** Save the formId→outcomeType mappings. Confirms setup server-side when ≥1 form is mapped. */

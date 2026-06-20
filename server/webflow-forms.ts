@@ -55,11 +55,15 @@ export async function listWebflowForms(siteId: string, tokenOverride?: string): 
   });
 }
 
-/** List a form's submissions (paginated). Empty on no token / error — the poller degrades per-workspace. */
+/** List a form's submissions (paginated). Empty on no token / error — the poller degrades per-workspace.
+ *  `maxPages` bounds the network cost of a large backfill: the Webflow v2 submissions endpoint does not
+ *  guarantee a sort order (in practice ascending by date), so the poller can't safely early-terminate on
+ *  an "old" submission; it caps the page count instead and applies a date floor in-memory. */
 export async function listWebflowFormSubmissions(
   siteId: string,
   formId: string,
   tokenOverride?: string,
+  maxPages?: number,
 ): Promise<WebflowFormSubmission[]> {
   const token = tokenOverride || getToken();
   if (!token) return [];
@@ -68,6 +72,7 @@ export async function listWebflowFormSubmissions(
     extractItems: page => page.formSubmissions,
     getTotal: page => page.pagination?.total,
     tokenOverride: token,
+    maxPages,
   });
 }
 

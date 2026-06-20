@@ -89,7 +89,10 @@ describe('GET /api/workspaces/:id/conversion-tracking-status (requireWorkspaceAc
 describe('GET /api/workspaces/:id/webflow-forms (forms picker)', () => {
   it('returns a forms array (empty + 200 when no Webflow token is configured)', async () => {
     const res = await api(`/api/workspaces/${wsOn}/webflow-forms`);
-    // 200 with an empty list (no real token in CI → listWebflowForms degrades to []) — never a 500.
+    // With no WEBFLOW_API_TOKEN in the test env, listWebflowForms short-circuits to [] (it never calls
+    // the live API), so the picker degrades to an empty list + 200 — never a 500. The two error branches
+    // of this endpoint (400 no-site-linked, 502 Webflow-unreachable) need in-process module spying and
+    // are covered in the-issue-conversion-tracking-error-branches.test.ts.
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(Array.isArray(json.forms)).toBe(true);

@@ -363,6 +363,13 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     });
   };
 
+  // Close the picker without saving: reset the local mapping to the saved sources so closing never
+  // loses the current selection (and an accidental empty Save is avoidable).
+  const cancelFormPicker = () => {
+    setShowFormPicker(false);
+    setFormSources(ws?.webflowFormSources ?? []);
+  };
+
   const saveFormSources = async () => {
     setSavingFormSources(true);
     try {
@@ -1091,9 +1098,16 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   <p className="t-caption text-[var(--brand-text-muted)]">Select which Webflow forms produce leads — submissions are pulled from Webflow daily. The lead identity stays internal.</p>
                 </div>
                 {showFormPicker ? (
-                  <Button aria-label="Save tracked Webflow forms" onClick={saveFormSources} loading={savingFormSources} disabled={savingFormSources} icon={Save} size="sm" className="bg-teal-600 hover:bg-teal-500">
-                    Save
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button aria-label="Save tracked Webflow forms" onClick={saveFormSources} loading={savingFormSources} disabled={savingFormSources} icon={Save} size="sm" className="bg-teal-600 hover:bg-teal-500">
+                      Save
+                    </Button>
+                    {/* Cancel closes the picker WITHOUT saving and restores the current selection, so an
+                        accidental empty Save can't silently clear all tracked forms. */}
+                    <Button aria-label="Cancel form selection" onClick={cancelFormPicker} disabled={savingFormSources} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+                      Cancel
+                    </Button>
+                  </div>
                 ) : (
                   <Button aria-label="Select Webflow forms to track" onClick={openFormPicker} icon={Link2} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
                     {formCaptureConnected ? 'Edit forms' : 'Select forms'}

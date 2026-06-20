@@ -44,7 +44,7 @@ vi.mock('../../src/api/client', () => ({
 
 import { ClientDashboardTab } from '../../src/components/settings/ClientDashboardTab';
 
-function renderTab(ws: Record<string, unknown> = {}) {
+function renderTab(ws: Record<string, unknown> = {}, toast: (msg: string, type?: string) => void = vi.fn()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -55,7 +55,7 @@ function renderTab(ws: Record<string, unknown> = {}) {
         webflowSiteId="site-1"
         ws={{ ga4PropertyId: 'GA-123', ...ws }}
         patchWorkspace={vi.fn(async () => ({}))}
-        toast={vi.fn()}
+        toast={toast as (msg: string, type?: 'success' | 'error' | 'info') => void}
       />
     </QueryClientProvider>,
   );
@@ -96,6 +96,32 @@ describe('C4 — Webflow connect UI (flag ON)', () => {
     renderTab({ webflowFormSources: [{ formId: 'form_xyz', formName: 'Newsletter', outcomeType: 'email' }] });
     // The button reads "Select forms" until the status query reports connected; the picker still seeds
     // its local mapping from ws.webflowFormSources regardless.
+    fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
+    await screen.findByText('Newsletter');
+    expect((screen.getByLabelText('Lead type for Newsletter') as HTMLSelectElement).value).toBe('email');
+  });
+
+  it('shows a real error toast when getWebflowForms THROWS (502 / no-site-linked) — not a silent empty state', async () => {
+    // getWebflowForms now THROWS on a real failure (it switched off the swallowing getSafe), so the
+    // component catch fires and surfaces a distinguishable error toast instead of the "no forms" empty state.
+    getFormsMock.mockRejectedValueOnce(new Error('Could not load Webflow forms'));
+    const toast = vi.fn();
+    renderTab({}, toast);
+    fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Could not load Webflow forms', 'error'));
+  });
+
+  it('Cancel closes the picker WITHOUT calling saveFormSources and restores the saved selection', async () => {
+    renderTab({ webflowFormSources: [{ formId: 'form_xyz', formName: 'Newsletter', outcomeType: 'email' }] });
+    fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
+    await screen.findByText('Newsletter');
+    // Clear the mapping locally (would clobber all tracked forms on an accidental Save) …
+    fireEvent.change(screen.getByLabelText('Lead type for Newsletter'), { target: { value: '' } });
+    // … then Cancel: no save call, picker closes.
+    fireEvent.click(screen.getByRole('button', { name: /Cancel form selection/i }));
+    await waitFor(() => expect(screen.queryByLabelText('Lead type for Newsletter')).toBeNull());
+    expect(saveSourcesMock).not.toHaveBeenCalled();
+    // Reopening shows the original saved selection restored (Cancel reset formSources to ws sources).
     fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
     await screen.findByText('Newsletter');
     expect((screen.getByLabelText('Lead type for Newsletter') as HTMLSelectElement).value).toBe('email');

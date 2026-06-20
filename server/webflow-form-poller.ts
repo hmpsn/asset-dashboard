@@ -26,6 +26,12 @@ const log = createLogger('webflow-form-poller');
 
 const FLAG = 'the-issue-client-measured-capture';
 const DAILY_MS = 24 * 60 * 60 * 1000;
+// Backfill date floor: when a workspace has no confirmed-setup timestamp, only submissions newer than
+// (now − 30d) count as fresh measured outcomes. Older history is pre-setup noise and must be skipped.
+const DEFAULT_FLOOR_MS = 30 * 24 * 60 * 60 * 1000;
+// Network-cost bound for a single form's backfill (the v2 submissions endpoint has no guaranteed sort
+// order, so we cap pages rather than early-terminate on an "old" submission). 100/page × 20 pages.
+const MAX_SUBMISSION_PAGES = 20;
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 let pollStartupTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -47,11 +53,21 @@ export async function runWebflowFormPoll(): Promise<void> {
     // Dedupe tracked form ids (a name-mapped source may share an id; poll each unique form once).
     const formIds = Array.from(new Set(sources.map(s => s.formId).filter(Boolean)));
 
+    // Date floor: only post-setup submissions count as fresh measured outcomes. A confirmed-setup
+    // timestamp is the basis; before that, fall back to (now − 30d) so a first poll never ingests a
+    // workspace's entire historical lead backfill as if it were captured today. Pre-floor submissions
+    // are skipped entirely (no save → no flip → no broadcast → no activity → never counted by ROI).
+    const floor = ws.conversionTrackingConfirmedAt ?? new Date(Date.now() - DEFAULT_FLOOR_MS).toISOString();
+
     for (const formId of formIds) {
       try {
-        const submissions = await listWebflowFormSubmissions(siteId, formId, token);
+        // maxPages bounds the backfill network cost (the v2 endpoint has no guaranteed sort order).
+        const submissions = await listWebflowFormSubmissions(siteId, formId, token, MAX_SUBMISSION_PAGES);
         for (const sub of submissions) {
           const mapped = mapWebflowSubmission(ws, sub);
+          // Skip pre-floor (pre-setup) history: do NOT persist/flip/broadcast/log so ROI's 30-day
+          // count (countFormSubmissions by submittedAt) never sees a workspace's lead backfill.
+          if (mapped.submittedAt < floor) continue;
           const { inserted } = saveFormSubmission(mapped);
           // A duplicate (already-ingested submissionId) is a no-op — never broadcast/log/flip twice.
           if (!inserted) continue;

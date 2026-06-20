@@ -23,6 +23,7 @@ import { getFormCaptureStatus } from '../form-submissions.js';
 import { loadGa4SnapshotHistory } from '../ga4-snapshots.js';
 import { aggregatePinnedOutcomes } from '../the-issue-outcome.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { webflowFormMappingSchema } from '../schemas/workspace-schemas.js';
 import type { WebflowFormMapping } from '../../shared/types/form-submission.js';
@@ -129,6 +130,11 @@ theIssueConversionTrackingRouter.put(
       ? { conversionTrackingConfirmedAt: new Date().toISOString() }
       : {};
     updateWorkspace(ws.id, { webflowFormSources: sources, ...confirm });
+    // Audit trail for a config mutation that can flip the D6 provenance marker (admin-only; the type is
+    // NOT in CLIENT_VISIBLE_TYPES). PII-free metadata — only the count of mapped forms (D7).
+    addActivity(ws.id, 'form_capture_configured', `Tracked Webflow forms updated (${sources.length} mapped)`, undefined, {
+      formCount: sources.length,
+    });
     res.json({
       saved: true,
       // Connected once ≥1 form is mapped — saving sources confirms setup in this same call (above),

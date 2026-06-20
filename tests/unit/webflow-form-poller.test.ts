@@ -136,4 +136,65 @@ describe('runWebflowFormPoll', () => {
     expect(state.saveFormSubmission).toHaveBeenCalledTimes(1);
     expect(state.broadcast).toHaveBeenCalledWith('ws-ok', WS_EVENTS.FORM_SUBMISSION_CAPTURED, expect.anything());
   });
+
+  it('DATE FLOOR: skips pre-floor (historical) submissions — only post-floor are persisted/broadcast/counted', async () => {
+    // Workspace confirmed setup at a fixed instant; backfill returns a mix of pre- and post-floor leads.
+    // Only the post-floor lead is a fresh measured outcome; pre-floor history must be fully inert.
+    const floor = '2026-06-10T00:00:00.000Z';
+    state.workspaces = [{
+      id: 'ws-1', webflowSiteId: 'site-1',
+      conversionTrackingConfirmedAt: floor,
+      webflowFormSources: [{ formId: 'form_abc', formName: 'Contact', outcomeType: 'form_fill' }],
+    }];
+    const preFloor = {
+      id: 'wf_old_1', formId: 'form_abc', displayName: 'Contact',
+      dateSubmitted: '2026-05-01T12:00:00.000Z',
+      formResponse: { Name: 'Old Lead', Email: 'old@example.com' },
+    };
+    const postFloor = {
+      id: 'wf_new_1', formId: 'form_abc', displayName: 'Contact',
+      dateSubmitted: '2026-06-19T12:00:00.000Z',
+      formResponse: { Name: 'New Lead', Email: 'new@example.com' },
+    };
+    state.listSubmissions.mockResolvedValue([preFloor, postFloor]);
+
+    await runWebflowFormPoll();
+
+    // The pre-floor lead is NEVER persisted (no saveFormSubmission for it).
+    expect(state.saveFormSubmission).toHaveBeenCalledTimes(1);
+    expect(state.saveFormSubmission).toHaveBeenCalledWith(expect.objectContaining({ submissionId: 'wf_new_1' }));
+    expect(state.saveFormSubmission).not.toHaveBeenCalledWith(expect.objectContaining({ submissionId: 'wf_old_1' }));
+    // Only the post-floor lead broadcasts + logs.
+    expect(state.broadcast).toHaveBeenCalledTimes(1);
+    expect(state.addActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it('DATE FLOOR fallback: when setup is unconfirmed, a 30-day floor still skips ancient submissions', async () => {
+    // No conversionTrackingConfirmedAt → the floor falls back to now − 30d. An ancient lead is skipped;
+    // a same-day lead flips setup-confirmed (D6) and ingests.
+    state.workspaces = [{
+      id: 'ws-1', webflowSiteId: 'site-1',
+      webflowFormSources: [{ formId: 'form_abc', formName: 'Contact', outcomeType: 'form_fill' }],
+    }];
+    const ancient = {
+      id: 'wf_ancient', formId: 'form_abc', displayName: 'Contact',
+      dateSubmitted: '2020-01-01T00:00:00.000Z',
+      formResponse: { Name: 'Ancient', Email: 'ancient@example.com' },
+    };
+    const fresh = {
+      id: 'wf_fresh', formId: 'form_abc', displayName: 'Contact',
+      dateSubmitted: new Date().toISOString(),
+      formResponse: { Name: 'Fresh', Email: 'fresh@example.com' },
+    };
+    state.listSubmissions.mockResolvedValue([ancient, fresh]);
+
+    await runWebflowFormPoll();
+
+    expect(state.saveFormSubmission).toHaveBeenCalledTimes(1);
+    expect(state.saveFormSubmission).toHaveBeenCalledWith(expect.objectContaining({ submissionId: 'wf_fresh' }));
+    // The fresh lead flips setup-confirmed.
+    expect(state.updateWorkspace).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+      conversionTrackingConfirmedAt: expect.any(String),
+    }));
+  });
 });
