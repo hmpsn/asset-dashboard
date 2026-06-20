@@ -54,11 +54,18 @@ describe('engagement baseline anchor', () => {
     expect(b.baselineConversions).toBeNull();
     s4.cleanup();
   });
-  it('state=ready, baselineConversions from earliest snapshot once one exists', () => {
-    saveGa4Snapshot({ workspaceId: wsId, capturedAt: getWorkspace(wsId)!.createdAt, totalConversions: 6, totalUsers: 50, byEvent: [] });
+  it('state=ready; baselineConversions re-aggregated through the PINNED filter, not the raw all-events total', () => {
+    // The anchor snapshot's all-events total is 105 (4 + 2 + 99) but only phone_call + form_submit
+    // are pinned on wsId. The baseline MUST be the pinned-only 6 so baselineDeltaCount compares the
+    // pinned-vs-pinned like-for-like — using the raw all-events 105 would invert "vs. when we started".
+    saveGa4Snapshot({ workspaceId: wsId, capturedAt: getWorkspace(wsId)!.createdAt, totalConversions: 105, totalUsers: 90, byEvent: [
+      { eventName: 'phone_call', conversions: 4, users: 30, rate: 2 },
+      { eventName: 'form_submit', conversions: 2, users: 15, rate: 1 },
+      { eventName: 'scroll', conversions: 99, users: 90, rate: 40 },
+    ] });
     const b = computeOutcomeBaseline(getWorkspace(wsId)!);
     expect(b.state).toBe('ready');
-    expect(b.baselineConversions).toBe(6);
+    expect(b.baselineConversions).toBe(6); // pinned-only (4 + 2), NOT the all-events 105
     expect(b.engagementStart).toBe(getWorkspace(wsId)!.createdAt);
   });
 });

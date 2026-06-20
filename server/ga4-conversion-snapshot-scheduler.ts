@@ -29,6 +29,10 @@ export async function runGa4ConversionSnapshots(): Promise<void> {
   for (const ws of listWorkspaces()) {
     if (!ws.ga4PropertyId) continue;
     try {
+      // Anchor FIRST: ensureEngagementAnchor early-returns once any snapshot exists, so the
+      // createdAt-anchored backfill must run BEFORE today's snapshot is written — otherwise the
+      // first cron pass on a fresh workspace becomes the (wrong) prune-protected "earliest" anchor.
+      await ensureEngagementAnchor(ws);
       const summary = await getGA4Conversions(ws.ga4PropertyId, 1);
       const totalConversions = summary.reduce((sum, e) => sum + e.conversions, 0);
       const totalUsers = summary.reduce((max, e) => Math.max(max, e.users), 0);
@@ -39,7 +43,6 @@ export async function runGa4ConversionSnapshots(): Promise<void> {
         totalUsers,
         byEvent: summary,
       });
-      await ensureEngagementAnchor(ws);
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to capture GA4 conversion snapshot — skipping workspace');
     }

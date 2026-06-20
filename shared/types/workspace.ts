@@ -488,6 +488,8 @@ export interface AdminWorkspaceView {
   scoringConfig?: Workspace['scoringConfig'];
   intelligenceProfile?: Workspace['intelligenceProfile'];
   segmentConfig?: Workspace['segmentConfig'];
+  /** Pre-resolved segment profile (authority-layered) the admin segment UI reads to seed the override + gate the local/multi axis. */
+  segmentProfile?: ResolvedSegmentProfile;
   autoPublishBriefings?: boolean;
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;

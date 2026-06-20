@@ -75,15 +75,20 @@ export function aggregatePinnedOutcomes(
  * baselineConversions comes from the earliest ga4_conversion_snapshots row (the durable anchor).
  * `establishing` until one exists; `ready` once it does — never a fabricated delta.
  */
-export function computeOutcomeBaseline(ws: Pick<Workspace, 'id' | 'createdAt'>): OutcomeBaseline {
+export function computeOutcomeBaseline(ws: Pick<Workspace, 'id' | 'createdAt' | 'eventConfig'>): OutcomeBaseline {
   const engagementStart = ws.createdAt;
   const earliest = getEarliestGa4Snapshot(ws.id);
   if (!earliest) {
     return { engagementStart, baselineConversions: null, baselineCapturedAt: null, state: 'establishing' };
   }
+  // Re-aggregate the anchor snapshot through the SAME pinned-event filter the current outcome count
+  // uses, so baselineDeltaCount compares like-for-like (pinned-vs-pinned). Using the snapshot's raw
+  // all-events `totalConversions` here would subtract an all-events baseline from a pinned-only
+  // current and invert the "vs. when we started" delta whenever the anchor had non-pinned events.
+  const baselineConversions = aggregatePinnedOutcomes(ws, earliest.byEvent).totalConversions;
   return {
     engagementStart,
-    baselineConversions: earliest.totalConversions,
+    baselineConversions,
     baselineCapturedAt: earliest.capturedAt,
     state: 'ready',
   };

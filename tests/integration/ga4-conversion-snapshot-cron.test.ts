@@ -16,8 +16,8 @@ vi.mock('../../server/google-analytics.js', () => ({
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { runGa4ConversionSnapshots } from '../../server/ga4-conversion-snapshot-scheduler.js';
-import { loadGa4SnapshotHistory } from '../../server/ga4-snapshots.js';
-import { updateWorkspace } from '../../server/workspaces.js';
+import { loadGa4SnapshotHistory, getEarliestGa4Snapshot } from '../../server/ga4-snapshots.js';
+import { updateWorkspace, getWorkspace } from '../../server/workspaces.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 let wsId: string;
@@ -41,6 +41,19 @@ describe('runGa4ConversionSnapshots', () => {
     const hist = loadGa4SnapshotHistory(wsId);
     expect(hist.length).toBeGreaterThanOrEqual(1);
     expect(hist[hist.length - 1].totalConversions).toBe(8); // 5 + 3
+  });
+  it('anchors the FIRST pass at workspace.createdAt, not the cron-run time (anchor-before-snapshot)', async () => {
+    // Regression guard: ensureEngagementAnchor early-returns once any snapshot exists, so it MUST
+    // run before saveGa4Snapshot — otherwise the first cron pass on a fresh workspace becomes the
+    // (wrong) prune-protected "earliest" anchor stamped at "now" instead of engagement start.
+    const fresh = seedWorkspace();
+    updateWorkspace(fresh.workspaceId, { ga4PropertyId: '999000' });
+    const createdAt = getWorkspace(fresh.workspaceId)!.createdAt;
+    await runGa4ConversionSnapshots();
+    const earliest = getEarliestGa4Snapshot(fresh.workspaceId);
+    expect(earliest).not.toBeNull();
+    expect(earliest!.capturedAt).toBe(createdAt); // the engagement-start anchor, not "now"
+    fresh.cleanup();
   });
   it('skips (no throw) a workspace whose GA4 call errors — FM-2 honest degradation', async () => {
     const s2 = seedWorkspace();

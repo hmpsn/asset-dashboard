@@ -26,7 +26,6 @@ import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
 import type { IssueOutcomeCount } from '../../../shared/types/the-issue';
-import type { ResolvedSegmentProfile } from '../../../shared/types/workspace';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
   GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
@@ -155,8 +154,8 @@ export function OverviewTab({
       namedRecordsAvailable: false,
     };
     // The public workspace view carries the flag-gated, pre-resolved segment profile (authority-
-    // layered); read it off the runtime payload. Absent → null → default-visible inserts.
-    const segmentProfile = (ws as { segmentProfile?: ResolvedSegmentProfile }).segmentProfile ?? null;
+    // layered, typed on WorkspaceInfo). Absent → null → default-visible inserts.
+    const segmentProfile = ws.segmentProfile ?? null;
     return (
       <ErrorBoundary>
         <TheIssueClientPage

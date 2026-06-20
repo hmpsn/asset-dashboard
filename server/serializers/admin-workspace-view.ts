@@ -1,5 +1,5 @@
 import type { Workspace, AdminWorkspaceView } from '../../shared/types/workspace.js';
-import { computeEffectiveTier } from '../workspaces.js';
+import { computeEffectiveTier, resolveSegmentProfile } from '../workspaces.js';
 import { computeTrialState } from '../billing/trial-state.js';
 
 const DENIED_KEYS: ReadonlySet<string> = new Set([
@@ -62,6 +62,10 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     // admin Outcome Value / segment subsections silently never read back the persisted value.
     outcomeValue: ws.outcomeValue,
     segmentConfig: ws.segmentConfig,
+    // Pre-resolved segment profile (authority-layered): the admin segment UI reads
+    // segmentProfile.segment to seed the override + gate the local/multi read-only axis. Without
+    // this the UI always falls through to the b2b_saas default and the local-axis guard never fires.
+    segmentProfile: resolveSegmentProfile(ws),
     autoPublishBriefings: ws.autoPublishBriefings,
     autoPublishAfterHours: ws.autoPublishAfterHours,
     lastBriefingRunWeekOf: ws.lastBriefingRunWeekOf,

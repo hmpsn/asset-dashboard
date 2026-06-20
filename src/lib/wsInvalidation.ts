@@ -220,6 +220,10 @@ function adminInvalidationKeys(
         queryKeys.client.intelligence(workspaceId),
         queryKeys.client.rankHistory(workspaceId),
         queryKeys.client.latestRanks(workspaceId),
+        // The Issue (Client) P0 — a saved outcomeValue/segmentConfig changes the dollar verdict, so
+        // the ROI caches (which now carry outcomeVerdict) must refresh on workspace update.
+        queryKeys.admin.roi(workspaceId),
+        queryKeys.client.roi(workspaceId),
       ] as const;
     case WS_EVENTS.PAGE_STATE_UPDATED:
       return [
@@ -571,7 +575,9 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
-      return [queryKeys.client.pricing(workspaceId)] as const;
+      // client.roi carries the outcomeVerdict (The Issue P0), which depends on the workspace's
+      // outcomeValue/segmentConfig — refresh it when those are saved.
+      return [queryKeys.client.pricing(workspaceId), queryKeys.client.roi(workspaceId)] as const;
     case WS_EVENTS.PAGE_STATE_UPDATED:
       return [
         queryKeys.shared.pageEditStates(workspaceId, false),

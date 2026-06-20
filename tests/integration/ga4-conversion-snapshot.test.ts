@@ -64,7 +64,12 @@ describe('computeOutcomeBaseline establishing → ready', () => {
     const s = seedWorkspace(); cleanups.push(s.cleanup);
     const ws = getWorkspace(s.workspaceId)!;
     expect(computeOutcomeBaseline(ws).state).toBe('establishing');
-    saveGa4Snapshot({ workspaceId: ws.id, capturedAt: ws.createdAt, totalConversions: 5, totalUsers: 30, byEvent: [] });
+    // No events pinned on this fresh workspace → the baseline aggregates byEvent via the all-events
+    // fallback, so byEvent must carry the conversions (the raw totalConversions column is not the
+    // baseline source post-fix — it is re-aggregated through the pinned/fallback filter).
+    saveGa4Snapshot({ workspaceId: ws.id, capturedAt: ws.createdAt, totalConversions: 5, totalUsers: 30, byEvent: [
+      { eventName: 'form_submit', conversions: 5, users: 30, rate: 2 },
+    ] });
     const b = computeOutcomeBaseline(getWorkspace(ws.id)!);
     expect(b.state).toBe('ready');
     expect(b.baselineConversions).toBe(5);
