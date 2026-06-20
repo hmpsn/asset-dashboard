@@ -25,6 +25,7 @@ import { ARCHETYPE_ORDER, ARCHETYPE_LABELS, recArchetype } from '../../../../sha
 import type { Archetype } from '../../../../shared/types/strategy-archetype';
 import type { CockpitActions } from '../StrategyCockpit';
 import type { Recommendation } from '../../../../shared/types/recommendations';
+import type { RecWordingOverridePayload } from '../../../../shared/types/rec-operator-steering';
 
 // ── Default shortlist cap (used when the prop is absent) ──────────────────────
 const DEFAULT_SHORTLIST_CAP = 5;
@@ -50,6 +51,10 @@ export interface BackingMovesQueueProps {
   /** Maximum recs shown per archetype group before a "show the rest" toggle.
    *  Defaults to DEFAULT_SHORTLIST_CAP (5). */
   shortlistCap?: number;
+  /** Operator-steering wording edit (The Issue §11). Threaded down to each CockpitRow so the
+   *  operator can correct a rec's title/insight inline. Optional — absent on any consumer that
+   *  doesn't steer (the row renders unchanged), so the flag-OFF path stays byte-identical. */
+  onEditWording?: (recId: string, payload: RecWordingOverridePayload) => void;
 }
 
 /**
@@ -63,6 +68,7 @@ function ArchetypeGroup({
   actions,
   onCut,
   selectionState,
+  onEditWording,
 }: {
   archetype: Archetype;
   recs: Recommendation[];
@@ -73,6 +79,7 @@ function ArchetypeGroup({
     isSelected: (id: string) => boolean;
     toggle: (id: string) => void;
   };
+  onEditWording?: (recId: string, payload: RecWordingOverridePayload) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -113,6 +120,7 @@ function ArchetypeGroup({
           actions={wrappedActions}
           selected={selectionState.isSelected(r.id)}
           onToggleSelect={selectionState.toggle}
+          onEditWording={onEditWording}
         />
       ))}
 
@@ -148,6 +156,7 @@ export function BackingMovesQueue({
   actions,
   onCut,
   shortlistCap = DEFAULT_SHORTLIST_CAP,
+  onEditWording,
 }: BackingMovesQueueProps) {
   // Group recs by archetype, preserving ARCHETYPE_ORDER
   const groups = useMemo(() => {
@@ -199,6 +208,7 @@ export function BackingMovesQueue({
               actions={actions}
               onCut={onCut}
               selectionState={sel}
+              onEditWording={onEditWording}
             />
           ))}
         </div>

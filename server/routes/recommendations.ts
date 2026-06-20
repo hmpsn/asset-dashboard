@@ -18,7 +18,16 @@ import {
   updateRecommendationStatus,
   dismissRecommendation,
   recommendationOutcomeActionType,
+  isCuratedForClient,
 } from '../recommendations.js';
+import {
+  getOperatorOverrides,
+  getSortOrderMap,
+  setWordingOverride,
+  setSortOrders,
+  applyWordingOverrides,
+  RecWordingOverrideError,
+} from '../rec-operator-overrides.js';
 import {
   sendRecommendation,
   strikeRecommendation,
@@ -46,6 +55,12 @@ import {
   InvalidTransitionError,
 } from '../state-machines.js';
 import type { Recommendation, RecommendationSet, ClientFacingClientStatus, ClientRecResponseSummary } from '../../shared/types/recommendations.js';
+import {
+  MANUAL_REC_ALLOWED_TYPES,
+  REC_WORDING_TITLE_MAX,
+  REC_WORDING_INSIGHT_MAX,
+  type OperatorOverridesResponse,
+} from '../../shared/types/rec-operator-steering.js';
 import { computeImpactBand } from '../../shared/types/impact-band.js';
 import { mirrorRecommendationToDeliverable } from '../domains/inbox/recommendation-dual-write.js';
 import { createContentRequest } from '../content-requests.js';
@@ -242,6 +257,29 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
     if (exposeClientStatus && clientStatus) recs = recs.filter(r => r.clientStatus === clientStatus);
+    // The Issue (operator-steering) — flag-gated, so a non-Issue workspace's public read stays
+    // byte-identical to legacy. Apply the operator's wording corrections (title/insight, DISPLAY
+    // only — never baked) THEN order by the operator's client-facing running order (recs with a
+    // sort_order first, ascending; the rest after in their existing order via a stable sort).
+    if (exposeClientStatus) {
+      recs = applyWordingOverrides(workspaceId, recs);
+      const sortOrderMap = getSortOrderMap(workspaceId);
+      if (sortOrderMap.size > 0) {
+        recs = recs
+          .map((r, i) => ({ r, i }))
+          .sort((a, b) => {
+            const aOrder = sortOrderMap.get(a.r.id);
+            const bOrder = sortOrderMap.get(b.r.id);
+            // Operator-ordered recs first (ascending); un-ordered recs keep their natural order
+            // after them. The index tiebreaker (a.i - b.i) makes the sort stable.
+            if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder || a.i - b.i;
+            if (aOrder !== undefined) return -1;
+            if (bOrder !== undefined) return 1;
+            return a.i - b.i;
+          })
+          .map(({ r }) => r);
+      }
+    }
     res.json(toPublicRecommendationSet(set, recs, exposeClientStatus));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -594,6 +632,11 @@ router.get('/api/recommendations/:workspaceId', requireWorkspaceAccess('workspac
     let recs = set.recommendations;
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
+    // The Issue (operator-steering) — apply wording overrides for DISPLAY only so the cockpit shows
+    // the operator-corrected title/insight. Returns shallow clones; the base blob is never mutated
+    // (loadRecommendations stays pure — overrides are never baked back). Not flag-gated: an empty
+    // override table is a no-op (byte-identical), and the admin cockpit is already a flag-ON surface.
+    recs = applyWordingOverrides(workspaceId, recs);
     res.json({ ...set, recommendations: recs });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -833,6 +876,192 @@ router.post(
       rec.description,
     );
     res.json(rec);
+  },
+);
+
+// ─── The Issue (operator-steering) — correct wording / add a rec / reorder ───────────
+// All admin-only (no /api/public/ prefix → global APP_PASSWORD HMAC gate; requireWorkspaceAccess
+// passes through for HMAC callers). The two LITERAL routes (reorder, manual-rec) + the
+// operator-overrides GET are placed BEFORE the `:recId/*` param routes so their path segment is
+// never swallowed as a :recId (route-ordering rule). Overrides apply ONLY at display boundaries —
+// never baked into the recommendation_sets blob (loadRecommendations stays pure).
+
+// GET operator overrides (wording + running order) for the steering UI.
+router.get(
+  '/api/recommendations/:workspaceId/operator-overrides',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => { // activity-ok: read-only
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const { wording, sortOrder } = getOperatorOverrides(workspaceId);
+    const body: OperatorOverridesResponse = {
+      workspaceId,
+      wording: Object.fromEntries(wording),
+      sortOrder: Object.fromEntries(sortOrder),
+    };
+    res.json(body);
+  },
+);
+
+// PATCH reorder — persist the client-facing running order. Every recId must exist AND be curated
+// for the client (isCuratedForClient) in the current set, else 400. The archetype-grouped curation
+// view is unaffected; this orders ONLY the client-facing projection.
+const reorderRecsSchema = z.object({
+  recIds: z.array(z.string().min(1)).min(1).max(500),
+});
+router.patch(
+  '/api/recommendations/:workspaceId/reorder',
+  requireWorkspaceAccess('workspaceId'),
+  validate(reorderRecsSchema),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    const { recIds } = req.body as z.infer<typeof reorderRecsSchema>;
+    const set = loadRecommendations(workspaceId);
+    if (!set) {
+      if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+      return res.status(404).json({ error: 'Workspace has no recommendation set' });
+    }
+    // Reject duplicate ids (a duplicate would collapse to a single sort_order — ambiguous order).
+    if (new Set(recIds).size !== recIds.length) {
+      return res.status(400).json({ error: 'recIds: duplicate recommendation id' });
+    }
+    const curatedIds = new Set(set.recommendations.filter(isCuratedForClient).map(r => r.id));
+    for (const recId of recIds) {
+      if (!curatedIds.has(recId)) {
+        return res.status(400).json({ error: `recIds: ${recId} is not a curated client-facing recommendation` });
+      }
+    }
+    setSortOrders(workspaceId, recIds);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { reason: 'reorder' });
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      'Client running order updated',
+      `Reordered ${recIds.length} client-facing recommendation(s)`,
+    );
+    res.json({ ok: true });
+  },
+);
+
+// POST manual-rec — mint the operator-authored recommendation the system missed. Generalizes the
+// competitor-rec mint: source 'manual:<hex>', actionType 'manual', clientStatus 'system',
+// lifecycle 'active', status 'pending'. The auto-resolve retention branch (isOperatorMintedRec)
+// keeps it across regen; an explicit strike removes it. Type must be in MANUAL_REC_ALLOWED_TYPES
+// (cannibalization is excluded — it needs a urlSetKey + competing-page set the operator can't
+// hand-author here).
+const createManualRecSchema = z.object({
+  type: z.enum(MANUAL_REC_ALLOWED_TYPES),
+  title: z.string().min(1).max(REC_WORDING_TITLE_MAX),
+  insight: z.string().min(1).max(REC_WORDING_INSIGHT_MAX),
+  description: z.string().max(2000).optional(),
+  priority: z.enum(['fix_now', 'fix_soon', 'fix_later', 'ongoing']).optional(),
+  targetKeyword: z.string().max(200).optional(),
+  affectedPages: z.array(z.string().max(500)).max(100).optional(),
+});
+router.post(
+  '/api/recommendations/:workspaceId/manual-rec',
+  requireWorkspaceAccess('workspaceId'),
+  validate(createManualRecSchema),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const { type, title, insight, description, priority, targetKeyword, affectedPages } =
+      req.body as z.infer<typeof createManualRecSchema>;
+
+    const now = new Date().toISOString();
+    const rec: Recommendation = {
+      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+      workspaceId,
+      type,
+      priority: priority ?? 'fix_soon',
+      title,
+      description: description || insight,
+      insight,
+      impact: 'medium',
+      effort: 'medium',
+      impactScore: 40,
+      source: `manual:${crypto.randomBytes(6).toString('hex')}`,
+      affectedPages: affectedPages ?? [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: 'Operator-authored recommendation',
+      actionType: 'manual',
+      status: 'pending',
+      clientStatus: 'system',
+      lifecycle: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (targetKeyword) rec.targetKeyword = targetKeyword;
+
+    // load → push → recompute summary → save in ONE transaction so a regen racing this mint can
+    // never see a half-written set (multi-step DB write rule).
+    const persist = db.transaction(() => {
+      const set = loadRecommendations(workspaceId) ?? {
+        workspaceId,
+        generatedAt: now,
+        recommendations: [] as Recommendation[],
+        summary: computeRecommendationSummary([]),
+      };
+      set.recommendations.push(rec);
+      set.summary = computeRecommendationSummary(set.recommendations);
+      saveRecommendations(set);
+    });
+    persist();
+
+    invalidateIntelligenceCache(workspaceId);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
+      recId: rec.id,
+      type,
+      reason: 'manual-mint',
+    });
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Recommendation added: ${rec.title}`,
+      rec.insight,
+    );
+    res.json(rec);
+  },
+);
+
+// PATCH wording — correct a rec's title/insight. recId-keyed override survives regen via
+// id-continuity (applyLifecycleCarryOver carries the rec id old→new). An absent/empty field clears
+// that override (restores the source wording); an all-cleared row is deleted. DISPLAY-only — never
+// baked into the recommendation_sets blob. This is a `:recId/*` param route, placed after the
+// literal routes above.
+const recWordingSchema = z.object({
+  title: z.string().max(REC_WORDING_TITLE_MAX).optional(),
+  insight: z.string().max(REC_WORDING_INSIGHT_MAX).optional(),
+});
+router.patch(
+  '/api/recommendations/:workspaceId/:recId/wording',
+  requireWorkspaceAccess('workspaceId'),
+  validate(recWordingSchema),
+  (req, res) => {
+    const { workspaceId, recId } = req.params;
+    const set = loadRecommendations(workspaceId);
+    if (!set) {
+      if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+      return res.status(404).json({ error: 'Workspace has no recommendation set' });
+    }
+    const rec = set.recommendations.find(r => r.id === recId);
+    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+    const { title, insight } = req.body as z.infer<typeof recWordingSchema>;
+    try {
+      setWordingOverride(workspaceId, recId, { title, insight });
+    } catch (err) {
+      if (err instanceof RecWordingOverrideError) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, reason: 'wording' });
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Recommendation wording edited: ${title || rec.title}`,
+      'Operator corrected the title/insight wording.',
+    );
+    res.json({ ok: true });
   },
 );
 

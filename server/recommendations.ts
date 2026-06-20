@@ -988,6 +988,19 @@ export function buildMergeKey(rec: { source: string; affectedPages: string[]; ti
   return `${source}::${page}`;
 }
 
+/**
+ * The Issue (operator-steering) — true for an operator-MINTED rec: an add-a-rec the operator
+ * authored (`source: 'manual:<hex>'`) or a competitor-gap mint (`source: 'competitor:<keyword>'`).
+ * These recs have NO producer in the merge phase, so their buildMergeKey is never in `newSources` —
+ * without a retention branch they would auto-resolve to 'completed' on the very next regen. The
+ * auto-resolve loop uses this to RETAIN them as-is when their source is absent (the operator owns
+ * their lifecycle; only an explicit strike removes them).
+ * @internal exported for unit testing
+ */
+export function isOperatorMintedRec(rec: { source: string }): boolean {
+  return rec.source.startsWith('manual:') || rec.source.startsWith('competitor:');
+}
+
 /** Weight impact score based on page type (homepage/service pages matter more)
  * @internal exported for unit testing
  */
@@ -2600,6 +2613,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       // If the source is gone, RETAIN the old rec as-is (preserve its sent/discussing/approved state);
       // the positive "we handled this" terminal is a later phase (P2/P3) — here we only preserve.
       if (isExemptFromAutoResolve(oldRec)) {
+        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
+        continue;
+      }
+      // The Issue (operator-steering) — operator-minted recs (manual:/competitor:) have NO producer
+      // in the merge phase, so their merge key is NEVER in newSources. Without this they auto-resolve
+      // to 'completed' on the next regen. RETAIN as-is when the source is absent — the operator owns
+      // their lifecycle; only an explicit strike removes them. (Also fixes the live competitor-rec
+      // auto-resolve bug: an un-sent competitor mint silently flipped to "✓ done" on the next regen.)
+      if (isOperatorMintedRec(oldRec)) {
         if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
         continue;
       }

@@ -27,7 +27,11 @@ export function isManualRecType(t: RecType | string): t is ManualRecType {
 export const REC_WORDING_TITLE_MAX = 160;
 export const REC_WORDING_INSIGHT_MAX = 600;
 
-/** PATCH wording. An absent/empty field clears that override (restores the source wording). */
+/**
+ * PATCH wording — MERGE semantics (title + insight are independent overrides, committed separately by
+ * the inline editor): an ABSENT field leaves that override unchanged; a PRESENT-but-blank field ('')
+ * clears that override (restores its source wording); a present non-blank field sets it.
+ */
 export interface RecWordingOverridePayload {
   title?: string;
   insight?: string;

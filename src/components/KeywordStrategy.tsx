@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Target, FileText, HelpCircle } from 'lucide-react';
+import { Target, FileText, HelpCircle, Plus } from 'lucide-react';
 import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
@@ -10,6 +10,7 @@ import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLife
 import { useContentDecay } from '../hooks/admin/useContentDecay';
 import { useStrategyKeywordSet } from '../hooks/admin/useStrategyKeywordSet';
 import { useStrategyPov } from '../hooks/admin/useStrategyPov';
+import { useOperatorSteering } from '../hooks/admin/useOperatorSteering';
 import { useRecBulkMutation } from '../hooks/admin/useRecBulkMutation';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
@@ -28,6 +29,8 @@ import { IssueHeader } from './strategy/issue/IssueHeader';
 import { StanceBar } from './strategy/issue/StanceBar';
 import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
 import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
+import { AddRecommendationModal } from './strategy/issue/AddRecommendationModal';
+import { ClientRunningOrder } from './strategy/issue/ClientRunningOrder';
 import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
 import { KeywordTargetsLens } from './strategy/issue/KeywordTargetsLens';
 import { ContentWorkOrderLens } from './strategy/issue/ContentWorkOrderLens';
@@ -180,6 +183,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const issueBulkSend = useRecBulkMutation(workspaceId);
   // cut→sentence contract: cutting a backing move strikes its POV sentence live.
   const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
+  // Operator steering (§11/§12): wording overrides + client running order + add-a-rec.
+  // `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls (byte-identical OFF).
+  const operatorSteering = useOperatorSteering(workspaceId, theIssueEnabled);
+  const [addRecOpen, setAddRecOpen] = useState(false);
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -553,12 +560,32 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onRegenerate={strategyPov.regenerate}
         isGenerating={strategyPov.isGenerating}
       />
+      {/* Operator steering §12 — add a rec the system missed (mints into the curation queue). */}
+      <div className="flex justify-end">
+        <Button
+          variant="secondary"
+          icon={Plus}
+          onClick={() => setAddRecOpen(true)}
+          disabled={operatorSteering.isPending}
+        >
+          Add a recommendation
+        </Button>
+      </div>
       <BackingMovesQueue
         workspaceId={workspaceId}
         recs={cockpitRecs}
         actions={lifecycleActions}
         onCut={(id) => setStruckRecIds((s) => [...s, id])}
         shortlistCap={5}
+        onEditWording={operatorSteering.editWording}
+      />
+      {/* Operator steering §12 — reorder the client-facing running order (decoupled from the
+          archetype grouping above; orders only what the client already sees). */}
+      <ClientRunningOrder
+        recs={cockpitRecs}
+        sortOrder={operatorSteering.sortOrder}
+        onReorder={operatorSteering.reorder}
+        isPending={operatorSteering.isPending}
       />
       {/* Trust ladder (Phase 4) — per-archetype auto-send rewards for the 2 low-risk buckets. */}
       <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
@@ -577,6 +604,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           Competitor intelligence →
         </Button>
       </div>
+      <AddRecommendationModal
+        open={addRecOpen}
+        onClose={() => setAddRecOpen(false)}
+        onCreate={(payload) => {
+          operatorSteering.addManualRec(payload);
+          setAddRecOpen(false);
+        }}
+        isPending={operatorSteering.isPending}
+      />
     </div>
   ) : null;
 
