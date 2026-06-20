@@ -434,14 +434,14 @@ export interface Workspace {
   segmentConfig?: SegmentConfig;
   /**
    * The Issue (Client) P1a — Webflow form-capture config (website-native measured outcome capture).
-   * ALL admin-only: webflowFormWebhookSecret signs the X-Webflow-Signature HMAC; webflowFormSources
-   * maps each Webflow form to a typed outcome; conversionTrackingConfirmedAt marks confirmed setup.
-   * The secret + sources are NEVER serialized into any public/client payload (D7). Backing columns:
-   * webflow_form_webhook_secret, webflow_form_sources (JSON), conversion_tracking_confirmed_at (149).
+   * Capture is via Webflow Data-API POLLING (server/webflow-form-poller.ts), not a webhook. ALL
+   * admin-only: webflowFormSources maps each selected Webflow form to a typed outcome;
+   * conversionTrackingConfirmedAt marks confirmed setup (the provenance-flip basis). Sources are NEVER
+   * serialized into any public/client payload (D7). Backing columns: webflow_form_sources (JSON),
+   * conversion_tracking_confirmed_at (149). The legacy webhook signing secret was dropped in 150.
    */
-  webflowFormWebhookSecret?: string;       // admin-only, like webflowToken — never client-facing
   webflowFormSources?: WebflowFormMapping[];
-  conversionTrackingConfirmedAt?: string;  // ISO; set by the admin setup flow / first captured lead
+  conversionTrackingConfirmedAt?: string;  // ISO; set by the admin form-sources save / first captured lead
   // Client Briefing (weekly editorial)
   /** Auto-publish briefings without admin review after N hours */
   autoPublishBriefings?: boolean;
@@ -503,8 +503,8 @@ export interface AdminWorkspaceView {
   segmentConfig?: Workspace['segmentConfig'];
   /** Pre-resolved segment profile (authority-layered) the admin segment UI reads to seed the override + gate the local/multi axis. */
   segmentProfile?: ResolvedSegmentProfile;
-  // The Issue (Client) P1a — Webflow form-capture config (admin view). webflowFormWebhookSecret is
-  // DELIBERATELY omitted (like webflowToken): the secret is returned once on enable, never re-served.
+  // The Issue (Client) P1a — Webflow form-capture config (admin view). Capture is via Data-API polling;
+  // the admin reads back the selected form-source mapping + the setup-confirmation marker.
   webflowFormSources?: Workspace['webflowFormSources'];
   conversionTrackingConfirmedAt?: string;
   autoPublishBriefings?: boolean;

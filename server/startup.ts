@@ -14,6 +14,7 @@ import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelli
 import { startInsightRecomputeCron } from './insight-recompute-cron.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
 import { startGa4ConversionSnapshotScheduler } from './ga4-conversion-snapshot-scheduler.js';
+import { startWebflowFormPoller } from './webflow-form-poller.js';
 import { startBriefingCron } from './briefing-cron.js';
 import { startStrategyIssueCron } from './strategy-issue-cron.js';
 
@@ -40,6 +41,7 @@ export function startSchedulers() {
   startInsightRecomputeCron();
   startRankTrackingScheduler();
   startGa4ConversionSnapshotScheduler();
+  startWebflowFormPoller();
   startBriefingCron();
   startStrategyIssueCron();
 }

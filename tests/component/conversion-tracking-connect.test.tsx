@@ -1,9 +1,11 @@
 /**
- * Lane C C4 — Webflow form-capture connect UI (guided manual webhook registration).
+ * Lane C C4 — Webflow form-capture connect UI (Data-API POLLING model — select forms to track).
  *
- * Flag ON: a "Webflow form capture" subsection renders an Enable button; clicking it calls the enable
- * API and, on success, renders a copyable webhook URL + a one-time signing secret + a 3-step guided
- * checklist. Copy buttons call navigator.clipboard.writeText. Flag OFF: the subsection is absent.
+ * Capture switched from an HMAC webhook (paste a signing secret) to polling the Webflow Forms API: the
+ * admin SELECTS which forms produce leads and maps each to a typed outcome. Flag ON: a "Webflow form
+ * capture" subsection renders a "Select forms" button; clicking it lists the site's forms, each with a
+ * lead-type <select>; choosing a type and saving calls saveFormSources with the mappings. Flag OFF: the
+ * subsection is absent (byte-identical P0).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -18,16 +20,17 @@ vi.mock('../../src/hooks/admin/useConversionTrackingStatus', () => ({
   useConversionTrackingStatus: () => ({ status: undefined, isLoading: false, isError: false }),
 }));
 
-// Stub the conversion-tracking API enable call.
-const enableMock = vi.fn(async () => ({
-  webhookUrl: 'https://app.test/api/public/webflow-form-webhook/ws-1',
-  webhookSecret: 'whsec_test_one_time_secret_abcdef',
-}));
+// Stub the conversion-tracking API: list two forms + capture the saved sources.
+const getFormsMock = vi.fn(async () => [
+  { id: 'form_abc', displayName: 'Contact' },
+  { id: 'form_xyz', displayName: 'Newsletter' },
+]);
+const saveSourcesMock = vi.fn(async () => ({ saved: true, formCaptureConnected: true }));
 vi.mock('../../src/api/conversionTracking', () => ({
   conversionTrackingApi: {
     getStatus: vi.fn(async () => ({ pinnedCount: 0, typedCount: 0, formCaptureConnected: false, lastSubmissionAt: null, submissionCount: 0, recentOutcomeCount: 0 })),
-    enableFormCapture: (...args: unknown[]) => enableMock(...(args as [])),
-    disableFormCapture: vi.fn(async () => ({ disabled: true })),
+    getWebflowForms: (...args: unknown[]) => getFormsMock(...(args as [])),
+    saveFormSources: (...args: unknown[]) => saveSourcesMock(...(args as [string, unknown])),
   },
 }));
 
@@ -61,36 +64,41 @@ function renderTab(ws: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   featureFlagMock.mockReturnValue(false);
-  const writeText = vi.fn();
-  vi.stubGlobal('navigator', { clipboard: { writeText } });
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
 });
 
 describe('C4 — Webflow connect UI (flag ON)', () => {
   beforeEach(() => featureFlagMock.mockImplementation((flag: string) => flag === 'the-issue-client-measured-capture'));
 
-  it('renders the subsection + Enable, and on enable shows the copyable URL + one-time secret', async () => {
+  it('renders the subsection + a "Select forms" button that lists the site forms with lead-type selects', async () => {
     renderTab();
-    const enableBtn = screen.getByRole('button', { name: /Enable Webflow form capture/i });
-    expect(enableBtn).toBeInTheDocument();
-    fireEvent.click(enableBtn);
-    await waitFor(() => expect(enableMock).toHaveBeenCalledWith('ws-1'));
-    expect(await screen.findByDisplayValue(/webflow-form-webhook\/ws-1/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue('whsec_test_one_time_secret_abcdef')).toBeInTheDocument();
+    const selectBtn = screen.getByRole('button', { name: /Select Webflow forms to track/i });
+    expect(selectBtn).toBeInTheDocument();
+    fireEvent.click(selectBtn);
+    await waitFor(() => expect(getFormsMock).toHaveBeenCalledWith('ws-1'));
+    expect(await screen.findByText('Contact')).toBeInTheDocument();
+    expect(screen.getByText('Newsletter')).toBeInTheDocument();
+    expect(screen.getByLabelText('Lead type for Contact')).toBeInTheDocument();
   });
 
-  it('copy buttons call navigator.clipboard.writeText', async () => {
+  it('mapping a form to a lead type and saving calls saveFormSources with the mapping', async () => {
     renderTab();
-    fireEvent.click(screen.getByRole('button', { name: /Enable Webflow form capture/i }));
-    await screen.findByDisplayValue(/webflow-form-webhook\/ws-1/);
-    fireEvent.click(screen.getByLabelText('Copy webhook URL'));
-    fireEvent.click(screen.getByLabelText('Copy signing secret'));
-    expect((navigator.clipboard.writeText as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      'https://app.test/api/public/webflow-form-webhook/ws-1',
-    );
-    expect((navigator.clipboard.writeText as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      'whsec_test_one_time_secret_abcdef',
-    );
+    fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
+    await screen.findByText('Contact');
+    fireEvent.change(screen.getByLabelText('Lead type for Contact'), { target: { value: 'form_fill' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save tracked Webflow forms/i }));
+    await waitFor(() => expect(saveSourcesMock).toHaveBeenCalledWith('ws-1', [
+      { formId: 'form_abc', formName: 'Contact', outcomeType: 'form_fill' },
+    ]));
+  });
+
+  it('seeds the picker from the workspace\'s already-saved sources', async () => {
+    renderTab({ webflowFormSources: [{ formId: 'form_xyz', formName: 'Newsletter', outcomeType: 'email' }] });
+    // The button reads "Select forms" until the status query reports connected; the picker still seeds
+    // its local mapping from ws.webflowFormSources regardless.
+    fireEvent.click(screen.getByRole('button', { name: /Select Webflow forms to track/i }));
+    await screen.findByText('Newsletter');
+    expect((screen.getByLabelText('Lead type for Newsletter') as HTMLSelectElement).value).toBe('email');
   });
 });
 
@@ -98,6 +106,6 @@ describe('C4 — flag OFF parity', () => {
   it('does NOT render the Webflow form capture subsection when the flag is OFF', () => {
     featureFlagMock.mockReturnValue(false);
     renderTab();
-    expect(screen.queryByRole('button', { name: /Enable Webflow form capture/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Select Webflow forms to track/i })).toBeNull();
   });
 });

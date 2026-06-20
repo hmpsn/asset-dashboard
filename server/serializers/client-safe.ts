@@ -101,10 +101,11 @@ export function toPublicWorkspaceView(
     // The Issue (Client) P0 — flag-gated: attach the pre-resolved segment profile only when ON,
     // so the OFF path is byte-identical (field absent from the payload entirely).
     ...(opts.theIssueClientSpine ? { segmentProfile: resolveSegmentProfile(ws) } : {}),
-    // The Issue (Client) P1a — flag-gated boolean only (never the secret, never PII, D7). Attached on
-    // the same spine-flag gate so the OFF path stays byte-identical.
+    // The Issue (Client) P1a — flag-gated boolean only (never sources, never PII, D7). Attached on
+    // the same spine-flag gate so the OFF path stays byte-identical. Connected = confirmed setup OR
+    // ≥1 selected Webflow form to poll (capture is via Data-API polling, no webhook secret).
     ...(opts.theIssueClientSpine
-      ? { formCaptureConnected: !!ws.conversionTrackingConfirmedAt || !!ws.webflowFormWebhookSecret }
+      ? { formCaptureConnected: !!ws.conversionTrackingConfirmedAt || (ws.webflowFormSources?.length ?? 0) > 0 }
       : {}),
   };
 }

@@ -3,7 +3,7 @@
  *
  * Exercises the PUBLIC route GET /api/public/roi/:id (NOT the admin GET) so a serialization
  * regression on the measured money surface — or a PII leak — is caught on the real read path.
- * PII (leadName/leadEmail/leadMessage) + the webhook secret must NEVER appear in the raw response.
+ * PII (leadName/leadEmail/leadMessage) must NEVER appear in the raw response.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
@@ -30,7 +30,7 @@ beforeAll(async () => {
     outcomeValue: { valuePerOutcome: 800, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate', monthlyRetainer: 1500 },
     eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
     conversionTrackingConfirmedAt: new Date().toISOString(),
-    webflowFormWebhookSecret: 'whsec_super_secret_value',
+    webflowFormSources: [{ formId: 'form_abc', formName: 'Contact', outcomeType: 'form_fill' }],
   });
   saveGa4Snapshot({
     workspaceId: wsId, capturedAt: new Date().toISOString(), totalConversions: 23, totalUsers: 300,
@@ -70,11 +70,10 @@ describe('GET /api/public/roi — measured outcomes + reconciliation, no PII', (
     expect(roi.outcomeVerdict.outcomeTypeBreakdown[0].outcomeType).toBe('form_fill');
     expect(roi.outcomeVerdict.outcomeReconciliation.ga4Count).toBe(23);
     expect(roi.outcomeVerdict.outcomeReconciliation.capturedCount).toBe(2);
-    // PII boundary — names, emails, messages, and the secret never ride the public payload.
+    // PII boundary — names, emails, and messages never ride the public payload.
     expect(raw).not.toContain('jane@example.com');
     expect(raw).not.toContain('john@example.com');
     expect(raw).not.toContain('Jane Doe');
-    expect(raw).not.toContain('whsec_super_secret_value');
     expect(raw).not.toMatch(/leadName|leadEmail|leadMessage|webflowFormWebhookSecret/);
   });
 });

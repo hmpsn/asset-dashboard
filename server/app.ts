@@ -82,7 +82,7 @@ import clientActionsRouter from './routes/client-actions.js';
 import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import { theIssueAdminRouter } from './routes/the-issue-admin.js';
-import { theIssueConversionTrackingRouter, handleWebflowFormWebhook } from './routes/the-issue-conversion-tracking.js';
+import { theIssueConversionTrackingRouter } from './routes/the-issue-conversion-tracking.js';
 import strategyPovRouter from './routes/strategy-pov.js';
 import strategyIssueLensesRouter from './routes/strategy-issue-lenses.js';
 import competitorAlertsRouter from './routes/competitor-alerts.js';
@@ -190,15 +190,6 @@ export function createApp(): express.Express {
       res.status(400).json({ error: 'Webhook verification failed' });
     }
   });
-
-  // The Issue (Client) P1a — Webflow form webhook must receive the RAW body so the HMAC verifies the
-  // exact bytes Webflow signed (sibling to the Stripe webhook above; both mounted before express.json).
-  // The handler is flag-gated internally → 404 when the-issue-client-measured-capture is OFF.
-  app.post(
-    '/api/public/webflow-form-webhook/:workspaceId',
-    express.raw({ type: 'application/json' }),
-    handleWebflowFormWebhook,
-  );
 
   app.use(express.json({ limit: '10mb' }));
 

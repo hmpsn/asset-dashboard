@@ -7,9 +7,6 @@ const DENIED_KEYS: ReadonlySet<string> = new Set([
   'clientPassword',
   'stripeCustomerId',
   'stripeSubscriptionId',
-  // The Issue (Client) P1a — the Webflow form-webhook signing secret is admin-only and returned
-  // exactly once on enable; like webflowToken it is NEVER re-served in any workspace view (D7).
-  'webflowFormWebhookSecret',
 ]);
 
 export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWorkspaceView {

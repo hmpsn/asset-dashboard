@@ -1,34 +1,31 @@
 /**
- * The Issue (Client) P1a — conversion-tracking setup flow + Webflow form-webhook receiver.
+ * The Issue (Client) P1a — conversion-tracking admin setup flow (Webflow Data-API POLLING).
  *
- * Two surfaces, one bounded context (outcomes-roi):
+ * Owner directive: outcome capture switched from an HMAC webhook receiver to polling the Webflow Forms
+ * Data API (the signed-webhook model needed an operator-pasted per-workspace secret that didn't match
+ * reality). This router is now PURE ADMIN — no public receiver. The daily poller lives in
+ * server/webflow-form-poller.ts; the storage/provenance/client render are source-agnostic and unchanged.
  *
- *  1. PUBLIC webhook receiver — `handleWebflowFormWebhook` (mounted in app.ts via express.raw BEFORE
- *     express.json, sibling to the Stripe webhook). HMAC-verified (Lane A's verifyWebflowSignature),
- *     idempotent (saveFormSubmission), flag-gated (404 when OFF — the A9 receiver-inert case). On a
- *     NEW capture it broadcasts FORM_SUBMISSION_CAPTURED + logs the admin-only form_submission_captured
- *     activity (PII omitted from metadata, D7) and confirms setup on the first lead (D6 provenance flip).
+ * Endpoints (all requireWorkspaceAccess — NEVER requireAuth; admin auth is the HMAC x-auth-token gate;
+ * all flag-gated → 404 when the-issue-client-measured-capture is OFF):
+ *   GET  /api/workspaces/:id/conversion-tracking-status  — verification readout (counts + freshness)
+ *   GET  /api/workspaces/:id/webflow-forms               — list the site's forms for the picker
+ *   PUT  /api/workspaces/:id/form-sources                — save formId→outcomeType mappings; confirm setup
  *
- *  2. ADMIN endpoints (requireWorkspaceAccess — NEVER requireAuth; admin auth is the HMAC x-auth-token
- *     gate): GET status (verification readout), POST enable (mint + return the signing secret ONCE),
- *     POST disable (clear secret + sources). All flag-gated.
- *
- * D7: the signing secret + captured lead identity (leadName/leadEmail/leadMessage) are admin-internal
- * and NEVER serialized into any public/client payload. The secret is returned exactly once on enable.
+ * D7: captured lead identity (leadName/leadEmail/leadMessage) is admin-internal and NEVER serialized
+ * into any payload here — the status readout exposes counts + freshness only.
  */
-import express, { Router } from 'express';
-import crypto from 'node:crypto';
+import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
-import { getWorkspace, updateWorkspace } from '../workspaces.js';
-import { verifyWebflowSignature, parseWebflowFormPayload, resolveOutcomeType } from '../webflow-form-webhook.js';
-import { saveFormSubmission, getFormCaptureStatus } from '../form-submissions.js';
-import { parseJsonFallback } from '../db/json-validation.js';
+import { getWorkspace, getTokenForSite, updateWorkspace } from '../workspaces.js';
+import { listWebflowForms } from '../webflow-forms.js';
+import { getFormCaptureStatus } from '../form-submissions.js';
 import { loadGa4SnapshotHistory } from '../ga4-snapshots.js';
 import { aggregatePinnedOutcomes } from '../the-issue-outcome.js';
-import { broadcastToWorkspace } from '../broadcast.js';
-import { WS_EVENTS } from '../ws-events.js';
-import { addActivity } from '../activity-log.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { validate, z } from '../middleware/validate.js';
+import { webflowFormMappingSchema } from '../schemas/workspace-schemas.js';
+import type { WebflowFormMapping } from '../../shared/types/form-submission.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('the-issue-conversion-tracking');
@@ -36,85 +33,6 @@ const log = createLogger('the-issue-conversion-tracking');
 const FLAG = 'the-issue-client-measured-capture';
 
 export const theIssueConversionTrackingRouter = Router();
-
-/**
- * PUBLIC: Webflow form-submission webhook receiver. Mounted with express.raw in app.ts so `req.body`
- * is a Buffer (the HMAC must verify the EXACT bytes Webflow signed). Returns 404 when the flag is OFF
- * (the receiver is inert — A9). Never throws to the client: malformed body → 400, bad signature → 401.
- */
-export function handleWebflowFormWebhook(req: express.Request, res: express.Response): void {
-  const ws = getWorkspace(req.params.workspaceId);
-  // Inert (404) when the workspace is unknown OR the flag is OFF — no oracle, no capture.
-  if (!ws || !isFeatureEnabled(FLAG, ws.id)) {
-    res.sendStatus(404);
-    return;
-  }
-  const secret = ws.webflowFormWebhookSecret;
-  if (!secret) {
-    res.status(400).json({ error: 'Webflow form webhook not configured' });
-    return;
-  }
-
-  const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body ?? '');
-  // Webflow signs `${timestamp}:${rawBody}` and sends the signed timestamp in X-Webflow-Timestamp.
-  // Reject a missing / non-numeric / stale timestamp (>5min skew) before the HMAC check to bound replay.
-  const ts = req.header('x-webflow-timestamp');
-  if (!ts || Number.isNaN(Number(ts)) || Math.abs(Date.now() - Number(ts)) > 300_000) {
-    log.warn({ workspaceId: ws.id }, 'webflow form webhook: missing or stale timestamp');
-    res.sendStatus(401);
-    return;
-  }
-  const signature = req.header('x-webflow-signature') ?? '';
-  if (!verifyWebflowSignature(raw, signature, secret, ts)) {
-    log.warn({ workspaceId: ws.id }, 'webflow form webhook: invalid signature');
-    res.sendStatus(401);
-    return;
-  }
-
-  // parseJsonFallback never throws: a non-empty-but-malformed body yields undefined → 400. Valid JSON
-  // (object or not) is handed to parseWebflowFormPayload, which returns null on a non-form trigger.
-  const json = parseJsonFallback<unknown>(raw, undefined);
-  if (json === undefined && raw.trim().length > 0) {
-    res.sendStatus(400);
-    return;
-  }
-  const parsed = parseWebflowFormPayload(json);
-  // A non-form trigger (site_publish, etc.) is acknowledged but stores nothing.
-  if (!parsed) {
-    res.status(200).json({ ignored: true });
-    return;
-  }
-
-  const outcomeType = resolveOutcomeType(ws, parsed.formId, parsed.formName);
-  const { inserted } = saveFormSubmission({
-    workspaceId: ws.id,
-    formId: parsed.formId,
-    submissionId: parsed.submissionId,
-    formName: parsed.formName,
-    leadName: parsed.leadName,
-    leadEmail: parsed.leadEmail,
-    leadMessage: parsed.leadMessage,
-    eventName: 'form_submit',
-    outcomeType,
-    submittedAt: parsed.submittedAt,
-    capturedAt: new Date().toISOString(),
-  });
-
-  if (inserted) {
-    // D6 provenance-flip basis: the first captured real lead confirms setup if the operator hasn't yet.
-    if (!ws.conversionTrackingConfirmedAt) {
-      updateWorkspace(ws.id, { conversionTrackingConfirmedAt: new Date().toISOString() });
-    }
-    // PII omitted from metadata (D7) — only the form id + resolved outcome type.
-    addActivity(ws.id, 'form_submission_captured', `New ${parsed.formName} submission captured`, undefined, {
-      formId: parsed.formId,
-      outcomeType,
-    });
-    broadcastToWorkspace(ws.id, WS_EVENTS.FORM_SUBMISSION_CAPTURED, { workspaceId: ws.id, outcomeType });
-  }
-
-  res.status(200).json({ ok: true, inserted });
-}
 
 // ── Admin: verification readout ──────────────────────────────────────────────
 // GET /api/workspaces/:id/conversion-tracking-status
@@ -141,8 +59,8 @@ theIssueConversionTrackingRouter.get(
     res.json({
       pinnedCount: pinned.length,
       typedCount: pinned.filter((c) => c.outcomeType).length,
-      // The provenance-flip basis (D6): confirmed setup AND a signing secret exists.
-      formCaptureConnected: !!ws.conversionTrackingConfirmedAt && !!ws.webflowFormWebhookSecret,
+      // Provenance-flip basis (D6): confirmed setup AND ≥1 tracked Webflow form selected.
+      formCaptureConnected: !!ws.conversionTrackingConfirmedAt && (ws.webflowFormSources?.length ?? 0) > 0,
       lastSubmissionAt: status.lastSubmissionAt,
       submissionCount: status.count,
       recentOutcomeCount,
@@ -150,12 +68,12 @@ theIssueConversionTrackingRouter.get(
   },
 );
 
-// ── Admin: enable form capture (mint + return the signing secret ONCE) ───────
-// POST /api/workspaces/:id/form-capture/enable
-theIssueConversionTrackingRouter.post(
-  '/api/workspaces/:id/form-capture/enable',
+// ── Admin: list the site's Webflow forms (for the "select forms to track" picker) ──
+// GET /api/workspaces/:id/webflow-forms
+theIssueConversionTrackingRouter.get(
+  '/api/workspaces/:id/webflow-forms',
   requireWorkspaceAccess(),
-  (req, res) => {
+  async (req, res) => {
     const ws = getWorkspace(req.params.id);
     if (!ws) {
       res.status(404).json({ error: 'Workspace not found' });
@@ -165,26 +83,32 @@ theIssueConversionTrackingRouter.post(
       res.sendStatus(404);
       return;
     }
-    // Mint a fresh secret on first enable; preserve an existing one so re-enable is idempotent and the
-    // operator's already-pasted Webflow secret keeps working. (Rotation = disable then enable.)
-    const secret = ws.webflowFormWebhookSecret ?? crypto.randomBytes(24).toString('hex');
-    if (!ws.webflowFormWebhookSecret) {
-      updateWorkspace(ws.id, { webflowFormWebhookSecret: secret });
+    if (!ws.webflowSiteId) {
+      res.status(400).json({ error: 'Link a Webflow site first' });
+      return;
     }
-    const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
-    res.json({
-      webhookUrl: `${origin}/api/public/webflow-form-webhook/${ws.id}`,
-      // Shown exactly once — never re-serialized (the GET status endpoint never returns it). D7.
-      webhookSecret: secret,
-    });
+    try {
+      const token = getTokenForSite(ws.webflowSiteId) || undefined;
+      const forms = await listWebflowForms(ws.webflowSiteId, token);
+      res.json({ forms });
+    } catch (err) {
+      // FM-2 honest degradation: a Webflow API error returns an empty picker + error, never a 500 throw.
+      log.warn({ err, workspaceId: ws.id }, 'Failed to list Webflow forms');
+      res.status(502).json({ error: 'Could not load Webflow forms', forms: [] });
+    }
   },
 );
 
-// ── Admin: disable form capture (clear secret + sources) ─────────────────────
-// POST /api/workspaces/:id/form-capture/disable
-theIssueConversionTrackingRouter.post(
-  '/api/workspaces/:id/form-capture/disable',
+// ── Admin: save the form-source mappings (+ confirm setup when ≥1 mapped) ─────
+// PUT /api/workspaces/:id/form-sources
+const formSourcesBodySchema = z.object({
+  sources: z.array(webflowFormMappingSchema),
+});
+
+theIssueConversionTrackingRouter.put(
+  '/api/workspaces/:id/form-sources',
   requireWorkspaceAccess(),
+  validate(formSourcesBodySchema),
   (req, res) => {
     const ws = getWorkspace(req.params.id);
     if (!ws) {
@@ -195,7 +119,21 @@ theIssueConversionTrackingRouter.post(
       res.sendStatus(404);
       return;
     }
-    updateWorkspace(ws.id, { webflowFormWebhookSecret: undefined, webflowFormSources: [] });
-    res.json({ disabled: true });
+    // The zod enum on outcomeType matches OutcomeType exactly, so the validated body is WebflowFormMapping[].
+    const sources = req.body.sources as WebflowFormMapping[];
+    // Confirm setup (the D6 provenance-flip basis) when ≥1 form is mapped; preserve an existing
+    // confirmation timestamp (a re-save shouldn't reset it). Clearing all sources leaves the prior
+    // confirmation intact — a captured lead history already justifies "measured".
+    const alreadyConfirmed = !!ws.conversionTrackingConfirmedAt;
+    const confirm = sources.length > 0 && !alreadyConfirmed
+      ? { conversionTrackingConfirmedAt: new Date().toISOString() }
+      : {};
+    updateWorkspace(ws.id, { webflowFormSources: sources, ...confirm });
+    res.json({
+      saved: true,
+      // Connected once ≥1 form is mapped — saving sources confirms setup in this same call (above),
+      // so the provenance-flip basis (confirmed AND ≥1 form) reduces to "≥1 form mapped".
+      formCaptureConnected: sources.length > 0,
+    });
   },
 );

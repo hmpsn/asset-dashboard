@@ -14,8 +14,9 @@ import { CHART_SERIES_COLORS } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useConversionTrackingStatus } from '../../hooks/admin/useConversionTrackingStatus';
-import { conversionTrackingApi, type FormCaptureEnableResult } from '../../api/conversionTracking';
+import { conversionTrackingApi, type WebflowFormOption } from '../../api/conversionTracking';
 import { ConversionTrackingReadout, type ConversionSetupStep } from './ConversionTrackingReadout';
+import type { WebflowFormMapping } from '../../../shared/types/form-submission.ts';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type {
@@ -52,6 +53,8 @@ interface WorkspaceData {
   segmentProfile?: ResolvedSegmentProfile;
   // The Issue (Client) P1a — confirmed-setup marker (the provenance-flip basis; admin-only).
   conversionTrackingConfirmedAt?: string;
+  // The Issue (Client) P1a — selected Webflow forms to poll (formId→outcomeType mapping; admin-only).
+  webflowFormSources?: WebflowFormMapping[];
   [key: string]: unknown;
 }
 
@@ -128,10 +131,13 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   // every new subsection below is gated out and the surface is byte-identical to P0.
   const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
   const conversionTracking = useConversionTrackingStatus(workspaceId, measuredCapture && !!ws?.ga4PropertyId);
-  const [enablingCapture, setEnablingCapture] = useState(false);
-  const [captureCreds, setCaptureCreds] = useState<FormCaptureEnableResult | null>(null);
-  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
-  const [copiedWebhookSecret, setCopiedWebhookSecret] = useState(false);
+  // P1a: Webflow form-capture is now Data-API POLLING — the admin SELECTS which forms to track and
+  // maps each to a typed outcome (no webhook secret to mint/paste). Local picker state below.
+  const [showFormPicker, setShowFormPicker] = useState(false);
+  const [loadingForms, setLoadingForms] = useState(false);
+  const [availableForms, setAvailableForms] = useState<WebflowFormOption[]>([]);
+  const [formSources, setFormSources] = useState<WebflowFormMapping[]>([]);
+  const [savingFormSources, setSavingFormSources] = useState(false);
 
   const basisLabel = (b: OutcomeValue['basis']): string =>
     b === 'client_provided' ? 'Client-provided' : b === 'ai_enriched' ? 'AI estimate' : 'Agency estimate';
@@ -335,41 +341,41 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     finally { setSavingEvents(false); }
   };
 
-  // P1a: enable Webflow form capture — mints + returns the signing secret ONCE (copy-now, shown-once).
-  const enableFormCapture = async () => {
-    setEnablingCapture(true);
+  // P1a: open the form picker — fetch the site's Webflow forms + seed the local mapping from the saved
+  // sources so the operator sees their current selection. Capture is polling-based (no secret to mint).
+  const openFormPicker = async () => {
+    setShowFormPicker(true);
+    setLoadingForms(true);
     try {
-      const creds = await conversionTrackingApi.enableFormCapture(workspaceId);
-      setCaptureCreds(creds);
-      // Enabling mints the secret server-side → the connected/provenance state changed; refresh the
-      // readout query so it isn't stale (otherwise the integrity strip lags one toggle behind).
-      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
-      toast('Webflow form capture enabled — copy your signing secret now');
-    } catch { toast('Failed to enable form capture', 'error'); }
-    finally { setEnablingCapture(false); }
+      const forms = await conversionTrackingApi.getWebflowForms(workspaceId);
+      setAvailableForms(forms);
+      setFormSources(ws?.webflowFormSources ?? []);
+    } catch { toast('Could not load Webflow forms', 'error'); }
+    finally { setLoadingForms(false); }
   };
 
-  const disableFormCapture = async () => {
-    try {
-      await conversionTrackingApi.disableFormCapture(workspaceId);
-      setCaptureCreds(null);
-      // Disabling clears the secret + sources server-side → invalidate the cached status so the
-      // readout drops back to "Not connected" instead of showing a stale connected state.
-      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
-      toast('Webflow form capture disabled');
-    } catch { toast('Failed to disable form capture', 'error'); }
+  // Toggle a form's tracked outcomeType. Empty value = untracked (removed from sources).
+  const setFormOutcomeType = (form: WebflowFormOption, outcomeType: OutcomeType | '') => {
+    setFormSources(prev => {
+      const without = prev.filter(s => s.formId !== form.id);
+      if (!outcomeType) return without;
+      return [...without, { formId: form.id, formName: form.displayName, outcomeType }];
+    });
   };
 
-  // Copy handler: await the clipboard write and only flag "copied" on success (an unawaited promise
-  // could reject silently and still flash the success state). try/catch surfaces a denied-permission.
-  const copyToClipboard = async (text: string, mark: (v: boolean) => void) => {
+  const saveFormSources = async () => {
+    setSavingFormSources(true);
     try {
-      await navigator.clipboard.writeText(text);
-      mark(true);
-      setTimeout(() => mark(false), 2000);
-    } catch {
-      toast('Could not copy to clipboard', 'error');
-    }
+      await conversionTrackingApi.saveFormSources(workspaceId, formSources);
+      // Saving sources (+ confirming setup) changes the connected/provenance state server-side →
+      // refresh the readout query so the integrity strip isn't stale, and re-fetch the workspace so
+      // ws.webflowFormSources reflects the save.
+      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+      toast(formSources.length > 0 ? 'Tracked Webflow forms saved' : 'Form tracking cleared');
+      setShowFormPicker(false);
+    } catch { toast('Failed to save tracked forms', 'error'); }
+    finally { setSavingFormSources(false); }
   };
 
   // Load users on mount
@@ -1012,13 +1018,13 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             completed: typedCount > 0,
           },
           {
-            id: 'connect-webflow', label: 'Connect Webflow form capture',
-            description: 'Paste the signing secret + webhook URL into Webflow so named leads flow in.',
+            id: 'connect-webflow', label: 'Select which Webflow forms to track',
+            description: 'Pick the Webflow forms that produce leads and map each to a lead type.',
             completed: formCaptureConnected,
           },
           {
             id: 'confirm-lead', label: 'Confirm a measured lead landed',
-            description: 'Submit a test form — it appears in the readout above when capture is live.',
+            description: 'New submissions are pulled from Webflow daily and appear in the readout above.',
             completed: submissionCount > 0,
           },
         ];
@@ -1074,7 +1080,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               </SectionCard>
             )}
 
-            {/* Webflow form-capture connect (guided manual webhook registration) */}
+            {/* Webflow form capture — select which forms to track (Data-API polling, no webhook). */}
             <SectionCard noPadding>
               <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
@@ -1082,48 +1088,56 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow form capture</h3>
-                  <p className="t-caption text-[var(--brand-text-muted)]">Capture named leads from Webflow forms via a signed webhook — the lead identity stays internal.</p>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Select which Webflow forms produce leads — submissions are pulled from Webflow daily. The lead identity stays internal.</p>
                 </div>
-                {(formCaptureConnected || captureCreds) ? (
-                  <Button aria-label="Disable Webflow form capture" onClick={disableFormCapture} variant="secondary" size="sm" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
-                    Disconnect
+                {showFormPicker ? (
+                  <Button aria-label="Save tracked Webflow forms" onClick={saveFormSources} loading={savingFormSources} disabled={savingFormSources} icon={Save} size="sm" className="bg-teal-600 hover:bg-teal-500">
+                    Save
                   </Button>
                 ) : (
-                  <Button aria-label="Enable Webflow form capture" onClick={enableFormCapture} loading={enablingCapture} disabled={enablingCapture} icon={Link2} size="sm" className="bg-teal-600 hover:bg-teal-500">
-                    Enable
+                  <Button aria-label="Select Webflow forms to track" onClick={openFormPicker} icon={Link2} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+                    {formCaptureConnected ? 'Edit forms' : 'Select forms'}
                   </Button>
                 )}
               </div>
 
-              {captureCreds ? (
-                <div className="px-5 py-4 space-y-4">
-                  <p className="t-caption-sm text-amber-400">Copy your signing secret now — it's shown only once.</p>
-                  <div className="space-y-1.5">
-                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Webhook URL</div>
-                    <div className="flex items-center gap-2">
-                      <FormInput readOnly value={captureCreds.webhookUrl} onChange={() => {}} className={`flex-1 ${inputClass} font-mono`} />
-                      <IconButton onClick={() => copyToClipboard(captureCreds.webhookUrl, setCopiedWebhookUrl)} icon={copiedWebhookUrl ? Check : Copy} label="Copy webhook URL" size="sm" variant="ghost" className={copiedWebhookUrl ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'} />
+              {showFormPicker ? (
+                <div className="px-5 py-4 space-y-3">
+                  {loadingForms ? (
+                    <div className="flex items-center gap-2 t-caption py-4 justify-center text-[var(--brand-text-muted)]">
+                      <Icon as={Loader2} size="xs" className="animate-spin" /> Loading forms from Webflow...
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Signing secret</div>
-                    <div className="flex items-center gap-2">
-                      <FormInput readOnly value={captureCreds.webhookSecret} onChange={() => {}} className={`flex-1 ${inputClass} font-mono`} />
-                      <IconButton onClick={() => copyToClipboard(captureCreds.webhookSecret, setCopiedWebhookSecret)} icon={copiedWebhookSecret ? Check : Copy} label="Copy signing secret" size="sm" variant="ghost" className={copiedWebhookSecret ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'} />
+                  ) : availableForms.length === 0 ? (
+                    <p className="t-caption-sm py-2 text-[var(--brand-text-muted)]">No Webflow forms found for this site. Publish a form in Webflow, then refresh.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {availableForms.map(form => {
+                        const mapped = formSources.find(s => s.formId === form.id)?.outcomeType ?? '';
+                        return (
+                          <div key={form.id} className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] transition-colors ${mapped ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
+                            <span className="t-caption flex-1 min-w-0 truncate text-[var(--brand-text)]">{form.displayName}</span>
+                            <FormSelect
+                              aria-label={`Lead type for ${form.displayName}`}
+                              value={mapped}
+                              onChange={value => setFormOutcomeType(form, (value || '') as OutcomeType | '')}
+                              options={[{ value: '', label: "Don't track" }, ...OUTCOME_TYPE_OPTIONS.filter(o => o.value !== '')]}
+                              className={`${inputClass} py-1 max-w-[140px]`}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                  <ol className="t-caption-sm text-[var(--brand-text-muted)] space-y-1 list-decimal list-inside">
-                    <li>In Webflow: Site settings → Forms → Webhooks, paste this URL.</li>
-                    <li>Paste this signing secret into the webhook's secret field.</li>
-                    <li>Submit a test form — it appears in the readout above within seconds.</li>
-                  </ol>
+                  )}
+                  <p className="t-caption-sm leading-relaxed text-[var(--brand-text-muted)] pt-1">
+                    Each tracked form's submissions are captured daily and counted toward the client's measured outcome number. Lead names and emails stay internal.
+                  </p>
                 </div>
               ) : (
                 <div className="px-5 py-3">
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">
                     {formCaptureConnected
-                      ? 'Webflow form capture is connected. Named leads flow in via the signed webhook.'
-                      : 'Not connected — enable to generate a webhook URL + signing secret for Webflow.'}
+                      ? `Tracking ${ws?.webflowFormSources?.length ?? 0} Webflow form${(ws?.webflowFormSources?.length ?? 0) === 1 ? '' : 's'}. New submissions are pulled in daily.`
+                      : 'Not connected — select the Webflow forms that produce leads to start capturing measured outcomes.'}
                   </p>
                 </div>
               )}

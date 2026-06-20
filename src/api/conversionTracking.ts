@@ -1,12 +1,15 @@
 /**
- * The Issue (Client) P1a — typed fetch wrapper for the admin conversion-tracking setup flow.
+ * The Issue (Client) P1a — typed fetch wrappers for the admin conversion-tracking setup flow.
  *
- * Keeps the admin status/enable/disable calls out of raw component `fetch` (no-raw-fetch convention).
- * The webhook RECEIVER (POST /api/public/webflow-form-webhook/:id) is server-to-server (Webflow → us)
- * and is NOT called from here. PII (lead identity) + the signing secret are admin-internal (D7); the
- * secret is returned exactly once on enable and never re-serialized — copy it immediately.
+ * Keeps the admin status / forms / form-sources calls out of raw component `fetch` (no-raw-fetch
+ * convention). Outcome capture is via Webflow Data-API POLLING (server/webflow-form-poller.ts), not a
+ * webhook — so this surface no longer mints a signing secret. The setup is: list the site's Webflow
+ * forms → map each to a typed outcome → save. PII (lead identity) is admin-internal (D7) and never
+ * crosses this boundary; the status readout exposes counts + freshness only.
  */
-import { getSafe, post } from './client';
+import { getSafe, put } from './client';
+import type { OutcomeType } from '../../shared/types/the-issue.ts';
+import type { WebflowFormMapping } from '../../shared/types/form-submission.ts';
 
 /** Admin verification-readout status. Counts + freshness only — never PII. */
 export interface ConversionTrackingStatus {
@@ -14,7 +17,7 @@ export interface ConversionTrackingStatus {
   pinnedCount: number;
   /** Pinned events that also carry an outcomeType classification. */
   typedCount: number;
-  /** True only when setup is confirmed AND a signing secret exists (the provenance-flip basis). */
+  /** True only when setup is confirmed AND ≥1 Webflow form is selected (the provenance-flip basis). */
   formCaptureConnected: boolean;
   /** ISO timestamp of the most recently captured lead, or null if none. */
   lastSubmissionAt: string | null;
@@ -24,11 +27,16 @@ export interface ConversionTrackingStatus {
   recentOutcomeCount: number;
 }
 
-/** Result of enabling form capture — the signing secret is returned ONCE. Copy it immediately. */
-export interface FormCaptureEnableResult {
-  webhookUrl: string;
-  /** The HMAC signing secret — shown exactly once, never re-fetched. */
-  webhookSecret: string;
+/** A Webflow form available for selection in the "track these forms" picker. */
+export interface WebflowFormOption {
+  id: string;
+  displayName: string;
+}
+
+/** Result of saving the form-source mappings. */
+export interface FormSourcesSaveResult {
+  saved: boolean;
+  formCaptureConnected: boolean;
 }
 
 const STATUS_FALLBACK: ConversionTrackingStatus = {
@@ -48,11 +56,17 @@ export const conversionTrackingApi = {
       STATUS_FALLBACK,
     ),
 
-  /** Enable Webflow form capture — generates + returns the signing secret ONCE. */
-  enableFormCapture: (workspaceId: string) =>
-    post<FormCaptureEnableResult>(`/api/workspaces/${workspaceId}/form-capture/enable`, {}),
+  /** GET the site's Webflow forms for the picker. Returns [] on any error / flag-OFF / unlinked site. */
+  getWebflowForms: (workspaceId: string) =>
+    getSafe<{ forms: WebflowFormOption[] }>(
+      `/api/workspaces/${workspaceId}/webflow-forms`,
+      { forms: [] },
+    ).then((r) => r.forms),
 
-  /** Disable form capture — clears the secret + sources. Re-enabling mints a fresh secret. */
-  disableFormCapture: (workspaceId: string) =>
-    post<{ disabled: true }>(`/api/workspaces/${workspaceId}/form-capture/disable`, {}),
+  /** Save the formId→outcomeType mappings. Confirms setup server-side when ≥1 form is mapped. */
+  saveFormSources: (workspaceId: string, sources: WebflowFormMapping[]) =>
+    put<FormSourcesSaveResult>(`/api/workspaces/${workspaceId}/form-sources`, { sources }),
 };
+
+/** Re-export OutcomeType for the picker UI (each selected form maps to one). */
+export type { OutcomeType, WebflowFormMapping };

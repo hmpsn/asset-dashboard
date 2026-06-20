@@ -155,8 +155,7 @@ interface WorkspaceRow {
   intelligence_profile: string | null;
   segment_config: string | null;
   outcome_value: string | null;
-  // The Issue (Client) P1a — Webflow form-capture config (migration 149). All admin-only.
-  webflow_form_webhook_secret: string | null;
+  // The Issue (Client) P1a — Webflow form-capture config (migration 149; secret dropped in 150). All admin-only.
   webflow_form_sources: string | null;
   conversion_tracking_confirmed_at: string | null;
   business_priorities: string | null;
@@ -268,9 +267,9 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const ov = parseJsonSafe(row.outcome_value, outcomeValueSchema, null, { workspaceId: row.id, field: 'outcome_value', table: 'workspaces' });
     if (ov) ws.outcomeValue = ov;
   }
-  // The Issue (Client) P1a — Webflow form-capture config (all admin-only; secret/sources/PII never
-  // serialized into any public/client payload, D7).
-  if (row.webflow_form_webhook_secret) ws.webflowFormWebhookSecret = row.webflow_form_webhook_secret;
+  // The Issue (Client) P1a — Webflow form-capture config (all admin-only; sources/PII never serialized
+  // into any public/client payload, D7). Capture is via Data-API polling; the legacy signing secret was
+  // dropped in migration 150.
   if (row.webflow_form_sources) ws.webflowFormSources = parseJsonSafeArray(row.webflow_form_sources, webflowFormMappingSchema, { workspaceId: row.id, field: 'webflow_form_sources', table: 'workspaces' });
   if (row.conversion_tracking_confirmed_at) ws.conversionTrackingConfirmedAt = row.conversion_tracking_confirmed_at;
   // Use loose != null (not !==) so undefined (column not yet in DB before migration 049) is also excluded,
@@ -418,8 +417,7 @@ function workspaceToParams(ws: Workspace) {
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     segment_config: ws.segmentConfig ? JSON.stringify(ws.segmentConfig) : null,
     outcome_value: ws.outcomeValue ? JSON.stringify(ws.outcomeValue) : null,
-    // The Issue (Client) P1a — Webflow form-capture config (write boundary).
-    webflow_form_webhook_secret: ws.webflowFormWebhookSecret ?? null,
+    // The Issue (Client) P1a — Webflow form-capture config (write boundary; secret dropped in 150).
     webflow_form_sources: ws.webflowFormSources ? JSON.stringify(ws.webflowFormSources) : null,
     conversion_tracking_confirmed_at: ws.conversionTrackingConfirmedAt ?? null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
@@ -507,7 +505,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'webflowFormWebhookSecret' | 'webflowFormSources' | 'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'webflowFormSources' | 'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -548,7 +546,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
     segmentConfig: 'segment_config', outcomeValue: 'outcome_value',
-    webflowFormWebhookSecret: 'webflow_form_webhook_secret', webflowFormSources: 'webflow_form_sources',
+    webflowFormSources: 'webflow_form_sources',
     conversionTrackingConfirmedAt: 'conversion_tracking_confirmed_at',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
     autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
