@@ -150,8 +150,11 @@ export function DraftedPovEditor({
 }: DraftedPovEditorProps) {
   // Local draft mirrors the POV; edits flow through here and are emitted on a debounce.
   const [draft, setDraft] = useState<StrategyPovEdit>({});
-  // Track the POV identity so external generations reset the local draft.
-  const baselineRef = useRef<string>('');
+  // Track ONLY the last-synced generatedAt so an EXTERNAL regenerate resets the local draft.
+  // We must NOT key the reset on version/editedAt — those bump on the operator's own optimistic
+  // PATCH, and resetting the draft mid-flight would wipe keystrokes typed during the in-flight
+  // save (the lost-keystroke race). Only a regenerate (new generatedAt) is an external change.
+  const lastGeneratedAtRef = useRef<string | null>(null);
 
   // The cut→sentence contract: when the lead move's rec id is cut, the lead sentence is gone.
   const leadCut = useMemo(
@@ -165,14 +168,16 @@ export function DraftedPovEditor({
   const wins = draft.wins ?? pov?.wins ?? [];
   const flags = draft.flags ?? pov?.flags ?? [];
 
-  // When the server POV identity changes (regenerate landed), drop the local draft.
+  // When the server POV is regenerated (a NEW generatedAt), drop the local draft. Keyed on
+  // generatedAt ONLY — a successful PATCH bumps version/editedAt but NOT generatedAt, so in-flight
+  // edits survive the optimistic save round-trip (lost-keystroke fix).
+  const generatedAt = pov?.generatedAt ?? null;
   useEffect(() => {
-    const baseline = pov ? `${pov.version}:${pov.generatedAt}:${pov.editedAt ?? ''}` : '';
-    if (baseline !== baselineRef.current) {
-      baselineRef.current = baseline;
+    if (generatedAt !== lastGeneratedAtRef.current) {
+      lastGeneratedAtRef.current = generatedAt;
       setDraft({});
     }
-  }, [pov]);
+  }, [generatedAt]);
 
   // Debounce the draft and emit only the changed fields.
   const debouncedDraft = useDebouncedValue(draft, DEBOUNCE_MS);
@@ -189,6 +194,20 @@ export function DraftedPovEditor({
           icon={Pencil}
           title="No point of view drafted yet"
           description="Generate the issue to draft a curated point of view over your sent moves."
+          action={
+            onRegenerate ? (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={RefreshCw}
+                loading={isGenerating}
+                disabled={isGenerating}
+                onClick={onRegenerate}
+              >
+                Generate
+              </Button>
+            ) : undefined
+          }
         />
       </SectionCard>
     );

@@ -11,5 +11,6 @@ CREATE TABLE IF NOT EXISTS cannibalization_keeper_override (
   url_set_key  TEXT NOT NULL,
   keeper_path  TEXT NOT NULL,
   created_at   TEXT NOT NULL,
-  PRIMARY KEY (workspace_id, url_set_key)
+  PRIMARY KEY (workspace_id, url_set_key),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );

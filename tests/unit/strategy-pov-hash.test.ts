@@ -3,14 +3,16 @@ import { buildStrategyPovHash } from '../../server/strategy-pov-generator.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
 
 /**
- * Lane B cache-completeness contract (plan Step 3, audit §8):
+ * Lane B cache-completeness contract (plan Step 3, audit §8, scaled-review fix #5):
  * buildStrategyPovHash MUST bust when ANY of these change:
  *   - the curated rec id-set
- *   - each curated rec's clientStatus
- *   - each curated rec's lifecycle
- *   - the prose-edit version
+ *   - each curated rec's clientStatus / lifecycle
+ *   - each curated rec's CONTENT (title / insight / estimatedGain / opportunity value)
+ *   - the rec ORDER (the POV leads with the #1 curated move)
+ *   - the variant (admin vs client prose must not share a cache)
  *   - the regenerate nonce
- * Identical inputs ⇒ identical hash (pure).
+ * It MUST NOT bust on the prose-edit version change (folding version in would let a plain generate
+ * after an operator edit overwrite the edit). Identical inputs ⇒ identical hash (pure).
  */
 
 function rec(over: Partial<Recommendation>): Recommendation {
@@ -40,39 +42,63 @@ function rec(over: Partial<Recommendation>): Recommendation {
   } as Recommendation;
 }
 
-const base = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active' }), rec({ id: 'b', clientStatus: 'approved', lifecycle: 'active' })];
+const base = [
+  rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga' }),
+  rec({ id: 'b', clientStatus: 'approved', lifecycle: 'active', title: 'B', insight: 'ib', estimatedGain: 'gb' }),
+];
 
 describe('buildStrategyPovHash', () => {
   it('is pure — identical inputs produce identical hash', () => {
-    expect(buildStrategyPovHash(base, 0, null)).toBe(buildStrategyPovHash(base, 0, null));
+    expect(buildStrategyPovHash(base, 'admin', null)).toBe(buildStrategyPovHash(base, 'admin', null));
   });
 
   it('busts when the curated rec id-set changes', () => {
     const withExtra = [...base, rec({ id: 'c' })];
-    expect(buildStrategyPovHash(withExtra, 0, null)).not.toBe(buildStrategyPovHash(base, 0, null));
+    expect(buildStrategyPovHash(withExtra, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
   });
 
   it('busts when a curated rec clientStatus changes', () => {
-    const flipped = [rec({ id: 'a', clientStatus: 'discussing', lifecycle: 'active' }), base[1]];
-    expect(buildStrategyPovHash(flipped, 0, null)).not.toBe(buildStrategyPovHash(base, 0, null));
+    const flipped = [rec({ id: 'a', clientStatus: 'discussing', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga' }), base[1]];
+    expect(buildStrategyPovHash(flipped, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
   });
 
   it('busts when a curated rec lifecycle changes', () => {
-    const flipped = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'throttled' }), base[1]];
-    expect(buildStrategyPovHash(flipped, 0, null)).not.toBe(buildStrategyPovHash(base, 0, null));
+    const flipped = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'throttled', title: 'A', insight: 'ia', estimatedGain: 'ga' }), base[1]];
+    expect(buildStrategyPovHash(flipped, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
   });
 
-  it('busts when the prose-edit version changes', () => {
-    expect(buildStrategyPovHash(base, 1, null)).not.toBe(buildStrategyPovHash(base, 0, null));
+  it('busts when a curated rec CONTENT changes (title / insight / estimatedGain / opportunity value)', () => {
+    const newTitle = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A-EDITED', insight: 'ia', estimatedGain: 'ga' }), base[1]];
+    expect(buildStrategyPovHash(newTitle, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+
+    const newInsight = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia-EDITED', estimatedGain: 'ga' }), base[1]];
+    expect(buildStrategyPovHash(newInsight, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+
+    const newGain = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga-EDITED' }), base[1]];
+    expect(buildStrategyPovHash(newGain, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+
+    const newValue = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga', opportunity: { value: 999 } as Recommendation['opportunity'] }), base[1]];
+    expect(buildStrategyPovHash(newValue, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  });
+
+  it('busts when the rec ORDER changes (POV leads with the #1 curated move)', () => {
+    const reordered = [base[1], base[0]];
+    expect(buildStrategyPovHash(reordered, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  });
+
+  it('busts when the variant changes (admin vs client must not share a cache)', () => {
+    expect(buildStrategyPovHash(base, 'client', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
   });
 
   it('busts when the regenerate nonce changes', () => {
-    expect(buildStrategyPovHash(base, 0, 'nonce-1')).not.toBe(buildStrategyPovHash(base, 0, null));
-    expect(buildStrategyPovHash(base, 0, 'nonce-2')).not.toBe(buildStrategyPovHash(base, 0, 'nonce-1'));
+    expect(buildStrategyPovHash(base, 'admin', 'nonce-1')).not.toBe(buildStrategyPovHash(base, 'admin', null));
+    expect(buildStrategyPovHash(base, 'admin', 'nonce-2')).not.toBe(buildStrategyPovHash(base, 'admin', 'nonce-1'));
   });
 
-  it('is order-independent over the curated set (rec order must not matter)', () => {
-    const reordered = [base[1], base[0]];
-    expect(buildStrategyPovHash(reordered, 0, null)).toBe(buildStrategyPovHash(base, 0, null));
+  it('does NOT bust on a prose-edit version change (the version is not part of the hash)', () => {
+    // The version no longer participates in the hash — a plain generate after an operator edit must
+    // return the cached (edited) POV, not overwrite it. The signature dropped `version` entirely, so
+    // there is no version arg to vary: identical curated content + variant + nonce ⇒ identical hash.
+    expect(buildStrategyPovHash(base, 'admin', null)).toBe(buildStrategyPovHash(base, 'admin', null));
   });
 });

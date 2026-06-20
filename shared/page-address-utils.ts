@@ -32,6 +32,21 @@ export function toPageSlug(url: string): string {
   return normalizePageUrl(url).replace(/^\//, '');
 }
 
+/**
+ * SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization URL set.
+ * Normalizes each path to its slug, dedupes, and sorts so the SAME set of competing pages always
+ * produces the SAME key. Used as the rec source suffix (status carry-over), to dedupe a
+ * cannibalization rec against an active insight, AND as the key for the keeper-override store so the
+ * override survives the delete-then-reinsert regen clobber. Pure / deterministic.
+ *
+ * Lives in shared so both the recommendation generator and the cannibalization read path
+ * (cannibalization-issues.ts) compute the key from ONE source — a divergent key would silently miss
+ * the override or break carry-over. recommendations.ts re-exports it for back-compat.
+ */
+export function cannibalizationUrlSetKey(paths: string[]): string {
+  return Array.from(new Set(paths.map((p) => toPageSlug(p)))).sort().join('|');
+}
+
 function buildCanonicalUrl(baseUrl: string | null | undefined, canonicalPath: string): string | undefined {
   if (!baseUrl) return undefined;
   const normalizedBase = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;

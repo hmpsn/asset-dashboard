@@ -247,13 +247,18 @@ describe('KeywordStrategyPanel — The Issue flag parity', () => {
       // IssueHeader chrome
       expect(screen.getByText('The Issue')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /send issue/i })).toBeInTheDocument();
-      expect(screen.getByText('Preview as client')).toBeInTheDocument();
+      // "Preview as client" toggle was removed (Phase 1 had no client preview surface — dead
+      // control). It returns in Phase 2 once TheIssueClientPage exists.
+      expect(screen.queryByText('Preview as client')).toBeNull();
       // DraftedPovEditor
       expect(screen.getByText('The point of view')).toBeInTheDocument();
       // BackingMovesQueue
       expect(screen.getByText('Backing moves')).toBeInTheDocument();
       // The command-center cockpit is NOT rendered in the issue branch.
       expect(screen.queryByText('Curate recommendations')).toBeNull();
+      // The base "Keyword Strategy" PageHeader is suppressed in the issue branch — IssueHeader's
+      // "The Issue" is the only page header (no duplicate stacked headers).
+      expect(screen.queryByText('Keyword Strategy')).toBeNull();
     });
 
     it('Send issue fires the existing atomic bulk-send route (action:send)', () => {

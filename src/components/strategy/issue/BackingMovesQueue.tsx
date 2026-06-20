@@ -94,10 +94,10 @@ function ArchetypeGroup({
       {/* Group header */}
       <div className="flex items-center gap-2">
         <span
-          className={`inline-block h-2 w-2 rounded-full shrink-0 ${ARCHETYPE_ACCENT_SAFE[archetype]}`} // rounded-literal-ok: circular bullet indicator, no standard --radius-* equivalent
+          className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] shrink-0 ${ARCHETYPE_ACCENT_SAFE[archetype]}`}
           aria-hidden
         />
-        <h3 className="t-caption font-semibold text-[var(--brand-text-bright)]" role="heading">
+        <h3 className="t-caption font-semibold text-[var(--brand-text-bright)]">
           {ARCHETYPE_LABELS[archetype]}
           <span className="ml-1.5 t-caption-sm text-[var(--brand-text-muted)] font-normal">
             {recs.length}

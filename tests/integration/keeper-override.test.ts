@@ -24,7 +24,10 @@ import {
   clearKeeperOverride,
 } from '../../server/cannibalization-keeper-override.js';
 import { cannibalizationUrlSetKey } from '../../server/recommendations.js';
-import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
+import {
+  replaceAllCannibalizationIssues,
+  listCannibalizationIssues,
+} from '../../server/cannibalization-issues.js';
 import type { CannibalizationItem } from '../../shared/types/workspace.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -130,6 +133,14 @@ describe('PATCH /api/recommendations/:ws/cannibalization/:urlSetKey/keeper', () 
     expect(res.status).toBe(400);
   });
 
+  it('rejects a keeperPath that is not one of the competing pages with 422', async () => {
+    const res = await ctx.authPatchJson(
+      `/api/recommendations/${workspaceId}/cannibalization/${encodeURIComponent(TEST_URL_SET_KEY)}/keeper`,
+      { keeperPath: '/some-unrelated-page' },
+    );
+    expect(res.status).toBe(422);
+  });
+
   it('accepts the request via admin token (requireWorkspaceAccess gate)', async () => {
     // requireWorkspaceAccess passes through for HMAC-authenticated admin callers.
     // Auth guard integration tests live in admin-auth-guard.test.ts; this test
@@ -139,6 +150,31 @@ describe('PATCH /api/recommendations/:ws/cannibalization/:urlSetKey/keeper', () 
       { keeperPath: '/page-b' },
     );
     expect(res.status).toBe(200);
+  });
+});
+
+// ── Read-path override test (the override must CHANGE what readers see) ─────────
+
+describe('keeper override is applied on the cannibalization read path', () => {
+  it('listCannibalizationIssues returns the override canonicalPath, overriding the heuristic', () => {
+    // Reseed a clean issue with NO heuristic canonicalPath for the test URL set.
+    replaceAllCannibalizationIssues(workspaceId, [makeIssue(TEST_PAGES.map((p) => ({ path: p })))]);
+    clearKeeperOverride(workspaceId, TEST_URL_SET_KEY);
+
+    // Baseline: no override → no canonicalPath surfaced from the heuristic seed.
+    const before = listCannibalizationIssues(workspaceId).find((i) => i.keyword === 'test keyword');
+    expect(before).toBeDefined();
+    expect(before?.canonicalPath).toBeUndefined();
+
+    // Set the operator override and read again — the read result MUST change.
+    setKeeperOverride(workspaceId, TEST_URL_SET_KEY, '/page-b');
+    const after = listCannibalizationIssues(workspaceId).find((i) => i.keyword === 'test keyword');
+    expect(after?.canonicalPath).toBe('/page-b');
+
+    // Clearing the override reverts the read result.
+    clearKeeperOverride(workspaceId, TEST_URL_SET_KEY);
+    const reverted = listCannibalizationIssues(workspaceId).find((i) => i.keyword === 'test keyword');
+    expect(reverted?.canonicalPath).toBeUndefined();
   });
 });
 

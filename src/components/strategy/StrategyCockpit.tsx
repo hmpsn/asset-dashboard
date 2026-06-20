@@ -29,12 +29,6 @@ interface StrategyCockpitProps {
   workspaceId: string;
   recs: Recommendation[];
   actions: CockpitActions;
-  /** The Issue (P1-1D): when 'archetype', the BackingMovesQueue groups recs by archetype.
-   *  Default: undefined (no grouping — existing cockpit behavior, byte-identical flag-OFF). */
-  groupBy?: 'archetype';
-  /** The Issue (P1-1D): maximum recs shown per archetype group before a "show the rest" toggle.
-   *  Default: undefined (no cap — existing cockpit behavior, byte-identical flag-OFF). */
-  shortlistCap?: number;
 }
 
 const LIFECYCLE_TABS: ReadonlyArray<{ id: LifecycleBucket; label: string }> = [
@@ -60,9 +54,9 @@ const SORTS: ReadonlyArray<{ id: CockpitSort; label: string }> = [
  *  lifecycle segmented control + category toggle chips + sort, rendering the v3 CockpitRow.
  *  Pure: recs + lifecycle actions are injected by the host (Lane C wiring).
  *
- *  The Issue additive props (`groupBy`, `shortlistCap`) are consumed ONLY by BackingMovesQueue
- *  and are ignored here — they appear on the interface so BackingMovesQueue can forward them
- *  without a prop spread. When absent (the default), behavior is byte-identical to flag-OFF. */
+ *  The Issue's archetype grouping + per-group shortlist live entirely in BackingMovesQueue (a
+ *  sibling component, not a child), so this cockpit takes NO additive props — the flag-OFF
+ *  command-center path is byte-identical. */
 export function StrategyCockpit({ workspaceId, recs, actions }: StrategyCockpitProps) {
   const [bucket, setBucket] = useState<LifecycleBucket>('active');
   // useToggleSet with min:0 (all categories optional = "show all"), max:unbounded.

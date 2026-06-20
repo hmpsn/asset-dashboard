@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { deriveStance } from '../../src/lib/recStance';
 import type { Recommendation } from '../../shared/types/recommendations';
 
+// Throttle windows for the expiry-aware parked/active classification.
+const FUTURE = new Date(Date.now() + 86_400_000).toISOString();  // +1 day → still parked
+const PAST = new Date(Date.now() - 86_400_000).toISOString();    // -1 day → expired, resurfaces
+
 function makeRec(overrides: Partial<Recommendation>): Recommendation {
   return {
     id: 'r1',
@@ -32,13 +36,13 @@ describe('deriveStance', () => {
     const recs = [
       makeRec({ type: 'content', lifecycle: 'active', clientStatus: 'system' }),
       makeRec({ type: 'content_refresh', lifecycle: 'active', clientStatus: 'system' }),
-      makeRec({ type: 'cannibalization', lifecycle: 'throttled', clientStatus: 'system' }),
+      makeRec({ type: 'cannibalization', lifecycle: 'throttled', throttledUntil: FUTURE, clientStatus: 'system' }),
       makeRec({ type: 'schema', lifecycle: 'struck', clientStatus: 'system' }),
     ];
     const s = deriveStance(recs);
     expect(s.byArchetype.authority_bet).toBe(1);
     expect(s.byArchetype.refresh_reclaim).toBe(1);
-    expect(s.parked).toBe(1);  // throttled
+    expect(s.parked).toBe(1);  // throttled with a future window
     expect(s.cut).toBe(1);    // struck
   });
 
@@ -62,13 +66,33 @@ describe('deriveStance', () => {
     expect(s.cut).toBe(1);
   });
 
-  it('does not count throttled recs in byArchetype active counts', () => {
+  it('does not count throttled (future-window) recs in byArchetype active counts', () => {
     const recs = [
-      makeRec({ type: 'content_refresh', lifecycle: 'throttled', clientStatus: 'system' }),
+      makeRec({ type: 'content_refresh', lifecycle: 'throttled', throttledUntil: FUTURE, clientStatus: 'system' }),
     ];
     const s = deriveStance(recs);
     expect(s.byArchetype.refresh_reclaim).toBe(0);
     expect(s.parked).toBe(1);
+  });
+
+  it('counts an EXPIRED-throttle rec as active in its archetype (auto-resurfaces, not parked)', () => {
+    const recs = [
+      makeRec({ type: 'content_refresh', lifecycle: 'throttled', throttledUntil: PAST, clientStatus: 'system' }),
+    ];
+    const s = deriveStance(recs);
+    // The throttle window has passed — the rec resurfaces and counts as active, not parked.
+    expect(s.parked).toBe(0);
+    expect(s.byArchetype.refresh_reclaim).toBe(1);
+    expect(s.createRefreshDefend.refresh).toBe(1);
+  });
+
+  it('counts a throttled rec with NO throttledUntil as active (no open window = resurfaced)', () => {
+    const recs = [
+      makeRec({ type: 'content_refresh', lifecycle: 'throttled', clientStatus: 'system' }),
+    ];
+    const s = deriveStance(recs);
+    expect(s.parked).toBe(0);
+    expect(s.byArchetype.refresh_reclaim).toBe(1);
   });
 
   it('counts create/refresh/defend from ARCHETYPE_HEADLINE_VERB', () => {

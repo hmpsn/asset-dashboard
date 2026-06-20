@@ -28,6 +28,7 @@ import { IssueHeader } from './strategy/issue/IssueHeader';
 import { StanceBar } from './strategy/issue/StanceBar';
 import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
 import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
+import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
@@ -124,11 +125,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Called unconditionally here (before all early returns) — Rules of Hooks.
   const commandCenterEnabled = useFeatureFlag('strategy-command-center');
   // The Issue (Phase 1) — strict superset of the command-center cockpit. Read UNCONDITIONALLY
-  // here (before all early returns — Rules of Hooks). When ON, the Overview renders a third
-  // composed branch (IssueHeader → StanceBar → DraftedPovEditor → BackingMovesQueue → supporting
-  // surfaces). flag-OFF keeps the command-center / legacy branches byte-identical: theIssueEnabled
-  // gates a NEW branch only; it never alters the existing two.
-  const theIssueEnabled = commandCenterEnabled && useFeatureFlag('strategy-the-issue');
+  // here (before all early returns — Rules of Hooks). The flag MUST be read on its own line, never
+  // on the RHS of `commandCenterEnabled && useFeatureFlag(...)` — short-circuit evaluation would
+  // make the hook call conditional (Rules-of-Hooks violation). When ON, the Overview renders a
+  // third composed branch (IssueHeader → StanceBar → DraftedPovEditor → BackingMovesQueue →
+  // supporting surfaces). flag-OFF keeps the command-center / legacy branches byte-identical:
+  // theIssueEnabled gates a NEW branch only; it never alters the existing two.
+  const theIssueFlag = useFeatureFlag('strategy-the-issue');
+  const theIssueEnabled = commandCenterEnabled && theIssueFlag;
   // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
   // M1 — the managed-set UI is part of the v3 command-center redesign, so it must be gated on
   // BOTH flags. Without the `commandCenterEnabled &&` composition the managed UI would leak into
@@ -173,8 +177,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const issueBulkSend = useRecBulkMutation(workspaceId);
   // cut→sentence contract: cutting a backing move strikes its POV sentence live.
   const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
-  // Preview-as-client toggle (operator switches to the client framing).
-  const [previewAsClient, setPreviewAsClient] = useState(false);
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -246,7 +248,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />
   ) : null;
 
-  const headerEl = commandCenterEnabled ? (
+  // The Issue branch renders its own IssueHeader ("The Issue") as page chrome — suppress the base
+  // "Keyword Strategy" PageHeader so the two don't stack. flag-OFF / command-center-only keep the
+  // base header byte-identical. (The StrategyConfigPanel is mounted inside IssueHeader, not here,
+  // so suppressing headerEl does not affect the config panel.)
+  const headerEl = theIssueEnabled ? null : commandCenterEnabled ? (
     <PageHeader
       title="Keyword Strategy"
       subtitle={headerSubtitle}
@@ -476,17 +482,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     : null;
 
   // ── The Issue (Phase 1) overview composition — only built when theIssueEnabled && real strategy. ──
-  // The set "Send issue" ships: active, not-yet-sent, not-struck/completed/dismissed recs (the
-  // operator's curated candidates). Reuses the cockpit's atomic bulk route via issueBulkSend.
+  // The set "Send issue" ships: active, not-yet-sent recs (the operator's curated candidates).
+  // Sendable = ACTIVE (server isActiveRec semantics) AND clientStatus not in {sent, approved,
+  // declined, discussing}. This mirrors server isActiveRec (struck/completed/dismissed excluded;
+  // throttle auto-resurfaces once EXPIRED, so an expired throttle is sendable — reuse the shared
+  // isThrottledOpen predicate, not a blanket lifecycle==='throttled' exclusion) PLUS the curated
+  // exclusions (isActiveRec already drops sent/approved/declined; 'discussing' is excluded here
+  // because a discussing rec is already in front of the client and must not be re-sent).
   const sendableRecIds = cockpitRecs
     .filter(
       (r) =>
         r.lifecycle !== 'struck' &&
-        r.lifecycle !== 'throttled' &&
+        !isThrottledOpen(r) &&
         r.status !== 'completed' &&
         r.status !== 'dismissed' &&
         r.clientStatus !== 'sent' &&
-        r.clientStatus !== 'approved',
+        r.clientStatus !== 'approved' &&
+        r.clientStatus !== 'declined' &&
+        r.clientStatus !== 'discussing',
     )
     .map((r) => r.id);
   const handleSendIssue = () => {
@@ -524,8 +537,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     <div className="space-y-8">
       <IssueHeader
         subtitle={headerSubtitle}
-        previewAsClient={previewAsClient}
-        onPreviewAsClientChange={setPreviewAsClient}
         onSendIssue={handleSendIssue}
         isSending={issueBulkSend.isPending}
         canSend={sendableRecIds.length > 0}

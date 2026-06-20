@@ -44,21 +44,38 @@ export function loadCuratedRecs(workspaceId: string): Recommendation[] {
 /**
  * Pure content hash. MUST bust when ANY of these change (audit §8 cache-completeness):
  *   - the curated rec id-set, the per-rec clientStatus, the per-rec lifecycle,
- *   - the prose-edit version, the regenerate nonce.
- * Order-independent over the curated set (rec ordering must not matter — only membership).
+ *   - the per-rec CONTENT (title / insight / estimatedGain / opportunity value) AND its ORDER,
+ *   - the variant (admin vs client — the prose differs, so the caches must not collide),
+ *   - the regenerate nonce.
+ *
+ * The prose-edit `version` is DELIBERATELY NOT folded into the hash. Folding version in would let a
+ * plain `generate` after an operator edit bust the cache (version bumped) and silently overwrite the
+ * operator's edit with a fresh draft. By keying only on curated content + variant + nonce, a plain
+ * generate over unchanged curated content reports POV_UNCHANGED (operator edits survive); a
+ * regenerate (nonce present) always redrafts.
+ *
+ * Order-DEPENDENT over the curated set: the rec order is part of the prompt (the POV leads with the
+ * #1 curated move), so a reorder must redraft. Each rec carries its index in the signal.
  */
 export function buildStrategyPovHash(
   curatedRecs: Recommendation[],
-  version: number,
+  variant: StrategyPovVariant,
   regenerateNonce: string | null,
 ): string {
-  // Sort by id so a reorder of the same set does not bust the cache.
-  const recSignal = curatedRecs
-    .map(r => ({ id: r.id, clientStatus: r.clientStatus ?? 'system', lifecycle: r.lifecycle ?? 'active' }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  // Order is significant — the POV leads with the first curated move, so a reorder must bust.
+  const recSignal = curatedRecs.map((r, index) => ({
+    index,
+    id: r.id,
+    clientStatus: r.clientStatus ?? 'system',
+    lifecycle: r.lifecycle ?? 'active',
+    title: r.title,
+    insight: r.insight,
+    estimatedGain: r.estimatedGain,
+    value: r.opportunity?.value ?? null,
+  }));
   const relevant = {
     recs: recSignal,
-    version,
+    variant,
     regenerateNonce: regenerateNonce ?? null,
   };
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
@@ -192,7 +209,9 @@ export interface GenerateStrategyPovOptions {
 /**
  * Generate (or return cached) the strategy POV. Throws POV_UNCHANGED when the content hash matches
  * the stored hash so the route can return the cached POV as a 200 (clone of BRIEF_UNCHANGED).
- * The version (prose-edit count) participates in the hash so an operator edit forces a re-draft.
+ * The hash keys on curated content + variant + nonce — NOT the prose-edit version — so a plain
+ * generate after an operator edit returns the cached (edited) POV rather than overwriting it; a
+ * regenerate (nonce present) always redrafts.
  */
 export async function generateStrategyPov(
   workspaceId: string,
@@ -203,7 +222,7 @@ export async function generateStrategyPov(
 
   const curatedRecs = loadCuratedRecs(workspaceId);
   const version = getStrategyPovVersion(workspaceId);
-  const hash = buildStrategyPovHash(curatedRecs, version, regenerateNonce);
+  const hash = buildStrategyPovHash(curatedRecs, variant, regenerateNonce);
   const cachedHash = getStrategyPovHash(workspaceId);
 
   if (regenerateNonce == null && hash === cachedHash) {

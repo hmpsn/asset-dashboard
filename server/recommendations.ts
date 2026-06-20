@@ -47,7 +47,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
-import { toPageSlug as toPageSlugShared } from '../shared/page-address-utils.js';
+import { toPageSlug as toPageSlugShared, cannibalizationUrlSetKey as cannibalizationUrlSetKeyShared } from '../shared/page-address-utils.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
@@ -937,15 +937,11 @@ export function toPageSlug(url: string): string {
   return toPageSlugShared(url);
 }
 
-/** SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization
- *  URL set. Normalizes each path to its slug, dedupes, and sorts so the SAME set of
- *  competing pages always produces the SAME key — used both as the rec source suffix
- *  (status carries over between runs) and to dedupe a cannibalization rec against an
- *  active cannibalization insight covering the same pages. Pure / deterministic.
- *  @internal exported for unit testing */
-export function cannibalizationUrlSetKey(paths: string[]): string {
-  return Array.from(new Set(paths.map(p => toPageSlug(p)))).sort().join('|');
-}
+/** SEO Gen-Quality P5 — stable, order-independent key for a cannibalization URL set. Now defined in
+ *  shared/page-address-utils.ts (single source of truth for the generator AND the cannibalization
+ *  read path's keeper-override lookup). Re-exported here for back-compat with existing importers and
+ *  unit tests. @internal exported for unit testing */
+export const cannibalizationUrlSetKey = cannibalizationUrlSetKeyShared;
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
 // in recs generated before the toPageSlug normalisation was introduced.

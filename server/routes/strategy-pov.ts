@@ -59,6 +59,10 @@ router.post(
     try {
       const pov = await generateStrategyPov(workspaceId, { variant });
       addActivity(workspaceId, 'strategy_pov_generated', 'Strategy POV generated');
+      // The POV feeds AI context — invalidate so downstream reads see the fresh draft. The
+      // generator already broadcasts STRATEGY_POV_GENERATED; all three write paths
+      // (generate / regenerate / PATCH) now invalidate the intelligence cache consistently.
+      invalidateIntelligenceCache(workspaceId);
       res.json({ pov });
     } catch (err) {
       if (err instanceof Error && err.message === POV_UNCHANGED) {
@@ -93,6 +97,9 @@ router.post(
     try {
       const pov = await generateStrategyPov(workspaceId, { variant, regenerateNonce: randomUUID() });
       addActivity(workspaceId, 'strategy_pov_generated', 'Strategy POV regenerated');
+      // POV feeds AI context — invalidate consistently with generate + PATCH. The generator
+      // already broadcasts STRATEGY_POV_GENERATED.
+      invalidateIntelligenceCache(workspaceId);
       res.json({ pov });
     } catch (err) {
       log.error({ err, workspaceId }, 'Failed to regenerate strategy POV');

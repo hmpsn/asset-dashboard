@@ -2,16 +2,19 @@
  * Stance derivation for "The Issue" cockpit (Phase 1 Lane A).
  *
  * `deriveStance` computes the per-archetype active count + cut/parked
- * summary from a raw recommendation list. It follows `isActiveRec` semantics
- * (see server/recommendations.ts) for the FE context:
+ * summary from a raw recommendation list. It mirrors the throttle-expiry clause
+ * of the server's `isActiveRec` (see server/recommendations.ts) for the FE context:
  *
- *   - lifecycle === 'struck'    → cut (permanently suppressed)
- *   - lifecycle === 'throttled' → parked (hidden until throttledUntil)
- *   - anything else             → active, counted per archetype
+ *   - lifecycle === 'struck'              → cut (permanently suppressed)
+ *   - throttled AND throttledUntil future → parked (hidden until the window passes)
+ *   - throttled BUT throttledUntil past   → active (the throttle expired and the rec
+ *                                            auto-resurfaces on read) — counted per archetype
+ *   - anything else                       → active, counted per archetype
  *
- * NOTE: `isCuratedForClient` and `isActiveRec` overlap on `discussing`; this
- * function counts from the FULL rec list, not only the curated-for-client set.
- * Callers that want only the active admin-queue slice filter upstream.
+ * Throttle-expiry is the one rule shared with `cockpitRowModel.isThrottledOpen`, reused here so the
+ * stance bar and the cockpit never diverge. NOTE: clientStatus is NOT filtered here (unlike full
+ * isActiveRec, which also drops sent/approved/declined) — this counts the operator-facing stance
+ * over the FULL rec list. Callers that want the active admin-queue slice filter upstream.
  */
 import type { Recommendation } from '../../shared/types/recommendations';
 import type { Archetype } from '../../shared/types/strategy-archetype';
@@ -20,13 +23,15 @@ import {
   ARCHETYPE_HEADLINE_VERB,
   recArchetype,
 } from '../../shared/types/strategy-archetype';
+import { isThrottledOpen } from '../components/strategy/cockpitRowModel';
 
 export interface StanceResult {
   /** Active rec count per archetype (excludes struck and throttled). */
   byArchetype: Record<Archetype, number>;
   /** Count of permanently suppressed recs (lifecycle === 'struck'). */
   cut: number;
-  /** Count of temporarily hidden recs (lifecycle === 'throttled'). */
+  /** Count of temporarily hidden recs (throttled with throttledUntil still in the future).
+   *  An EXPIRED throttle is NOT parked — it counts in its archetype active bucket. */
   parked: number;
   /**
    * MarketMuse-style "create / refresh / defend" headline totals.
@@ -55,11 +60,13 @@ export function deriveStance(recs: Recommendation[]): StanceResult {
       cut++;
       continue;
     }
-    if (rec.lifecycle === 'throttled') {
+    // Parked only while the throttle window is still OPEN — an expired throttle auto-resurfaces and
+    // is counted as active below (mirrors isActiveRec / cockpitRowModel.isThrottledOpen).
+    if (isThrottledOpen(rec)) {
       parked++;
       continue;
     }
-    // Active (or no lifecycle field — legacy recs default to 'active')
+    // Active (or no lifecycle field — legacy recs default to 'active'; expired throttle resurfaces)
     const archetype = recArchetype(rec.type);
     byArchetype[archetype]++;
 

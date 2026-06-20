@@ -114,9 +114,10 @@ export function saveStrategyPov(
 /**
  * Bump the version after an operator edit. Re-reads, applies the edited fields onto the resolved
  * blob, increments version, stamps editedAt, and persists. Returns the new resolved POV.
- * The prompt_hash is left UNCHANGED here — version is folded into the hash by the generator the
- * next time generate runs, but an edit must not silently re-key the AI cache (the edit IS the new
- * truth; a subsequent regenerate compares against the bumped version). Returns null if no row.
+ * The prompt_hash is left UNCHANGED here — the generator's hash keys on curated rec content +
+ * variant + regenerate nonce, NOT on version, so an operator edit leaves the cache key intact: a
+ * subsequent plain generate over unchanged curated content reports POV_UNCHANGED and the edit
+ * survives (only a regenerate forces a redraft). Returns null if no row.
  */
 export function bumpStrategyPovVersion(
   workspaceId: string,
