@@ -4,6 +4,8 @@
 
 > This is the **final planning artifact**. Once the owner ratifies the one decision-register item (the "Act on this" pricing model), the next step is pure implementation against the acceptance criteria below.
 
+> **✅ OWNER RATIFIED (2026-06-20): D1 = Option A** — tier-aware "Request this": Free gated server-side (403 + `<TierGate>`), Growth/Premium = an `included` request with a confirm + no-charge consequence line. The launch PR ships the relabel + the Free server-gate + the server-side `actOn` projection descriptor + Premium `included` mode; the Growth à-la-carte Stripe charge is **fast-follow #2** (reuses the existing `createCartCheckoutSession`/`pending_payment` plumbing). The decision register is now **fully resolved** — the only remaining item is D11 (the external client-facing name; marketing, non-blocking; lock before any external demo). **The spec is LOCKED and execution-ready.**
+
 ---
 
 All key claims verified against code: the cron auto-send at line 213 fires in the same tick (per-workspace, one-line guardable), `sendableRecIds` is a frontend derivation at `KeywordStrategy.tsx:502` (Ship-It's "server is already right" framing mis-locates it), the `discussing`-overlap red-line at `recommendations.ts:676-678` is real, and `createCartCheckoutSession` plumbing exists (Money-Surface's "no per-item checkout route" claim is overstated — the substrate is reusable). Here is the final decision.
