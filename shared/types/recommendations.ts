@@ -1,6 +1,7 @@
 // ── Recommendation domain types ─────────────────────────────────
 
 import type { ImpactBand } from './impact-band.js';
+import type { StrategyCardContext } from './content.js';
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
 export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap' | 'competitor';
@@ -247,3 +248,91 @@ export interface RecPolicy {
 /** The registry shape the single-writer consumes. Keyed by RecType; an unlisted RecType is a
  *  bug (it cannot be curated until a policy is registered). Populated in P1 Lane 1B. */
 export type RecPolicyRegistry = Partial<Record<RecType, RecPolicy>>;
+
+// ── Client-safe rec projection (Phase 2 TheIssueClientPage) ──────────────────
+//
+// This is the EXACT field set the client feed consumes from the public rec route
+// (`GET /api/public/recommendations/:workspaceId?clientStatus=sent`).
+// The server route's `stripEmvFromPublicRecs` projects Recommendation → this shape.
+// Lane A (BE, Track C) implements the projection to this type.
+// Lane B (FE, Track E) consumes it — import from this type, not from Recommendation.
+//
+// Rules for this type:
+//  - Never add admin-only fields (lifecycle, struckAt, cascade, sendChannel,
+//    emvPerWeek, predictedEmv, roiPerEffortDay, confidence, calibration, groundedSpine,
+//    calibrationVersion, opportunity.emvPerWeek, opportunity.predictedEmv).
+//  - `clientStatus` is restricted to the post-send states only (a client never
+//    sees a 'system' or 'curated' rec — those haven't been sent yet).
+//  - `opportunity.components` is included so the #1 "why" contribution bars render
+//    without admin data leaking (evidence strings are safe).
+//  - `delivered` is a synthetic boolean set by the route: true once the rec's
+//    downstream content/work is marked complete by the operator.
+
+/** Restricted clientStatus values a client may ever observe.
+ *  Recs with clientStatus 'system' or 'curated' are never exposed to the client. */
+export type ClientFacingClientStatus = 'sent' | 'approved' | 'declined' | 'discussing';
+
+/**
+ * The client-safe projection of a Recommendation.
+ *
+ * The public route (`GET /api/public/recommendations/:workspaceId`) projects
+ * Recommendation → ClientFacingRecommendation, stripping all admin/AI-only fields.
+ * Lane A (Track C) implements the projection; Lane B (Track E) consumes it.
+ *
+ * DO NOT add fields here without updating `stripEmvFromPublicRecs` in
+ * `server/routes/recommendations.ts` to project them.
+ */
+export interface ClientFacingRecommendation {
+  id: string;
+  workspaceId: string;
+  type: RecType;
+  /** Human-readable "why this matters" explanation. Safe for client display. */
+  insight: string;
+  /** Human-readable expected improvement (e.g. "~240 clicks/mo at rank #3"). */
+  estimatedGain: string;
+  /** One-line rationale for the #1 rec derived from its opportunity.components.
+   *  Present only when this is the top rec; absent on others. */
+  topOpportunityRationale?: string;
+  /** Contribution bars for the "why this is #1" progressive-disclosure section.
+   *  Carries dimension, normalized, weight, contribution, and the client-safe
+   *  evidence string — never emvPerWeek, predictedEmv, or raw $ figures. */
+  opportunityComponents?: Array<Pick<OpportunityComponent, 'dimension' | 'normalized' | 'weight' | 'contribution' | 'evidence'>>;
+  /** The keyword this rec targets. Set on content-gap recs; absent on others. */
+  targetKeyword?: string;
+  /** Strategy card context carried from the recommendation (rationale, volume,
+   *  difficulty, intent, priority, etc.). Threaded through so the client can make
+   *  an informed "Act on this" decision without admin context leaking. */
+  strategyCardContext?: StrategyCardContext;
+  /** Client-safe banded monthly impact. Present when projected monthly value is
+   *  above the display floor; absent otherwise. Never shows raw $ from emvPerWeek. */
+  impactBand?: ImpactBand;
+  /** Post-send client status. Restricted to states the client can observe. */
+  clientStatus: ClientFacingClientStatus;
+  /**
+   * True once the operator has marked the downstream content/work complete.
+   * Synthetic field set by the route projection — not a DB column.
+   * Powers the "what's working" section: the client's own greenlit-and-won moves.
+   */
+  delivered: boolean;
+}
+
+/**
+ * Client-safe summary of the client's own responses to sent recs — powers the Strategy "The Issue"
+ * loop footer ("you've greenlit N moves · 1 in discussion", spec §5.5 / §7). Projected by the public
+ * route from the rec set's clientStatus axis. Carries ONLY client-safe fields (rec TITLE + the
+ * restricted clientStatus + a respondedAt proxy) — NEVER admin/AI-only fields, lifecycle, or $/ROI.
+ * Mirrors the server-only `ClientSignalsSlice.recResponses` shape (counts + recent), but is the
+ * dedicated CLIENT read (that slice is admin-only). `recent` titles are operator-authored rec
+ * titles, which are already client-facing prose (the same titles the client saw when the rec was
+ * sent).
+ */
+export interface ClientRecResponseSummary {
+  /** Count of recs the client greenlit (clientStatus 'approved'). */
+  approved: number;
+  /** Count of recs the client declined (clientStatus 'declined'). */
+  declined: number;
+  /** Count of recs the client is still discussing (clientStatus 'discussing'). */
+  discussing: number;
+  /** The most-recent responses (newest first, capped). Title + restricted status + a respondedAt proxy. */
+  recent: Array<{ title: string; clientStatus: ClientFacingClientStatus; respondedAt: string }>;
+}

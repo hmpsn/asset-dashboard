@@ -6,6 +6,7 @@ import { Router } from 'express';
 
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { validate, z } from '../middleware/validate.js';
 import db from '../db/index.js';
 import { createLogger } from '../logger.js';
@@ -24,6 +25,7 @@ import {
   unstrikeRecommendation,
   throttleRecommendation,
   fixRecommendation,
+  approveRecommendation,
 } from '../recommendation-lifecycle.js';
 import { addRecDiscussionEntry, listRecDiscussion } from '../rec-discussion.js';
 import { notifyClientCuratedRecsSent } from '../email.js';
@@ -43,8 +45,12 @@ import {
   validateTransition,
   InvalidTransitionError,
 } from '../state-machines.js';
-import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+import type { Recommendation, RecommendationSet, ClientFacingClientStatus, ClientRecResponseSummary } from '../../shared/types/recommendations.js';
 import { computeImpactBand } from '../../shared/types/impact-band.js';
+import { mirrorRecommendationToDeliverable } from '../domains/inbox/recommendation-dual-write.js';
+import { createContentRequest } from '../content-requests.js';
+import { buildStrategyCardContextFromRec } from '../recommendation-strategy-card-context.js';
+import type { StrategyCardContext } from '../../shared/types/content.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
@@ -77,16 +83,37 @@ function sanitizePublicGain(gain: string): string {
   return cleaned.length > 0 ? cleaned : 'Estimated to drive meaningful organic growth';
 }
 
+/** Restricted post-send statuses a client may ever observe (mirrors ClientFacingClientStatus). A
+ *  rec in 'system'/'curated' (pre-send operator axis) must NEVER expose its clientStatus to the
+ *  client — only the post-send states leak, and only as the restricted value. */
+const CLIENT_FACING_STATUSES: readonly ClientFacingClientStatus[] = ['sent', 'approved', 'declined', 'discussing'];
+function clientFacingStatus(status: Recommendation['clientStatus']): ClientFacingClientStatus | undefined {
+  return status && (CLIENT_FACING_STATUSES as readonly string[]).includes(status)
+    ? (status as ClientFacingClientStatus)
+    : undefined;
+}
+
+/** The shape a public rec read emits: the allow-listed Recommendation fields plus the two
+ *  Strategy "The Issue" §7 client-facing projections (restricted clientStatus + synthetic
+ *  `delivered`). `delivered` is NOT a DB column — it is derived from the rec's completion state. */
+type PublicRecommendation = Recommendation & { delivered?: boolean };
+
 // Strategy v3 (spec §7.4 / 00-contracts §4 readers) — the public rec projection is an explicit
 // ALLOW-LIST, not a blocklist. A blocklist (`...rec` minus a few keys) silently leaks every NEW
 // admin-only field the moment it is added (the v3 lifecycle axis: throttledUntil/struckAt/sentAt/
 // cascade/lifecycle/clientStatus/sendChannel). This names ONLY client-safe fields, so a future
 // admin-only field is leak-proof by default. The OpportunityScore is itself allow-listed (raw
 // emvPerWeek/predictedEmv/roiPerEffortDay never copied), and estimatedGain is dollar-sanitized.
-function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
+//
+// Strategy "The Issue" §7 (P2-5): a RESTRICTED clientStatus (only the post-send states sent/
+// approved/declined/discussing — never the operator-axis system/curated) + a synthetic `delivered`
+// flag are projected so the curated client feed can render the loop ("you've greenlit N moves") and
+// "what's working" (the client's own delivered moves). A pre-send rec exposes NEITHER (clientStatus
+// stays absent → byte-identical to the legacy/flag-OFF read).
+function stripEmvFromPublicRecs(recs: Recommendation[], exposeClientStatus = false): PublicRecommendation[] {
   return recs.map((r) => {
     const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
-    const out: Recommendation = {
+    const out: PublicRecommendation = {
       id: r.id,
       workspaceId: r.workspaceId,
       priority: r.priority,
@@ -121,13 +148,25 @@ function stripEmvFromPublicRecs(recs: Recommendation[]): Recommendation[] {
       const impactBand = computeImpactBand(rawEmvPerWeek);
       if (impactBand) out.impactBand = impactBand;
     }
+    // Strategy "The Issue" §7 — restricted clientStatus + synthetic `delivered`, projected ONLY when
+    // the caller passes exposeClientStatus=true (gated on the per-workspace strategy-the-issue flag).
+    // A non-Issue workspace's public read is byte-identical to the legacy payload (NO clientStatus/
+    // delivered key). Post-send states only (pre-send recs expose nothing even when ON). `delivered`
+    // (RecStatus 'completed') powers "what's working" — the client's own greenlit-and-delivered moves.
+    if (exposeClientStatus) {
+      const cfStatus = clientFacingStatus(r.clientStatus);
+      if (cfStatus) {
+        out.clientStatus = cfStatus;
+        out.delivered = r.status === 'completed';
+      }
+    }
     return out;
   });
 }
 
 /** Public-route response: a RecommendationSet whose recs have emvPerWeek stripped. */
-function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[]): RecommendationSet {
-  return { ...set, recommendations: stripEmvFromPublicRecs(recs) };
+function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[], exposeClientStatus = false): RecommendationSet {
+  return { ...set, recommendations: stripEmvFromPublicRecs(recs, exposeClientStatus) };
 }
 
 // ─── Recommendation Engine ─────────────────────────────────────────
@@ -188,10 +227,19 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
     // Filter by status if requested
     const status = req.query.status as string | undefined;
     const priority = req.query.priority as string | undefined;
+    // Strategy "The Issue" §7 (P2-5) — the curated client feed reads ?clientStatus=sent to fetch
+    // ONLY the recs the operator has put in front of the client. Filters on the RAW rec.clientStatus
+    // (pre-projection); only the post-send client-facing values are meaningful here (a request for
+    // 'system'/'curated' returns nothing, since those are operator-axis states the client never sees).
+    const clientStatus = req.query.clientStatus as string | undefined;
+    // The Issue §7 — the restricted clientStatus projection + the ?clientStatus filter are gated on
+    // the per-workspace flag, so a non-Issue workspace's public read stays byte-identical to legacy.
+    const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
     let recs = set.recommendations;
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
-    res.json(toPublicRecommendationSet(set, recs));
+    if (exposeClientStatus && clientStatus) recs = recs.filter(r => r.clientStatus === clientStatus);
+    res.json(toPublicRecommendationSet(set, recs, exposeClientStatus));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -308,7 +356,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
   }
   // Client-facing single-rec response — strip the admin/AI-only dollar figures
   // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
-  res.json(stripEmvFromPublicRecs([rec])[0]);
+  res.json(stripEmvFromPublicRecs([rec], isFeatureEnabled('strategy-the-issue', workspaceId))[0]);
 });
 
 // Dismiss a recommendation
@@ -334,6 +382,164 @@ router.delete('/api/public/recommendations/:workspaceId/:recId', requireAuthenti
   );
   res.json({ ok: true });
 });
+
+// ─── Strategy "The Issue" §7 — client greenlight ("Act on this") ─────────────────────────────
+// POST /api/public/recommendations/:workspaceId/:recId/act-on
+//
+// The client's "Act on this" on a SENT curated rec. Per the owner correction this is a content
+// REQUEST (approval), NOT generation: NOTHING is pre-generated or generated on the fly. It:
+//   1. sets clientStatus → approved via the single-writer (approveRecommendation; validates
+//      CLIENT_REC_TRANSITIONS — never RecStatus, never the operator curation axis), AND
+//   2. creates a DURABLE server-side content REQUEST carrying the rec id + targetKeyword + the rec's
+//      StrategyCardContext (briefId stays null — the operator decides whether/when to create the
+//      brief later), AND
+//   3. creates a TrackedAction (the greenlight→result attribution join, spec §7 C2) keyed to the
+//      rec id + targetKeyword so a later milestone resolves back to the originating move.
+// It MUST NOT fire fixContext (admin-only navigation state) and MUST NOT call any brief/post
+// generator. Soft-gated like the sibling client routes (passwordless portals pass through).
+//
+// Maps the rec's priority axis (fix_now/fix_soon/fix_later/ongoing) onto the content-request
+// priority vocabulary (high/medium/low) the request list + brief generator expect.
+function recPriorityToRequestPriority(priority: Recommendation['priority']): string {
+  switch (priority) {
+    case 'fix_now':
+      return 'high';
+    case 'fix_soon':
+      return 'medium';
+    default:
+      return 'low'; // fix_later / ongoing
+  }
+}
+
+router.post(
+  '/api/public/recommendations/:workspaceId/:recId/act-on',
+  requireAuthenticatedClientPortalAuth(),
+  (req, res) => {
+    const { workspaceId, recId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Read the rec BEFORE mutating so we can derive the content-request fields + attribution.
+    const set = loadRecommendations(workspaceId);
+    const recBefore = set?.recommendations.find((r) => r.id === recId) ?? null;
+    if (!recBefore) return res.status(404).json({ error: 'Recommendation not found' });
+
+    // Single-writer greenlight: clientStatus sent|discussing → approved (validates the client axis).
+    let rec: Recommendation | null;
+    try {
+      rec = approveRecommendation(workspaceId, recId);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+
+    // Build the StrategyCardContext stamped onto the durable request — the SAME derivation the
+    // rec→deliverable adapter uses (one source of truth so the two §7 stamps never drift).
+    const cardContext: StrategyCardContext = buildStrategyCardContextFromRec(rec);
+
+    // The durable content REQUEST — nothing generated (briefId stays null; initialStatus 'requested'
+    // = queued, no brief yet). A targetKeyword is required by the request model; fall back to the rec
+    // title when the rec carries none (e.g. a technical rec) so the request is still durable.
+    const targetKeyword = rec.targetKeyword?.trim() || rec.title;
+    const request = createContentRequest(workspaceId, {
+      topic: rec.title,
+      targetKeyword,
+      intent: cardContext.intent || 'informational',
+      priority: recPriorityToRequestPriority(rec.priority),
+      rationale: rec.insight,
+      source: 'client',
+      recommendationId: rec.id,
+      strategyCardContext: cardContext,
+      initialStatus: 'requested', // queued; NOTHING generated — the operator works it later
+    });
+
+    // Greenlight → result attribution (spec §7 C2/C5). Idempotent: a re-act-on (or a later
+    // mark-delivered) keyed to the same rec id must not double-record. attribution 'platform_executed'
+    // — the agency executes the greenlit work. baselineSnapshot timestamped now so the P6
+    // realized-vs-predicted loop has a pairing; predictedEmv snapshotted when the rec carries it.
+    try {
+      if (!getActionBySource('recommendation', rec.id)) {
+        recordAction({ // recordAction-ok: workspaceId is the path param, validated by getWorkspace above
+          workspaceId,
+          actionType: recommendationOutcomeActionType(rec.type, rec.source),
+          sourceType: 'recommendation',
+          sourceId: rec.id,
+          pageUrl: rec.affectedPages?.[0] ?? null,
+          targetKeyword: rec.targetKeyword ?? null,
+          baselineSnapshot: { captured_at: new Date().toISOString() },
+          predictedEmv: rec.opportunity?.predictedEmv ?? null,
+          attribution: 'platform_executed',
+        });
+      }
+    } catch (err) {
+      log.warn({ err, recId: rec.id }, 'Failed to record greenlight attribution for act-on');
+    }
+
+    invalidateIntelligenceCache(workspaceId);
+    // Both halves of the feedback loop (data-flow rule #6): the clientStatus change AND the new
+    // content request must each broadcast so admin + client React Query caches invalidate.
+    broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'approved' });
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, recommendationId: rec.id });
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Client greenlit recommendation: ${rec.title}`,
+      `"Act on this" created content request ${request.id}`,
+    );
+
+    // Client-facing response — strip the admin/AI-only fields (mirror the GET/PATCH routes). act-on
+    // is a The-Issue action, so expose the restricted clientStatus (the client must see their
+    // greenlight took effect) gated on the per-workspace flag.
+    res.json({
+      recommendation: stripEmvFromPublicRecs([rec], isFeatureEnabled('strategy-the-issue', workspaceId))[0],
+      requestId: request.id,
+    });
+  },
+);
+
+// ─── Strategy "The Issue" §7 — client-safe loop summary ──────────────────────────────────────
+// GET /api/public/recommendations/:workspaceId/responses
+//
+// Counts of the client's own responses to sent recs (approved / declined / discussing) + the most
+// recent few — powers the curated feed's loop footer ("you've greenlit N moves · 1 in discussion").
+// Client-safe: only rec TITLES (already client-facing prose) + the restricted clientStatus + a
+// respondedAt proxy (updatedAt — the single-writer bumps it on every clientStatus mutation). NEVER
+// admin/AI-only fields, lifecycle, cascade, or $/ROI. Mirrors the server-only
+// ClientSignalsSlice.recResponses shape; this is the dedicated CLIENT read.
+//
+// LITERAL '/responses' segment — there is no GET '/:workspaceId/:recId' route to shadow it, but it
+// is placed in the public block above the admin section for locality. Soft-gated like the GET set.
+router.get(
+  '/api/public/recommendations/:workspaceId/responses',
+  requireClientPortalAuth(),
+  (req, res) => { // activity-ok: read-only
+    const { workspaceId } = req.params;
+    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const set = loadRecommendations(workspaceId);
+    const recs: Recommendation[] = set?.recommendations ?? [];
+    const responded = recs.filter(
+      (r) =>
+        r.clientStatus === 'approved' ||
+        r.clientStatus === 'declined' ||
+        r.clientStatus === 'discussing',
+    );
+    const recent = [...responded]
+      .sort((a, b) => Date.parse(b.updatedAt ?? b.createdAt) - Date.parse(a.updatedAt ?? a.createdAt))
+      .slice(0, 5)
+      .map((r) => ({
+        title: r.title,
+        clientStatus: (r.clientStatus ?? 'sent') as ClientFacingClientStatus,
+        respondedAt: r.updatedAt ?? r.createdAt,
+      }));
+    const summary: ClientRecResponseSummary = {
+      approved: responded.filter((r) => r.clientStatus === 'approved').length,
+      declined: responded.filter((r) => r.clientStatus === 'declined').length,
+      discussing: responded.filter((r) => r.clientStatus === 'discussing').length,
+      recent,
+    };
+    res.json(summary);
+  },
+);
 
 // ─── Admin endpoints ────────────────────────────────────────────────────────
 // These routes are NOT prefixed with /api/public/ so they are admin-only
@@ -467,6 +673,10 @@ router.post(
         // Bulk note is intentionally replicated per-rec: each rec owns its own discussion thread,
         // so the shared rationale must land on each (a 30-rec send with one note → 30 entries).
         if (note) addRecDiscussionEntry(workspaceId, rec.id, 'strategist', note);
+        // Close-the-loop half #1 (spec §7 / P2-2): mirror EACH sent rec into the unified deliverable
+        // so the bulk send reaches the client feed exactly like the per-row /send. Best-effort
+        // (never throws), runs outside the committed txn (upsertDeliverable owns its own). // rec-mirror-ok
+        mirrorRecommendationToDeliverable(workspaceId, rec);
         addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
       } else if (action === 'throttle') {
         addActivity(workspaceId, 'rec_throttled', `Recommendation throttled ${throttleDays}d: ${rec.title}`, rec.description);
@@ -617,6 +827,9 @@ router.patch('/api/recommendations/:workspaceId/:recId/send', requireWorkspaceAc
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   // Optional note-on-send → a strategist discussion entry (the narrative lever).
   if (note) addRecDiscussionEntry(workspaceId, recId, 'strategist', note);
+  // Close-the-loop half #1 (spec §7 / P2-2): mirror the sent rec into the unified deliverable so it
+  // reaches the client feed/inbox. Best-effort + fires DELIVERABLE_SENT itself (never throws). // rec-mirror-ok
+  mirrorRecommendationToDeliverable(workspaceId, rec);
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'sent' });
   addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
@@ -710,6 +923,27 @@ router.patch('/api/recommendations/:workspaceId/:recId/fix', requireWorkspaceAcc
     throw err;
   }
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+  // Greenlight→attribution (spec §7 C5): a SILENT fix still earns "we handled this" credit. Every
+  // fix path — client-greenlit OR operator-silent — creates a TrackedAction ('platform_executed');
+  // the only difference is whether it surfaced as a client decision. Idempotent: keyed to the rec id
+  // so a rec already credited (e.g. a prior act-on or the completion route) is not double-recorded.
+  try {
+    if (!getActionBySource('recommendation', rec.id)) {
+      recordAction({ // recordAction-ok: workspaceId is the path param on an admin-gated route
+        workspaceId,
+        actionType: recommendationOutcomeActionType(rec.type, rec.source),
+        sourceType: 'recommendation',
+        sourceId: rec.id,
+        pageUrl: rec.affectedPages?.[0] ?? null,
+        targetKeyword: rec.targetKeyword ?? null,
+        baselineSnapshot: { captured_at: new Date().toISOString() },
+        predictedEmv: rec.opportunity?.predictedEmv ?? null,
+        attribution: 'platform_executed',
+      });
+    }
+  } catch (err) {
+    log.warn({ err, recId: rec.id }, 'Failed to record attribution for silent /fix');
+  }
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, status: rec.status });
   addActivity(workspaceId, 'rec_status_updated', `Recommendation marked as agency work: ${rec.title}`, rec.description);

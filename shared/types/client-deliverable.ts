@@ -31,6 +31,7 @@ export const DELIVERABLE_TYPES = [
   'briefing',
   'copy_section',
   'content_request',
+  'recommendation',
 ] as const;
 export type DeliverableType = (typeof DELIVERABLE_TYPES)[number];
 

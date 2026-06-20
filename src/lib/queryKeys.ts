@@ -295,6 +295,21 @@ export const queryKeys = {
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
     /** Active background jobs visible to this workspace's client portal. */
     jobs: (wsId: string) => ['client-jobs', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — the evergreen curated recommendation feed the
+     * client sees on TheIssueClientPage. Reads the public `?clientStatus=sent` projection.
+     * Distinct from `shared.recommendations` (raw read) and `curatedRecommendations`
+     * (admin-projection v1) so each surface invalidates independently.
+     * Invalidated by the RECOMMENDATIONS_UPDATED + DELIVERABLE_SENT WS handlers.
+     */
+    theIssue: (wsId: string) => ['client-the-issue', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — pre-aggregated client response summary for the
+     * loop footer ("you've greenlit N moves · 1 in discussion"). Reads a client-safe
+     * projection of rec responses from the public route.
+     * Invalidated alongside `theIssue` on RECOMMENDATIONS_UPDATED.
+     */
+    recResponses: (wsId: string) => ['client-rec-responses', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

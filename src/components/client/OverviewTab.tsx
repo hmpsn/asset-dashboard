@@ -21,6 +21,7 @@ import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
+import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
 import type {
@@ -77,6 +78,9 @@ interface OverviewTabProps {
   clientUser: { id: string; name: string; email: string; role: string } | null;
   // Content Plan
   contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
+  /** Optional toast sink — consumed only by the strategy-the-issue surface (act-on / feedback).
+   *  Absent on the flag-OFF path, so the legacy render is byte-identical. */
+  setToast?: (msg: string) => void;
 }
 
 export function OverviewTab({
@@ -89,7 +93,7 @@ export function OverviewTab({
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
   workspaceId, onAskAi, onOpenChat,
-  clientUser, contentPlanSummary,
+  clientUser, contentPlanSummary, setToast,
 }: OverviewTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
@@ -115,7 +119,43 @@ export function OverviewTab({
   // flag can be flipped per-workspace without touching anything below this
   // block. When OFF (default), the original overview body renders unchanged.
   const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  const theIssueEnabled = useFeatureFlag('strategy-the-issue');
   const workFeedEnabled = useFeatureFlag('client-work-feed');
+
+  // ── strategy-the-issue evergreen money surface (Phase 2) ─────────────────
+  // The Issue WINS over client-briefing-v2 when both flags are on (audit §9.9):
+  // it is the reimagined overview both other surfaces are superseded by. Read
+  // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so
+  // the legacy overview body below is byte-identical.
+  if (theIssueEnabled) {
+    const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
+    const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
+    return (
+      <ErrorBoundary>
+        <TheIssueClientPage
+          workspaceId={workspaceId}
+          effectiveTier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'}
+          betaMode={betaMode}
+          actionCounts={{
+            approvals: pendingApprovals,
+            briefs: briefReviews,
+            posts: postReviews,
+            replies: unreadTeamNotes,
+            contentPlan: contentPlanSummary?.reviewCells ?? 0,
+          }}
+          overview={overview}
+          ga4Overview={ga4Overview}
+          ga4Conversions={ga4Conversions}
+          audit={audit}
+          strategyData={strategyData}
+          onAskAi={onAskAi}
+          onOpenChat={onOpenChat}
+          setToast={setToast}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (briefingV2Enabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;

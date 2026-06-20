@@ -34,7 +34,7 @@ import { fmtNum } from '../../utils/formatNumbers';
 import { kdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { kdFraming, kdTooltip } from '../../lib/kdFraming';
 
-export type ContentGapAudience = 'admin' | 'strategy-tab' | 'briefing';
+export type ContentGapAudience = 'admin' | 'strategy-tab' | 'briefing' | 'issue';
 
 /** Minimal data shape shared by the 3 surfaces' gap/recommendation rows. */
 export interface ContentGapRowData {
@@ -152,7 +152,7 @@ const CHROME: Record<ContentGapAudience, AudienceChrome> = {
   },
   'strategy-tab': {
     topicClass: 't-body font-semibold text-[var(--brand-text-bright)]',
-    targetKeyword: (kw) => `“${kw}”`,
+    targetKeyword: (kw) => `”${kw}”`,
     targetKeywordClass: 't-caption-sm text-accent-brand',
     volumeClass: 't-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5',
     kdPrefix: 'Difficulty',
@@ -170,6 +170,32 @@ const CHROME: Record<ContentGapAudience, AudienceChrome> = {
     questionIconClass: '',
     questionTextClass: '',
     rationaleClass: 't-caption-sm text-[var(--brand-text-muted)] leading-snug mb-2',
+  },
+  // ── Issue (Phase 2 client money surface) ─────────────────────────────────────
+  // Client-facing evergreen content plan cards. No $ / pricing copy. Uses teal
+  // for the target keyword (action) and blue for data metrics per the Four Laws.
+  // estClicks shown always (volume-based entry point for “Act on this” decision).
+  // CTA copy (“Act on this” / “See the details”) lives in the card chrome, not here.
+  issue: {
+    topicClass: 't-ui font-semibold text-[var(--brand-text-bright)]',
+    targetKeyword: (kw) => `Target: “${kw}”`,
+    targetKeywordClass: 't-caption-sm text-teal-400',
+    volumeClass: 't-caption-sm text-blue-400 flex items-center gap-0.5',
+    kdPrefix: 'Difficulty',
+    impressionsClass: 't-caption-sm text-blue-400 flex items-center gap-0.5',
+    impressionsSuffix: 'impr',
+    competitorClass: 'flex items-center gap-0.5 t-caption-sm text-orange-400 font-medium',
+    trendRisingClass: 'flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium',
+    trendDecliningClass: 'flex items-center gap-0.5 t-caption-sm text-red-400 font-medium',
+    trendStableClass: 'flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium',
+    serpLabels: 'descriptive',
+    estClicks: 'always',
+    estClicksClass: 't-caption-sm text-blue-400/70 flex items-center gap-0.5',
+    serpTargetingBorder: 'mt-1.5 pl-2 border-l-2 border-yellow-500/20',
+    serpTargetingText: 't-caption-sm text-yellow-400/80 leading-relaxed',
+    questionIconClass: 'text-[var(--brand-text-muted)] flex-shrink-0',
+    questionTextClass: 't-caption-sm text-[var(--brand-text-muted)] italic',
+    rationaleClass: 't-caption-sm text-[var(--brand-text-muted)] mt-0.5',
   },
 };
 

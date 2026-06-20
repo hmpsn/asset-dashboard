@@ -146,6 +146,7 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   briefing:              'Briefing',
   copy_section:          'Copy',
   content_request:       'Content',
+  recommendation:        'Recommendation',
 };
 
 export function deliverableTypeBadge(type: DeliverableType | string): string {

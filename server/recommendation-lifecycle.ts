@@ -25,7 +25,7 @@ import {
   computeRecommendationSummary,
   updateRecommendationStatus,
 } from './recommendations.js';
-import { validateTransition, RECOMMENDATION_TRANSITIONS } from './state-machines.js';
+import { validateTransition, RECOMMENDATION_TRANSITIONS, CLIENT_REC_TRANSITIONS } from './state-machines.js';
 import { createLogger } from './logger.js';
 import type { Recommendation, RecPolicyRegistry } from '../shared/types/recommendations.js';
 
@@ -92,6 +92,23 @@ export function sendRecommendation(workspaceId: string, recId: string): Recommen
     // Stamp the routing channel from the policy so downstream readers know where this Send went.
     const policy = REC_POLICY_REGISTRY[rec.type];
     rec.sendChannel = policy?.sendChannel ?? 'rec';
+  });
+}
+
+/** Approve a sent rec on the CLIENT-side response axis (clientStatus: sent|discussing → approved).
+ *  The single writer for the client "Act on this" greenlight (Strategy "The Issue" §7 half-loop #2).
+ *  Validates ONLY against CLIENT_REC_TRANSITIONS (the client response axis) and mutates ONLY
+ *  clientStatus — NEVER RecStatus, NEVER the operator curation axis. Throws InvalidTransitionError
+ *  on an illegal edge (e.g. a rec the client already declined, or one never sent). Returns null when
+ *  the rec id is absent. The route owns the durable content-request creation + the attribution
+ *  TrackedAction; this writer only flips the client status. */
+export function approveRecommendation(workspaceId: string, recId: string): Recommendation | null {
+  return mutateRec(workspaceId, recId, (rec) => {
+    const from = rec.clientStatus ?? 'system';
+    // Only a sent/discussing rec can be approved by the client. CLIENT_REC_TRANSITIONS rejects
+    // system/curated/approved/declined → approved (an un-sent or already-decided rec).
+    validateTransition('recommendation_client', CLIENT_REC_TRANSITIONS, from, 'approved');
+    rec.clientStatus = 'approved';
   });
 }
 
