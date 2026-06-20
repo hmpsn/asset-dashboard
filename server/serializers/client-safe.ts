@@ -45,6 +45,12 @@ export interface PublicWorkspaceView {
    * Pre-resolved (authority-layered-fields rule): the client reads the boolean flags, never raw industry.
    */
   segmentProfile?: ResolvedSegmentProfile;
+  /**
+   * The Issue (Client) P1a — whether website-native conversion capture is wired (setup confirmed OR a
+   * webhook secret exists). A BOOLEAN ONLY — never the secret, never any PII (D7). Present ONLY when the
+   * spine flag is ON (opts.theIssueClientSpine); optional → flag-OFF byte-identical.
+   */
+  formCaptureConnected?: boolean;
 }
 
 export function toPublicWorkspaceView(
@@ -95,6 +101,11 @@ export function toPublicWorkspaceView(
     // The Issue (Client) P0 — flag-gated: attach the pre-resolved segment profile only when ON,
     // so the OFF path is byte-identical (field absent from the payload entirely).
     ...(opts.theIssueClientSpine ? { segmentProfile: resolveSegmentProfile(ws) } : {}),
+    // The Issue (Client) P1a — flag-gated boolean only (never the secret, never PII, D7). Attached on
+    // the same spine-flag gate so the OFF path stays byte-identical.
+    ...(opts.theIssueClientSpine
+      ? { formCaptureConnected: !!ws.conversionTrackingConfirmedAt || !!ws.webflowFormWebhookSecret }
+      : {}),
   };
 }
 

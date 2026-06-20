@@ -95,9 +95,14 @@ export const FEATURE_FLAGS = {
   // and toPublicWorkspaceView omits segmentProfile when OFF.
   // See docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md.
   'the-issue-client-spine': false,
+  // P1a — website-native MEASURED outcome capture: operator-pinned typed GA4 key-events + Webflow
+  // form capture (signed webhook) → measured_action provenance. OFF = P0 estimate-only spine,
+  // byte-identical (computeROI selects estimate_ga4, the webhook receiver 404s, no reconciliation).
+  'the-issue-client-measured-capture': false,
   // P1 children — DECLARED OFF + unread in P0 so the flag family/group is stable. Do not start P1
   // until P0 is merged + green on staging.
-  // P1: named-record reconciliation (call tracking + CRM + form capture → actual_reconciled).
+  // P3: named-record reconciliation (call-tracking + CRM closed-won → actual_reconciled). RESERVED
+  // for P3 — NOT P1a website capture (P1a uses the-issue-client-measured-capture).
   'the-issue-client-reconciliation': false,
   // P1: event-driven SMS/email push + forwardable one-pager export (the return hook).
   'the-issue-client-return-hook': false,
@@ -445,14 +450,27 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
-  'the-issue-client-reconciliation': {
-    label: 'The Issue (Client) — named-record reconciliation (P1, actual_reconciled)',
+  'the-issue-client-measured-capture': {
+    label: 'The Issue (Client) — website-native measured outcome capture (P1a, measured_action)',
     group: 'The Issue (Client)',
     lifecycle: {
       owner: 'analytics-intelligence',
       createdAt: '2026-06-20',
       rolloutTarget: 'pilot-clients',
-      removalCondition: 'Enable + remove once call-tracking + CRM + form-capture reconciliation graduates provenance to actual_reconciled and the count becomes clickable to named records.',
+      removalCondition: 'Promote once GA4 measured-action selection + Webflow form-capture named-lead path is validated with pilot clients on staging.',
+      linkedRoadmapItemId: 'the-issue-client-redesign-p1a-measured-capture',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'the-issue-client-reconciliation': {
+    label: 'The Issue (Client) — named-record reconciliation (P3, actual_reconciled)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'pilot-clients',
+      removalCondition: 'Reserved for CRM/call-tracking reconciliation → actual_reconciled (P3); NOT P1a website capture. Enable + remove once call-tracking + CRM closed-won graduates provenance to actual_reconciled and the count becomes clickable to named records.',
       linkedRoadmapItemId: 'the-issue-client-redesign-p1-reconciliation',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-20',
@@ -530,7 +548,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'The Issue (Client)',
-    keys: ['the-issue-client-spine', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets'],
+    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets'],
   },
 ];
 

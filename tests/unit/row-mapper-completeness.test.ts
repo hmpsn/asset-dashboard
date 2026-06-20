@@ -200,6 +200,10 @@ describe('rowToWorkspace mapper completeness', () => {
       // stripe_subscription_id is set only during Stripe webhook flows; not populated here
       // but IS correctly mapped (ws.stripeSubscriptionId)
       'stripe_subscription_id',
+      // The Issue (Client) P1a — these are set via the conversion-tracking admin routes (webhook-enable
+      // + confirm-setup), NOT updateWorkspace's Pick, but all three ARE mapped (rowToWorkspace).
+      // webflow_form_webhook_secret is admin-only (returned once, in DENIED_KEYS).
+      'webflow_form_webhook_secret', 'webflow_form_sources', 'conversion_tracking_confirmed_at',
       // site_intelligence_client_view uses loose != null check, not if() guard — tested separately
       'site_intelligence_client_view',
       // businessPriorities (camelCase) is a legacy column name from an older migration that used

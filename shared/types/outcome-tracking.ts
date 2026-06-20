@@ -49,13 +49,22 @@ export type EarlySignal = 'on_track' | 'no_movement' | 'too_early';
 
 /**
  * Single confidence/provenance source carried on EVERY client-facing outcome and money number
- * across The Issue client surface. P0 hard-codes 'estimate_ga4'; P1 graduates to
- * 'actual_reconciled' once named records reconcile the count. The render contract derives the
- * human "estimate" label + rounding precision from this field — see fmtEstimateMoney/Ratio (Lane B).
+ * across The Issue client surface. P0 hard-codes 'estimate_ga4'; P1a graduates the COUNT's
+ * confidence to 'measured_action' once we measure real on-site actions (operator-pinned typed
+ * GA4 key-events and/or Webflow form-submission named leads); P3 graduates to 'actual_reconciled'
+ * once named records reconcile to revenue. The render contract derives the human label + rounding
+ * precision from this field — see fmtEstimateMoney/Ratio + resolveProvenanceRender (Lane B).
+ *
+ * Ordered by confidence (weakest → strongest); consumers must switch exhaustively and never add a
+ * `default` that swallows a future tier.
  */
 export type OutcomeProvenance =
   | 'estimate_ga4'        // GA4 key-event aggregate × client lead value. Renders an "estimate" label.
-  | 'actual_reconciled';  // Reconciled to call-tracking / CRM / form capture. Renders "actual".
+  | 'measured_action'     // P1a: a real website action we measured (GA4 key-event marked as a conversion,
+                          //      or a Webflow form-submission named lead). More than an estimate; not yet
+                          //      revenue-reconciled. Renders "measured" + an exact count, but the DOLLAR
+                          //      figure stays estimate-banded (still count × lead value).
+  | 'actual_reconciled';  // P3: reconciled to call-tracking / CRM closed-won. Renders "actual".
 
 /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
 export interface BaselineSnapshot {

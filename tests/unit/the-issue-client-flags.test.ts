@@ -29,3 +29,20 @@ describe('the-issue-client feature flag family', () => {
     }
   });
 });
+
+describe('the-issue-client-measured-capture (P1a website-native capture)', () => {
+  it('registered, default-OFF, grouped under "The Issue (Client)"', () => {
+    expect(FEATURE_FLAGS['the-issue-client-measured-capture']).toBe(false);
+    const group = FEATURE_FLAG_GROUPS.find(g => g.label === 'The Issue (Client)');
+    expect(group!.keys).toContain('the-issue-client-measured-capture');
+  });
+  it('carries a P1a roadmap link + pilot-clients rollout, distinct from the P3 reconciliation flag', () => {
+    const meta = FEATURE_FLAG_CATALOG['the-issue-client-measured-capture'].lifecycle;
+    expect(meta.rolloutTarget).toBe('pilot-clients');
+    expect(meta.linkedRoadmapItemId).toBe('the-issue-client-redesign-p1a-measured-capture');
+  });
+  it('the P3 reconciliation flag stays reserved for CRM/call-tracking (NOT P1a)', () => {
+    expect(FEATURE_FLAGS['the-issue-client-reconciliation']).toBe(false);
+    expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation'].lifecycle.removalCondition).toMatch(/CRM|call.?tracking|P3/i);
+  });
+});

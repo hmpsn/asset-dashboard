@@ -7,6 +7,9 @@ const DENIED_KEYS: ReadonlySet<string> = new Set([
   'clientPassword',
   'stripeCustomerId',
   'stripeSubscriptionId',
+  // The Issue (Client) P1a — the Webflow form-webhook signing secret is admin-only and returned
+  // exactly once on enable; like webflowToken it is NEVER re-served in any workspace view (D7).
+  'webflowFormWebhookSecret',
 ]);
 
 export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWorkspaceView {
@@ -62,6 +65,11 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     // admin Outcome Value / segment subsections silently never read back the persisted value.
     outcomeValue: ws.outcomeValue,
     segmentConfig: ws.segmentConfig,
+    // The Issue (Client) P1a — admin reads back the persisted Webflow form-source mapping +
+    // setup-confirmation timestamp (same explicit-field-list lockstep as outcomeValue above). The
+    // signing secret is denied (see DENIED_KEYS) and intentionally absent here.
+    webflowFormSources: ws.webflowFormSources,
+    conversionTrackingConfirmedAt: ws.conversionTrackingConfirmedAt,
     // Pre-resolved segment profile (authority-layered): the admin segment UI reads
     // segmentProfile.segment to seed the override + gate the local/multi read-only axis. Without
     // this the UI always falls through to the b2b_saas default and the local-axis guard never fires.

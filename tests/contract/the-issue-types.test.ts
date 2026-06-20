@@ -28,10 +28,10 @@ describe('the-issue P0 type contracts', () => {
     expect(v.unit).toBe('dollars');
   });
 
-  it('OutcomeProvenance is a closed two-value union', () => {
-    const ok: OutcomeProvenance[] = ['estimate_ga4', 'actual_reconciled'];
-    expect(ok).toHaveLength(2);
-    // @ts-expect-error — no third provenance value is permitted
+  it('OutcomeProvenance is a closed three-value union (P1a added measured_action)', () => {
+    const ok: OutcomeProvenance[] = ['estimate_ga4', 'measured_action', 'actual_reconciled'];
+    expect(ok).toHaveLength(3);
+    // @ts-expect-error — no fourth provenance value is permitted
     const bad: OutcomeProvenance = 'estimate_crm';
     expect(bad).toBeDefined();
   });
@@ -39,6 +39,7 @@ describe('the-issue P0 type contracts', () => {
   it('IssueOutcomeCount + OutcomeBaseline pin their shapes', () => {
     const count: IssueOutcomeCount = {
       units: [{ label: 'calls', current: 8, baseline: 3, priorPeriod: 5, eventName: 'phone_call' }],
+      byType: [],
       provenance: 'estimate_ga4', namedRecordsAvailable: false,
     };
     const baseline: OutcomeBaseline = {

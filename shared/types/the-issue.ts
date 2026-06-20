@@ -15,6 +15,21 @@ export interface IssueVerdict {
   provenance: OutcomeProvenance;  // 'estimate_ga4' (P0) | 'actual_reconciled' (P1)
 }
 
+/**
+ * Website-native high-intent action categories (P1a). 'other' is the honest fallback for any
+ * pinned event the admin has not mapped to a known type — never silently dropped.
+ */
+export type OutcomeType =
+  | 'form_fill' | 'call' | 'booking' | 'email' | 'directions' | 'chat' | 'other';
+
+export interface OutcomeTypeBreakdown {
+  outcomeType: OutcomeType;
+  label: string;
+  current: number;
+  baseline: number | null;
+  priorPeriod: number | null;
+}
+
 export interface IssueOutcomeCount {
   units: {
     label: string;                // 'calls' | 'form fills' | 'demos' | …
@@ -22,7 +37,10 @@ export interface IssueOutcomeCount {
     baseline: number | null;
     priorPeriod: number | null;
     eventName?: string;           // GA4 key-event backing this unit (P0)
+    outcomeType?: OutcomeType;    // P1a: which website action this unit measures
   }[];
+  /** P1a: typed rollup ("23 form fills + 41 calls"). Empty when no events carry an outcomeType. */
+  byType: OutcomeTypeBreakdown[];
   provenance: OutcomeProvenance;
   namedRecordsAvailable: boolean; // false at P0 → render the honest upsell affordance
 }

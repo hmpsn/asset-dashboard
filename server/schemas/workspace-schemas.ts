@@ -17,6 +17,9 @@ export const eventDisplayConfigSchema = z.object({
   displayName: z.string(),
   pinned: z.boolean(),
   group: z.string().optional(),
+  // P1a: which website action this pinned event measures. Optional + additive → flag-OFF
+  // byte-identical; existing pinned events with no outcomeType aggregate as 'other'.
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']).optional(),
 }).passthrough();
 
 export const eventDisplayConfigArraySchema = z.array(eventDisplayConfigSchema);
@@ -569,4 +572,14 @@ export const segmentConfigSchema = z.object({
   outcomeNounSingular: z.string().optional(),
   outcomeNounPlural: z.string().optional(),
   reportingAudience: z.enum(['self', 'board', 'partners', 'owners']).optional(),
+}).passthrough();
+
+// ── The Issue (Client) — Webflow form-source mapping (P1a) ────────
+
+/** Per-workspace mapping of a Webflow form to a typed outcome. Stored in the webflow_form_sources
+ *  JSON column; parsed item-by-item via parseJsonSafeArray so one bad mapping doesn't drop the rest. */
+export const webflowFormMappingSchema = z.object({
+  formId: z.string(),
+  formName: z.string(),
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']),
 }).passthrough();
