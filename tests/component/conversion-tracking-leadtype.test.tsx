@@ -3,11 +3,13 @@
  *
  * Flag ON: each PINNED event row renders an outcomeType <select>; choosing a type and saving PATCHes
  * eventConfig carrying { outcomeType }. Flag OFF: no outcomeType select renders (the row is
- * byte-identical to the P0 surface). useFeatureFlag is mocked (no QueryClientProvider needed for the
- * flag path); the component's network layer is stubbed.
+ * byte-identical to the P0 surface). useFeatureFlag is mocked; a QueryClientProvider wraps the render
+ * because ClientDashboardTab calls useQueryClient unconditionally (the enable/disable handlers
+ * invalidate the conversion-tracking-status query). The component's network layer is stubbed.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ─── per-flag useFeatureFlag dispatcher (Sidebar.test.tsx pattern) ──────────────
 const featureFlagMock = vi.fn((_flag: string) => false);
@@ -38,14 +40,19 @@ vi.mock('../../src/api/client', () => ({
 import { ClientDashboardTab } from '../../src/components/settings/ClientDashboardTab';
 
 function renderTab(ws: Record<string, unknown> = {}, patchWorkspace = vi.fn(async () => ({}))) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   render(
-    <ClientDashboardTab
-      workspaceId="ws-1"
-      webflowSiteId="site-1"
-      ws={{ ga4PropertyId: 'GA-123', ...ws }}
-      patchWorkspace={patchWorkspace}
-      toast={vi.fn()}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ClientDashboardTab
+        workspaceId="ws-1"
+        webflowSiteId="site-1"
+        ws={{ ga4PropertyId: 'GA-123', ...ws }}
+        patchWorkspace={patchWorkspace}
+        toast={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
   return { patchWorkspace };
 }

@@ -56,8 +56,16 @@ export function handleWebflowFormWebhook(req: express.Request, res: express.Resp
   }
 
   const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body ?? '');
+  // Webflow signs `${timestamp}:${rawBody}` and sends the signed timestamp in X-Webflow-Timestamp.
+  // Reject a missing / non-numeric / stale timestamp (>5min skew) before the HMAC check to bound replay.
+  const ts = req.header('x-webflow-timestamp');
+  if (!ts || Number.isNaN(Number(ts)) || Math.abs(Date.now() - Number(ts)) > 300_000) {
+    log.warn({ workspaceId: ws.id }, 'webflow form webhook: missing or stale timestamp');
+    res.sendStatus(401);
+    return;
+  }
   const signature = req.header('x-webflow-signature') ?? '';
-  if (!verifyWebflowSignature(raw, signature, secret)) {
+  if (!verifyWebflowSignature(raw, signature, secret, ts)) {
     log.warn({ workspaceId: ws.id }, 'webflow form webhook: invalid signature');
     res.sendStatus(401);
     return;

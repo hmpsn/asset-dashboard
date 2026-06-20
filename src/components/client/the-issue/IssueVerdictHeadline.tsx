@@ -8,9 +8,10 @@
 //
 // P1a: the dollar precision + disclosure are driven by verdict.provenance via the SINGLE
 // resolveProvenanceRender contract (authority-layered-fields rule) — never an inline
-// `provenance === …` branch. estimate_ga4 → banded ~ estimate; measured_action → exact $ +
-// "tracked on your site" disclosure. The retainer ratio stays banded for ALL provenances (a
-// multiple of a measured value is editorial, not sourced).
+// `provenance === …` branch. estimate_ga4 → banded ~ estimate; measured_action → banded ~ dollar
+// (the COUNT is measured/"tracked on your site" but the dollar = count × an estimated lead rate, so
+// it stays banded — only P3 actual_reconciled is exact at the dollar). The retainer ratio stays
+// banded for ALL provenances (a multiple of a measured value is editorial, not sourced).
 //
 // KEPT from NarratedStatusHeadline (the human-curation moat):
 //   • the "Curated by your strategist" byline (teal Sparkles)
@@ -76,8 +77,9 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
       ) : (
         <div className="min-w-0">
           <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">What your SEO is worth</span>
-          {/* The dollar lead — emerald (success/$ law). Precision is provenance-driven: banded ~
-              for estimate_ga4, exact for measured_action — never false precision either way. */}
+          {/* The dollar lead — emerald (success/$ law). Precision is provenance-driven: banded ~ for
+              estimate_ga4 AND measured_action (value = count × estimated rate), exact only for
+              actual_reconciled — never false precision either way. */}
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
             {/* stat-primitive-ok: the verdict headline is an intentional editorial hero shell (inline dollar lead + "X your retainer"), not a labeled StatCard grid. */}
             <span className="t-stat-lg text-accent-success leading-none">{prov!.fmtMoney(verdict.estimatedValue)}</span>

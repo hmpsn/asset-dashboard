@@ -106,7 +106,7 @@ export function ConversionTrackingReadout({
               <StatLine
                 label="Outcome value"
                 value={outcomeValue ? `${outcomeValue.currency} ${outcomeValue.valuePerOutcome.toLocaleString()} / ${outcomeValue.unitLabel} · ${outcomeValue.basisLabel}` : 'Not set'}
-                tone={outcomeValue ? 'muted' : 'muted'}
+                tone="muted"
               />
               <StatLine label="Client segment" value={segmentLabel} tone="muted" />
               <StatLine label="Events pinned" value={`${pinnedCount} pinned · ${typedCount} typed`} tone="blue" />

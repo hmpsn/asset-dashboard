@@ -6,8 +6,10 @@
  * express.raw BEFORE express.json (sibling to the Stripe webhook in app.ts) and feeds the raw body here.
  *
  * Signature model: the operator pastes a per-workspace signing secret into Webflow's form-webhook UI;
- * Webflow signs the raw request body with HMAC-SHA256 and sends the hex digest in X-Webflow-Signature.
- * We recompute and compare timing-safely. (The programmatic-registration / OAuth-app path is NOT built
+ * Webflow signs `${timestamp}:${rawBody}` with HMAC-SHA256 and sends the hex digest in
+ * X-Webflow-Signature alongside the signed timestamp in X-Webflow-Timestamp. We recompute over the
+ * SAME `${timestamp}:${rawBody}` string and compare timing-safely; the route also enforces a 5-minute
+ * timestamp skew window to bound replay. (The programmatic-registration / OAuth-app path is NOT built
  * at P1a — see the plan's feasibility verdict.)
  */
 import crypto from 'node:crypto';
@@ -25,11 +27,17 @@ export interface ParsedWebflowForm {
   leadMessage: string | null;
 }
 
-/** Timing-safe HMAC-SHA256(rawBody, secret) hex comparison. Length-checks first so a wrong-length or
- *  empty signature returns false instead of throwing inside timingSafeEqual. */
-export function verifyWebflowSignature(rawBody: string, signature: string, secret: string): boolean {
-  if (!signature || !secret) return false;
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+/** Timing-safe HMAC-SHA256(`${timestamp}:${rawBody}`, secret) hex comparison — Webflow signs the
+ *  timestamp-prefixed body, not the bare body. Length-checks first so a wrong-length or empty signature
+ *  returns false instead of throwing inside timingSafeEqual. The route enforces timestamp freshness. */
+export function verifyWebflowSignature(
+  rawBody: string,
+  signature: string,
+  secret: string,
+  timestamp: string,
+): boolean {
+  if (!signature || !secret || !timestamp) return false;
+  const expected = crypto.createHmac('sha256', secret).update(`${timestamp}:${rawBody}`).digest('hex');
   if (signature.length !== expected.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(signature, 'utf8'), Buffer.from(expected, 'utf8'));

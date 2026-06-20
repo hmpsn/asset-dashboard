@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const featureFlagMock = vi.fn((_flag: string) => false);
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
@@ -41,14 +42,19 @@ vi.mock('../../src/api/client', () => ({
 import { ClientDashboardTab } from '../../src/components/settings/ClientDashboardTab';
 
 function renderTab(ws: Record<string, unknown> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   render(
-    <ClientDashboardTab
-      workspaceId="ws-1"
-      webflowSiteId="site-1"
-      ws={{ ga4PropertyId: 'GA-123', ...ws }}
-      patchWorkspace={vi.fn(async () => ({}))}
-      toast={vi.fn()}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ClientDashboardTab
+        workspaceId="ws-1"
+        webflowSiteId="site-1"
+        ws={{ ga4PropertyId: 'GA-123', ...ws }}
+        patchWorkspace={vi.fn(async () => ({}))}
+        toast={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
 }
 

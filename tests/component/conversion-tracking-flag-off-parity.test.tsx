@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: () => false, // measured-capture OFF
@@ -34,25 +35,31 @@ beforeEach(() => {
 
 describe('C5 — flag-OFF byte-identical parity', () => {
   it('renders none of the P1a subsections when measured-capture is OFF', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     render(
-      <ClientDashboardTab
-        workspaceId="ws-1"
-        webflowSiteId="site-1"
-        ws={{
-          ga4PropertyId: 'GA-123',
-          outcomeValue: { valuePerOutcome: 800, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate' },
-          conversionTrackingConfirmedAt: new Date().toISOString(),
-          eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
-        }}
-        patchWorkspace={vi.fn(async () => ({}))}
-        toast={vi.fn()}
-      />,
+      <QueryClientProvider client={queryClient}>
+        <ClientDashboardTab
+          workspaceId="ws-1"
+          webflowSiteId="site-1"
+          ws={{
+            ga4PropertyId: 'GA-123',
+            outcomeValue: { valuePerOutcome: 800, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate' },
+            conversionTrackingConfirmedAt: new Date().toISOString(),
+            eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
+          }}
+          patchWorkspace={vi.fn(async () => ({}))}
+          toast={vi.fn()}
+        />
+      </QueryClientProvider>,
     );
 
-    // No readout, no connect card, no value-integrity preview.
+    // No readout, no connect card, no value-integrity preview (the relabelled "based on your most
+    // recent tracked data" line lives in the gated subsection and must not render OFF).
     expect(screen.queryByText('Conversion tracking')).toBeNull();
     expect(screen.queryByText('Webflow form capture')).toBeNull();
-    expect(screen.queryByText(/would have read/i)).toBeNull();
+    expect(screen.queryByText(/based on your most recent tracked data/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /Enable Webflow form capture/i })).toBeNull();
 
     // The P0 surface still renders.

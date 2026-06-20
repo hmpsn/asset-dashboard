@@ -122,6 +122,11 @@ export function OverviewTab({
   // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so
   // the legacy overview body below is byte-identical.
   if (theIssueEnabled) {
+    // P1a measured-capture flag — read unconditionally at the top of the block (Rules of Hooks;
+    // useFeatureFlag is a hook). Flag-OFF this gates every per-unit outcomeType back to undefined so
+    // the typed render (type icons, [data-outcome-type] tags, byType rollup) vanishes byte-identically
+    // to P0. The rollback must never leak typed-outcome UI just because eventConfig still carries types.
+    const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
     // ── The Issue (Client) P0 spine props (additive; unread on the spine-flag-OFF path) ──
@@ -134,8 +139,11 @@ export function OverviewTab({
     // Attach it per-unit so OutcomeCountBand can render typed, type-ordered StatCards. The fallback
     // (no events pinned) carries no eventConfig entry → outcomeType stays undefined → the unit
     // degrades byte-identically to the P0 estimate render.
+    // Gate on the measured-capture flag: OFF → every unit's outcomeType is undefined, so the byType
+    // rollup is empty and OutcomeCountBand's `!u.outcomeType` short-circuit makes the typed render
+    // (icons + [data-outcome-type] tags) vanish byte-identically to P0.
     const outcomeTypeFor = (eventName: string): OutcomeType | undefined =>
-      ws.eventConfig?.find(c => c.eventName === eventName)?.outcomeType;
+      measuredCapture ? ws.eventConfig?.find(c => c.eventName === eventName)?.outcomeType : undefined;
     const outcomeUnits = (pinned.length > 0
       ? pinned.map(p => ({ eventName: p.eventName, label: p.label }))
       : ga4Conversions.map(c => ({ eventName: c.eventName, label: c.eventName.replace(/_/g, ' ') })))

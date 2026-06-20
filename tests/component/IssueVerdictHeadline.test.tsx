@@ -60,11 +60,14 @@ describe('IssueVerdictHeadline', () => {
   // ── P1a: measured_action provenance ─────────────────────────────────────────
   const measured: NonNullable<ROIData['outcomeVerdict']> = { ...verdict, provenance: 'measured_action' };
 
-  it('measured_action → EXACT dollar (no ~ band) and a "tracked on your site" measured disclosure', () => {
+  it('measured_action → BANDED dollar (~$, value = exact count × estimated rate) + measured disclosure', () => {
+    // Dollar-overclaim fix: the COUNT graduates to measured, but the DOLLAR stays banded (~$) because
+    // value = count × an estimated lead rate. Exact dollars arrive only at P3 actual_reconciled.
     render(<IssueVerdictHeadline verdict={measured} topRec={null} />);
-    expect(screen.getByText(/\$11,234/)).toBeInTheDocument();
-    expect(screen.queryByText(/~\$/)).not.toBeInTheDocument();
+    expect(screen.getByText(/~\$11,000/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$11,234/)).not.toBeInTheDocument();
     expect(screen.getByText(/measured from real actions/i)).toBeInTheDocument();
+    // Measured framing, NOT estimate framing — but the dollar itself is honestly approximate.
     expect(screen.queryByText(/this is an estimate/i)).not.toBeInTheDocument();
   });
   it('estimate_ga4 stays banded ~ + estimate disclosure (byte-identical to P0)', () => {

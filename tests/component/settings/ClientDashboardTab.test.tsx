@@ -6,10 +6,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // P1a measured-capture: useFeatureFlag is read unconditionally + the status hook is imported.
-// Mock both OFF so these P0 client-access/pricing tests stay on the byte-identical flag-OFF
-// surface and don't need a QueryClientProvider.
+// Mock both OFF so these P0 client-access/pricing tests stay on the byte-identical flag-OFF surface.
+// A QueryClientProvider is still required: ClientDashboardTab calls useQueryClient unconditionally
+// (the form-capture enable/disable handlers invalidate the conversion-tracking-status query).
 vi.mock('../../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: () => false,
 }));
@@ -44,8 +46,13 @@ Object.defineProperty(navigator, 'clipboard', {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter>{children}</MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

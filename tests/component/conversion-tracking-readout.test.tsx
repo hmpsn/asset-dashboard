@@ -2,12 +2,14 @@
  * Lane C C2/C5 — admin verification readout + setup checklist + value-integrity guardrails.
  *
  * Flag ON: the Conversion tracking readout renders pinned/typed counts, the Webflow-forms-connected
- * pill, relative last-lead freshness, the resolved provenance pill, the OnboardingStep-shaped setup
- * checklist, and the value-integrity preview ("last 90 days would have read ~$Y" + client-sentence
- * echo). Flag OFF: the readout is absent (byte-identical P0).
+ * pill, relative last-lead freshness, the resolved provenance pill (both "Measured" and "Estimate"
+ * directions), the OnboardingStep-shaped setup checklist, and the value-integrity preview ("based on
+ * your most recent tracked data, that's about $Y" — the latest single GA4 snapshot, NOT a 90-day
+ * aggregate — + client-sentence echo). Flag OFF: the readout is absent (byte-identical P0).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ConversionTrackingStatus } from '../../src/api/conversionTracking';
 
 const featureFlagMock = vi.fn((_flag: string) => false);
@@ -35,14 +37,21 @@ import { ClientDashboardTab } from '../../src/components/settings/ClientDashboar
 const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
 function renderTab(ws: Record<string, unknown> = {}) {
+  // ClientDashboardTab now calls useQueryClient (the disable/enable handlers invalidate the
+  // conversion-tracking-status query), so a QueryClientProvider must wrap the render.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   render(
-    <ClientDashboardTab
-      workspaceId="ws-1"
-      webflowSiteId="site-1"
-      ws={{ ga4PropertyId: 'GA-123', ...ws }}
-      patchWorkspace={vi.fn(async () => ({}))}
-      toast={vi.fn()}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ClientDashboardTab
+        workspaceId="ws-1"
+        webflowSiteId="site-1"
+        ws={{ ga4PropertyId: 'GA-123', ...ws }}
+        patchWorkspace={vi.fn(async () => ({}))}
+        toast={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
 }
 
@@ -79,13 +88,47 @@ describe('C2 — verification readout (flag ON)', () => {
     expect(screen.getByText(/2h ago/)).toBeInTheDocument();
   });
 
-  it('shows the value-integrity preview ("would have read ~$") + the client-sentence echo', () => {
+  it('provenance pill reads "Measured" when a real lead has been captured (submissionCount > 0)', () => {
+    // C2 fixture above already sets submissionCount: 5 → the provenance flips to measured_action.
+    renderTab({
+      eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
+    });
+    const pill = document.querySelector('[data-provenance]');
+    expect(pill).not.toBeNull();
+    expect(pill?.getAttribute('data-provenance')).toBe('measured_action');
+    expect(pill?.textContent).toMatch(/measured/i);
+    expect(pill?.textContent).not.toMatch(/estimate/i);
+  });
+
+  it('provenance pill reads "Estimate" when nothing is captured and setup is unconfirmed', () => {
+    // Override the C2 status fixture: no leads captured, not connected → stays an estimate.
+    statusMock.mockReturnValue({
+      status: {
+        pinnedCount: 1, typedCount: 1, formCaptureConnected: false,
+        lastSubmissionAt: null, submissionCount: 0, recentOutcomeCount: 0,
+      },
+      isLoading: false, isError: false,
+    });
+    renderTab({
+      // No conversionTrackingConfirmedAt → hasConfirmedTypedSetup is false → estimate_ga4.
+      eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
+    });
+    const pill = document.querySelector('[data-provenance]');
+    expect(pill).not.toBeNull();
+    expect(pill?.getAttribute('data-provenance')).toBe('estimate_ga4');
+    expect(pill?.textContent).toMatch(/estimate/i);
+    expect(pill?.textContent).not.toMatch(/measured/i);
+  });
+
+  it('shows the value-integrity preview ("based on your most recent tracked data") + the client-sentence echo', () => {
     renderTab({
       outcomeValue: { valuePerOutcome: 800, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate' },
       eventConfig: [{ eventName: 'form_submit', displayName: 'Form fills', pinned: true, outcomeType: 'form_fill' }],
     });
-    // 18 outcomes * $800 = $14,400 preview (also echoed in the client-sentence below).
-    expect(screen.getByText(/would have read/i)).toBeInTheDocument();
+    // 18 outcomes * $800 = $14,400 preview (also echoed in the client-sentence below). The label must
+    // reflect the latest single GA4 snapshot, NOT a 90-day aggregate (which would inflate the figure).
+    expect(screen.getByText(/based on your most recent tracked data/i)).toBeInTheDocument();
+    expect(screen.queryByText(/last 90 days/i)).toBeNull();
     expect(screen.getAllByText(/\$14,400/).length).toBeGreaterThanOrEqual(1);
   });
 });

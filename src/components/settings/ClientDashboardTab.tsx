@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Search, Loader2, Check, X, Users, ExternalLink, ChevronRight,
   Copy, CheckCircle, Lock, KeyRound, Plus, Trash2, Pencil, Save,
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect, Checkbox } from '../ui';
 import { CHART_SERIES_COLORS } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
@@ -62,6 +64,7 @@ interface ClientDashboardTabProps {
 }
 
 export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorkspace, toast }: ClientDashboardTabProps) {
+  const qc = useQueryClient();
   const [copiedLink, setCopiedLink] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -338,6 +341,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     try {
       const creds = await conversionTrackingApi.enableFormCapture(workspaceId);
       setCaptureCreds(creds);
+      // Enabling mints the secret server-side → the connected/provenance state changed; refresh the
+      // readout query so it isn't stale (otherwise the integrity strip lags one toggle behind).
+      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
       toast('Webflow form capture enabled — copy your signing secret now');
     } catch { toast('Failed to enable form capture', 'error'); }
     finally { setEnablingCapture(false); }
@@ -347,14 +353,23 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     try {
       await conversionTrackingApi.disableFormCapture(workspaceId);
       setCaptureCreds(null);
+      // Disabling clears the secret + sources server-side → invalidate the cached status so the
+      // readout drops back to "Not connected" instead of showing a stale connected state.
+      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
       toast('Webflow form capture disabled');
     } catch { toast('Failed to disable form capture', 'error'); }
   };
 
-  const copyToClipboard = (text: string, mark: (v: boolean) => void) => {
-    navigator.clipboard.writeText(text);
-    mark(true);
-    setTimeout(() => mark(false), 2000);
+  // Copy handler: await the clipboard write and only flag "copied" on success (an unawaited promise
+  // could reject silently and still flash the success state). try/catch surfaces a denied-permission.
+  const copyToClipboard = async (text: string, mark: (v: boolean) => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      mark(true);
+      setTimeout(() => mark(false), 2000);
+    } catch {
+      toast('Could not copy to clipboard', 'error');
+    }
   };
 
   // Load users on mount
@@ -1009,7 +1024,11 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
         ];
 
         // ALIGNMENT #3 — value-integrity guardrails. Sanity band warns on an implausible value; the
-        // 90-day preview + client-sentence echo de-risk a one-misset-input → confident-wrong headline.
+        // latest-snapshot preview + client-sentence echo de-risk a one-misset-input → confident-wrong
+        // headline. recentOutcomeCount is the most recent single GA4 snapshot's pinned-outcome total
+        // (the scheduler reads getGA4Conversions(..., 1)) — NOT a 90-day aggregate, so the preview is
+        // labelled as "your most recent tracked data" rather than implying a 90-day sum (would inflate
+        // the figure up to ~90×).
         const ov = ws?.outcomeValue ?? null;
         const value = ov?.valuePerOutcome ?? 0;
         const outOfBand = value > 0 && (value < 5 || value > 100_000);
@@ -1043,7 +1062,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   )}
                   {recentOutcomeCount > 0 && (
                     <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                      With this value, the last 90 days would have read{' '}
+                      Based on your most recent tracked data, that's about{' '}
                       <span className="font-semibold text-blue-400">{currency === 'USD' ? '$' : `${currency} `}{previewTotal.toLocaleString()}</span>
                       {' '}({recentOutcomeCount.toLocaleString()} tracked outcomes × {currency === 'USD' ? '$' : `${currency} `}{value.toLocaleString()}).
                     </p>

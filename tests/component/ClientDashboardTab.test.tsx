@@ -6,9 +6,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// useFeatureFlag (P1a measured-capture) is read unconditionally; mock it OFF so these P0 tests stay
-// on the byte-identical surface and don't need a QueryClientProvider.
+// useFeatureFlag (P1a measured-capture) is read unconditionally; mock it OFF so these P0 tests stay on
+// the byte-identical surface. A QueryClientProvider is still required because ClientDashboardTab calls
+// useQueryClient unconditionally (enable/disable handlers invalidate the status query).
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: () => false,
 }));
@@ -30,14 +32,19 @@ vi.mock('../../src/api/client', () => ({
 
 function renderTab(wsOverrides: Record<string, unknown> = {}, patchWorkspace = vi.fn(async () => ({}))) {
   const toast = vi.fn();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   render(
-    <ClientDashboardTab
-      workspaceId="ws-1"
-      webflowSiteId="site-1"
-      ws={{ ...wsOverrides }}
-      patchWorkspace={patchWorkspace}
-      toast={toast}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ClientDashboardTab
+        workspaceId="ws-1"
+        webflowSiteId="site-1"
+        ws={{ ...wsOverrides }}
+        patchWorkspace={patchWorkspace}
+        toast={toast}
+      />
+    </QueryClientProvider>,
   );
   return { patchWorkspace, toast };
 }
