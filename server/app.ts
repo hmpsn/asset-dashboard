@@ -82,6 +82,7 @@ import clientActionsRouter from './routes/client-actions.js';
 import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import strategyPovRouter from './routes/strategy-pov.js';
+import strategyIssueLensesRouter from './routes/strategy-issue-lenses.js';
 import autoSendPolicyRouter from './routes/auto-send-policy.js';
 import brandscriptRoutes from './routes/brandscript.js';
 import voiceCalibrationRoutes from './routes/voice-calibration.js';
@@ -359,6 +360,7 @@ export function createApp(): express.Express {
   app.use(deliverablesRoutes);
   app.use(meetingBriefRouter);
   app.use(strategyPovRouter);
+  app.use(strategyIssueLensesRouter);
   app.use(autoSendPolicyRouter);
   app.use(brandscriptRoutes);
   app.use(voiceCalibrationRoutes);
