@@ -268,14 +268,14 @@ describe('ClientDashboardTab', () => {
 
   it('clicking Configure reveals pricing form', () => {
     renderTab();
-    fireEvent.click(screen.getByRole('button', { name: /configure/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
     expect(screen.getByPlaceholderText(/150/)).toBeInTheDocument();
   });
 
   it('Save Pricing calls patchWorkspace with contentPricing', async () => {
     const patchWorkspace = vi.fn().mockResolvedValue({});
     renderTab({ patchWorkspace });
-    fireEvent.click(screen.getByRole('button', { name: /configure/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
 
     const briefInput = screen.getByPlaceholderText('150');
     const fullInput = screen.getByPlaceholderText('500');

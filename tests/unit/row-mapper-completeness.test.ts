@@ -165,6 +165,8 @@ describe('rowToWorkspace mapper completeness', () => {
       autoPublishAfterHours: 12,
       lastBriefingRunWeekOf: '2026-04-27',
       siteHasSearch: true,
+      outcomeValue: { valuePerOutcome: 600, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate', monthlyRetainer: 1500 },
+      segmentConfig: { segment: 'b2b_saas' },
     });
 
     const result = getWorkspace(ws.id);
