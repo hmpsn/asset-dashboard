@@ -68,6 +68,11 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // queryKeys.admin.strategyKeywordSet) lands in P3 — REMOVE this exemption
   // in P3 when the handler ships.
   'STRATEGY_KEYWORD_SET_UPDATED',
+
+  // STRATEGY_POV_GENERATED (The Issue): handled locally by src/hooks/admin/useStrategyPov.ts via
+  // useWorkspaceEvents (invalidates queryKeys.admin.strategyPov). Only the cockpit's POV query
+  // consumes it, so a centralized useWsInvalidation.ts handler would invalidate nothing else.
+  'STRATEGY_POV_GENERATED',
 ]);
 
 // ---------------------------------------------------------------------------

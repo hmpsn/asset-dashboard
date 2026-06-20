@@ -19,7 +19,7 @@ plans.
 
 ## Findings Summary
 
-- `native`: 33
+- `native`: 34
 - `hybrid`: 0
 - `legacy`: 0
 - `documented-exception`: 0

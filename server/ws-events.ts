@@ -100,7 +100,7 @@ export const WS_EVENTS = {
 
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate and on every operator
   // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.
-  STRATEGY_POV_GENERATED: 'strategy:pov:generated',
+  STRATEGY_POV_GENERATED: 'strategy:pov-generated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',

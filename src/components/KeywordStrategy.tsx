@@ -9,6 +9,8 @@ import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendation
 import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLifecycle';
 import { useContentDecay } from '../hooks/admin/useContentDecay';
 import { useStrategyKeywordSet } from '../hooks/admin/useStrategyKeywordSet';
+import { useStrategyPov } from '../hooks/admin/useStrategyPov';
+import { useRecBulkMutation } from '../hooks/admin/useRecBulkMutation';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
@@ -22,6 +24,10 @@ import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { StrategyConfigPanel } from './strategy/StrategyConfigPanel';
+import { IssueHeader } from './strategy/issue/IssueHeader';
+import { StanceBar } from './strategy/issue/StanceBar';
+import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
+import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
@@ -117,6 +123,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Flag gate: flag-ON renders v3 StrategyCockpit; flag-OFF preserves the v2 Act queue exactly.
   // Called unconditionally here (before all early returns) — Rules of Hooks.
   const commandCenterEnabled = useFeatureFlag('strategy-command-center');
+  // The Issue (Phase 1) — strict superset of the command-center cockpit. Read UNCONDITIONALLY
+  // here (before all early returns — Rules of Hooks). When ON, the Overview renders a third
+  // composed branch (IssueHeader → StanceBar → DraftedPovEditor → BackingMovesQueue → supporting
+  // surfaces). flag-OFF keeps the command-center / legacy branches byte-identical: theIssueEnabled
+  // gates a NEW branch only; it never alters the existing two.
+  const theIssueEnabled = commandCenterEnabled && useFeatureFlag('strategy-the-issue');
   // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
   // M1 — the managed-set UI is part of the v3 command-center redesign, so it must be gated on
   // BOTH flags. Without the `commandCenterEnabled &&` composition the managed UI would leak into
@@ -154,6 +166,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // (it has its own lifecycle/category facets + Fix-now pin, so it filters internally).
   const lifecycleActions = useRecommendationLifecycle(workspaceId);
   const cockpitRecs = recommendationSet?.recommendations ?? [];
+  // ── The Issue (Phase 1) hooks/state — all called UNCONDITIONALLY (Rules of Hooks). ──
+  // The drafted POV. `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls.
+  const strategyPov = useStrategyPov(workspaceId, theIssueEnabled);
+  // The atomic bulk-send route (the cockpit's existing send spine) — reused for "Send issue".
+  const issueBulkSend = useRecBulkMutation(workspaceId);
+  // cut→sentence contract: cutting a backing move strikes its POV sentence live.
+  const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
+  // Preview-as-client toggle (operator switches to the client framing).
+  const [previewAsClient, setPreviewAsClient] = useState(false);
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -454,6 +475,84 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ? <StrategyCockpit workspaceId={workspaceId} recs={cockpitRecs} actions={lifecycleActions} />
     : null;
 
+  // ── The Issue (Phase 1) overview composition — only built when theIssueEnabled && real strategy. ──
+  // The set "Send issue" ships: active, not-yet-sent, not-struck/completed/dismissed recs (the
+  // operator's curated candidates). Reuses the cockpit's atomic bulk route via issueBulkSend.
+  const sendableRecIds = cockpitRecs
+    .filter(
+      (r) =>
+        r.lifecycle !== 'struck' &&
+        r.lifecycle !== 'throttled' &&
+        r.status !== 'completed' &&
+        r.status !== 'dismissed' &&
+        r.clientStatus !== 'sent' &&
+        r.clientStatus !== 'approved',
+    )
+    .map((r) => r.id);
+  const handleSendIssue = () => {
+    if (sendableRecIds.length === 0) return;
+    issueBulkSend.mutate({ recIds: sendableRecIds, action: 'send' });
+  };
+  const issueConfigPanelProps = {
+    workspaceId,
+    isAuxLoading,
+    settingsOpen: settings.settingsOpen,
+    setSettingsOpen: settings.setSettingsOpen,
+    seoDataAvailable: settings.seoDataAvailable,
+    seoDataMode: settings.seoDataMode,
+    setSeoDataMode: settings.setSeoDataMode,
+    maxPages: settings.maxPages,
+    setMaxPages: settings.setMaxPages,
+    competitors: settings.competitors,
+    setCompetitors: settings.setCompetitors,
+    businessContext: settings.businessContext,
+    setBusinessContext: settings.setBusinessContext,
+    contextOpen: settings.contextOpen,
+    setContextOpen: settings.setContextOpen,
+    discoveringCompetitors: settings.discoveringCompetitors,
+    discoverError: settings.discoverError,
+    onDiscoverCompetitors: settings.discoverCompetitors,
+    providerName: settings.selectedSeoDataProvider === 'dataforseo' ? 'DataForSEO' : settings.selectedSeoDataProvider,
+    localMarketLabel: primaryMarket?.label,
+    onOpenLocalSeoSetup: () => setLocalSeoSetupOpen(true),
+  };
+  const issueOverviewEl = (theIssueEnabled && isRealStrategy && strategy) ? (
+    // Order (plan §5): IssueHeader (config chrome + Preview + Send issue) → StanceBar →
+    // DraftedPovEditor → BackingMovesQueue (archetype) → existing supporting surfaces
+    // (Orient → NeedsAttentionStrip is folded into BackingMovesQueue's cockpit reuse;
+    // OrientZone + cannibalization + competitor/keywords/content reference below).
+    <div className="space-y-8">
+      <IssueHeader
+        subtitle={headerSubtitle}
+        previewAsClient={previewAsClient}
+        onPreviewAsClientChange={setPreviewAsClient}
+        onSendIssue={handleSendIssue}
+        isSending={issueBulkSend.isPending}
+        canSend={sendableRecIds.length > 0}
+        configPanelProps={issueConfigPanelProps}
+      />
+      <StanceBar recs={cockpitRecs} />
+      <DraftedPovEditor
+        pov={strategyPov.pov}
+        onEdit={strategyPov.edit}
+        struckRecIds={struckRecIds}
+        onRegenerate={strategyPov.regenerate}
+        isGenerating={strategyPov.isGenerating}
+      />
+      <BackingMovesQueue
+        workspaceId={workspaceId}
+        recs={cockpitRecs}
+        actions={lifecycleActions}
+        onCut={(id) => setStruckRecIds((s) => [...s, id])}
+        shortlistCap={5}
+      />
+      {/* Existing supporting surfaces — reused verbatim from the command-center branch. */}
+      {orientEl}
+      {realLeaves?.cannibalization}
+      {realLeaves?.strategyDiff}
+    </div>
+  ) : null;
+
   const handleInteriorTabChange = (id: string) => {
     setInteriorTab(id as StrategyInteriorTab);
     const next = clearTabSearchParam(searchParams);
@@ -489,7 +588,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <>
           <TabBar tabs={displayedTabs} active={interiorTab} onChange={handleInteriorTabChange} />
           {interiorTab === 'overview' && (
-            commandCenterEnabled ? (
+            theIssueEnabled ? (
+              // ── The Issue (Phase 1): a THIRD composed branch (strict superset of command-center).
+              // Built above as issueOverviewEl. Leaves the existing flag-ON / flag-OFF branches
+              // untouched — this branch only ADDS the issue cockpit, byte-identical OFF. ──
+              issueOverviewEl
+            ) : commandCenterEnabled ? (
               // ── flag-ON: decision-pipeline IA (graft 3) ──
               // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → StrategyConfigPanel.
               // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).

@@ -40,6 +40,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'correct' },
   { file: 'server/llms-txt-generator.ts', classification: 'documented-exception' },
   { file: 'server/meeting-brief-generator.ts', classification: 'correct' },
+  { file: 'server/strategy-pov-generator.ts', classification: 'correct' },
   { file: 'server/monthly-digest.ts', classification: 'correct' },
   { file: 'server/page-analysis-job.ts', classification: 'documented-exception' },
   { file: 'server/schema-plan.ts', classification: 'documented-exception' },

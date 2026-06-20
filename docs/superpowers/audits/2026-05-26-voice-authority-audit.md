@@ -9,7 +9,7 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 20
+- `correct`: 21
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 17
