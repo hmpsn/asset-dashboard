@@ -6,6 +6,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+// P1a measured-capture: useFeatureFlag is read unconditionally + the status hook is imported.
+// Mock both OFF so these P0 client-access/pricing tests stay on the byte-identical flag-OFF
+// surface and don't need a QueryClientProvider.
+vi.mock('../../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+vi.mock('../../../src/hooks/admin/useConversionTrackingStatus', () => ({
+  useConversionTrackingStatus: () => ({ status: undefined, isLoading: false, isError: false }),
+}));
+
 import { ClientDashboardTab } from '../../../src/components/settings/ClientDashboardTab';
 
 // ── API mocks ────────────────────────────────────────────────────────────────

@@ -63,6 +63,11 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
 
+  // FORM_SUBMISSION_CAPTURED (The Issue P1a) is handled locally by useConversionTrackingStatus
+  // (useWorkspaceEvents) on the admin conversion-tracking surface — it invalidates the
+  // conversion-tracking-status query directly, not via the centralized useWsInvalidation hook.
+  'FORM_SUBMISSION_CAPTURED',
+
   // STRATEGY_KEYWORD_SET_UPDATED: forward-declared in P2 pre-commit; the
   // centralized useWsInvalidation.ts handler (invalidating
   // queryKeys.admin.strategyKeywordSet) lands in P3 — REMOVE this exemption
