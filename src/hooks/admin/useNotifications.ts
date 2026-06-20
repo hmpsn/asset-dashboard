@@ -28,7 +28,7 @@ interface WorkspaceSummary {
   clientSignals?: { new: number };
   clientActions?: { approved?: number; changesRequested?: number };
   recResponses?: { approved?: number; declined?: number; discussing?: number };
-  issue?: { ready?: boolean; pushedWeekOf?: string | null };
+  issue?: { ready?: boolean; pushedWeekOf?: string | null; isCurrentWeek?: boolean };
 }
 
 interface AnomalySummary {
@@ -256,10 +256,12 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         tab: 'seo-strategy',
       });
     }
-    // The Issue (Phase 3) — operator doorbell. The pushed-Issue cron stamped a week
-    // (`pushedWeekOf`) and the workspace is still curatable (`ready`): the weekly Issue
-    // is drafted and waiting. Deep-links to the standing Strategy page.
-    if (ws.issue?.ready && ws.issue.pushedWeekOf) {
+    // The Issue (Phase 3) — operator doorbell (scaled-review fix #2). `issue.ready` is now the
+    // SERVER's authoritative gate: flag ON + ≥1 active rec + this-week's Issue is fresh
+    // (pushedWeekOf === current ISO week) + the operator hasn't acted (edited the POV) this week.
+    // The bell therefore lights the week the Issue is pushed and clears once the operator edits the
+    // POV that week, instead of ringing forever. Deep-links to the standing Strategy page.
+    if (ws.issue?.ready) {
       notifications.push({
         id: `strategy-issue-${ws.id}`,
         label: 'Weekly Issue drafted and ready to curate',

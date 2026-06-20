@@ -4,12 +4,15 @@ import type { Recommendation } from '../../shared/types/recommendations.js';
 
 /**
  * Lane B cache-completeness contract (plan Step 3, audit §8, scaled-review fix #5):
- * buildStrategyPovHash MUST bust when ANY of these change:
- *   - the curated rec id-set
- *   - each curated rec's clientStatus / lifecycle
- *   - each curated rec's CONTENT (title / insight / estimatedGain / opportunity value)
- *   - the rec ORDER (the POV leads with the #1 curated move)
- *   - the variant (admin vs client prose must not share a cache)
+ * buildStrategyPovHash MUST bust when ANY of these change. The hash operates over the POV rec set
+ * passed in — which is now VARIANT-AWARE upstream (active for admin, curated for client, scaled-
+ * review fix #1) — but the hash itself is variant-agnostic over its inputs, so these cases assert
+ * busting on the passed recs regardless of how they were selected:
+ *   - the POV rec id-set
+ *   - each rec's clientStatus / lifecycle
+ *   - each rec's CONTENT (title / insight / estimatedGain / opportunity value)
+ *   - the rec ORDER (the POV leads with the #1 move)
+ *   - the variant (admin vs client prose AND source set must not share a cache)
  *   - the regenerate nonce
  * It MUST NOT bust on the prose-edit version change (folding version in would let a plain generate
  * after an operator edit overwrite the edit). Identical inputs ⇒ identical hash (pure).

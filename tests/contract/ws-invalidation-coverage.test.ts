@@ -75,12 +75,13 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   'STRATEGY_POV_GENERATED',
 
   // STRATEGY_ISSUE_PUSHED (The Issue, Phase 3): the pushed-Issue cron's operator-doorbell signal.
-  // The visible NotificationBell entry is derived from the polled /api/workspace-overview summary
-  // (`issue.ready` + `issue.pushedWeekOf`) via the admin-notifications query, which self-refreshes
-  // on a 5-minute interval — the same poll-driven pattern as the requests/approvals/rec-responses
-  // entries (none of which have WS handlers either). The broadcast piggybacks the cockpit's
-  // STRATEGY_POV_GENERATED handler for immediate POV-cache freshness; no centralized React Query
-  // cache keys off STRATEGY_ISSUE_PUSHED directly.
+  // It is NOT consumed by ANY frontend handler. The visible NotificationBell entry is derived from
+  // the polled /api/workspace-overview summary (`issue.ready` + `issue.pushedWeekOf`) via the
+  // admin-notifications query, which self-refreshes on a 5-minute interval — the same poll-driven
+  // pattern as the requests/approvals/rec-responses entries (none of which have WS handlers either).
+  // The cockpit's POV cache is refreshed separately by generateStrategyPov's OWN
+  // STRATEGY_POV_GENERATED broadcast (and only on the changed path — POV_UNCHANGED does not
+  // broadcast), not by this event. No centralized React Query cache keys off STRATEGY_ISSUE_PUSHED.
   'STRATEGY_ISSUE_PUSHED',
 ]);
 

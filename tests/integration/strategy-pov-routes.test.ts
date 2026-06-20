@@ -5,7 +5,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import db from '../../server/db/index.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { saveStrategyPov as realSave } from '../../server/strategy-pov-store.js';
+import { saveRecommendations, computeRecommendationSummary } from '../../server/recommendations.js';
 import type { StrategyPov } from '../../shared/types/strategy-pov.js';
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
@@ -35,7 +37,7 @@ vi.mock('../../server/strategy-pov-generator.js', async (importOriginal) => {
   };
 });
 
-import { generateStrategyPov as mockGenerate, POV_UNCHANGED } from '../../server/strategy-pov-generator.js';
+import { generateStrategyPov as mockGenerate, POV_UNCHANGED, loadPovRecs } from '../../server/strategy-pov-generator.js';
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -157,5 +159,82 @@ describe('integration: strategy POV routes', () => {
     const body = await res.json().catch(() => ({}));
     expect(res.status).toBe(500);
     expect(body).toEqual({ error: 'Failed to generate strategy POV' });
+  });
+});
+
+// ── Variant-aware POV rec-set selection (scaled-review fix #1) ────────────────
+// loadPovRecs is the REAL implementation here (the module mock spreads ...actual and only replaces
+// generateStrategyPov), so this exercises the genuine isActiveRec / isCuratedForClient split.
+describe('loadPovRecs — variant-aware rec set', () => {
+  let seeded: SeededFullWorkspace;
+
+  function recOf(over: Partial<Recommendation>): Recommendation {
+    const ts = '2026-06-19T00:00:00.000Z';
+    return {
+      id: 'r',
+      workspaceId: seeded.workspaceId,
+      priority: 'fix_now',
+      type: 'content',
+      title: 't',
+      description: 'd',
+      insight: 'i',
+      impact: 'high',
+      effort: 'low',
+      impactScore: 50,
+      source: 's',
+      affectedPages: [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: 'g',
+      actionType: 'manual',
+      status: 'pending',
+      clientStatus: 'system',
+      lifecycle: 'active',
+      createdAt: ts,
+      updatedAt: ts,
+      ...over,
+    } as Recommendation;
+  }
+
+  beforeEach(() => {
+    seeded = seedWorkspace();
+    // active-for-admin: clientStatus not in {sent,approved,declined}, status not terminal, not struck.
+    // curated-for-client: clientStatus in {sent,approved,discussing}, not struck.
+    const recs = [
+      recOf({ id: 'active-only', clientStatus: 'curated', lifecycle: 'active' }),   // admin-active, NOT curated
+      recOf({ id: 'sent-only', clientStatus: 'sent', lifecycle: 'active' }),         // client-curated, NOT admin-active
+      recOf({ id: 'discussing-both', clientStatus: 'discussing', lifecycle: 'active' }), // BOTH (deliberate overlap)
+      recOf({ id: 'declined-neither', clientStatus: 'declined', lifecycle: 'active' }),  // neither
+    ];
+    const set: RecommendationSet = {
+      workspaceId: seeded.workspaceId,
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      recommendations: recs,
+      summary: computeRecommendationSummary(recs),
+    };
+    saveRecommendations(set);
+  });
+
+  afterEach(() => {
+    db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(seeded.workspaceId);
+    seeded.cleanup();
+  });
+
+  it('admin variant draws from the ACTIVE (proposable) set, not the sent set', () => {
+    const ids = loadPovRecs(seeded.workspaceId, 'admin').map(r => r.id).sort();
+    // active-only + discussing-both are active; sent-only + declined-neither are excluded.
+    expect(ids).toEqual(['active-only', 'discussing-both']);
+  });
+
+  it('client variant draws from the CURATED/sent set, not the active set', () => {
+    const ids = loadPovRecs(seeded.workspaceId, 'client').map(r => r.id).sort();
+    // sent-only + discussing-both are curated; active-only + declined-neither are excluded.
+    expect(ids).toEqual(['discussing-both', 'sent-only']);
+  });
+
+  it('returns [] for both variants when no rec set is cached', () => {
+    db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(seeded.workspaceId);
+    expect(loadPovRecs(seeded.workspaceId, 'admin')).toEqual([]);
+    expect(loadPovRecs(seeded.workspaceId, 'client')).toEqual([]);
   });
 });

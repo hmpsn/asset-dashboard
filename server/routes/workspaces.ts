@@ -36,6 +36,8 @@ import { listClientSignals } from '../client-signals-store.js';
 import { summarizeClientActions } from '../client-actions.js';
 import { loadRecommendations, isActiveRec } from '../recommendations.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { currentWeekOfUTC } from '../strategy-issue-cron.js';
+import { getStrategyPov } from '../strategy-pov-store.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -186,11 +188,17 @@ router.get('/api/workspace-overview', (req, res) => {
     let recApproved = 0;
     let recDeclined = 0;
     let recDiscussing = 0;
-    // The Issue (Phase 3) — operator doorbell: a workspace whose flag is ON and whose curated
-    // set has ≥1 active rec is curatable; `issuePushedWeekOf` is the ISO-week the pushed-Issue
-    // cron last pre-baked + rang the doorbell. `useNotifications` surfaces the bell entry from
-    // these two fields, deep-linking to the standing Strategy page.
+    // The Issue (Phase 3) — operator doorbell (scaled-review fix #2). The bell lights ONLY when
+    // THIS WEEK's Issue is both fresh and unacted:
+    //   - flag ON AND ≥1 active rec (there IS an Issue — same ACTIVE-set signal the cron's
+    //     isEligible uses, so cron + bell agree on "there is something to curate"), AND
+    //   - `pushedWeekOf === currentWeekOfUTC()` (this week's Issue was pushed — `isCurrentWeek`), AND
+    //   - the operator has NOT acted on it this week. "Acted" = the strategy POV was edited within
+    //     the current ISO week (editedAt >= this week's Monday anchor). Without the act-check the
+    //     bell would ring forever: ≥1-active-rec is permanently true and pushedWeekOf never reverts.
+    // `useNotifications` surfaces the bell entry from `issue.ready`, deep-linking to the Strategy page.
     let issueReady = false;
+    let issueIsCurrentWeek = false;
     try {
       const recSet = loadRecommendations(ws.id);
       const recs = recSet?.recommendations ?? [];
@@ -199,7 +207,19 @@ router.get('/api/workspace-overview', (req, res) => {
         else if (r.clientStatus === 'declined') recDeclined++;
         else if (r.clientStatus === 'discussing') recDiscussing++;
       }
-      issueReady = isFeatureEnabled('strategy-the-issue', ws.id) && recs.some((r) => isActiveRec(r));
+      const flagOn = isFeatureEnabled('strategy-the-issue', ws.id);
+      const hasActiveIssue = flagOn && recs.some((r) => isActiveRec(r));
+      const weekOf = currentWeekOfUTC();
+      issueIsCurrentWeek = ws.lastIssuePushedWeekOf === weekOf;
+      // "Acted on" signal: the POV was edited within the current ISO week (editedAt on/after the
+      // Monday anchor of `weekOf`). currentWeekOfUTC returns the YYYY-MM-DD Monday; comparing the
+      // editedAt date-prefix string lexicographically against it is correct for ISO dates.
+      let actedThisWeek = false;
+      const pov = getStrategyPov(ws.id);
+      if (pov?.editedAt) {
+        actedThisWeek = pov.editedAt.slice(0, 10) >= weekOf;
+      }
+      issueReady = hasActiveIssue && issueIsCurrentWeek && !actedThisWeek;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     const { isTrial, trialDaysRemaining } = computeTrialState(ws);
@@ -247,6 +267,7 @@ router.get('/api/workspace-overview', (req, res) => {
       issue: {
         ready: issueReady,
         pushedWeekOf: ws.lastIssuePushedWeekOf ?? null,
+        isCurrentWeek: issueIsCurrentWeek,
       },
       pageStates,
     };

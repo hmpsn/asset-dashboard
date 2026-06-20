@@ -10,8 +10,9 @@
 //   (b) stamps `workspaces.last_issue_pushed_week_of` (cross-process idempotency),
 //   and (c) rings the OPERATOR doorbell so the operator opens to a ready draft.
 // - Eligibility: feature flag `strategy-the-issue` ON for the workspace AND the
-//   workspace has a recommendation set with ≥1 active rec (nothing to curate
-//   otherwise — the POV is drafted OVER the curated recs).
+//   workspace has a recommendation set with ≥1 ACTIVE rec (isActiveRec). Nothing
+//   to curate otherwise — the admin POV is drafted OVER the active/proposable set
+//   (scaled-review fix #1), so isEligible and the admin POV's rec set agree.
 // - Per-workspace single-flight mutex (a running Set, mirroring briefing's
 //   runningBriefings) prevents a cron tick racing a future "push now" button.
 // - The whole cron is gated behind the flag: if `strategy-the-issue` is globally
@@ -20,11 +21,12 @@
 // The operator "doorbell" reuses the EXISTING admin notification rail — it does
 // NOT invent a new one. Two halves:
 //   1. addActivity('strategy_issue_pushed', …) — operator-only activity entry.
-//   2. broadcastToWorkspace(STRATEGY_ISSUE_PUSHED) — the admin NotificationBell
-//      invalidates its notifications cache on this event. The visible bell entry
-//      is derived in `useNotifications` from the workspace-overview summary's
-//      `issuePushedWeekOf` field (set by the stamp above), deep-linking to the
-//      standing Strategy page (`seo-strategy`).
+//   2. broadcastToWorkspace(STRATEGY_ISSUE_PUSHED) — a bookkeeping broadcast that
+//      NO frontend handler consumes directly. The visible bell entry is derived
+//      in `useNotifications` from the polled workspace-overview summary's `issue`
+//      block (`issue.ready`, set by the route from the stamp above + the active-rec
+//      + not-acted-this-week gate, scaled-review fix #2), which self-refreshes on a
+//      5-minute interval, deep-linking to the standing Strategy page (`seo-strategy`).
 
 import {
   listWorkspaces,
@@ -49,8 +51,12 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // poll every hour
  * ISO date (YYYY-MM-DD) of the Monday that anchors the week containing `d`.
  * Identical to briefing-cron's currentWeekOfUTC — kept local so the two crons
  * stay independently editable (briefing cadence may diverge).
+ *
+ * Exported (scaled-review fix #2) so the workspace-overview doorbell summary computes the SAME
+ * "this week" the cron stamps — the bell's `ready` flag MUST agree with the cron's week semantics
+ * or it would either never light or never clear.
  */
-function currentWeekOfUTC(d = new Date()): string {
+export function currentWeekOfUTC(d = new Date()): string {
   const day = d.getUTCDay();
   // Treat Sunday (0) as the *end* of last week so its Monday is 6 days back.
   const diffToMonday = (day + 6) % 7;
@@ -143,13 +149,17 @@ async function runIssuePushForWorkspaceInner(
     return { status: 'duplicate', weekOf };
   }
 
-  // Pre-bake the admin-variant POV. POV_UNCHANGED is the cheap/no-op path (the
-  // curated content hash matched the stored hash) — the draft is already ready,
-  // so it STILL counts as a successful push for idempotency + doorbell purposes.
+  // Pre-bake the admin-variant POV. POV_UNCHANGED is the cheap/no-op path (the admin POV's ACTIVE
+  // rec-set hash matched the stored hash — the admin variant drafts over the active/proposable set,
+  // the same isActiveRec set this cron's isEligible gates on) — the draft is already ready, so it
+  // STILL counts as a successful push for idempotency + doorbell purposes.
   let unchanged = false;
   try {
     await generateStrategyPov(workspaceId, { variant: 'admin' });
   } catch (err) {
+    // brittle: matches the POV_UNCHANGED message string (the generator throws new Error(POV_UNCHANGED)).
+    // Compared against the imported sentinel const, not a literal — but it is still a message-equality
+    // check, so a future Error reusing that message would be misclassified. No dedicated error class exists.
     if (err instanceof Error && err.message === POV_UNCHANGED) {
       unchanged = true;
     } else {

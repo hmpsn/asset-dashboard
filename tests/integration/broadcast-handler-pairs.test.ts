@@ -85,10 +85,12 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // useBackgroundTasks. They are intentionally NOT listed here anymore.
 
   // strategy:issue-pushed (The Issue, Phase 3) — the pushed-Issue cron's operator-doorbell signal.
-  // The visible NotificationBell entry derives from the polled /api/workspace-overview summary
-  // (issue.ready / issue.pushedWeekOf), which self-refreshes every 5 min — the same poll-driven
-  // pattern as requests/approvals/rec-responses (none have WS handlers). No frontend handler keys
-  // off this broadcast directly; it is intentionally unhandled.
+  // It is NOT consumed by any frontend handler; it is intentionally unhandled. The visible
+  // NotificationBell entry derives from the polled /api/workspace-overview summary (issue.ready /
+  // issue.pushedWeekOf), which self-refreshes every 5 min — the same poll-driven pattern as
+  // requests/approvals/rec-responses (none have WS handlers). The cockpit's POV cache is refreshed
+  // separately by generateStrategyPov's OWN strategy:pov-generated broadcast (changed path only —
+  // POV_UNCHANGED does not broadcast), not by this event.
   'strategy:issue-pushed',
 ]);
 
