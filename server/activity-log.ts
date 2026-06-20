@@ -98,6 +98,7 @@ export type ActivityType =
   | 'deliverable_reminded'   // operator: admin re-nudged the client about a pending deliverable (NOT client-visible)
   | 'meeting_brief_generated'
   | 'strategy_pov_generated'   // The Issue (Lane B): admin generated/regenerated/edited the curated POV
+  | 'strategy_issue_pushed'    // The Issue (Phase 3): the weekly cron pre-baked the POV + rang the operator doorbell (OPERATOR-only, never client-visible)
   | 'brandscript_created'
   | 'brandscript_deleted'
   | 'brandscript_imported'

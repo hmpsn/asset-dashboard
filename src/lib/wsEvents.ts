@@ -61,6 +61,7 @@ export const WS_EVENTS = {
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate/operator-edit; handled by
   // src/hooks/admin/useStrategyPov.ts (useWorkspaceEvents → invalidate queryKeys.admin.strategyPov).
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',
+  STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',

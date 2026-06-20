@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard, Layers,
+  Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard, Layers, Newspaper,
 } from 'lucide-react';
 import { anomalies as anomaliesApi, churnSignals } from '../../api/misc';
 import { workspaceOverview } from '../../api/platform';
@@ -28,6 +28,7 @@ interface WorkspaceSummary {
   clientSignals?: { new: number };
   clientActions?: { approved?: number; changesRequested?: number };
   recResponses?: { approved?: number; declined?: number; discussing?: number };
+  issue?: { ready?: boolean; pushedWeekOf?: string | null };
 }
 
 interface AnomalySummary {
@@ -250,6 +251,21 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         sub: ws.name,
         color: 'text-teal-400',
         icon: MessageSquare,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'seo-strategy',
+      });
+    }
+    // The Issue (Phase 3) — operator doorbell. The pushed-Issue cron stamped a week
+    // (`pushedWeekOf`) and the workspace is still curatable (`ready`): the weekly Issue
+    // is drafted and waiting. Deep-links to the standing Strategy page.
+    if (ws.issue?.ready && ws.issue.pushedWeekOf) {
+      notifications.push({
+        id: `strategy-issue-${ws.id}`,
+        label: 'Weekly Issue drafted and ready to curate',
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: Newspaper,
         workspaceId: ws.id,
         workspaceName: ws.name,
         tab: 'seo-strategy',

@@ -102,6 +102,11 @@ export const WS_EVENTS = {
   // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',
 
+  // The Issue — pushed weekly Issue (Phase 3). The cron rings the OPERATOR doorbell after it
+  // pre-bakes the week's POV draft. The admin NotificationBell invalidates its notifications
+  // cache on this so the "Issue drafted and ready to curate" entry appears without a full poll.
+  STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
+
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
   DISCOVERY_UPDATED: 'discovery:updated',

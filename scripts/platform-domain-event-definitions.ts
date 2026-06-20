@@ -202,6 +202,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   DELIVERABLE_UPDATED: 'inbox',
   MEETING_BRIEF_GENERATED: 'analytics-intelligence',
   STRATEGY_POV_GENERATED: 'analytics-intelligence',
+  STRATEGY_ISSUE_PUSHED: 'analytics-intelligence',
   BRANDSCRIPT_UPDATED: 'brand-engine',
   DISCOVERY_UPDATED: 'brand-engine',
   VOICE_PROFILE_UPDATED: 'brand-engine',

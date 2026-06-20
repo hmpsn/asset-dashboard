@@ -385,6 +385,8 @@ export interface Workspace {
   autoPublishAfterHours?: number;
   /** ISO-week marker (YYYY-MM-DD) of last briefing run, prevents duplicate runs */
   lastBriefingRunWeekOf?: string | null;
+  /** ISO-week marker (YYYY-MM-DD) of last pushed-Issue cron run (The Issue, Phase 3) — prevents duplicate weekly pushes */
+  lastIssuePushedWeekOf?: string | null;
   folder: string;
   createdAt: string;
 }
@@ -436,6 +438,7 @@ export interface AdminWorkspaceView {
   autoPublishBriefings?: boolean;
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;
+  lastIssuePushedWeekOf?: string | null;
   folder: string;
   createdAt: string;
   // Computed fields (not on Workspace row)

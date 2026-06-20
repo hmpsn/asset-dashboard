@@ -34,7 +34,8 @@ import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listClientSignals } from '../client-signals-store.js';
 import { summarizeClientActions } from '../client-actions.js';
-import { loadRecommendations } from '../recommendations.js';
+import { loadRecommendations, isActiveRec } from '../recommendations.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -185,13 +186,20 @@ router.get('/api/workspace-overview', (req, res) => {
     let recApproved = 0;
     let recDeclined = 0;
     let recDiscussing = 0;
+    // The Issue (Phase 3) — operator doorbell: a workspace whose flag is ON and whose curated
+    // set has ≥1 active rec is curatable; `issuePushedWeekOf` is the ISO-week the pushed-Issue
+    // cron last pre-baked + rang the doorbell. `useNotifications` surfaces the bell entry from
+    // these two fields, deep-linking to the standing Strategy page.
+    let issueReady = false;
     try {
       const recSet = loadRecommendations(ws.id);
-      for (const r of recSet?.recommendations ?? []) {
+      const recs = recSet?.recommendations ?? [];
+      for (const r of recs) {
         if (r.clientStatus === 'approved') recApproved++;
         else if (r.clientStatus === 'declined') recDeclined++;
         else if (r.clientStatus === 'discussing') recDiscussing++;
       }
+      issueReady = isFeatureEnabled('strategy-the-issue', ws.id) && recs.some((r) => isActiveRec(r));
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     const { isTrial, trialDaysRemaining } = computeTrialState(ws);
@@ -235,6 +243,10 @@ router.get('/api/workspace-overview', (req, res) => {
         approved: recApproved,
         declined: recDeclined,
         discussing: recDiscussing,
+      },
+      issue: {
+        ready: issueReady,
+        pushedWeekOf: ws.lastIssuePushedWeekOf ?? null,
       },
       pageStates,
     };

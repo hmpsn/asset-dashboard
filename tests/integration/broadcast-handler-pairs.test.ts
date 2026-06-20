@@ -83,6 +83,13 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // agency work feed wires useWorkspaceEvents for both, invalidating the
   // client work-feed queries) in addition to BackgroundTaskProvider /
   // useBackgroundTasks. They are intentionally NOT listed here anymore.
+
+  // strategy:issue-pushed (The Issue, Phase 3) — the pushed-Issue cron's operator-doorbell signal.
+  // The visible NotificationBell entry derives from the polled /api/workspace-overview summary
+  // (issue.ready / issue.pushedWeekOf), which self-refreshes every 5 min — the same poll-driven
+  // pattern as requests/approvals/rec-responses (none have WS handlers). No frontend handler keys
+  // off this broadcast directly; it is intentionally unhandled.
+  'strategy:issue-pushed',
 ]);
 
 /**

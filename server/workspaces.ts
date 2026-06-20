@@ -119,6 +119,7 @@ interface WorkspaceRow {
   auto_publish_briefings: number;
   auto_publish_after_hours: number;
   last_briefing_run_week_of: string | null;
+  last_issue_pushed_week_of: string | null;
   created_at: string;
 }
 
@@ -223,6 +224,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   ws.autoPublishBriefings = !!row.auto_publish_briefings;
   ws.autoPublishAfterHours = row.auto_publish_after_hours;
   ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of ?? null;
+  ws.lastIssuePushedWeekOf = row.last_issue_pushed_week_of ?? null;
   return ws;
 }
 
@@ -259,6 +261,9 @@ const stmts = createStmtCache(() => ({
   listAll: db.prepare(`SELECT * FROM workspaces`),
   getById: db.prepare<[id: string]>(`SELECT * FROM workspaces WHERE id = ?`),
   getBySiteId: db.prepare<[siteId: string]>(`SELECT * FROM workspaces WHERE webflow_site_id = ?`),
+  setIssuePushedWeek: db.prepare<[weekOf: string | null, id: string]>(
+    `UPDATE workspaces SET last_issue_pushed_week_of = ? WHERE id = ?`,
+  ),
   insert: db.prepare(`
     INSERT INTO workspaces
       (id, name, folder, webflow_site_id, webflow_site_name, webflow_token,
@@ -358,6 +363,7 @@ function workspaceToParams(ws: Workspace) {
     auto_publish_briefings: ws.autoPublishBriefings === undefined ? 0 : (ws.autoPublishBriefings ? 1 : 0),
     auto_publish_after_hours: ws.autoPublishAfterHours ?? 24,
     last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
+    last_issue_pushed_week_of: ws.lastIssuePushedWeekOf ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -436,7 +442,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -478,6 +484,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
     autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
+    lastIssuePushedWeekOf: 'last_issue_pushed_week_of',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
@@ -546,6 +553,16 @@ export function getWorkspace(id: string): Workspace | undefined {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return undefined;
   return attachPageStates(rowToWorkspace(row));
+}
+
+/**
+ * Stamp the ISO-week marker for the pushed weekly Issue cron (The Issue, Phase 3).
+ * Mirrors the `lastBriefingRunWeekOf` idempotency pattern: the cron writes this once
+ * per ISO week per workspace so a later tick in the same week is a no-op. A dedicated
+ * setter (vs `updateWorkspace`) so the single-column write stays cheap and explicit.
+ */
+export function markIssuePushedWeek(workspaceId: string, weekOf: string): void {
+  stmts().setIssuePushedWeek.run(weekOf, workspaceId);
 }
 
 /**

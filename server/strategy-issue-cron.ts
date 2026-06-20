@@ -1,0 +1,249 @@
+// server/strategy-issue-cron.ts
+//
+// The Issue — pushed weekly Issue cron (Phase 3).
+//
+// Clone of briefing-cron.ts, re-pointed at the strategy POV:
+//
+// - Polls every hour. Once per ISO week per ELIGIBLE workspace, it (a) pre-bakes
+//   the admin-variant strategy POV via generateStrategyPov (cheap content-hash
+//   recompute — POV_UNCHANGED is the no-op path and STILL counts as "ready"),
+//   (b) stamps `workspaces.last_issue_pushed_week_of` (cross-process idempotency),
+//   and (c) rings the OPERATOR doorbell so the operator opens to a ready draft.
+// - Eligibility: feature flag `strategy-the-issue` ON for the workspace AND the
+//   workspace has a recommendation set with ≥1 active rec (nothing to curate
+//   otherwise — the POV is drafted OVER the curated recs).
+// - Per-workspace single-flight mutex (a running Set, mirroring briefing's
+//   runningBriefings) prevents a cron tick racing a future "push now" button.
+// - The whole cron is gated behind the flag: if `strategy-the-issue` is globally
+//   off, tick() returns immediately.
+//
+// The operator "doorbell" reuses the EXISTING admin notification rail — it does
+// NOT invent a new one. Two halves:
+//   1. addActivity('strategy_issue_pushed', …) — operator-only activity entry.
+//   2. broadcastToWorkspace(STRATEGY_ISSUE_PUSHED) — the admin NotificationBell
+//      invalidates its notifications cache on this event. The visible bell entry
+//      is derived in `useNotifications` from the workspace-overview summary's
+//      `issuePushedWeekOf` field (set by the stamp above), deep-linking to the
+//      standing Strategy page (`seo-strategy`).
+
+import {
+  listWorkspaces,
+  getWorkspace,
+  markIssuePushedWeek,
+} from './workspaces.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { loadRecommendations, isActiveRec } from './recommendations.js';
+import { generateStrategyPov, POV_UNCHANGED } from './strategy-pov-generator.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
+import { addActivity } from './activity-log.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('strategy-issue-cron');
+
+const CHECK_INTERVAL_MS = 60 * 60 * 1000; // poll every hour
+
+// ── Time helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * ISO date (YYYY-MM-DD) of the Monday that anchors the week containing `d`.
+ * Identical to briefing-cron's currentWeekOfUTC — kept local so the two crons
+ * stay independently editable (briefing cadence may diverge).
+ */
+function currentWeekOfUTC(d = new Date()): string {
+  const day = d.getUTCDay();
+  // Treat Sunday (0) as the *end* of last week so its Monday is 6 days back.
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate() - diffToMonday,
+  ));
+  return monday.toISOString().slice(0, 10);
+}
+
+// ── Eligibility ──────────────────────────────────────────────────────────────
+
+/**
+ * A workspace is eligible for the pushed Issue when the flag is ON for it AND it
+ * has something to curate — a recommendation set with ≥1 active rec. Without an
+ * active rec the POV would be drafted over an empty curated set, so there is
+ * nothing worth ringing the doorbell about.
+ */
+function isEligible(workspaceId: string): boolean {
+  if (!isFeatureEnabled('strategy-the-issue', workspaceId)) return false;
+  const set = loadRecommendations(workspaceId);
+  if (!set) return false;
+  return set.recommendations.some((r) => isActiveRec(r));
+}
+
+// ── Public runner API ────────────────────────────────────────────────────────
+
+export interface RunIssuePushOptions {
+  /** Skip the duplicate-week guard. Used by a future "push now" admin button. */
+  manual?: boolean;
+  /** Override "now" for testing. */
+  nowMs?: number;
+}
+
+export interface RunIssuePushResult {
+  status: 'pushed' | 'unchanged' | 'skipped' | 'duplicate';
+  weekOf: string;
+  reason?: string;
+}
+
+/**
+ * Per-process mutex preventing concurrent runs for the same workspace. Mirrors
+ * runningBriefings in briefing-cron.ts. Two POV pre-bakes for the same workspace
+ * (a cron tick racing a future push-now button) would double-broadcast and waste
+ * an AI call. The DB-level last_issue_pushed_week_of guard handles cross-process
+ * duplicates after the first completes; this Set handles the in-process race.
+ */
+const runningPushes = new Set<string>();
+
+/**
+ * Run the pushed-Issue pipeline once for one workspace. Idempotent within an ISO
+ * week unless `manual: true`. Returns a result object — never throws on expected
+ * control-flow paths (ineligible, duplicate, unchanged). Re-throws unexpected
+ * errors so the cron loop logs them.
+ */
+export async function runIssuePushForWorkspace(
+  workspaceId: string,
+  opts: RunIssuePushOptions = {},
+): Promise<RunIssuePushResult> {
+  if (runningPushes.has(workspaceId)) {
+    return { status: 'duplicate', weekOf: '', reason: 'already running' };
+  }
+  runningPushes.add(workspaceId);
+  try {
+    return await runIssuePushForWorkspaceInner(workspaceId, opts);
+  } finally {
+    runningPushes.delete(workspaceId);
+  }
+}
+
+async function runIssuePushForWorkspaceInner(
+  workspaceId: string,
+  opts: RunIssuePushOptions,
+): Promise<RunIssuePushResult> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return { status: 'skipped', weekOf: '', reason: 'workspace not found' };
+
+  // Flag + curated-set eligibility. Manual bypasses neither — a push-now on an
+  // ineligible workspace is still a no-op (nothing to draft a POV over).
+  if (!isEligible(workspaceId)) {
+    return { status: 'skipped', weekOf: '', reason: 'not eligible' };
+  }
+
+  const now = opts.nowMs ? new Date(opts.nowMs) : new Date();
+  const weekOf = currentWeekOfUTC(now);
+
+  // Duplicate-week guard — manual bypasses.
+  if (ws.lastIssuePushedWeekOf === weekOf && !opts.manual) {
+    return { status: 'duplicate', weekOf };
+  }
+
+  // Pre-bake the admin-variant POV. POV_UNCHANGED is the cheap/no-op path (the
+  // curated content hash matched the stored hash) — the draft is already ready,
+  // so it STILL counts as a successful push for idempotency + doorbell purposes.
+  let unchanged = false;
+  try {
+    await generateStrategyPov(workspaceId, { variant: 'admin' });
+  } catch (err) {
+    if (err instanceof Error && err.message === POV_UNCHANGED) {
+      unchanged = true;
+    } else {
+      // Unexpected (AI 5xx, DB hiccup). Re-throw so the tick logs + retries next
+      // hour WITHOUT stamping the week — a transient failure must not lock the
+      // workspace out of its push for the rest of the week.
+      throw err;
+    }
+  }
+
+  // Stamp the week BEFORE the doorbell so a crash between the two can't re-ring.
+  markIssuePushedWeek(workspaceId, weekOf);
+
+  // ── Ring the operator doorbell (reuse the existing admin notification rail) ──
+  // 1) Operator-only activity entry (strategy_issue_pushed is NOT in
+  //    CLIENT_VISIBLE_TYPES, so the client never sees it).
+  addActivity(
+    workspaceId,
+    'strategy_issue_pushed',
+    `The weekly Issue for ${ws.name} is drafted and ready to curate`,
+    unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
+    { weekOf, unchanged },
+  );
+  // 2) Workspace broadcast — the admin NotificationBell invalidates its
+  //    notifications cache on this event so the bell entry (derived from the
+  //    workspace-overview `issuePushedWeekOf` field) appears without a full poll.
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_ISSUE_PUSHED, { weekOf });
+
+  log.info({ workspaceId, weekOf, unchanged }, 'weekly Issue pushed — operator doorbell rung');
+  return { status: unchanged ? 'unchanged' : 'pushed', weekOf };
+}
+
+// ── Cron loop ────────────────────────────────────────────────────────────────
+
+/**
+ * In-memory "we already ran this workspace this week" memo. Backstops the
+ * DB-level idempotency (workspaces.last_issue_pushed_week_of) so we don't
+ * re-list + re-check eligibility every hour for already-pushed workspaces.
+ */
+const lastTickRunWeek: Record<string, string> = {};
+
+async function tick(now = new Date()): Promise<void> {
+  // Whole-cron flag gate: skip entirely if the feature is globally off.
+  if (!isFeatureEnabled('strategy-the-issue')) return;
+
+  const weekOf = currentWeekOfUTC(now);
+  const all = listWorkspaces();
+  for (const ws of all) {
+    if (lastTickRunWeek[ws.id] === weekOf) continue;
+    if (!isEligible(ws.id)) continue;
+    let result: RunIssuePushResult | undefined;
+    try {
+      result = await runIssuePushForWorkspace(ws.id, { nowMs: now.getTime() });
+      log.info({ workspaceId: ws.id, ...result }, 'issue-push tick');
+    } catch (err) {
+      // Don't stamp the memo on error — a transient AI 5xx or DB hiccup would
+      // otherwise lock the workspace out of its push for the entire week.
+      // Hourly retries recover from transient failures; the DB-level
+      // last_issue_pushed_week_of still prevents successful re-runs.
+      log.error({ err, workspaceId: ws.id }, 'issue-push tick error');
+      continue;
+    }
+    // Stamp the in-memory memo for terminal results (pushed/unchanged/duplicate).
+    lastTickRunWeek[ws.id] = weekOf;
+  }
+}
+
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Idempotent — calling twice is a no-op. */
+export function startStrategyIssueCron(): void {
+  if (tickInterval) return;
+
+  startupTimeout = setTimeout(() => {
+    tick().catch((err) => log.error({ err }, 'first issue-push tick failed'));
+  }, 90_000);
+  startupTimeout.unref?.();
+
+  tickInterval = setInterval(() => {
+    tick().catch((err) => log.error({ err }, 'issue-push tick failed'));
+  }, CHECK_INTERVAL_MS);
+  tickInterval.unref?.();
+
+  log.info('strategy issue-push cron started — checks hourly, once per ISO week per eligible workspace');
+}
+
+export function stopStrategyIssueCron(): void {
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
+  }
+  if (tickInterval) {
+    clearInterval(tickInterval);
+    tickInterval = null;
+  }
+}

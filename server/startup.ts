@@ -14,6 +14,7 @@ import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelli
 import { startInsightRecomputeCron } from './insight-recompute-cron.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
 import { startBriefingCron } from './briefing-cron.js';
+import { startStrategyIssueCron } from './strategy-issue-cron.js';
 
 /** Start all background schedulers and queues. */
 let started = false;
@@ -38,4 +39,5 @@ export function startSchedulers() {
   startInsightRecomputeCron();
   startRankTrackingScheduler();
   startBriefingCron();
+  startStrategyIssueCron();
 }
