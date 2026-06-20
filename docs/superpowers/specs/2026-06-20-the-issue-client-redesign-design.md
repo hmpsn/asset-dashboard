@@ -21,6 +21,24 @@
 
 ---
 
+## OWNER RESOLUTIONS (2026-06-20, post-review)
+
+All five review-gate open questions are resolved. **These govern build scope and override anything below that conflicts.**
+
+| Q | Resolution |
+|---|---|
+| **Lead-value capture** | **Both, with AI fallback.** Per-workspace `outcomeValue` carries a `basis` enum with precedence `client_provided` → `agency_estimate` → `ai_enriched`. Agency can set/override; client can correct it in-portal; if neither exists, an AI-enriched estimate fills in (labeled as such, lowest confidence). Every dollar figure inherits the verdict's `OutcomeProvenance` AND this `basis`. |
+| **GA4 conversion selection** | **Reuse the existing `eventConfig` — do NOT build a new config surface.** Workspaces already carry `ws.eventConfig: { eventName, pinned, displayName }[]` (admin pins which GA4 events are true conversions + names them; surfaced today via `isEventPinned` / `eventDisplayName` in `ClientDashboard.tsx:443-448`). The outcome count (slot 2) and verdict (slot 1) sum **pinned** events only and use each event's `displayName` as the outcome noun. If a workspace has no pinned events, fall back to GA4 key-events with an admin nudge to pin. |
+| **Baseline window** | **90-day rolling for the trend + one persisted engagement-start anchor.** Reuse the existing ~90-day `roi_snapshots` / `ga4_conversion_snapshots` retention for "vs. last period." ADD a single cheap persisted **engagement-baseline anchor row** (captured/backfilled once at `workspace.createdAt`) so the verdict's "vs. when we started" survives beyond 90 days without full-history retention. Resolves the personas' baseline demand at near-zero storage cost. |
+| **P1 integration priority** | **Deferred to roadmap.** No new acquisition integrations (call tracking, CRM/HubSpot, form capture) until the GA4-estimate core works well. The `OutcomeProvenance` enum still reserves `actual_reconciled`, but reconciliation ships later. A `data/roadmap.json` item tracks it. |
+| **Legacy workspaces** | **Backfill via GA4 historical API** at `createdAt` to seed the engagement-start anchor; where GA4 retention does not reach, fall back to a labeled "since measurement started [date]" anchor. |
+
+**Net re-scope (honors "get this working well first"):**
+- **Build now — Phase 1 = P0 only:** the trust spine on GA4 *estimates* (verdict → outcome count → money frame → what-needs-me → work-log → under-the-hood), wired to `eventConfig` pinned events + the `outcomeValue`/`basis` input + the dual baseline (90-day rolling + engagement anchor, backfilled).
+- **Fast-follow (after P0 proves out) — cheap, no-integration P1:** return-hook push/export, the local map-pack/reviews insert (existing data), the segment-conditional competitor block.
+- **Roadmap (deferred) — integration-dependent reconciliation:** call tracking, CRM/HubSpot, form capture (the `actual_reconciled` graduation).
+
+---
 ## The Spine (universal layout, slots 0–6)
 
 A single top-to-bottom layout every client gets, regardless of segment or tier. It replaces the inverted spine in `TheIssueClientPage.tsx` (where `IssueContentPlanSection` is the HERO and the proof band sits behind a `<details>`). The three D3 reversals are baked into the slot order and contracts. Segment behavior never changes slot order — it swaps the outcome noun and money-frame altitude inside slots 1–3 and toggles inserts inside slot 6 (see §Segment-Adaptive Layers).
@@ -460,7 +478,10 @@ Every phase ships behind its own flag, and **flag-OFF must render the current su
 
 ---
 
-## Open Questions for the Owner (below the locked calls)
+## Open Questions for the Owner — ALL RESOLVED (2026-06-20)
+
+> All five were resolved at review; see **Owner Resolutions (2026-06-20, post-review)** near the top for the governing answers. The original questions are retained below for provenance.
+
 
 1. **Segment-detection mechanism — RESOLVED (owner, 2026-06-20).** Local & multi-location are **deterministic** from the Strategy local setup (`client_locations` count: exactly 1 → `local_smb`, ≥2 → `multi_location`). The non-local split (`b2b_saas` / `professional_services` / `board_vc`) is **derived from the Brand & AI business profile** (`industry` + audience), operator-confirmed. *Residual sub-question:* for the non-local 3-way, keep the AI-assisted proposal (operator-confirmed) as specced, or start with a pure-manual admin dropdown to eliminate any first-screen misclassification risk? (`board_vc` is an audience choice via `reportingAudience`, admin-set regardless.)
 2. **`outcomeValue` capture ownership.** P0 needs a per-workspace lead/customer value. Is this **agency-set** (we estimate it with the client and stamp `basis: 'agency_estimate'`), **client-supplied during onboarding** (`basis: 'client_provided'`), or both with the client able to correct it in-portal? The data shape supports all three; the *capture UX* differs (admin-only field vs. a client-facing input).
