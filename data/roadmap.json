@@ -304,6 +304,16 @@
           "status": "pending",
           "createdAt": "2026-06-20",
           "notes": "After the re-designed Issue client surface (the-issue-client-redesign-p0) proves out on staging, retire the other two client overview variants so The Issue is the only one. Teardown analysis (2026-06-20): three variants today, selected in OverviewTab.tsx:121-179 (priority Issue > Briefing > Legacy); betaMode (/client/beta) is ORTHOGONAL -> keep BetaContext. EASY: delete Briefing-v2 (9 isolated Briefing/* files + ~6 flag-check removals, zero shared render, ~1-2h). MEDIUM: legacy Overview -- OverviewTab.tsx mixes selection logic (121-179) + legacy render (203-669); extract the legacy render to its own file first, then delete; InsightsDigest.tsx is the only legacy-exclusive component (deletable). PRESERVE shared: WinsSurface (3-way shared!), ROIDashboard, OutcomeSummary, ActionQueueStrip, MonthlyDigest. Server: flip flag gates to always-on (recommendations.ts clientStatus projection, briefing.ts 404 guard, the two crons). Then collapse the client-briefing-v2 + spine flags per the feature-flag-lifecycle + route-removal checklists; delete the variant test files. ~1200 lines deleted, ~15 file changes, ~6-8h, low-moderate risk. Ship as its own PR after P0 is verified on staging."
+        },
+        {
+          "id": "the-issue-client-crm-reconciliation",
+          "title": "Client outcome reconciliation — CRM/HubSpot sync (down the road, after website-native capture)",
+          "source": "Owner direction 2026-06-20 — defer CRM, prefer website-native capture first",
+          "est": "L",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "DEFERRED by owner (2026-06-20): clients are unlikely to want to sync CRM data right now. The P1 reconciliation path is REFRAMED to capture outcomes from the client's WEBSITE + analytics (assets the agency already accesses), NOT their internal systems: (1) GTM + GA4 event instrumentation (form submits, click-to-call tel:, booking/Calendly clicks, mailto, directions/map clicks, chat opens) marked as GA4 key events -> the existing eventConfig-pinned P0 consumer renders '23 form fills + 41 calls' (client-verifiable, no client system); (2) Webflow-native form capture via the existing Webflow integration -> real NAMED leads, no CRM; (3) GA4 enhanced measurement + custom dimensions; (4) optional later: call tracking w/ dynamic number insertion (WE-provision, not a client system). THIS item (HubSpot/CRM/Salesforce lead->opp->closed-won sync) is the FAR-DOWN-ROAD upgrade for clients who later want true revenue attribution from their own CRM. Do NOT build until website-native capture (the reframed P1) ships and a client actually asks for CRM sync."
         }
       ]
     },
