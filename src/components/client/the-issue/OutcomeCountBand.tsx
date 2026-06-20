@@ -10,15 +10,40 @@
 //     call/CRM tracking" affordance, NOT a fake "view names" link.
 //   • zero units → an EmptyState set-up CTA, never a "0" rendered as if it were an outcome.
 //
-// Four Laws: emerald = the outcome counts (success), tokens only, no purple.
+// P1a (measured): when units carry an `outcomeType`, each StatCard gets a type-aware icon and the
+// grid is sorted into a stable type order (form fills · calls · bookings · …). Untyped/estimate
+// units degrade byte-identically to P0 — no icon, no [data-outcome-type] tag, original DOM order.
+//
+// Four Laws: emerald = the outcome counts (success), tokens only, no purple. Type icons are muted
+// (--brand-text-muted), never a new hue.
 
-import { PhoneCall } from 'lucide-react';
+import { PhoneCall, FileText, CalendarCheck, Mail, MapPin, MessageSquare, Activity } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { StatCard, EmptyState } from '../../ui';
-import type { IssueOutcomeCount } from '../../../../shared/types/the-issue';
+import type { IssueOutcomeCount, OutcomeType } from '../../../../shared/types/the-issue';
 
 interface OutcomeCountBandProps {
   /** Server-assembled outcome counts, summed over pinned eventConfig events. */
   count: IssueOutcomeCount;
+}
+
+/** Type-aware icon per website-native action. Muted tone only — never a new hue (Four Laws). */
+const TYPE_ICON: Record<OutcomeType, LucideIcon> = {
+  form_fill: FileText,
+  call: PhoneCall,
+  booking: CalendarCheck,
+  email: Mail,
+  directions: MapPin,
+  chat: MessageSquare,
+  other: Activity,
+};
+
+/** Stable display order for typed units. Untyped units sort last (rank = length). */
+const TYPE_ORDER: OutcomeType[] = ['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other'];
+function typeRank(t?: OutcomeType): number {
+  if (t == null) return TYPE_ORDER.length;
+  const i = TYPE_ORDER.indexOf(t);
+  return i === -1 ? TYPE_ORDER.length : i;
 }
 
 /**
@@ -58,20 +83,35 @@ export function OutcomeCountBand({ count }: OutcomeCountBandProps) {
     );
   }
 
+  // Stable sort into type order; untyped units keep their original relative order (byte-identical
+  // degradation — Array.sort is stable). When no unit carries an outcomeType, every rank is equal
+  // so the order is unchanged from P0.
+  const orderedUnits = [...count.units].sort((a, b) => typeRank(a.outcomeType) - typeRank(b.outcomeType));
+
   return (
     <div data-testid="outcome-count-band" className="space-y-3">
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${count.units.length >= 3 ? 'lg:grid-cols-3' : ''} gap-3`}>
-        {count.units.map((unit, i) => (
-          <StatCard
-            key={unit.eventName ?? unit.label ?? i}
-            size="hero"
-            label={unit.label}
-            value={unit.current}
-            valueColor="text-accent-success"
-            sub={trendSub(unit.current, unit.priorPeriod, unit.baseline)}
-            className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
-          />
-        ))}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${orderedUnits.length >= 3 ? 'lg:grid-cols-3' : ''} gap-3`}>
+        {orderedUnits.map((unit, i) => {
+          const key = unit.eventName ?? unit.label ?? i;
+          const card = (
+            <StatCard
+              key={unit.outcomeType ? undefined : key}
+              size="hero"
+              label={unit.label}
+              value={unit.current}
+              icon={unit.outcomeType ? TYPE_ICON[unit.outcomeType] : undefined}
+              iconColor={unit.outcomeType ? 'var(--brand-text-muted)' : undefined}
+              valueColor="text-accent-success"
+              sub={trendSub(unit.current, unit.priorPeriod, unit.baseline)}
+              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+            />
+          );
+          // Untyped (estimate/P0) → render the bare StatCard as the grid child so the DOM degrades
+          // byte-identically to P0. Typed (measured) → wrap in a [data-outcome-type] tag (StatCard
+          // does not forward data-* attrs) so the type-aware render contract is queryable.
+          if (!unit.outcomeType) return card;
+          return <div key={key} data-outcome-type={unit.outcomeType}>{card}</div>;
+        })}
       </div>
       {/* Honest upsell — at P0 we count outcomes but cannot name the people behind them. */}
       {!count.namedRecordsAvailable && (

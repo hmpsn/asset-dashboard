@@ -6,6 +6,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+
+// useFeatureFlag (P1a measured-capture) is read unconditionally; mock it OFF so these P0 tests stay
+// on the byte-identical surface and don't need a QueryClientProvider.
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+// The P1a status hook is gated on the flag (OFF here) but is still imported — stub it to a no-op.
+vi.mock('../../src/hooks/admin/useConversionTrackingStatus', () => ({
+  useConversionTrackingStatus: () => ({ status: undefined, isLoading: false, isError: false }),
+}));
+
 import { ClientDashboardTab } from '../../src/components/settings/ClientDashboardTab';
 
 // The component fetches client users on mount via api/client `get`; stub the network layer.

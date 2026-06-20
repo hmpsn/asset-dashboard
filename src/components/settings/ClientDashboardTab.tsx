@@ -3,18 +3,36 @@ import {
   Search, Loader2, Check, X, Users, ExternalLink, ChevronRight,
   Copy, CheckCircle, Lock, KeyRound, Plus, Trash2, Pencil, Save,
   Pin, PinOff, ArrowUp, ArrowDown, Palette, RefreshCw, DollarSign, Shield,
-  Sparkles, Target,
+  Sparkles, Target, Link2, PlugZap,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
 import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect, Checkbox } from '../ui';
 import { CHART_SERIES_COLORS } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useConversionTrackingStatus } from '../../hooks/admin/useConversionTrackingStatus';
+import { conversionTrackingApi, type FormCaptureEnableResult } from '../../api/conversionTracking';
+import { ConversionTrackingReadout, type ConversionSetupStep } from './ConversionTrackingReadout';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type {
   EventGroup, EventDisplayConfig, ClientSegment, ResolvedSegmentProfile, SegmentConfig, Workspace,
 } from '../../../shared/types/workspace.ts';
+import type { OutcomeType } from '../../../shared/types/the-issue.ts';
+import type { OutcomeProvenance } from '../../../shared/types/outcome-tracking.ts';
+
+/** P1a outcome-type options for the per-event lead-type mapping (canonical OutcomeType values). */
+const OUTCOME_TYPE_OPTIONS: { value: OutcomeType | ''; label: string }[] = [
+  { value: '', label: 'Untyped' },
+  { value: 'form_fill', label: 'Form fill' },
+  { value: 'call', label: 'Call' },
+  { value: 'booking', label: 'Booking' },
+  { value: 'email', label: 'Email' },
+  { value: 'directions', label: 'Directions' },
+  { value: 'chat', label: 'Chat' },
+  { value: 'other', label: 'Other' },
+];
 
 type OutcomeValue = NonNullable<Workspace['outcomeValue']>;
 
@@ -30,6 +48,8 @@ interface WorkspaceData {
   segmentConfig?: SegmentConfig | null;
   /** Pre-resolved segment profile (admin GET seeds the deterministic local/multi axis read-only). */
   segmentProfile?: ResolvedSegmentProfile;
+  // The Issue (Client) P1a — confirmed-setup marker (the provenance-flip basis; admin-only).
+  conversionTrackingConfirmedAt?: string;
   [key: string]: unknown;
 }
 
@@ -99,6 +119,16 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   // The Issue (Client) P0 — segment confirm/override state (manual non-local FormSelect)
   const [savingSegment, setSavingSegment] = useState(false);
   const [segmentOverride, setSegmentOverride] = useState<ClientSegment>('b2b_saas');
+
+  // The Issue (Client) P1a — measured-capture flag + Webflow form-capture connect state.
+  // useFeatureFlag is unconditional (Rules-of-Hooks-safe, before any early return). Flag-OFF →
+  // every new subsection below is gated out and the surface is byte-identical to P0.
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  const conversionTracking = useConversionTrackingStatus(workspaceId, measuredCapture && !!ws?.ga4PropertyId);
+  const [enablingCapture, setEnablingCapture] = useState(false);
+  const [captureCreds, setCaptureCreds] = useState<FormCaptureEnableResult | null>(null);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+  const [copiedWebhookSecret, setCopiedWebhookSecret] = useState(false);
 
   const basisLabel = (b: OutcomeValue['basis']): string =>
     b === 'client_provided' ? 'Client-provided' : b === 'ai_enriched' ? 'AI estimate' : 'Agency estimate';
@@ -251,6 +281,15 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     });
   };
 
+  // P1a: map a pinned event to a typed outcome (rides along in the existing eventConfig PATCH).
+  const setOutcomeType = (name: string, outcomeType: OutcomeType | undefined) => {
+    setLocalEventConfig(prev => {
+      const existing = prev.find(c => c.eventName === name);
+      if (existing) return prev.map(c => c.eventName === name ? { ...c, outcomeType } : c);
+      return [...prev, { eventName: name, displayName: name, pinned: false, outcomeType }];
+    });
+  };
+
   const updateDisplayName = (name: string, displayName: string) => {
     setLocalEventConfig(prev => {
       const existing = prev.find(c => c.eventName === name);
@@ -291,6 +330,31 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     try { await patchWorkspace({ eventConfig: localEventConfig, eventGroups: localGroups }); toast('Event configuration saved'); }
     catch { toast('Failed to save', 'error'); }
     finally { setSavingEvents(false); }
+  };
+
+  // P1a: enable Webflow form capture — mints + returns the signing secret ONCE (copy-now, shown-once).
+  const enableFormCapture = async () => {
+    setEnablingCapture(true);
+    try {
+      const creds = await conversionTrackingApi.enableFormCapture(workspaceId);
+      setCaptureCreds(creds);
+      toast('Webflow form capture enabled — copy your signing secret now');
+    } catch { toast('Failed to enable form capture', 'error'); }
+    finally { setEnablingCapture(false); }
+  };
+
+  const disableFormCapture = async () => {
+    try {
+      await conversionTrackingApi.disableFormCapture(workspaceId);
+      setCaptureCreds(null);
+      toast('Webflow form capture disabled');
+    } catch { toast('Failed to disable form capture', 'error'); }
+  };
+
+  const copyToClipboard = (text: string, mark: (v: boolean) => void) => {
+    navigator.clipboard.writeText(text);
+    mark(true);
+    setTimeout(() => mark(false), 2000);
   };
 
   // Load users on mount
@@ -911,6 +975,144 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
         </div>
       </SectionCard>
 
+      {/* The Issue (Client) P1a — Conversion tracking (verification readout + Webflow connect). Every
+          render path here is gated on measuredCapture → flag-OFF is byte-identical to the P0 surface. */}
+      {measuredCapture && ws?.ga4PropertyId && (() => {
+        const status = conversionTracking.status;
+        const pinnedCfg = (ws?.eventConfig ?? []).filter(c => c.pinned);
+        const pinnedCount = status?.pinnedCount ?? pinnedCfg.length;
+        const typedCount = status?.typedCount ?? pinnedCfg.filter(c => c.outcomeType).length;
+        const formCaptureConnected = status?.formCaptureConnected ?? false;
+        const submissionCount = status?.submissionCount ?? 0;
+        const recentOutcomeCount = status?.recentOutcomeCount ?? 0;
+        // ALIGNMENT #4 — provenance flip is ABSOLUTE: measured only on confirmed typed setup OR a
+        // captured lead. Mirrors the server's selectOutcomeProvenance contract (READ-ONLY here).
+        const hasConfirmedTypedSetup = !!ws?.conversionTrackingConfirmedAt && typedCount > 0;
+        const resolvedProvenance: OutcomeProvenance =
+          hasConfirmedTypedSetup || submissionCount > 0 ? 'measured_action' : 'estimate_ga4';
+        const steps: ConversionSetupStep[] = [
+          {
+            id: 'pin-type', label: 'Pin & type your key conversions',
+            description: 'Pin the GA4 events that matter and map each to a lead type below.',
+            completed: typedCount > 0,
+          },
+          {
+            id: 'connect-webflow', label: 'Connect Webflow form capture',
+            description: 'Paste the signing secret + webhook URL into Webflow so named leads flow in.',
+            completed: formCaptureConnected,
+          },
+          {
+            id: 'confirm-lead', label: 'Confirm a measured lead landed',
+            description: 'Submit a test form — it appears in the readout above when capture is live.',
+            completed: submissionCount > 0,
+          },
+        ];
+
+        // ALIGNMENT #3 — value-integrity guardrails. Sanity band warns on an implausible value; the
+        // 90-day preview + client-sentence echo de-risk a one-misset-input → confident-wrong headline.
+        const ov = ws?.outcomeValue ?? null;
+        const value = ov?.valuePerOutcome ?? 0;
+        const outOfBand = value > 0 && (value < 5 || value > 100_000);
+        const previewTotal = value > 0 ? recentOutcomeCount * value : 0;
+        const currency = ov?.currency ?? 'USD';
+        const unitLabel = ov?.unitLabel ?? 'outcome';
+
+        return (
+          <>
+            <ConversionTrackingReadout
+              outcomeValue={ov ? { valuePerOutcome: value, unitLabel, currency, basisLabel: basisLabel(ov.basis) } : null}
+              segmentLabel={resolvedSegment.replace(/_/g, ' ')}
+              pinnedCount={pinnedCount}
+              typedCount={typedCount}
+              formCaptureConnected={formCaptureConnected}
+              lastSubmissionAt={status?.lastSubmissionAt ?? null}
+              submissionCount={submissionCount}
+              resolvedProvenance={resolvedProvenance}
+              steps={steps}
+              loading={conversionTracking.isLoading}
+            />
+
+            {/* Value-integrity guardrails (ALIGNMENT #3) — only meaningful once an outcome value is set. */}
+            {value > 0 && (
+              <SectionCard noPadding>
+                <div className="px-5 py-4 space-y-2">
+                  {outOfBand && (
+                    <p className="t-caption-sm text-amber-400">
+                      Heads up: {currency} {value.toLocaleString()} per {unitLabel} looks unusual — double-check before this drives the client's number.
+                    </p>
+                  )}
+                  {recentOutcomeCount > 0 && (
+                    <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                      With this value, the last 90 days would have read{' '}
+                      <span className="font-semibold text-blue-400">{currency === 'USD' ? '$' : `${currency} `}{previewTotal.toLocaleString()}</span>
+                      {' '}({recentOutcomeCount.toLocaleString()} tracked outcomes × {currency === 'USD' ? '$' : `${currency} `}{value.toLocaleString()}).
+                    </p>
+                  )}
+                  <p className="t-caption-sm leading-relaxed text-[var(--brand-text)]">
+                    Client sees: <span className="italic">“We tracked {recentOutcomeCount.toLocaleString()} {unitLabel}s on your site, worth about {currency === 'USD' ? '$' : `${currency} `}{previewTotal.toLocaleString()}.”</span>
+                  </p>
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Webflow form-capture connect (guided manual webhook registration) */}
+            <SectionCard noPadding>
+              <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+                <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+                  <Icon as={PlugZap} size="md" className="text-teal-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow form capture</h3>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Capture named leads from Webflow forms via a signed webhook — the lead identity stays internal.</p>
+                </div>
+                {(formCaptureConnected || captureCreds) ? (
+                  <Button aria-label="Disable Webflow form capture" onClick={disableFormCapture} variant="secondary" size="sm" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+                    Disconnect
+                  </Button>
+                ) : (
+                  <Button aria-label="Enable Webflow form capture" onClick={enableFormCapture} loading={enablingCapture} disabled={enablingCapture} icon={Link2} size="sm" className="bg-teal-600 hover:bg-teal-500">
+                    Enable
+                  </Button>
+                )}
+              </div>
+
+              {captureCreds ? (
+                <div className="px-5 py-4 space-y-4">
+                  <p className="t-caption-sm text-amber-400">Copy your signing secret now — it's shown only once.</p>
+                  <div className="space-y-1.5">
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Webhook URL</div>
+                    <div className="flex items-center gap-2">
+                      <FormInput readOnly value={captureCreds.webhookUrl} onChange={() => {}} className={`flex-1 ${inputClass} font-mono`} />
+                      <IconButton onClick={() => copyToClipboard(captureCreds.webhookUrl, setCopiedWebhookUrl)} icon={copiedWebhookUrl ? Check : Copy} label="Copy webhook URL" size="sm" variant="ghost" className={copiedWebhookUrl ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Signing secret</div>
+                    <div className="flex items-center gap-2">
+                      <FormInput readOnly value={captureCreds.webhookSecret} onChange={() => {}} className={`flex-1 ${inputClass} font-mono`} />
+                      <IconButton onClick={() => copyToClipboard(captureCreds.webhookSecret, setCopiedWebhookSecret)} icon={copiedWebhookSecret ? Check : Copy} label="Copy signing secret" size="sm" variant="ghost" className={copiedWebhookSecret ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'} />
+                    </div>
+                  </div>
+                  <ol className="t-caption-sm text-[var(--brand-text-muted)] space-y-1 list-decimal list-inside">
+                    <li>In Webflow: Site settings → Forms → Webhooks, paste this URL.</li>
+                    <li>Paste this signing secret into the webhook's secret field.</li>
+                    <li>Submit a test form — it appears in the readout above within seconds.</li>
+                  </ol>
+                </div>
+              ) : (
+                <div className="px-5 py-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                    {formCaptureConnected
+                      ? 'Webflow form capture is connected. Named leads flow in via the signed webhook.'
+                      : 'Not connected — enable to generate a webhook URL + signing secret for Webflow.'}
+                  </p>
+                </div>
+              )}
+            </SectionCard>
+          </>
+        );
+      })()}
+
       {/* Event Configuration */}
       {ws?.ga4PropertyId && (
         <SectionCard noPadding>
@@ -922,11 +1124,11 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
             <div className="flex items-center gap-2">
               {showEventConfig && (
-                <Button onClick={saveEventConfig} disabled={savingEvents} loading={savingEvents} icon={Save} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                <Button aria-label="Save event configuration" onClick={saveEventConfig} disabled={savingEvents} loading={savingEvents} icon={Save} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
                   Save
                 </Button>
               )}
-              <Button onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+              <Button aria-label="Configure event display" onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
                 {showEventConfig ? 'Close' : <><Icon as={RefreshCw} size="xs" /> Configure</>}
               </Button>
             </div>
@@ -1059,7 +1261,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                     const pinned = isPinned(ev.eventName);
                     const displayName = getDisplayName(ev.eventName);
                     const isEditing = editingEventName === ev.eventName;
-                    const evGroup = localEventConfig.find(c => c.eventName === ev.eventName)?.group;
+                    const evConfig = localEventConfig.find(c => c.eventName === ev.eventName);
+                    const evGroup = evConfig?.group;
+                    const evOutcomeType = evConfig?.outcomeType ?? '';
                     return (
                       <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] transition-colors ${pinned ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
                         <IconButton
@@ -1089,6 +1293,16 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                             </div>
                           )}
                         </div>
+                        {/* P1a — lead-type (outcomeType) mapping, only for pinned events when the flag is ON. */}
+                        {measuredCapture && pinned && (
+                          <FormSelect
+                            aria-label={`Lead type for ${ev.eventName}`}
+                            value={evOutcomeType}
+                            onChange={value => setOutcomeType(ev.eventName, (value || undefined) as OutcomeType | undefined)}
+                            options={OUTCOME_TYPE_OPTIONS}
+                            className={`${inputClass} py-1 max-w-[110px]`}
+                          />
+                        )}
                         {localGroups.length > 0 && (
                           <FormSelect
                             value={evGroup || ''}

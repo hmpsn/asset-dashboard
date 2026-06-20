@@ -175,7 +175,11 @@ export type ActivityType =
   | 'strategy_keyword_removed'   // admin-only: operator removed a keyword from the managed set
   | 'strategy_keyword_added'     // admin-only: keyword added to the managed set (client_request / manual_add)
   // The Issue — Lane 1E: cannibalization keeper-override (operator sets the canonical page).
-  | 'cannibalization_keeper_set'; // admin-only: operator set the keeper page for a cannibalization URL set
+  | 'cannibalization_keeper_set' // admin-only: operator set the keeper page for a cannibalization URL set
+  // The Issue (Client) P1a: a Webflow named lead was captured via the HMAC-verified form webhook.
+  // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES (the capture is an internal operator
+  // signal, not a client deliverable) and its metadata omits PII (D7): only { formId, outcomeType }.
+  | 'form_submission_captured';
 
 export interface ActivityEntry {
   id: string;

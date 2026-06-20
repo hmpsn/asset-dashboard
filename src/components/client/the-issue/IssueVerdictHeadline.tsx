@@ -2,9 +2,15 @@
 //
 // Replaces NarratedStatusHeadline AT THE HEADLINE on the flag-ON spine. It DROPS the
 // 0–100 visibility ring + the score-band evergreenVerdict() and instead LEADS WITH MEANING:
-// a banded, baseline-anchored, GA4-grounded dollar/outcome verdict. The number and the
-// sentence are pure renders — `verdict` is server-assembled (ROIData.outcomeVerdict); the
-// client only formats already-resolved values through fmtEstimateMoney + baselineVerdict.
+// a baseline-anchored, GA4-grounded dollar/outcome verdict. The number and the sentence are
+// pure renders — `verdict` is server-assembled (ROIData.outcomeVerdict); the client only formats
+// already-resolved values through the provenance render contract + baselineVerdict.
+//
+// P1a: the dollar precision + disclosure are driven by verdict.provenance via the SINGLE
+// resolveProvenanceRender contract (authority-layered-fields rule) — never an inline
+// `provenance === …` branch. estimate_ga4 → banded ~ estimate; measured_action → exact $ +
+// "tracked on your site" disclosure. The retainer ratio stays banded for ALL provenances (a
+// multiple of a measured value is editorial, not sourced).
 //
 // KEPT from NarratedStatusHeadline (the human-curation moat):
 //   • the "Curated by your strategist" byline (teal Sparkles)
@@ -23,8 +29,9 @@ import { ChevronDown, Sparkles, Zap } from 'lucide-react';
 import { Icon, Button } from '../../ui';
 import type { ROIData } from '../../../../shared/types/roi';
 import type { Recommendation } from '../../../../shared/types/recommendations';
-import { fmtEstimateMoney, fmtEstimateRatio } from '../../../utils/formatNumbers';
+import { fmtEstimateRatio } from '../../../utils/formatNumbers';
 import { baselineVerdict } from './evergreenCopy';
+import { resolveProvenanceRender } from './outcomeProvenance';
 
 type OutcomeVerdict = NonNullable<ROIData['outcomeVerdict']>;
 
@@ -44,6 +51,10 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
   const maxContribution = Math.max(...whyComponents.map((c) => c.contribution), 0.0001);
 
   const isEstablishing = verdict != null && verdict.baseline.state === 'establishing';
+  // Single resolved provenance contract — drives dollar precision + disclosure (authority-layered).
+  const prov = verdict != null ? resolveProvenanceRender(verdict.provenance) : null;
+  // The retainer ratio stays banded for ALL provenances — a multiple of a measured value is
+  // editorial, not sourced. Intentionally NOT routed through prov.fmtMoney.
   const retainerRatio = verdict?.monthlyRetainer && verdict.monthlyRetainer > 0
     ? fmtEstimateRatio(verdict.estimatedValue / verdict.monthlyRetainer)
     : null;
@@ -65,10 +76,11 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
       ) : (
         <div className="min-w-0">
           <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">What your SEO is worth</span>
-          {/* The dollar lead — emerald (success/$ law), banded estimate, never false precision. */}
+          {/* The dollar lead — emerald (success/$ law). Precision is provenance-driven: banded ~
+              for estimate_ga4, exact for measured_action — never false precision either way. */}
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
             {/* stat-primitive-ok: the verdict headline is an intentional editorial hero shell (inline dollar lead + "X your retainer"), not a labeled StatCard grid. */}
-            <span className="t-stat-lg text-accent-success leading-none">{fmtEstimateMoney(verdict.estimatedValue)}</span>
+            <span className="t-stat-lg text-accent-success leading-none">{prov!.fmtMoney(verdict.estimatedValue)}</span>
             {retainerRatio && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{retainerRatio} your retainer</span>
             )}
@@ -79,12 +91,11 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
               ? baselineVerdict({ outcomeNoun: verdict.outcomeUnitLabel, current: verdict.outcomeCount, baseline: null })
               : baselineVerdict({ outcomeNoun: verdict.outcomeUnitLabel, current: verdict.outcomeCount, baseline: verdict.baseline.baselineConversions })}
           </p>
-          {/* Provenance disclosure — P0 is ALWAYS an estimate; render the honest label. */}
-          {verdict.provenance === 'estimate_ga4' && (
-            <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
-              This is an estimate — your tracked conversions valued at {fmtEstimateMoney(verdict.valuePerOutcome)} each.
-            </p>
-          )}
+          {/* Provenance disclosure — the honest label + precision come from the single render
+              contract (estimate vs measured vs actual). No inline `provenance === …` branch. */}
+          <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
+            {prov!.disclosure(verdict.valuePerOutcome)}
+          </p>
         </div>
       )}
 

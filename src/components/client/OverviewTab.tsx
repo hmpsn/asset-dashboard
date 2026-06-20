@@ -24,7 +24,7 @@ import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
-import type { IssueOutcomeCount } from '../../../shared/types/the-issue';
+import type { IssueOutcomeCount, OutcomeType, OutcomeTypeBreakdown } from '../../../shared/types/the-issue';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
   GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
@@ -130,6 +130,12 @@ export function OverviewTab({
     // so they stay null — OutcomeCountBand degrades honestly. Falls back to all key-events when
     // none pinned. namedRecordsAvailable is false at P0.
     const pinned = pinnedOutcomeNouns(ws.eventConfig);
+    // P1a: each pinned event carries an admin-assigned outcomeType on ws.eventConfig (Lane A/C).
+    // Attach it per-unit so OutcomeCountBand can render typed, type-ordered StatCards. The fallback
+    // (no events pinned) carries no eventConfig entry → outcomeType stays undefined → the unit
+    // degrades byte-identically to the P0 estimate render.
+    const outcomeTypeFor = (eventName: string): OutcomeType | undefined =>
+      ws.eventConfig?.find(c => c.eventName === eventName)?.outcomeType;
     const outcomeUnits = (pinned.length > 0
       ? pinned.map(p => ({ eventName: p.eventName, label: p.label }))
       : ga4Conversions.map(c => ({ eventName: c.eventName, label: c.eventName.replace(/_/g, ' ') })))
@@ -139,9 +145,30 @@ export function OverviewTab({
         current: ga4Conversions.find(c => c.eventName === u.eventName)?.conversions ?? 0,
         baseline: null,
         priorPeriod: null,
+        outcomeType: outcomeTypeFor(u.eventName),
       }));
+    // P1a typed rollup ("23 form fills + 41 calls"): group the typed units by outcomeType and sum
+    // their current counts. Empty when no unit carries an outcomeType (byte-identical estimate path —
+    // OutcomeCountBand/IssueVerdictHeadline only read byType on the measured branch). Baseline/prior
+    // are server substrate (not surfaced here), so they stay null and degrade honestly.
+    const byTypeMap = new Map<OutcomeType, OutcomeTypeBreakdown>();
+    for (const u of outcomeUnits) {
+      if (!u.outcomeType) continue;
+      const existing = byTypeMap.get(u.outcomeType);
+      if (existing) {
+        existing.current += u.current;
+      } else {
+        byTypeMap.set(u.outcomeType, {
+          outcomeType: u.outcomeType, label: u.label, current: u.current, baseline: null, priorPeriod: null,
+        });
+      }
+    }
     const outcomeCount: IssueOutcomeCount = {
       units: outcomeUnits,
+      byType: Array.from(byTypeMap.values()),
+      // P0 client construction is always an estimate — measured_action graduation is the server's
+      // computeROI seam (Lane A), driven by confirmed conversion-tracking setup. This client-built
+      // count feeds the count-band only; the dollar verdict's provenance rides ROIData.outcomeVerdict.
       provenance: 'estimate_ga4',
       namedRecordsAvailable: false,
     };

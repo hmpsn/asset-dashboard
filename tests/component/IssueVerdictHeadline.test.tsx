@@ -56,4 +56,24 @@ describe('IssueVerdictHeadline', () => {
     fireEvent.click(screen.getByRole('button', { name: /why this is the move/i }));
     expect(screen.getByText('Publish KPI guide')).toBeInTheDocument();
   });
+
+  // ── P1a: measured_action provenance ─────────────────────────────────────────
+  const measured: NonNullable<ROIData['outcomeVerdict']> = { ...verdict, provenance: 'measured_action' };
+
+  it('measured_action → EXACT dollar (no ~ band) and a "tracked on your site" measured disclosure', () => {
+    render(<IssueVerdictHeadline verdict={measured} topRec={null} />);
+    expect(screen.getByText(/\$11,234/)).toBeInTheDocument();
+    expect(screen.queryByText(/~\$/)).not.toBeInTheDocument();
+    expect(screen.getByText(/measured from real actions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/this is an estimate/i)).not.toBeInTheDocument();
+  });
+  it('estimate_ga4 stays banded ~ + estimate disclosure (byte-identical to P0)', () => {
+    render(<IssueVerdictHeadline verdict={verdict} topRec={null} />);
+    expect(screen.getByText(/~\$11,000/)).toBeInTheDocument();
+    expect(screen.getByText(/this is an estimate/i)).toBeInTheDocument();
+  });
+  it('measured branch passes the verdict-zone evergreen guard (no temporal language)', () => {
+    const { container } = render(<IssueVerdictHeadline verdict={measured} topRec={null} />);
+    expect(hasTemporalLanguage(container.textContent ?? '', 'verdict')).toBe(false);
+  });
 });

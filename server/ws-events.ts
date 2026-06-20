@@ -76,6 +76,12 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
+  // The Issue (Client) P1a — Webflow named-lead captured via the HMAC-verified form webhook.
+  // Broadcast by the conversion-tracking webhook receiver on a NEW (non-duplicate) insert; the
+  // admin conversion-tracking-status query handler (useConversionTrackingStatus) invalidates so the
+  // verification readout's last-lead/connected state refreshes without a poll. PII is never in the
+  // payload (D7) — only { workspaceId, outcomeType }.
+  FORM_SUBMISSION_CAPTURED: 'outcome:form_captured',
 
   // Intelligence layer cache
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',

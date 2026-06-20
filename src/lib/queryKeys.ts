@@ -57,6 +57,9 @@ export const queryKeys = {
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
+    // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
+    // forms-connected/last-lead). Invalidated by the FORM_SUBMISSION_CAPTURED workspace broadcast.
+    conversionTrackingStatus: (wsId: string) => ['admin-conversion-tracking-status', wsId] as const,
 
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
