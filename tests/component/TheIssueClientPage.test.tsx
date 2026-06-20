@@ -40,6 +40,14 @@ vi.mock('../../src/components/client/strategy/useStrategyKeywordFeedback', () =>
 }));
 vi.mock('../../src/hooks/client', () => ({
   useClientContentRequests: () => ({ data: [] }),
+  useClientROI: () => ({ data: undefined }),
+}));
+
+// Spine flag — default OFF so the existing legacy-layout tests stay on the byte-identical
+// flag-OFF path. The spine-ON tests pass `theIssueClientSpine` as an explicit prop override.
+const mockUseFeatureFlag = vi.fn().mockReturnValue(false);
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => mockUseFeatureFlag(),
 }));
 
 // ── Stub the network-heavy reused children to keep the test hermetic ─────────
@@ -60,6 +68,12 @@ vi.mock('../../src/components/client/strategy/StrategyRequestedKeywordTrendSecti
 }));
 vi.mock('../../src/components/client/Briefing/ActionQueueStrip', () => ({
   ActionQueueStrip: () => <div data-testid="stub-action-queue" />,
+}));
+vi.mock('../../src/components/client/the-issue/IssueVerdictHeadline', () => ({
+  IssueVerdictHeadline: () => <div data-testid="stub-verdict" />,
+}));
+vi.mock('../../src/components/client/the-issue/OutcomeCountBand', () => ({
+  OutcomeCountBand: () => <div data-testid="stub-outcome-count" />,
 }));
 
 import { TheIssueClientPage } from '../../src/components/client/the-issue/TheIssueClientPage';
@@ -149,6 +163,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetFeedbackStatus.mockReturnValue(undefined);
   mockUseClientRecResponses.mockReturnValue({ data: { approved: 2, discussing: 1, declined: 0, pending: 3 } });
+  mockUseFeatureFlag.mockReturnValue(false);
 });
 
 describe('TheIssueClientPage', () => {
@@ -239,5 +254,61 @@ describe('TheIssueClientPage', () => {
     const { container } = renderPage();
     const text = container.textContent ?? '';
     expect(hasTemporalLanguage(text)).toBe(false);
+  });
+
+  // ── Flag-OFF byte-identical guard (the #1 acceptance gate) ──────────────────
+  it('flag-OFF (default): renders the legacy "See full report" <details> proof band, no spine slots', () => {
+    mockUseClientTheIssue.mockReturnValue({ data: recSet([baseRec()]), isLoading: false });
+    renderPage({ theIssueClientSpine: false });
+    expect(screen.getByText('See full report')).toBeInTheDocument();
+    expect(screen.getByText('Where your site stands')).toBeInTheDocument();
+    expect(screen.queryByTestId('stub-verdict')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slot-verdict')).not.toBeInTheDocument();
+  });
+});
+
+describe('TheIssueClientPage — spine (flag ON)', () => {
+  beforeEach(() => {
+    mockUseClientTheIssue.mockReturnValue({ data: recSet([baseRec()]), isLoading: false });
+  });
+
+  it('orders verdict before outcome-count before content-plan', () => {
+    const outcomeCount = { units: [{ label: 'calls', current: 5, baseline: null, priorPeriod: null }], provenance: 'estimate_ga4' as const, namedRecordsAvailable: false };
+    renderPage({ theIssueClientSpine: true, outcomeCount });
+    const verdict = screen.getByTestId('slot-verdict');
+    const outcome = screen.getByTestId('slot-outcome-count');
+    const contentPlan = screen.getByTestId('slot-content-plan');
+    // DOCUMENT_POSITION_FOLLOWING (4) = the argument node comes AFTER the reference node.
+    expect(verdict.compareDocumentPosition(outcome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(outcome.compareDocumentPosition(contentPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders the money frame UN-COLLAPSED (not inside a <details>)', () => {
+    renderPage({ theIssueClientSpine: true });
+    const money = screen.getByTestId('slot-money');
+    expect(money.closest('details')).toBeNull();
+  });
+
+  it('local_smb segment (showCompetitorAuthority=false) hides the competitor snapshot', () => {
+    renderPage({
+      theIssueClientSpine: true,
+      segmentProfile: {
+        segment: 'local_smb', outcomeNounSingular: 'new patient', outcomeNounPlural: 'new patients',
+        moneyFrameAltitude: 'production_vs_retainer', showCompetitorAuthority: false,
+        showPortfolioRollup: false, showLocalMapAndReviews: true, exportProfile: 'sms_recap',
+      },
+    });
+    expect(screen.queryByTestId('stub-competitors')).not.toBeInTheDocument();
+  });
+
+  it('default segment (unresolved) keeps the competitor snapshot visible', () => {
+    renderPage({ theIssueClientSpine: true });
+    expect(screen.getByTestId('stub-competitors')).toBeInTheDocument();
+  });
+
+  it('omits the outcome-count slot when no outcomeCount is provided', () => {
+    renderPage({ theIssueClientSpine: true });
+    expect(screen.queryByTestId('slot-outcome-count')).not.toBeInTheDocument();
+    expect(screen.getByTestId('slot-verdict')).toBeInTheDocument();
   });
 });

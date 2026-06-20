@@ -22,8 +22,11 @@ import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
 import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
+import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
+import type { IssueOutcomeCount } from '../../../shared/types/the-issue';
+import type { ResolvedSegmentProfile } from '../../../shared/types/workspace';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
   GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
@@ -130,6 +133,30 @@ export function OverviewTab({
   if (theIssueEnabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
+    // ── The Issue (Client) P0 spine props (additive; unread on the spine-flag-OFF path) ──
+    // Outcome count in human units: one unit per pinned eventConfig event, current count from
+    // GA4 conversions. Baseline/prior-period are server substrate (not surfaced client-side here),
+    // so they stay null — OutcomeCountBand degrades honestly. Falls back to all key-events when
+    // none pinned. namedRecordsAvailable is false at P0.
+    const pinned = pinnedOutcomeNouns(ws.eventConfig);
+    const outcomeUnits = (pinned.length > 0
+      ? pinned.map(p => ({ eventName: p.eventName, label: p.label }))
+      : ga4Conversions.map(c => ({ eventName: c.eventName, label: c.eventName.replace(/_/g, ' ') })))
+      .map(u => ({
+        label: u.label,
+        eventName: u.eventName,
+        current: ga4Conversions.find(c => c.eventName === u.eventName)?.conversions ?? 0,
+        baseline: null,
+        priorPeriod: null,
+      }));
+    const outcomeCount: IssueOutcomeCount = {
+      units: outcomeUnits,
+      provenance: 'estimate_ga4',
+      namedRecordsAvailable: false,
+    };
+    // The public workspace view carries the flag-gated, pre-resolved segment profile (authority-
+    // layered); read it off the runtime payload. Absent → null → default-visible inserts.
+    const segmentProfile = (ws as { segmentProfile?: ResolvedSegmentProfile }).segmentProfile ?? null;
     return (
       <ErrorBoundary>
         <TheIssueClientPage
@@ -151,6 +178,8 @@ export function OverviewTab({
           onAskAi={onAskAi}
           onOpenChat={onOpenChat}
           setToast={setToast}
+          outcomeCount={outcomeCount}
+          segmentProfile={segmentProfile}
         />
       </ErrorBoundary>
     );

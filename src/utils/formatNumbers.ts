@@ -36,6 +36,33 @@ export function fmtMoneyFull(value: number): string {
   }).format(value);
 }
 
+/**
+ * Estimate-labeled money band. Used ONLY when provenance === 'estimate_ga4'. Rounds to two
+ * significant figures and prefixes "~"; never emits cents. Exact figures use fmtMoneyFull.
+ */
+export function fmtEstimateMoney(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value === 0) return '~$0';
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(abs)) - 1);
+  const banded = Math.round(abs / magnitude) * magnitude;
+  return `~${sign}$${banded.toLocaleString('en-US')}`;
+}
+
+/**
+ * Estimate-labeled ratio ("~7×"). One significant figure at/above 1×, one decimal below.
+ * Non-finite → em-dash sentinel.
+ */
+export function fmtEstimateRatio(ratio: number): string {
+  if (!Number.isFinite(ratio)) return '—';
+  if (ratio >= 1) {
+    const magnitude = Math.pow(10, Math.floor(Math.log10(ratio)));
+    return `~${Math.round(ratio / magnitude) * magnitude}×`;
+  }
+  return `~${ratio.toFixed(1)}×`;
+}
+
 /** Human-readable file size: 0 → "0 B", 1024 → "1.0 KB", 1048576 → "1.0 MB" */
 export function formatBytes(bytes: number, decimals = 1): string {
   if (bytes <= 0) return '0 B';

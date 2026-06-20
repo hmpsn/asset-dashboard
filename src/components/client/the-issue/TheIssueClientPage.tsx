@@ -29,6 +29,9 @@ import { ErrorBoundary } from '../../ErrorBoundary';
 import { CompactStatBar, Skeleton, SectionCard, Icon } from '../../ui';
 import type { Tier } from '../../ui/TierGate';
 import type { Recommendation } from '../../../../shared/types/recommendations';
+import type { ROIData } from '../../../../shared/types/roi';
+import type { IssueOutcomeCount } from '../../../../shared/types/the-issue';
+import type { ResolvedSegmentProfile } from '../../../../shared/types/workspace';
 import { ActionQueueStrip } from '../Briefing/ActionQueueStrip';
 import { ROIDashboard } from '../ROIDashboard';
 import { CompetitorGapsSection } from '../CompetitorGapsSection';
@@ -37,7 +40,8 @@ import OutcomeSummary from '../OutcomeSummary';
 import { StrategyRequestedKeywordTrendSection } from '../strategy/StrategyRequestedKeywordTrendSection';
 import { useStrategyTrackedKeywords } from '../strategy/useStrategyTrackedKeywords';
 import { useStrategyKeywordFeedback } from '../strategy/useStrategyKeywordFeedback';
-import { useClientContentRequests } from '../../../hooks/client';
+import { useClientContentRequests, useClientROI } from '../../../hooks/client';
+import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { clientPath } from '../../../routes';
 import type { Archetype } from '../../../lib/recArchetypeMap';
 import { QUICK_QUESTIONS } from '../types';
@@ -46,6 +50,8 @@ import type {
 } from '../types';
 
 import { NarratedStatusHeadline } from './NarratedStatusHeadline';
+import { IssueVerdictHeadline } from './IssueVerdictHeadline';
+import { OutcomeCountBand } from './OutcomeCountBand';
 import { IssueContentPlanSection } from './IssueContentPlanSection';
 import { IssueAlsoOnPlanSection } from './IssueAlsoOnPlanSection';
 import { IssueLoopFooter } from './IssueLoopFooter';
@@ -82,6 +88,15 @@ export interface TheIssueClientPageProps {
   setToast?: (msg: string) => void;
   /** Admin "Preview as client": render read-only (decision controls suppressed). */
   previewMode?: boolean;
+  // ── The Issue (Client) P0 spine — all additive/optional; unread on the flag-OFF path ──
+  /** Server-assembled dollar/outcome verdict (slot 1). Falls back to useClientROI when absent. */
+  outcomeVerdict?: ROIData['outcomeVerdict'] | null;
+  /** Outcome counts in human units (slot 2), summed over pinned eventConfig events. */
+  outcomeCount?: IssueOutcomeCount | null;
+  /** Pre-resolved segment profile (authority-layered): drives the slot inserts. */
+  segmentProfile?: ResolvedSegmentProfile | null;
+  /** Test override for the spine flag. When provided, overrides useFeatureFlag (Rules-of-Hooks-safe). */
+  theIssueClientSpine?: boolean;
 }
 
 export function TheIssueClientPage({
@@ -98,6 +113,10 @@ export function TheIssueClientPage({
   onOpenChat,
   setToast,
   previewMode = false,
+  outcomeVerdict,
+  outcomeCount,
+  segmentProfile,
+  theIssueClientSpine,
 }: TheIssueClientPageProps) {
   const navigate = useNavigate();
 
@@ -108,6 +127,16 @@ export function TheIssueClientPage({
   const { getFeedbackStatus, submitFeedback } = useStrategyKeywordFeedback({ workspaceId, setToast });
   const { actOn, pendingRecId } = useActOnRecommendation({ workspaceId, setToast });
   const { data: contentRequests = [] } = useClientContentRequests(workspaceId, !!workspaceId);
+  const { data: roiData } = useClientROI(workspaceId, !!workspaceId);
+
+  // ── The Issue (Client) P0 spine flag — read unconditionally at the top (Rules of Hooks).
+  //    An explicit prop override wins for deterministic component tests. ──────────
+  const flagValue = useFeatureFlag('the-issue-client-spine');
+  const spineEnabled = theIssueClientSpine ?? flagValue;
+  // Verdict source: explicit prop wins; otherwise the public ROI payload (deduped React Query).
+  const resolvedVerdict = outcomeVerdict !== undefined ? outcomeVerdict : (roiData?.outcomeVerdict ?? null);
+  // Default-visible preserves the current surface when the segment is unresolved.
+  const showCompetitor = segmentProfile?.showCompetitorAuthority ?? true;
 
   const recs = issueQuery.data?.recommendations ?? [];
   const topRecId = issueQuery.data?.summary?.topRecommendationId ?? null;
@@ -158,6 +187,134 @@ export function TheIssueClientPage({
     conversionsTotal > 0 && { label: 'Conversions', value: compact(conversionsTotal), valueColor: 'text-blue-400' },
   ].filter(Boolean) as { label: string; value: string; valueColor: string }[];
 
+  // ── The Issue (Client) P0 spine (flag ON) — verdict-first trust spine ─────────
+  // Slot 0 Your turn → 1 Verdict → 2 Outcome count → 3 Money (un-collapsed) →
+  // 4 What needs me → 5 Content plan (demoted) → 6 Under the hood (collapsed; the ring lives here).
+  if (spineEnabled) {
+    return (
+      <ErrorBoundary>
+        <div className="space-y-6" data-testid="the-issue-client-page">
+          {/* 0. Your turn — pending decisions (reuse ActionQueueStrip; renders null when empty). */}
+          {!previewMode && (
+            <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
+          )}
+
+          {/* 1. Verdict — the dollar/outcome lead (no ring). */}
+          <ErrorBoundary label="Verdict">
+            <div data-testid="slot-verdict">
+              <IssueVerdictHeadline verdict={resolvedVerdict ?? null} topRec={topRec} />
+            </div>
+          </ErrorBoundary>
+
+          {/* 2. Outcome count — outcomes in human units (only when there are pinned events). */}
+          {outcomeCount && (
+            <ErrorBoundary label="Outcome count">
+              <div data-testid="slot-outcome-count">
+                <OutcomeCountBand count={outcomeCount} />
+              </div>
+            </ErrorBoundary>
+          )}
+
+          {/* 3. Money frame — UN-COLLAPSED (no <details>), compact (tables relocate to slot 6). */}
+          <ErrorBoundary label="What your SEO is worth">
+            <div data-testid="slot-money" className="space-y-3">
+              <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.roi}</h2>
+              <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact />
+            </div>
+          </ErrorBoundary>
+
+          {/* 4. What needs me — the full pending-decisions queue / loop. */}
+          {previewMode ? (
+            <SectionCard title={ISSUE_SECTION_TITLES.ask}>
+              <p className="t-body text-[var(--brand-text-muted)]">
+                In the live dashboard, your client can ask their strategist a question here and see the moves they’ve greenlit.
+              </p>
+            </SectionCard>
+          ) : (
+            <ErrorBoundary label="Ask your strategist">
+              <IssueLoopFooter
+                responses={recResponses}
+                briefsInProgress={briefsInProgress}
+                quickQuestions={QUICK_QUESTIONS}
+                onOpenChat={onOpenChat}
+                onAskAi={onAskAi}
+              />
+            </ErrorBoundary>
+          )}
+
+          {/* 5. Content plan — DEMOTED below the proof/money band (positional, nothing cut). */}
+          <ErrorBoundary label="Content plan">
+            <div data-testid="slot-content-plan">
+              <IssueContentPlanSection
+                recs={recs}
+                strategyData={strategyData}
+                tier={effectiveTier}
+                getFeedbackStatus={getFeedbackStatus}
+                onRelevant={handleRelevant}
+                onNotRelevant={handleNotRelevant}
+                onActOn={onActOn}
+                pendingRecId={pendingRecId}
+                onLetsTalk={handleLetsTalk}
+                onSeeDetails={openStrategy}
+              />
+            </div>
+          </ErrorBoundary>
+          <ErrorBoundary label="Also on your plan">
+            <IssueAlsoOnPlanSection recs={recs} onOpenGroup={openGroup} />
+          </ErrorBoundary>
+
+          {/* What's working right now — evergreen proof (Wins). */}
+          <div className="space-y-4">
+            {/* duplicate-heading-ok: this is the spine-ON branch; the flag-OFF branch below renders the same section title, but the two are mutually exclusive at runtime and the OFF branch must stay byte-identical. */}
+            <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.whatsWorking}</h2>
+            <ErrorBoundary label="Wins">
+              <WinsSurface workspaceId={workspaceId} effectiveTier={effectiveTier} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Your results">
+              <OutcomeSummary workspaceId={workspaceId} tier={effectiveTier} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Requested keyword trend">
+              <StrategyRequestedKeywordTrendSection
+                workspaceId={workspaceId}
+                trackedKeywords={trackedKeywords}
+                effectiveTier={effectiveTier}
+              />
+            </ErrorBoundary>
+          </div>
+
+          {/* P1 insert points — gated now so the segment wiring contract exists (built in P1). */}
+          {segmentProfile?.showLocalMapAndReviews && null /* P1 local map + reviews insert */}
+          {segmentProfile?.showPortfolioRollup && null /* P1 portfolio rollup insert */}
+
+          {/* 6. Under the hood — collapsed. The visibility ring + the numbers strip + the
+              relocated ROI tables + (segment-gated) competitor snapshot live here now. */}
+          <ErrorBoundary label="Under the hood">
+            <details className="group bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 [&::-webkit-details-marker]:hidden">
+                <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">Under the hood</span>
+                <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand flex-shrink-0">
+                  See the full picture
+                  <Icon as={ChevronDown} size="sm" className="transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              <div className="px-4 pb-4 pt-1 space-y-4">
+                <NarratedStatusHeadline orient={orient} topRec={topRec} statedGoal={strategyData?.businessContext} />
+                {statItems.length > 0 && <CompactStatBar items={statItems} />}
+                <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact={false} />
+                {showCompetitor && (
+                  <ErrorBoundary label="Competitors">
+                    <CompetitorGapsSection workspaceId={workspaceId} tier={effectiveTier} />
+                  </ErrorBoundary>
+                )}
+              </div>
+            </details>
+          </ErrorBoundary>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // ── Flag-OFF path — the CURRENT layout, byte-identical (do NOT refactor) ──────
   return (
     <ErrorBoundary>
       <div className="space-y-6" data-testid="the-issue-client-page">
