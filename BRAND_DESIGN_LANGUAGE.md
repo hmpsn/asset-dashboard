@@ -366,6 +366,12 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | **OvDivergencePanel.tsx** | `invariantHeld` indicator | `Badge tone="emerald"` (held) / `Badge tone="red"` (broken, `AlertTriangle`) | Emerald = success; red = failure |
 | **OvDivergencePanel.tsx** | "OV no pick" flag | `Badge tone="red"` (`ShieldOff`) | Red = missing OV pick (red flag) |
 | **OvDivergencePanel.tsx** | Show/Hide collapse + disagreement rows | `Button variant="ghost"` + `ClickableRow` | Primitives only — no raw `<button>`. Admin-only, no purple. |
+| **CompetitorsPage.tsx** (The Issue Phase 6) | PageHeader icon (`Users`) | `text-accent-brand` | Brand-tinted page icon, matches KeywordStrategy/Strategy chrome |
+| **CompetitorsPage.tsx** | Page composition | `CompetitorAlertsPanel` → existing `StrategyCompetitiveTab` (ShareBar + CompetitiveIntel + KeywordGaps + BacklinkProfile) | Maximal reuse; admin-only, no purple. NON_REGISTRY page (no global nav), reached via flag-ON deep-link from The Issue cockpit |
+| **CompetitorAlertsPanel.tsx** | SectionCard title icon (`Swords`) | `text-accent-brand` | Brand-tinted section icon |
+| **CompetitorAlertsPanel.tsx** | Position-change metric (`#12 → #7`) + volume | `text-blue-400` | Blue = data metric, read-only (Law 2) |
+| **CompetitorAlertsPanel.tsx** | Severity Badge | `critical → Badge tone="red"`, `warning → tone="amber"`, `opportunity → tone="emerald"` | Severity map per Laws (red=critical, amber=warning, emerald=opportunity); never teal (no action), never purple |
+| **KeywordStrategy.tsx** (issueOverviewEl, flag-ON only) | "Competitor intelligence →" deep-link | `Button variant="link"` (teal) | Teal = action/link (Law 1); flag-ON deep-link to the Competitors page, not rendered flag-OFF |
 
 ### Outcome Tracking
 

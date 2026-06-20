@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Target, FileText, HelpCircle } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton } from './ui';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button } from './ui';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { useKeywordStrategy, useLocalSeo } from '../hooks/admin';
@@ -570,6 +570,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {orientEl}
       {realLeaves?.cannibalization}
       {realLeaves?.strategyDiff}
+      {/* Phase 6 deep-link (flag-ON only — lives inside issueOverviewEl) to the dedicated
+          Competitors page (share of voice, keyword gaps, backlinks, competitor alerts). */}
+      <div className="flex justify-end">
+        <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
+          Competitor intelligence →
+        </Button>
+      </div>
     </div>
   ) : null;
 
