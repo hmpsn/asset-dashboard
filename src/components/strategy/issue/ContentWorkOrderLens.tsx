@@ -12,8 +12,8 @@
  * the status palette (Three Laws). Tokens from src/tokens.css; typography via .t-* utilities.
  */
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, FilePlus } from 'lucide-react';
-import { SectionCard, Badge, Button, EmptyState, Icon } from '../../ui';
+import { ClipboardList } from 'lucide-react';
+import { SectionCard, Badge, Button, Icon } from '../../ui';
 import type { BadgeTone } from '../../ui';
 import { useIssueLenses } from '../../../hooks/admin/useIssueLenses';
 import { adminPath } from '../../../routes';
@@ -85,6 +85,11 @@ export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: C
   const navigate = useNavigate();
   const { contentWorkOrders, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
 
+  // Empty → null (Blocker 4): when there are no curated content work-orders, render nothing rather
+  // than an empty SectionCard, so a cold workspace shows zero placeholder chrome (mirrors
+  // IssueAlsoOnPlanSection). Loading/error keep their inline states (transient, not "cold").
+  if (!isLoading && !isError && contentWorkOrders.length === 0) return null;
+
   const openInPipeline = (row: ContentWorkOrderRow) => {
     navigate(adminPath(workspaceId, 'content-pipeline') + (row.hasPost ? '?tab=posts' : '?tab=briefs'));
   };
@@ -105,12 +110,6 @@ export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: C
         <p className="t-caption-sm text-red-400/80 py-4 text-center">
           Couldn't load content work-orders. It'll retry shortly.
         </p>
-      ) : contentWorkOrders.length === 0 ? (
-        <EmptyState
-          icon={FilePlus}
-          title="No content work-orders yet"
-          description="Curate content or refresh moves in the queue above — each will appear here with its production stage and a link into the pipeline."
-        />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
           {contentWorkOrders.map((row) => (

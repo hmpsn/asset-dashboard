@@ -35,7 +35,9 @@ let cleanupWorkspace: (() => void) | undefined;
 beforeAll(async () => {
   await ctx.startServer();
   // Passwordless portal so the public act-on/GET routes pass through (autoPublicAuth covers config).
-  const seeded = seedWorkspace({ clientPassword: '' });
+  // Growth tier: this loop test exercises the act-on REQUEST/transition logic; the Free+monetizable
+  // tier-gate (audit blocker #1) is a separate concern, covered by the-issue-acton-pricing.test.ts.
+  const seeded = seedWorkspace({ clientPassword: '', tier: 'growth' });
   workspaceId = seeded.workspaceId;
   cleanupWorkspace = seeded.cleanup;
   // The Issue §7: the restricted clientStatus public projection + the ?clientStatus filter are

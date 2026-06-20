@@ -16,6 +16,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { theIssueApi, type ActOnRecommendationResult } from '../../api/theIssue';
 import { queryKeys } from '../../lib/queryKeys';
+import { ISSUE_REQUEST_SUCCESS_TOAST } from '../../components/client/the-issue/evergreenCopy';
 
 interface UseActOnRecommendationOptions {
   workspaceId?: string;
@@ -37,7 +38,8 @@ export function useActOnRecommendation({ workspaceId, setToast }: UseActOnRecomm
       // is no longer clientStatus='sent') and the response summary (greenlit count ↑).
       void queryClient.invalidateQueries({ queryKey: queryKeys.client.theIssue(workspaceId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.client.recResponses(workspaceId) });
-      setToast?.("Sent to your strategist — we'll scope it and get to work.");
+      // Audit blocker #1 (D1) success copy — names the plan + the no-charge consequence.
+      setToast?.(ISSUE_REQUEST_SUCCESS_TOAST);
     },
     onError: () => {
       setToast?.('Could not send that just now — please try again.');

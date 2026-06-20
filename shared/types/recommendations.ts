@@ -328,7 +328,7 @@ export interface ClientFacingRecommendation {
    * `requiredTier` names the upgrade for a `locked` rec. ABSENT when strategy-the-issue is OFF
    * (gated exactly like the restricted clientStatus projection — keeps flag-OFF byte-identical).
    */
-  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth' };
+  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth'; monetizable: boolean };
 }
 
 /**

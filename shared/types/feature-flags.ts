@@ -400,12 +400,12 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Strategy',
     lifecycle: {
       owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
+      createdAt: '2026-06-18',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Enable per-workspace only after a decoupled-tick auto-send with an operator veto/review window ships; until then the weekly cron never auto-sends (manual operator send only).',
       linkedRoadmapItemId: 'strategy-the-issue',
       staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
+      lastReviewedAt: '2026-06-18',
     },
   },
 };

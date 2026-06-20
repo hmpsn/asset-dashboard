@@ -26,16 +26,23 @@ export const ISSUE_SECTION_TITLES = {
 /** Short evergreen intros / helper copy per section. */
 export const ISSUE_SECTION_INTROS = {
   contentPlan: 'The pieces we recommend writing next — each one a chance to capture qualified search demand.',
-  contentPlanFloor: "Opportunities we're evaluating — these are content gaps we're sizing up before we recommend them.",
+  contentPlanFloor: 'The content moves we recommend next will appear here as your strategist curates them.',
   alsoOnPlan: 'The rest of the plan — refreshes, technical work, and keywords we’re working on your behalf.',
   whatsWorking: 'Real results from the work we’ve shipped for you.',
   ask: 'Have a question about your strategy? Your strategist is one message away.',
 } as const;
 
-/** CTA labels (locked): "Act on this" = request; the detail link is "See the details". */
+/** CTA labels (locked, audit blocker #1 / D1). The greenlight verb is "Request this" on
+ *  monetizable content moves and "Discuss this" on non-monetizable moves — the literal
+ *  the retired act-on label never appears on the client surface. The detail link is "See the details";
+ *  the in-card soft-yes opens the advisor ("Let us talk"). */
 export const ISSUE_CTA = {
-  /** Primary greenlight CTA — a request, never "open the brief" (the brief doesn't exist yet). */
-  actOnThis: 'Act on this',
+  /** Primary greenlight CTA on a monetizable content move — a REQUEST (the brief doesn't exist yet). */
+  requestThis: 'Request this',
+  /** Greenlight verb on a NON-monetizable move — opens a conversation, not a priced request. */
+  discussThis: 'Discuss this',
+  /** In-card soft-yes — opens the advisor pre-seeded with the move (warm-lead valve). */
+  letsTalk: 'Let us talk',
   /** Alternate phrasing for compact rows. */
   request: 'Request',
   /** Link to the recommendation's details — NOT "open the brief". */
@@ -43,6 +50,14 @@ export const ISSUE_CTA = {
   relevant: 'Relevant',
   notRelevant: 'Not relevant',
 } as const;
+
+/** Consequence line shown in the pre-request ConfirmDialog (audit blocker #1 / D3). No charge at click. */
+export const ISSUE_REQUEST_CONFIRM_CONSEQUENCE =
+  'Your strategist will confirm scope before any work begins. Nothing is billed at this click.';
+
+/** Success toast after a request is added to the plan (audit blocker #1). */
+export const ISSUE_REQUEST_SUCCESS_TOAST =
+  'Added to your plan — your strategist will scope and confirm before any work or charge.';
 
 /**
  * Loop-footer summary line, evergreen. "you've greenlit N moves · M in discussion".

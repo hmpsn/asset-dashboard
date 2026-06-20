@@ -6,27 +6,29 @@
 // editorial card rhythm. No admin jargon, no archetype/confidence/severity labels, no
 // purple, no pricing UI, one decision per card.
 //
-// Sections in order (audit §16 client):
-//   0. Your turn          — pending-decisions strip (reuse ActionQueueStrip)
-//   1. Narrated status     — evergreen headline + #1-why bars (NarratedStatusHeadline)
-//   2. Your numbers        — simple analytics stats bar (+ conversions)
-//   3. What your SEO is worth — ROI (reuse ROIDashboard, re-homed, evergreen-safe)
-//   4. ⭐ Content plan      — the money: multiple value-first cards + Act-on (request) + floor
-//   5. Also on your plan   — compact non-content moves, link out
+// Sections in canonical order (audit blocker #2 re-sequence — plan LEADS, proof FOLLOWS):
+//   1. Your turn          — pending-decisions strip (reuse ActionQueueStrip)
+//   2. Narrated status     — evergreen headline + health chip + "curated by your strategist" byline
+//   3. ⭐ Content plan      — the HERO money surface: value-first cards + Request this + 2-state floor
+//   4. Also on your plan   — compact non-content moves, link out
+//   5. Proof band          — ONE compressed band (numbers strip + ROI), collapsed behind a
+//                            "See full report →" reveal (user action); ROI methodology kept
 //   6. What's working      — evergreen proof (WinsSurface + OutcomeSummary + requested-kw trend)
 //   7. How you stack up    — competitor snapshot (reuse CompetitorGapsSection)
 //   8. Ask your strategist — advisor + the loop footer (greenlit / discussing)
 //
-// "Act on this" = a content REQUEST (retainer greenlight); nothing is generated on the fly.
+// "Request this" = a content REQUEST (retainer greenlight); nothing is generated on the fly.
 // Evergreen copy throughout (no time-relative language). Flag-OFF this file never mounts.
 //
 // `previewMode` (admin "Preview as client"): when true the surface mounts read-only —
 // decision controls (act-on / feedback) are suppressed so the operator can preview safely.
 
+import { ChevronDown, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../../ErrorBoundary';
-import { CompactStatBar, Skeleton, SectionCard } from '../../ui';
+import { CompactStatBar, Skeleton, SectionCard, Icon } from '../../ui';
 import type { Tier } from '../../ui/TierGate';
+import type { Recommendation } from '../../../../shared/types/recommendations';
 import { ActionQueueStrip } from '../Briefing/ActionQueueStrip';
 import { ROIDashboard } from '../ROIDashboard';
 import { CompetitorGapsSection } from '../CompetitorGapsSection';
@@ -121,6 +123,14 @@ export function TheIssueClientPage({
   const onActOn = previewMode ? () => {} : actOn;
   const handleRelevant = (kw: string) => { if (!previewMode) void submitFeedback(kw, 'approved', 'the-issue-content'); };
   const handleNotRelevant = (kw: string) => { if (!previewMode) void submitFeedback(kw, 'declined', 'the-issue-content'); };
+  // In-card soft-yes (audit blocker #1): open the advisor pre-seeded with the move
+  // (title + targetKeyword) — same open-chat-then-ask pattern the loop footer uses.
+  const handleLetsTalk = (rec: Recommendation) => {
+    if (previewMode) return;
+    const kw = rec.targetKeyword ? ` (target keyword: ${rec.targetKeyword})` : '';
+    onOpenChat();
+    setTimeout(() => onAskAi(`I'd like to talk through this move: "${rec.title}"${kw}.`), 100);
+  };
   const openStrategy = () => navigate(clientPath(workspaceId, 'strategy', betaMode));
   const openGroup = (_archetype: Archetype) => navigate(clientPath(workspaceId, 'strategy', betaMode));
 
@@ -151,50 +161,69 @@ export function TheIssueClientPage({
   return (
     <ErrorBoundary>
       <div className="space-y-6" data-testid="the-issue-client-page">
-        {/* 0. Your turn — pending decisions (reuse ActionQueueStrip; renders null when empty). */}
+        {/* 1. Your turn — pending decisions (reuse ActionQueueStrip; renders null when empty). */}
         {!previewMode && (
           <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
         )}
 
-        {/* 1. Narrated status headline — evergreen + #1-why bars. */}
-        <NarratedStatusHeadline orient={orient} topRec={topRec} statedGoal={strategyData?.businessContext} />
+        {/* 2. Narrated status headline (health chip lives in the ring) + the "curated by your
+            strategist" byline sub-line — makes the human-curation moat visible at the top. */}
+        <div>
+          <NarratedStatusHeadline orient={orient} topRec={topRec} statedGoal={strategyData?.businessContext} />
+          <p className="mt-2 inline-flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
+            <Icon as={Sparkles} size="sm" className="text-accent-brand" />
+            Curated by your strategist
+          </p>
+        </div>
 
-        {/* 2. Your numbers — simple analytics stats bar (+ conversions). */}
-        {statItems.length > 0 && (
-          <div>
-            <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">{ISSUE_SECTION_TITLES.stats}</h2>
-            <CompactStatBar items={statItems} />
-          </div>
-        )}
-
-        {/* 3. What your SEO is worth — ROI (reuse, re-homed; evergreen-safe). */}
-        <ErrorBoundary label="What your SEO is worth">
-          <div>
-            <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">{ISSUE_SECTION_TITLES.roi}</h2>
-            <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
-          </div>
-        </ErrorBoundary>
-
-        {/* 4. ⭐ Content plan — the money. Multiple value-first cards + Act-on (request) + floor. */}
+        {/* 3. ⭐ Content plan — the HERO (the money). Value-first cards + Request this + floor. */}
         <ErrorBoundary label="Content plan">
           <IssueContentPlanSection
             recs={recs}
             strategyData={strategyData}
+            tier={effectiveTier}
             getFeedbackStatus={getFeedbackStatus}
             onRelevant={handleRelevant}
             onNotRelevant={handleNotRelevant}
             onActOn={onActOn}
             pendingRecId={pendingRecId}
+            onLetsTalk={handleLetsTalk}
             onSeeDetails={openStrategy}
           />
         </ErrorBoundary>
 
-        {/* 5. Also on your plan — compact non-content moves, link out. */}
+        {/* 4. Also on your plan — compact non-content moves, link out. */}
         <ErrorBoundary label="Also on your plan">
           <IssueAlsoOnPlanSection recs={recs} onOpenGroup={openGroup} />
         </ErrorBoundary>
 
-        {/* 6. What's working right now — evergreen proof. */}
+        {/* 5. ONE compressed proof band — numbers strip + ROI merged, collapsed behind a
+            "See full report →" reveal that requires a user action (the <details> toggle). The
+            ROI methodology disclosure is kept (moved, not dropped); the temporal MoM stat is
+            suppressed via evergreen. Replaces the two co-equal "Your numbers" + ROI sections. */}
+        <ErrorBoundary label="Your proof">
+          <details className="group bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 [&::-webkit-details-marker]:hidden">
+              <div className="min-w-0 flex-1">
+                <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.roi}</span>
+                {statItems.length > 0 && (
+                  <div className="mt-2">
+                    <CompactStatBar items={statItems} />
+                  </div>
+                )}
+              </div>
+              <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand flex-shrink-0">
+                See full report
+                <Icon as={ChevronDown} size="sm" className="transition-transform group-open:rotate-180" />
+              </span>
+            </summary>
+            <div className="px-4 pb-4 pt-1">
+              <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen />
+            </div>
+          </details>
+        </ErrorBoundary>
+
+        {/* 6. What's working right now — evergreen proof (Wins). */}
         <div className="space-y-4">
           <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.whatsWorking}</h2>
           <ErrorBoundary label="Wins">

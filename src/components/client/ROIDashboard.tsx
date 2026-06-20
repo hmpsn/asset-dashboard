@@ -15,6 +15,10 @@ import { clientPath } from '../../routes';
 interface ROIDashboardProps {
   workspaceId: string;
   tier: 'free' | 'growth' | 'premium';
+  /** The Issue evergreen surface (audit D4): suppress the temporal "Month-over-Month" stat so
+   *  the dateless client dashboard stays evergreen. Default false → byte-identical for every
+   *  existing caller (legacy overview / briefing-v2). The ROI methodology disclosure is kept. */
+  evergreen?: boolean;
 }
 
 function ROIMethodologyDisclosure({ showRevenueAtStake }: { showRevenueAtStake: boolean }) {
@@ -67,7 +71,7 @@ function ROIMethodologyDisclosure({ showRevenueAtStake }: { showRevenueAtStake: 
   );
 }
 
-export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
+export function ROIDashboard({ workspaceId, tier, evergreen = false }: ROIDashboardProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const [showAllPages, setShowAllPages] = useState(false);
@@ -178,22 +182,33 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20"
         />
 
-        <StatCard
-          label={data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
-          value={
-            data.growthPercent != null
-              ? `${data.growthPercent >= 0 ? '+' : ''}${data.growthPercent.toFixed(1)}%`
-              : data.trackedPages
-          }
-          icon={data.growthPercent != null ? TrendingUp : Shield}
-          valueColor={data.growthPercent != null ? (data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning') : 'text-accent-brand'}
-          sub={
-            data.growthPercent != null
-              ? `Traffic value growth vs. 30 days ago · ${data.trackedPages} pages tracked`
-              : 'Pages generating organic value · growth tracking starts next month'
-          }
-          className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
-        />
+        {/* Audit D4: on the evergreen client surface the temporal "Month-over-Month" stat is
+            suppressed — it always renders the dateless "Pages Tracked" variant instead. Every
+            other caller (evergreen=false) is byte-identical to before. */}
+        {(() => {
+          const showMoM = data.growthPercent != null && !evergreen;
+          return (
+            <StatCard
+              label={showMoM ? 'Month-over-Month' : 'Pages Tracked'}
+              value={
+                showMoM
+                  ? `${data.growthPercent! >= 0 ? '+' : ''}${data.growthPercent!.toFixed(1)}%`
+                  : data.trackedPages
+              }
+              icon={showMoM ? TrendingUp : Shield}
+              valueColor={showMoM ? (data.growthPercent! >= 0 ? 'text-accent-brand' : 'text-accent-warning') : 'text-accent-brand'}
+              sub={
+                showMoM
+                  ? `Traffic value growth vs. 30 days ago · ${data.trackedPages} pages tracked`
+                  // Evergreen surface stays dateless; every other caller keeps the original copy.
+                  : evergreen
+                    ? 'Pages generating organic value'
+                    : 'Pages generating organic value · growth tracking starts next month'
+              }
+              className={`bg-gradient-to-br ${showMoM ? (data.growthPercent! >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
+            />
+          );
+        })()}
 
         {/* Task 3.4: portfolio "Revenue at stake" — Σ upsideMonthly via the single
             keywordDollarValue helper. Emerald = success/$ law. Absent on older payloads. */}

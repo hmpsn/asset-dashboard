@@ -203,16 +203,20 @@ async function runIssuePushForWorkspaceInner(
     log.error({ err, workspaceId, weekOf }, 'issue doorbell failed (swallowed) — push stands, auto-send proceeds');
   }
 
-  // ── Trust-ladder auto-send (Phase 4) ───────────────────────────────────────
+  // ── Trust-ladder auto-send (Phase 4) — DARK-LAUNCHED (audit blocker #3) ─────────────────────
   // After the Issue is pushed + stamped + the doorbell rung, auto-send the active recs of every
-  // earned+enabled+eligible archetype. Flag-eligibility already gated upstream (isEligible). The
-  // whole step is best-effort: a failure must not roll back the push (the Issue is already drafted
-  // and the operator doorbell already queued). Idempotent within the week — a rec sent this cycle is
-  // no longer isActiveRec, so a re-run skips it.
-  try {
-    runAutoSendForWorkspace(workspaceId, weekOf, ws.name);
-  } catch (err) {
-    log.error({ err, workspaceId, weekOf }, 'auto-send step failed (swallowed) — Issue push stands');
+  // earned+enabled+eligible archetype. GUARDED behind the OFF-by-default child flag
+  // `strategy-trust-ladder-autosend`: with the flag OFF (default) auto-send is NOT invoked at all —
+  // the doorbell + STRATEGY_ISSUE_PUSHED push above stand untouched, so no client receives a rec
+  // without a manual operator send. The whole step is best-effort: a failure must not roll back the
+  // push (the Issue is already drafted and the operator doorbell already queued). Idempotent within
+  // the week — a rec sent this cycle is no longer isActiveRec, so a re-run skips it.
+  if (isFeatureEnabled('strategy-trust-ladder-autosend', workspaceId)) {
+    try {
+      runAutoSendForWorkspace(workspaceId, weekOf, ws.name);
+    } catch (err) {
+      log.error({ err, workspaceId, weekOf }, 'auto-send step failed (swallowed) — Issue push stands');
+    }
   }
 
   log.info({ workspaceId, weekOf, unchanged }, 'weekly Issue pushed — operator doorbell rung');
@@ -289,6 +293,16 @@ export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsN
       count,
     });
     log.info({ workspaceId, weekOf, count, archetypes: archetypeList }, 'trust-ladder auto-send complete');
+  } else {
+    // Audit blocker #3 — observability for the enabled-but-zero case. We had candidates
+    // (candidateIds.length > 0, guarded above) yet sent NONE — every send hit an
+    // InvalidTransitionError (each already logged per-rec above) or returned null. Without this the
+    // batch would silently vanish. Only reachable when the flag is ENABLED (the call site guards on
+    // strategy-trust-ladder-autosend), so a 0/unexpected count here is a real signal worth a warn.
+    log.warn(
+      { workspaceId, weekOf, count, candidateCount: candidateIds.length },
+      'trust-ladder auto-send sent zero of its candidate batch',
+    );
   }
 }
 

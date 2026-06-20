@@ -195,29 +195,27 @@ describe('TheIssueClientPage', () => {
     expect(screen.getByTestId('the-issue-client-page')).toBeInTheDocument();
   });
 
-  it('"Act on this" fires a content REQUEST (act-on), not generation', () => {
+  it('"Request this" opens a confirm, then fires a content REQUEST (act-on) on confirm — not generation (D1)', () => {
     mockUseClientTheIssue.mockReturnValue({ data: recSet([baseRec({ id: 'rec-99' })]), isLoading: false });
     renderPage();
-    const actBtn = screen.getByRole('button', { name: 'Act on this' });
-    fireEvent.click(actBtn);
+    // The greenlight is "Request this" (monetizable content move); clicking it opens a ConfirmDialog —
+    // act-on fires ONLY on confirm (the no-charge consequence step).
+    fireEvent.click(screen.getByRole('button', { name: 'Request this' }));
+    expect(mockActOn).not.toHaveBeenCalled(); // not yet — dialog is open
+    const requestButtons = screen.getAllByRole('button', { name: 'Request this' });
+    fireEvent.click(requestButtons[requestButtons.length - 1]); // the dialog's confirm
     expect(mockActOn).toHaveBeenCalledWith('rec-99');
   });
 
-  it('content FLOOR: < 2 curated content recs → un-curated gaps framed "we\'re evaluating"', () => {
-    // Zero curated content recs → floor uses strategyData.contentGaps.
+  it('content FLOOR (2-state, audit fix): zero curated content recs → one honest "sizing up" line, no greenlightable cards', () => {
+    // The audit cut the up-to-4 "we're evaluating" filler cards: a single curated rec must never sit
+    // atop a hero of non-actionable filler. With zero curated content recs the floor is one honest line.
     mockUseClientTheIssue.mockReturnValue({ data: recSet([], null), isLoading: false });
-    renderPage({
-      strategyData: strategy({
-        contentGaps: [
-          { topic: 'Choosing a CRM', targetKeyword: 'best crm for agencies', intent: 'commercial', priority: 'high', rationale: 'gap' },
-        ],
-      }),
-    });
-    // Topic renders in both the card headline and the ContentGapRow body — at least one.
-    expect(screen.getAllByText('Choosing a CRM').length).toBeGreaterThan(0);
-    expect(screen.getByText("We're evaluating")).toBeInTheDocument();
-    // Floor cards are NOT greenlightable — no "Act on this" button.
-    expect(screen.queryByRole('button', { name: 'Act on this' })).not.toBeInTheDocument();
+    renderPage();
+    expect(screen.getByText('Your strategist is sizing up your next content opportunities.')).toBeInTheDocument();
+    // No fabricated "we're evaluating" cards, and nothing greenlightable in the floor state.
+    expect(screen.queryByText("We're evaluating")).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Request this|Discuss this/ })).not.toBeInTheDocument();
   });
 
   it('relevance feedback fires the keyword-feedback writer', () => {
@@ -230,8 +228,9 @@ describe('TheIssueClientPage', () => {
   it('preview mode suppresses act-on (read-only)', () => {
     mockUseClientTheIssue.mockReturnValue({ data: recSet([baseRec({ id: 'rec-pv' })]), isLoading: false });
     renderPage({ previewMode: true });
-    const actBtn = screen.getByRole('button', { name: 'Act on this' });
-    fireEvent.click(actBtn);
+    // In preview the greenlight is read-only: act-on must never fire. Clicking any greenlight button
+    // (which would otherwise open the confirm) must not trigger the act-on writer.
+    screen.queryAllByRole('button', { name: /Request this|Discuss this/ }).forEach((b) => fireEvent.click(b));
     expect(mockActOn).not.toHaveBeenCalled();
   });
 

@@ -147,6 +147,7 @@ describe('strategy-autosend-cron — auto-send on weekly push (The Issue, Phase 
 
   afterAll(() => {
     setWorkspaceFlagOverride('strategy-the-issue', wsId, null);
+    setWorkspaceFlagOverride('strategy-trust-ladder-autosend', wsId, null);
     db.prepare('DELETE FROM strategy_autosend_policy WHERE workspace_id = ?').run(wsId);
     db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(wsId);
     db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(wsId);
@@ -159,6 +160,10 @@ describe('strategy-autosend-cron — auto-send on weekly push (The Issue, Phase 
     db.prepare('DELETE FROM client_deliverable WHERE workspace_id = ?').run(wsId);
     clearWeekMarker();
     setWorkspaceFlagOverride('strategy-the-issue', wsId, true);
+    // Blocker 3 (audit resolution): auto-send is now dark-launched behind this child flag. This file
+    // tests the auto-send SUBSYSTEM, so enable it; the dark-launch default-OFF is covered separately
+    // in tests/integration/the-issue-autosend-darklaunch.test.ts.
+    setWorkspaceFlagOverride('strategy-trust-ladder-autosend', wsId, true);
     generateStrategyPovMock.mockReset();
     generateStrategyPovMock.mockResolvedValue({ situation: 'ok' });
     addActivityMock.mockReset();

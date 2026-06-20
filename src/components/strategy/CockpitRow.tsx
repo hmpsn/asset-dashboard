@@ -24,6 +24,22 @@ interface CockpitRowProps {
    *  toggle → inline title (FormInput) + insight (FormTextarea) editor, committed on blur. When
    *  ABSENT (flag-OFF / command-center / other consumers) the row renders exactly as before. */
   onEditWording?: (recId: string, payload: RecWordingOverridePayload) => void;
+  /**
+   * Per-row send-action label. Optional — defaults to "Send to client" so StrategyCockpit and
+   * the flag-OFF path stay byte-identical. The Issue cockpit (BackingMovesQueue) passes
+   * "Stage for issue" because staging is not a client commit; the single commit is the header
+   * "Send issue" button (Blocker 5 — the word "send" lives in exactly one place).
+   */
+  sendLabel?: string;
+  /**
+   * Blocker 5 staging model. When provided (the Issue cockpit), the primary button STAGES the rec
+   * into a local set — it does NOT send to the client (no `actions.send`, no CockpitSendPanel). The
+   * header "Send issue" is the only client commit. `staged` reflects whether this rec is in the set.
+   * ABSENT on StrategyCockpit / flag-OFF → the primary button keeps the real per-row send flow,
+   * byte-identical.
+   */
+  onStage?: (recId: string) => void;
+  staged?: boolean;
 }
 
 type RowMode = 'idle' | 'send' | 'throttle' | 'strike';
@@ -55,7 +71,7 @@ function resurfaceLabel(rec: Recommendation): string | null {
 /** Strategy v3 cockpit row — fixed [severity][value][lifecycle] tag slots + single-line-clamped
  *  why-line + left-edge lifecycle accent rail + the four row actions. NOT the shared
  *  admin/recommendations/RecommendationRow (3 consumers) — this is the v3 curation row. */
-export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWording }: CockpitRowProps) {
+export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWording, sendLabel = 'Send to client', onStage, staged = false }: CockpitRowProps) {
   const [mode, setMode] = useState<RowMode>('idle');
   const [editingWording, setEditingWording] = useState(false);
   const model = toCockpitRow(rec);
@@ -120,9 +136,23 @@ export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWordi
                 onClick={() => setEditingWording((e) => !e)}
               />
             )}
-            <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
-              Send to client
-            </Button>
+            {onStage ? (
+              // Blocker 5 staging: toggle membership in the staged set — NO client write. The header
+              // "Send issue" commits the staged set. CockpitSendPanel is never opened in this path.
+              <Button
+                size="sm"
+                variant={staged ? 'secondary' : 'primary'}
+                disabled={actions.isPending}
+                aria-pressed={staged}
+                onClick={() => onStage(rec.id)}
+              >
+                {staged ? 'Staged' : sendLabel}
+              </Button>
+            ) : (
+              <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
+                {sendLabel}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="secondary"
@@ -184,6 +214,7 @@ export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWordi
       {mode === 'send' && (
         <CockpitSendPanel
           disabled={actions.isPending}
+          commitLabel={sendLabel}
           onSend={(note) => {
             actions.send(rec.id, note || undefined);
             close();

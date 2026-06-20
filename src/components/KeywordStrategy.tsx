@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Target, FileText, HelpCircle, Plus } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button } from './ui';
+import { Target, FileText, HelpCircle, Plus, Search, ArrowRight, AlertTriangle } from 'lucide-react';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow } from './ui';
+import { isCuratedForClient } from '../../shared/recommendation-predicates';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { useKeywordStrategy, useLocalSeo } from '../hooks/admin';
@@ -13,6 +14,7 @@ import { useStrategyPov } from '../hooks/admin/useStrategyPov';
 import { useOperatorSteering } from '../hooks/admin/useOperatorSteering';
 import { useRecBulkMutation } from '../hooks/admin/useRecBulkMutation';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../hooks/useToggleSet';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { ContentGaps } from './strategy/ContentGaps';
@@ -30,9 +32,7 @@ import { StanceBar } from './strategy/issue/StanceBar';
 import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
 import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
 import { AddRecommendationModal } from './strategy/issue/AddRecommendationModal';
-import { ClientRunningOrder } from './strategy/issue/ClientRunningOrder';
 import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
-import { KeywordTargetsLens } from './strategy/issue/KeywordTargetsLens';
 import { ContentWorkOrderLens } from './strategy/issue/ContentWorkOrderLens';
 import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
@@ -183,6 +183,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const issueBulkSend = useRecBulkMutation(workspaceId);
   // cut→sentence contract: cutting a backing move strikes its POV sentence live.
   const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
+  // Blocker 5 staging set — the recs the operator has staged for the ONE client commit (the header
+  // "Send issue"). Per-row "Stage for issue" toggles membership; nothing is written to the client
+  // until "Send issue" commits this set. useToggleSet (UNBOUNDED) = the shared toggle-set primitive
+  // (no hand-rolled has?delete:add). Declared with the other hooks (before any early return).
+  const [stagedRecIds, toggleStage, setStagedRecIds] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   // Operator steering (§11/§12): wording overrides + client running order + add-a-rec.
   // `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls (byte-identical OFF).
   const operatorSteering = useOperatorSteering(workspaceId, theIssueEnabled);
@@ -512,10 +517,43 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         r.clientStatus !== 'discussing',
     )
     .map((r) => r.id);
+  // Blocker 5 staging: a rec is "stageable" iff it is in the staged set AND still sendable. Reconciling
+  // against sendableRecIds keeps the set honest if a staged rec was struck/sent/throttled out from
+  // under it. Per-row/bulk staging never writes to the client — only "Send issue" commits.
+  const sendableSet = new Set(sendableRecIds);
+  const stagedSendableIds = [...stagedRecIds].filter((id) => sendableSet.has(id));
+  // toggleStage comes from useToggleSet (above). Bulk "Stage N" adds the selection (a set UNION, not
+  // a toggle) — the toggle primitive only handles single keys.
+  const stageMany = (recIds: string[]) =>
+    setStagedRecIds((prev) => new Set([...prev, ...recIds]));
   const handleSendIssue = () => {
-    if (sendableRecIds.length === 0) return;
-    issueBulkSend.mutate({ recIds: sendableRecIds, action: 'send' });
+    if (stagedSendableIds.length === 0) return;
+    // The ONE client commit (Blocker 5): send the staged set, then clear it.
+    issueBulkSend.mutate(
+      { recIds: stagedSendableIds, action: 'send' },
+      { onSuccess: () => setStagedRecIds(new Set()) },
+    );
   };
+  // Blocker 5 live counter — "N staged · M already with client". N (staged) is the staged-and-still-
+  // sendable count; M (already with client) is the curated set via the SHARED isCuratedForClient
+  // predicate (recommendation-predicates.ts — the single source the server projection also uses).
+  // Both derive from the one cockpitRecs set, so numerator and denominator share a source.
+  const stagedCount = stagedSendableIds.length;
+  const curatedCount = cockpitRecs.filter(isCuratedForClient).length;
+  // POV-staleness signal: the drafted POV is stale when backing moves have diverged from it since it
+  // was drafted — either a backing move was CUT (struck this session) or the operator has applied a
+  // wording OVERRIDE to a rec (the override exists only because the operator changed the rec after the
+  // draft, so the POV's prose may now reference outdated wording). We READ pov.generatedAt only to
+  // anchor that a POV exists to be stale; we NEVER reset any draft on generatedAt here — the
+  // lost-keystroke guard (reset keyed on generatedAt) lives wholly inside DraftedPovEditor and is
+  // untouched. A struck backing move always diverges from a POV drafted before the cut.
+  const hasWordingOverride = Object.values(operatorSteering.wording).some(
+    (o) => !!o && (!!o.title || !!o.insight),
+  );
+  const povMayBeStale =
+    !!strategyPov.pov &&
+    !!strategyPov.pov.generatedAt &&
+    (struckRecIds.length > 0 || hasWordingOverride);
   const issueConfigPanelProps = {
     workspaceId,
     isAuxLoading,
@@ -540,17 +578,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     onOpenLocalSeoSetup: () => setLocalSeoSetupOpen(true),
   };
   const issueOverviewEl = (theIssueEnabled && isRealStrategy && strategy) ? (
-    // Order (plan §5): IssueHeader (config chrome + Preview + Send issue) → StanceBar →
-    // DraftedPovEditor → BackingMovesQueue (archetype) → existing supporting surfaces
-    // (Orient → NeedsAttentionStrip is folded into BackingMovesQueue's cockpit reuse;
-    // OrientZone + cannibalization + competitor/keywords/content reference below).
+    // Blocker 4 — the 5-beat SPINE above the fold (IssueHeader [config + the canonical Send-issue
+    // button] → StanceBar → DraftedPovEditor → BackingMovesQueue), then everything else collapsed
+    // into ONE "Supporting detail" disclosure (closed by default). KeywordTargetsLens is dropped
+    // for a single deep-link row; ClientRunningOrder is cut from v1. Empty lenses self-null so a
+    // cold workspace shows zero empty SectionCard chrome.
     <div className="space-y-8">
       <IssueHeader
         subtitle={headerSubtitle}
         onSendIssue={handleSendIssue}
         isSending={issueBulkSend.isPending}
-        canSend={sendableRecIds.length > 0}
+        canSend={stagedCount > 0}
         configPanelProps={issueConfigPanelProps}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
       />
       <StanceBar recs={cockpitRecs} />
       <DraftedPovEditor
@@ -560,6 +601,26 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onRegenerate={strategyPov.regenerate}
         isGenerating={strategyPov.isGenerating}
       />
+      {/* POV-staleness nudge — directly under the editor. Shows when cut/edited backing moves have
+          diverged from the drafted POV (anchored on pov.generatedAt; never resets on it). Reuses the
+          existing regenerate action. */}
+      {povMayBeStale && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <span className="flex items-center gap-2 t-caption-sm text-amber-400">
+            <Icon as={AlertTriangle} size="sm" className="text-amber-400 shrink-0" />
+            Point of view may be out of date — regenerate?
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => strategyPov.regenerate()}
+            loading={strategyPov.isGenerating}
+            disabled={strategyPov.isGenerating}
+          >
+            Regenerate
+          </Button>
+        </div>
+      )}
       {/* Operator steering §12 — add a rec the system missed (mints into the curation queue). */}
       <div className="flex justify-end">
         <Button
@@ -578,32 +639,53 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onCut={(id) => setStruckRecIds((s) => [...s, id])}
         shortlistCap={5}
         onEditWording={operatorSteering.editWording}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
+        stagedRecIds={stagedRecIds}
+        onStage={toggleStage}
+        onStageMany={stageMany}
       />
-      {/* Operator steering §12 — reorder the client-facing running order (decoupled from the
-          archetype grouping above; orders only what the client already sees). */}
-      <ClientRunningOrder
-        recs={cockpitRecs}
-        sortOrder={operatorSteering.sortOrder}
-        onReorder={operatorSteering.reorder}
-        isPending={operatorSteering.isPending}
-      />
-      {/* Trust ladder (Phase 4) — per-archetype auto-send rewards for the 2 low-risk buckets. */}
-      <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
-      {/* Four-jobs lenses (Phase 5) — read-projections of the curated rec set into the existing
-          Keyword Hub + content-pipeline surfaces. */}
-      <KeywordTargetsLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
-      <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
-      {/* Existing supporting surfaces — reused verbatim from the command-center branch. */}
-      {orientEl}
-      {realLeaves?.cannibalization}
-      {realLeaves?.strategyDiff}
-      {/* Phase 6 deep-link (flag-ON only — lives inside issueOverviewEl) to the dedicated
-          Competitors page (share of voice, keyword gaps, backlinks, competitor alerts). */}
-      <div className="flex justify-end">
-        <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
-          Competitor intelligence →
-        </Button>
-      </div>
+      {/* ── Supporting detail — collapsed by default. Everything that is NOT the 5-beat spine lives
+          here so the cockpit opens to the decision, not a wall. ── */}
+      <details className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 t-ui font-medium text-[var(--brand-text)] select-none">
+          <span>Supporting detail</span>
+          <Icon
+            as={ArrowRight}
+            size="sm"
+            className="text-[var(--brand-text-muted)] transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div className="space-y-6 border-t border-[var(--brand-border)] px-4 py-4">
+          {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
+          <ClickableRow
+            onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60"
+          >
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+              <Icon as={Search} size="md" className="text-accent-brand" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Curated keyword targets</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+                Open the curated keyword &amp; topic targets in the Keyword Hub
+              </div>
+            </div>
+            <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+          </ClickableRow>
+          {/* Read-projection lenses + supporting surfaces (each self-nulls when empty). */}
+          <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          {orientEl}
+          {realLeaves?.cannibalization}
+          {realLeaves?.strategyDiff}
+          <div className="flex justify-end">
+            <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
+              Competitor intelligence →
+            </Button>
+          </div>
+        </div>
+      </details>
       <AddRecommendationModal
         open={addRecOpen}
         onClose={() => setAddRecOpen(false)}

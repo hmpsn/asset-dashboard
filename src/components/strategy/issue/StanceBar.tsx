@@ -19,28 +19,22 @@
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { Archetype } from '../../../../shared/types/strategy-archetype';
 import { ARCHETYPE_ORDER, ARCHETYPE_LABELS } from '../../../../shared/types/strategy-archetype';
+import { ARCHETYPE_ACCENT } from '../../../lib/recArchetypeMap';
 import { deriveStance, type StanceResult } from '../../../lib/recStance';
 
-// ─── Per-archetype accent fill (uses existing accent hue tokens via Tailwind
-//     utility classes — no new tokens; see tokens.css --teal/--blue/--emerald/
-//     --amber/--sky/--orange). No purple.
-const ARCHETYPE_COLOR: Record<Archetype, string> = {
-  authority_bet: 'bg-teal-500/70',      // action hue — new content bets
-  refresh_reclaim: 'bg-blue-400/70',    // data hue — refresh work
-  defend: 'bg-amber-400/70',            // amber — risk / defend
-  quick_win: 'bg-emerald-400/70',       // emerald — wins / quick gains
-  technical: 'bg-sky-400/60',           // sky — technical / infra
-  local: 'bg-orange-400/70',            // orange — local
-};
-
-// Dot color for legend swatch (slightly more opaque than bar fill)
-const ARCHETYPE_DOT_COLOR: Record<Archetype, string> = {
-  authority_bet: 'bg-teal-400',
-  refresh_reclaim: 'bg-blue-400',
-  defend: 'bg-amber-400',
-  quick_win: 'bg-emerald-400',
-  technical: 'bg-sky-400',
-  local: 'bg-orange-400',
+// ─── Per-archetype bar fill — the SAME hue family as the shared ARCHETYPE_ACCENT
+//     dot, just at ~70% opacity so the proportional fill reads as a tint of its
+//     legend dot. Kept as STATIC literals (not runtime-concatenated) so the
+//     Tailwind v4 JIT scanner emits every class. Hue-for-hue identical to
+//     ARCHETYPE_ACCENT (teal/blue/amber/emerald/sky/orange) — the authority_bet
+//     teal/blue swap is gone. No new tokens, no purple.
+const ARCHETYPE_BAR_FILL: Record<Archetype, string> = {
+  authority_bet: 'bg-teal-400/70',     // action hue — new content bets (matches ARCHETYPE_ACCENT)
+  refresh_reclaim: 'bg-blue-400/70',   // data hue — reclaim work
+  defend: 'bg-amber-400/70',           // amber — risk / defend
+  quick_win: 'bg-emerald-400/70',      // emerald — wins / quick gains
+  technical: 'bg-sky-400/70',          // sky — technical / infra
+  local: 'bg-orange-400/70',           // orange — local
 };
 
 interface StanceBarProps {
@@ -65,9 +59,10 @@ export function StanceBar({ recs, stance: stanceProp }: StanceBarProps) {
             <div
               key={archetype}
               data-archetype={archetype}
-              className={`h-full transition-all ${ARCHETYPE_COLOR[archetype]}`}
+              className={`h-full transition-all ${ARCHETYPE_BAR_FILL[archetype]}`}
               style={{ width: `${pct}%` }}
               title={`${ARCHETYPE_LABELS[archetype]}: ${count}`}
+              aria-label={`${count} ${ARCHETYPE_LABELS[archetype]} moves`}
             />
           );
         })}
@@ -78,7 +73,7 @@ export function StanceBar({ recs, stance: stanceProp }: StanceBarProps) {
         {populated.map(archetype => (
           <span key={archetype} className="flex items-center gap-1.5">
             <span
-              className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] ${ARCHETYPE_DOT_COLOR[archetype]}`}
+              className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] ${ARCHETYPE_ACCENT[archetype]}`}
             />
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {ARCHETYPE_LABELS[archetype]}

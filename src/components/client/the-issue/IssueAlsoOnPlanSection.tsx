@@ -2,8 +2,8 @@
 //
 // Spec §5.3 / audit §16.5. The NON-content moves (refresh & reclaim, technical, keyword/
 // topic, defend) grouped and lighter, below the content hero. Each group links out to its
-// interior page. "Act on this" where relevant — but the section is intentionally compact
-// (links + counts), not a second wall of full cards.
+// interior page — but the section is intentionally compact (links + counts), not a second
+// wall of full cards with their own greenlight CTA.
 //
 // Uses the shared archetype contract (recArchetype) but with CLIENT-FRIENDLY labels — no
 // admin jargon ("Defend cannibalized" → "Protecting your rankings"). The content

@@ -22,6 +22,7 @@ import { sortRecs } from '../cockpitRowModel';
 import { useCurationSelection } from '../hooks/useCurationSelection';
 import { useRecBulkMutation } from '../../../hooks/admin/useRecBulkMutation';
 import { ARCHETYPE_ORDER, ARCHETYPE_LABELS, recArchetype } from '../../../../shared/types/strategy-archetype';
+import { ARCHETYPE_ACCENT } from '../../../lib/recArchetypeMap';
 import type { Archetype } from '../../../../shared/types/strategy-archetype';
 import type { CockpitActions } from '../StrategyCockpit';
 import type { Recommendation } from '../../../../shared/types/recommendations';
@@ -30,16 +31,14 @@ import type { RecWordingOverridePayload } from '../../../../shared/types/rec-ope
 // ── Default shortlist cap (used when the prop is absent) ──────────────────────
 const DEFAULT_SHORTLIST_CAP = 5;
 
-// ── Per-archetype accent dot for the group header ─────────────────────────────
-// Brand-law: teal=action, blue=data, emerald=wins. No purple anywhere.
-const ARCHETYPE_ACCENT_SAFE: Record<Archetype, string> = {
-  authority_bet: 'bg-blue-500',
-  refresh_reclaim: 'bg-teal-500',
-  defend: 'bg-amber-500',
-  quick_win: 'bg-emerald-500',
-  technical: 'bg-[var(--zinc-600)]',
-  local: 'bg-cyan-600',
-};
+// Per-row + bulk staging verbs (Blocker 5). The header "Send issue" button is the ONE commit, so
+// every queue-level action stages only — the word "send" never appears at queue level.
+const STAGE_ROW_LABEL = 'Stage for issue';
+const STAGE_BULK_VERB = 'Stage';
+
+// Group-dot color comes from the ONE shared ARCHETYPE_ACCENT map (recArchetypeMap.ts),
+// imported by StanceBar too — so the stance legend dot and this group dot are byte-
+// identical per archetype (the authority_bet teal/blue swap is fixed at the source).
 
 export interface BackingMovesQueueProps {
   workspaceId: string;
@@ -55,6 +54,23 @@ export interface BackingMovesQueueProps {
    *  operator can correct a rec's title/insight inline. Optional — absent on any consumer that
    *  doesn't steer (the row renders unchanged), so the flag-OFF path stays byte-identical. */
   onEditWording?: (recId: string, payload: RecWordingOverridePayload) => void;
+  /**
+   * Blocker 5 live counter: N = staged (sendableRecIds.length) · M = already with client
+   * (cockpitRecs.filter(isCuratedForClient).length). Both derived ONCE in the orchestrator from the
+   * SAME rec set + shared predicate (numerator/denominator share a source). Rendered near the queue
+   * header. Optional so other (future) consumers render the queue without the counter.
+   */
+  stagedCount?: number;
+  curatedCount?: number;
+  /**
+   * Blocker 5 staging model. `stagedRecIds` is the orchestrator-owned set of recs queued for the
+   * one commit (the header "Send issue"). `onStage` toggles one rec; `onStageMany` adds the bulk
+   * selection. NEITHER writes to the client — staging is local selection only. When provided, the
+   * per-row primary button + the bulk bar STAGE instead of sending.
+   */
+  stagedRecIds?: Set<string>;
+  onStage?: (recId: string) => void;
+  onStageMany?: (recIds: string[]) => void;
 }
 
 /**
@@ -69,6 +85,9 @@ function ArchetypeGroup({
   onCut,
   selectionState,
   onEditWording,
+  sendLabel,
+  stagedRecIds,
+  onStage,
 }: {
   archetype: Archetype;
   recs: Recommendation[];
@@ -80,6 +99,11 @@ function ArchetypeGroup({
     toggle: (id: string) => void;
   };
   onEditWording?: (recId: string, payload: RecWordingOverridePayload) => void;
+  /** Per-row send label threaded to each CockpitRow ("Stage for issue" in the Issue cockpit). */
+  sendLabel: string;
+  /** Blocker 5 staging — the staged set + the toggle, threaded to each CockpitRow. */
+  stagedRecIds?: Set<string>;
+  onStage?: (recId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -101,7 +125,7 @@ function ArchetypeGroup({
       {/* Group header */}
       <div className="flex items-center gap-2">
         <span
-          className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] shrink-0 ${ARCHETYPE_ACCENT_SAFE[archetype]}`}
+          className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] shrink-0 ${ARCHETYPE_ACCENT[archetype]}`}
           aria-hidden
         />
         <h3 className="t-caption font-semibold text-[var(--brand-text-bright)]">
@@ -121,6 +145,9 @@ function ArchetypeGroup({
           selected={selectionState.isSelected(r.id)}
           onToggleSelect={selectionState.toggle}
           onEditWording={onEditWording}
+          sendLabel={sendLabel}
+          onStage={onStage}
+          staged={stagedRecIds?.has(r.id) ?? false}
         />
       ))}
 
@@ -157,6 +184,11 @@ export function BackingMovesQueue({
   onCut,
   shortlistCap = DEFAULT_SHORTLIST_CAP,
   onEditWording,
+  stagedCount,
+  curatedCount,
+  stagedRecIds,
+  onStage,
+  onStageMany,
 }: BackingMovesQueueProps) {
   // Group recs by archetype, preserving ARCHETYPE_ORDER
   const groups = useMemo(() => {
@@ -185,9 +217,19 @@ export function BackingMovesQueue({
 
   const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
 
+  // Blocker 5 live counter, rendered as the SectionCard action. N and M share the orchestrator's
+  // single rec set + the shared isCuratedForClient predicate (numerator/denominator-share-a-source).
+  // Only rendered when both counts are provided (the Issue cockpit always passes them).
+  const counterEl =
+    stagedCount !== undefined && curatedCount !== undefined ? (
+      <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums" data-testid="backing-moves-counter">
+        {stagedCount} staged · {curatedCount} already with client
+      </span>
+    ) : undefined;
+
   if (groups.length === 0) {
     return (
-      <SectionCard title="Backing moves" titleIcon={titleIcon}>
+      <SectionCard title="Backing moves" titleIcon={titleIcon} action={counterEl}>
         <p className="t-caption-sm text-[var(--brand-text-muted)] py-6 text-center">
           No recommendations to back the issue yet.
         </p>
@@ -197,7 +239,7 @@ export function BackingMovesQueue({
 
   return (
     <>
-      <SectionCard title="Backing moves" titleIcon={titleIcon}>
+      <SectionCard title="Backing moves" titleIcon={titleIcon} action={counterEl}>
         <div className="space-y-6">
           {groups.map(({ archetype, recs: groupRecs }) => (
             <ArchetypeGroup
@@ -209,25 +251,38 @@ export function BackingMovesQueue({
               onCut={onCut}
               selectionState={sel}
               onEditWording={onEditWording}
+              sendLabel={STAGE_ROW_LABEL}
+              stagedRecIds={stagedRecIds}
+              onStage={onStage}
             />
           ))}
         </div>
       </SectionCard>
 
-      {/* Sticky bulk-action bar — outside the SectionCard so fixed positioning isn't clipped. */}
+      {/* Sticky bulk-action bar — outside the SectionCard so fixed positioning isn't clipped.
+          sendVerb="Stage" so the bulk action reads "Stage N". Blocker 5: "Stage N" STAGES the
+          selection (no client write) — the one client commit is the header "Send issue". Throttle /
+          strike remain real bulk mutations (they are not client sends). */}
       <CurationBulkActionBar
         selectedCount={sel.selectedCount}
         isAllInFilter={sel.isAllInFilter}
         isPending={bulk.isPending}
         onClear={sel.clear}
-        onAction={(action, throttleDays) =>
+        sendVerb={STAGE_BULK_VERB}
+        onAction={(action, throttleDays) => {
+          if (action === 'send') {
+            // Stage the selected recs (local set) — NOT a client send.
+            onStageMany?.(sel.resolveSelectedIds());
+            sel.clear();
+            return;
+          }
           bulk.mutate({
             recIds: sel.resolveSelectedIds(),
             action,
             throttleDays,
             confirmStrike: action === 'strike',
-          })
-        }
+          });
+        }}
       />
     </>
   );

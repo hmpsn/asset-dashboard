@@ -20,7 +20,7 @@
  * StrategyCockpit.test.tsx for the rec factory + bulk-mutation mock).
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordStrategyPanel } from '../../src/components/KeywordStrategy';
@@ -261,12 +261,18 @@ describe('KeywordStrategyPanel — The Issue flag parity', () => {
       expect(screen.queryByText('Keyword Strategy')).toBeNull();
     });
 
-    it('Send issue fires the existing atomic bulk-send route (action:send)', () => {
+    it('Send issue commits the STAGED set via the atomic bulk-send route (action:send)', () => {
       renderPanel();
-      const sendBtn = screen.getByRole('button', { name: /send issue/i });
-      sendBtn.click();
+      // Blocker 5 staging model: per-row "Stage for issue" stages locally (NO client write); the
+      // header "Send issue" is the one commit. Stage both rows (re-query each time — a staged row
+      // relabels to "Staged"), then Send issue commits the staged set. fireEvent flushes state so the
+      // send handler sees the staged set.
+      fireEvent.click(screen.getAllByRole('button', { name: 'Stage for issue' })[0]);
+      fireEvent.click(screen.getAllByRole('button', { name: 'Stage for issue' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: /send issue/i }));
       expect(mocks.bulkMutate).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'send', recIds: expect.arrayContaining(['r1', 'r2']) }),
+        expect.anything(), // the { onSuccess } options that clear the staged set
       );
     });
   });

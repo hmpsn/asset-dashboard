@@ -35,10 +35,13 @@ describe('the-issue evergreen copy', () => {
     }
   });
 
-  it('CTA labels are "Act on this" / "See the details", never "open the brief"', () => {
+  it('CTA labels are "Request this"/"Discuss this" + "See the details", never "Act on this"/"open the brief" (D1)', () => {
     const all = Object.values(ISSUE_CTA).join(' ').toLowerCase();
-    expect(all).toContain('act on this');
+    expect(all).toContain('request this');
+    expect(all).toContain('discuss this');
     expect(all).toContain('see the details');
+    // The retired pre-D1 greenlight label must never appear on the client surface.
+    expect(all).not.toContain('act on this');
     expect(all).not.toContain('open the brief');
     expect(all).not.toContain('get brief');
   });

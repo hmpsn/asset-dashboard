@@ -14,6 +14,7 @@
 import { ShieldCheck } from 'lucide-react';
 import { SectionCard, Icon, Toggle } from '../../ui';
 import { useAutoSendPolicy } from '../../../hooks/admin/useAutoSendPolicy';
+import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { ARCHETYPE_LABELS } from '../../../../shared/types/strategy-archetype';
 import type { AutoSendPolicyRow } from '../../../../shared/types/strategy-autosend';
 
@@ -78,10 +79,27 @@ function LadderRow({
  * Renders one row per auto-send-eligible archetype. The `theIssueEnabled` prop is threaded into the
  * hook's `enabled` arg, so flag-OFF makes zero network calls even if this panel is mounted outside
  * the issueOverviewEl gate.
+ *
+ * Blocker 3 (dark-launch): the panel returns `null` unless the OFF-by-default child flag
+ * `strategy-trust-ladder-autosend` is on. With it OFF (the default) the auto-send subsystem is inert
+ * server-side AND this control surface never renders — there is no way to flip on a feature the cron
+ * won't honor. Both hooks (flag + policy) are called UNCONDITIONALLY before any early return
+ * (Rules of Hooks); the policy hook's `enabled` arg is additionally gated on the flag so a hidden
+ * panel makes zero network calls.
+ *
+ * Blocker 4 (empty→null): once the flag IS on, the panel still returns `null` when there are no
+ * policy rows yet, so a cold workspace shows zero empty SectionCard chrome (mirrors
+ * IssueAlsoOnPlanSection).
  */
 export function TrustLadderPanel({ workspaceId, theIssueEnabled = true }: TrustLadderPanelProps) {
+  const autoSendEnabled = useFeatureFlag('strategy-trust-ladder-autosend');
   const { policies, threshold, isLoading, isError, setEnabled, isUpdating } =
-    useAutoSendPolicy(workspaceId, theIssueEnabled);
+    useAutoSendPolicy(workspaceId, theIssueEnabled && autoSendEnabled);
+
+  // Dark-launch: nothing renders unless the child flag is on (default OFF).
+  if (!autoSendEnabled) return null;
+  // Empty → null: no eligible buckets yet ⇒ no empty SectionCard on a cold workspace.
+  if (!isLoading && !isError && policies.length === 0) return null;
 
   const titleIcon = <Icon as={ShieldCheck} size="md" className="text-accent-brand" />;
 

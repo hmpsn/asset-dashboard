@@ -35,6 +35,7 @@ import {
   throttleRecommendation,
   fixRecommendation,
   approveRecommendation,
+  REC_POLICY_REGISTRY,
 } from '../recommendation-lifecycle.js';
 import { addRecDiscussionEntry, listRecDiscussion } from '../rec-discussion.js';
 import { notifyClientCuratedRecsSent } from '../email.js';
@@ -42,7 +43,8 @@ import { createJob, hasActiveJob } from '../jobs.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
-import { updatePageState, getPageIdBySlug, getWorkspace, buildClientPortalUrl } from '../workspaces.js';
+import { updatePageState, getPageIdBySlug, getWorkspace, buildClientPortalUrl, computeEffectiveTier } from '../workspaces.js';
+import type { EffectiveTier } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -113,8 +115,34 @@ function clientFacingStatus(status: Recommendation['clientStatus']): ClientFacin
 
 /** The shape a public rec read emits: the allow-listed Recommendation fields plus the two
  *  Strategy "The Issue" §7 client-facing projections (restricted clientStatus + synthetic
- *  `delivered`). `delivered` is NOT a DB column — it is derived from the rec's completion state. */
-type PublicRecommendation = Recommendation & { delivered?: boolean };
+ *  `delivered`), plus the audit-blocker #1 server-authoritative `actOn` descriptor. `delivered`
+ *  is NOT a DB column — it is derived from the rec's completion state. `actOn` is computed once
+ *  per rec from the effective tier + the rec's monetizable policy (see actOnDescriptor). */
+type PublicRecommendation = Recommendation & {
+  delivered?: boolean;
+  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth'; monetizable: boolean };
+};
+
+/**
+ * The Issue audit-blocker #1 — server-authoritative "Request this" descriptor. Computed ONCE per
+ * rec from the workspace's effective tier + the rec's monetizable policy (REC_POLICY_REGISTRY), so
+ * the client can never be tricked by a hidden button: the act-on route is the gate, this descriptor
+ * is the matching projection. Free + monetizable → `locked` (client renders <TierGate>; the route
+ * also 403s). Growth/Premium, or any non-monetizable rec → `included` (covered by the plan; confirm,
+ * no charge at click). `priced` is reserved for the future à-la-carte path and is NOT emitted now.
+ * Gated by the caller exactly like the restricted clientStatus projection so it is ABSENT when
+ * strategy-the-issue is OFF (flag-OFF byte-identical).
+ */
+function actOnDescriptor(rec: Recommendation, effectiveTier: EffectiveTier): NonNullable<PublicRecommendation['actOn']> {
+  // `monetizable` drives the client greenlight verb ("Request this" vs "Discuss this") AND the gate —
+  // it travels on the descriptor so the client never re-derives it (non-monetizable authority_bet
+  // recs like keyword_gap/topic_cluster must read "Discuss this").
+  const monetizable = REC_POLICY_REGISTRY[rec.type]?.monetizable ?? false;
+  if (effectiveTier === 'free' && monetizable) {
+    return { mode: 'locked', requiredTier: 'growth', monetizable };
+  }
+  return { mode: 'included', monetizable };
+}
 
 // Strategy v3 (spec §7.4 / 00-contracts §4 readers) — the public rec projection is an explicit
 // ALLOW-LIST, not a blocklist. A blocklist (`...rec` minus a few keys) silently leaks every NEW
@@ -128,7 +156,11 @@ type PublicRecommendation = Recommendation & { delivered?: boolean };
 // flag are projected so the curated client feed can render the loop ("you've greenlit N moves") and
 // "what's working" (the client's own delivered moves). A pre-send rec exposes NEITHER (clientStatus
 // stays absent → byte-identical to the legacy/flag-OFF read).
-function stripEmvFromPublicRecs(recs: Recommendation[], exposeClientStatus = false): PublicRecommendation[] {
+function stripEmvFromPublicRecs(
+  recs: Recommendation[],
+  exposeClientStatus = false,
+  effectiveTier: EffectiveTier = 'free',
+): PublicRecommendation[] {
   return recs.map((r) => {
     const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
     const out: PublicRecommendation = {
@@ -177,14 +209,26 @@ function stripEmvFromPublicRecs(recs: Recommendation[], exposeClientStatus = fal
         out.clientStatus = cfStatus;
         out.delivered = r.status === 'completed';
       }
+      // Audit-blocker #1 — the server-authoritative "Request this" descriptor. UNLIKE clientStatus/
+      // delivered above (post-send only), actOn is intentionally projected for EVERY flag-ON rec —
+      // the client needs it on any card it can act on (pre-send included). Gated by THIS same
+      // exposeClientStatus flag (per-workspace strategy-the-issue), so it is ABSENT when the flag is
+      // OFF (flag-OFF byte-identical). Computed once from the effective tier + the rec's monetizable
+      // policy; the client renders <TierGate> for `locked` and the act-on route 403s in lock-step.
+      out.actOn = actOnDescriptor(r, effectiveTier);
     }
     return out;
   });
 }
 
 /** Public-route response: a RecommendationSet whose recs have emvPerWeek stripped. */
-function toPublicRecommendationSet(set: RecommendationSet, recs: Recommendation[], exposeClientStatus = false): RecommendationSet {
-  return { ...set, recommendations: stripEmvFromPublicRecs(recs, exposeClientStatus) };
+function toPublicRecommendationSet(
+  set: RecommendationSet,
+  recs: Recommendation[],
+  exposeClientStatus = false,
+  effectiveTier: EffectiveTier = 'free',
+): RecommendationSet {
+  return { ...set, recommendations: stripEmvFromPublicRecs(recs, exposeClientStatus, effectiveTier) };
 }
 
 // ─── Recommendation Engine ─────────────────────────────────────────
@@ -253,6 +297,11 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
     // The Issue §7 — the restricted clientStatus projection + the ?clientStatus filter are gated on
     // the per-workspace flag, so a non-Issue workspace's public read stays byte-identical to legacy.
     const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
+    // Effective tier feeds the audit-blocker #1 `actOn` descriptor. Resolved ONLY on the flag-ON
+    // path (inside the exposeClientStatus block below) so the flag-OFF read does zero extra DB work
+    // and stays byte-identical; the default 'free' is never used when the flag is off (actOn is
+    // gated on exposeClientStatus, so it is absent then regardless of this value).
+    let effectiveTier: EffectiveTier = 'free';
     let recs = set.recommendations;
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
@@ -262,6 +311,8 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
     // only — never baked) THEN order by the operator's client-facing running order (recs with a
     // sort_order first, ascending; the rest after in their existing order via a stable sort).
     if (exposeClientStatus) {
+      const ws = getWorkspace(workspaceId);
+      if (ws) effectiveTier = computeEffectiveTier(ws);
       recs = applyWordingOverrides(workspaceId, recs);
       const sortOrderMap = getSortOrderMap(workspaceId);
       if (sortOrderMap.size > 0) {
@@ -280,7 +331,7 @@ router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth()
           .map(({ r }) => r);
       }
     }
-    res.json(toPublicRecommendationSet(set, recs, exposeClientStatus));
+    res.json(toPublicRecommendationSet(set, recs, exposeClientStatus, effectiveTier));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -397,7 +448,13 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
   }
   // Client-facing single-rec response — strip the admin/AI-only dollar figures
   // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
-  res.json(stripEmvFromPublicRecs([rec], isFeatureEnabled('strategy-the-issue', workspaceId))[0]);
+  // Resolve the effective tier ONLY on the flag-ON path so the flag-OFF response stays
+  // byte-identical (no actOn, no extra DB read); the tier feeds the audit-blocker #1 descriptor.
+  const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
+  const effectiveTier: EffectiveTier = exposeClientStatus
+    ? (() => { const ws = getWorkspace(workspaceId); return ws ? computeEffectiveTier(ws) : 'free'; })()
+    : 'free';
+  res.json(stripEmvFromPublicRecs([rec], exposeClientStatus, effectiveTier)[0]);
 });
 
 // Dismiss a recommendation
@@ -457,12 +514,28 @@ router.post(
   requireAuthenticatedClientPortalAuth(),
   (req, res) => {
     const { workspaceId, recId } = req.params;
-    if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
     // Read the rec BEFORE mutating so we can derive the content-request fields + attribution.
     const set = loadRecommendations(workspaceId);
     const recBefore = set?.recommendations.find((r) => r.id === recId) ?? null;
     if (!recBefore) return res.status(404).json({ error: 'Recommendation not found' });
+
+    // Audit-blocker #1 — server-authoritative pricing gate (NO Stripe I/O; runs BEFORE the L6
+    // db.transaction() so a rejected request creates NOTHING). Additive under strategy-the-issue so
+    // the route stays byte-identical when the flag is OFF: a Free-tier client greenlighting a
+    // MONETIZABLE rec (REC_POLICY_REGISTRY) is rejected with 403 + the required upgrade tier. The
+    // route — not the hidden button — is the gate; the `actOn: locked` projection is its UI mirror.
+    const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
+    const effectiveTier = computeEffectiveTier(ws);
+    if (
+      exposeClientStatus &&
+      effectiveTier === 'free' &&
+      (REC_POLICY_REGISTRY[recBefore.type]?.monetizable ?? false)
+    ) {
+      return res.status(403).json({ error: 'This move is available on the Growth plan.', requiredTier: 'growth' });
+    }
 
     // L6: the greenlight (clientStatus → approved) and the durable content-request creation are
     // ONE atomic unit — a throw between them must not leave an approved rec with no request (an
@@ -552,9 +625,10 @@ router.post(
 
     // Client-facing response — strip the admin/AI-only fields (mirror the GET/PATCH routes). act-on
     // is a The-Issue action, so expose the restricted clientStatus (the client must see their
-    // greenlight took effect) gated on the per-workspace flag.
+    // greenlight took effect) + the actOn descriptor, gated on the per-workspace flag (exposeClientStatus
+    // + effectiveTier resolved once at the top of the handler for the pricing gate).
     res.json({
-      recommendation: stripEmvFromPublicRecs([rec], isFeatureEnabled('strategy-the-issue', workspaceId))[0],
+      recommendation: stripEmvFromPublicRecs([rec], exposeClientStatus, effectiveTier)[0],
       requestId: request.id,
     });
   },

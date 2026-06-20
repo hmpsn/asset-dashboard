@@ -41,6 +41,14 @@ export interface IssueHeaderProps {
    * header. Forwarded verbatim from the orchestrator's StrategySettings wiring.
    */
   configPanelProps: StrategyConfigPanelProps;
+  /**
+   * Blocker 5 live counter (the ONE canonical send surface). N = staged (sendableRecIds.length),
+   * M = already with client (curated set via the shared isCuratedForClient predicate). Both derive
+   * from the orchestrator's single rec set, so numerator and denominator share a source. Shown
+   * beside the Send-issue button; M=curatedCount also drives the all-curated disabled reason.
+   */
+  stagedCount: number;
+  curatedCount: number;
 }
 
 export function IssueHeader({
@@ -49,7 +57,17 @@ export function IssueHeader({
   isSending,
   canSend,
   configPanelProps,
+  stagedCount,
+  curatedCount,
 }: IssueHeaderProps) {
+  // Inline visible disabled reason (NOT a tooltip) — a11y: wired to the button via aria-describedby.
+  // staged===0 with nothing curated yet vs everything-curated produce different copy.
+  const disabledReason = canSend
+    ? null
+    : curatedCount > 0
+      ? 'Everything curated is already with your client.'
+      : 'Stage moves below to send.';
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -57,16 +75,34 @@ export function IssueHeader({
         subtitle={subtitle}
         icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
         actions={
-          <Button
-            variant="primary"
-            size="md"
-            icon={Send}
-            loading={isSending}
-            disabled={!canSend}
-            onClick={onSendIssue}
-          >
-            Send issue
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3">
+              {/* Live counter beside the single commit button (numerator/denominator share a source). */}
+              <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums whitespace-nowrap">
+                {stagedCount} staged · {curatedCount} already with client
+              </span>
+              <Button
+                variant="primary"
+                size="md"
+                icon={Send}
+                loading={isSending}
+                disabled={!canSend}
+                aria-disabled={!canSend}
+                aria-describedby={disabledReason ? 'send-issue-disabled-reason' : undefined}
+                onClick={onSendIssue}
+              >
+                Send issue
+              </Button>
+            </div>
+            {disabledReason && (
+              <span
+                id="send-issue-disabled-reason"
+                className="t-caption-sm text-[var(--brand-text-muted)]"
+              >
+                {disabledReason}
+              </span>
+            )}
+          </div>
         }
       />
 
