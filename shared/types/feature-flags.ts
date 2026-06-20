@@ -24,6 +24,12 @@ export const FEATURE_FLAGS = {
   'smart-placeholders': false,
 
   // Client Insights Briefing (5-phase feature)
+  // NOTE: the CLIENT magazine overview variant (InsightsBriefingPage + sub-components)
+  // was removed (2026-06-20). These flags are RETAINED because the SERVER briefing
+  // pipeline they gate (briefing-cron, briefing routes, admin BriefingReviewQueue) is
+  // shared infrastructure: it feeds the intelligence ClientSignalsSlice, the public-portal
+  // projection, and strategy-issue-cron (The Issue). See controller-review note in the
+  // teardown PR before retiring these flags or the server briefing system.
   'client-briefing-v2': false,
   // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
   'client-briefing-v2-ai-polish': false,

@@ -35,7 +35,6 @@ vi.mock('../../../src/components/client/IntelligenceSummaryCard', () => ({ Intel
 vi.mock('../../../src/components/client/HealthScoreCard', () => ({ HealthScoreCard: () => <div /> }));
 vi.mock('../../../src/components/client/PredictionShowcaseCard', () => ({ PredictionShowcaseCard: () => <div /> }));
 vi.mock('../../../src/components/client/InsightsDigest', () => ({ InsightsDigest: () => <div /> }));
-vi.mock('../../../src/components/client/Briefing/InsightsBriefingPage', () => ({ InsightsBriefingPage: () => <div /> }));
 
 import { OverviewTab } from '../../../src/components/client/OverviewTab';
 

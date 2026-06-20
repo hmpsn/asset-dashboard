@@ -228,30 +228,9 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
 | Client header at mobile widths | Responsive stacked toolbar (`flex-col` on mobile, `sm:flex-row` on desktop) with contained horizontal scrollers | Prevent document-level horizontal overflow at 375px while preserving tab/date-range scroll affordances |
 
-#### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
+#### Client Insights — Magazine Briefing Layout — REMOVED 2026-06-20
 
-When the `client-briefing-v2` feature flag is on, the client Insights tab swaps to a magazine-rhythm editorial briefing. Layout convention:
-
-| Element | Color | Rationale |
-|---------|-------|-----------|
-| **Action queue strip** (top) | `bg-amber-500/15 border-amber-500/30 text-amber-300` | Amber = "needs attention" — same hue as the existing inbox banner. Renders null when all 5 counts are zero. |
-| Action chip hover | `hover:text-amber-200` | Subtle one-step lift (avoids invisible-hover trap from CLAUDE.md memory) |
-| **Hero card** wrapper | `border-l-2 border-teal-400 pl-3` around `<SectionCard>` | Teal-accent left stripe (SectionCard has no built-in accent prop, so use a wrapper div) |
-| Hero category label | `t-label text-teal-400 font-semibold tracking-wider` | Teal = brand action / editorial accent |
-| Hero headline | `t-h2 font-bold text-[var(--brand-text-bright)]` | Largest type on the page |
-| Hero metric pills | `bg-teal-500/10 text-teal-400 rounded-full t-caption inline-flex` | 0–2 per story, max — supporting numbers, not data dump |
-| Hero "See the data →" | `t-caption text-teal-400 hover:text-teal-300` | Drill-in link, teal action |
-| **Secondary divider rows** | `border-b border-[var(--brand-border)] last:border-b-0 hover:bg-[var(--surface-3)]/50` | No card chrome — plain rows, hover state for affordance |
-| Secondary category icon | category-mapped: `win=star/emerald-400`, `risk=alert-triangle/amber-400`, `opportunity=lightbulb/blue-400`, `competitive=search/teal-400`, `period_change=trending-up/blue-400` | Color-codes the category at a glance |
-| **Free-tier upgrade CTA** | Same teal-accent wrapper as Hero, solid `bg-teal-500 hover:bg-teal-400` button | NEVER hand-rolled gradient (pr-check enforces) |
-
-**Magazine layout principles** (mirrors the spec's three rules):
-
-1. **No top-of-page health score, no stat row, no banner CTAs** when the flag is on. Numbers appear ONLY as inline metric badges inside the hero card.
-2. **Exactly one hero card** per briefing. The Phase 1 Zod schema enforces `isHeadline: true` on exactly one story.
-3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
-
-**Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+The client-facing magazine briefing variant (`src/components/client/Briefing/InsightsBriefingPage` + sub-components, gated on `client-briefing-v2`) was removed when the client overview consolidated on The Issue. The shared primitives it composed survive: `ActionQueueStrip` (amber action strip, `bg-amber-500/15 border-amber-500/30`, stale-pill escalation) and `WinsSurface` are still used by The Issue and the legacy overview; `MonthlyDigestContent` / `StatCard size="hero"` / `MetricRing` / `ContentGapRow` design conventions documented elsewhere are unchanged. The Briefing-v2-exclusive Phase 2.5b (DateLine / IssueSummaryLine / PulseStrip / DataSpread / RecommendedForYou) and Phase 2.5e (`WeeklyOpener`, gated on `client-briefing-v2-ai-polish`) layout sections below describe deleted components — retained briefly as historical reference, not active design law. The server briefing pipeline + admin `BriefingReviewQueue` remain live (see FEATURE_AUDIT #528).
 
 #### Client Inbox IA — 3-Section Layout
 
@@ -268,7 +247,7 @@ InboxTab renders three named sections in the canonical client inbox routing mode
 
 The legacy single-list fallback and the `new-inbox-ia` rollout flag are retired.
 
-##### Phase 2.5b — investor-briefing reading rhythm
+##### Phase 2.5b — investor-briefing reading rhythm — REMOVED 2026-06-20 (Briefing-v2 client variant teardown; historical reference only)
 
 Phase 2.5b extends the magazine layout with five new sections in the 8-stop reading rhythm: Dateline → Issue Summary → Action Strip → **Pulse** → Lead → **Data Spread** → **Recommended for You** → Watch List. New layout conventions:
 
@@ -301,7 +280,7 @@ Phase 2.5b extends the magazine layout with five new sections in the 8-stop read
 
 **Typography update (Phase 2.5b):** `.t-caption` switched from `'Inter' 400` to `'DIN Pro' 600` — global typography refresh aligning caption text with the rest of the DIN Pro hierarchy.
 
-##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`)
+##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`) — REMOVED 2026-06-20 (Briefing-v2 client variant teardown; historical reference only)
 
 Premium-only one-line "letter from the editor" rendered ABOVE the dateline when the `client-briefing-v2-ai-polish` flag is on. Free/Growth tiers and any fail-soft path → component is omitted entirely; the dateline remains the first element.
 

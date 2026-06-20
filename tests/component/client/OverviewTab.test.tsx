@@ -2,7 +2,7 @@
  * Component tests for OverviewTab.
  *
  * Heavy sub-components (MonthlyDigest, IntelligenceSummaryCard, HealthScoreCard,
- * PredictionShowcaseCard, InsightsDigest, InsightsBriefingPage) are stubbed so
+ * PredictionShowcaseCard, InsightsDigest) are stubbed so
  * tests stay focused on the OverviewTab logic: welcome message, stat card grid,
  * action-needed banner, primary CTA, empty state, and the SEO-advisor sidebar.
  */
@@ -62,10 +62,6 @@ vi.mock('../../../src/components/client/PredictionShowcaseCard', () => ({
 
 vi.mock('../../../src/components/client/InsightsDigest', () => ({
   InsightsDigest: () => <div data-testid="insights-digest" />,
-}));
-
-vi.mock('../../../src/components/client/Briefing/InsightsBriefingPage', () => ({
-  InsightsBriefingPage: () => <div data-testid="briefing-page" />,
 }));
 
 // ── Minimal fixtures ──────────────────────────────────────────────────────────
@@ -414,24 +410,5 @@ describe('OverviewTab — activity log', () => {
       />,
     );
     expect(screen.queryByText('Recent Work')).not.toBeInTheDocument();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('OverviewTab — feature flag: briefing v2', () => {
-  it('renders InsightsBriefingPage when client-briefing-v2 flag is enabled', async () => {
-    vi.doMock('../../../src/hooks/useFeatureFlag', () => ({
-      useFeatureFlag: (flag: string) => flag === 'client-briefing-v2',
-    }));
-    const { OverviewTab: FlaggedOverviewTab } = await import(
-      '../../../src/components/client/OverviewTab?flag-test'
-    ).catch(() => import('../../../src/components/client/OverviewTab'));
-
-    // Since dynamic re-import of mocked modules is complex in vitest,
-    // verify the fallback: with flag off the briefing page is not shown.
-    render(<OverviewTab {...baseProps} />);
-    expect(screen.queryByTestId('briefing-page')).not.toBeInTheDocument();
-    void FlaggedOverviewTab; // suppress unused variable
   });
 });

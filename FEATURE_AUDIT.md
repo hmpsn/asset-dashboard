@@ -8195,3 +8195,22 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Files:** `shared/types/workspace.ts` (`ClientSegment`/`SegmentConfig`/`ResolvedSegmentProfile`/`Workspace.outcomeValue`/`Workspace.segmentConfig` + `AdminWorkspaceView` mirror); `shared/types/roi.ts` (`ROIData.outcomeVerdict`); `server/roi.ts` (`computeROI` extension); `server/workspaces.ts` (column lockstep + `resolveSegmentProfile`); `server/schemas/workspace-schemas.ts` (schemas); `server/serializers/client-safe.ts` (`PublicWorkspaceView.segmentProfile`, flag-gated); `server/routes/public-portal.ts` (pass flag); `server/routes/stripe.ts` (public ROI comment); `server/ai-operation-registry.ts` (`the-issue-lead-value-enrich`); `server/the-issue-lead-value-ai.ts` (NEW — `enrichLeadValue`); `shared/types/feature-flags.ts` (`the-issue-client-*` family). Tests: `tests/unit/{outcome-provenance,the-issue-types,workspace-segment-types,the-issue-client-flags,resolve-segment-profile,compute-roi-outcome-verdict}.test.ts`, `tests/contract/the-issue-types.test.ts`, `tests/integration/{ga4-snapshots,the-issue-outcome,the-issue-lead-value-ai,ga4-conversion-snapshot-cron,ga4-conversion-snapshot,the-issue-client-roi-public}.test.ts` (all NEW).
 
 **PR:** The Issue (Client) P0 — Lane A + D0 + D2 (pre-dispatch contract commit).
+
+---
+
+### 528. Client Insights Briefing v2 — CLIENT magazine variant REMOVED 2026-06-20 (overview-variant teardown)
+**Status:** The unused CLIENT-facing magazine overview variant (gated on `client-briefing-v2`, default OFF, verified zero enabled rows in `feature_flag_overrides` / `feature_flag_workspace_overrides`) was torn down. This entry supersedes the client-render half of #321, #382, #390, #410 (the server pipeline + admin review queue from #320 remain live — see "Preserved" below). Removed as part of consolidating on The Issue as the single client overview.
+
+**What was removed (client UI only):**
+- `src/components/client/Briefing/` — deleted 9 Briefing-v2-exclusive components: `InsightsBriefingPage.tsx`, `DateLine.tsx`, `IssueSummaryLine.tsx`, `PulseStrip.tsx`, `DataSpread.tsx`, `RecommendedForYou.tsx`, `SecondaryStoryRow.tsx`, `WeeklyOpener.tsx`, `FreeTierUpgradeCTA.tsx`, plus `drillIn.ts` (`renderDrillInUrl` — only consumed by the deleted composer + `SecondaryStoryRow`).
+- `src/components/client/OverviewTab.tsx` — removed the `const briefingV2Enabled = useFeatureFlag('client-briefing-v2')` read, the `import { InsightsBriefingPage }`, and the entire `if (briefingV2Enabled) { … }` render branch. The Issue branch and the legacy fallback are byte-unchanged.
+- Tests: deleted `tests/component/client/Briefing/InsightsBriefingPage.risky.test.tsx`, `tests/unit/briefing-deeplink.test.ts`, `tests/unit/RecommendedForYou.test.tsx`, `tests/unit/briefing-data-spread.test.tsx`; removed the briefing-v2 render branch test + stub from `tests/component/client/OverviewTab.test.tsx` and the stale stub from `tests/component/client/OverviewTabTopPriority.test.tsx`.
+
+**Preserved (shared — NOT removed):**
+- `src/components/client/Briefing/ActionQueueStrip.tsx` + `WinsSurface.tsx` — 3-way shared by The Issue (`TheIssueClientPage`), legacy `OverviewTab`, and (formerly) the briefing composer.
+- `MonthlyDigest` / `MonthlyDigestContent`, `OutcomeSummary`, `ROIDashboard` — shared.
+- The entire SERVER briefing pipeline (`server/briefing-cron.ts`, `server/routes/briefing.ts`, `briefing-store.ts`, `briefing-candidates.ts`, `briefing-prompt.ts`, `briefing-client-projection.ts`, `briefing-summary.ts`, `briefing-anchors.ts`, `briefing-templates/`) and the admin `BriefingReviewQueue` (`src/components/WorkspaceHome.tsx`) — these are shared infrastructure: the briefing data feeds the intelligence `ClientSignalsSlice`, the `GET /api/public` projection (`public-portal.ts`), and `strategy-issue-cron.ts` (The Issue). Both flags (`client-briefing-v2`, `client-briefing-v2-ai-polish`) were therefore RETAINED (the server still reads them via `isFeatureEnabled`).
+
+**Flagged for controller review:** whether to retire the server briefing pipeline + admin review queue + the two flags + the now-caller-less `src/hooks/client/useClientBriefing.ts` is a larger decision than this client-variant teardown — left intact pending that call.
+
+**Verification:** `npm run typecheck` clean; `npx vite build` ok; `npx tsx scripts/pr-check.ts` 0 errors; `npm run verify:feature-flags` exit 0; OverviewTab / WorkspaceHome / The Issue / WinsSurface / ActionQueueStrip / feature-flag tests pass.

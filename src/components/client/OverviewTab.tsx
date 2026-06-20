@@ -20,7 +20,6 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
 import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
@@ -115,18 +114,11 @@ export function OverviewTab({
     ? (recSet?.recommendations.find(r => r.id === topRecId && r.status !== 'completed' && r.status !== 'dismissed') ?? null)
     : null;
 
-  // ── client-briefing-v2 magazine layout (Phase 2) ─────────────────────────
-  // When the flag is on, replace the entire overview body with the
-  // <InsightsBriefingPage> composer. Routes / props remain identical so the
-  // flag can be flipped per-workspace without touching anything below this
-  // block. When OFF (default), the original overview body renders unchanged.
-  const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
   const theIssueEnabled = useFeatureFlag('strategy-the-issue');
   const workFeedEnabled = useFeatureFlag('client-work-feed');
 
   // ── strategy-the-issue evergreen money surface (Phase 2) ─────────────────
-  // The Issue WINS over client-briefing-v2 when both flags are on (audit §9.9):
-  // it is the reimagined overview both other surfaces are superseded by. Read
+  // The Issue is the reimagined overview that supersedes the legacy body. Read
   // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so
   // the legacy overview body below is byte-identical.
   if (theIssueEnabled) {
@@ -184,27 +176,6 @@ export function OverviewTab({
     );
   }
 
-  if (briefingV2Enabled) {
-    const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
-    const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
-    const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
-    return (
-      <ErrorBoundary>
-        <InsightsBriefingPage
-          workspaceId={workspaceId}
-          effectiveTier={effectiveTier}
-          betaMode={betaMode}
-          actionCounts={{
-            approvals: pendingApprovals,
-            briefs: briefReviews,
-            posts: postReviews,
-            replies: unreadTeamNotes,
-            contentPlan: contentPlanSummary?.reviewCells ?? 0,
-          }}
-        />
-      </ErrorBoundary>
-    );
-  }
   // ─────────────────────────────────────────────────────────────────────────
 
   // Derive a dynamic subtitle from the most significant data signal

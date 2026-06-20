@@ -1,17 +1,16 @@
 // SHARED PRIMITIVE — Wave 2 T4 (#5)
 //
 // ONE audience-parameterized content-gap / recommendation row, subsuming the
-// metric-and-badge body previously hand-rolled three times:
+// metric-and-badge body previously hand-rolled multiple times:
 //   - admin       → src/components/strategy/ContentGaps.tsx
 //   - strategy-tab → src/components/client/strategy/StrategyContentOpportunitiesSection.tsx (ContentGapCard)
-//   - briefing     → src/components/client/Briefing/RecommendedForYou.tsx
 //
 // The component is parameterized by SIX axes (audit §ContentGapRow):
 //   (a) KD prefix          — 'KD' | 'Difficulty'
 //   (b) SERP label set     — 'plain' | 'descriptive' | 'emoji'
 //   (c) intentTone map     — supplied per surface (admin and client diverge)
 //   (d) est-clicks mode    — 'always' | 'conditional' | 'never'
-//   (e) ovGainActive       — briefing-only compatibility boolean; default false
+//   (e) ovGainActive       — compatibility boolean; default false
 //   (f) backfilled slot    — field-presence-driven 'Expanded pick' affordance
 //
 // Each surface keeps its own card chrome (SectionCard / signature card) and its own
