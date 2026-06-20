@@ -81,6 +81,7 @@ import clientSignalsRouter from './routes/client-signals.js';
 import clientActionsRouter from './routes/client-actions.js';
 import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
+import { theIssueAdminRouter } from './routes/the-issue-admin.js';
 import strategyPovRouter from './routes/strategy-pov.js';
 import strategyIssueLensesRouter from './routes/strategy-issue-lenses.js';
 import competitorAlertsRouter from './routes/competitor-alerts.js';
@@ -360,6 +361,7 @@ export function createApp(): express.Express {
   app.use(clientActionsRouter);
   app.use(deliverablesRoutes);
   app.use(meetingBriefRouter);
+  app.use(theIssueAdminRouter);
   app.use(strategyPovRouter);
   app.use(strategyIssueLensesRouter);
   app.use(competitorAlertsRouter);

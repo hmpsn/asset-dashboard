@@ -57,6 +57,11 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     customPromptNotes: ws.customPromptNotes,
     scoringConfig: ws.scoringConfig,
     intelligenceProfile: ws.intelligenceProfile,
+    // The Issue (Client) P0 — admin-edited outcome value + segment override. Explicit-field-list
+    // lockstep: the type carries these (AdminWorkspaceView) but the body must list them too, or the
+    // admin Outcome Value / segment subsections silently never read back the persisted value.
+    outcomeValue: ws.outcomeValue,
+    segmentConfig: ws.segmentConfig,
     autoPublishBriefings: ws.autoPublishBriefings,
     autoPublishAfterHours: ws.autoPublishAfterHours,
     lastBriefingRunWeekOf: ws.lastBriefingRunWeekOf,

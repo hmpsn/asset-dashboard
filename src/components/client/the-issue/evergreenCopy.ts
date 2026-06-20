@@ -80,14 +80,19 @@ export function workInFlightLine(count: number): string | null {
   return `${count} brief${count === 1 ? '' : 's'} in progress`;
 }
 
-// ── Evergreen guard (used by the contract test + dev assertions) ────────────────
+// ── Evergreen guard — two zones (D2) ────────────────────────────────────────────
 //
-// The banned phrases mirror the evergreen-copy pr-check rule. This is the
-// programmatic twin: a test can import BANNED_TEMPORAL_PATTERNS and assert that no
-// rendered client-surface string matches, catching a reused component that smuggles
-// in "vs last refresh" copy.
+// The client experiences The Issue as a continuously-current dashboard, but the D2
+// owner ruling carves out a SURGICAL relaxation: the verdict (slot 1) and money frame
+// (slot 3) MAY carry exactly one fixed engagement-start baseline ("since we started").
+// Two zones, both enforced through this module:
+//   • PLAN zone (default) — content plan / also-on-plan. No temporal phrasing at all
+//     (rolling windows + issue numbers + week-of). Back-compat for the static pr-check twin.
+//   • VERDICT zone — verdict / proof. Allows ALLOWED_BASELINE_PATTERNS anchors and bans
+//     rolling windows; the INVERSE law makes a *dateless* verdict a violation.
 
-export const BANNED_TEMPORAL_PATTERNS: RegExp[] = [
+/** Rolling / shifting / cherry-picked windows — banned in EVERY zone. */
+export const ROLLING_WINDOW_PATTERNS: RegExp[] = [
   /\bsince last week\b/i,
   /\bthis week\b/i,
   /\blast week\b/i,
@@ -95,11 +100,58 @@ export const BANNED_TEMPORAL_PATTERNS: RegExp[] = [
   /\bvs\.?\s+(?:the\s+)?previous\b/i,
   /\b\d+\s+days?\s+ago\b/i,
   /\byesterday\b/i,
+];
+
+/** Plan-zone-only bans (issue numbers, week-of, manufactured cadence). */
+export const PLAN_RELATIVE_PATTERNS: RegExp[] = [
   /\bissue\s+#\d+\b/i,
   /\bweek of\b/i,
 ];
 
-/** True when `text` contains a banned time-relative phrase (evergreen violation). */
-export function hasTemporalLanguage(text: string): boolean {
+/**
+ * Plan-zone ban superset = rolling + plan-relative. Preserved under the original name for the
+ * pr-check static evergreen rule and the existing contract test.
+ */
+export const BANNED_TEMPORAL_PATTERNS: RegExp[] = [...ROLLING_WINDOW_PATTERNS, ...PLAN_RELATIVE_PATTERNS];
+
+/** The ONLY temporal phrases allowed in the verdict/proof zone — fixed engagement-start anchors. */
+export const ALLOWED_BASELINE_PATTERNS: RegExp[] = [
+  /\bsince we started\b/i,
+  /\bwhen we started\b/i,
+  /\bvs\.?\s+when we started\b/i,
+  /\bsince [A-Z][a-z]+\b/, // "since January" — a fixed month anchor
+];
+
+export type EvergreenZone = 'plan' | 'verdict';
+
+/**
+ * Zone-aware temporal guard — returns TRUE on a VIOLATION.
+ *  - 'plan' (default): any BANNED_TEMPORAL_PATTERNS match.
+ *  - 'verdict': a rolling-window match OR the ABSENCE of a baseline anchor (inverse law, D2).
+ */
+export function hasTemporalLanguage(text: string, zone: EvergreenZone = 'plan'): boolean {
+  if (ROLLING_WINDOW_PATTERNS.some((re) => re.test(text))) return true;
+  if (zone === 'verdict') return !ALLOWED_BASELINE_PATTERNS.some((re) => re.test(text));
   return BANNED_TEMPORAL_PATTERNS.some((re) => re.test(text));
+}
+
+/** True when `text` carries at least one allowed engagement-start anchor (inverse-law helper). */
+export function hasBaselineAnchor(text: string): boolean {
+  return ALLOWED_BASELINE_PATTERNS.some((re) => re.test(text));
+}
+
+/**
+ * Baseline-anchored verdict copy (D2, verdict zone). Carries an ALLOWED_BASELINE anchor when a
+ * baseline exists (inverse law), never a rolling window, reports declines truthfully, and degrades
+ * to an honest establishing line when baseline is null.
+ */
+export function baselineVerdict(args: { outcomeNoun: string; current: number; baseline: number | null }): string {
+  const { outcomeNoun, current, baseline } = args;
+  const head = `${current.toLocaleString()} ${outcomeNoun}`;
+  if (baseline == null) {
+    return `${head} — we're establishing your baseline now; your trend appears here as outcomes land.`;
+  }
+  if (current > baseline) return `${head}, up from ${baseline.toLocaleString()} since we started.`;
+  if (current < baseline) return `${head}, down from ${baseline.toLocaleString()} since we started.`;
+  return `${head} — holding steady since we started.`;
 }

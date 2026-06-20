@@ -64,6 +64,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
+import { outcomeValueSchema, segmentConfigSchema } from '../schemas/workspace-schemas.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
 const log = createLogger('workspaces');
@@ -326,6 +327,19 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   // rather than relying on rowToWorkspace normalization to swallow it.
   if ('billingMode' in updates && updates.billingMode !== 'platform' && updates.billingMode !== 'external') {
     return res.status(400).json({ error: "billingMode must be 'platform' or 'external'" });
+  }
+  // The Issue (Client) P0 — validate outcomeValue / segmentConfig at the boundary so a garbage
+  // basis/segment is a 400, not a silent drop (parseJsonSafe would otherwise swallow it at read).
+  // null is allowed (clears the field); validate only when a non-null object is present.
+  if ('outcomeValue' in updates && updates.outcomeValue !== null) {
+    const parsed = outcomeValueSchema.safeParse(updates.outcomeValue);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid outcomeValue' });
+    updates.outcomeValue = parsed.data;
+  }
+  if ('segmentConfig' in updates && updates.segmentConfig !== null) {
+    const parsed = segmentConfigSchema.safeParse(updates.segmentConfig);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid segmentConfig' });
+    updates.segmentConfig = parsed.data;
   }
   // Hash clientPassword with bcrypt before saving (empty string = remove password)
   if (typeof updates.clientPassword === 'string') {

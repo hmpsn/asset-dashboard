@@ -14,6 +14,10 @@ import {
   loopStatusLine,
   workInFlightLine,
   hasTemporalLanguage,
+  hasBaselineAnchor,
+  baselineVerdict,
+  ALLOWED_BASELINE_PATTERNS,
+  ROLLING_WINDOW_PATTERNS,
 } from '../../src/components/client/the-issue/evergreenCopy';
 
 describe('the-issue evergreen copy', () => {
@@ -71,5 +75,53 @@ describe('the-issue evergreen copy', () => {
     // Evergreen state phrases are NOT temporal.
     expect(hasTemporalLanguage('what is working right now')).toBe(false);
     expect(hasTemporalLanguage('3 briefs in progress')).toBe(false);
+  });
+});
+
+// ── C1: two-zone split (D2) ─────────────────────────────────────────────────
+describe('the-issue evergreen — two-zone split (D2)', () => {
+  it('plan zone bans rolling + relative windows', () => {
+    expect(hasTemporalLanguage('up since last week', 'plan')).toBe(true);
+    expect(hasTemporalLanguage('vs last refresh', 'plan')).toBe(true);
+    expect(hasTemporalLanguage('Issue #15', 'plan')).toBe(true);
+    expect(hasTemporalLanguage('The pieces we recommend writing next', 'plan')).toBe(false);
+  });
+  it('verdict zone allows since-engagement-start baselines, still bans rolling windows', () => {
+    expect(hasTemporalLanguage('14 new patients, up from 6 since we started', 'verdict')).toBe(false);
+    expect(hasTemporalLanguage('up from 9 since January', 'verdict')).toBe(false);
+    expect(hasTemporalLanguage('up 12% vs last week', 'verdict')).toBe(true);
+  });
+  it('INVERSE law: a dateless verdict is a violation', () => {
+    expect(hasTemporalLanguage('Your search visibility is strong', 'verdict')).toBe(true);
+    expect(hasBaselineAnchor('Your search visibility is strong')).toBe(false);
+    expect(hasBaselineAnchor('14 new patients, up from 6 since we started')).toBe(true);
+    for (const re of ALLOWED_BASELINE_PATTERNS) expect(re).toBeInstanceOf(RegExp);
+    expect(ROLLING_WINDOW_PATTERNS.length).toBeGreaterThan(0);
+  });
+  it('1-arg call defaults to plan-zone banning (back-compat)', () => {
+    expect(hasTemporalLanguage('vs last refresh')).toBe(true);
+    expect(hasTemporalLanguage('what is working right now')).toBe(false);
+  });
+});
+
+// ── C2: baselineVerdict() ───────────────────────────────────────────────────
+describe('baselineVerdict — verdict-zone copy generator', () => {
+  it('emits a baseline-anchored sentence passing the verdict guard + carrying an anchor', () => {
+    const s = baselineVerdict({ outcomeNoun: 'new patients', current: 14, baseline: 6 });
+    expect(s).toContain('14 new patients');
+    expect(s).toContain('since we started');
+    expect(hasTemporalLanguage(s, 'verdict')).toBe(false);
+    expect(hasBaselineAnchor(s)).toBe(true);
+  });
+  it('degrades to an establishing line (no fabricated delta) when baseline is null', () => {
+    const s = baselineVerdict({ outcomeNoun: 'qualified leads', current: 3, baseline: null });
+    expect(s).toContain('3 qualified leads');
+    expect(s).toContain('establishing your baseline');
+  });
+  it('reports a decline honestly', () => {
+    const s = baselineVerdict({ outcomeNoun: 'bookings', current: 5, baseline: 8 });
+    expect(s).toContain('5 bookings');
+    expect(s).toContain('down from 8');
+    expect(hasTemporalLanguage(s, 'verdict')).toBe(false);
   });
 });

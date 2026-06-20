@@ -3,6 +3,7 @@ import {
   Search, Loader2, Check, X, Users, ExternalLink, ChevronRight,
   Copy, CheckCircle, Lock, KeyRound, Plus, Trash2, Pencil, Save,
   Pin, PinOff, ArrowUp, ArrowDown, Palette, RefreshCw, DollarSign, Shield,
+  Sparkles, Target,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
@@ -11,7 +12,11 @@ import { CHART_SERIES_COLORS } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
-import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
+import type {
+  EventGroup, EventDisplayConfig, ClientSegment, ResolvedSegmentProfile, SegmentConfig, Workspace,
+} from '../../../shared/types/workspace.ts';
+
+type OutcomeValue = NonNullable<Workspace['outcomeValue']>;
 
 interface WorkspaceData {
   hasPassword?: boolean;
@@ -20,6 +25,11 @@ interface WorkspaceData {
   eventGroups?: EventGroup[];
   ga4PropertyId?: string;
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
+  // The Issue (Client) P0 — admin-edited outcome value + segment override.
+  outcomeValue?: OutcomeValue | null;
+  segmentConfig?: SegmentConfig | null;
+  /** Pre-resolved segment profile (admin GET seeds the deterministic local/multi axis read-only). */
+  segmentProfile?: ResolvedSegmentProfile;
   [key: string]: unknown;
 }
 
@@ -75,6 +85,65 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const [pricingFull, setPricingFull] = useState(0);
   const [pricingCurrency, setPricingCurrency] = useState('USD');
   const [savingPricing, setSavingPricing] = useState(false);
+
+  // The Issue (Client) P0 — outcome value state (basis precedence client_provided > agency_estimate > ai_enriched)
+  const [showOutcomeValue, setShowOutcomeValue] = useState(false);
+  const [ovValue, setOvValue] = useState(0);
+  const [ovUnit, setOvUnit] = useState('');
+  const [ovRetainer, setOvRetainer] = useState(0);
+  const [ovCurrency, setOvCurrency] = useState('USD');
+  const [ovBasis, setOvBasis] = useState<OutcomeValue['basis']>('agency_estimate');
+  const [savingOutcomeValue, setSavingOutcomeValue] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+
+  // The Issue (Client) P0 — segment confirm/override state (manual non-local FormSelect)
+  const [savingSegment, setSavingSegment] = useState(false);
+  const [segmentOverride, setSegmentOverride] = useState<ClientSegment>('b2b_saas');
+
+  const basisLabel = (b: OutcomeValue['basis']): string =>
+    b === 'client_provided' ? 'Client-provided' : b === 'ai_enriched' ? 'AI estimate' : 'Agency estimate';
+
+  // Deterministic local/multi axis is read-only (resolved server-side from client_locations); only the
+  // non-local 3-way is admin-overridable here.
+  const resolvedSegment = ws?.segmentProfile?.segment ?? ws?.segmentConfig?.segment ?? 'b2b_saas';
+  const isLocalAxis = resolvedSegment === 'local_smb' || resolvedSegment === 'multi_location';
+
+  const saveOutcomeValue = async (clear = false) => {
+    setSavingOutcomeValue(true);
+    try {
+      const outcomeValue = clear || ovValue <= 0
+        ? null
+        : { valuePerOutcome: ovValue, unitLabel: ovUnit.trim() || 'outcome', currency: ovCurrency, basis: ovBasis, ...(ovRetainer > 0 ? { monthlyRetainer: ovRetainer } : {}) };
+      await patchWorkspace({ outcomeValue });
+      toast(outcomeValue ? 'Outcome value saved' : 'Outcome value removed');
+      setShowOutcomeValue(false);
+    } catch { toast('Failed to save outcome value', 'error'); }
+    finally { setSavingOutcomeValue(false); }
+  };
+
+  const enrichOutcomeValue = async () => {
+    setEnriching(true);
+    try {
+      // fetch-ok: one-off P0 advisory enrich endpoint; no src/api/ helper exists for it.
+      const res = await fetch(`/api/workspaces/${workspaceId}/outcome-value-enrich`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      if (!res.ok) { toast('AI estimate failed — set a value manually', 'error'); return; }
+      const data = await res.json() as { valuePerOutcome: number; unitLabel: string };
+      setOvValue(data.valuePerOutcome);
+      setOvUnit(data.unitLabel);
+      setOvBasis('ai_enriched');
+      toast('AI estimate ready — review and save', 'info');
+    } catch { toast('AI estimate failed — set a value manually', 'error'); }
+    finally { setEnriching(false); }
+  };
+
+  const saveSegment = async () => {
+    setSavingSegment(true);
+    try {
+      await patchWorkspace({ segmentConfig: { segment: segmentOverride } });
+      toast('Segment saved');
+    } catch { toast('Failed to save segment', 'error'); }
+    finally { setSavingSegment(false); }
+  };
 
   const GROUP_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.orange, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.purple]; // chart-hex-ok — #14b8a6 is teal-500 for darker anchor
 
@@ -229,6 +298,12 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
 
   // Sync clientEmail when ws loads asynchronously
   useEffect(() => { if (ws?.clientEmail !== undefined) setClientEmail(ws.clientEmail || ''); }, [ws?.clientEmail]);
+
+  // Seed the segment override select from the stored admin config when ws loads (non-local only).
+  useEffect(() => {
+    const stored = ws?.segmentConfig?.segment;
+    if (stored && stored !== 'local_smb' && stored !== 'multi_location') setSegmentOverride(stored);
+  }, [ws?.segmentConfig?.segment]);
 
   const inputClass = 'bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption';
 
@@ -647,6 +722,193 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
           </div>
         )}
+      </SectionCard>
+
+      {/* Outcome Value — The Issue (Client) P0 dollar verdict input */}
+      <SectionCard noPadding>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+            <Icon as={Target} size="md" className="text-teal-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Outcome Value</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">The dollar value of one converted outcome — powers the client's dollar verdict (a labeled estimate).</p>
+          </div>
+          <Button
+            aria-label="Configure outcome value"
+            onClick={() => {
+              if (!showOutcomeValue) {
+                setOvValue(ws?.outcomeValue?.valuePerOutcome || 0);
+                setOvUnit(ws?.outcomeValue?.unitLabel || '');
+                setOvRetainer(ws?.outcomeValue?.monthlyRetainer || 0);
+                setOvCurrency(ws?.outcomeValue?.currency || 'USD');
+                setOvBasis(ws?.outcomeValue?.basis || 'agency_estimate');
+              }
+              setShowOutcomeValue(!showOutcomeValue);
+            }}
+            variant="secondary"
+            size="sm"
+            className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+            {showOutcomeValue ? 'Close' : <><Icon as={Pencil} size="xs" /> Configure</>}
+          </Button>
+        </div>
+
+        {/* Summary row when collapsed */}
+        {!showOutcomeValue && (
+          <div className="px-5 py-3 flex items-center gap-4">
+            {ws?.outcomeValue ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Per {ws.outcomeValue.unitLabel}:</span>
+                  <span className="t-caption font-semibold text-teal-400">{ws.outcomeValue.currency} {ws.outcomeValue.valuePerOutcome.toLocaleString()}</span>
+                </div>
+                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">{basisLabel(ws.outcomeValue.basis)}</span>
+              </>
+            ) : (
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">No outcome value set — the client sees a count-only verdict, no dollar figure.</span>
+            )}
+          </div>
+        )}
+
+        {/* Expanded config form */}
+        {showOutcomeValue && (
+          <div className="px-5 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Value per outcome</div>
+                <FormInput type="number" min={0} value={ovValue || ''} onChange={value => { setOvValue(Number(value)); setOvBasis('agency_estimate'); }}
+                  placeholder="800"
+                  className={`w-full ${inputClass}`} />
+              </div>
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Outcome unit</div>
+                <FormInput type="text" value={ovUnit} onChange={value => { setOvUnit(value); setOvBasis('agency_estimate'); }}
+                  placeholder="new patient"
+                  className={`w-full ${inputClass}`} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Monthly retainer (optional)</div>
+                <FormInput type="number" min={0} value={ovRetainer || ''} onChange={value => setOvRetainer(Number(value))}
+                  placeholder="1500"
+                  className={`w-full ${inputClass}`} />
+              </div>
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Currency</div>
+                <FormSelect
+                  value={ovCurrency}
+                  onChange={setOvCurrency}
+                  options={[
+                    { value: 'USD', label: 'USD ($)' },
+                    { value: 'EUR', label: 'EUR (€)' },
+                    { value: 'GBP', label: 'GBP (£)' },
+                    { value: 'CAD', label: 'CAD (C$)' },
+                    { value: 'AUD', label: 'AUD (A$)' },
+                  ]}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            {ovBasis === 'ai_enriched' && (
+              <div className="t-caption-sm text-amber-400">AI estimate — lowest confidence. Review before saving; edit any field to switch to an agency estimate.</div>
+            )}
+            <div className="pt-2 flex items-center gap-3 border-t border-[var(--brand-border)]">
+              <Button
+                aria-label="Save outcome value"
+                disabled={savingOutcomeValue}
+                onClick={() => saveOutcomeValue(false)}
+                loading={savingOutcomeValue}
+                icon={Save}
+                size="md"
+                className="bg-teal-600 hover:bg-teal-500"
+              >
+                Save outcome value
+              </Button>
+              {ovValue <= 0 && (
+                <Button
+                  aria-label="Estimate with AI"
+                  disabled={enriching}
+                  onClick={enrichOutcomeValue}
+                  loading={enriching}
+                  icon={Sparkles}
+                  variant="secondary"
+                  size="sm"
+                  className="bg-[var(--surface-3)] text-[var(--brand-text)]"
+                >
+                  Estimate with AI
+                </Button>
+              )}
+              {ws?.outcomeValue && (
+                <Button
+                  disabled={savingOutcomeValue}
+                  onClick={() => saveOutcomeValue(true)}
+                  variant="link"
+                  size="sm"
+                  className="no-underline text-red-400/60 hover:text-red-400"
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+            <div className="t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
+              This value is always shown to the client as a labeled estimate, never as booked revenue.
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Client Segment — The Issue (Client) P0 confirm/override (manual non-local select) */}
+      <SectionCard noPadding>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/10 flex items-center justify-center">
+            <Icon as={Shield} size="md" className="text-blue-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Client Segment</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">Decides which client-dashboard inserts appear. Local segments are detected automatically; confirm the non-local split here.</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Resolved segment:</span>
+            <span className="t-caption font-semibold text-blue-400">{resolvedSegment.replace(/_/g, ' ')}</span>
+          </div>
+          {isLocalAxis ? (
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Detected from this workspace's configured locations — no override needed.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="segment-override" className="t-caption-sm font-medium mb-1.5 block text-[var(--brand-text-muted)]">Segment override</label>
+                <FormSelect
+                  id="segment-override"
+                  aria-label="Segment override"
+                  value={segmentOverride}
+                  onChange={value => setSegmentOverride(value as ClientSegment)}
+                  options={[
+                    { value: 'b2b_saas', label: 'B2B SaaS' },
+                    { value: 'professional_services', label: 'Professional services' },
+                    { value: 'board_vc', label: 'Board / VC' },
+                  ]}
+                  className={inputClass}
+                />
+              </div>
+              <Button
+                aria-label="Save segment"
+                disabled={savingSegment}
+                onClick={saveSegment}
+                loading={savingSegment}
+                icon={Save}
+                size="md"
+                className="bg-teal-600 hover:bg-teal-500"
+              >
+                Save segment
+              </Button>
+            </div>
+          )}
+        </div>
       </SectionCard>
 
       {/* Event Configuration */}
