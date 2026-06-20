@@ -152,7 +152,7 @@ const CHROME: Record<ContentGapAudience, AudienceChrome> = {
   },
   'strategy-tab': {
     topicClass: 't-body font-semibold text-[var(--brand-text-bright)]',
-    targetKeyword: (kw) => `”${kw}”`,
+    targetKeyword: (kw) => `“${kw}”`,
     targetKeywordClass: 't-caption-sm text-accent-brand',
     volumeClass: 't-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5',
     kdPrefix: 'Difficulty',

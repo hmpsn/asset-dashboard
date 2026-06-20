@@ -1,7 +1,6 @@
 // ── Recommendation domain types ─────────────────────────────────
 
 import type { ImpactBand } from './impact-band.js';
-import type { StrategyCardContext } from './content.js';
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
 export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap' | 'competitor';
@@ -258,13 +257,16 @@ export type RecPolicyRegistry = Partial<Record<RecType, RecPolicy>>;
 // Lane B (FE, Track E) consumes it — import from this type, not from Recommendation.
 //
 // Rules for this type:
-//  - Never add admin-only fields (lifecycle, struckAt, cascade, sendChannel,
-//    emvPerWeek, predictedEmv, roiPerEffortDay, confidence, calibration, groundedSpine,
-//    calibrationVersion, opportunity.emvPerWeek, opportunity.predictedEmv).
+//  - Never project the admin-only TOP-LEVEL rec axes: lifecycle, struckAt, cascade, sendChannel.
+//  - The $/ROI exposure on `opportunity` is STRIPPED in `stripEmvFromPublicRecs` by an explicit
+//    destructure ({ emvPerWeek, predictedEmv, roiPerEffortDay, ...publicOpportunity }): those
+//    three are dropped, and the REMAINING opportunity sub-fields PASS THROUGH the rest-spread
+//    intentionally — value, components (with evidence), confidence, calibration, groundedSpine,
+//    calibrationVersion, modelVersion. They are client-safe (no raw $) and power the #1 "why this
+//    is #1" breakdown. (L5: this reconciles the comment with the projection — only the three
+//    $/ROI sub-fields are blocked, not the whole OpportunityScore.)
 //  - `clientStatus` is restricted to the post-send states only (a client never
 //    sees a 'system' or 'curated' rec — those haven't been sent yet).
-//  - `opportunity.components` is included so the #1 "why" contribution bars render
-//    without admin data leaking (evidence strings are safe).
 //  - `delivered` is a synthetic boolean set by the route: true once the rec's
 //    downstream content/work is marked complete by the operator.
 
@@ -299,10 +301,9 @@ export interface ClientFacingRecommendation {
   opportunityComponents?: Array<Pick<OpportunityComponent, 'dimension' | 'normalized' | 'weight' | 'contribution' | 'evidence'>>;
   /** The keyword this rec targets. Set on content-gap recs; absent on others. */
   targetKeyword?: string;
-  /** Strategy card context carried from the recommendation (rationale, volume,
-   *  difficulty, intent, priority, etc.). Threaded through so the client can make
-   *  an informed "Act on this" decision without admin context leaking. */
-  strategyCardContext?: StrategyCardContext;
+  // B4: no strategyCardContext — act-on derives StrategyCardContext server-side from the rec
+  // (buildStrategyCardContextFromRec), and the public allow-list never projected this field, so
+  // it was a dead contract on the client surface. Removed to keep the projection honest.
   /** Client-safe banded monthly impact. Present when projected monthly value is
    *  above the display floor; absent otherwise. Never shows raw $ from emvPerWeek. */
   impactBand?: ImpactBand;

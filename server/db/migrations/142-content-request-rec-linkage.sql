@@ -3,8 +3,10 @@
 -- created by "Act on this" (client greenlight), enabling the greenlight→result
 -- attribution join (spec §7 C2) and seeding the brief generator (spec §7 C3).
 --
--- recommendation_id    — FK to the recommendation that triggered this request (nullable;
---                        absent on operator-created or legacy requests).
+-- recommendation_id    — the in-blob Recommendation.id that triggered this request (nullable;
+--                        absent on operator-created or legacy requests). NOT a foreign key:
+--                        recommendation_sets is a JSON blob, so there is no FK target — the id
+--                        is the globally-unique natural key, scoped by workspace_id on every read.
 -- strategy_card_context — JSON blob carrying the StrategyCardContext fields captured at
 --                         act-on time (rationale, volume, difficulty, trendDirection,
 --                         serpFeatures, competitorProof, impressions, intent, priority).

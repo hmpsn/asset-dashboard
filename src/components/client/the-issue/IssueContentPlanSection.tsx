@@ -15,6 +15,7 @@ import { FileText } from 'lucide-react';
 import { SectionCard, EmptyState, Icon } from '../../ui';
 import { IssueContentCard, type IssueContentCardData } from './IssueContentCard';
 import { recArchetype } from '../../../lib/recArchetypeMap';
+import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { ClientKeywordStrategy } from '../types';
 import { ISSUE_SECTION_TITLES, ISSUE_SECTION_INTROS } from './evergreenCopy';
@@ -49,7 +50,9 @@ function recToCard(rec: Recommendation): IssueContentCardData {
     topic: rec.title,
     targetKeyword: rec.targetKeyword ?? '',
     rationale: rec.insight,
-    opportunityScore: rec.opportunity ? Math.round(rec.opportunity.value) : undefined,
+    // L3: NO opportunityScore on curated cards. The shared ContentGapRow renders it as a bare
+    // `N/100` badge — internal admin jargon (an OV score) that must not surface on the client
+    // money surface. The gap-floor path (gapToCard) intentionally keeps its own opportunityScore.
   };
 }
 
@@ -93,8 +96,19 @@ export function IssueContentPlanSection({
     .sort((a, b) => (b.opportunity?.value ?? b.impactScore) - (a.opportunity?.value ?? a.impactScore));
 
   // Content FLOOR: < 2 curated content recs → un-curated content gaps ("we're evaluating").
+  // L2: a gap whose keyword already appears as a curated "Act on this" card must NOT also
+  // render as a floor "evaluating" gap (the same keyword can surface in both sources). Filter
+  // gaps against the curated recs' targetKeywords (normalized via keywordComparisonKey) BEFORE
+  // slicing, so the dedup never silently drops a floor card the slice would otherwise have kept.
+  const curatedKeywordKeys = new Set(
+    contentRecs.map((r) => keywordComparisonKey(r.targetKeyword)).filter(Boolean),
+  );
   const useFloor = contentRecs.length < 2;
-  const floorGaps = useFloor ? (strategyData?.contentGaps ?? []).slice(0, 4) : [];
+  const floorGaps = useFloor
+    ? (strategyData?.contentGaps ?? [])
+        .filter((gap) => !curatedKeywordKeys.has(keywordComparisonKey(gap.targetKeyword)))
+        .slice(0, 4)
+    : [];
 
   const header = (
     <SectionCard
@@ -102,7 +116,11 @@ export function IssueContentPlanSection({
       titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
     >
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
-        {useFloor ? ISSUE_SECTION_INTROS.contentPlanFloor : ISSUE_SECTION_INTROS.contentPlan}
+        {/* B2: drive the intro by what actually RENDERS, not by useFloor. With exactly ONE
+            curated rec, useFloor is true (contentRecs.length < 2) yet a real "Act on this" card
+            renders — so the floor "opportunities we're evaluating" copy would contradict it.
+            Show the real intro whenever any curated content rec renders; floor copy only at zero. */}
+        {contentRecs.length > 0 ? ISSUE_SECTION_INTROS.contentPlan : ISSUE_SECTION_INTROS.contentPlanFloor}
       </p>
 
       {/* Curated request cards (primary path). */}

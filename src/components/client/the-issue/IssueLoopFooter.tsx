@@ -11,7 +11,7 @@
 
 import { Sparkles, CheckCircle2, MessageCircle } from 'lucide-react';
 import { SectionCard, Button, ClickableRow, Icon } from '../../ui';
-import type { ClientRecResponseSummary } from '../../../api/theIssue';
+import type { ClientRecResponseSummary } from '../../../../shared/types/recommendations';
 import { ISSUE_SECTION_TITLES, ISSUE_SECTION_INTROS, loopStatusLine, workInFlightLine } from './evergreenCopy';
 
 interface IssueLoopFooterProps {

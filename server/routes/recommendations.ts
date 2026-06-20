@@ -50,10 +50,15 @@ import { computeImpactBand } from '../../shared/types/impact-band.js';
 import { mirrorRecommendationToDeliverable } from '../domains/inbox/recommendation-dual-write.js';
 import { createContentRequest } from '../content-requests.js';
 import { buildStrategyCardContextFromRec } from '../recommendation-strategy-card-context.js';
+import { sanitizePublicGain } from '../recommendation-gain-sanitizer.js';
 import type { StrategyCardContext } from '../../shared/types/content.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
+
+/** Internal sentinel (L6): thrown inside the act-on transaction when the rec vanishes mid-flight
+ *  so the whole greenlight+request unit rolls back and the route can map it to a 404. */
+class RecGoneError extends Error {}
 
 /**
  * Strip the admin/AI-only dollar/ROI fields from each rec before responding on a
@@ -75,13 +80,11 @@ const router = Router();
  * exposure (a `$nnn` / `$/wk` substring), so even a future dollarized variant (P6) or a
  * renderer that forgets to gate cannot leak a raw money figure to a client. Non-dollarized
  * strings pass through unchanged.
+ *
+ * The implementation lives in the shared leaf util `server/recommendation-gain-sanitizer.ts`
+ * (B1) so the rec→deliverable adapter — which mints client-facing payloads OUTSIDE this route —
+ * runs the SAME safety net (imported at the top of this file).
  */
-const DOLLAR_EXPOSURE_RE = /\$\s?[\d,.]+(?:\s*\/\s*\w+)?/g;
-function sanitizePublicGain(gain: string): string {
-  // Replace any "$1,234" / "$1,234/wk" run with a neutral, non-dollarized token.
-  const cleaned = gain.replace(DOLLAR_EXPOSURE_RE, 'high-value').trim();
-  return cleaned.length > 0 ? cleaned : 'Estimated to drive meaningful organic growth';
-}
 
 /** Restricted post-send statuses a client may ever observe (mirrors ClientFacingClientStatus). A
  *  rec in 'system'/'curated' (pre-send operator axis) must NEVER expose its clientStatus to the
@@ -423,35 +426,57 @@ router.post(
     const recBefore = set?.recommendations.find((r) => r.id === recId) ?? null;
     if (!recBefore) return res.status(404).json({ error: 'Recommendation not found' });
 
-    // Single-writer greenlight: clientStatus sent|discussing → approved (validates the client axis).
-    let rec: Recommendation | null;
+    // L6: the greenlight (clientStatus → approved) and the durable content-request creation are
+    // ONE atomic unit — a throw between them must not leave an approved rec with no request (an
+    // orphaned greenlight the client believes took effect but that produced no work item). Wrap
+    // BOTH writes in a single outer db.transaction(): approveRecommendation opens its own inner
+    // txn (mutateRec), which better-sqlite3 nests via savepoint into this outer one (the same
+    // nesting the bulk route relies on), so the pair commits or rolls back together. recordAction,
+    // broadcasts, and activity logging stay OUTSIDE the txn (post-commit side effects).
+    let rec: Recommendation;
+    let request: ReturnType<typeof createContentRequest>;
     try {
-      rec = approveRecommendation(workspaceId, recId);
+      const result = db.transaction(() => {
+        // Single-writer greenlight: clientStatus sent|discussing → approved (validates the client axis).
+        const approved = approveRecommendation(workspaceId, recId);
+        // null = rec vanished mid-flight (already 404'd on recBefore, but re-guard inside the txn).
+        // Throw to roll back so a vanished rec never leaves a half-written request.
+        if (!approved) throw new RecGoneError();
+
+        // Build the StrategyCardContext stamped onto the durable request — the SAME derivation the
+        // rec→deliverable adapter uses (one source of truth so the two §7 stamps never drift).
+        const cardContext: StrategyCardContext = buildStrategyCardContextFromRec(approved);
+
+        // The durable content REQUEST — nothing generated (briefId stays null; initialStatus
+        // 'requested' = queued, no brief yet). A targetKeyword is required by the request model;
+        // fall back to the rec title when the rec carries none (e.g. a technical rec).
+        const targetKeyword = approved.targetKeyword?.trim() || approved.title;
+        const createdRequest = createContentRequest(workspaceId, {
+          topic: approved.title,
+          targetKeyword,
+          intent: cardContext.intent || 'informational',
+          priority: recPriorityToRequestPriority(approved.priority),
+          rationale: approved.insight,
+          source: 'client',
+          recommendationId: approved.id,
+          strategyCardContext: cardContext,
+          initialStatus: 'requested', // queued; NOTHING generated — the operator works it later
+          // M1/L1: each greenlight is a DISTINCT durable intent. The default keyword-scoped dedupe
+          // would return a pre-existing request row for the same targetKeyword and NEVER stamp this
+          // rec's recommendationId / strategyCardContext, silently breaking the C2/C3 attribution
+          // join (two recs sharing a keyword would collapse onto one row pointing at neither).
+          // Disable dedupe so every act-on mints its own lineage-stamped row.
+          dedupe: false,
+        });
+        return { rec: approved, request: createdRequest };
+      })();
+      rec = result.rec;
+      request = result.request;
     } catch (err) {
       if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+      if (err instanceof RecGoneError) return res.status(404).json({ error: 'Recommendation not found' });
       throw err;
     }
-    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
-
-    // Build the StrategyCardContext stamped onto the durable request — the SAME derivation the
-    // rec→deliverable adapter uses (one source of truth so the two §7 stamps never drift).
-    const cardContext: StrategyCardContext = buildStrategyCardContextFromRec(rec);
-
-    // The durable content REQUEST — nothing generated (briefId stays null; initialStatus 'requested'
-    // = queued, no brief yet). A targetKeyword is required by the request model; fall back to the rec
-    // title when the rec carries none (e.g. a technical rec) so the request is still durable.
-    const targetKeyword = rec.targetKeyword?.trim() || rec.title;
-    const request = createContentRequest(workspaceId, {
-      topic: rec.title,
-      targetKeyword,
-      intent: cardContext.intent || 'informational',
-      priority: recPriorityToRequestPriority(rec.priority),
-      rationale: rec.insight,
-      source: 'client',
-      recommendationId: rec.id,
-      strategyCardContext: cardContext,
-      initialStatus: 'requested', // queued; NOTHING generated — the operator works it later
-    });
 
     // Greenlight → result attribution (spec §7 C2/C5). Idempotent: a re-act-on (or a later
     // mark-delivered) keyed to the same rec id must not double-record. attribution 'platform_executed'

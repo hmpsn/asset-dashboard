@@ -10,7 +10,8 @@
 // (both halves of the broadcast contract — see src/lib/wsInvalidation.ts).
 
 import { useQuery } from '@tanstack/react-query';
-import { theIssueApi, type ClientRecResponseSummary } from '../../api/theIssue';
+import { theIssueApi } from '../../api/theIssue';
+import type { ClientRecResponseSummary } from '../../../shared/types/recommendations';
 import { queryKeys } from '../../lib/queryKeys';
 
 export function useClientRecResponses(workspaceId?: string) {

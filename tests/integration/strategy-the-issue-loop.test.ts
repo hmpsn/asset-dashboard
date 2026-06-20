@@ -112,8 +112,12 @@ describe('operator /send mirrors a rec→deliverable (half-loop #1)', () => {
     expect(minted!.payload.recommendationId).toBe('rec_send_row');
     expect(minted!.payload.targetKeyword).toBe('keyword-rec_send_row');
     expect(minted!.payload.strategyCardContext).toBeDefined();
-    // No $/ROI leak in the client-facing payload.
-    expect(JSON.stringify(minted!.payload)).not.toContain('emvPerWeek');
+    // No $/ROI leak in the client-facing payload (B1): neither the admin-only field name nor
+    // any raw dollar figure may ride in the minted deliverable. estimatedGain is run through the
+    // same sanitizePublicGain safety net the public rec route uses.
+    const payloadJson = JSON.stringify(minted!.payload);
+    expect(payloadJson).not.toContain('emvPerWeek');
+    expect(payloadJson).not.toContain('$');
   });
 
   it('bulk /send mints a deliverable for each sent rec', async () => {
@@ -197,6 +201,32 @@ describe('client act-on → durable content request (half-loop #2)', () => {
     expect(clientList.some((r) => r.id === requestId)).toBe(true);
   });
 
+  it('M1/L1: two act-ons on different recs sharing a targetKeyword each mint a DISTINCT lineage-stamped request', async () => {
+    // Both recs target the SAME keyword. The default keyword-scoped dedupe would collapse the
+    // second act-on onto the first row (never stamping rec_share_b's recommendationId) — act-on
+    // passes dedupe:false so each greenlight is its own durable, lineage-stamped intent.
+    seedRec('rec_share_a', { clientStatus: 'sent', sentAt: now(), targetKeyword: 'shared-keyword' });
+    seedRec('rec_share_b', { clientStatus: 'sent', sentAt: now(), targetKeyword: 'shared-keyword' });
+
+    const resA = await postJson(`/api/public/recommendations/${workspaceId}/rec_share_a/act-on`, {});
+    expect(resA.status).toBe(200);
+    const { requestId: reqA } = (await resA.json()) as { requestId: string };
+    const resB = await postJson(`/api/public/recommendations/${workspaceId}/rec_share_b/act-on`, {});
+    expect(resB.status).toBe(200);
+    const { requestId: reqB } = (await resB.json()) as { requestId: string };
+
+    // Two DISTINCT rows, each stamped with its own originating rec id.
+    expect(reqA).not.toBe(reqB);
+    const all = listContentRequests(workspaceId);
+    const rowA = all.find((r) => r.id === reqA);
+    const rowB = all.find((r) => r.id === reqB);
+    expect(rowA?.recommendationId).toBe('rec_share_a');
+    expect(rowB?.recommendationId).toBe('rec_share_b');
+    // Both carry strategyCardContext (the C2/C3 join would be dead if dedupe returned the prior row).
+    expect(rowA?.strategyCardContext).toBeDefined();
+    expect(rowB?.strategyCardContext).toBeDefined();
+  });
+
   it('rejects act-on on a rec that was never sent (illegal client transition)', async () => {
     seedRec('rec_never_sent', { clientStatus: 'curated' });
     const res = await postJson(
@@ -209,6 +239,67 @@ describe('client act-on → durable content request (half-loop #2)', () => {
   it('404s act-on on an unknown rec', async () => {
     const res = await postJson(`/api/public/recommendations/${workspaceId}/nope/act-on`, {});
     expect(res.status).toBe(404);
+  });
+});
+
+describe('L8: cross-workspace act-on is tenant-scoped (404, mutates nothing)', () => {
+  it('act-on against workspace A with a recId that belongs to workspace B → 404, no mutation in B', async () => {
+    // Seed a second workspace with its own SENT rec.
+    const other = seedWorkspace({ clientPassword: '' });
+    setWorkspaceFlagOverride('strategy-the-issue', other.workspaceId, true);
+    try {
+      const otherRec: Recommendation = {
+        id: 'rec_other_ws',
+        workspaceId: other.workspaceId,
+        priority: 'fix_now',
+        type: 'content',
+        title: 'Other-workspace rec',
+        description: 'desc',
+        insight: 'why',
+        impact: 'high',
+        effort: 'low',
+        impactScore: 60,
+        source: 'audit:content',
+        affectedPages: [],
+        trafficAtRisk: 0,
+        impressionsAtRisk: 0,
+        estimatedGain: 'gain',
+        actionType: 'manual',
+        targetKeyword: 'other-keyword',
+        status: 'pending',
+        clientStatus: 'sent',
+        sentAt: now(),
+        lifecycle: 'active',
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      const otherSet: RecommendationSet = {
+        workspaceId: other.workspaceId,
+        generatedAt: now(),
+        recommendations: [otherRec],
+        summary: computeRecommendationSummary([otherRec]),
+      };
+      saveRecommendations(otherSet);
+
+      // POST act-on against the FIRST workspace's URL but with B's rec id → not found in A's set.
+      const res = await postJson(
+        `/api/public/recommendations/${workspaceId}/rec_other_ws/act-on`,
+        {},
+      );
+      expect(res.status).toBe(404);
+
+      // Nothing in workspace B was mutated: rec still 'sent', no content request, no tracked action.
+      const reloaded = loadRecommendations(other.workspaceId);
+      expect(reloaded?.recommendations.find((r) => r.id === 'rec_other_ws')?.clientStatus).toBe('sent');
+      expect(
+        listContentRequests(other.workspaceId).some((r) => r.recommendationId === 'rec_other_ws'),
+      ).toBe(false);
+      expect(
+        getActionByWorkspaceAndSource(other.workspaceId, 'recommendation', 'rec_other_ws'),
+      ).toBeNull();
+    } finally {
+      other.cleanup();
+    }
   });
 });
 

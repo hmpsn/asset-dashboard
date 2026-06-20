@@ -24,12 +24,15 @@
  * complete manually (spec §7 C1). The adapter opts OUT of `appliesOnApprove`; `applyDisabledStub`
  * throws if any future caller wires it on.
  *
- * Leaf rule: this module imports ONLY shared types + the adapter contract + the (already-leaf)
- * `applyDisabledStub`. It is NOT imported back by the store/service.
+ * Leaf rule: this module imports ONLY shared types, the adapter contract, the (already-leaf)
+ * `applyDisabledStub`, and pure leaf helpers that derive the client-facing payload
+ * (`buildStrategyCardContextFromRec`, `sanitizePublicGain` — both side-effect-free). It is NOT
+ * imported back by the store/service.
  */
 import { registerAdapter, type DeliverableAdapter } from './types.js';
 import { applyDisabledStub } from './client-action-shared.js';
 import { buildStrategyCardContextFromRec } from '../../../recommendation-strategy-card-context.js';
+import { sanitizePublicGain } from '../../../recommendation-gain-sanitizer.js';
 import type { Recommendation } from '../../../../shared/types/recommendations.js';
 import type { StrategyCardContext } from '../../../../shared/types/content.js';
 
@@ -74,7 +77,11 @@ function buildRecPayload(rec: Recommendation): RecommendationDeliverablePayload 
     recommendationId: rec.id,
     recType: rec.type,
     insight: rec.insight,
-    estimatedGain: rec.estimatedGain,
+    // B1: run estimatedGain through the SAME safety net the public rec route uses
+    // (sanitizePublicGain). This payload reaches the client feed WITHOUT passing through
+    // `stripEmvFromPublicRecs`, so without this a future dollarized gain string would leak a
+    // raw $/wk figure into the client-facing deliverable. Non-dollarized gains pass through.
+    estimatedGain: sanitizePublicGain(rec.estimatedGain),
     targetKeyword: rec.targetKeyword ?? null,
     strategyCardContext: buildStrategyCardContextFromRec(rec),
   };

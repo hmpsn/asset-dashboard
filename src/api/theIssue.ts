@@ -13,32 +13,29 @@
 // (Route ownership is Track C; this wrapper pins the contract from the client side.)
 
 import { get, getSafe, post } from './client';
-import type { RecommendationSet } from '../../shared/types/recommendations.ts';
+import type {
+  RecommendationSet,
+  ClientFacingRecommendation,
+  ClientRecResponseSummary,
+} from '../../shared/types/recommendations.ts';
+
+// B3: ClientRecResponseSummary is the SHARED contract (shared/types/recommendations.ts) — the
+// server route emits {approved, declined, discussing, recent[]}. This wrapper previously
+// re-declared a divergent {approved, discussing, declined, pending} shape (no `recent`, a
+// non-existent `pending`), which silently disagreed with the server payload. Import + re-export
+// the single shared type so the FE and server never drift.
+export type { ClientRecResponseSummary } from '../../shared/types/recommendations.ts';
 
 /**
- * Client-safe pre-aggregated response summary for the loop footer
- * ("you've greenlit N moves · M in discussion"). Reads a client-safe projection
- * from the public route (server Track C / audit P2-6). Counts only — no admin axes.
+ * Server response from the act-on (greenlight) write (B3). Mirrors the act-on route's actual
+ * JSON: the client-facing projected recommendation + the durable content-request id created by
+ * the greenlight. (Previously a divergent {recId, requestId?, clientStatus?} shape.)
  */
-export interface ClientRecResponseSummary {
-  /** clientStatus === 'approved' (greenlit). */
-  approved: number;
-  /** clientStatus === 'discussing'. */
-  discussing: number;
-  /** clientStatus === 'declined'. */
-  declined: number;
-  /** clientStatus === 'sent' and not yet responded to. */
-  pending: number;
-}
-
-/** Server response from the act-on (greenlight) write. */
 export interface ActOnRecommendationResult {
-  /** The originating recommendation id. */
-  recId: string;
+  /** The client-facing projected recommendation after the greenlight (clientStatus 'approved'). */
+  recommendation: ClientFacingRecommendation;
   /** The durable content-request id created by the greenlight. */
-  requestId?: string;
-  /** Resolved client status after the write ('approved'). */
-  clientStatus?: string;
+  requestId: string;
 }
 
 export const theIssueApi = {
@@ -69,7 +66,7 @@ export const theIssueApi = {
   recResponses: (workspaceId: string) =>
     getSafe<ClientRecResponseSummary>(
       `/api/public/recommendations/${workspaceId}/responses`,
-      { approved: 0, discussing: 0, declined: 0, pending: 0 },
+      { approved: 0, declined: 0, discussing: 0, recent: [] },
     ),
 
   /**
