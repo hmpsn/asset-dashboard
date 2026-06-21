@@ -29,6 +29,7 @@ const NO_AUTO = { headers: { 'x-no-auto-public-auth': 'true' } };
 
 let wsOn: string;
 let wsOff: string;
+let wsNoVerdict: string; // return-hook ON, spine ON, but no outcomeValue → no verdict (the 404 branch)
 const cleanups: Array<() => void> = [];
 
 function seedExportable(wsId: string): void {
@@ -53,20 +54,31 @@ function seedExportable(wsId: string): void {
 beforeAll(async () => {
   const sOn = seedWorkspace(); wsOn = sOn.workspaceId; cleanups.push(sOn.cleanup);
   const sOff = seedWorkspace(); wsOff = sOff.workspaceId; cleanups.push(sOff.cleanup);
+  const sNoV = seedWorkspace(); wsNoVerdict = sNoV.workspaceId; cleanups.push(sNoV.cleanup);
   seedExportable(wsOn);
   seedExportable(wsOff);
+  // wsNoVerdict: SEO data present but NO outcomeValue/GA4 snapshot → computeROI hydrates no verdict,
+  // so assembleOnePagerExport returns null and the route takes its "verdict not yet established" branch.
+  upsertPageKeywordsBatch(wsNoVerdict, [{
+    pagePath: '/services', pageTitle: 'Services', primaryKeyword: 'dentist near me',
+    secondaryKeywords: [], clicks: 100, impressions: 1000, cpc: 3.5,
+  }]);
+  updateWorkspace(wsNoVerdict, { clientPassword: 'client-pass' });
 
   setWorkspaceFlagOverride('the-issue-client-spine', wsOn, true);
   setWorkspaceFlagOverride('the-issue-client-return-hook', wsOn, true);
   // wsOff: spine ON (so computeROI hydrates → public roi 200) but return-hook OFF.
   setWorkspaceFlagOverride('the-issue-client-spine', wsOff, true);
   setWorkspaceFlagOverride('the-issue-client-return-hook', wsOff, false);
+  // wsNoVerdict: both flags ON so the route passes the flag gate and reaches the null-payload branch.
+  setWorkspaceFlagOverride('the-issue-client-spine', wsNoVerdict, true);
+  setWorkspaceFlagOverride('the-issue-client-return-hook', wsNoVerdict, true);
 
   await ctx.startServer();
 });
 
 afterAll(async () => {
-  for (const id of [wsOn, wsOff]) {
+  for (const id of [wsOn, wsOff, wsNoVerdict]) {
     setWorkspaceFlagOverride('the-issue-client-spine', id, null);
     setWorkspaceFlagOverride('the-issue-client-return-hook', id, null);
   }
@@ -113,6 +125,13 @@ describe('GET /api/public/export/:id/one-pager (A6)', () => {
   it('flag-OFF → 404', async () => {
     const res = await api(`/api/public/export/${wsOff}/one-pager`);
     expect(res.status).toBe(404);
+  });
+
+  it('flag-ON but no verdict yet → 404 with the "not yet established" message (not a 500 throw)', async () => {
+    const res = await api(`/api/public/export/${wsNoVerdict}/one-pager`);
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not yet established/i);
   });
 });
 

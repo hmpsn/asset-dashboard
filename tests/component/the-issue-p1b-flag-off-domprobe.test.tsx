@@ -151,14 +151,17 @@ const GAPS: SetupReadinessState = {
   ga4Connected: false,
   valueSet: false,
   basisOfValue: null,
+  outcomeValueLabel: null,
   segmentConfirmed: false,
+  segmentLabel: 'b2b saas',
   eventsPinned: false,
   eventsTyped: false,
   webflowConnected: false,
   conversionTrackingConfirmedAt: null,
   lastLeadAt: null,
   povDrafted: false,
-  openGapCount: 7,
+  resolvedProvenance: 'estimate_ga4',
+  openGapCount: 6,
 };
 
 const STATUS_WITH_READINESS: ConversionTrackingStatus = {

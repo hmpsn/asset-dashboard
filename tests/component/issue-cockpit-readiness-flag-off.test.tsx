@@ -108,14 +108,17 @@ const GAPS: SetupReadinessState = {
   ga4Connected: false,
   valueSet: false,
   basisOfValue: null,
+  outcomeValueLabel: null,
   segmentConfirmed: false,
+  segmentLabel: 'b2b saas',
   eventsPinned: false,
   eventsTyped: false,
   webflowConnected: false,
   conversionTrackingConfirmedAt: null,
   lastLeadAt: null,
   povDrafted: false,
-  openGapCount: 7,
+  resolvedProvenance: 'estimate_ga4',
+  openGapCount: 6,
 };
 
 const STATUS_WITH_READINESS: ConversionTrackingStatus = {
@@ -176,7 +179,7 @@ describe('Cockpit P1b mount — flag ON (B5)', () => {
     renderPanel();
     expect(document.querySelector('[data-p1b-readiness]')).not.toBeNull();
     expect(screen.getByText('Conversion tracking')).toBeInTheDocument();
-    expect(screen.getByText(/7 steps left/i)).toBeInTheDocument();
+    expect(screen.getByText(/6 steps left/i)).toBeInTheDocument();
     // The readiness panel precedes the IssueHeader "Send issue" button in DOM order (slot-0).
     const readiness = document.querySelector('[data-p1b-readiness]')!;
     const sendIssue = screen.getByRole('button', { name: /send issue/i });

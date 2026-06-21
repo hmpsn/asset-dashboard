@@ -26,8 +26,17 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="51
   </g>
 </svg>`;
 
+// Full HTML-context escape set (& < > " '). Every interpolation site below sits in a text node or a
+// double-quoted attribute, so escaping ' is not strictly required today — it is kept so the helper
+// stays safe if a future edit ever interpolates into a single-quoted attribute (defense-in-depth on a
+// forwardable document). &#39; is the numeric entity (HTML4-safe; &apos; is not).
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function fmtDate(iso: string | null): string {

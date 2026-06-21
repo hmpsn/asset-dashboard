@@ -23,17 +23,22 @@ describe('P1b Lane A — shared-type contracts', () => {
       ga4Connected: true,
       valueSet: true,
       basisOfValue: 'agency_estimate',
+      outcomeValueLabel: 'USD 800 / new patient · Agency estimate',
       segmentConfirmed: true,
+      segmentLabel: 'b2b saas',
       eventsPinned: true,
       eventsTyped: true,
       webflowConnected: true,
       conversionTrackingConfirmedAt: '2026-06-20T00:00:00.000Z',
       lastLeadAt: '2026-06-19T00:00:00.000Z',
       povDrafted: true,
+      resolvedProvenance: 'measured_action',
       openGapCount: 0,
     };
     expect(r.openGapCount).toBe(0);
-    // PII-free: no lead identity keys exist on the type.
+    expect(r.resolvedProvenance).toBe('measured_action');
+    expect(r.segmentLabel).toBe('b2b saas');
+    // PII-free: no lead identity keys exist on the type (segment/value labels are config, not PII).
     expect(JSON.stringify(r)).not.toContain('leadName');
     expect(JSON.stringify(r)).not.toContain('@');
   });
@@ -44,7 +49,6 @@ describe('P1b Lane A — shared-type contracts', () => {
     const payload: OnePagerExportPayload = {
       exportProfile: segProfile,
       workspaceName: 'Acme',
-      brandLogoUrl: null,
       outcomeNoun: 'qualified leads',
       verdictSentence: '14 qualified leads ≈ $11,200 in value',
       estimatedValue: 11200,

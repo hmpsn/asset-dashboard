@@ -22,6 +22,9 @@ export interface AdminLeadsReadoutProps {
   loading?: boolean;
   /** Deep-link into the form-source picker when the operator has no captured leads yet. */
   onConnectCta?: () => void;
+  /** Reveal more captured leads. When provided AND more remain below the page cap, the footer renders
+   *  an actionable "Load more" button instead of a dead-end count. Omit to keep the static footer. */
+  onLoadMore?: () => void;
 }
 
 const OUTCOME_TYPE_LABEL: Record<OutcomeType, string> = {
@@ -34,7 +37,8 @@ const OUTCOME_TYPE_LABEL: Record<OutcomeType, string> = {
   other: 'Other',
 };
 
-export function AdminLeadsReadout({ leads, total, loading = false, onConnectCta }: AdminLeadsReadoutProps) {
+export function AdminLeadsReadout({ leads, total, loading = false, onConnectCta, onLoadMore }: AdminLeadsReadoutProps) {
+  const hasMore = total > leads.length && leads.length > 0;
   return (
     <SectionCard noPadding>
       <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
@@ -102,11 +106,18 @@ export function AdminLeadsReadout({ leads, total, loading = false, onConnectCta 
             ))}
           </ul>
         )}
-        {!loading && total > leads.length && leads.length > 0 && (
-          <p className="t-caption-sm text-[var(--brand-text-muted)] pt-3 flex items-center gap-1.5">
-            <Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" />
-            Showing {leads.length.toLocaleString()} of {total.toLocaleString()} captured leads.
-          </p>
+        {!loading && hasMore && (
+          <div className="pt-3 flex items-center justify-between gap-3">
+            <p className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1.5">
+              <Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" />
+              Showing {leads.length.toLocaleString()} of {total.toLocaleString()} captured leads.
+            </p>
+            {onLoadMore && (
+              <Button variant="secondary" size="sm" onClick={onLoadMore}>
+                Load more
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </SectionCard>

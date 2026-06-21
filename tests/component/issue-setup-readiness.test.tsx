@@ -25,27 +25,33 @@ const ALL_GAPS: SetupReadinessState = {
   ga4Connected: false,
   valueSet: false,
   basisOfValue: null,
+  outcomeValueLabel: null,
   segmentConfirmed: false,
+  segmentLabel: 'b2b saas',
   eventsPinned: false,
   eventsTyped: false,
   webflowConnected: false,
   conversionTrackingConfirmedAt: null,
   lastLeadAt: null,
   povDrafted: false,
-  openGapCount: 7,
+  resolvedProvenance: 'estimate_ga4',
+  openGapCount: 6,
 };
 
 const ALL_CLEAR: SetupReadinessState = {
   ga4Connected: true,
   valueSet: true,
   basisOfValue: 'agency_estimate',
+  outcomeValueLabel: 'USD 800 / new patient · Agency estimate',
   segmentConfirmed: true,
+  segmentLabel: 'b2b saas',
   eventsPinned: true,
   eventsTyped: true,
   webflowConnected: true,
   conversionTrackingConfirmedAt: new Date().toISOString(),
   lastLeadAt: new Date().toISOString(),
   povDrafted: true,
+  resolvedProvenance: 'measured_action',
   openGapCount: 0,
 };
 
@@ -68,8 +74,6 @@ function renderPanel(readiness: SetupReadinessState, status: ConversionTrackingS
           workspaceId="ws-1"
           readiness={readiness}
           status={status}
-          segmentLabel="b2b saas"
-          resolvedProvenance={readiness.lastLeadAt ? 'measured_action' : 'estimate_ga4'}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -81,9 +85,18 @@ beforeEach(() => {
 });
 
 describe('IssueSetupReadiness (B4)', () => {
-  it('shows the open-gap headline when there are gaps', () => {
+  it('shows the open-gap headline (one count per visible step) when there are gaps', () => {
     renderPanel(ALL_GAPS);
-    expect(screen.getByText(/7 steps left|7 steps|steps left/i)).toBeInTheDocument();
+    // 6 gaps — matches the 6 rendered steps (pin+type is a single step), never 7.
+    expect(screen.getByText(/6 steps left/i)).toBeInTheDocument();
+  });
+
+  it('renders the server-resolved value line + segment verbatim (no zero stub, no hardcoded dash)', () => {
+    renderPanel(ALL_CLEAR, { ...STATUS, readiness: ALL_CLEAR, formCaptureConnected: true, submissionCount: 3 });
+    // F4 regression: the cockpit must NOT render "0 /  · …" — it shows the server-formatted label.
+    expect(screen.getByText('USD 800 / new patient · Agency estimate')).toBeInTheDocument();
+    // F3 regression: the segment row shows the resolved label, not "—".
+    expect(screen.getByText('b2b saas')).toBeInTheDocument();
   });
 
   it('renders each gap as an actionable deep-link button', () => {

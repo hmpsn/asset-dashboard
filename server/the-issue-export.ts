@@ -85,7 +85,6 @@ export function assembleOnePagerExport(workspaceId: string): OnePagerExportPaylo
   return {
     exportProfile,
     workspaceName: ws.name,
-    brandLogoUrl: ws.brandLogoUrl ?? null,
     outcomeNoun,
     verdictSentence,
     estimatedValue,

@@ -24,7 +24,7 @@ describe('assembleSetupReadiness', () => {
     expect(assembleSetupReadiness('does-not-exist')).toBeNull();
   });
 
-  it('bare workspace → every required gate false, openGapCount === 7', () => {
+  it('bare workspace → every required gate false, openGapCount === 6 (one gate per visible step)', () => {
     const s = seedWorkspace(); cleanups.push(s.cleanup);
     const r = assembleSetupReadiness(s.workspaceId);
     expect(r).not.toBeNull();
@@ -36,9 +36,17 @@ describe('assembleSetupReadiness', () => {
     expect(r!.eventsTyped).toBe(false);
     expect(r!.webflowConnected).toBe(false);
     expect(r!.povDrafted).toBe(false);
-    expect(r!.openGapCount).toBe(7);
+    // 6 gates (ga4 · value · segment · pin+type · webflow · pov), one per visible checklist step —
+    // the pin+type pair is a SINGLE gate so the headline matches the rendered rows (not 7).
+    expect(r!.openGapCount).toBe(6);
     expect(r!.lastLeadAt).toBeNull();
     expect(r!.conversionTrackingConfirmedAt).toBeNull();
+    // Resolved fields the cockpit renders verbatim (no stubs / no count heuristic).
+    expect(r!.resolvedProvenance).toBe('estimate_ga4'); // no GA4 snapshot → estimate (matches client)
+    expect(r!.outcomeValueLabel).toBeNull();             // no outcome value set
+    expect(typeof r!.segmentLabel).toBe('string');
+    expect(r!.segmentLabel.length).toBeGreaterThan(0);
+    expect(r!.segmentLabel).not.toContain('_');          // de-underscored, human-readable
   });
 
   it('fully configured workspace → every gate true, openGapCount === 0', () => {
@@ -63,9 +71,12 @@ describe('assembleSetupReadiness', () => {
     expect(r.eventsTyped).toBe(true);
     expect(r.webflowConnected).toBe(true);
     expect(r.conversionTrackingConfirmedAt).toBe('2026-06-20T00:00:00.000Z');
-    // POV not seeded → still a gap. The remaining 6 config gates are all cleared.
+    // POV not seeded → still a gap. The remaining 5 config gates are all cleared.
     expect(r.povDrafted).toBe(false);
     expect(r.openGapCount).toBe(1);
+    // Pre-formatted value line + resolved segment, rendered verbatim by the cockpit.
+    expect(r.outcomeValueLabel).toBe('USD 800 / new patient · Client provided');
+    expect(r.segmentLabel).toBe('b2b saas');
   });
 
   it('pinned-but-untyped event → eventsPinned true, eventsTyped false', () => {

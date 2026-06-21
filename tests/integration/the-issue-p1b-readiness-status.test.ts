@@ -66,6 +66,12 @@ describe('GET /api/workspaces/:id/conversion-tracking-status — readiness rollu
     expect(s.readiness.webflowConnected).toBe(true);
     expect(s.readiness.segmentConfirmed).toBe(true);
     expect(typeof s.readiness.openGapCount).toBe('number');
+    // Resolved fields the cockpit renders verbatim (A4 enrichment) — present on the live payload.
+    expect(['estimate_ga4', 'measured_action', 'actual_reconciled']).toContain(s.readiness.resolvedProvenance);
+    expect(typeof s.readiness.segmentLabel).toBe('string');
+    expect(s.readiness.segmentLabel.length).toBeGreaterThan(0);
+    // outcomeValueLabel is the pre-formatted value line (value is set in this fixture → non-null string).
+    expect(typeof s.readiness.outcomeValueLabel).toBe('string');
   });
 
   it('readiness rollup is PII-free (D7)', async () => {

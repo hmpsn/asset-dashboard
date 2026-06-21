@@ -15,7 +15,6 @@ function basePayload(over: Partial<OnePagerExportPayload> = {}): OnePagerExportP
   return {
     exportProfile: 'board_one_pager',
     workspaceName: 'Acme Dental',
-    brandLogoUrl: null,
     outcomeNoun: 'qualified leads',
     verdictSentence: '14 qualified leads ≈ $11,200 in value vs. a $1,500 retainer',
     estimatedValue: 11200,

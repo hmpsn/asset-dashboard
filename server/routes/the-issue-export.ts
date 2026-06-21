@@ -18,12 +18,18 @@ import { Router } from 'express';
 import { requireAuthenticatedClientPortalAuth } from '../middleware.js';
 import { getWorkspace } from '../workspaces.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { loadFormSubmissions } from '../form-submissions.js';
+import { loadFormSubmissionsPaged } from '../form-submissions.js';
 import { assembleOnePagerExport, toNamedLeadView } from '../the-issue-export.js';
 import { renderOnePagerHTML } from '../the-issue-one-pager-html.js';
 import type { NamedLeadView } from '../../shared/types/the-issue.js';
 
 const FLAG = 'the-issue-client-return-hook';
+
+// Bounded reads (parity with the paged admin route): never materialize the whole form_submissions
+// table into memory / the HTML on a single request. The forwardable one-pager embeds the most-recent
+// slice (a board summary, not a full ledger); the my-leads portal view caps the page generously.
+const ONE_PAGER_LEADS_CAP = 50;
+const MY_LEADS_CAP = 200;
 
 export const theIssueExportRouter = Router();
 
@@ -38,7 +44,9 @@ theIssueExportRouter.get(
     const payload = assembleOnePagerExport(ws.id);
     if (!payload) { res.status(404).json({ error: 'Export not available — verdict not yet established' }); return; }
     // Attach the client's OWN leads (authed surface only) — the export DATA payload carries none.
-    const leads: NamedLeadView[] = loadFormSubmissions(ws.id).map(toNamedLeadView);
+    // Bounded to the most-recent slice so a high-volume workspace never bloats the print document.
+    const { leads: rows } = loadFormSubmissionsPaged(ws.id, { limit: ONE_PAGER_LEADS_CAP, offset: 0 });
+    const leads: NamedLeadView[] = rows.map(toNamedLeadView);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderOnePagerHTML({ ...payload, leads }));
   },
@@ -52,7 +60,11 @@ theIssueExportRouter.get(
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) { res.status(404).json({ error: 'Workspace not found' }); return; }
     if (!isFeatureEnabled(FLAG, ws.id)) { res.sendStatus(404); return; }
-    const leads: NamedLeadView[] = loadFormSubmissions(ws.id).map(toNamedLeadView);
-    res.json({ leads });
+    // Bounded read — the portal "your leads" view is a tertiary disclosure; cap the page generously
+    // rather than serializing the full PII set (parity with the paged admin route). `total` lets the
+    // UI honestly say "showing N of M" without a second count drift.
+    const { leads: rows, total } = loadFormSubmissionsPaged(ws.id, { limit: MY_LEADS_CAP, offset: 0 });
+    const leads: NamedLeadView[] = rows.map(toNamedLeadView);
+    res.json({ leads, total });
   },
 );

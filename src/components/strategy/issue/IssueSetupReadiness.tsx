@@ -14,19 +14,15 @@ import { useNavigate } from 'react-router-dom';
 import { ConversionTrackingReadout, type ConversionSetupStep } from '../../settings/ConversionTrackingReadout';
 import { adminPath } from '../../../routes';
 import type { SetupReadinessState } from '../../../../shared/types/the-issue';
-import type { OutcomeProvenance } from '../../../../shared/types/outcome-tracking';
 import type { ConversionTrackingStatus } from '../../../api/conversionTracking';
 
 export interface IssueSetupReadinessProps {
   workspaceId: string;
-  /** The PII-free ✓/⚠ rollup (server-assembled, A4). */
+  /** The PII-free ✓/⚠ rollup (server-assembled, A4). Carries the resolved segmentLabel, resolved
+   *  provenance, and pre-formatted outcomeValueLabel — the cockpit renders these verbatim (no stubs). */
   readiness: SetupReadinessState;
   /** The admin conversion-tracking status (counts + freshness) — feeds the integrity rows. */
   status: ConversionTrackingStatus | undefined;
-  /** Resolved client segment (human-readable, e.g. "b2b saas"). */
-  segmentLabel: string;
-  /** The provenance the client number will resolve to (drives the Measured/Estimate pill). */
-  resolvedProvenance: OutcomeProvenance;
   /** Whether the underlying status query is still loading. */
   loading?: boolean;
 }
@@ -35,8 +31,6 @@ export function IssueSetupReadiness({
   workspaceId,
   readiness,
   status,
-  segmentLabel,
-  resolvedProvenance,
   loading = false,
 }: IssueSetupReadinessProps) {
   const navigate = useNavigate();
@@ -93,11 +87,6 @@ export function IssueSetupReadiness({
     },
   ];
 
-  // The readout's value/basis line: show the basis label when a value is set; null otherwise.
-  const outcomeValue = readiness.valueSet
-    ? { valuePerOutcome: 0, unitLabel: '', currency: '', basisLabel: basisLabelFor(readiness.basisOfValue) }
-    : null;
-
   return (
     // data-p1b-readiness — Lane D flag-OFF DOM-probe hook; this whole subtree is absent when the
     // measured-capture flag is OFF (gated at the cockpit mount), so the cockpit stays byte-identical.
@@ -118,30 +107,18 @@ export function IssueSetupReadiness({
         )}
       </div>
       <ConversionTrackingReadout
-        outcomeValue={outcomeValue}
-        segmentLabel={segmentLabel}
+        outcomeValue={null}
+        outcomeValueLabel={readiness.outcomeValueLabel}
+        segmentLabel={readiness.segmentLabel}
         pinnedCount={status?.pinnedCount ?? 0}
         typedCount={status?.typedCount ?? 0}
         formCaptureConnected={status?.formCaptureConnected ?? readiness.webflowConnected}
         lastSubmissionAt={status?.lastSubmissionAt ?? readiness.lastLeadAt}
         submissionCount={status?.submissionCount ?? 0}
-        resolvedProvenance={resolvedProvenance}
+        resolvedProvenance={readiness.resolvedProvenance}
         steps={steps}
         loading={loading}
       />
     </div>
   );
-}
-
-function basisLabelFor(basis: SetupReadinessState['basisOfValue']): string {
-  switch (basis) {
-    case 'client_provided':
-      return 'Client provided';
-    case 'agency_estimate':
-      return 'Agency estimate';
-    case 'ai_enriched':
-      return 'AI enriched';
-    default:
-      return 'Set';
-  }
 }

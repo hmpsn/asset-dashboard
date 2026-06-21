@@ -42,7 +42,6 @@ import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
-import type { OutcomeProvenance } from '../../shared/types/outcome-tracking';
 import {
   useStrategyMetrics,
   useStrategySettings,
@@ -203,15 +202,18 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
   const { status: conversionStatus, isLoading: conversionStatusLoading } =
     useConversionTrackingStatus(workspaceId, measuredCapture);
+  // Captured-leads page size — "Load more" widens the limit (capped server-side at 200) so the readout's
+  // "Showing X of Y" footer is an affordance, not a dead-end. Unconditional state (Rules of Hooks).
+  const LEADS_PAGE = 50;
+  const LEADS_MAX = 200;
+  const [leadsLimit, setLeadsLimit] = useState(LEADS_PAGE);
   const { leads: capturedLeads, total: capturedLeadsTotal, isLoading: capturedLeadsLoading } =
-    useAdminLeads(workspaceId, undefined, measuredCapture);
-  // The readiness rollup rides the status endpoint (A4); the provenance the client number resolves
-  // to drives the Measured/Estimate pill (count-only freshness, no PII).
+    useAdminLeads(workspaceId, { limit: leadsLimit }, measuredCapture);
+  // The readiness rollup rides the status endpoint (A4). It carries the resolved provenance, segment
+  // label, and pre-formatted value line — IssueSetupReadiness reads them straight off `readiness` so the
+  // cockpit never reconstructs the Measured/Estimate pill from an all-time count heuristic (which could
+  // disagree with the period-scoped client number).
   const setupReadiness = conversionStatus?.readiness ?? null;
-  const readinessProvenance: OutcomeProvenance =
-    (conversionStatus?.submissionCount ?? 0) > 0 || !!setupReadiness?.lastLeadAt
-      ? 'measured_action'
-      : 'estimate_ga4';
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -612,8 +614,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           workspaceId={workspaceId}
           readiness={setupReadiness}
           status={conversionStatus}
-          segmentLabel="—"
-          resolvedProvenance={readinessProvenance}
           loading={conversionStatusLoading}
         />
       )}
@@ -699,6 +699,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               total={capturedLeadsTotal}
               loading={capturedLeadsLoading}
               onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
+              onLoadMore={leadsLimit < LEADS_MAX ? () => setLeadsLimit((l) => Math.min(l + LEADS_PAGE, LEADS_MAX)) : undefined}
             />
           )}
           {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}

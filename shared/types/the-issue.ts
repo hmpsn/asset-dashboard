@@ -79,14 +79,26 @@ export interface SetupReadinessState {
   ga4Connected: boolean;            // workspace.ga4PropertyId present
   valueSet: boolean;                // workspace.outcomeValue present
   basisOfValue: 'client_provided' | 'agency_estimate' | 'ai_enriched' | null;
+  /** Pre-formatted outcome value/basis line (e.g. "USD 800 / new patient · Agency estimate"), or null
+   *  when no value is set. The single resolved representation (CLAUDE.md authority-layered-fields) — the
+   *  cockpit renders it verbatim instead of reconstructing money from a count/zero stub. Not PII (the
+   *  agency's own per-outcome value config, admin-only payload). */
+  outcomeValueLabel: string | null;
   segmentConfirmed: boolean;        // admin-confirmed segmentConfig OR deterministic local/multi
+  /** Resolved client segment, human-readable (e.g. "b2b saas"). PII-free enum, not identity data. */
+  segmentLabel: string;
   eventsPinned: boolean;            // ≥1 pinned eventConfig entry
   eventsTyped: boolean;             // ≥1 pinned event carrying an outcomeType
   webflowConnected: boolean;        // ≥1 webflowFormSources mapping
   conversionTrackingConfirmedAt: string | null;
   lastLeadAt: string | null;        // freshness of captured leads (count-only freshness, no PII)
   povDrafted: boolean;              // Strategy POV exists for the workspace
-  /** Count of gates not yet cleared (drives the admin "N steps left" affordance). */
+  /** The provenance the CLIENT number resolves to — computed via the SAME selectOutcomeProvenance +
+   *  30-day window path computeROI uses, so the admin Measured/Estimate pill never disagrees with the
+   *  client's actual number. NOT a count heuristic. */
+  resolvedProvenance: OutcomeProvenance;
+  /** Count of gates not yet cleared (drives the admin "N steps left" affordance). One gate PER visible
+   *  checklist step (the pin+type pair is a SINGLE gate) so the headline matches the rendered rows. */
   openGapCount: number;
 }
 
@@ -113,7 +125,6 @@ export interface NamedLeadView {
 export interface OnePagerExportPayload {
   exportProfile: 'sms_recap' | 'board_one_pager' | 'partner_summary' | 'owner_portfolio';
   workspaceName: string;
-  brandLogoUrl: string | null;
   outcomeNoun: string;              // resolved segment plural noun
   verdictSentence: string;          // pre-templated dollar verdict (client never re-derives)
   estimatedValue: number;

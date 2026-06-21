@@ -37,6 +37,13 @@ export interface ConversionSetupStep {
 export interface ConversionTrackingReadoutProps {
   /** Outcome value + basis line (value/basis), or null when no outcome value is set. */
   outcomeValue: { valuePerOutcome: number; unitLabel: string; currency: string; basisLabel: string } | null;
+  /**
+   * Pre-formatted outcome value/basis line. When provided (non-null), it renders verbatim in the
+   * Outcome value row — the cockpit (IssueSetupReadiness) passes a server-resolved label since it has
+   * no raw value object. ADDITIVE: when absent the structured `outcomeValue` is formatted exactly as
+   * before (byte-identical for the P1a Settings consumer that passes no label).
+   */
+  outcomeValueLabel?: string | null;
   /** Resolved client segment (human-readable, e.g. "b2b saas"). */
   segmentLabel: string;
   /** Pinned event count. */
@@ -69,6 +76,7 @@ function StatLine({ label, value, tone }: { label: string; value: string; tone?:
 
 export function ConversionTrackingReadout({
   outcomeValue,
+  outcomeValueLabel,
   segmentLabel,
   pinnedCount,
   typedCount,
@@ -112,7 +120,12 @@ export function ConversionTrackingReadout({
             <div className="divide-y divide-[var(--brand-border)]">
               <StatLine
                 label="Outcome value"
-                value={outcomeValue ? `${outcomeValue.currency} ${outcomeValue.valuePerOutcome.toLocaleString()} / ${outcomeValue.unitLabel} · ${outcomeValue.basisLabel}` : 'Not set'}
+                value={
+                  outcomeValueLabel ??
+                  (outcomeValue
+                    ? `${outcomeValue.currency} ${outcomeValue.valuePerOutcome.toLocaleString()} / ${outcomeValue.unitLabel} · ${outcomeValue.basisLabel}`
+                    : 'Not set')
+                }
                 tone="muted"
               />
               <StatLine label="Client segment" value={segmentLabel} tone="muted" />
