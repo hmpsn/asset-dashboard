@@ -23,6 +23,7 @@ const { api } = ctx;
 const PINNED_EVENT = 'form_submit';
 let twoSnapWsId: string;
 let oneSnapWsId: string;
+let outOfWindowWsId: string;
 const cleanups: Array<() => void> = [];
 
 function configureOutcomeWorkspace(wsId: string): void {
@@ -64,6 +65,21 @@ beforeAll(async () => {
     byEvent: [{ eventName: PINNED_EVENT, conversions: 9, users: 100, rate: 7 }],
   });
 
+  // ── Workspace C: two snapshots, but the prior is only ~5 days before the latest — INSIDE history
+  // yet OUTSIDE the 15–45-day window. Proves computeROI() applies the window guard on the real read
+  // path (not just the unit helper): priorPeriodCount must be null, not the 5-day-old count.
+  const fiveDaysBackIso = new Date(new Date(latestIso).getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const wsC = seedWorkspace(); outOfWindowWsId = wsC.workspaceId; cleanups.push(wsC.cleanup);
+  configureOutcomeWorkspace(outOfWindowWsId);
+  saveGa4Snapshot({
+    workspaceId: outOfWindowWsId, capturedAt: fiveDaysBackIso, totalConversions: 6, totalUsers: 90,
+    byEvent: [{ eventName: PINNED_EVENT, conversions: 6, users: 70, rate: 6 }],
+  });
+  saveGa4Snapshot({
+    workspaceId: outOfWindowWsId, capturedAt: latestIso, totalConversions: 11, totalUsers: 180,
+    byEvent: [{ eventName: PINNED_EVENT, conversions: 11, users: 140, rate: 8 }],
+  });
+
   await ctx.startServer();
 });
 
@@ -88,6 +104,18 @@ describe('GET /api/public/roi — real month-over-month outcome delta', () => {
     expect(res.status).toBe(200);
     const roi = await res.json();
     expect(roi.outcomeVerdict).toBeTruthy();
+    expect(roi.outcomeVerdict.priorPeriodCount).toBeNull();
+  });
+
+  it('applies the 15–45-day window guard on the real read path: a ~5-day-prior snapshot yields priorPeriodCount === null', async () => {
+    const res = await api(`/api/public/roi/${outOfWindowWsId}`);
+    expect(res.status).toBe(200);
+    const roi = await res.json();
+    expect(roi.outcomeVerdict).toBeTruthy();
+    // Latest count is still surfaced…
+    expect(roi.outcomeVerdict.outcomeCount).toBe(11);
+    // …but the too-recent (~5-day-old) prior snapshot is OUTSIDE the 15–45-day window, so computeROI
+    // must NOT use it as the comparison period — never a fabricated MoM off a too-recent snapshot.
     expect(roi.outcomeVerdict.priorPeriodCount).toBeNull();
   });
 });

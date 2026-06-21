@@ -24,6 +24,25 @@ describe('IssueVerdictHeadline — IA v2 MoM', () => {
     expect(screen.getByText(/establishing your month-over-month/i)).toBeInTheDocument();
     expect(screen.queryByText(/vs last month/i)).toBeNull();
   });
+  it('DECLINE: shows a DOWN indicator + absolute delta, never a fabricated up arrow', () => {
+    // outcomeCount 5 < priorPeriodCount 12 → momDelta = -7 (a real decline).
+    render(<IssueVerdictHeadline verdict={{ ...base, outcomeCount: 5, priorPeriodCount: 12 }} iaV2 />);
+    const mom = screen.getByTestId('verdict-mom');
+    // The honest decline render: down arrow, the absolute magnitude, "vs last month".
+    expect(mom).toHaveTextContent(/↓\s*7\b.*vs last month/i);
+    // A fabricated ↑ on a decline is the worst-case trust failure — it must NOT appear.
+    expect(mom).not.toHaveTextContent('↑');
+    // Magnitude is the absolute value (never the signed "-7").
+    expect(mom).not.toHaveTextContent('-7');
+  });
+  it('FLAT: shows the flat indicator (→) and a zero delta', () => {
+    // outcomeCount === priorPeriodCount → momDelta = 0 (flat, neither up nor down).
+    render(<IssueVerdictHeadline verdict={{ ...base, outcomeCount: 8, priorPeriodCount: 8 }} iaV2 />);
+    const mom = screen.getByTestId('verdict-mom');
+    expect(mom).toHaveTextContent(/→\s*0\b.*vs last month/i);
+    expect(mom).not.toHaveTextContent('↑');
+    expect(mom).not.toHaveTextContent('↓');
+  });
 });
 
 describe('IssueVerdictHeadline — IA v2 typed breakdown', () => {
