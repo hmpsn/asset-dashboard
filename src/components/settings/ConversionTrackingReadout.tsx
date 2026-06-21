@@ -14,8 +14,8 @@
  * Color (Four Laws): teal = connected/active pill; amber = not-connected warning; blue = read-only
  * count metrics; emerald = the measured-provenance affirmation. No purple (admin AI only, not here).
  */
-import { CheckCircle, Circle } from 'lucide-react';
-import { SectionCard } from '../ui';
+import { CheckCircle, Circle, ArrowRight } from 'lucide-react';
+import { SectionCard, ClickableRow } from '../ui';
 import { timeAgo } from '../../lib/timeAgo';
 import type { OutcomeProvenance } from '../../../shared/types/outcome-tracking';
 
@@ -25,6 +25,13 @@ export interface ConversionSetupStep {
   label: string;
   description: string;
   completed: boolean;
+  /**
+   * P1b (Lane B): optional one-click deep-link to the gap-fix surface. When present, an incomplete
+   * step renders as an actionable button (label hover-steps + trailing arrow). ADDITIVE — when
+   * absent the step renders as today's static row (byte-identical for the P1a Settings consumer).
+   * Converges ConversionSetupStep toward OnboardingStep (which already has onClick, ALIGNMENT #2).
+   */
+  onClick?: () => void;
 }
 
 export interface ConversionTrackingReadoutProps {
@@ -132,22 +139,53 @@ export function ConversionTrackingReadout({
             {/* Setup checklist (ALIGNMENT #2 — OnboardingStep-shaped, drop-in for the modal later) */}
             {steps.length > 0 && (
               <div className="pt-2 border-t border-[var(--brand-border)] space-y-1">
-                {steps.map((step) => (
-                  <div key={step.id} data-step-id={step.id} className="flex items-start gap-2.5 py-1.5">
-                    {step.completed ? (
-                      <CheckCircle className="w-4 h-4 mt-0.5 shrink-0 text-teal-400" />
-                    ) : (
-                      <Circle className="w-4 h-4 mt-0.5 shrink-0 text-[var(--brand-text-disabled)]" />
-                    )}
-                    <div className="min-w-0">
-                      {/* muted-tier-ok — a COMPLETED step label is tertiary done-state (dim + line-through), matching the OnboardingChecklist primitive's completed-step pattern. */}
-                      <div className={`t-caption font-medium ${step.completed ? 'text-[var(--brand-text-dim)] line-through' : 'text-[var(--brand-text-bright)]'}`}>
-                        {step.label}
-                      </div>
+                {steps.map((step) => {
+                  // P1b: an incomplete step WITH an onClick deep-links to its gap-fix surface (button);
+                  // otherwise (or once completed) it stays today's static row — byte-identical for the
+                  // existing P1a Settings consumer that passes no onClick.
+                  const actionable = !step.completed && !!step.onClick;
+                  const StepIcon = step.completed ? (
+                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0 text-teal-400" />
+                  ) : (
+                    <Circle className="w-4 h-4 mt-0.5 shrink-0 text-[var(--brand-text-disabled)]" />
+                  );
+                  // muted-tier-ok — a COMPLETED step label is tertiary done-state (dim + line-through),
+                  // matching the OnboardingChecklist primitive's completed-step pattern.
+                  const labelClass = `t-caption font-medium ${step.completed ? 'text-[var(--brand-text-dim)] line-through' : 'text-[var(--brand-text-bright)]'}`;
+                  const body = (
+                    <>
+                      <div className={labelClass}>{step.label}</div>
                       <p className="t-caption-sm text-[var(--brand-text-muted)]">{step.description}</p>
+                    </>
+                  );
+                  if (actionable) {
+                    return (
+                      <ClickableRow
+                        key={step.id}
+                        data-step-id={step.id}
+                        onClick={step.onClick}
+                        aria-label={`Fix: ${step.label}`}
+                        className="group flex items-start gap-2.5 py-1.5 px-1 rounded-[var(--radius-sm)]"
+                      >
+                        {StepIcon}
+                        <div className="min-w-0 flex-1">
+                          {/* Hover MUST step one tier (--brand-text-bright is already the brightest). */}
+                          <div className="t-caption font-medium text-[var(--brand-text)] group-hover:text-[var(--brand-text-bright)] flex items-center gap-1.5">
+                            {step.label}
+                            <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors" />
+                          </div>
+                          <p className="t-caption-sm text-[var(--brand-text-muted)]">{step.description}</p>
+                        </div>
+                      </ClickableRow>
+                    );
+                  }
+                  return (
+                    <div key={step.id} data-step-id={step.id} className="flex items-start gap-2.5 py-1.5">
+                      {StepIcon}
+                      <div className="min-w-0">{body}</div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <p className="t-caption-sm leading-relaxed text-[var(--brand-text-muted)] pt-1">
                   Once a conversion is pinned, typed, and capturing real website actions, your client's number becomes{' '}
                   <span className="font-medium text-emerald-400">measured</span>, not estimated.

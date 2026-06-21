@@ -34,10 +34,15 @@ import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
 import { AddRecommendationModal } from './strategy/issue/AddRecommendationModal';
 import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
 import { ContentWorkOrderLens } from './strategy/issue/ContentWorkOrderLens';
+import { IssueSetupReadiness } from './strategy/issue/IssueSetupReadiness';
+import { AdminLeadsReadout } from './strategy/issue/AdminLeadsReadout';
+import { useConversionTrackingStatus } from '../hooks/admin/useConversionTrackingStatus';
+import { useAdminLeads } from '../hooks/admin/useAdminLeads';
 import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
+import type { OutcomeProvenance } from '../../shared/types/outcome-tracking';
 import {
   useStrategyMetrics,
   useStrategySettings,
@@ -192,6 +197,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls (byte-identical OFF).
   const operatorSteering = useOperatorSteering(workspaceId, theIssueEnabled);
   const [addRecOpen, setAddRecOpen] = useState(false);
+  // ── The Issue (Client) P1b — admin setup-readiness + named-leads (Lane B). Read UNCONDITIONALLY
+  // (Rules of Hooks). Gated on the-issue-client-measured-capture; flag-OFF → both hooks no-op (no
+  // fetch, no WS subscription) and the panels below are not mounted → byte-identical cockpit. ──
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  const { status: conversionStatus, isLoading: conversionStatusLoading } =
+    useConversionTrackingStatus(workspaceId, measuredCapture);
+  const { leads: capturedLeads, total: capturedLeadsTotal, isLoading: capturedLeadsLoading } =
+    useAdminLeads(workspaceId, undefined, measuredCapture);
+  // The readiness rollup rides the status endpoint (A4); the provenance the client number resolves
+  // to drives the Measured/Estimate pill (count-only freshness, no PII).
+  const setupReadiness = conversionStatus?.readiness ?? null;
+  const readinessProvenance: OutcomeProvenance =
+    (conversionStatus?.submissionCount ?? 0) > 0 || !!setupReadiness?.lastLeadAt
+      ? 'measured_action'
+      : 'estimate_ga4';
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -584,6 +604,19 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     // for a single deep-link row; ClientRunningOrder is cut from v1. Empty lenses self-null so a
     // cold workspace shows zero empty SectionCard chrome.
     <div className="space-y-8">
+      {/* The Issue (Client) P1b — setup-readiness checklist (Lane B). Slot-0, ABOVE IssueHeader:
+          the integrity guard that earns a trustworthy number is the first config chrome the operator
+          sees. Flag-gated on measured-capture; renders NOTHING when OFF → byte-identical cockpit. */}
+      {measuredCapture && setupReadiness && (
+        <IssueSetupReadiness
+          workspaceId={workspaceId}
+          readiness={setupReadiness}
+          status={conversionStatus}
+          segmentLabel="—"
+          resolvedProvenance={readinessProvenance}
+          loading={conversionStatusLoading}
+        />
+      )}
       <IssueHeader
         subtitle={headerSubtitle}
         onSendIssue={handleSendIssue}
@@ -657,6 +690,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           />
         </summary>
         <div className="space-y-6 border-t border-[var(--brand-border)] px-4 py-4">
+          {/* The Issue (Client) P1b — the operator's captured named-leads (Lane B). Progressive
+              disclosure — lives inside the collapsed "Supporting detail" so the cold cockpit stays
+              decision-first. Flag-gated; absent when OFF → byte-identical. */}
+          {measuredCapture && (
+            <AdminLeadsReadout
+              leads={capturedLeads}
+              total={capturedLeadsTotal}
+              loading={capturedLeadsLoading}
+              onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
+            />
+          )}
           {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
           <ClickableRow
             onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}

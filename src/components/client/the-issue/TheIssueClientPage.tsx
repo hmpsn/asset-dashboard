@@ -52,6 +52,8 @@ import type {
 import { NarratedStatusHeadline } from './NarratedStatusHeadline';
 import { IssueVerdictHeadline } from './IssueVerdictHeadline';
 import { OutcomeCountBand } from './OutcomeCountBand';
+import { IssueExportBar } from './IssueExportBar';
+import { IssueYourLeadsSection } from './IssueYourLeadsSection';
 import { IssueContentPlanSection } from './IssueContentPlanSection';
 import { IssueAlsoOnPlanSection } from './IssueAlsoOnPlanSection';
 import { IssueLoopFooter } from './IssueLoopFooter';
@@ -97,6 +99,9 @@ export interface TheIssueClientPageProps {
   segmentProfile?: ResolvedSegmentProfile | null;
   /** Test override for the spine flag. When provided, overrides useFeatureFlag (Rules-of-Hooks-safe). */
   theIssueClientSpine?: boolean;
+  /** P1b (Lane C) — test override for the return-hook flag (export bar + your-leads). When provided,
+   *  overrides useFeatureFlag (Rules-of-Hooks-safe). Flag-OFF → neither P1b surface mounts. */
+  theIssueReturnHook?: boolean;
 }
 
 export function TheIssueClientPage({
@@ -117,6 +122,7 @@ export function TheIssueClientPage({
   outcomeCount,
   segmentProfile,
   theIssueClientSpine,
+  theIssueReturnHook,
 }: TheIssueClientPageProps) {
   const navigate = useNavigate();
 
@@ -133,6 +139,10 @@ export function TheIssueClientPage({
   //    An explicit prop override wins for deterministic component tests. ──────────
   const flagValue = useFeatureFlag('the-issue-client-spine');
   const spineEnabled = theIssueClientSpine ?? flagValue;
+  // P1b (Lane C) — the return-hook flag gates the export bar + the client's own-leads view. Read
+  // unconditionally at the top (Rules of Hooks); an explicit prop override wins for tests.
+  const returnHookFlag = useFeatureFlag('the-issue-client-return-hook');
+  const exportEnabled = theIssueReturnHook ?? returnHookFlag;
   // Verdict source: explicit prop wins; otherwise the public ROI payload (deduped React Query).
   const resolvedVerdict = outcomeVerdict !== undefined ? outcomeVerdict : (roiData?.outcomeVerdict ?? null);
   // Default-visible preserves the current surface when the segment is unresolved.
@@ -205,6 +215,18 @@ export function TheIssueClientPage({
               <IssueVerdictHeadline verdict={resolvedVerdict ?? null} topRec={topRec} />
             </div>
           </ErrorBoundary>
+
+          {/* P1b (Lane C) — the forwardable one-pager affordance. Gated on the-issue-client-return-hook
+              (flag OFF → not mounted → byte-identical). NOT tier-gated (DR-5). */}
+          {exportEnabled && (
+            <ErrorBoundary label="One-pager export">
+              <IssueExportBar
+                workspaceId={workspaceId}
+                previewMode={previewMode}
+                segmentProfile={segmentProfile}
+              />
+            </ErrorBoundary>
+          )}
 
           {/* 2. Outcome count — outcomes in human units (only when there are pinned events). */}
           {outcomeCount && (
@@ -301,6 +323,13 @@ export function TheIssueClientPage({
                 <NarratedStatusHeadline orient={orient} topRec={topRec} statedGoal={strategyData?.businessContext} />
                 {statItems.length > 0 && <CompactStatBar items={statItems} />}
                 <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact={false} />
+                {/* P1b (Lane C) — the client's OWN captured leads (authed surface only). Gated on the
+                    return-hook flag; suppressed in admin preview (client PII is not the operator's). */}
+                {exportEnabled && !previewMode && (
+                  <ErrorBoundary label="Your captured leads">
+                    <IssueYourLeadsSection workspaceId={workspaceId} />
+                  </ErrorBoundary>
+                )}
                 {showCompetitor && (
                   <ErrorBoundary label="Competitors">
                     <CompetitorGapsSection workspaceId={workspaceId} tier={effectiveTier} />
