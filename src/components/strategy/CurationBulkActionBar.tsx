@@ -12,6 +12,12 @@ interface CurationBulkActionBarProps {
   /** Throttle passes the chosen day count; send/strike pass undefined. */
   onAction: (action: BulkAction, throttleDays?: 7 | 30 | 90) => void;
   onClear: () => void;
+  /**
+   * Bulk send-action verb. Optional — defaults to "Send" so StrategyCockpit and the flag-OFF
+   * path stay byte-identical. The Issue cockpit passes "Stage" (staging only — the one client
+   * commit is the header "Send issue" button; Blocker 5).
+   */
+  sendVerb?: string;
 }
 
 export function CurationBulkActionBar({
@@ -20,6 +26,7 @@ export function CurationBulkActionBar({
   isPending,
   onAction,
   onClear,
+  sendVerb = 'Send',
 }: CurationBulkActionBarProps) {
   const [throttleOpen, setThrottleOpen] = useState(false);
   const [strikeArmed, setStrikeArmed] = useState(false);
@@ -50,7 +57,7 @@ export function CurationBulkActionBar({
             disabled={isPending}
             onClick={() => onAction('send')}
           >
-            Send {selectedCount}
+            {sendVerb} {selectedCount}
           </Button>
 
           {throttleOpen ? (

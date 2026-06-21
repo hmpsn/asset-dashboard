@@ -9,10 +9,10 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 20
+- `correct`: 21
 - `builder-backed`: 5
 - `drift`: 0
-- `documented-exception`: 17
+- `documented-exception`: 18
 
 Authority rules:
 
@@ -45,6 +45,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/aeo-page-review.ts` | builder-backed | Uses canonical intelligence prompt context. |
 | `server/anomaly-detection.ts` | correct | Uses `buildSystemPrompt()` for anomaly summary generation. |
 | `server/blueprint-generator.ts` | documented-exception | Generates page plans from discovery/strategy context, not client-facing prose. |
+| `server/the-issue-lead-value-ai.ts` | documented-exception | Estimates a numeric per-outcome lead value (gpt-5.4-nano JSON), not client-facing prose — no brand voice needed. |
 | `server/brand-identity.ts` | correct | Uses `buildSystemPrompt()` plus `buildVoiceCalibrationContext()`. |
 | `server/brandscript.ts` | correct | Uses `buildSystemPrompt()` for brand strategy generation. |
 | `server/briefing-prompt.ts` | correct | Instructions are passed through `buildSystemPrompt()` by callers. |

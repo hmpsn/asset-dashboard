@@ -7,6 +7,7 @@ import { clientPath } from '../routes';
 import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
+import { eventDisplayName as deriveEventDisplayName, isEventPinned as deriveIsEventPinned } from './client/the-issue/outcomeNoun';
 import {
   AlertTriangle,
   X,
@@ -440,13 +441,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   });
 
 
-  const eventDisplayName = (eventName: string): string => {
-    const cfg = ws?.eventConfig?.find(c => c.eventName === eventName);
-    return cfg?.displayName && cfg.displayName !== eventName ? cfg.displayName : eventName.replace(/_/g, ' ');
-  };
-  const isEventPinned = (eventName: string): boolean => {
-    return ws?.eventConfig?.find(c => c.eventName === eventName)?.pinned || false;
-  };
+  const eventDisplayName = (eventName: string): string => deriveEventDisplayName(ws?.eventConfig, eventName);
+  const isEventPinned = (eventName: string): boolean => deriveIsEventPinned(ws?.eventConfig, eventName);
 
   const getInsights = () => {
     if (!overview) return null;

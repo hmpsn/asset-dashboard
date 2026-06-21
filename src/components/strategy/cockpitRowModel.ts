@@ -89,8 +89,10 @@ export function toCockpitRow(rec: Recommendation): CockpitRowModel {
 /** A rec is "throttled" only while its snooze window is still open — an EXPIRED throttle
  *  auto-resurfaces to Active on read (matches the server's isActiveRec throttle clause). The
  *  canonical predicate lives in server/recommendations.ts and can't be imported into the client
- *  bundle, so this mirrors only the throttle-expiry rule both classifiers need. */
-function isThrottledOpen(rec: Recommendation): boolean {
+ *  bundle, so this mirrors only the throttle-expiry rule both classifiers need. Exported so
+ *  every client-side active/throttle classifier (cockpit, stance bar, sendable set) reuses one
+ *  rule rather than re-implementing the expiry comparison. */
+export function isThrottledOpen(rec: Recommendation): boolean {
   return rec.lifecycle === 'throttled' && !!rec.throttledUntil && Date.parse(rec.throttledUntil) > Date.now();
 }
 

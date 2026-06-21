@@ -101,6 +101,8 @@ export const NON_REGISTRY_PAGES: Page[] = [
   'calendar',       // redirect → content-pipeline?tab=calendar
   'subscriptions',  // folded into content-pipeline (Subscriptions sub-tab)
   'workspace-settings', // reached via per-workspace settings, not the main nav
+  'competitors',    // The Issue Phase 6 — dedicated competitor interior page; reached via a deep-link
+                    // from The Issue cockpit (flag-ON), not the global nav, so flag-OFF nav is byte-identical
 ];
 
 /**

@@ -323,6 +323,15 @@ export interface ContentTopicRequest {
   deliveryNotes?: string;
   targetPageId?: string;
   targetPageSlug?: string;
+  /** Originating recommendation id for requests created via client "Act on this".
+   *  Absent on operator-created or legacy requests.
+   *  @see StrategyCardContext for the accompanying context blob. */
+  recommendationId?: string;
+  /** Strategy card context captured at act-on time (rationale, volume, difficulty,
+   *  trendDirection, serpFeatures, intent, priority, etc.).
+   *  Parsed from the `strategy_card_context` JSON column via parseJsonSafe.
+   *  Absent when no strategy context was available at request creation. */
+  strategyCardContext?: StrategyCardContext;
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;

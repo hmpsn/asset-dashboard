@@ -28,7 +28,7 @@ function loadRoadmap(): RoadmapData {
 describe('feature-flag lifecycle audit', () => {
   it('covers every feature flag and keeps lifecycle contract complete', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-18');
+    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-20');
 
     expect(report.generatedBy).toBe('scripts/feature-flag-lifecycle.ts');
     expect(report.totalFlags).toBe(FEATURE_FLAG_KEYS.length);
@@ -39,7 +39,7 @@ describe('feature-flag lifecycle audit', () => {
 
   it('keeps cadence accounting aligned with the available cadence set', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-18');
+    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-20');
 
     const cadenceTotal = FEATURE_FLAG_AUDIT_CADENCES.reduce((sum, cadence) => sum + report.cadenceCounts[cadence], 0);
     expect(cadenceTotal).toBe(FEATURE_FLAG_KEYS.length);
@@ -47,7 +47,7 @@ describe('feature-flag lifecycle audit', () => {
 
   it('builds stable markdown output with contract sections', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-18');
+    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-20');
     const markdown = formatFeatureFlagLifecycleReportMarkdown(report);
 
     expect(markdown).toContain('# Feature Flag Lifecycle Report');

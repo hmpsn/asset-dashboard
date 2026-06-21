@@ -1,17 +1,43 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Search, Loader2, Check, X, Users, ExternalLink, ChevronRight,
   Copy, CheckCircle, Lock, KeyRound, Plus, Trash2, Pencil, Save,
   Pin, PinOff, ArrowUp, ArrowDown, Palette, RefreshCw, DollarSign, Shield,
+  Sparkles, Target, Link2, PlugZap,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect, Checkbox } from '../ui';
 import { CHART_SERIES_COLORS } from '../ui/constants';
 import { formatDate } from '../../utils/formatDates';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useConversionTrackingStatus } from '../../hooks/admin/useConversionTrackingStatus';
+import { conversionTrackingApi, type WebflowFormOption } from '../../api/conversionTracking';
+import { ConversionTrackingReadout, type ConversionSetupStep } from './ConversionTrackingReadout';
+import type { WebflowFormMapping } from '../../../shared/types/form-submission.ts';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
-import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
+import type {
+  EventGroup, EventDisplayConfig, ClientSegment, ResolvedSegmentProfile, SegmentConfig, Workspace,
+} from '../../../shared/types/workspace.ts';
+import type { OutcomeType } from '../../../shared/types/the-issue.ts';
+import type { OutcomeProvenance } from '../../../shared/types/outcome-tracking.ts';
+
+/** P1a outcome-type options for the per-event lead-type mapping (canonical OutcomeType values). */
+const OUTCOME_TYPE_OPTIONS: { value: OutcomeType | ''; label: string }[] = [
+  { value: '', label: 'Untyped' },
+  { value: 'form_fill', label: 'Form fill' },
+  { value: 'call', label: 'Call' },
+  { value: 'booking', label: 'Booking' },
+  { value: 'email', label: 'Email' },
+  { value: 'directions', label: 'Directions' },
+  { value: 'chat', label: 'Chat' },
+  { value: 'other', label: 'Other' },
+];
+
+type OutcomeValue = NonNullable<Workspace['outcomeValue']>;
 
 interface WorkspaceData {
   hasPassword?: boolean;
@@ -20,6 +46,15 @@ interface WorkspaceData {
   eventGroups?: EventGroup[];
   ga4PropertyId?: string;
   contentPricing?: { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string } | null;
+  // The Issue (Client) P0 — admin-edited outcome value + segment override.
+  outcomeValue?: OutcomeValue | null;
+  segmentConfig?: SegmentConfig | null;
+  /** Pre-resolved segment profile (admin GET seeds the deterministic local/multi axis read-only). */
+  segmentProfile?: ResolvedSegmentProfile;
+  // The Issue (Client) P1a — confirmed-setup marker (the provenance-flip basis; admin-only).
+  conversionTrackingConfirmedAt?: string;
+  // The Issue (Client) P1a — selected Webflow forms to poll (formId→outcomeType mapping; admin-only).
+  webflowFormSources?: WebflowFormMapping[];
   [key: string]: unknown;
 }
 
@@ -32,6 +67,7 @@ interface ClientDashboardTabProps {
 }
 
 export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorkspace, toast }: ClientDashboardTabProps) {
+  const qc = useQueryClient();
   const [copiedLink, setCopiedLink] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -75,6 +111,78 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const [pricingFull, setPricingFull] = useState(0);
   const [pricingCurrency, setPricingCurrency] = useState('USD');
   const [savingPricing, setSavingPricing] = useState(false);
+
+  // The Issue (Client) P0 — outcome value state (basis precedence client_provided > agency_estimate > ai_enriched)
+  const [showOutcomeValue, setShowOutcomeValue] = useState(false);
+  const [ovValue, setOvValue] = useState(0);
+  const [ovUnit, setOvUnit] = useState('');
+  const [ovRetainer, setOvRetainer] = useState(0);
+  const [ovCurrency, setOvCurrency] = useState('USD');
+  const [ovBasis, setOvBasis] = useState<OutcomeValue['basis']>('agency_estimate');
+  const [savingOutcomeValue, setSavingOutcomeValue] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+
+  // The Issue (Client) P0 — segment confirm/override state (manual non-local FormSelect)
+  const [savingSegment, setSavingSegment] = useState(false);
+  const [segmentOverride, setSegmentOverride] = useState<ClientSegment>('b2b_saas');
+
+  // The Issue (Client) P1a — measured-capture flag + Webflow form-capture connect state.
+  // useFeatureFlag is unconditional (Rules-of-Hooks-safe, before any early return). Flag-OFF →
+  // every new subsection below is gated out and the surface is byte-identical to P0.
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  const conversionTracking = useConversionTrackingStatus(workspaceId, measuredCapture && !!ws?.ga4PropertyId);
+  // P1a: Webflow form-capture is now Data-API POLLING — the admin SELECTS which forms to track and
+  // maps each to a typed outcome (no webhook secret to mint/paste). Local picker state below.
+  const [showFormPicker, setShowFormPicker] = useState(false);
+  const [loadingForms, setLoadingForms] = useState(false);
+  const [availableForms, setAvailableForms] = useState<WebflowFormOption[]>([]);
+  const [formSources, setFormSources] = useState<WebflowFormMapping[]>([]);
+  const [savingFormSources, setSavingFormSources] = useState(false);
+
+  const basisLabel = (b: OutcomeValue['basis']): string =>
+    b === 'client_provided' ? 'Client-provided' : b === 'ai_enriched' ? 'AI estimate' : 'Agency estimate';
+
+  // Deterministic local/multi axis is read-only (resolved server-side from client_locations); only the
+  // non-local 3-way is admin-overridable here.
+  const resolvedSegment = ws?.segmentProfile?.segment ?? ws?.segmentConfig?.segment ?? 'b2b_saas';
+  const isLocalAxis = resolvedSegment === 'local_smb' || resolvedSegment === 'multi_location';
+
+  const saveOutcomeValue = async (clear = false) => {
+    setSavingOutcomeValue(true);
+    try {
+      const outcomeValue = clear || ovValue <= 0
+        ? null
+        : { valuePerOutcome: ovValue, unitLabel: ovUnit.trim() || 'outcome', currency: ovCurrency, basis: ovBasis, ...(ovRetainer > 0 ? { monthlyRetainer: ovRetainer } : {}) };
+      await patchWorkspace({ outcomeValue });
+      toast(outcomeValue ? 'Outcome value saved' : 'Outcome value removed');
+      setShowOutcomeValue(false);
+    } catch { toast('Failed to save outcome value', 'error'); }
+    finally { setSavingOutcomeValue(false); }
+  };
+
+  const enrichOutcomeValue = async () => {
+    setEnriching(true);
+    try {
+      // fetch-ok: one-off P0 advisory enrich endpoint; no src/api/ helper exists for it.
+      const res = await fetch(`/api/workspaces/${workspaceId}/outcome-value-enrich`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      if (!res.ok) { toast('AI estimate failed — set a value manually', 'error'); return; }
+      const data = await res.json() as { valuePerOutcome: number; unitLabel: string };
+      setOvValue(data.valuePerOutcome);
+      setOvUnit(data.unitLabel);
+      setOvBasis('ai_enriched');
+      toast('AI estimate ready — review and save', 'info');
+    } catch { toast('AI estimate failed — set a value manually', 'error'); }
+    finally { setEnriching(false); }
+  };
+
+  const saveSegment = async () => {
+    setSavingSegment(true);
+    try {
+      await patchWorkspace({ segmentConfig: { segment: segmentOverride } });
+      toast('Segment saved');
+    } catch { toast('Failed to save segment', 'error'); }
+    finally { setSavingSegment(false); }
+  };
 
   const GROUP_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.orange, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.purple]; // chart-hex-ok — #14b8a6 is teal-500 for darker anchor
 
@@ -182,6 +290,15 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     });
   };
 
+  // P1a: map a pinned event to a typed outcome (rides along in the existing eventConfig PATCH).
+  const setOutcomeType = (name: string, outcomeType: OutcomeType | undefined) => {
+    setLocalEventConfig(prev => {
+      const existing = prev.find(c => c.eventName === name);
+      if (existing) return prev.map(c => c.eventName === name ? { ...c, outcomeType } : c);
+      return [...prev, { eventName: name, displayName: name, pinned: false, outcomeType }];
+    });
+  };
+
   const updateDisplayName = (name: string, displayName: string) => {
     setLocalEventConfig(prev => {
       const existing = prev.find(c => c.eventName === name);
@@ -224,11 +341,61 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
     finally { setSavingEvents(false); }
   };
 
+  // P1a: open the form picker — fetch the site's Webflow forms + seed the local mapping from the saved
+  // sources so the operator sees their current selection. Capture is polling-based (no secret to mint).
+  const openFormPicker = async () => {
+    setShowFormPicker(true);
+    setLoadingForms(true);
+    try {
+      const forms = await conversionTrackingApi.getWebflowForms(workspaceId);
+      setAvailableForms(forms);
+      setFormSources(ws?.webflowFormSources ?? []);
+    } catch { toast('Could not load Webflow forms', 'error'); }
+    finally { setLoadingForms(false); }
+  };
+
+  // Toggle a form's tracked outcomeType. Empty value = untracked (removed from sources).
+  const setFormOutcomeType = (form: WebflowFormOption, outcomeType: OutcomeType | '') => {
+    setFormSources(prev => {
+      const without = prev.filter(s => s.formId !== form.id);
+      if (!outcomeType) return without;
+      return [...without, { formId: form.id, formName: form.displayName, outcomeType }];
+    });
+  };
+
+  // Close the picker without saving: reset the local mapping to the saved sources so closing never
+  // loses the current selection (and an accidental empty Save is avoidable).
+  const cancelFormPicker = () => {
+    setShowFormPicker(false);
+    setFormSources(ws?.webflowFormSources ?? []);
+  };
+
+  const saveFormSources = async () => {
+    setSavingFormSources(true);
+    try {
+      await conversionTrackingApi.saveFormSources(workspaceId, formSources);
+      // Saving sources (+ confirming setup) changes the connected/provenance state server-side →
+      // refresh the readout query so the integrity strip isn't stale, and re-fetch the workspace so
+      // ws.webflowFormSources reflects the save.
+      qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+      toast(formSources.length > 0 ? 'Tracked Webflow forms saved' : 'Form tracking cleared');
+      setShowFormPicker(false);
+    } catch { toast('Failed to save tracked forms', 'error'); }
+    finally { setSavingFormSources(false); }
+  };
+
   // Load users on mount
   useEffect(() => { loadClientUsers(); }, []);
 
   // Sync clientEmail when ws loads asynchronously
   useEffect(() => { if (ws?.clientEmail !== undefined) setClientEmail(ws.clientEmail || ''); }, [ws?.clientEmail]);
+
+  // Seed the segment override select from the stored admin config when ws loads (non-local only).
+  useEffect(() => {
+    const stored = ws?.segmentConfig?.segment;
+    if (stored && stored !== 'local_smb' && stored !== 'multi_location') setSegmentOverride(stored);
+  }, [ws?.segmentConfig?.segment]);
 
   const inputClass = 'bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption';
 
@@ -649,6 +816,350 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
         )}
       </SectionCard>
 
+      {/* Outcome Value — The Issue (Client) P0 dollar verdict input */}
+      <SectionCard noPadding>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+            <Icon as={Target} size="md" className="text-teal-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Outcome Value</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">The dollar value of one converted outcome — powers the client's dollar verdict (a labeled estimate).</p>
+          </div>
+          <Button
+            aria-label="Configure outcome value"
+            onClick={() => {
+              if (!showOutcomeValue) {
+                setOvValue(ws?.outcomeValue?.valuePerOutcome || 0);
+                setOvUnit(ws?.outcomeValue?.unitLabel || '');
+                setOvRetainer(ws?.outcomeValue?.monthlyRetainer || 0);
+                setOvCurrency(ws?.outcomeValue?.currency || 'USD');
+                setOvBasis(ws?.outcomeValue?.basis || 'agency_estimate');
+              }
+              setShowOutcomeValue(!showOutcomeValue);
+            }}
+            variant="secondary"
+            size="sm"
+            className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+            {showOutcomeValue ? 'Close' : <><Icon as={Pencil} size="xs" /> Configure</>}
+          </Button>
+        </div>
+
+        {/* Summary row when collapsed */}
+        {!showOutcomeValue && (
+          <div className="px-5 py-3 flex items-center gap-4">
+            {ws?.outcomeValue ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Per {ws.outcomeValue.unitLabel}:</span>
+                  <span className="t-caption font-semibold text-teal-400">{ws.outcomeValue.currency} {ws.outcomeValue.valuePerOutcome.toLocaleString()}</span>
+                </div>
+                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">{basisLabel(ws.outcomeValue.basis)}</span>
+              </>
+            ) : (
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">No outcome value set — the client sees a count-only verdict, no dollar figure.</span>
+            )}
+          </div>
+        )}
+
+        {/* Expanded config form */}
+        {showOutcomeValue && (
+          <div className="px-5 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Value per outcome</div>
+                <FormInput type="number" min={0} value={ovValue || ''} onChange={value => { setOvValue(Number(value)); setOvBasis('agency_estimate'); }}
+                  placeholder="800"
+                  className={`w-full ${inputClass}`} />
+              </div>
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Outcome unit</div>
+                <FormInput type="text" value={ovUnit} onChange={value => { setOvUnit(value); setOvBasis('agency_estimate'); }}
+                  placeholder="new patient"
+                  className={`w-full ${inputClass}`} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Monthly retainer (optional)</div>
+                <FormInput type="number" min={0} value={ovRetainer || ''} onChange={value => setOvRetainer(Number(value))}
+                  placeholder="1500"
+                  className={`w-full ${inputClass}`} />
+              </div>
+              <div>
+                <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Currency</div>
+                <FormSelect
+                  value={ovCurrency}
+                  onChange={setOvCurrency}
+                  options={[
+                    { value: 'USD', label: 'USD ($)' },
+                    { value: 'EUR', label: 'EUR (€)' },
+                    { value: 'GBP', label: 'GBP (£)' },
+                    { value: 'CAD', label: 'CAD (C$)' },
+                    { value: 'AUD', label: 'AUD (A$)' },
+                  ]}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            {ovBasis === 'ai_enriched' && (
+              <div className="t-caption-sm text-amber-400">AI estimate — lowest confidence. Review before saving; edit any field to switch to an agency estimate.</div>
+            )}
+            <div className="pt-2 flex items-center gap-3 border-t border-[var(--brand-border)]">
+              <Button
+                aria-label="Save outcome value"
+                disabled={savingOutcomeValue}
+                onClick={() => saveOutcomeValue(false)}
+                loading={savingOutcomeValue}
+                icon={Save}
+                size="md"
+                className="bg-teal-600 hover:bg-teal-500"
+              >
+                Save outcome value
+              </Button>
+              {ovValue <= 0 && (
+                <Button
+                  aria-label="Estimate with AI"
+                  disabled={enriching}
+                  onClick={enrichOutcomeValue}
+                  loading={enriching}
+                  icon={Sparkles}
+                  variant="secondary"
+                  size="sm"
+                  className="bg-[var(--surface-3)] text-[var(--brand-text)]"
+                >
+                  Estimate with AI
+                </Button>
+              )}
+              {ws?.outcomeValue && (
+                <Button
+                  disabled={savingOutcomeValue}
+                  onClick={() => saveOutcomeValue(true)}
+                  variant="link"
+                  size="sm"
+                  className="no-underline text-red-400/60 hover:text-red-400"
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+            <div className="t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
+              This value is always shown to the client as a labeled estimate, never as booked revenue.
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Client Segment — The Issue (Client) P0 confirm/override (manual non-local select) */}
+      <SectionCard noPadding>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/10 flex items-center justify-center">
+            <Icon as={Shield} size="md" className="text-blue-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Client Segment</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">Decides which client-dashboard inserts appear. Local segments are detected automatically; confirm the non-local split here.</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Resolved segment:</span>
+            <span className="t-caption font-semibold text-blue-400">{resolvedSegment.replace(/_/g, ' ')}</span>
+          </div>
+          {isLocalAxis ? (
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              Detected from this workspace's configured locations — no override needed.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="segment-override" className="t-caption-sm font-medium mb-1.5 block text-[var(--brand-text-muted)]">Segment override</label>
+                <FormSelect
+                  id="segment-override"
+                  aria-label="Segment override"
+                  value={segmentOverride}
+                  onChange={value => setSegmentOverride(value as ClientSegment)}
+                  options={[
+                    { value: 'b2b_saas', label: 'B2B SaaS' },
+                    { value: 'professional_services', label: 'Professional services' },
+                    { value: 'board_vc', label: 'Board / VC' },
+                  ]}
+                  className={inputClass}
+                />
+              </div>
+              <Button
+                aria-label="Save segment"
+                disabled={savingSegment}
+                onClick={saveSegment}
+                loading={savingSegment}
+                icon={Save}
+                size="md"
+                className="bg-teal-600 hover:bg-teal-500"
+              >
+                Save segment
+              </Button>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* The Issue (Client) P1a — Conversion tracking (verification readout + Webflow connect). Every
+          render path here is gated on measuredCapture → flag-OFF is byte-identical to the P0 surface. */}
+      {measuredCapture && ws?.ga4PropertyId && (() => {
+        const status = conversionTracking.status;
+        const pinnedCfg = (ws?.eventConfig ?? []).filter(c => c.pinned);
+        const pinnedCount = status?.pinnedCount ?? pinnedCfg.length;
+        const typedCount = status?.typedCount ?? pinnedCfg.filter(c => c.outcomeType).length;
+        const formCaptureConnected = status?.formCaptureConnected ?? false;
+        const submissionCount = status?.submissionCount ?? 0;
+        const recentOutcomeCount = status?.recentOutcomeCount ?? 0;
+        // ALIGNMENT #4 — provenance flip is ABSOLUTE: measured only on confirmed typed setup OR a
+        // captured lead. Mirrors the server's selectOutcomeProvenance contract (READ-ONLY here).
+        const hasConfirmedTypedSetup = !!ws?.conversionTrackingConfirmedAt && typedCount > 0;
+        const resolvedProvenance: OutcomeProvenance =
+          hasConfirmedTypedSetup || submissionCount > 0 ? 'measured_action' : 'estimate_ga4';
+        const steps: ConversionSetupStep[] = [
+          {
+            id: 'pin-type', label: 'Pin & type your key conversions',
+            description: 'Pin the GA4 events that matter and map each to a lead type below.',
+            completed: typedCount > 0,
+          },
+          {
+            id: 'connect-webflow', label: 'Select which Webflow forms to track',
+            description: 'Pick the Webflow forms that produce leads and map each to a lead type.',
+            completed: formCaptureConnected,
+          },
+          {
+            id: 'confirm-lead', label: 'Confirm a measured lead landed',
+            description: 'New submissions are pulled from Webflow daily and appear in the readout above.',
+            completed: submissionCount > 0,
+          },
+        ];
+
+        // ALIGNMENT #3 — value-integrity guardrails. Sanity band warns on an implausible value; the
+        // latest-snapshot preview + client-sentence echo de-risk a one-misset-input → confident-wrong
+        // headline. recentOutcomeCount is the most recent single GA4 snapshot's pinned-outcome total
+        // (the scheduler reads getGA4Conversions(..., 1)) — NOT a 90-day aggregate, so the preview is
+        // labelled as "your most recent tracked data" rather than implying a 90-day sum (would inflate
+        // the figure up to ~90×).
+        const ov = ws?.outcomeValue ?? null;
+        const value = ov?.valuePerOutcome ?? 0;
+        const outOfBand = value > 0 && (value < 5 || value > 100_000);
+        const previewTotal = value > 0 ? recentOutcomeCount * value : 0;
+        const currency = ov?.currency ?? 'USD';
+        const unitLabel = ov?.unitLabel ?? 'outcome';
+
+        return (
+          <>
+            <ConversionTrackingReadout
+              outcomeValue={ov ? { valuePerOutcome: value, unitLabel, currency, basisLabel: basisLabel(ov.basis) } : null}
+              segmentLabel={resolvedSegment.replace(/_/g, ' ')}
+              pinnedCount={pinnedCount}
+              typedCount={typedCount}
+              formCaptureConnected={formCaptureConnected}
+              lastSubmissionAt={status?.lastSubmissionAt ?? null}
+              submissionCount={submissionCount}
+              resolvedProvenance={resolvedProvenance}
+              steps={steps}
+              loading={conversionTracking.isLoading}
+            />
+
+            {/* Value-integrity guardrails (ALIGNMENT #3) — only meaningful once an outcome value is set. */}
+            {value > 0 && (
+              <SectionCard noPadding>
+                <div className="px-5 py-4 space-y-2">
+                  {outOfBand && (
+                    <p className="t-caption-sm text-amber-400">
+                      Heads up: {currency} {value.toLocaleString()} per {unitLabel} looks unusual — double-check before this drives the client's number.
+                    </p>
+                  )}
+                  {recentOutcomeCount > 0 && (
+                    <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                      Based on your most recent tracked data, that's about{' '}
+                      <span className="font-semibold text-blue-400">{currency === 'USD' ? '$' : `${currency} `}{previewTotal.toLocaleString()}</span>
+                      {' '}({recentOutcomeCount.toLocaleString()} tracked outcomes × {currency === 'USD' ? '$' : `${currency} `}{value.toLocaleString()}).
+                    </p>
+                  )}
+                  <p className="t-caption-sm leading-relaxed text-[var(--brand-text)]">
+                    Client sees: <span className="italic">“We tracked {recentOutcomeCount.toLocaleString()} {unitLabel}s on your site, worth about {currency === 'USD' ? '$' : `${currency} `}{previewTotal.toLocaleString()}.”</span>
+                  </p>
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Webflow form capture — select which forms to track (Data-API polling, no webhook). */}
+            <SectionCard noPadding>
+              <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+                <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+                  <Icon as={PlugZap} size="md" className="text-teal-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow form capture</h3>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Select which Webflow forms produce leads — submissions are pulled from Webflow daily. The lead identity stays internal.</p>
+                </div>
+                {showFormPicker ? (
+                  <div className="flex items-center gap-2">
+                    <Button aria-label="Save tracked Webflow forms" onClick={saveFormSources} loading={savingFormSources} disabled={savingFormSources} icon={Save} size="sm" className="bg-teal-600 hover:bg-teal-500">
+                      Save
+                    </Button>
+                    {/* Cancel closes the picker WITHOUT saving and restores the current selection, so an
+                        accidental empty Save can't silently clear all tracked forms. */}
+                    <Button aria-label="Cancel form selection" onClick={cancelFormPicker} disabled={savingFormSources} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button aria-label="Select Webflow forms to track" onClick={openFormPicker} icon={Link2} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+                    {formCaptureConnected ? 'Edit forms' : 'Select forms'}
+                  </Button>
+                )}
+              </div>
+
+              {showFormPicker ? (
+                <div className="px-5 py-4 space-y-3">
+                  {loadingForms ? (
+                    <div className="flex items-center gap-2 t-caption py-4 justify-center text-[var(--brand-text-muted)]">
+                      <Icon as={Loader2} size="xs" className="animate-spin" /> Loading forms from Webflow...
+                    </div>
+                  ) : availableForms.length === 0 ? (
+                    <p className="t-caption-sm py-2 text-[var(--brand-text-muted)]">No Webflow forms found for this site. Publish a form in Webflow, then refresh.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {availableForms.map(form => {
+                        const mapped = formSources.find(s => s.formId === form.id)?.outcomeType ?? '';
+                        return (
+                          <div key={form.id} className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] transition-colors ${mapped ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
+                            <span className="t-caption flex-1 min-w-0 truncate text-[var(--brand-text)]">{form.displayName}</span>
+                            <FormSelect
+                              aria-label={`Lead type for ${form.displayName}`}
+                              value={mapped}
+                              onChange={value => setFormOutcomeType(form, (value || '') as OutcomeType | '')}
+                              options={[{ value: '', label: "Don't track" }, ...OUTCOME_TYPE_OPTIONS.filter(o => o.value !== '')]}
+                              className={`${inputClass} py-1 max-w-[140px]`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="t-caption-sm leading-relaxed text-[var(--brand-text-muted)] pt-1">
+                    Each tracked form's submissions are captured daily and counted toward the client's measured outcome number. Lead names and emails stay internal.
+                  </p>
+                </div>
+              ) : (
+                <div className="px-5 py-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                    {formCaptureConnected
+                      ? `Tracking ${ws?.webflowFormSources?.length ?? 0} Webflow form${(ws?.webflowFormSources?.length ?? 0) === 1 ? '' : 's'}. New submissions are pulled in daily.`
+                      : 'Not connected — select the Webflow forms that produce leads to start capturing measured outcomes.'}
+                  </p>
+                </div>
+              )}
+            </SectionCard>
+          </>
+        );
+      })()}
+
       {/* Event Configuration */}
       {ws?.ga4PropertyId && (
         <SectionCard noPadding>
@@ -660,11 +1171,11 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
             <div className="flex items-center gap-2">
               {showEventConfig && (
-                <Button onClick={saveEventConfig} disabled={savingEvents} loading={savingEvents} icon={Save} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                <Button aria-label="Save event configuration" onClick={saveEventConfig} disabled={savingEvents} loading={savingEvents} icon={Save} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
                   Save
                 </Button>
               )}
-              <Button onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
+              <Button aria-label="Configure event display" onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()} size="sm" variant="secondary" className="bg-[var(--surface-3)] text-[var(--brand-text)]">
                 {showEventConfig ? 'Close' : <><Icon as={RefreshCw} size="xs" /> Configure</>}
               </Button>
             </div>
@@ -797,7 +1308,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                     const pinned = isPinned(ev.eventName);
                     const displayName = getDisplayName(ev.eventName);
                     const isEditing = editingEventName === ev.eventName;
-                    const evGroup = localEventConfig.find(c => c.eventName === ev.eventName)?.group;
+                    const evConfig = localEventConfig.find(c => c.eventName === ev.eventName);
+                    const evGroup = evConfig?.group;
+                    const evOutcomeType = evConfig?.outcomeType ?? '';
                     return (
                       <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] transition-colors ${pinned ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
                         <IconButton
@@ -827,6 +1340,16 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                             </div>
                           )}
                         </div>
+                        {/* P1a — lead-type (outcomeType) mapping, only for pinned events when the flag is ON. */}
+                        {measuredCapture && pinned && (
+                          <FormSelect
+                            aria-label={`Lead type for ${ev.eventName}`}
+                            value={evOutcomeType}
+                            onChange={value => setOutcomeType(ev.eventName, (value || undefined) as OutcomeType | undefined)}
+                            options={OUTCOME_TYPE_OPTIONS}
+                            className={`${inputClass} py-1 max-w-[110px]`}
+                          />
+                        )}
                         {localGroups.length > 0 && (
                           <FormSelect
                             value={evGroup || ''}

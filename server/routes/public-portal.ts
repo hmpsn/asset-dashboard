@@ -58,6 +58,7 @@ import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
@@ -91,6 +92,8 @@ router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok
     stripeEnabled: isStripeConfigured(),
     hasClientUsers: hasClientUsers(req.params.id),
     bookingUrl: getBookingUrl() ?? null,
+    // The Issue (Client) P0 — flag-gated: attach segmentProfile only when the spine is ON.
+    theIssueClientSpine: isFeatureEnabled('the-issue-client-spine', ws.id),
   }));
 });
 

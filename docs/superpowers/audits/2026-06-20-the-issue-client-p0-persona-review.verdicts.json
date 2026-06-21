@@ -1,0 +1,711 @@
+[
+  {
+    "persona": "A 47-year-old owner-dentist, single-location general/family practice. Chairside 8 to 5, not a marketer. I pay a retainer to fill empty chairs with new patients and I want proof in plain English — phone calls, bookings, reviews, dentist-near-me, dollars — that matches what my front desk actually saw. Very low time, high skepticism of vanity metrics.",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "Headline answer at the very top: one big new-patient-inquiries number with the trend (e.g. '14 this month, up from 9').",
+        "status": "delivered",
+        "note": "Slot 1 IssueVerdictHeadline leads with the outcome and baselineVerdict() gives me 'N qualified leads, up from M since we started' — exactly the lead-with-outcome-not-activity I asked for. Caveat: it's a GA4 conversion count, not a literal verified phone-call count, but the shape is right."
+      },
+      {
+        "ask": "Estimated dollar value of those new patients vs. what I pay you, second from top — the 'am I getting ripped off?' check.",
+        "status": "delivered",
+        "note": "Verdict shows emerald dollar value + '~7x your retainer', and ROIDashboard money frame is now UN-collapsed right below it (slot 3). This is the indispensable ROI line and it's finally front-and-center instead of buried behind 'See full report'."
+      },
+      {
+        "ask": "Am I in the Google map pack for 'dentist near me' for my town, and did it move? (90% of how patients find me.)",
+        "status": "deferred-P1",
+        "note": "This is my #1 'ranking-ish' care and it's NOT on the P0 screen — showLocalMapAndReviews is wired but renders null. local-seo.ts data exists, so it's a real fast-follow, not vapor. But for a LOCAL dentist this is core, not garnish; deferring it leaves the first screen missing the thing patients actually use to find me."
+      },
+      {
+        "ask": "My Google reviews status: star rating, new reviews this month, unanswered/negative flagged — the thing I can personally act on today.",
+        "status": "deferred-P1",
+        "note": "Also gated behind the same null P1 insert. This is the most actionable-for-ME item I named and the one I'd open the dashboard for between patients. Planned P1, but its absence at P0 is the biggest gap in my idealFirstScreen."
+      },
+      {
+        "ask": "The ONE thing you need from me, or 'nothing needed right now.'",
+        "status": "delivered",
+        "note": "Slot 0 ActionQueueStrip (pending decisions, hidden when empty) + slot 4 IssueLoopFooter cover 'the ball is in your court vs. close the tab happy.' Good. Minor: the explicit 'Nothing needed from you right now' reassurance line is optional per spec — I'd want it shown."
+      },
+      {
+        "ask": "Do NOT put keyword tables, traffic graphs, impressions, bounce rate, DA, backlinks, or 'organic' at the top — bury it under-the-hood.",
+        "status": "delivered",
+        "note": "Exactly done. The 0-100 ring, CompactStatBar, competitor block and the per-page traffic-value tables are demoted into a collapsed 'Under the hood' details at slot 6. The dining room is clean; the kitchen is hidden."
+      },
+      {
+        "ask": "Indispensable: a trustworthy, DOLLARIZED count of new patients you generated vs. what I pay, sanity-checkable against my front desk.",
+        "status": "partial",
+        "note": "The dollarized-vs-retainer line exists and is honestly labeled as an estimate (banded ~$ , no false precision, 'tracked conversions valued at ~$X each'). What's missing is the 'sanity-check against my front desk' half — named-record / call-tracking reconciliation is P1 (namedRecordsAvailable always false). So the number is honest but not yet verifiable against reality, which is the exact trust test I set."
+      },
+      {
+        "ask": "would-leave guard: numbers must match my front desk / reconcile to reality.",
+        "status": "partial",
+        "note": "They handled this with HONESTY rather than reconciliation — provenance is hard-labeled 'estimate_ga4', shown as a banded estimate 'never as booked revenue', with an honest 'Names available with call & CRM tracking' affordance instead of a fake link. That earns trust. But true reconciliation is P1, so I still can't tie a number to a specific patient yet."
+      },
+      {
+        "ask": "would-leave guard: no jargon I have to Google (impressions, CTR, DA, SERP, organic).",
+        "status": "delivered",
+        "note": "Headline and money frame speak dollars and outcome units (admin displayName). Jargon survives only under the collapsed hood. I can read my own dashboard."
+      },
+      {
+        "ask": "would-leave guard: don't count garbage (spam/robocalls/existing-patient reschedules) as new-patient wins.",
+        "status": "partial",
+        "note": "Counts are GA4 key-events filtered to the admin's PINNED events, so it's not raw all-traffic — there's an intentional filter. But GA4 conversions can't yet distinguish a new-patient call from a reschedule; junk quality-scoring is explicitly P1. So the inflation risk I fear isn't fully closed at P0."
+      },
+      {
+        "ask": "would-leave guard: no all-green-arrows while my schedule has holes; no over-claimed attribution.",
+        "status": "delivered",
+        "note": "Strong here. Baseline is engagement-anchored to when we started; while no anchor exists it says 'we're establishing your baseline now' with NO fabricated delta, and verdict==null degrades to honest no-number copy. It can say 'holding steady' or 'down from'. It won't lie green at me."
+      },
+      {
+        "ask": "would-leave guard: no stale 'last updated 3 weeks ago' data.",
+        "status": "not-applicable",
+        "note": "Verdict reads the latest GA4 snapshot; freshness/last-updated surfacing wasn't a P0 line item I can verify from the digest. Not a concern unless snapshots go stale silently."
+      },
+      {
+        "ask": "Cut the noise: no SEO-health gauges, audit checklists, blog-count brag lists, social followers, confetti/gamification.",
+        "status": "delivered",
+        "note": "Content plan was DEMOTED below the proof (no longer the hero), and the health ring/audit stuff is under the hood. No confetti in the spine. The surface is outcome-first, not busywork-first."
+      },
+      {
+        "ask": "Return hook: push me a text/email when something needs ME (new 2-star review, missed calls) and a monthly count to my phone — don't make me log in and dig.",
+        "status": "deferred-P1",
+        "note": "exportProfile is defined but unused; push/SMS return hook is explicitly P1. This is my honest cadence truth — without push I'll open it ~once a month at invoice time. Planned, but until it ships the dashboard still relies on me remembering to log in."
+      }
+    ],
+    "deliveredWell": [
+      "The order finally matches how my brain works: dollar verdict first, money-vs-retainer second, content plan demoted, kitchen hidden under the hood. The old version buried the ROI behind a 'See full report' click — that's fixed, and it's the single biggest improvement.",
+      "They were honest instead of slick. The dollar number is a banded estimate ('~$12,000', '~7x your retainer'), explicitly labeled 'This is an estimate — your tracked conversions valued at ~$X each', and never dressed up as booked revenue. For a guy whose #1 trust killer is fake precision, that honesty buys more credibility than a bigger number would.",
+      "No fabricated deltas. When there's no baseline it says 'we're establishing your baseline now'; when there's no data the verdict degrades to honest no-number copy. It can tell me 'holding steady' or 'down from'. It is built to NOT lie green at me while my chairs sit empty — that's the thing I was most afraid of.",
+      "The 'Names available with call & CRM tracking — ask your strategist' line is the right move: it tells me the better version exists without faking a clickable name today. That's an honest promise, not a bait.",
+      "Jargon is gone from my view. I can read the whole top of this in 60 seconds in my language."
+    ],
+    "stillMissing": [
+      "TRULY MISSING from where I need it (though planned P1): the map pack / 'dentist near me' position AND my Google reviews status. These are the two things I said I genuinely care about — 90% of how patients find me, and the one thing I can act on myself between patients. The data source (local-seo.ts) already exists, which makes their absence from the P0 first screen sting more, not less. For a single-location dentist this isn't 'nice to have later' — it's half my front screen.",
+      "The verification half of my indispensable ask: I can't yet sanity-check the number against my receptionist. Honestly-labeled GA4 estimate is a good down payment, but reconciled call/booking data (P1) is what turns 'I believe you' into 'I'll never cancel.'",
+      "The push/text return hook (P1). Without it, busy-me opens this maybe once a month. The whole point was you bringing me the number and the decision where I already am.",
+      "Junk filtering on the count (P1) — distinguishing a real new-patient call from a reschedule or robocall. The pinned-event filter helps but isn't the same thing."
+    ],
+    "builtToMySpec": "mostly",
+    "movedRead": "It moved me — but to 'cautiously staying and watching,' not yet 'happily renewing and expanding.' The reframe is genuinely better: leading with an honestly-labeled dollar verdict over my retainer, demoting the busywork, and refusing to fabricate a number is exactly the trust posture I asked for, and it's enough that I won't cancel on sight. On the dollar verdict specifically: yes, I'll trust an honestly-labeled GA4 estimate as a directional 'is this working' signal — the banding and the 'this is an estimate' line earn that — but I will NOT yet treat it as proof I'm getting my money's worth, and I won't expand spend on it. My indispensable fact was a DOLLARIZED count I can sanity-check against my front desk; right now I have the dollarized half and not the sanity-check half. I need the reconciled version (call tracking + reviews + map pack) before I'd say 'never cancel' or fund a second location. So: retained, not yet expanded — and the clock on my patience is the P1 map-pack/reviews/reconciliation work landing soon.",
+    "narrative": "I'll give it to them straight, the way I'd want it given to me. This is a real improvement and I can tell they actually listened. When I open it I see what my SEO is worth in dollars against my retainer, in plain English, right at the top — not buried, not behind a click, not drowned in graphs that make me feel dumb in my own account. And critically, they didn't try to spin me: the number is clearly flagged as an estimate, it won't show me green arrows when I've got nothing, and when they don't have data yet it says so. For a guy who walks away the second the numbers feel fake, that honesty is worth a lot. The content-plan brag list got pushed down where it belongs and the keyword/impressions/health-score kitchen is hidden under the hood. Good. But here's my problem: the two things I told you I actually care about — am I in the map pack for 'dentist near me,' and what's happening with my Google reviews — aren't on the screen. You're telling me they're coming in P1 and the data already exists, so I believe you, but for a single-location dentist that's not a side dish, that's half the meal. And the dollar number, honest as it is, still doesn't reconcile to what my receptionist actually felt at the front desk — that's the one thing I can't get anywhere else and the thing that would make me never cancel. So I'm staying, I'm watching, and I'm not spinning up a second location or paying more until the map pack, the reviews, and a number I can check against reality show up. Don't make me wait three quarters for it. And get that text-me-when-something-needs-me hook live — otherwise honestly I'll forget this exists until the invoice hits.",
+    "newConcerns": [
+      "The headline says 'qualified leads / new patients' but underneath it's a GA4 conversion count, not a verified phone-call-from-a-new-patient count. The labeling is honest about the estimate, but a conversion event and a butt-in-the-chair aren't the same thing — if my front desk count and this number drift apart before reconciliation ships, the trust I'm extending on the 'estimate' label evaporates fast.",
+      "Everything good about this depends on the admin pinning the right GA4 events and setting a sane per-outcome value. The fallback-to-all-key-events path could quietly inflate my count if my strategist forgets to pin — and I'd have no way to know from my seat that the number got looser.",
+      "So much of what makes this trustworthy-for-ME (map, reviews, reconciliation, push) is concentrated in P1. If P1 slips, what I'm left with at P0 is a nicer-looking, more-honest estimate — better than before, but still not the verified new-patient ROI that was the whole reason I hired you."
+    ]
+  },
+  {
+    "persona": "Busy in-house B2B SaaS marketing lead — owns the demand/growth number, lives in GA4/HubSpot/Ahrefs, hired the agency for pipeline capacity without headcount, allergic to vanity metrics and being managed by dashboard.",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "One headline ROI line at the very top: organic pipeline $ vs retainer spend with a simple ratio, screenshottable to justify spend",
+        "status": "partial",
+        "note": "IssueVerdictHeadline now leads with an emerald dollar value + '~7x your retainer' at the very top — the layout I asked for. But the dollar is GA4 key-events x an admin-set per-outcome value (provenance hard-coded estimate_ga4), not HubSpot pipeline $. It's honestly labeled 'an estimate,' which I respect, but it's not the CFO-grade number yet."
+      },
+      {
+        "ask": "Leads/demos/qualified conversions from organic this period with trend and which pages drove them, tied to HubSpot",
+        "status": "partial",
+        "note": "OutcomeCountBand delivers per-event counts with dual trend (vs last period AND since we started) — exactly the leading indicator I trust. But it's GA4 key-event counts only; no HubSpot tie, and namedRecordsAvailable is always false so I can't see which deals/titles. 'Which pages drove them' is relocated to slot 6, not surfaced up top."
+      },
+      {
+        "ask": "What needs ME this week — explicit decision/approval queue, max 3 items, clear ask, two-minute clear",
+        "status": "delivered",
+        "note": "ActionQueueStrip is hoisted to slot 0 (surfaced early when blocked) and IssueLoopFooter is the canonical queue at slot 4. This was my #3 fear (silent stalling on my side) and it's addressed structurally. The two-minute-clear loop is the existing Inbox decision substrate, which works."
+      },
+      {
+        "ask": "What YOU did since I last looked + what's shipping next, scannable not a changelog dump",
+        "status": "delivered",
+        "note": "WinsSurface + OutcomeSummary + the demoted content plan (IssueContentPlanSection) at slot 5 give me proof-of-motion below the proof. Demoting the content plan from hero to below the verdict is the right call — it reads as evidence now, not as the product."
+      },
+      {
+        "ask": "Movement on commercial-intent keywords/pages that matter (the 10 money terms, not 500), with so-what",
+        "status": "partial",
+        "note": "StrategyRequestedKeywordTrendSection covers requested-keyword trend at slot 5, and CompetitorGapsSection (commercial SOV) is segment-gated to show for my B2B-SaaS segment — but in slot 6 under the collapsed 'Under the hood'. The money-term focus exists; the prominence is buried. Acceptable for P0 since it's not vanity, just demoted."
+      },
+      {
+        "ask": "DO NOT lead with sessions, impressions, keyword count, DA, wall of charts — bury vanity on a second tab",
+        "status": "delivered",
+        "note": "The 0-100 visibility ring is removed from the headline and exiled to the collapsed slot 6. Sessions/impressions/health/CompactStatBar all live under 'Under the hood.' The surface now leads with money and outcomes. This is the single biggest trust win for me — exactly what I asked for."
+      },
+      {
+        "ask": "Numbers must reconcile with my GA4/HubSpot or I stop believing all of it",
+        "status": "partial",
+        "note": "GA4 side is honest: outcomes are real GA4 key-event counts over the admin's pinned events, banded (~$12,000, no false precision), with a visible 'this is an estimate' provenance line. That reconciles to my GA4. HubSpot does NOT reconcile yet — there's no CRM tie at P0. The honesty labeling is the right mitigation, but my hardest distrust guard (HubSpot match) is unmet."
+      },
+      {
+        "ask": "A line connecting to pipeline/revenue, not just traffic growth",
+        "status": "partial",
+        "note": "The verdict IS a dollar line now, not a traffic line — and traffic-value is explicitly demoted to 'Traffic value (reference).' That's a real shift toward my frame. But it's estimated-conversion-value, one step short of pipeline $ and two steps short of influenced revenue (both P1)."
+      },
+      {
+        "ask": "No static screenshots / stale data — must feel current",
+        "status": "delivered",
+        "note": "Verdict and counts ride the live public payload from GA4 snapshots and computeROI; the baseline degrades honestly to 'establishing your baseline now' rather than showing stale or fabricated deltas. Nothing here reads as a 6-week-old screenshot."
+      },
+      {
+        "ask": "No cherry-picked wins / hidden losses — show flat/down honestly",
+        "status": "delivered",
+        "note": "baselineVerdict() reports 'down from N since we started' and 'holding steady' truthfully; OutcomeCountBand shows flat/down deltas; zero outcomes render an EmptyState CTA, never a fake zero-as-win. The anti-spin discipline is genuinely built in, not just promised."
+      },
+      {
+        "ask": "Real revenue attribution — organic content to HubSpot opportunity to closed-won (would pay more / expand)",
+        "status": "deferred-P1",
+        "note": "DEFERRED, and I was told. provenance has an actual_reconciled value reserved but unused; namedRecordsAvailable wired to false with an honest 'names available with call & CRM tracking' affordance. This is my expand trigger — it's not here, but it's contracted and signposted, not faked."
+      },
+      {
+        "ask": "Board-ready / exec-ready export I can forward into a QBR with zero editing",
+        "status": "deferred-P1",
+        "note": "DEFERRED. exportProfile ('board_one_pager') exists in shared types but has zero client usage — defined-but-unused. This is my literal return hook (I open this monthly before a review). Its absence is the most consequential P0 gap for me, even though planned."
+      },
+      {
+        "ask": "Proactive strategic recommendations with projected pipeline/$ impact ('3 plays, here's what each is worth')",
+        "status": "partial",
+        "note": "The spec frames a NextBetsCard reframing existing rec estimatedGain into dollars as P0, and the verdict keeps the opt-in 'why this is the move we'd make first' contribution bars from topRec. But I don't see a dedicated dollarized next-bets card in the built spine — recs surface in the demoted content plan without a per-play $ projection. Underdelivered vs the spec's P0 intent."
+      },
+      {
+        "ask": "Competitive context — share of voice on commercial terms vs 2-3 named competitors",
+        "status": "partial",
+        "note": "CompetitorGapsSection is segment-gated true for B2B-SaaS (showCompetitorAuthority default true) — the segment-adaptive contract works. But it sits in collapsed slot 6, not surfaced as the commercial-SOV insert the spec described for my segment. Present, demoted."
+      },
+      {
+        "ask": "Push notification return hook (monthly email/Slack: ROI line + trend + X items need approval, one-click)",
+        "status": "deferred-P1",
+        "note": "DEFERRED. I explicitly said I'm a once-a-month user pulled back by a push, not a pull. The dashboard is the landing page; the notification is what brings me. No push/SMS hook at P0 means the thing that actually drives my engagement isn't built yet. Planned, but this is the difference between a dashboard I forget and a service I feel."
+      },
+      {
+        "ask": "AI-answer visibility (do I show up when buyers ask ChatGPT 'who's best for X')",
+        "status": "deferred-P1",
+        "note": "DEFERRED to P2 per spec. Not expected at P0; flagged here only for completeness. No concern — it's a clearly-future expansion lever."
+      },
+      {
+        "ask": "Cut vanity: sessions/users/pageviews, total impressions/avg position, DA/DR/backlinks, total ranked-keyword count, engagement micro-metrics, SEO jargon, dense charts, daily granularity",
+        "status": "delivered",
+        "note": "All of it is either removed or relocated to collapsed slot 6. MoM is suppressed on the evergreen surface; the surface thinks in the achieved-state baseline framing I asked for, not daily wiggles. The noise-to-cut discipline is the cleanest part of the build."
+      }
+    ],
+    "deliveredWell": [
+      "The vanity exile is real, not cosmetic. The 0-100 ring is gone from the headline (relocated to a collapsed drawer), sessions/impressions/DA/health are all under 'Under the hood,' and the content plan is demoted from hero to evidence. The surface now opens on money, then outcomes, then the money frame — the exact spine I described. This alone earns the login back.",
+      "Honest provenance is handled like a grown-up. The dollar is banded (~$12,000, no cents, no false precision), carries a permanent 'this is an estimate — your tracked conversions valued at ~$X each' line, and provenance is hard-coded estimate_ga4 server-side so nobody can quietly imply booked revenue. The admin footer even says 'always shown to the client as a labeled estimate, never as booked revenue.' That is the opposite of agency spin — it builds trust rather than spending it.",
+      "The anti-spin baseline copy is genuinely honest. baselineVerdict() says 'down from N since we started' and 'holding steady,' and when there's no anchor it says 'we're establishing your baseline now' with NO fabricated delta. A flat/down month is reported truthfully. This directly answers my 'cherry-picked wins' distrust guard.",
+      "'What needs me' is structurally solved — ActionQueueStrip hoisted to slot 0 when something's blocked, with the canonical queue at slot 4. My biggest agency fear (silent stalling on my side) is designed against.",
+      "The deferrals are signposted, not hidden. namedRecordsAvailable=false renders 'names available with call & CRM tracking — ask your strategist' instead of a dead link or a fake name list. The honest affordance is itself an upsell I'd actually act on."
+    ],
+    "stillMissing": [
+      "TRULY MISSING (P0 underdelivery vs spec): a dollarized next-bets card. The spec called NextBetsCard a P0 reframe ('3 plays — here's what each could be worth') from existing rec estimatedGain, but the built spine surfaces recs only inside the demoted content plan with no per-play $ projection. This is the proactive-strategy lever I'd pay more for and it's the one P0 item that reads as quietly dropped rather than deliberately phased.",
+      "TRULY MISSING (prominence bug, not a deferral): my commercial-intent keyword movement and competitor SOV are correct in substance but buried in collapsed slot 6. For my segment those ARE the money terms, not vanity — they shouldn't require a click to expand. I'd want the commercial-SOV insert surfaced for B2B-SaaS, not hidden alongside the ring.",
+      "DEFERRED-P1 but load-bearing for me: the board/QBR export (exportProfile is defined-but-unused). I'm a monthly user who opens this to grab one number before a review. Without a zero-edit forwardable one-pager, I'm still rebuilding it in slides — the exact tax I asked you to remove.",
+      "DEFERRED-P1 but it's literally my return hook: the push notification (monthly ROI line + trend + 'X items need approval'). I told you I won't build a check-in habit; a push is what pulls me back. No push means a great dashboard I forget to open.",
+      "DEFERRED-P1, the real prize: HubSpot/CRM reconciliation to pipeline and influenced revenue. The honest GA4 estimate is a fine bridge, but my indispensable ask — the number that reconciles with MY HubSpot and survives a CFO — isn't here yet."
+    ],
+    "builtToMySpec": "mostly",
+    "movedRead": "Yes, it moved me — but to 'I'll stay and lean in,' not yet to 'I'll expand.' The old surface (ring + content-plan hero + ROI buried behind a 'See full report' drawer) is the exact thing that made me suspect agency theater. This rebuild leads with money, exiles the vanity, and is honest about a flat month — so I trust it now, and I'd re-sign at renewal on the strength of the verdict + the cleared-blockers loop. On the dollar verdict specifically: yes, I trust an honestly-labeled GA4 estimate as a directional, screenshottable 'is this worth it' line — the banding and the permanent estimate label are exactly what make it forwardable without me apologizing for it. But I will NOT put it in front of my CFO as influenced revenue, and I won't expand scope, until it reconciles to my HubSpot (the P1 actual_reconciled path). So: I stay, I approve, I clear my queue — but the expand-and-pay-more conversation is gated on P1 (CRM reconciliation + the export I can forward). Right now I still have to rebuild the board view in slides, which is the friction that keeps me from fully relaxing.",
+    "narrative": "I'll be straight: this is the version I actually wanted, and I didn't expect to say that. I open it and the first thing I see is a dollar number against my retainer with a ratio next to it — not a 0-100 score I'd never report upward, not a content calendar pretending to be the product. The ring is gone from the top, the sessions and DA are buried where they belong, and the content plan finally reads as evidence instead of the headline. That reordering alone fixed my deepest distrust, that you were filling space because the real number wasn't ready. And the honesty layer is genuinely impressive for an agency tool — the dollar is banded with a '~', it always says 'this is an estimate,' and when there's no baseline it just tells me you're still establishing one instead of inventing a delta. A flat month would show as flat. That's the opposite of spin, and it's why I believe the GA4 number even though it isn't my HubSpot number. Where it falls short for me is the stuff that decides whether I expand, not whether I stay. I can't forward a board one-pager yet — the export exists in the code but isn't wired, so I'm still rebuilding it in slides, which is the exact tax I begged you to kill. There's no push to pull me back, and I'm a once-a-month user by nature, so a beautiful dashboard I forget to open is a half-win. And the number, however honestly labeled, is still GA4 conversions times a value you typed in — it's a bridge to the reconciled HubSpot pipeline figure, not the figure itself. You told me those three (export, push, reconciliation) are P1, and I believe you, so I'm not calling them betrayals. The one thing that does nag me as a real P0 miss is the dollarized 'next bets' — '3 plays, here's what each is worth' — which your own spec scoped for P0 and I don't see surfaced; that's the proactive-strategy muscle I'd pay more for, and it reads as dropped rather than deferred. Net: you earned the login back, you'll keep me through renewal, and you've set yourself up to earn the expansion the day the number reconciles to my CRM and I can forward it without touching it.",
+    "newConcerns": [
+      "The outcome unitLabel is free-text on the admin side (defaults to 'outcome'), and the segment outcome-noun for B2B-SaaS isn't enforced. If my strategist types a vague label or mis-sets the per-outcome value, my verdict sentence ('N outcomes, up from M') could read generic or be silently mis-valued — and I'd have no way to sanity-check the per-outcome value against my own data. The honesty labeling protects against false precision but not against a wrong-but-confident estimate.",
+      "The whole verdict hinges on the admin pinning the RIGHT GA4 key-events. The fallback to 'all key-events' with an admin nudge is sensible, but if pinning is wrong or stale, my headline dollar is wrong while still looking authoritative and 'estimate-labeled.' I'd want a client-visible note of WHICH events are being counted, so the number I forward is one I can defend if my CFO asks 'counted how?'",
+      "My single most important number (the verdict) only renders when three conditions all hold — flag on, outcomeValue set, GA4 snapshot exists. If any is missing I get the no-number degradation copy. That's honest, but it means a misconfiguration on your side shows me an empty verdict, and for a once-a-month user that empty state on the one visit I make could read as 'nothing's working' rather than 'not set up.'"
+    ]
+  },
+  {
+    "persona": "VC backer / board member — the investor the marketing lead reports up to. I think in CAC, payback, blended efficiency, and defensibility, not rankings or impressions. I see this dashboard maybe once a quarter, usually as a screenshot in a board update. My one question: is organic becoming our cheapest, most durable acquisition channel, or are we funding a treadmill?",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "Headline verdict line in DOLLARS, conclusion before math (on track / off track / too early)",
+        "status": "partial",
+        "note": "The spine now leads with a dollar verdict and a plain baselineVerdict() sentence with honest 'establishing your baseline' degradation — exactly the verdict-first shape I demanded. But the framing is 'what your SEO is worth × your retainer multiple,' not my altitude ('organic CAC $X vs paid $Z, on track'). The cac_vs_paid altitude is P1 segment wiring. So: right shape, wrong denominator for me."
+      },
+      {
+        "ask": "Organic-sourced pipeline/revenue vs all-in cost = channel ROI + payback in months",
+        "status": "partial",
+        "note": "Money frame is un-collapsed and promoted (ROIDashboard), with estimated value and return-on-retainer in dollars — a real improvement. But there is NO payback-in-months, no all-in cost denominator (retainer + content + internal time), and 'value' is GA4 conversions × a lead-value estimate, not pipeline/closed-won. The fraction I asked for is half-built."
+      },
+      {
+        "ask": "Trend line: organic as a share of total new pipeline over 4–6 quarters",
+        "status": "missing",
+        "note": "Not in P0 and, candidly, not on a near roadmap line for me either. There is a since-we-started baseline (one anchor point, not a 4–6Q slope) and MoM is suppressed for evergreen. The slope that proves defensibility — share of total pipeline over quarters — doesn't exist. This is my single most-important board signal and it's absent."
+      },
+      {
+        "ask": "Compounding-asset / moat view: prior work still earning with zero new spend",
+        "status": "deferred-P1",
+        "note": "Explicitly the 'VC compounding-asset view' deferred to P2 (redesign spec line 424). The 'evergreen' framing (MoM suppressed, 'still working' language) gestures at durability, but the actual moat proof — last quarter's pages still converting this quarter at no incremental spend — is not built. Told about it, so deferred not betrayed, but it IS the thing I underwrote."
+      },
+      {
+        "ask": "Short 'what we did and what it cost' line — spend + the 1–3 bets it funded",
+        "status": "partial",
+        "note": "The verdict keeps the 'why this is the move we'd make first' contribution bars (top-3 bets), which is the 'what we did' half. The 'what it cost / all-in spend' half is not surfaced as an honest denominator — retainer is only used as a ratio divisor, content + internal time are nowhere. Denominator honesty is the thing I guard hardest."
+      },
+      {
+        "ask": "DO NOT lead with rankings/impressions/traffic/DA/green-arrow wall — bury them 3 clicks deep",
+        "status": "delivered",
+        "note": "This is the build's strongest win for me. The 0–100 score ring is GONE from the headline (survives only inside slot 6 'Under the hood' collapsed <details>), the visibility ring is demoted there too, traffic-value is relabeled '(reference),' and rankings/CompactStatBar/competitor live behind the collapse. The spin surface is genuinely off my screen."
+      },
+      {
+        "ask": "INDISPENSABLE: defensible, consistently-measured organic CAC trend shown next to blended/paid CAC",
+        "status": "deferred-P1",
+        "note": "The one thing that justifies the line item. Not in P0. True organic-CAC-vs-paid requires CRM/cost data (P1 reconciliation, spec line 209/298). The OutcomeProvenance enum reserves the upgrade path and the verdict shape is designed to swap in place, but today there is zero CAC and zero paid comparison. Honest about the gap; still, my indispensable is not yet delivered."
+      },
+      {
+        "ask": "Quarterly dollar-denominated push ('Organic CAC $X, down Y% QoQ, Z% below paid; payback N') — my real return hook",
+        "status": "deferred-P1",
+        "note": "the-issue-client-return-hook is an explicit P1 flag (push + export). I barely log in; the push IS my product. exportProfile/board_one_pager is wired in the contract but renders nothing yet. Deferred-but-planned, and correctly sequenced after the core proves out — but until it ships, I have no reason to engage at all."
+      },
+      {
+        "ask": "Board-ready one-pager export I can paste into a deck with zero reformatting",
+        "status": "deferred-P1",
+        "note": "exportProfile defined but UNUSED in P0 (digest confirms). Listed as 'P1 — the return hook' (spec line 320). This is the feature that saves my operators a half-day a quarter and is my anti-lock-in guard. Contract exists, deliverable doesn't."
+      },
+      {
+        "ask": "GUARD: no all-green-forever — show honest red / bad quarters",
+        "status": "partial",
+        "note": "Big credit for honesty primitives: 'establishing your baseline now' with NO fabricated delta, 'down from M since we started' is a real branch, banded estimates (~$12,000, ~7×) with no false precision, and a hard-coded estimate_ga4 provenance line on every number. That's a measurement tool, not a marketing artifact. BUT 'evergreen' framing suppresses MoM and emphasizes 'what's working' — I can't yet see a genuinely bad quarter rendered as red, because there's no QoQ trend to go red."
+      },
+      {
+        "ask": "GUARD: dollar figures, not just scores/percentages/indices",
+        "status": "delivered",
+        "note": "Dollars are now the lead unit (emerald fmtEstimateMoney value, retainer multiple), the 82-style visibility score is demoted out of the headline, and traffic-value is relabeled reference. This directly answers 'a visibility score of 82 means nothing to me, I can't put it in a model.' Genuinely delivered."
+      },
+      {
+        "ask": "GUARD: attribution methodology visible and not silently restated quarter to quarter",
+        "status": "partial",
+        "note": "P0 hard-codes provenance='estimate_ga4' and ALWAYS shows the disclosure line ('your tracked conversions valued at ~$X each') — methodology is visible and consistent by construction today. But 'visible/locked methodology across quarters' is explicitly a P2 VC item (spec line 424); with only one provenance value and no quarter-over-quarter history, the 'doesn't silently change' guarantee isn't yet tested by reality."
+      },
+      {
+        "ask": "GUARD: no vanity precision (ROI to two decimals on estimated data)",
+        "status": "delivered",
+        "note": "fmtEstimateMoney bands to 2 sig-figs with a '~' prefix and no cents; fmtEstimateRatio gives '~7×'. This is exactly the restraint I asked for — false precision reads as spin, and they refused it."
+      },
+      {
+        "ask": "CUT: keyword tables, impressions, sessions, DA/visibility scores, backlinks, activity theater",
+        "status": "delivered",
+        "note": "All relocated to the collapsed slot-6 'Under the hood' details: rankings, CompactStatBar, the demoted ring, per-page traffic tables. Content plan demoted below proof. The board surface is no longer a wall of operator detail and activity counts. Clean."
+      },
+      {
+        "ask": "CUT: decorative gauges/speedometers/green checkmarks",
+        "status": "delivered",
+        "note": "The 0–100 gauge ring is removed from the headline entirely. No confetti-grade green theater at the top. The emerald is now attached to a dollar value, not a decorative score."
+      }
+    ],
+    "deliveredWell": [
+      "They killed the spin surface I hate most. The 0–100 visibility ring is gone from the headline and buried in a collapsed 'Under the hood' drawer; rankings, impressions, traffic tables, and the CompactStatBar all live three clicks deep. The first thing I see is no longer a wall of green up-arrows.",
+      "Dollars lead, scores follow. The headline number is an emerald dollar value with a retainer multiple, and the meaningless '82 visibility score' is demoted out of my sightline. This is the single biggest thing — I can finally put the top-of-screen number into a sentence, even if it's not yet the CAC sentence I want.",
+      "They refused false precision. Banding to '~$12,000' and '~7×' with no cents and a tilde is exactly right — estimated data shown as estimated. A lesser build would have shown me ROI to two decimals and lost my trust on sight.",
+      "Honest degradation instead of a fabricated number. 'We're establishing your baseline now; your trend appears here as outcomes land' with NO invented delta, plus a hard-coded estimate_ga4 provenance line on every dollar — this reads like a measurement instrument, not a marketing artifact. That earns real credibility with me.",
+      "The provenance enum and verdict shape are designed to swap in place. When reconciliation lands, the number gets more confident without re-laying-out the screen or silently rebasing — that architectural discipline is what makes me believe the P1 CAC promise is real and not vapor."
+    ],
+    "stillMissing": [
+      "The CAC-vs-paid comparison — my indispensable. Organic CAC sitting next to blended/paid CAC under the same attribution rules is the entire reason this line item exists in the budget, and P0 has zero CAC, zero paid comparison, zero payback. (Deferred-P1: needs CRM/cost data — correctly sequenced, but until it ships my core question is unanswered.)",
+      "The defensibility slope. Organic as a share of total new pipeline over 4–6 quarters. P0 gives me a single since-we-started anchor, not a trajectory — and a single quarter tells me nothing. (Truly missing, not on a clear near-term line for me.)",
+      "The compounding-asset / moat view — prior-quarter work still earning this quarter at zero incremental spend. (Deferred-P2.) This is what I underwrote; 'evergreen' copy hints at it but doesn't prove it.",
+      "An honest all-in denominator. P0 uses retainer only as a ratio divisor; content production and my team's internal time are nowhere. If the denominator is rigged or partial, the ROI is fiction — and right now it's incomplete. (Partly missing, partly P1.)",
+      "Payback in months. Not present. (Missing.)",
+      "The quarterly dollar-denominated push and the board one-pager export. (Both deferred-P1.) I barely log in — the push IS the product for me, and the export is my anti-lock-in guard. Until they ship I have no engagement hook at all."
+    ],
+    "builtToMySpec": "partially",
+    "movedRead": "Honestly, it moved me less than the other personas it'll move, and that's fair — P0 was built to the operator's altitude (estimate × retainer), not mine (CAC vs paid). I credit the direction enormously: they ripped out exactly the vanity surface I distrust and led with an honestly-labeled dollar number, which is the hardest cultural thing to get right. But on the question that decides my vote — 'is organic structurally lowering our blended CAC and building a moat?' — the build is silent. So I am roughly where I started: cautiously encouraged, not yet ready to argue in the boardroom to expand the budget. On the specific dollar-verdict trust question: yes, I trust an honestly-labeled GA4 estimate as a directional signal precisely BECAUSE they labeled it (~banded, 'this is an estimate,' estimate_ga4 provenance, no fabricated baseline) — that restraint is what buys my belief. But I will not put a GA4-estimate number into a board deck or an LP conversation as ROI; for that I need the reconciled, CRM-backed, CAC-vs-paid version. I'd stay and keep funding on the strength of this trajectory; I would not yet expand on it. Expansion is gated on P1 reconciliation + the CAC altitude + the quarterly push landing.",
+    "newConcerns": [
+      "The 'evergreen' framing suppresses MoM and leans on 'what's working right now' — which risks recreating, in spirit, the all-green-forever problem I explicitly named. A measurement tool needs to be able to render a genuinely bad quarter as red. With no QoQ trend in P0, I can't yet see the dashboard deliver bad news, so I can't yet confirm it's honest under stress.",
+      "Segment is a manual admin override at P0, not derived, and the non-local 3-way is an admin select. A misclassified verdict noun is itself a trust violation — if an operator can hand-pick the altitude/framing that flatters the number, that's a future spin lever I'll want locked down before I rely on it.",
+      "The retainer-as-divisor framing could harden into the de-facto denominator. If 'return on retainer' becomes the headline ROI and content + internal time never get added, the channel will look more efficient than it is. I'd want the all-in denominator built BEFORE the CAC altitude ships, not bolted on after, so the first CAC number I ever see is honest."
+    ],
+    "narrative": "I'll be candid: this is a real improvement and it's clearly not built for me yet — and I'm okay with both being true. The thing I came in most afraid of was opening a board screenshot and seeing a wall of green up-arrows, a visibility score of 82, and a rankings grid dressed up as progress. They genuinely fixed that. The score ring is gone from the top, the rankings and traffic are buried three clicks deep, dollars lead, and — the part that actually earns my trust — they refused to fake precision or fabricate a baseline. '~$12,000,' '~7×,' 'this is an estimate,' 'we're establishing your baseline now.' That's the posture of people building a measurement instrument, not a sales artifact. I respect it. But my one question — is organic becoming our cheapest, most durable acquisition channel, and is a moat compounding — is still unanswered. There's no CAC, no paid comparison, no payback, no share-of-pipeline slope, no proof that last quarter's pages are still earning this quarter. I was told those are P1/P2, and the architecture (provenance enum, swap-in-place verdict) makes the promise credible rather than hand-wavy, so I don't read it as betrayal. I read it as: they nailed the trust spine and the operator's altitude first, which is the right order, and my altitude is next. So I stay, I keep funding, and I trust the labeled GA4 estimate as a direction — but I won't paste it into a deck as ROI, and I won't argue to expand the budget until the reconciled CAC-vs-paid number, the quarterly push, and the one-pager actually ship. Get me those, with an honest all-in denominator and the ability to show me a bad quarter in red, and I become your loudest advocate in the room."
+  },
+  {
+    "persona": "Marketing lead for a mid-sized professional-services consulting firm (~40 partners). Non-technical buyer who sits between the agency and the managing partners; judges everything by whether it helps defend the retainer in front of partners who'd rather spend the money on a conference booth.",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "A one-line plain-English verdict for the period, written like a smart colleague briefing me, not a metric ('9 qualified inbound inquiries, up from 6, driven mostly by your tax-controversy content. One competitor overtook you — see below.')",
+        "status": "partial",
+        "note": "The verdict slot now LEADS the page (no ring) with a baseline-anchored plain-English sentence — 'N qualified inquiries, up from M since we started' via baselineVerdict(). That's the right altitude and exactly the colleague-briefing tone I asked for. But it's missing the two attributions that make MY sentence useful: 'driven mostly by [which topic]' and 'a competitor overtook you on [term]'. It tells me the score, not the why or the threat."
+      },
+      {
+        "ask": "Qualified inbound this period — count, trend vs last period, who/what kind (title, firm, topic), clickable to the actual named inquiries ('if you can show me the actual inquiries with names, I will trust everything else more')",
+        "status": "partial",
+        "note": "Count + DUAL trend (vs last period AND since we started) is real via OutcomeCountBand — genuinely good. But the count is GA4 key-event conversions, not 'qualified inbound by title/firm', and namedRecordsAvailable is hard-false at P0 so there are NO names, just an honest 'Names available with call & CRM tracking — ask your strategist' line. The named, title/firm-tagged, clickable list is the thing I said would make me trust everything else, and it's deferred-P1."
+      },
+      {
+        "ask": "Authority on our 15-20 core expertise topics — are we page-one for the topics partners get hired for, vs our 2-3 named competitors, framed by topic-vs-firm, not position 1-100",
+        "status": "deferred-P1",
+        "note": "This is my #1 credibility ask and it is NOT built at P0. My segment (professional_services) sets showCompetitorAuthority=true, but that only unlocks the generic CompetitorGapsSection (keyword-gap view) buried in the collapsed 'Under the hood' drawer — NOT the topic-vs-named-firm authority slot I asked for. The redesign spec explicitly schedules topic-vs-firm authority for P2, behind even P1. So my single most important screen — 'you vs Competitor X on the things that win deals' — does not exist yet."
+      },
+      {
+        "ask": "What needs my decision / sign-off right now — the 1-3 things you're waiting on me for, up top",
+        "status": "delivered",
+        "note": "Slot 0 'Your turn' (ActionQueueStrip) sits ABOVE the verdict and renders pending decisions; slot 4 'What needs me' (IssueLoopFooter) shows greenlit/discussing + briefs-in-flight. My homework is surfaced first and treated as a to-do, exactly as asked. This turns the dashboard into a task, which is the one thing that pulls me back."
+      },
+      {
+        "ask": "What you (the agency) shipped this period — concise, outcome-tagged, in language I can forward to a partner ('published 3 partner-bylined pieces, two now ranking page one')",
+        "status": "partial",
+        "note": "WinsSurface ('Real results from the work we've shipped for you') + briefs-in-flight proof exist in slots 4-5, so there IS a shipped-work proof surface. But it's evergreen (deliberately no 'this period' anchor) and not a tight forwardable 'we published 3, two now rank page one' list. The proof of motion is there; the partner-forwardable, outcome-tagged shipped summary is not."
+      },
+      {
+        "ask": "Do NOT put a wall of traffic graphs, keyword tables, or a site-health score gauge up top — that's your cockpit, not mine",
+        "status": "delivered",
+        "note": "This is the build's strongest move for me. The 0-100 ring is GONE from the headline (survives only inside the collapsed 'Under the hood' drawer); impressions/clicks/avg-position/site-health are demoted into that same drawer; the money/proof band is un-collapsed and leads. The page no longer opens with motion-to-hide-results, which is precisely the pattern that makes me tune out."
+      },
+      {
+        "ask": "INDISPENSABLE: a trustworthy, plain-English line connecting 'people found us online' → 'qualified inbound from the right prospects', forwardable to a managing partner, never dressing up traffic",
+        "status": "partial",
+        "note": "The honest backbone is real and I respect it: the dollar verdict is GA4-conversions × a labeled per-outcome value, banded ('~$12,000'), with provenance hard-labeled 'This is an estimate — your tracked conversions valued at ~$X each', and an honest 'establishing your baseline' state with NO fabricated delta. That is the trustworthy line I asked for and it does NOT dress up traffic. What's missing for it to be FULLY indispensable to me: it's a GA4 estimate, not reconciled named inquiries by title/firm, and there's no zero-edit export I can forward to a partner without rebuilding it into a slide."
+      },
+      {
+        "ask": "GUARD: would distrust if vanity metrics dressed up as wins, numbers that don't reconcile, junk traffic counted as pipeline, stale data, jargon walls, or anything that makes the firm look less credible (would churn over one embarrassing partner-bylined piece)",
+        "status": "partial",
+        "note": "Most guards honored: no vanity-as-headline (ring/impressions demoted), no false precision (banding + '~'), honest provenance + establishing state, and the 'Curated by your strategist' byline means it isn't an autopilot data dump. BUT my two sharpest guards are unaddressed at P0: (1) junk-traffic risk — outcomes are RAW GA4 key-events with no quality/'right kind of prospect' filtering, so students/vendors/job-seekers can inflate the count exactly as I warned; (2) the partner-byline approve-before-publish credibility gate (the thing that stops one embarrassing piece going out under a partner's name) is P2, not built."
+      }
+    ],
+    "deliveredWell": [
+      "The inversion I most wanted: verdict-and-proof first, the SEO cockpit (ring, impressions, keyword stuff) demoted into a collapsed 'Under the hood' drawer. I can now open this for ninety seconds before a partner meeting and lead with a conclusion, not assemble one from charts.",
+      "Intellectual honesty in the dollar number. Banded ('~$12,000'), provenance hard-labeled as an estimate, an 'establishing your baseline' state with no fabricated delta, and 'never as booked revenue' enforced on the admin side. This is the opposite of the spin I told you would make me start interviewing replacements — it actually buys trust.",
+      "My homework is first-class. 'Your turn' sits above the verdict and 'What needs me' is its own slot. That converts the dashboard from a report I forget into a task I act on — the only return hook that reliably works on me.",
+      "The 'Curated by your strategist' byline + the opt-in 'why this is the move we'd make first' bars. It reads like a smart colleague briefed me, which is exactly the voice I asked for, and it signals a human touched this — not autopilot.",
+      "Dual trend (vs last period AND 'since we started') on the outcome count. The baseline comparison is the thing that makes a number judgeable instead of just a number, and you anchored it honestly to when we started."
+    ],
+    "stillMissing": [
+      "TRULY MISSING (not deferred): no quality filter on outcomes. The count is raw GA4 key-events, so students, vendors, and competitor-snoops can inflate it — the exact 'junk counted as pipeline' failure I said would make me distrust the whole instrument. At minimum I need the count framed as 'tracked conversions' honestly (which it is) but I really need 'the RIGHT kind of inbound', and that distinction is absent.",
+      "DEFERRED-P1, but it's my trust linchpin: named, title/firm-tagged, clickable inbound records. Today it's an honest 'ask your strategist to connect call & CRM tracking' placeholder. Until that lands I'm trusting an estimate, and my partners will ask 'who actually called us?' — I won't have an answer.",
+      "DEFERRED-P2, and this is my single biggest credibility gap: the topic-vs-named-competitor authority slot ('you vs Competitor X on the 15-20 things that win deals'). The generic competitor keyword-gap view buried in a drawer is not the same thing and does not answer the question my managing partner actually Googles.",
+      "DEFERRED-P2: the partner-byline approve-before-publish gate. I said I'd churn over ONE embarrassing piece published under a partner's name. There is no pre-publish credibility gate fused into my decision loop yet.",
+      "DEFERRED-P1: a zero-edit, partner-forwardable one-pager export. exportProfile='partner_summary' is wired for my segment but renders nothing. The monthly auto-summary I could forward without editing is THE feature that would make me log in on purpose every month, and it isn't here yet."
+    ],
+    "newConcerns": [
+      "My segment barely does anything at P0. professional_services resolves to moneyFrameAltitude='pipeline_ratio' and exportProfile='partner_summary', but neither is rendered — the money frame is the same dollar-vs-retainer treatment everyone gets, and there's no export. The only live effect of my segment is showCompetitorAuthority=true, which I'd get from the default anyway. So the 'segment-adaptive' promise is, for me, contract-only scaffolding right now. Fine if it ships in P1, concerning if it stalls.",
+      "The outcome NOUN risk. My verdict sentence says 'N qualified inquiry/inquiries' only if the admin types that label into the Outcome Value field — the verdict pulls outcomeUnitLabel from admin free-text input, not from my segment's 'qualified inquiry' dictionary entry. If the strategist leaves it as a generic 'lead', my partner-facing sentence reads wrong for a professional-services firm. The honesty depends on an admin remembering to set the right unit.",
+      "The estimate could read as precise to a skeptical partner despite the banding. '~$12,000, ~7× your retainer' is honest, but a managing partner who'd rather fund a conference booth will poke at 'estimate' immediately — and right now I have no named inquiry to fall back on when they do. The honest label protects YOU from overclaiming; it doesn't yet arm ME to win the argument."
+    ],
+    "builtToMySpec": "partially",
+    "movedRead": "Partially moved. The spine inversion and the honest dollar verdict genuinely changed my read of this tool — it went from 'an SEO export I forget exists' to 'something I'd open before a partner meeting.' That's real progress and I'm no longer reaching for the replacement-agency list. But it has NOT yet moved me to expand budget or to walk into a partner meeting confident. On the dollar verdict specifically: I respect an honestly-labeled GA4 estimate and it earns my trust as an instrument — I will not accuse you of spin. But it is not enough to DEFEND the line item to partners who'd rather fund a booth. For that I need the reconciled, named-by-title/firm version — 'these three GCs of Fortune-2000 companies inquired, here's the topic' — and the topic-vs-named-competitor authority view. Until those land (P1/P2), I stay where I was on the budget question: holding, not expanding, and watching closely. Get me named records + topic-vs-firm authority + a forwardable one-pager and I expand without blinking — you told me those are coming, so I'm giving you the runway, but I'm judging P1 on whether they actually ship.",
+    "narrative": "Honestly? This is the first version of this dashboard I'd actually open between meetings, and I want to credit that. You did the hardest, most important thing I asked: you stopped opening with your cockpit. The 0-100 score gauge, the impressions, the keyword tables — all demoted into a drawer I never have to touch. The page now leads with a conclusion in plain English and a dollar number you were honest enough to band and label as an estimate. You even put my homework above the fold and signed it 'curated by your strategist' so it doesn't feel like autopilot. That's the right instinct, and it's the opposite of the spin that's gotten my last two agencies fired. Where it falls short for MY job specifically: I'm a professional-services firm, and the two things that actually win and lose me deals — named inquiries I can tie to a title and a firm, and authority on my expertise topics versus the two or three competitors we lose to — are both still IOUs. The 'qualified inquiry' in my verdict is really a raw GA4 conversion with no filter on whether it's a Fortune-2000 GC or a student, which is the exact junk-counted-as-pipeline thing I warned you about. The competitor view I do get is a generic keyword-gap table hidden in a drawer, not the 'you vs Competitor X on the things that win deals' screen I asked for. And there's no forwardable one-pager — the single feature that would make me log in every month on purpose. You told me reconciliation, the topic-vs-firm authority slot, the partner-byline approval gate, and the export are P1/P2, and I'm taking that in good faith — a deferral I was told about isn't a betrayal. So I'm not churning and I'm not yet expanding. I trust the instrument more than I did, but I can't yet walk into a partner meeting and win the budget argument with it. Ship me named records, topic-vs-firm authority, and a one-pager I can forward without editing, and you go from a line item I scrutinize to the reason prospects already trust us before they call. The foundation is right. Now build the part that's actually mine."
+  },
+  {
+    "persona": "Non-marketing SMB owner-operator (commercial HVAC + facilities maintenance, ~18 employees, ~$3M rev). The check-signer, NOT the daily user. Skeptical, revenue-literate, jargon-illiterate by choice, burned by a beautiful-PDF agency before.",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "Ideal-first-screen #1: One plain-English verdict line at the very top — a single sentence a human could say to me out loud ('This month SEO drove 23 leads, up from 17').",
+        "status": "partial",
+        "note": "Slot 1 IssueVerdictHeadline now LEADS with a verdict sentence + the baselineVerdict() copy ('N leads, up from M since we started') — exactly the shape I wanted, and the 0-100 ring is gone from the headline. BUT the lead number is a banded GA4 estimate (~$ value / count), not a phone-call count I can verify against my office. It reads honestly; it just isn't yet the verified number I asked for."
+      },
+      {
+        "ask": "Ideal-first-screen #2: Leads/calls/form fills from search this month, with last month AND 'before we started' right next to it.",
+        "status": "partial",
+        "note": "OutcomeCountBand delivers human-unit counts with DUAL trend (+N vs last period AND up-from-baseline since we started) — the before/after comparison I demanded is there and anchored to when we started (computeOutcomeBaseline). The miss: these are GA4 key-event conversions, not actual calls + form fills broken out as calls/forms. Close in spirit, not yet the call-count I'd cross-check with my front desk."
+      },
+      {
+        "ask": "Ideal-first-screen #3: A simple money frame — 'You pay $X/mo. We drove ~Y leads worth roughly $Z' — even a rough, clearly-labeled estimate.",
+        "status": "delivered",
+        "note": "This is the strongest hit. Slot 3 ROIDashboard is un-collapsed (out of the old <details>), leads with emerald estimated-value StatCards, shows return-on-retainer, and fmtEstimateMoney bands it ('~$12,000', no false cents) with 'your tracked conversions valued at ~$X each'. I explicitly said 'even a rough, clearly-labeled estimate' — they built exactly that and labeled it honestly. This is the line I'd read aloud to my spouse."
+      },
+      {
+        "ask": "Ideal-first-screen #4: The ONE thing you need from me right now, with a single button — or nothing.",
+        "status": "delivered",
+        "note": "Slot 0 ActionQueueStrip (pending decisions) surfaces my homework at the top, and slot 4 IssueLoopFooter is the canonical 'what needs me'. The 'nothing needed, close the tab happy' affirmation is honored. My homework is surfaced, not buried — that was a real ask and it's met."
+      },
+      {
+        "ask": "Ideal-first-screen #5: What you did this month + next, 3-4 plain bullets — BELOW the results, not above (activity is reassurance, not the headline).",
+        "status": "delivered",
+        "note": "Content plan was DEMOTED out of the hero slot down to slot 5, with WinsSurface + 'what's working right now' sitting under the verdict/money frame. The exact inversion I wanted: results lead, work-log is reassurance underneath. They got the hierarchy right."
+      },
+      {
+        "ask": "Ideal-first-screen #6: NOT up top — keyword tables, traffic graphs, impressions, domain authority, technical audit scores. Bury them.",
+        "status": "delivered",
+        "note": "The 0-100 ring, the visibility metric, CompactStatBar, per-page traffic tables and competitor gaps are all pushed into a collapsed 'Under the hood' <details> (slot 6). Traffic-value model is relabeled '(reference)' and demoted. Nothing agency-speak is in my first screen. This was a core demand and it's clean."
+      },
+      {
+        "ask": "Indispensable: a trustworthy monthly LEAD COUNT from search — calls and form fills I can BELIEVE — set against what I pay you, in one plain sentence.",
+        "status": "partial",
+        "note": "The 'set against what I pay you, in one plain sentence' half is delivered and well done. The load-bearing word in my ask was BELIEVE — calls/forms I can verify against my office. P0 gives a GA4-conversion estimate, honestly labeled, not a verified call count. The product exists in shape; the trust-grade verification (the thing I said is the whole point) is P1."
+      },
+      {
+        "ask": "Would-leave guard: rankings/traffic up while my phone is dead quiet (the exact pattern that made me fire my last agency).",
+        "status": "delivered",
+        "note": "Directly defused. The whole spine now leads with outcomes-and-dollars, not rankings; traffic-value is relabeled '(reference)' and demoted to slot 6. They architected AGAINST the precise failure that burned me. Credit where due."
+      },
+      {
+        "ask": "Would-leave guard: numbers that don't match my reality — claims 40 leads when I got 10 calls.",
+        "status": "partial",
+        "note": "Honesty scaffolding is real: provenance hard-coded estimate_ga4, 'This is an estimate — your tracked conversions valued at ~$X each', banded numbers, no false precision, namedRecordsAvailable=false shows 'Names available with call & CRM tracking' (no fake link). That's the right posture. BUT the actual reconciliation to my front desk is deferred to P1, so the divergence risk I fear isn't closed yet — it's just labeled honestly instead of hidden."
+      },
+      {
+        "ask": "Would-leave guard: wall of jargon I can't understand (schema, backlinks, keyword difficulty).",
+        "status": "delivered",
+        "note": "First screen is plain English — 'what your SEO is worth', dollars, leads, 'since we started'. Jargon lives in the collapsed under-the-hood drawer. I don't feel dumb in my own account. Met."
+      },
+      {
+        "ask": "Would-leave guard: vanity metrics dressed up as wins / position 4-to-3 celebrated.",
+        "status": "delivered",
+        "note": "Ring removed from headline, no confetti, outcomes lead. The verdict is a number I understand, not a dial. Met."
+      },
+      {
+        "ask": "Would-leave guard: no clear before/after baseline.",
+        "status": "delivered",
+        "note": "Baseline is engagement-anchored to workspace.createdAt, read from earliest GA4 snapshot, re-aggregated through the same pinned-event filter. When there's no anchor it says 'we're establishing your baseline now' with NO fabricated delta. That honest 'establishing' state is exactly what I'd want instead of a made-up comparison."
+      },
+      {
+        "ask": "Would-leave guard: cherry-picked dates / comparison window quietly shifts.",
+        "status": "delivered",
+        "note": "Baseline is a FIXED anchor to createdAt that never shifts, and evergreen rules keep the plan zone free of rolling-window spin. The window can't be quietly slid to flatter the chart. Structurally addressed."
+      },
+      {
+        "ask": "Would-leave guard: bad month hidden or spun instead of explained.",
+        "status": "delivered",
+        "note": "Zero units triggers an honest EmptyState CTA, verdict can read 'down from / holding steady', and there's a no-number degradation path when verdict is null. No all-green-when-flat. The honest-dip posture I asked for is built in."
+      },
+      {
+        "ask": "Pay-more-for: tying leads to actual revenue/closed jobs ('these 6 leads became $40K').",
+        "status": "deferred-P1",
+        "note": "actual_reconciled provenance + CRM/closed-won is explicitly P1/roadmap. Told about it, fine — but this is my biggest expansion trigger, so I want it on the near horizon."
+      },
+      {
+        "ask": "Pay-more-for: call tracking + lead capture so the count is real, not a story; + lead-quality flagging (in-area vs tire-kickers).",
+        "status": "deferred-P1",
+        "note": "Call tracking + form capture + quality scoring (ConversionRecord.quality flags spam/out-of-area) is P1. This is the single thing that converts my honest estimate into a number I'd stake the retainer on. Planned, not present."
+      },
+      {
+        "ask": "Cadence/return-hook: a short plain-English text/email — 'leads up 35%' or 'leads dipped, here's why' — pushed to me, since I only log in when the invoice hits.",
+        "status": "deferred-P1",
+        "note": "Push/SMS return hook is P1 (the-issue-client-return-hook flag). This is how you actually keep me, not the dashboard itself. Deferred-but-planned, so not a betrayal — but until it ships, I'll forget this exists between invoices."
+      }
+    ],
+    "deliveredWell": [
+      "The money frame is exactly what I asked for and I'd read it aloud: 'you pay ~$1,500/mo, we drove ~$12,000' — un-collapsed, dollars first, honestly banded, no false precision.",
+      "They architected directly against the pattern that made me fire my last guy: outcomes and dollars lead, rankings/traffic/ring are all shoved into a collapsed 'under the hood' drawer. My first screen has zero agency-speak.",
+      "The before/after baseline is honest and tamper-resistant — fixed anchor to when we started, an explicit 'establishing your baseline now' state with NO fabricated delta, and no cherry-pickable shifting window.",
+      "The honesty labeling is the kind that actually builds trust with a burned guy like me: it calls the estimate an estimate, shows the per-lead math, and where it can't prove names it says 'Names available with call & CRM tracking' instead of faking a link.",
+      "My homework is surfaced at the top (and the 'nothing needed' state lets me close the tab happy), and the work-log got demoted below the results where reassurance belongs."
+    ],
+    "stillMissing": [
+      "TRULY MISSING (the heart of my indispensable): a lead count I can BELIEVE against my own front desk. P0 gives a GA4-conversion estimate; calls and form fills are conversion events, not the verified calls/forms I'd cross-check. Honestly labeled — but the verification IS the product for me.",
+      "DEFERRED-P1 but it's my biggest expansion lever: revenue/closed-job attribution ('these 6 leads became $40K'). Without it the dollar frame is still an estimate I take on faith.",
+      "DEFERRED-P1: call tracking + lead-QUALITY flagging (in-area real jobs vs out-of-area tire-kickers). 20 good leads beats 200 junk — counting garbage would lose me, and quality scoring is what guards against it.",
+      "DEFERRED-P1: the push notification. I'm a once-a-month-at-invoice-time guy by my own admission; without a text/email bringing me the number and the one decision, the best dashboard in the world still won't pull me back."
+    ],
+    "builtToMySpec": "mostly",
+    "movedRead": "Yes — moved, but not all the way to 'I'd never question the invoice.' Before, I was bracing for another rankings-and-traffic fog while my phone stayed quiet; this build clearly didn't do that — it leads with my money and my leads, in my language, with the bad-month honesty and the no-cherry-picked-dates discipline I demanded. That alone earns it a real look instead of a cancel. On the dollar verdict specifically: I can LIVE with an honestly-labeled GA4 estimate as a starting point precisely BECAUSE they labeled it honestly and didn't dress it up as booked revenue — that's the opposite of what burned me, so it buys trust rather than spending it. But would I stake the renewal on it? Not yet. My indispensable was a count I can sanity-check against my front desk, and an estimate, however honest, isn't that. So: I stay, I keep paying through P0, and I'm watching — but I don't EXPAND or fully relax until call tracking + reconciliation lands and the number reconciles to my office (and a text shows up when leads move). Get P1 in and I'm a renew-without-thinking, tell-my-friends client. Right now I'm a cautiously-reassured one.",
+    "narrative": "I'll be straight, because that's the only way I deal. I opened this expecting the same trick the last agency pulled — pretty charts going up and to the right while my phones stayed dead. They didn't pull it. The first thing I see is what my SEO is worth in dollars against what I pay, then how many leads vs when we started, then the one thing they need from me — and all the keyword-table, domain-authority nonsense is folded away in a drawer I never have to open. That's the dashboard I described, near enough. The money line is the win: it's plain, it's got a dollar figure next to my retainer, and crucially they LABELED it an estimate instead of pretending it's booked money. For a guy who got conned with false precision before, being told 'this is an estimate, here's the math, names come later' actually makes me trust them MORE, not less. Where it falls short of my real bar: my whole reason for this thing is a lead count I can call my office and verify. What they've got is GA4 conversions — honest, but not the calls-and-forms my receptionist would confirm. That, plus tying leads to closed jobs, plus a text when something moves, are all on their P1 list, and they told me so up front, so I'm not crying betrayal. But until call tracking and reconciliation actually land, this is a believable estimate, not the proof I'd bet the renewal on. So: I'm not cancelling, I'm reassured, I'll keep writing the check through this phase — but I'm holding my expansion dollars and my full trust until the number reconciles to my front desk and starts showing up in my inbox without me logging in. Build that and I'm yours for good."
+  },
+  {
+    "persona": "Churned, skeptical ex-agency client — SMB owner/operator on a monthly SEO retainer, burned by a previous agency that drowned \"did you get me customers?\" in a fog of charts. Trust is the gate. Hyper-alert to spin, vanity metrics, and fabricated numbers.",
+    "isCustomer": true,
+    "askScorecard": [
+      {
+        "ask": "One plain-English headline: am I better/worse since you started, by how much (dated baseline, real number)",
+        "status": "delivered",
+        "note": "Slot 1 IssueVerdictHeadline leads with a dollar value + baselineVerdict() sentence ('N qualified leads, up from M since we started'), engagement-anchored to workspace.createdAt. Honest 'establishing your baseline now' when no anchor — never a fabricated delta. This is exactly the verdict I log in for."
+      },
+      {
+        "ask": "Leads/contacts in countable human units, by channel, with trend vs last month AND vs baseline",
+        "status": "partial",
+        "note": "OutcomeCountBand gives human-unit counts (calls/forms/demos) with a DUAL trend (vs last period AND since we started) — good. But it's GA4 key-event conversions, not a true call/form/booking breakdown reconciled to my phone; the per-channel split is only as granular as the admin's pinned GA4 events. Trend direction I asked for is there."
+      },
+      {
+        "ask": "What YOU actually did — dated, specific, clickable work log, sitting HIGH right under results",
+        "status": "partial",
+        "note": "IssueLoopFooter (greenlit/in-discussion moves + briefs in progress) + WinsSurface + AgencyWorkFeed exist and ARE positioned above the buried SEO mechanics. But the clickable-to-the-live-artifact link is explicitly P1 per spec — so I can see motion but can't yet click through to verify the live page. That clickable proof was the heart of my trust ask; it's deferred, not delivered."
+      },
+      {
+        "ask": "What needs ME — tiny honest list of approvals, or 'nothing needed'",
+        "status": "delivered",
+        "note": "Slot 0 ActionQueueStrip (pending decisions, renders null when empty) + Slot 4 IssueLoopFooter. Renders nothing when empty so I can close the tab — respects my time exactly as asked."
+      },
+      {
+        "ask": "SEO mechanics (rankings, traffic, technical) collapsed/below the fold, never first",
+        "status": "delivered",
+        "note": "Slot 6 'Under the hood' is a collapsed <details>. The 0–100 ring, CompactStatBar (impressions/avg position/site health), competitor block, and the detailed traffic-value tables all live there. The thing that made me fire my last agency is now where it belongs — out of my face until I want to audit."
+      },
+      {
+        "ask": "INDISPENSABLE: honest verifiable answer to 'is my money producing more real customers than before' + proof, with numbers that match my reality",
+        "status": "partial",
+        "note": "The outcome+baseline verdict pairing is built and honestly labeled. BUT the 'match my reality / verify against my phone' half is structurally P1 — provenance is hard-coded estimate_ga4, namedRecordsAvailable always false. The number is honest but UNVERIFIABLE against my front desk at P0. That's the one half of my non-negotiable that's deferred."
+      },
+      {
+        "ask": "Dollar attribution with methodology shown plainly, not a black box",
+        "status": "delivered",
+        "note": "ROIDashboard methodology disclosure reads 'We multiply your tracked conversions by the per-lead value you gave us — a labeled estimate, not booked revenue. We do not yet reconcile to named records.' Plain, honest, no black box. fmtEstimateMoney bands to '~$12,000' — no false precision."
+      },
+      {
+        "ask": "Never show me fabricated/unverifiable composite scores or invented numbers",
+        "status": "delivered",
+        "note": "Verdict is computed ONLY when flag ON + outcomeValue set + a real GA4 snapshot exists; otherwise outcomeVerdict is left undefined and degrades to honest no-number copy. The invented 0–100 'visibility score' was demoted out of the headline entirely. No fabrication path — exactly what I demanded."
+      },
+      {
+        "ask": "No vanity metrics dressed as wins (impressions, keyword count, DA)",
+        "status": "delivered",
+        "note": "Impressions/avg-position/site-health are blue (data, read-only) and buried in slot 6. Nothing vanity is presented as a headline result. Traffic-value model is relabeled '(reference)' once the real outcome verdict exists."
+      },
+      {
+        "ask": "Show me dips honestly — never always-green",
+        "status": "delivered",
+        "note": "baselineVerdict() explicitly returns 'down from M since we started' when current < baseline, and OutcomeCountBand renders 'down from … since we started'. Rolling/cherry-picked windows are banned by the evergreen guard. An honest red path exists in code."
+      },
+      {
+        "ask": "Call/lead tracking + recording so the count is real, not a story",
+        "status": "deferred-P1",
+        "note": "Explicitly deferred to roadmap per Owner Resolution D1/P1. No CallRail/Twilio/CRM anywhere. namedRecordsAvailable hard-false with the honest affordance 'Names available with call & CRM tracking — ask your strategist.' Told plainly, not hidden — fair deferral, but it's THE thing I'd pay more for."
+      },
+      {
+        "ask": "Lead QUALITY scoring (real buyers vs tire-kickers)",
+        "status": "deferred-P1",
+        "note": "Depends on named-record reconciliation, which is P1. Not present at P0; not falsely claimed either."
+      },
+      {
+        "ask": "No lock-in — easy export of my own data",
+        "status": "deferred-P1",
+        "note": "exportProfile is defined in the segment model but unused; the forwardable one-pager is the explicit P1 return hook. Not available yet."
+      },
+      {
+        "ask": "Event-driven notification when something real happens (lead in, competitor took a page, problem fixed) — earn the open",
+        "status": "deferred-P1",
+        "note": "Push/SMS return hook is explicitly P1. At P0 I still have to remember to log in — which, per my own discovery answer, means I'll mostly open it only when the invoice hits. The hook I said was decisive for cadence isn't built yet."
+      },
+      {
+        "ask": "Numbers must reconcile with my phone/inbox/bank",
+        "status": "deferred-P1",
+        "note": "The reconciliation guard (show both numbers, explain divergence, match to front desk) is P1. P0 honestly scopes the number to 'tracked conversions' and admits it doesn't reconcile to named records — that admission protects trust, but actual reconciliation is deferred."
+      }
+    ],
+    "deliveredWell": [
+      "The verdict leads with money and a dated baseline, not a chart. 'N qualified leads, up from M since we started' is a sentence I could read aloud to my spouse — that's the bar I set and they hit it.",
+      "The honesty engineering is genuinely better than I expected from an agency. The dollar number only computes from a REAL GA4 snapshot; with no data it degrades to 'establishing your baseline' instead of inventing a figure. fmtEstimateMoney bands to '~$12,000' so nobody's faking precision. This is the opposite of the black box that burned me.",
+      "The methodology line says out loud 'a labeled estimate, not booked revenue… we do not yet reconcile to named records.' An agency volunteering the limits of its own number is the single most trust-building thing on the screen.",
+      "Declines are told truthfully — 'down from M since we started' is wired in, and cherry-picked rolling windows ('this week', 'vs last refresh') are banned by a guard. A dashboard that can show me red is one I can believe when it shows green.",
+      "All the SEO machinery I never wanted — the 0–100 score ring, impressions, avg position, site health, competitor tables — got demoted into a collapsed 'Under the hood'. The motion-as-distraction pattern that made me cancel last time is gone from my first screen.",
+      "The 'names available with call & CRM tracking' affordance is an honest IOU, not a fake 'view names' link. They told me what I don't have yet instead of pretending I have it."
+    ],
+    "stillMissing": [
+      "TRULY MISSING (a P0 gap that touches my core need): the clickable, verifiable work log. My #1 reason for firing the last agency was never knowing what I paid for. The work log is positioned correctly (high, under results) but the click-through-to-the-live-page link is deferred to P1. Until I can click and SEE the page you shipped, 'proof of work' is still partly a claim — and that pairing (outcome + verifiable cause) was my stated indispensable.",
+      "DEFERRED-P1 but central to me: reconciliation to my actual phone/inbox. The number is honestly LABELED as a GA4 estimate, which I respect — but a labeled estimate is not yet a number I can check against my front desk. I understand it's planned; I'm flagging that the verify-against-reality half of my non-negotiable is the deferred half.",
+      "DEFERRED-P1: call tracking + lead quality. The thing I said I'd happily pay MORE for (proof of missed callable leads, real buyers vs tire-kickers) is roadmap, not here.",
+      "DEFERRED-P1: the event-driven push notification. By my own admission I won't build a login habit — without the 'a lead came in / a problem was fixed' nudge, this excellent dashboard risks being seen only at invoice time.",
+      "DEFERRED-P1: export / no-lock-in one-pager. Can't yet hand my data to someone else, which I read as a (planned) hostage-risk to watch."
+    ],
+    "builtToMySpec": "mostly",
+    "movedRead": "Yes — it moved me from 'about to churn' to 'cautiously willing to give this a real quarter,' which is a bigger shift than it sounds for me. On the dollar verdict specifically: I trust the honestly-labeled GA4 estimate FAR more than I'd ever have trusted the last agency's confident black-box number — precisely BECAUSE it volunteers that it's an estimate and that it doesn't yet reconcile to named records. That candor is what earns the benefit of the doubt. But to fully re-sign and expand spend, I still need the reconciled version: the day the count matches what my receptionist actually fielded and I can click a work-log item to the live page you shipped, you've got me for good. Right now I'll stay and watch — I won't yet pay more — and the thing that'll decide it is whether the estimate holds up against my own phone over the next 60 days. If P1 reconciliation and the push notification land as promised, I expand. If the estimate quietly drifts from my reality and there's no way to verify, I'm gone — same as last time.",
+    "newConcerns": [
+      "The verdict is only as honest as the admin's 'value per lead' input. A strategist who types an optimistic $1,200/lead inflates my whole headline number, and I can't see or challenge that input from my side. The basis-precedence (client_provided > agency_estimate > ai_enriched) is good engineering, but at P0 the value is set on the admin side — I want to know what number you plugged in and ideally to have confirmed it myself.",
+      "The estimate has no reconciliation guard YET, so for the P0 window there's a real risk the GA4 count and my actual phone diverge with no on-screen explanation. The spec promises the 'show both, explain divergence' note in P1 — but during P0 that's exactly the gap that historically breaks my trust. The methodology disclosure mitigates it; it doesn't close it.",
+      "'Estimating with AI' as a value-basis option makes me nervous even though it's flagged lowest-confidence. An AI-guessed lead value feeding a dollar headline is one step from the kind of number I can't verify — I'd want that path clearly walled off or shown to me as AI-derived on my own screen, not just in the admin footer."
+    ],
+    "narrative": "I came in expecting another beautiful fog of charts, and that's not what I got. The first thing I see now is a dollar number and a plain sentence — 'this many leads, up from this many since we started' — and the SEO machinery that made me feel stupid in my own account is folded away under a click. That alone is more respect than my last agency showed me in a year. What actually won me over, though, wasn't the headline — it was the small print. The dashboard tells me, unprompted, that the number is an estimate, that it's my tracked conversions times a value I provided, and that it does NOT yet reconcile to named records. An agency admitting the edge of its own number is the single thing I never got before, and it's why I believe the parts that ARE finished. The code backs it up too: no real GA4 data means no number, not a fabricated one, and a down month says 'down,' not spin. Where it falls short of my bar is exactly where they told me it would: I still can't click the work log to verify you shipped the page, and I can't yet check the count against my front desk — both are P1. I'll be fair about that, because being told is the opposite of being conned. But I'll be honest back: the verify-against-my-reality half is the half I care about most, and it's the deferred half. So I'm staying and watching, not expanding. Give me the reconciled number, the clickable proof, and a text when a real lead comes in, and I'll stop double-checking you and probably hand you more. Let the estimate quietly drift from my phone with no way to verify, and I'm gone the first slow quarter — same as last time. Right now: cautiously in, trust earned but not yet banked."
+  },
+  {
+    "persona": "Multi-location / franchise operator (15-40 outpatient clinics, one P&L, one agency relationship, decentralized local markets). Ops-bred, not a marketer. Time/attention is the scarce resource; buys triage and a decision, not SEO.",
+    "isCustomer": false,
+    "askScorecard": [
+      {
+        "ask": "One portfolio headline: total new-patient leads across all 22 locations this period vs last, with the dollar trend next to it — a rolled-up BUSINESS number, not a marketing number",
+        "status": "missing",
+        "note": "The verdict (slot 1) IS a dollar + outcome-count business number with vs-last-period and since-baseline trend — exactly the right SHAPE. But it is a single-workspace GA4 aggregate (roi.ts computeROI → aggregatePinnedOutcomes, no location dimension). It is not rolled up across 22 front doors; it is one undifferentiated blob. The core ask was the portfolio roll-up, and that is absent."
+      },
+      {
+        "ask": "A ranked 'needs attention' triage list — the 3-5 slipping locations, each with a plain-English reason and a dollar/lead impact ('Westside: calls down 30% MoM, profile suspended 11 days ago'). 'This IS the product to me.'",
+        "status": "deferred-P1",
+        "note": "My single most indispensable ask. The spine inversion (slot 2 = ranked triage) is specced but gated to the `the-issue-client-multi-location` flag, which the redesign doc lists as P2 — not even P1. `showPortfolioRollup` is wired but renders `null`. The contract exists; the product I'd renew for does not exist yet."
+      },
+      {
+        "ask": "Top 3 over-performing locations with the why, so I can copy the winning playbook across the other 21",
+        "status": "deferred-P1",
+        "note": "Part of the same multi_location inversion (P2). No per-location overperformer surface at P0. The generic content-plan/Wins surface is workspace-level, not location-level, so there is nothing to copy from."
+      },
+      {
+        "ask": "A consistency/health roll-up: how many of 22 are healthy vs at-risk vs broken (listing wrong, hours wrong, reviews tanking) — a single 'X of 22 clean' count",
+        "status": "deferred-P1",
+        "note": "No 'X of 22 clean' surface. Built on local-seo.ts + getClientLocations snapshots per the spec, deferred with the inversion. The honest baseline/establishing copy is nice, but it is workspace-level, not a 22-location consistency bar."
+      },
+      {
+        "ask": "What the agency did/decided since I last looked + anything waiting on MY approval",
+        "status": "delivered",
+        "note": "Slot 0 ActionQueueStrip (pending decisions) + slot 4 IssueLoopFooter (greenlit/discussing) cover the 'meter running' and 'needs my sign-off' asks well. Not location-scoped, but this is the one first-screen ask delivered at the right altitude for P0."
+      },
+      {
+        "ask": "Only THEN the full 22-location table, sortable, expanded on demand — never open me on a 22-row spreadsheet",
+        "status": "deferred-P1",
+        "note": "Correctly NOT shipped as a front door (good — the digest confirms the 22-row table is a deferred drill-down, never the load screen). But the table itself doesn't exist yet either, so there is no per-location detail to drill into at all."
+      },
+      {
+        "ask": "INDISPENSABLE: the ranked portfolio-wide 'where to look this month' list across all 22 at once — the thing I cannot reproduce without 22 tabs",
+        "status": "deferred-P1",
+        "note": "This is the reason I'd never cancel, and it is exactly what is deferred to P2. At P0 I still have to open 22 tabs (or rather, I have no per-location view at all). The single feature that makes the product indispensable to ME is the last thing on the roadmap, not the first."
+      },
+      {
+        "ask": "WOULD-LEAVE GUARD: lead/call numbers must reconcile with what my clinic managers see on the phones",
+        "status": "partial",
+        "note": "Honesty layer is genuinely strong: fmtEstimateMoney bands to 2 sig-figs with '~', the disclosure line 'This is an estimate — your tracked conversions valued at ~$X each' is always shown, provenance is hard-coded estimate_ga4, no fabricated number when data is absent. This protects against the silent-spin failure. BUT it is a GA4 estimate with NO call-tracking/CRM reconciliation (namedRecordsAvailable always false), so it still cannot reconcile to my managers' phone reality. The labeling makes it honest, not trustworthy-for-my-purpose."
+      },
+      {
+        "ask": "WOULD-LEAVE GUARD: don't show me a wall of green — with 22 locations something is always wrong",
+        "status": "partial",
+        "note": "Good instinct in P0: no 0-100 vanity ring in the headline (demoted to Under the hood), honest 'establishing your baseline' and 'down from' / 'holding steady' copy, no fabricated deltas. So the surface won't lie green. BUT with no per-location view, it ALSO can't show me the specific fire — it's neither falsely-green nor truthfully-red-at-a-location. It's silent at the level I care about."
+      },
+      {
+        "ask": "WOULD-LEAVE GUARD: no vanity metrics (impressions, keywords ranked, DA) leading the screen",
+        "status": "delivered",
+        "note": "Strong delivery. Verdict leads with dollars + outcomes; ring buried; impressions/clicks/avg-position relegated to the collapsed CompactStatBar under 'Under the hood'; content plan demoted below the proof. This directly honors my noise-to-cut list."
+      },
+      {
+        "ask": "WOULD-LEAVE GUARD: no stale data — closed location still showing, 3-week-old 'needs attention' list",
+        "status": "not-applicable",
+        "note": "No 'needs attention' list and no per-location surface exist at P0, so there is nothing stale to show — but also nothing to keep fresh. Becomes a real test only when the P2 triage ships."
+      },
+      {
+        "ask": "WOULD-LEAVE GUARD: no silent restatements — 140 leads last month, 95 this month for the same period with no explanation",
+        "status": "partial",
+        "note": "Baseline is engagement-anchored to workspace.createdAt and re-aggregated through the SAME pinned-event filter (computeOutcomeBaseline), which is the right anti-restatement discipline. But if an admin re-pins events the displayed number will move with no client-facing explanation, and there is no change-log on the number. Directionally protected, not bulletproof."
+      },
+      {
+        "ask": "PAY-MORE: per-location call/lead attribution I can trust (tracking numbers / booking integration)",
+        "status": "deferred-P1",
+        "note": "Explicitly P1 — 'actual_reconciled' provenance + conversion_records/call-tracking/CRM matching job. The honest affordance 'Names available with call & CRM tracking — ask your strategist' is shown instead of a fake link, which I respect. Deferred-and-told, not betrayed."
+      },
+      {
+        "ask": "PAY-MORE: a monthly one-page exec summary I can forward to owners/board without editing",
+        "status": "deferred-P1",
+        "note": "exportProfile 'owner_portfolio' is defined in the segment matrix but unused (exportProfile defined-but-unused at P0). This is my real recurring return hook — the forwardable summary — and it's deferred. No export button anywhere in the surface."
+      },
+      {
+        "ask": "PAY-MORE: proactive alerts when a location breaks (profile suspended, reviews crater) before it costs me a month",
+        "status": "deferred-P1",
+        "note": "Push/SMS return hook is explicitly P1. Combined with no per-location surface, there is no break-detection at all at P0. This is my actual cadence driver ('I'll open it weekly if it pushes me'); without it I'm back to the once-a-month glance."
+      },
+      {
+        "ask": "CADENCE: the push alert that deep-links straight to the broken/winning location",
+        "status": "deferred-P1",
+        "note": "Deferred with both push (P1) and the multi_location inversion (P2). The deep-link-to-location depends on a per-location surface that doesn't exist yet, so this is gated behind two deferred layers."
+      },
+      {
+        "ask": "SEGMENT CONTRACT: am I even correctly identified as multi-location?",
+        "status": "delivered",
+        "note": "resolveSegmentProfile (workspaces.ts L96-105) is deterministic: getClientLocations().length >= 2 → multi_location, with showPortfolioRollup:true, moneyFrameAltitude:'portfolio_cost_per_lead', exportProfile:'owner_portfolio'. The classification and contract are real and read-only/correct — the rendering for them just isn't built. Good foundation; the wiring is honest."
+      }
+    ],
+    "deliveredWell": [
+      "Vanity metrics are genuinely demoted: dollars and outcome-counts lead, the 0-100 ring is buried in 'Under the hood,' and impressions/keywords/DA are collapsed out of sight. This is the single biggest thing the OLD surface got wrong and the new one fixes — it honors my noise-to-cut list to the letter.",
+      "The honesty layer is the best part of the build. Banded estimates (~$12,000, ~7x), an always-on 'this is an estimate' disclosure line, hard-coded estimate_ga4 provenance, and 'we're establishing your baseline now' with NO fabricated delta. They resisted the temptation to fake precision or fake green. For an operator who'll fire an agency over one bad reconciliation, the fact that they LABEL the number as an estimate instead of dressing it up as booked revenue is exactly the integrity I asked for.",
+      "'Names available with call & CRM tracking — ask your strategist' instead of a dead link is the right way to defer. It tells me the better number is coming and how to get it, rather than pretending the GA4 estimate is the phone reality.",
+      "The 22-row spreadsheet is correctly NOT the front door. They understood the 'don't drown me on load' instinct even though the roll-up that should replace it isn't built yet.",
+      "Slot 0 (pending decisions) + slot 4 (greenlit/discussing loop) give me the 'meter running / needs my sign-off' visibility I asked for, at the right altitude.",
+      "The segment is resolved deterministically and correctly from location count — they didn't fudge it or reuse tier as a proxy. The contract for my segment is real even though its UI is deferred."
+    ],
+    "stillMissing": [
+      "TRULY MISSING (not a P0 vs P1 question — a shape problem): the verdict number is a single-workspace GA4 aggregate, not a portfolio roll-up. Even within P0's scope, the one number I open the dashboard for is one undifferentiated blob across all 22 front doors. I cannot tell which clinic earned it. That's not 'deferred,' that's the headline answering the wrong question for my segment.",
+      "DEFERRED-P1/P2 but it's my whole reason to exist as a customer: the ranked 'needs attention' triage across all 22 locations, biggest-$-impact first. The redesign doc puts the multi_location spine inversion at P2 (`the-issue-client-multi-location`), behind even P1. The single indispensable feature for me is last on the roadmap.",
+      "DEFERRED: top-3 overperformers + 'why,' and 'X of 22 clean' consistency roll-up — the copy-the-winner and basics-holding views. No per-location surface at all at P0.",
+      "DEFERRED-P1: trustworthy per-location call/lead attribution (call tracking / booking integration). Until this lands the verdict can't reconcile to my managers' phones — and reconciliation failure is my #1 leave trigger.",
+      "DEFERRED-P1: the forwardable, zero-edit owner/board one-pager export (exportProfile 'owner_portfolio' is defined but unused). This is my real recurring touchpoint, and there's no export button anywhere.",
+      "DEFERRED-P1: proactive break alerts + deep-link-to-location push. Without it the dashboard waits for me to remember it — which means the once-a-month glance, not the weekly open I promised if it pushed me well."
+    ],
+    "builtToMySpec": "partially",
+    "movedRead": "\"It did not move me. I'm still where I was — I would not yet renew on the strength of this, and I would not expand. As a generic single-front-door SEO dashboard, the P0 spine is honestly the best version of that I've seen: it leads with money, refuses to fake green, and demotes the vanity junk. I genuinely credit that. But I don't run one front door — I run 22, and this build shows me 22 clinics mashed into a single number with no way to see which one is bleeding. The thing I am actually paying for — turn 22 noisy markets into ONE prioritized list of who's winning and who's slipping — is not here, and the roadmap puts it at P2, behind even the P1 work. That stings more than a normal deferral because it's not a nice-to-have I can wait on; it IS the product to me. On the dollar verdict specifically: I trust the honestly-labeled GA4 estimate as a directional, can't-be-spun number — the banding and the disclosure line do their job, and I'd let it sit in front of me without feeling lied to. But I will NOT take it to my owner check-in or reconcile it against my clinic managers until it's the call-tracking-reconciled, per-location version. An honest portfolio-wide estimate is fine for a vibe; it is not fine for a decision about which of 22 clinics to fix. I need the reconciled, location-broken-out number before this changes my behavior. Right now I'd stay month-to-month and wait to see if P1/P2 actually ship.\"",
+    "newConcerns": [
+      "Roadmap-sequencing risk: my indispensable feature (multi-location triage inversion) is gated to a P2 child flag, behind P1 export/push/reconciliation. For me specifically, the build prioritized polishing the single-workspace spine — which I can't use at my altitude — over the portfolio view that is my entire job. I'd want a straight answer on whether multi_location is genuinely on the near roadmap or quietly parked.",
+      "The verdict will render a confident single dollar number for a 22-location operator with zero location attribution. Even labeled as an estimate, a portfolio-wide blob invites me to mis-trust it the first time it disagrees with a clinic manager — and there's no per-location breakout to let me sanity-check WHERE the number came from. The honesty labeling protects against fabrication but not against 'this aggregate is meaningless to how I actually run the business.'",
+      "Silent-restatement edge: the baseline re-aggregates through the current pinned-event filter. If an admin re-pins or renames events, my displayed leads/baseline can shift between visits with no client-facing explanation. For someone who'll lose trust over '140 last month, 95 now,' that's an unguarded path even though the baseline anchoring is otherwise disciplined.",
+      "showLocalMapAndReviews is set true for multi_location in the segment defaults but renders null at P0 — so the segment is configured to want local map/reviews data that the UI silently drops. Fine as a contract placeholder, but it means my profile 'asks for' surfaces that aren't there, which I'd notice as emptiness rather than as a deliberate 'coming soon.'"
+    ],
+    "narrative": "\"Let me be fair before I'm hard on it. I sat in the discovery and told you I'd never read a keyword table, I'd fire you over a wall of green, and I just want to open this thing for ninety seconds and walk away knowing two things. The P0 spine you built clearly heard half of that. The vanity metrics are gone from the top — the ring is buried, impressions are tucked away, the money number leads. And the honesty is real: you band the estimate, you stamp 'this is an estimate' on it every time, you say 'we're establishing your baseline' instead of inventing a fake trend, and you put 'ask your strategist for call tracking' where a fake link would've been. For an operator who's been spun by agencies before, that integrity is the thing that would eventually earn my trust. So credit where it's due — as a single-location dashboard, this is the good version.\\n\\nBut I don't run a single location. I run 22 front doors, and that's the part this build doesn't yet serve. The number you lead with is every clinic mashed into one figure — I can't tell if Northgate is printing and Westside is dark, which is the only thing I actually need to know. The triage list, the top-3 winners to clone, the 'X of 22 clean' — the stuff I literally called 'this IS the product to me' — isn't here, and your own roadmap puts it at P2, behind the P1 export and push work. I understand phasing, and I won't treat a deferral you warned me about as a betrayal. But you have to understand what it means that MY indispensable feature is last: it means P0, for me, is the trust spine without the product on top of it.\\n\\nDo I trust the dollar number? As a directional, can't-be-faked estimate to glance at — yes, the labeling earns that. As something I'd take to my owner check-in or argue with a clinic manager about — no, not until it's reconciled to actual calls and broken out by location. So I'm staying where I was: month-to-month, watching to see if the portfolio view and the reconciled number actually ship. Build the roll-up and the ranked triage, give me a forwardable one-pager, and push me to the fire when a profile goes dark — do that, and I'll renew without thinking about it. Right now you've built me an honest dashboard for a business I don't run.\""
+  }
+]

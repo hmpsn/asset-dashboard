@@ -97,6 +97,9 @@ export type ActivityType =
   | 'deliverable_responded'
   | 'deliverable_reminded'   // operator: admin re-nudged the client about a pending deliverable (NOT client-visible)
   | 'meeting_brief_generated'
+  | 'strategy_pov_generated'   // The Issue (Lane B): admin generated/regenerated/edited the curated POV
+  | 'strategy_issue_pushed'    // The Issue (Phase 3): the weekly cron pre-baked the POV + rang the operator doorbell (OPERATOR-only, never client-visible)
+  | 'strategy_autosent'        // The Issue (Phase 4): the trust-ladder cron auto-sent N low-risk moves (OPERATOR-only, never client-visible)
   | 'brandscript_created'
   | 'brandscript_deleted'
   | 'brandscript_imported'
@@ -170,7 +173,21 @@ export type ActivityType =
   // (ActionType), a SEPARATE union — do not conflate.
   | 'strategy_keyword_kept'      // admin-only: operator explicitly kept a keyword (survives regen)
   | 'strategy_keyword_removed'   // admin-only: operator removed a keyword from the managed set
-  | 'strategy_keyword_added';    // admin-only: keyword added to the managed set (client_request / manual_add)
+  | 'strategy_keyword_added'     // admin-only: keyword added to the managed set (client_request / manual_add)
+  // The Issue — Lane 1E: cannibalization keeper-override (operator sets the canonical page).
+  | 'cannibalization_keeper_set' // admin-only: operator set the keeper page for a cannibalization URL set
+  // The Issue (Client) P1a: a Webflow named lead was captured via the daily Data-API poller.
+  // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES (the capture is an internal operator
+  // signal, not a client deliverable) and its metadata omits PII (D7): only { formId, outcomeType }.
+  | 'form_submission_captured'
+  // The Issue (Client) P1a: the operator saved the tracked-Webflow-forms mapping (PUT form-sources),
+  // which can flip the D6 provenance marker (confirmed setup) — audit trail for a config mutation.
+  // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata: only { formCount }.
+  | 'form_capture_configured'
+  // The Issue (Client) P1c: the weekly return-hook cron sent the client their "what came in" digest.
+  // ADMIN-ONLY (operator audit trail) — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata:
+  // only counts/flags ({ weekOf, leadCount, hasMoney, pendingCount }), never lead identity.
+  | 'client_return_hook_sent';
 
 export interface ActivityEntry {
   id: string;

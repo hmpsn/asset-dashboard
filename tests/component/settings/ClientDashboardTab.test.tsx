@@ -6,6 +6,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// P1a measured-capture: useFeatureFlag is read unconditionally + the status hook is imported.
+// Mock both OFF so these P0 client-access/pricing tests stay on the byte-identical flag-OFF surface.
+// A QueryClientProvider is still required: ClientDashboardTab calls useQueryClient unconditionally
+// (the form-capture enable/disable handlers invalidate the conversion-tracking-status query).
+vi.mock('../../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+vi.mock('../../../src/hooks/admin/useConversionTrackingStatus', () => ({
+  useConversionTrackingStatus: () => ({ status: undefined, isLoading: false, isError: false }),
+}));
+
 import { ClientDashboardTab } from '../../../src/components/settings/ClientDashboardTab';
 
 // ── API mocks ────────────────────────────────────────────────────────────────
@@ -33,8 +46,13 @@ Object.defineProperty(navigator, 'clipboard', {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter>{children}</MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -268,14 +286,14 @@ describe('ClientDashboardTab', () => {
 
   it('clicking Configure reveals pricing form', () => {
     renderTab();
-    fireEvent.click(screen.getByRole('button', { name: /configure/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
     expect(screen.getByPlaceholderText(/150/)).toBeInTheDocument();
   });
 
   it('Save Pricing calls patchWorkspace with contentPricing', async () => {
     const patchWorkspace = vi.fn().mockResolvedValue({});
     renderTab({ patchWorkspace });
-    fireEvent.click(screen.getByRole('button', { name: /configure/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
 
     const briefInput = screen.getByPlaceholderText('150');
     const fullInput = screen.getByPlaceholderText('500');

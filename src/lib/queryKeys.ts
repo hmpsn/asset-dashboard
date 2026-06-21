@@ -57,6 +57,11 @@ export const queryKeys = {
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
+    // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
+    // forms-connected/last-lead). Invalidated by the FORM_SUBMISSION_CAPTURED workspace broadcast.
+    conversionTrackingStatus: (wsId: string) => ['admin-conversion-tracking-status', wsId] as const,
+    // The Issue (Client) P1b — admin paginated named-leads readout (PII; requireWorkspaceAccess).
+    formSubmissions: (wsId: string) => ['admin-form-submissions', wsId] as const,
 
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
@@ -120,6 +125,11 @@ export const queryKeys = {
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
+    strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
+    autoSendPolicy: (wsId: string) => ['admin-auto-send-policy', wsId] as const,
+    issueLenses: (wsId: string) => ['admin-issue-lenses', wsId] as const,
+    competitorAlerts: (wsId: string) => ['admin-competitor-alerts', wsId] as const,
+    operatorOverrides: (wsId: string) => ['admin-operator-overrides', wsId] as const,
     recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
     /** Strategy v3 — discussion thread for a workspace's recs (admin cockpit Discuss filter). */
     recDiscussion: (wsId: string) => ['admin-rec-discussion', wsId] as const,
@@ -263,6 +273,8 @@ export const queryKeys = {
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     strategyGuidance: (wsId: string) => ['client-strategy-guidance', wsId] as const,
     roi: (wsId: string) => ['client-roi', wsId] as const,
+    // The Issue (Client) P1b — the client's OWN captured leads (authed client-portal read).
+    myLeads: (wsId: string) => ['client-my-leads', wsId] as const,
     keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
@@ -294,6 +306,21 @@ export const queryKeys = {
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
     /** Active background jobs visible to this workspace's client portal. */
     jobs: (wsId: string) => ['client-jobs', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — the evergreen curated recommendation feed the
+     * client sees on TheIssueClientPage. Reads the public `?clientStatus=sent` projection.
+     * Distinct from `shared.recommendations` (raw read) and `curatedRecommendations`
+     * (admin-projection v1) so each surface invalidates independently.
+     * Invalidated by the RECOMMENDATIONS_UPDATED + DELIVERABLE_SENT WS handlers.
+     */
+    theIssue: (wsId: string) => ['client-the-issue', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — pre-aggregated client response summary for the
+     * loop footer ("you've greenlit N moves · 1 in discussion"). Reads a client-safe
+     * projection of rec responses from the public route.
+     * Invalidated alongside `theIssue` on RECOMMENDATIONS_UPDATED.
+     */
+    recResponses: (wsId: string) => ['client-rec-responses', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

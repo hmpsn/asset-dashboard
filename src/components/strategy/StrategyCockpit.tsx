@@ -52,7 +52,11 @@ const SORTS: ReadonlyArray<{ id: CockpitSort; label: string }> = [
 
 /** Strategy v3 admin Curation Cockpit (spec §4) — the Overview-tab hero. Fix-now pin +
  *  lifecycle segmented control + category toggle chips + sort, rendering the v3 CockpitRow.
- *  Pure: recs + lifecycle actions are injected by the host (Lane C wiring). */
+ *  Pure: recs + lifecycle actions are injected by the host (Lane C wiring).
+ *
+ *  The Issue's archetype grouping + per-group shortlist live entirely in BackingMovesQueue (a
+ *  sibling component, not a child), so this cockpit takes NO additive props — the flag-OFF
+ *  command-center path is byte-identical. */
 export function StrategyCockpit({ workspaceId, recs, actions }: StrategyCockpitProps) {
   const [bucket, setBucket] = useState<LifecycleBucket>('active');
   // useToggleSet with min:0 (all categories optional = "show all"), max:unbounded.

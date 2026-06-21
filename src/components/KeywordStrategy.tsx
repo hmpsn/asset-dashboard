@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Target, FileText, HelpCircle } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton } from './ui';
+import { Target, FileText, HelpCircle, Plus, Search, ArrowRight, AlertTriangle } from 'lucide-react';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow } from './ui';
+import { isCuratedForClient } from '../../shared/recommendation-predicates';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
 import { useKeywordStrategy, useLocalSeo } from '../hooks/admin';
@@ -9,7 +10,11 @@ import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendation
 import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLifecycle';
 import { useContentDecay } from '../hooks/admin/useContentDecay';
 import { useStrategyKeywordSet } from '../hooks/admin/useStrategyKeywordSet';
+import { useStrategyPov } from '../hooks/admin/useStrategyPov';
+import { useOperatorSteering } from '../hooks/admin/useOperatorSteering';
+import { useRecBulkMutation } from '../hooks/admin/useRecBulkMutation';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../hooks/useToggleSet';
 import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
 import { ContentGaps } from './strategy/ContentGaps';
@@ -22,6 +27,18 @@ import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { StrategyConfigPanel } from './strategy/StrategyConfigPanel';
+import { IssueHeader } from './strategy/issue/IssueHeader';
+import { StanceBar } from './strategy/issue/StanceBar';
+import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
+import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
+import { AddRecommendationModal } from './strategy/issue/AddRecommendationModal';
+import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
+import { ContentWorkOrderLens } from './strategy/issue/ContentWorkOrderLens';
+import { IssueSetupReadiness } from './strategy/issue/IssueSetupReadiness';
+import { AdminLeadsReadout } from './strategy/issue/AdminLeadsReadout';
+import { useConversionTrackingStatus } from '../hooks/admin/useConversionTrackingStatus';
+import { useAdminLeads } from '../hooks/admin/useAdminLeads';
+import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
 import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
@@ -117,6 +134,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // Flag gate: flag-ON renders v3 StrategyCockpit; flag-OFF preserves the v2 Act queue exactly.
   // Called unconditionally here (before all early returns) — Rules of Hooks.
   const commandCenterEnabled = useFeatureFlag('strategy-command-center');
+  // The Issue (Phase 1) — strict superset of the command-center cockpit. Read UNCONDITIONALLY
+  // here (before all early returns — Rules of Hooks). The flag MUST be read on its own line, never
+  // on the RHS of `commandCenterEnabled && useFeatureFlag(...)` — short-circuit evaluation would
+  // make the hook call conditional (Rules-of-Hooks violation). When ON, the Overview renders a
+  // third composed branch (IssueHeader → StanceBar → DraftedPovEditor → BackingMovesQueue →
+  // supporting surfaces). flag-OFF keeps the command-center / legacy branches byte-identical:
+  // theIssueEnabled gates a NEW branch only; it never alters the existing two.
+  const theIssueFlag = useFeatureFlag('strategy-the-issue');
+  const theIssueEnabled = commandCenterEnabled && theIssueFlag;
   // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
   // M1 — the managed-set UI is part of the v3 command-center redesign, so it must be gated on
   // BOTH flags. Without the `commandCenterEnabled &&` composition the managed UI would leak into
@@ -154,6 +180,40 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // (it has its own lifecycle/category facets + Fix-now pin, so it filters internally).
   const lifecycleActions = useRecommendationLifecycle(workspaceId);
   const cockpitRecs = recommendationSet?.recommendations ?? [];
+  // ── The Issue (Phase 1) hooks/state — all called UNCONDITIONALLY (Rules of Hooks). ──
+  // The drafted POV. `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls.
+  const strategyPov = useStrategyPov(workspaceId, theIssueEnabled);
+  // The atomic bulk-send route (the cockpit's existing send spine) — reused for "Send issue".
+  const issueBulkSend = useRecBulkMutation(workspaceId);
+  // cut→sentence contract: cutting a backing move strikes its POV sentence live.
+  const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
+  // Blocker 5 staging set — the recs the operator has staged for the ONE client commit (the header
+  // "Send issue"). Per-row "Stage for issue" toggles membership; nothing is written to the client
+  // until "Send issue" commits this set. useToggleSet (UNBOUNDED) = the shared toggle-set primitive
+  // (no hand-rolled has?delete:add). Declared with the other hooks (before any early return).
+  const [stagedRecIds, toggleStage, setStagedRecIds] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  // Operator steering (§11/§12): wording overrides + client running order + add-a-rec.
+  // `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls (byte-identical OFF).
+  const operatorSteering = useOperatorSteering(workspaceId, theIssueEnabled);
+  const [addRecOpen, setAddRecOpen] = useState(false);
+  // ── The Issue (Client) P1b — admin setup-readiness + named-leads (Lane B). Read UNCONDITIONALLY
+  // (Rules of Hooks). Gated on the-issue-client-measured-capture; flag-OFF → both hooks no-op (no
+  // fetch, no WS subscription) and the panels below are not mounted → byte-identical cockpit. ──
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  const { status: conversionStatus, isLoading: conversionStatusLoading } =
+    useConversionTrackingStatus(workspaceId, measuredCapture);
+  // Captured-leads page size — "Load more" widens the limit (capped server-side at 200) so the readout's
+  // "Showing X of Y" footer is an affordance, not a dead-end. Unconditional state (Rules of Hooks).
+  const LEADS_PAGE = 50;
+  const LEADS_MAX = 200;
+  const [leadsLimit, setLeadsLimit] = useState(LEADS_PAGE);
+  const { leads: capturedLeads, total: capturedLeadsTotal, isLoading: capturedLeadsLoading } =
+    useAdminLeads(workspaceId, { limit: leadsLimit }, measuredCapture);
+  // The readiness rollup rides the status endpoint (A4). It carries the resolved provenance, segment
+  // label, and pre-formatted value line — IssueSetupReadiness reads them straight off `readiness` so the
+  // cockpit never reconstructs the Measured/Estimate pill from an all-time count heuristic (which could
+  // disagree with the period-scoped client number).
+  const setupReadiness = conversionStatus?.readiness ?? null;
   // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
   // tab when no content opportunities exist.
   const { data: contentDecayData } = useContentDecay(workspaceId);
@@ -225,7 +285,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />
   ) : null;
 
-  const headerEl = commandCenterEnabled ? (
+  // The Issue branch renders its own IssueHeader ("The Issue") as page chrome — suppress the base
+  // "Keyword Strategy" PageHeader so the two don't stack. flag-OFF / command-center-only keep the
+  // base header byte-identical. (The StrategyConfigPanel is mounted inside IssueHeader, not here,
+  // so suppressing headerEl does not affect the config panel.)
+  const headerEl = theIssueEnabled ? null : commandCenterEnabled ? (
     <PageHeader
       title="Keyword Strategy"
       subtitle={headerSubtitle}
@@ -454,6 +518,231 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     ? <StrategyCockpit workspaceId={workspaceId} recs={cockpitRecs} actions={lifecycleActions} />
     : null;
 
+  // ── The Issue (Phase 1) overview composition — only built when theIssueEnabled && real strategy. ──
+  // The set "Send issue" ships: active, not-yet-sent recs (the operator's curated candidates).
+  // Sendable = ACTIVE (server isActiveRec semantics) AND clientStatus not in {sent, approved,
+  // declined, discussing}. This mirrors server isActiveRec (struck/completed/dismissed excluded;
+  // throttle auto-resurfaces once EXPIRED, so an expired throttle is sendable — reuse the shared
+  // isThrottledOpen predicate, not a blanket lifecycle==='throttled' exclusion) PLUS the curated
+  // exclusions (isActiveRec already drops sent/approved/declined; 'discussing' is excluded here
+  // because a discussing rec is already in front of the client and must not be re-sent).
+  const sendableRecIds = cockpitRecs
+    .filter(
+      (r) =>
+        r.lifecycle !== 'struck' &&
+        !isThrottledOpen(r) &&
+        r.status !== 'completed' &&
+        r.status !== 'dismissed' &&
+        r.clientStatus !== 'sent' &&
+        r.clientStatus !== 'approved' &&
+        r.clientStatus !== 'declined' &&
+        r.clientStatus !== 'discussing',
+    )
+    .map((r) => r.id);
+  // Blocker 5 staging: a rec is "stageable" iff it is in the staged set AND still sendable. Reconciling
+  // against sendableRecIds keeps the set honest if a staged rec was struck/sent/throttled out from
+  // under it. Per-row/bulk staging never writes to the client — only "Send issue" commits.
+  const sendableSet = new Set(sendableRecIds);
+  const stagedSendableIds = [...stagedRecIds].filter((id) => sendableSet.has(id));
+  // toggleStage comes from useToggleSet (above). Bulk "Stage N" adds the selection (a set UNION, not
+  // a toggle) — the toggle primitive only handles single keys.
+  const stageMany = (recIds: string[]) =>
+    setStagedRecIds((prev) => new Set([...prev, ...recIds]));
+  const handleSendIssue = () => {
+    if (stagedSendableIds.length === 0) return;
+    // The ONE client commit (Blocker 5): send the staged set, then clear it.
+    issueBulkSend.mutate(
+      { recIds: stagedSendableIds, action: 'send' },
+      { onSuccess: () => setStagedRecIds(new Set()) },
+    );
+  };
+  // Blocker 5 live counter — "N staged · M already with client". N (staged) is the staged-and-still-
+  // sendable count; M (already with client) is the curated set via the SHARED isCuratedForClient
+  // predicate (recommendation-predicates.ts — the single source the server projection also uses).
+  // Both derive from the one cockpitRecs set, so numerator and denominator share a source.
+  const stagedCount = stagedSendableIds.length;
+  const curatedCount = cockpitRecs.filter(isCuratedForClient).length;
+  // POV-staleness signal: the drafted POV is stale when backing moves have diverged from it since it
+  // was drafted — either a backing move was CUT (struck this session) or the operator has applied a
+  // wording OVERRIDE to a rec (the override exists only because the operator changed the rec after the
+  // draft, so the POV's prose may now reference outdated wording). We READ pov.generatedAt only to
+  // anchor that a POV exists to be stale; we NEVER reset any draft on generatedAt here — the
+  // lost-keystroke guard (reset keyed on generatedAt) lives wholly inside DraftedPovEditor and is
+  // untouched. A struck backing move always diverges from a POV drafted before the cut.
+  const hasWordingOverride = Object.values(operatorSteering.wording).some(
+    (o) => !!o && (!!o.title || !!o.insight),
+  );
+  const povMayBeStale =
+    !!strategyPov.pov &&
+    !!strategyPov.pov.generatedAt &&
+    (struckRecIds.length > 0 || hasWordingOverride);
+  const issueConfigPanelProps = {
+    workspaceId,
+    isAuxLoading,
+    settingsOpen: settings.settingsOpen,
+    setSettingsOpen: settings.setSettingsOpen,
+    seoDataAvailable: settings.seoDataAvailable,
+    seoDataMode: settings.seoDataMode,
+    setSeoDataMode: settings.setSeoDataMode,
+    maxPages: settings.maxPages,
+    setMaxPages: settings.setMaxPages,
+    competitors: settings.competitors,
+    setCompetitors: settings.setCompetitors,
+    businessContext: settings.businessContext,
+    setBusinessContext: settings.setBusinessContext,
+    contextOpen: settings.contextOpen,
+    setContextOpen: settings.setContextOpen,
+    discoveringCompetitors: settings.discoveringCompetitors,
+    discoverError: settings.discoverError,
+    onDiscoverCompetitors: settings.discoverCompetitors,
+    providerName: settings.selectedSeoDataProvider === 'dataforseo' ? 'DataForSEO' : settings.selectedSeoDataProvider,
+    localMarketLabel: primaryMarket?.label,
+    onOpenLocalSeoSetup: () => setLocalSeoSetupOpen(true),
+  };
+  const issueOverviewEl = (theIssueEnabled && isRealStrategy && strategy) ? (
+    // Blocker 4 — the 5-beat SPINE above the fold (IssueHeader [config + the canonical Send-issue
+    // button] → StanceBar → DraftedPovEditor → BackingMovesQueue), then everything else collapsed
+    // into ONE "Supporting detail" disclosure (closed by default). KeywordTargetsLens is dropped
+    // for a single deep-link row; ClientRunningOrder is cut from v1. Empty lenses self-null so a
+    // cold workspace shows zero empty SectionCard chrome.
+    <div className="space-y-8">
+      {/* The Issue (Client) P1b — setup-readiness checklist (Lane B). Slot-0, ABOVE IssueHeader:
+          the integrity guard that earns a trustworthy number is the first config chrome the operator
+          sees. Flag-gated on measured-capture; renders NOTHING when OFF → byte-identical cockpit. */}
+      {measuredCapture && setupReadiness && (
+        <IssueSetupReadiness
+          workspaceId={workspaceId}
+          readiness={setupReadiness}
+          status={conversionStatus}
+          loading={conversionStatusLoading}
+        />
+      )}
+      <IssueHeader
+        subtitle={headerSubtitle}
+        onSendIssue={handleSendIssue}
+        isSending={issueBulkSend.isPending}
+        canSend={stagedCount > 0}
+        configPanelProps={issueConfigPanelProps}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
+      />
+      <StanceBar recs={cockpitRecs} />
+      <DraftedPovEditor
+        pov={strategyPov.pov}
+        onEdit={strategyPov.edit}
+        struckRecIds={struckRecIds}
+        onRegenerate={strategyPov.regenerate}
+        isGenerating={strategyPov.isGenerating}
+      />
+      {/* POV-staleness nudge — directly under the editor. Shows when cut/edited backing moves have
+          diverged from the drafted POV (anchored on pov.generatedAt; never resets on it). Reuses the
+          existing regenerate action. */}
+      {povMayBeStale && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <span className="flex items-center gap-2 t-caption-sm text-amber-400">
+            <Icon as={AlertTriangle} size="sm" className="text-amber-400 shrink-0" />
+            Point of view may be out of date — regenerate?
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => strategyPov.regenerate()}
+            loading={strategyPov.isGenerating}
+            disabled={strategyPov.isGenerating}
+          >
+            Regenerate
+          </Button>
+        </div>
+      )}
+      {/* Operator steering §12 — add a rec the system missed (mints into the curation queue). */}
+      <div className="flex justify-end">
+        <Button
+          variant="secondary"
+          icon={Plus}
+          onClick={() => setAddRecOpen(true)}
+          disabled={operatorSteering.isPending}
+        >
+          Add a recommendation
+        </Button>
+      </div>
+      <BackingMovesQueue
+        workspaceId={workspaceId}
+        recs={cockpitRecs}
+        actions={lifecycleActions}
+        onCut={(id) => setStruckRecIds((s) => [...s, id])}
+        shortlistCap={5}
+        onEditWording={operatorSteering.editWording}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
+        stagedRecIds={stagedRecIds}
+        onStage={toggleStage}
+        onStageMany={stageMany}
+      />
+      {/* ── Supporting detail — collapsed by default. Everything that is NOT the 5-beat spine lives
+          here so the cockpit opens to the decision, not a wall. ── */}
+      <details className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 t-ui font-medium text-[var(--brand-text)] select-none">
+          <span>Supporting detail</span>
+          <Icon
+            as={ArrowRight}
+            size="sm"
+            className="text-[var(--brand-text-muted)] transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div className="space-y-6 border-t border-[var(--brand-border)] px-4 py-4">
+          {/* The Issue (Client) P1b — the operator's captured named-leads (Lane B). Progressive
+              disclosure — lives inside the collapsed "Supporting detail" so the cold cockpit stays
+              decision-first. Flag-gated; absent when OFF → byte-identical. */}
+          {measuredCapture && (
+            <AdminLeadsReadout
+              leads={capturedLeads}
+              total={capturedLeadsTotal}
+              loading={capturedLeadsLoading}
+              onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
+              onLoadMore={leadsLimit < LEADS_MAX ? () => setLeadsLimit((l) => Math.min(l + LEADS_PAGE, LEADS_MAX)) : undefined}
+            />
+          )}
+          {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
+          <ClickableRow
+            onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60"
+          >
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+              <Icon as={Search} size="md" className="text-accent-brand" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Curated keyword targets</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+                Open the curated keyword &amp; topic targets in the Keyword Hub
+              </div>
+            </div>
+            <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+          </ClickableRow>
+          {/* Read-projection lenses + supporting surfaces (each self-nulls when empty). */}
+          <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          {orientEl}
+          {realLeaves?.cannibalization}
+          {realLeaves?.strategyDiff}
+          <div className="flex justify-end">
+            <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
+              Competitor intelligence →
+            </Button>
+          </div>
+        </div>
+      </details>
+      <AddRecommendationModal
+        open={addRecOpen}
+        onClose={() => setAddRecOpen(false)}
+        onCreate={(payload) => {
+          operatorSteering.addManualRec(payload);
+          setAddRecOpen(false);
+        }}
+        isPending={operatorSteering.isPending}
+      />
+    </div>
+  ) : null;
+
   const handleInteriorTabChange = (id: string) => {
     setInteriorTab(id as StrategyInteriorTab);
     const next = clearTabSearchParam(searchParams);
@@ -489,7 +778,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <>
           <TabBar tabs={displayedTabs} active={interiorTab} onChange={handleInteriorTabChange} />
           {interiorTab === 'overview' && (
-            commandCenterEnabled ? (
+            theIssueEnabled ? (
+              // ── The Issue (Phase 1): a THIRD composed branch (strict superset of command-center).
+              // Built above as issueOverviewEl. Leaves the existing flag-ON / flag-OFF branches
+              // untouched — this branch only ADDS the issue cockpit, byte-identical OFF. ──
+              issueOverviewEl
+            ) : commandCenterEnabled ? (
               // ── flag-ON: decision-pipeline IA (graft 3) ──
               // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → StrategyConfigPanel.
               // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).

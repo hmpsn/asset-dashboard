@@ -83,6 +83,10 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM competitor_alerts WHERE workspace_id = ? AND insight_id IS NULL
      ORDER BY created_at DESC LIMIT 50`,
   ),
+  listAlerts: db.prepare<[string, number]>(
+    `SELECT * FROM competitor_alerts WHERE workspace_id = ?
+     ORDER BY created_at DESC LIMIT ?`,
+  ),
   linkInsightId: db.prepare<[string, string, string]>(
     `UPDATE competitor_alerts SET insight_id = ? WHERE id = ? AND workspace_id = ?`,
   ),
@@ -240,6 +244,17 @@ export function saveCompetitorAlerts(alerts: CompetitorAlert[]): void {
 
 export function listUnlinkedCompetitorAlerts(workspaceId: string): CompetitorAlert[] {
   const rows = stmts().listUnlinkedAlerts.all(workspaceId) as AlertRow[];
+  return rows.map(rowToAlert);
+}
+
+/**
+ * Recent competitor alerts for a workspace, newest-first (the existing
+ * (workspace_id, created_at DESC) index). Powers the admin Competitors page
+ * (GET /api/workspaces/:workspaceId/competitor-alerts). Unlike
+ * listUnlinkedCompetitorAlerts, this includes alerts already linked to an insight.
+ */
+export function listCompetitorAlerts(workspaceId: string, limit = 50): CompetitorAlert[] {
+  const rows = stmts().listAlerts.all(workspaceId, limit) as AlertRow[];
   return rows.map(rowToAlert);
 }
 

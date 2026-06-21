@@ -47,7 +47,8 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { normalizePageUrl } from './helpers.js';
-import { toPageSlug as toPageSlugShared } from '../shared/page-address-utils.js';
+import { toPageSlug as toPageSlugShared, cannibalizationUrlSetKey as cannibalizationUrlSetKeyShared } from '../shared/page-address-utils.js';
+import { isActiveRec, isCuratedForClient } from '../shared/recommendation-predicates.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
@@ -629,6 +630,7 @@ export function applyLifecycleCarryOver(newRecs: Recommendation[], oldRecs: Reco
     if (oldRec.lifecycle !== undefined) newRec.lifecycle = oldRec.lifecycle;
     if (oldRec.throttledUntil !== undefined) newRec.throttledUntil = oldRec.throttledUntil;
     if (oldRec.sentAt !== undefined) newRec.sentAt = oldRec.sentAt;
+    if (oldRec.autoSent !== undefined) newRec.autoSent = oldRec.autoSent;
     if (oldRec.struckAt !== undefined) newRec.struckAt = oldRec.struckAt;
     if (oldRec.cascade !== undefined) newRec.cascade = oldRec.cascade;
     if (oldRec.sendChannel !== undefined) newRec.sendChannel = oldRec.sendChannel;
@@ -648,23 +650,11 @@ export function isExemptFromAutoResolve(rec: Recommendation): boolean {
     || rec.lifecycle === 'struck' || rec.lifecycle === 'throttled';
 }
 
-/**
- * The ONE active-set predicate (spec §6.4). A rec is "active" — eligible to surface in the
- * Act queue, the summary top-rec, AI context, and briefings — iff:
- *   - RecStatus is not terminal (not completed, not dismissed), AND
- *   - it is not permanently struck, AND
- *   - it is not throttled into the future (throttle auto-resurfaces on-read once the date passes), AND
- *   - the client has not already received/resolved it (clientStatus not sent/approved/declined).
- * Absent v3 fields ⇒ legacy rec ⇒ treated as clientStatus:'system', lifecycle:'active'.
- * Imported by EVERY reader so no surface re-implements a partial filter (the leak bug pattern).
- */
-export function isActiveRec(rec: Recommendation, now: number = Date.now()): boolean {
-  if (rec.status === 'completed' || rec.status === 'dismissed') return false;
-  if (rec.lifecycle === 'struck') return false;
-  if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
-  if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
-  return true;
-}
+// isActiveRec + isCuratedForClient moved to shared/recommendation-predicates.ts (the SINGLE source,
+// shared with the client so the admin send counter and the projection key off ONE implementation).
+// Imported at the top of this file (local binding for internal callers) and re-exported here so every
+// existing server importer is unchanged. The `discussing`-overlap red-line lives with the impl there.
+export { isActiveRec, isCuratedForClient };
 
 /**
  * Compute the RecommendationSet summary from a rec list. Shared by the full
@@ -921,15 +911,11 @@ export function toPageSlug(url: string): string {
   return toPageSlugShared(url);
 }
 
-/** SEO Gen-Quality P5 — build a stable, order-independent key for a cannibalization
- *  URL set. Normalizes each path to its slug, dedupes, and sorts so the SAME set of
- *  competing pages always produces the SAME key — used both as the rec source suffix
- *  (status carries over between runs) and to dedupe a cannibalization rec against an
- *  active cannibalization insight covering the same pages. Pure / deterministic.
- *  @internal exported for unit testing */
-export function cannibalizationUrlSetKey(paths: string[]): string {
-  return Array.from(new Set(paths.map(p => toPageSlug(p)))).sort().join('|');
-}
+/** SEO Gen-Quality P5 — stable, order-independent key for a cannibalization URL set. Now defined in
+ *  shared/page-address-utils.ts (single source of truth for the generator AND the cannibalization
+ *  read path's keeper-override lookup). Re-exported here for back-compat with existing importers and
+ *  unit tests. @internal exported for unit testing */
+export const cannibalizationUrlSetKey = cannibalizationUrlSetKeyShared;
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
 // in recs generated before the toPageSlug normalisation was introduced.
@@ -973,6 +959,19 @@ export function buildMergeKey(rec: { source: string; affectedPages: string[]; ti
   if (!source.startsWith('strategy:')) return source;
   const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
   return `${source}::${page}`;
+}
+
+/**
+ * The Issue (operator-steering) — true for an operator-MINTED rec: an add-a-rec the operator
+ * authored (`source: 'manual:<hex>'`) or a competitor-gap mint (`source: 'competitor:<keyword>'`).
+ * These recs have NO producer in the merge phase, so their buildMergeKey is never in `newSources` —
+ * without a retention branch they would auto-resolve to 'completed' on the very next regen. The
+ * auto-resolve loop uses this to RETAIN them as-is when their source is absent (the operator owns
+ * their lifecycle; only an explicit strike removes them).
+ * @internal exported for unit testing
+ */
+export function isOperatorMintedRec(rec: { source: string }): boolean {
+  return rec.source.startsWith('manual:') || rec.source.startsWith('competitor:');
 }
 
 /** Weight impact score based on page type (homepage/service pages matter more)
@@ -2587,6 +2586,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       // If the source is gone, RETAIN the old rec as-is (preserve its sent/discussing/approved state);
       // the positive "we handled this" terminal is a later phase (P2/P3) — here we only preserve.
       if (isExemptFromAutoResolve(oldRec)) {
+        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
+        continue;
+      }
+      // The Issue (operator-steering) — operator-minted recs (manual:/competitor:) have NO producer
+      // in the merge phase, so their merge key is NEVER in newSources. Without this they auto-resolve
+      // to 'completed' on the next regen. RETAIN as-is when the source is absent — the operator owns
+      // their lifecycle; only an explicit strike removes them. (Also fixes the live competitor-rec
+      // auto-resolve bug: an un-sent competitor mint silently flipped to "✓ done" on the next regen.)
+      if (isOperatorMintedRec(oldRec)) {
         if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
         continue;
       }

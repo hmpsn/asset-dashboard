@@ -14,6 +14,11 @@ import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
 import { normalizePageUrl } from './helpers.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { loadGa4SnapshotHistory } from './ga4-snapshots.js';
+import { aggregatePinnedOutcomes, computeOutcomeBaseline, selectOutcomeProvenance } from './the-issue-outcome.js';
+import { countFormSubmissions } from './form-submissions.js';
+import type { OutcomeBaseline, OutcomeProvenance, OutcomeTypeBreakdown } from '../shared/types/the-issue.js';
 
 
 const log = createLogger('roi');
@@ -105,6 +110,26 @@ export interface ROIData {
   contentItems: ContentItemROI[];
   /** Computed at */
   computedAt: string;
+  /**
+   * The Issue (Client) P0 — outcome-denominated verdict. Present ONLY when the spine flag is ON,
+   * GA4 conversions exist, AND workspace.outcomeValue is set; additive + optional → legacy callers
+   * and the flag-OFF path are unaffected. provenance is ALWAYS 'estimate_ga4' in P0.
+   */
+  outcomeVerdict?: {
+    outcomeCount: number;
+    outcomeUnitLabel: string;
+    valuePerOutcome: number;
+    estimatedValue: number;
+    monthlyRetainer: number | null;
+    baseline: OutcomeBaseline;
+    baselineDeltaCount: number | null;
+    provenance: OutcomeProvenance;
+    /** P1a: typed breakdown ("23 form fills + 41 calls"). Present when measured-capture is ON. */
+    outcomeTypeBreakdown?: OutcomeTypeBreakdown[];
+    /** P1a: anonymous reconciliation counts for the trust-guard discrepancy surface. Counts only —
+     *  never PII. Present only when measured-capture is ON. */
+    outcomeReconciliation?: { ga4Count: number; capturedCount: number };
+  };
 }
 
 export interface PageROI {
@@ -326,6 +351,53 @@ export function computeROI(workspaceId: string): ROIData | null {
 
   // Save snapshot for future MoM comparison
   saveSnapshot(workspaceId, result.organicTrafficValue);
+
+  // The Issue (Client) P0 — additive outcome-denominated verdict. Hydrated ONLY when the spine flag
+  // is ON for this workspace AND outcomeValue is set AND a GA4 conversion snapshot exists. Otherwise
+  // left undefined so the flag-OFF / legacy path is byte-identical (no fabricated number).
+  if (isFeatureEnabled('the-issue-client-spine', workspaceId) && ws.outcomeValue) {
+    const history = loadGa4SnapshotHistory(ws.id);
+    const latest = history.length > 0 ? history[history.length - 1] : null;
+    if (latest) {
+      const agg = aggregatePinnedOutcomes(ws, latest.byEvent);
+      const baseline = computeOutcomeBaseline(ws);
+      const baselineDeltaCount =
+        baseline.state === 'ready' && baseline.baselineConversions != null
+          ? agg.totalConversions - baseline.baselineConversions
+          : null;
+      // P1a current-period window for Webflow form-submission counts/reconciliation: the 30 days
+      // ending at the latest snapshot. countFormSubmissions returns 0 when measured-capture is OFF
+      // anyway (no leads captured), so the OFF path stays byte-identical.
+      const periodEnd = latest.capturedAt.slice(0, 10);
+      const periodStartMs = new Date(latest.capturedAt).getTime() - 30 * 24 * 60 * 60 * 1000;
+      const currentPeriodRange = { startDate: new Date(periodStartMs).toISOString().slice(0, 10), endDate: periodEnd };
+      const periodFormCount = countFormSubmissions(ws.id, currentPeriodRange);
+      // P1a provenance seam: graduate the COUNT's confidence to measured_action on confirmed setup
+      // (D6); estimate_ga4 otherwise (incl. the flag-OFF / P0 path). The dollar math is unchanged.
+      const provenance: OutcomeProvenance = selectOutcomeProvenance(ws, periodFormCount);
+      const verdictBaseline: OutcomeBaseline = baseline;
+      result.outcomeVerdict = {
+        outcomeCount: agg.totalConversions,
+        outcomeUnitLabel: ws.outcomeValue.unitLabel,
+        valuePerOutcome: ws.outcomeValue.valuePerOutcome,
+        estimatedValue: agg.totalConversions * ws.outcomeValue.valuePerOutcome,
+        monthlyRetainer: ws.outcomeValue.monthlyRetainer ?? null,
+        baseline: verdictBaseline,
+        baselineDeltaCount,
+        provenance,
+      };
+      // P1a additive fields — only when measured-capture is ON, so the OFF path emits neither
+      // (byte-identical to P0). outcomeTypeBreakdown carries the typed rollup; outcomeReconciliation
+      // carries anonymous GA4-vs-captured counts (A8) — counts only, never PII (D7).
+      if (isFeatureEnabled('the-issue-client-measured-capture', workspaceId)) {
+        result.outcomeVerdict.outcomeTypeBreakdown = agg.byType;
+        result.outcomeVerdict.outcomeReconciliation = {
+          ga4Count: agg.totalConversions,        // anonymous aggregate
+          capturedCount: periodFormCount,        // named-lead COUNT only — no names ride the payload
+        };
+      }
+    }
+  }
 
   return result;
 }

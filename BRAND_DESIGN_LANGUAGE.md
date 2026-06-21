@@ -228,30 +228,9 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
 | Client header at mobile widths | Responsive stacked toolbar (`flex-col` on mobile, `sm:flex-row` on desktop) with contained horizontal scrollers | Prevent document-level horizontal overflow at 375px while preserving tab/date-range scroll affordances |
 
-#### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
+#### Client Insights — Magazine Briefing Layout — REMOVED 2026-06-20
 
-When the `client-briefing-v2` feature flag is on, the client Insights tab swaps to a magazine-rhythm editorial briefing. Layout convention:
-
-| Element | Color | Rationale |
-|---------|-------|-----------|
-| **Action queue strip** (top) | `bg-amber-500/15 border-amber-500/30 text-amber-300` | Amber = "needs attention" — same hue as the existing inbox banner. Renders null when all 5 counts are zero. |
-| Action chip hover | `hover:text-amber-200` | Subtle one-step lift (avoids invisible-hover trap from CLAUDE.md memory) |
-| **Hero card** wrapper | `border-l-2 border-teal-400 pl-3` around `<SectionCard>` | Teal-accent left stripe (SectionCard has no built-in accent prop, so use a wrapper div) |
-| Hero category label | `t-label text-teal-400 font-semibold tracking-wider` | Teal = brand action / editorial accent |
-| Hero headline | `t-h2 font-bold text-[var(--brand-text-bright)]` | Largest type on the page |
-| Hero metric pills | `bg-teal-500/10 text-teal-400 rounded-full t-caption inline-flex` | 0–2 per story, max — supporting numbers, not data dump |
-| Hero "See the data →" | `t-caption text-teal-400 hover:text-teal-300` | Drill-in link, teal action |
-| **Secondary divider rows** | `border-b border-[var(--brand-border)] last:border-b-0 hover:bg-[var(--surface-3)]/50` | No card chrome — plain rows, hover state for affordance |
-| Secondary category icon | category-mapped: `win=star/emerald-400`, `risk=alert-triangle/amber-400`, `opportunity=lightbulb/blue-400`, `competitive=search/teal-400`, `period_change=trending-up/blue-400` | Color-codes the category at a glance |
-| **Free-tier upgrade CTA** | Same teal-accent wrapper as Hero, solid `bg-teal-500 hover:bg-teal-400` button | NEVER hand-rolled gradient (pr-check enforces) |
-
-**Magazine layout principles** (mirrors the spec's three rules):
-
-1. **No top-of-page health score, no stat row, no banner CTAs** when the flag is on. Numbers appear ONLY as inline metric badges inside the hero card.
-2. **Exactly one hero card** per briefing. The Phase 1 Zod schema enforces `isHeadline: true` on exactly one story.
-3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
-
-**Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+The client-facing magazine briefing variant (`src/components/client/Briefing/InsightsBriefingPage` + sub-components, gated on `client-briefing-v2`) was removed when the client overview consolidated on The Issue. The shared primitives it composed survive: `ActionQueueStrip` (amber action strip, `bg-amber-500/15 border-amber-500/30`, stale-pill escalation) and `WinsSurface` are still used by The Issue and the legacy overview; `MonthlyDigestContent` / `StatCard size="hero"` / `MetricRing` / `ContentGapRow` design conventions documented elsewhere are unchanged. The Briefing-v2-exclusive Phase 2.5b (DateLine / IssueSummaryLine / PulseStrip / DataSpread / RecommendedForYou) and Phase 2.5e (`WeeklyOpener`, gated on `client-briefing-v2-ai-polish`) layout sections below describe deleted components — retained briefly as historical reference, not active design law. The server briefing pipeline + admin `BriefingReviewQueue` remain live (see FEATURE_AUDIT #528).
 
 #### Client Inbox IA — 3-Section Layout
 
@@ -268,7 +247,7 @@ InboxTab renders three named sections in the canonical client inbox routing mode
 
 The legacy single-list fallback and the `new-inbox-ia` rollout flag are retired.
 
-##### Phase 2.5b — investor-briefing reading rhythm
+##### Phase 2.5b — investor-briefing reading rhythm — REMOVED 2026-06-20 (Briefing-v2 client variant teardown; historical reference only)
 
 Phase 2.5b extends the magazine layout with five new sections in the 8-stop reading rhythm: Dateline → Issue Summary → Action Strip → **Pulse** → Lead → **Data Spread** → **Recommended for You** → Watch List. New layout conventions:
 
@@ -301,7 +280,7 @@ Phase 2.5b extends the magazine layout with five new sections in the 8-stop read
 
 **Typography update (Phase 2.5b):** `.t-caption` switched from `'Inter' 400` to `'DIN Pro' 600` — global typography refresh aligning caption text with the rest of the DIN Pro hierarchy.
 
-##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`)
+##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`) — REMOVED 2026-06-20 (Briefing-v2 client variant teardown; historical reference only)
 
 Premium-only one-line "letter from the editor" rendered ABOVE the dateline when the `client-briefing-v2-ai-polish` flag is on. Free/Growth tiers and any fail-soft path → component is omitted entirely; the dateline remains the first element.
 
@@ -366,6 +345,12 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | **OvDivergencePanel.tsx** | `invariantHeld` indicator | `Badge tone="emerald"` (held) / `Badge tone="red"` (broken, `AlertTriangle`) | Emerald = success; red = failure |
 | **OvDivergencePanel.tsx** | "OV no pick" flag | `Badge tone="red"` (`ShieldOff`) | Red = missing OV pick (red flag) |
 | **OvDivergencePanel.tsx** | Show/Hide collapse + disagreement rows | `Button variant="ghost"` + `ClickableRow` | Primitives only — no raw `<button>`. Admin-only, no purple. |
+| **CompetitorsPage.tsx** (The Issue Phase 6) | PageHeader icon (`Users`) | `text-accent-brand` | Brand-tinted page icon, matches KeywordStrategy/Strategy chrome |
+| **CompetitorsPage.tsx** | Page composition | `CompetitorAlertsPanel` → existing `StrategyCompetitiveTab` (ShareBar + CompetitiveIntel + KeywordGaps + BacklinkProfile) | Maximal reuse; admin-only, no purple. NON_REGISTRY page (no global nav), reached via flag-ON deep-link from The Issue cockpit |
+| **CompetitorAlertsPanel.tsx** | SectionCard title icon (`Swords`) | `text-accent-brand` | Brand-tinted section icon |
+| **CompetitorAlertsPanel.tsx** | Position-change metric (`#12 → #7`) + volume | `text-blue-400` | Blue = data metric, read-only (Law 2) |
+| **CompetitorAlertsPanel.tsx** | Severity Badge | `critical → Badge tone="red"`, `warning → tone="amber"`, `opportunity → tone="emerald"` | Severity map per Laws (red=critical, amber=warning, emerald=opportunity); never teal (no action), never purple |
+| **KeywordStrategy.tsx** (issueOverviewEl, flag-ON only) | "Competitor intelligence →" deep-link | `Button variant="link"` (teal) | Teal = action/link (Law 1); flag-ON deep-link to the Competitors page, not rendered flag-OFF |
 
 ### Outcome Tracking
 
@@ -794,3 +779,27 @@ When shipping UI changes that affect color or design patterns:
 - CompetitorGapsSection: Premium chip in teal (confirmed-access, never amber); banded chips only
 - StrategyPageRankStoriesSection: ranked chips blue (data), gap chips amber/10 pill ("worth adding" = attention semantics)
 - Cart content items: strikethrough original + discounted price for Premium (MONETIZATION §261 pattern)
+
+### The Issue — TrustLadderPanel (Phase 4, June 2026)
+- `src/components/strategy/issue/TrustLadderPanel.tsx` — operator-facing trust ladder, admin-only (mounted inside `KeywordStrategy.tsx` issueOverviewEl after `BackingMovesQueue`, theIssueEnabled-gated). No purple, no TierGate.
+- `<SectionCard title="Trust ladder">` with `ShieldCheck` titleIcon (`text-accent-brand`). One row per auto-send-eligible archetype (quick_win, technical).
+- Each row uses the shared `<Toggle>` (Law 1 — teal track `--brand-mint` when on). The toggle is **disabled until the archetype is `earned`** (`disabled={!row.earned || isUpdating}`) — disabled-until-earned reuses Toggle's built-in `opacity-50 cursor-not-allowed`; the toggle is the reward for 3 consecutive cycles.
+- Progress/state caption is `t-caption-sm`: `--brand-text-muted` while building (`{n}/{threshold} cycles`), `--brand-text` once earned ("Auto-sends each cycle" / "Ready — flip on to automate"). Rows separated by `divide-y divide-[var(--brand-border)]`.
+
+### The Issue — Four-jobs lenses (Phase 5, June 2026)
+- `src/components/strategy/issue/KeywordTargetsLens.tsx` + `ContentWorkOrderLens.tsx` — two operator-facing, admin-only read-projections of the curated rec set (mounted in `KeywordStrategy.tsx` issueOverviewEl after `TrustLadderPanel`, theIssueEnabled-gated). No purple, no TierGate.
+- Both are `<SectionCard>` ("Keyword targets" / "Content work-orders") with a `text-accent-brand` titleIcon (`Target` / `ClipboardList`) and a leading `t-caption-sm text-[var(--brand-text-muted)]` subtitle. One row per item, `divide-y divide-[var(--brand-border)]`; row title `t-ui font-medium text-[var(--brand-text-bright)]`, sub-label `t-caption-sm text-[var(--brand-text-muted)]`. Empty states use `<EmptyState>` (action-oriented copy). Each row's action is the shared `<Button variant="link" size="sm">` (Law 1 — teal `--teal` text link) deep-linking into the Keyword Hub (`?q=`) / content pipeline (`?tab=briefs|posts`); a keyword target with no resolvable `deepLinkKeyword` renders a muted "No keyword link" span instead.
+- **Keyword Targets** sent/proposed badge: `<Badge>` `teal` ("In front of client", curated to client) vs `zinc` ("Proposed", merely active) — teal=action/client-facing, zinc=neutral.
+- **Content work-order stage badge** (`ContentWorkOrderStage` → `<Badge tone>` `soft`): `not_started`→`zinc`, `queued`→`blue` (data/queued, read-only), `in_progress`→`teal` (active work), `awaiting_client`→`amber` (warning/blocked-on-client), `changes_requested`→`orange` (changes-requested status color), `approved`→`emerald`, `completed`→`emerald` (success), `declined`→`red` (error). Follows the status-badge palette (green/emerald=success, amber=warning, orange=changes-requested, red=error, blue=info/data, teal=in-progress/client-facing).
+
+### The Issue — Operator steering (§11/§12, June 2026)
+Three operator-facing, admin-only curation verbs, all theIssueEnabled-gated (byte-identical OFF). No purple, no TierGate.
+- **Inline rec-wording editor** (`src/components/strategy/CockpitRow.tsx`) — an OPTIONAL `onEditWording` prop adds a `Pencil` `<IconButton>` (`variant="ghost"`) to the row's idle action cluster (before "Send to client"). Toggling it reveals an inline editor panel — `bg-[var(--surface-1)]` inset (one tier below the row's `--surface-2`, so the `--surface-3` `FormInput`/`FormTextarea` controls read as nested) with a `--brand-border`, `--radius-lg`. Title via `<FormInput commitOnBlur>` (cap `REC_WORDING_TITLE_MAX`=160), insight via `<FormTextarea commitOnBlur rows={3}>` (cap `REC_WORDING_INSIGHT_MAX`=600); field labels are `t-label text-[var(--brand-text-muted)] uppercase`. When the prop is ABSENT (flag-OFF / command-center / StrategyCockpit consumers) the row renders byte-identically — no pencil, no editor.
+- **Add-a-recommendation modal** (`src/components/strategy/issue/AddRecommendationModal.tsx`) — ConfirmDialog-style overlay (`z-[var(--z-modal)]`, `--brand-overlay` scrim, `bg-[var(--surface-2)]` panel, `--radius-xl`). Mounted in `KeywordStrategy.tsx` issueOverviewEl; opened by a `<Button variant="secondary" icon={Plus}>` "Add a recommendation" above `BackingMovesQueue`. Body composes `<FormField>` + `FormSelect` (type = `MANUAL_REC_ALLOWED_TYPES`, human labels), `FormInput` (title, required), `FormTextarea` (insight, required), `FormSelect` (priority, default `fix_soon`), optional `FormInput` (target keyword). Primary `<Button variant="primary">` "Add recommendation" (Law 1 teal), `loading` while pending, disabled until title+insight non-empty.
+- **Client running order panel** (`src/components/strategy/issue/ClientRunningOrder.tsx`) — `<SectionCard title="Client running order">` with `ListOrdered` titleIcon (`text-accent-brand`), mounted after `BackingMovesQueue`. Lists only the curated/sent recs (`clientStatus` ∈ {sent, approved, discussing} AND not struck) as an `<ol>`; each `<li>` is a `bg-[var(--surface-2)]` row (`--radius-lg`, `--brand-border`) with a tabular-nums position index (`t-caption-sm text-[var(--brand-text-muted)]`), the rec title (`t-ui text-[var(--brand-text)]` truncated), and `ChevronUp`/`ChevronDown` ghost `<IconButton>`s (first row's up + last row's down disabled). `<EmptyState icon={ListOrdered}>` ("Nothing sent yet") when none are in front of the client.
+
+### The Issue (Client) — P1b admin readiness + named-leads (Lane B, June 2026)
+Two operator-facing, admin-only panels mounted in `KeywordStrategy.tsx` issueOverviewEl, gated on `the-issue-client-measured-capture` (byte-identical OFF — not mounted). No purple, no TierGate.
+- **Setup-readiness checklist** (`src/components/strategy/issue/IssueSetupReadiness.tsx`) — mounted SLOT-0, above `IssueHeader` (config chrome the operator sees first). Tagged `data-p1b-readiness` (flag-OFF DOM-probe hook). An "N steps left" headline badge: AMBER (`bg-amber-500/10 text-amber-400 border-amber-500/20`, warning) when gaps remain, EMERALD ("Setup complete", success) at zero gaps. It RE-MOUNTS the reusable `ConversionTrackingReadout` (no rewrite) for the integrity rows + Measured/Estimate provenance pill (teal when measured) + the step list.
+- **Deep-linkable setup steps** (`ConversionSetupStep.onClick`, additive in `ConversionTrackingReadout.tsx`) — an incomplete step WITH an `onClick` renders as a `<ClickableRow>` (shared primitive — never a raw `<button>`); the label hover-steps `--brand-text → --brand-text-bright` (hover-must-step rule) with a trailing `ArrowRight`. Absent `onClick` (the P1a Settings consumer) → today's static `<div>` row, byte-identical. Each open gate deep-links to its fix surface honoring the `?tab=` two-halves contract: GA4 → `workspace-settings?tab=connections`; value / segment / events / Webflow forms → `?tab=dashboard`; POV → no deep-link (edited on the cockpit).
+- **Captured-leads readout** (`src/components/strategy/issue/AdminLeadsReadout.tsx`) — mounted inside the collapsed "Supporting detail" `<details>` (progressive disclosure). `<SectionCard noPadding>` "Captured leads"; the count badge uses the unbounded `total` and is BLUE (`bg-blue-500/10 text-blue-400 border-blue-500/20` — Law 2, data not actionable, never teal). Per-lead rows: `leadName` (`--brand-text-bright`, em-dash when null), `leadEmail` (`t-caption-sm` WITH explicit `text-[var(--brand-text-muted)]` — `t-caption-sm` has no color), a BLUE read-only lead-type chip, `formName` + `timeAgo(submittedAt)`. Empty → `<EmptyState icon={Users}>` with a TEAL-equivalent secondary `<Button>` CTA "Connect a Webflow form" (Law 1, action). PII (name/email) is admin-only — this is the `requireWorkspaceAccess` surface (D7: the guard, not the shape, enforces the boundary).

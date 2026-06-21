@@ -1,3 +1,5 @@
+import type { OutcomeBaseline, OutcomeProvenance, OutcomeTypeBreakdown } from './the-issue.js';
+
 export interface PageROI {
   pagePath: string;
   pageTitle: string;
@@ -46,4 +48,29 @@ export interface ROIData {
   } | null;
   contentItems: ContentItemROI[];
   computedAt: string;
+  /**
+   * The Issue (Client) P0 — outcome-denominated verdict. Present ONLY when the spine flag is ON,
+   * GA4 conversions exist, AND workspace.outcomeValue is set; additive + optional → legacy callers
+   * and the flag-OFF path are unaffected (byte-identical). provenance is ALWAYS 'estimate_ga4' in P0.
+   */
+  outcomeVerdict?: {
+    outcomeCount: number;
+    outcomeUnitLabel: string;
+    valuePerOutcome: number;
+    estimatedValue: number;            // outcomeCount × valuePerOutcome
+    monthlyRetainer: number | null;
+    baseline: OutcomeBaseline;
+    baselineDeltaCount: number | null; // null while establishing
+    provenance: OutcomeProvenance;     // 'estimate_ga4' (P0/flag-OFF) | 'measured_action' (P1a)
+    /**
+     * P1a: typed outcome breakdown ("23 form fills + 41 calls"). Present ONLY when the
+     * measured-capture flag is ON; absent on the P0 / flag-OFF path (byte-identical).
+     */
+    outcomeTypeBreakdown?: OutcomeTypeBreakdown[];
+    /**
+     * P1a: anonymous GA4-vs-captured reconciliation counts for the trust-guard discrepancy surface.
+     * Counts ONLY — never PII (D7). Present ONLY when the measured-capture flag is ON.
+     */
+    outcomeReconciliation?: { ga4Count: number; capturedCount: number };
+  };
 }

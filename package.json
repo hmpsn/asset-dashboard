@@ -67,7 +67,9 @@
     "verify:release-safety": "tsx scripts/platform-release-safety.ts",
     "report:release-safety": "tsx scripts/report-release-safety.ts",
     "verify:tenant-boundary": "tsx scripts/platform-tenant-boundary-audit.ts",
-    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts"
+    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts",
+    "verify:the-issue-flag-off": "tsx scripts/verify/the-issue-flag-off-domprobe.ts",
+    "verify:the-issue-measured-off": "PROBE_SCENARIO=measured-capture-off tsx scripts/verify/the-issue-flag-off-domprobe.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

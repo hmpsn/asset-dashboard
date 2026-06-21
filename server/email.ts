@@ -364,6 +364,42 @@ export function notifyClientCuratedRecsSent(opts: {
   }));
 }
 
+/**
+ * The Issue (Client) P1c — weekly return-hook digest. Queues ONE consolidated "what came in this
+ * week" email. The cron owns the flag gate + content gate + weekly idempotency; this helper validates
+ * transport + recipient and enqueues (mirrors the other notifyClient* helpers).
+ *
+ * RETURNS whether it actually enqueued: the cron stamps its ISO-week marker ONLY on `true`, so an
+ * unconfigured-SMTP no-op (or absent recipient) does NOT burn the week or log a false "sent". Once the
+ * email is enqueued the existing queue persists it to disk + the 'return' category is throttle-exempt,
+ * so an enqueue reliably means committed delivery.
+ *
+ * outcomeNoun is always sent (segment framing); the three sections are conditional fields.
+ */
+export function notifyClientReturnHook(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  outcomeNoun: string;
+  leadCount?: number;
+  recentNames?: string[];
+  moneyValue?: number;
+  sinceStartDelta?: number | null;
+  pendingCount?: number;
+  dashboardUrl?: string;
+}): boolean {
+  if (!isEmailConfigured() || !opts.clientEmail) return false;
+  queueEmail(makeEvent('client_return_hook', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    outcomeNoun: opts.outcomeNoun,
+    leadCount: opts.leadCount,
+    recentNames: opts.recentNames,
+    moneyValue: opts.moneyValue,
+    sinceStartDelta: opts.sinceStartDelta,
+    pendingCount: opts.pendingCount,
+  }));
+  return true;
+}
+
 export function notifyClientAuditComplete(opts: {
   clientEmail: string;
   workspaceName: string;

@@ -327,6 +327,8 @@ router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAcces
 
 // --- ROI Dashboard ---
 router.get('/api/public/roi/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {
+  // the-issue-client P0: outcomeVerdict rides this payload additively via computeROI() (flag-gated
+  // inside computeROI); no serializer change needed here.
   const roi = computeROI(req.params.workspaceId);
   if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
   res.json(roi);

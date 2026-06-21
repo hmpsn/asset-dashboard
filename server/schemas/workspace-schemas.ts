@@ -17,6 +17,9 @@ export const eventDisplayConfigSchema = z.object({
   displayName: z.string(),
   pinned: z.boolean(),
   group: z.string().optional(),
+  // P1a: which website action this pinned event measures. Optional + additive → flag-OFF
+  // byte-identical; existing pinned events with no outcomeType aggregate as 'other'.
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']).optional(),
 }).passthrough();
 
 export const eventDisplayConfigArraySchema = z.array(eventDisplayConfigSchema);
@@ -416,6 +419,7 @@ export const recommendationSchema = z.object({
   lifecycle: z.enum(['active', 'throttled', 'struck']).optional(),
   throttledUntil: z.string().optional(),
   sentAt: z.string().optional(),
+  autoSent: z.boolean().optional(),
   struckAt: z.string().optional(),
   cascade: z.object({
     removedKeywords: z.array(z.string()).optional(),
@@ -549,4 +553,33 @@ export const actionItemSchema = z.object({
   category: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+}).passthrough();
+
+// ── The Issue (Client) — outcome value + segment config (P0) ──────
+
+/** Per-workspace converted-outcome value powering the dollar verdict. */
+export const outcomeValueSchema = z.object({
+  valuePerOutcome: z.number().nonnegative(),
+  unitLabel: z.string().min(1),
+  currency: z.string().min(1),
+  basis: z.enum(['client_provided', 'agency_estimate', 'ai_enriched']),
+  monthlyRetainer: z.number().nonnegative().optional(),
+}).passthrough();
+
+/** Admin-confirmed segment classification override (non-local 3-way). */
+export const segmentConfigSchema = z.object({
+  segment: z.enum(['local_smb', 'b2b_saas', 'board_vc', 'professional_services', 'multi_location']),
+  outcomeNounSingular: z.string().optional(),
+  outcomeNounPlural: z.string().optional(),
+  reportingAudience: z.enum(['self', 'board', 'partners', 'owners']).optional(),
+}).passthrough();
+
+// ── The Issue (Client) — Webflow form-source mapping (P1a) ────────
+
+/** Per-workspace mapping of a Webflow form to a typed outcome. Stored in the webflow_form_sources
+ *  JSON column; parsed item-by-item via parseJsonSafeArray so one bad mapping doesn't drop the rest. */
+export const webflowFormMappingSchema = z.object({
+  formId: z.string(),
+  formName: z.string(),
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']),
 }).passthrough();

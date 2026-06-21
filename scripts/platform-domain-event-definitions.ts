@@ -132,7 +132,7 @@ const DEFAULTS_BY_CONTEXT: Record<BoundedContextId, RegistryDefaults> = {
     expectedInvalidations: ['queryKeys.admin.outcome*', 'queryKeys.client.outcome*'],
     adminListeners: ['src/hooks/useWsInvalidation.ts'],
     clientListeners: ['src/components/ClientDashboard.tsx'],
-    relatedActivityTypes: ['client_action_completed', 'outcome_scored', 'outcome_learning_updated'],
+    relatedActivityTypes: ['client_action_completed', 'outcome_scored', 'outcome_learning_updated', 'client_return_hook_sent'],
   },
   'billing-monetization': {
     producerModules: ['server/stripe.ts', 'server/routes/content-subscriptions.ts'],
@@ -191,6 +191,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   OUTCOME_EXTERNAL_DETECTED: 'outcomes-roi',
   OUTCOME_LEARNINGS_UPDATED: 'outcomes-roi',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcomes-roi',
+  FORM_SUBMISSION_CAPTURED: 'outcomes-roi',
   INTELLIGENCE_CACHE_UPDATED: 'analytics-intelligence',
   SUGGESTED_BRIEF_UPDATED: 'content-pipeline',
   INSIGHT_BRIDGE_UPDATED: 'analytics-intelligence',
@@ -201,6 +202,9 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   DELIVERABLE_SENT: 'inbox',
   DELIVERABLE_UPDATED: 'inbox',
   MEETING_BRIEF_GENERATED: 'analytics-intelligence',
+  STRATEGY_POV_GENERATED: 'analytics-intelligence',
+  STRATEGY_ISSUE_PUSHED: 'analytics-intelligence',
+  STRATEGY_AUTOSEND_POLICY_UPDATED: 'analytics-intelligence',
   BRANDSCRIPT_UPDATED: 'brand-engine',
   DISCOVERY_UPDATED: 'brand-engine',
   VOICE_PROFILE_UPDATED: 'brand-engine',
@@ -250,6 +254,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   RANK_TRACKING_UPDATED: 'Rank-tracking keyword lifecycle, snapshot, and strategy reconciliation updates.',
   LOCAL_SEO_UPDATED: 'Local SEO market configuration and visibility refresh updates.',
   EEAT_ASSETS_UPDATED: 'E-E-A-T workspace trust-asset inventory updates for content, schema, and page-analysis consumers.',
+  FORM_SUBMISSION_CAPTURED: 'The Issue (Client) P1a: anonymous Webflow named-lead capture signal — payload carries only { workspaceId, outcomeType } (PII stays in form_submissions, D7); refreshes the admin conversion-tracking-status readout.',
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -270,6 +275,7 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   RANK_TRACKING_UPDATED: ['queryKeys.admin.rankTracking*', 'queryKeys.client.rankTracking*', 'queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.pageKeywords', 'queryKeys.admin.intelligence'],
   LOCAL_SEO_UPDATED: ['queryKeys.admin.localSeo', 'queryKeys.admin.keywordCommandCenter', 'queryKeys.admin.keywordStrategy'],
   EEAT_ASSETS_UPDATED: ['queryKeys.admin.eeatAssets', 'queryKeys.admin.intelligence', 'queryKeys.admin.keywordStrategy'],
+  FORM_SUBMISSION_CAPTURED: ['queryKeys.admin.conversionTrackingStatus'],
 };
 
 const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -294,6 +300,7 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   RANK_TRACKING_UPDATED: ['rank_tracking_updated', 'rank_snapshot'],
   LOCAL_SEO_UPDATED: ['local_seo_updated'],
   EEAT_ASSETS_UPDATED: ['eeat_asset_created', 'eeat_asset_updated', 'eeat_asset_deleted'],
+  FORM_SUBMISSION_CAPTURED: ['form_submission_captured'],
 };
 
 function collectTsFiles(dir: string): string[] {

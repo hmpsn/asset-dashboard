@@ -113,8 +113,11 @@ export const RECOMMENDATION_TRANSITIONS: Record<string, readonly string[]> = {
 
 // Strategy v3 — client-side response axis (spec §7.2). A sent rec is the only thing the
 // client can act on. Distinct from RecStatus AND from the operator curation axis: the
-// client respond route (POST /api/public/recommendations/:ws/:recId/respond) validates
+// client act-on route (POST /api/public/recommendations/:ws/:recId/act-on) validates
 // ONLY against this map and mutates ONLY clientStatus — never RecStatus, never completion.
+// "Act on this" (greenlight) is the sent|discussing → approved edge; it also creates a durable
+// content REQUEST (nothing is pre-generated). The other client edges (declined / discussing)
+// flow through the same axis.
 export const CLIENT_REC_TRANSITIONS: Record<string, readonly string[]> = {
   sent:       ['approved', 'declined', 'discussing'],
   discussing: ['approved', 'declined'],   // a discussion resolves to a decision

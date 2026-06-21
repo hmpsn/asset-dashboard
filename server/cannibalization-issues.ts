@@ -11,7 +11,9 @@ import { createLogger } from './logger.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { cannibalizationUrlSetKey } from '../shared/page-address-utils.js';
 import { dedupeByLast } from './utils/collections.js';
+import { getKeeperOverride } from './cannibalization-keeper-override.js';
 
 const log = createLogger('cannibalization-issues');
 
@@ -159,7 +161,25 @@ const stmts = createStmtCache(() => ({
 
 export function listCannibalizationIssues(workspaceId: string): CannibalizationItem[] {
   const rows = stmts().listByWs.all(workspaceId) as CannibalizationIssueRow[];
-  return rows.map(rowToModel);
+  return rows.map(rowToModel).map((issue) => applyKeeperOverride(workspaceId, issue));
+}
+
+/**
+ * The operator-chosen keeper override (cannibalization_keeper_override) takes PRECEDENCE over the
+ * heuristic canonicalPath stored on the row. Keyed on the order-independent cannibalizationUrlSetKey
+ * so it survives the delete-then-reinsert regen clobber of cannibalization_issues. Applied at the
+ * read boundary so BOTH the display path AND the rec-mint path (which read via
+ * listCannibalizationIssues) see the operator's choice. When an override exists we set
+ * canonicalPath and drop the stale heuristic canonicalUrl (it was derived from the old keeper);
+ * the canonical URL is rebuilt downstream from the override path + the live domain when needed.
+ */
+function applyKeeperOverride(workspaceId: string, issue: CannibalizationItem): CannibalizationItem {
+  const urlSetKey = cannibalizationUrlSetKey(issue.pages.map((p) => p.path));
+  const override = getKeeperOverride(workspaceId, urlSetKey);
+  if (!override || override === issue.canonicalPath) return issue;
+  const next: CannibalizationItem = { ...issue, canonicalPath: override };
+  delete next.canonicalUrl;
+  return next;
 }
 
 export function replaceAllCannibalizationIssues(workspaceId: string, issues: CannibalizationItem[]): void {

@@ -7,7 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState, TierGate } from '../ui';
 import { Icon } from '../ui/Icon';
-import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
+import { fmtMoney, fmtMoneyFull, fmtEstimateMoney, fmtEstimateRatio } from '../../utils/formatNumbers';
 import { useClientROI } from '../../hooks/client';
 import { useBetaMode } from './BetaContext';
 import { clientPath } from '../../routes';
@@ -15,9 +15,21 @@ import { clientPath } from '../../routes';
 interface ROIDashboardProps {
   workspaceId: string;
   tier: 'free' | 'growth' | 'premium';
+  /** The Issue surface (audit D4): suppress the temporal "Month-over-Month" stat so the
+   *  dateless client dashboard stays no-rolling-window. Default false → byte-identical for
+   *  every existing caller (legacy overview / briefing-v2). The methodology disclosure is kept. */
+  evergreen?: boolean;
+  /** The Issue (Client) P0 spine: when true, this is the un-collapsed slot-3 money frame —
+   *  the per-page traffic-value table + content-attribution table are hidden (they relocate to
+   *  the collapsed "Under the hood" slot 6, where a second `compact` ROIDashboard renders them).
+   *  Default false → byte-identical for every legacy caller. */
+  compact?: boolean;
 }
 
-function ROIMethodologyDisclosure({ showRevenueAtStake }: { showRevenueAtStake: boolean }) {
+function ROIMethodologyDisclosure({
+  showRevenueAtStake,
+  hasOutcomeVerdict,
+}: { showRevenueAtStake: boolean; hasOutcomeVerdict: boolean }) {
   return (
     <details
       data-testid="roi-methodology"
@@ -61,13 +73,15 @@ function ROIMethodologyDisclosure({ showRevenueAtStake }: { showRevenueAtStake: 
       </div>
 
       <p className="mt-3 border-t border-blue-500/20 pt-3 t-caption-sm text-[var(--brand-text-muted)]">
-        We do not multiply by lead value, close rate, or lifetime value, so this is a directional traffic-value model, not a promise of booked revenue.
+        {hasOutcomeVerdict
+          ? 'We multiply your tracked conversions by the per-lead value you gave us — a labeled estimate, not booked revenue. We do not yet reconcile to named records.'
+          : 'We do not multiply by lead value, close rate, or lifetime value, so this is a directional traffic-value model, not a promise of booked revenue.'}
       </p>
     </details>
   );
 }
 
-export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
+export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = false }: ROIDashboardProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const [showAllPages, setShowAllPages] = useState(false);
@@ -153,15 +167,55 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
   const pages = showAllPages ? data.pageBreakdown : data.pageBreakdown.slice(0, 10);
   const maxValue = Math.max(...data.pageBreakdown.map(p => p.trafficValue), 1);
+  const verdict = data.outcomeVerdict;
+  // When the dollar verdict exists, the lead-value frame leads and the traffic-value model
+  // demotes to a labeled reference metric — never the headline.
+  const hasOutcomeVerdict = verdict != null;
 
   return (
     <div className="space-y-8">
-      <ROIMethodologyDisclosure showRevenueAtStake={data.revenueAtStake != null} />
+      <ROIMethodologyDisclosure showRevenueAtStake={data.revenueAtStake != null} hasOutcomeVerdict={hasOutcomeVerdict} />
 
-      {/* Hero metrics */}
+      {/* The Issue (Client) P0 — lead-value money frame. Leads when a dollar verdict exists;
+          banded estimate (never false precision), emerald = $/success per the Four Laws. */}
+      {verdict && (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${verdict.monthlyRetainer ? 'lg:grid-cols-3' : ''} gap-3`}>
+          <StatCard
+            label={`Estimated value · ${verdict.outcomeUnitLabel}`}
+            value={fmtEstimateMoney(verdict.estimatedValue)}
+            icon={DollarSign}
+            valueColor="text-accent-success"
+            sub={`${verdict.outcomeCount.toLocaleString()} ${verdict.outcomeUnitLabel} valued at ${fmtEstimateMoney(verdict.valuePerOutcome)} each — a labeled estimate`}
+            className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+          />
+          {verdict.monthlyRetainer != null && verdict.monthlyRetainer > 0 && (
+            <StatCard
+              label="Return on your retainer"
+              value={fmtEstimateRatio(verdict.estimatedValue / verdict.monthlyRetainer)}
+              icon={TrendingUp}
+              valueColor="text-accent-success"
+              sub={`Estimated value vs your ${fmtMoneyFull(verdict.monthlyRetainer)}/mo retainer`}
+              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+            />
+          )}
+          {verdict.baseline.state === 'ready' && evergreen && verdict.baselineDeltaCount != null && (
+            <StatCard
+              label="vs. when we started"
+              value={`${verdict.baselineDeltaCount >= 0 ? '+' : ''}${verdict.baselineDeltaCount.toLocaleString()}`}
+              icon={TrendingUp}
+              valueColor={verdict.baselineDeltaCount >= 0 ? 'text-accent-success' : 'text-accent-warning'}
+              sub={`${verdict.outcomeUnitLabel} since we started`}
+              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Hero metrics — the traffic-value model. Relabeled to "(reference)" when the
+          dollar verdict frame leads, so it reads as supporting context, not the headline. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${data.revenueAtStake != null ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         <StatCard
-          label="Organic Traffic Value"
+          label={hasOutcomeVerdict ? 'Traffic value (reference)' : 'Organic Traffic Value'}
           value={fmtMoneyFull(data.organicTrafficValue)}
           icon={DollarSign}
           valueColor="text-accent-success"
@@ -178,22 +232,33 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20"
         />
 
-        <StatCard
-          label={data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
-          value={
-            data.growthPercent != null
-              ? `${data.growthPercent >= 0 ? '+' : ''}${data.growthPercent.toFixed(1)}%`
-              : data.trackedPages
-          }
-          icon={data.growthPercent != null ? TrendingUp : Shield}
-          valueColor={data.growthPercent != null ? (data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning') : 'text-accent-brand'}
-          sub={
-            data.growthPercent != null
-              ? `Traffic value growth vs. 30 days ago · ${data.trackedPages} pages tracked`
-              : 'Pages generating organic value · growth tracking starts next month'
-          }
-          className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
-        />
+        {/* Audit D4: on the evergreen client surface the temporal "Month-over-Month" stat is
+            suppressed — it always renders the dateless "Pages Tracked" variant instead. Every
+            other caller (evergreen=false) is byte-identical to before. */}
+        {(() => {
+          const showMoM = data.growthPercent != null && !evergreen;
+          return (
+            <StatCard
+              label={showMoM ? 'Month-over-Month' : 'Pages Tracked'}
+              value={
+                showMoM
+                  ? `${data.growthPercent! >= 0 ? '+' : ''}${data.growthPercent!.toFixed(1)}%`
+                  : data.trackedPages
+              }
+              icon={showMoM ? TrendingUp : Shield}
+              valueColor={showMoM ? (data.growthPercent! >= 0 ? 'text-accent-brand' : 'text-accent-warning') : 'text-accent-brand'}
+              sub={
+                showMoM
+                  ? `Traffic value growth vs. 30 days ago · ${data.trackedPages} pages tracked`
+                  // Evergreen surface stays dateless; every other caller keeps the original copy.
+                  : evergreen
+                    ? 'Pages generating organic value'
+                    : 'Pages generating organic value · growth tracking starts next month'
+              }
+              className={`bg-gradient-to-br ${showMoM ? (data.growthPercent! >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
+            />
+          );
+        })()}
 
         {/* Task 3.4: portfolio "Revenue at stake" — Σ upsideMonthly via the single
             keywordDollarValue helper. Emerald = success/$ law. Absent on older payloads. */}
@@ -209,8 +274,9 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         )}
       </div>
 
-      {/* Page breakdown table */}
-      {data.pageBreakdown.length > 0 && (
+      {/* Page breakdown table — hidden in the compact slot-3 money frame; it relocates to the
+          collapsed "Under the hood" slot 6 (a second compact ROIDashboard renders it there). */}
+      {!compact && data.pageBreakdown.length > 0 && (
         <SectionCard
           title="Traffic Value by Page"
           titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
@@ -265,8 +331,8 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         </SectionCard>
       )}
 
-      {/* Content ROI Attribution */}
-      {data.contentItems && data.contentItems.length > 0 && (
+      {/* Content ROI Attribution — also relocated to "Under the hood" in the compact frame. */}
+      {!compact && data.contentItems && data.contentItems.length > 0 && (
         <SectionCard
           title="Content ROI Attribution"
           titleIcon={<Icon as={DollarSign} size="md" className="text-accent-success" />}

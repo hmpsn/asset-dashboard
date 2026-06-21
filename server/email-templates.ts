@@ -189,7 +189,8 @@ export type EmailEventType =
   | 'action_approved'
   | 'work_order_comment_team'
   | 'work_order_comment_client'
-  | 'curated_recs_sent';
+  | 'curated_recs_sent'
+  | 'client_return_hook';
 
 type PayloadRule = {
   requiredStrings?: string[];
@@ -217,6 +218,9 @@ const CLIENT_EMAIL_PAYLOAD_RULES: Partial<Record<EmailEventType, PayloadRule>> =
   client_briefing_ready: { requiredStrings: ['weekOf', 'heroHeadline'], requiredNumbers: ['storyCount'] },
   work_order_comment_client: { requiredStrings: ['orderTitle', 'message'] },
   curated_recs_sent: { requiredNumbers: ['recCount'] },
+  // P1c return-hook: outcomeNoun is always required (segment framing); the three sections
+  // (leads/money/decision) are conditional and validated by the assembler, not here.
+  client_return_hook: { requiredStrings: ['outcomeNoun'] },
 };
 
 function isNonEmptyString(value: unknown): value is string {
@@ -349,6 +353,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderWorkOrderCommentClient(events, count, ws, dashUrl, logoUrl); break;
     case 'curated_recs_sent':
       result = renderCuratedRecsSent(events, count, ws, dashUrl, logoUrl); break;
+    case 'client_return_hook':
+      result = renderClientReturnHook(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -1031,6 +1037,73 @@ function renderCuratedRecsSent(_events: EmailEvent[], _count: number, ws: string
       subtitle: ws,
       body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">Your strategist curated ${recCount} recommendation${plural ? 's' : ''} for you. Review the why, the projected result, and approve or ask a question — right from your dashboard.</div>`,
       cta: dashUrl ? { label: 'Review recommendations', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+// The Issue (Client) P1c — weekly return-hook digest. ONE consolidated "what came in this week"
+// email with up to three conditional sections (new customers · new measured money · decision waiting).
+// The cron sends a single event per workspace per week, so events[0] IS the digest. Email-only,
+// literal hex (server-only template, not a src/ component): teal=leads, blue=money, amber=decision.
+function renderClientReturnHook(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const d = events[0].data;
+  const outcomeNoun = esc(String(d.outcomeNoun ?? 'results'));
+  const sections: string[] = [];
+
+  // 1) New customers / leads captured this week.
+  const leadCount = typeof d.leadCount === 'number' ? d.leadCount : 0;
+  if (leadCount > 0) {
+    const names = Array.isArray(d.recentNames)
+      ? (d.recentNames as unknown[]).filter((n): n is string => typeof n === 'string')
+      : [];
+    const nameLine = names.length
+      ? `<div style="font-size:12px;color:#6b7280;margin-top:4px;">Most recent: ${names.map((n) => esc(n)).join(', ')}</div>`
+      : '';
+    sections.push(`
+      <div style="background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <div><span style="font-size:24px;font-weight:700;color:#0d9488;">${leadCount}</span>
+        <span style="font-size:14px;color:#374151;margin-left:6px;">${outcomeNoun} this week</span></div>
+        ${nameLine}
+      </div>`);
+  }
+
+  // 2) New measured money (only present when the cron confirmed measured_action + value + this-week activity).
+  const moneyValue = typeof d.moneyValue === 'number' ? d.moneyValue : null;
+  if (moneyValue != null) {
+    const delta = typeof d.sinceStartDelta === 'number' ? d.sinceStartDelta : null;
+    const deltaLine = delta != null && delta > 0
+      ? `<div style="font-size:12px;color:#15803d;margin-top:4px;">+${delta.toLocaleString('en-US')} ${outcomeNoun} since we started</div>`
+      : '';
+    sections.push(`
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <div><span style="font-size:22px;font-weight:700;color:#2563eb;">$${moneyValue.toLocaleString('en-US')}</span>
+        <span style="font-size:14px;color:#374151;margin-left:6px;">in measured value</span></div>
+        ${deltaLine}
+      </div>`);
+  }
+
+  // 3) Decision still waiting on the client (a gentle week-later nudge, not the original send).
+  const pendingCount = typeof d.pendingCount === 'number' ? d.pendingCount : 0;
+  if (pendingCount > 0) {
+    const plural = pendingCount !== 1;
+    sections.push(`
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <span style="font-size:14px;color:#92400e;font-weight:600;">${pendingCount} item${plural ? 's' : ''} still waiting for your input</span>
+      </div>`);
+  }
+
+  return {
+    subject: `What came in this week at ${ws}`,
+    html: layout({
+      preheader: `Your weekly recap from ${STUDIO_NAME}`,
+      headline: "Here's what came in this week",
+      subtitle: ws,
+      // The one-pager export is an authed client-portal page (no passwordless email link), so the CTA
+      // routes the client to their dashboard, where the P1b export bar offers the one-pager.
+      body: sections.join(''),
+      cta: dashUrl ? { label: 'See your dashboard', url: dashUrl } : undefined,
+      footer: `You're receiving this because ${STUDIO_NAME} manages your site — reply to stop these.`,
       logoUrl,
     }),
   };

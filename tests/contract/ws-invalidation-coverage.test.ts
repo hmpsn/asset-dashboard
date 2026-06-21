@@ -63,11 +63,38 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
 
+  // FORM_SUBMISSION_CAPTURED (The Issue P1a) is handled locally by useConversionTrackingStatus
+  // (useWorkspaceEvents) on the admin conversion-tracking surface — it invalidates the
+  // conversion-tracking-status query directly, not via the centralized useWsInvalidation hook.
+  'FORM_SUBMISSION_CAPTURED',
+
   // STRATEGY_KEYWORD_SET_UPDATED: forward-declared in P2 pre-commit; the
   // centralized useWsInvalidation.ts handler (invalidating
   // queryKeys.admin.strategyKeywordSet) lands in P3 — REMOVE this exemption
   // in P3 when the handler ships.
   'STRATEGY_KEYWORD_SET_UPDATED',
+
+  // STRATEGY_POV_GENERATED (The Issue): handled locally by src/hooks/admin/useStrategyPov.ts via
+  // useWorkspaceEvents (invalidates queryKeys.admin.strategyPov). Only the cockpit's POV query
+  // consumes it, so a centralized useWsInvalidation.ts handler would invalidate nothing else.
+  'STRATEGY_POV_GENERATED',
+
+  // STRATEGY_ISSUE_PUSHED (The Issue, Phase 3): the pushed-Issue cron's operator-doorbell signal.
+  // It is NOT consumed by ANY frontend handler. The visible NotificationBell entry is derived from
+  // the polled /api/workspace-overview summary (`issue.ready` + `issue.pushedWeekOf`) via the
+  // admin-notifications query, which self-refreshes on a 5-minute interval — the same poll-driven
+  // pattern as the requests/approvals/rec-responses entries (none of which have WS handlers either).
+  // The cockpit's POV cache is refreshed separately by generateStrategyPov's OWN
+  // STRATEGY_POV_GENERATED broadcast (and only on the changed path — POV_UNCHANGED does not
+  // broadcast), not by this event. No centralized React Query cache keys off STRATEGY_ISSUE_PUSHED.
+  'STRATEGY_ISSUE_PUSHED',
+
+  // STRATEGY_AUTOSEND_POLICY_UPDATED (The Issue, Phase 4 trust ladder): handled locally by
+  // src/hooks/admin/useAutoSendPolicy.ts via useWorkspaceEvents (invalidates
+  // queryKeys.admin.autoSendPolicy(workspaceId)). Only that hook's query — the TrustLadderPanel's
+  // per-workspace policy fetch — consumes it, so a centralized useWsInvalidation.ts handler would
+  // invalidate nothing else. Mirrors the STRATEGY_POV_GENERATED local-handler pattern above.
+  'STRATEGY_AUTOSEND_POLICY_UPDATED',
 ]);
 
 // ---------------------------------------------------------------------------

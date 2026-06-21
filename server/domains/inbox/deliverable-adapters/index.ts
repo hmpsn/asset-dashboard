@@ -39,6 +39,11 @@ import './content-request.js';
 // publish seams (manual + auto).
 import './work-order.js';
 import './briefing.js';
+// recommendation — the Strategy "The Issue" close-the-loop type. Minted by
+// mirrorRecommendationToDeliverable at the rec /send (per-row + bulk) seam; respond-only
+// (D-apply). The canonical client decision flows through the public act-on route, not the
+// deliverable respond path.
+import './recommendation.js';
 
 export {
   registerAdapter,

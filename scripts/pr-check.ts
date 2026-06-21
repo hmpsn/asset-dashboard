@@ -8470,6 +8470,7 @@ export const CHECKS: Check[] = [
         'briefing',
         'copy_section',
         'content_request',
+        'recommendation',
       ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
       for (const type of deliverableTypes) {
