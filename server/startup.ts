@@ -17,6 +17,7 @@ import { startGa4ConversionSnapshotScheduler } from './ga4-conversion-snapshot-s
 import { startWebflowFormPoller } from './webflow-form-poller.js';
 import { startBriefingCron } from './briefing-cron.js';
 import { startStrategyIssueCron } from './strategy-issue-cron.js';
+import { startReturnHookCron } from './return-hook-cron.js';
 
 /** Start all background schedulers and queues. */
 let started = false;
@@ -44,4 +45,5 @@ export function startSchedulers() {
   startWebflowFormPoller();
   startBriefingCron();
   startStrategyIssueCron();
+  startReturnHookCron();
 }

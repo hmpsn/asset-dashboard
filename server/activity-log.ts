@@ -183,7 +183,11 @@ export type ActivityType =
   // The Issue (Client) P1a: the operator saved the tracked-Webflow-forms mapping (PUT form-sources),
   // which can flip the D6 provenance marker (confirmed setup) — audit trail for a config mutation.
   // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata: only { formCount }.
-  | 'form_capture_configured';
+  | 'form_capture_configured'
+  // The Issue (Client) P1c: the weekly return-hook cron sent the client their "what came in" digest.
+  // ADMIN-ONLY (operator audit trail) — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata:
+  // only counts/flags ({ weekOf, leadCount, hasMoney, pendingCount }), never lead identity.
+  | 'client_return_hook_sent';
 
 export interface ActivityEntry {
   id: string;

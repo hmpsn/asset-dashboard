@@ -132,7 +132,7 @@ const DEFAULTS_BY_CONTEXT: Record<BoundedContextId, RegistryDefaults> = {
     expectedInvalidations: ['queryKeys.admin.outcome*', 'queryKeys.client.outcome*'],
     adminListeners: ['src/hooks/useWsInvalidation.ts'],
     clientListeners: ['src/components/ClientDashboard.tsx'],
-    relatedActivityTypes: ['client_action_completed', 'outcome_scored', 'outcome_learning_updated'],
+    relatedActivityTypes: ['client_action_completed', 'outcome_scored', 'outcome_learning_updated', 'client_return_hook_sent'],
   },
   'billing-monetization': {
     producerModules: ['server/stripe.ts', 'server/routes/content-subscriptions.ts'],

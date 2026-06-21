@@ -38,6 +38,7 @@ export type ClientNotificationEventType = Extract<
   | 'client_briefing_ready'
   | 'work_order_comment_client'
   | 'curated_recs_sent'
+  | 'client_return_hook'
   | 'trial_expiry_warning'
   | 'client_welcome'
   | 'password_reset'
@@ -93,6 +94,11 @@ export const CLIENT_NOTIFICATION_RECIPIENT_POLICIES = {
     authority: 'workspace_primary',
     source: 'workspace.clientEmail',
     note: 'Briefing notifications target the primary workspace client contact.',
+  },
+  client_return_hook: {
+    authority: 'workspace_primary',
+    source: 'workspace.clientEmail',
+    note: 'The Issue P1c — weekly return-hook digest targets the primary workspace client contact.',
   },
   trial_expiry_warning: {
     authority: 'workspace_primary',

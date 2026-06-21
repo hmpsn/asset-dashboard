@@ -165,6 +165,7 @@ interface WorkspaceRow {
   auto_publish_after_hours: number;
   last_briefing_run_week_of: string | null;
   last_issue_pushed_week_of: string | null;
+  last_return_hook_sent_week_of: string | null;
   created_at: string;
 }
 
@@ -283,6 +284,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   ws.autoPublishAfterHours = row.auto_publish_after_hours;
   ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of ?? null;
   ws.lastIssuePushedWeekOf = row.last_issue_pushed_week_of ?? null;
+  ws.lastReturnHookSentWeekOf = row.last_return_hook_sent_week_of ?? null;
   return ws;
 }
 
@@ -321,6 +323,9 @@ const stmts = createStmtCache(() => ({
   getBySiteId: db.prepare<[siteId: string]>(`SELECT * FROM workspaces WHERE webflow_site_id = ?`),
   setIssuePushedWeek: db.prepare<[weekOf: string | null, id: string]>(
     `UPDATE workspaces SET last_issue_pushed_week_of = ? WHERE id = ?`,
+  ),
+  setReturnHookSentWeek: db.prepare<[weekOf: string | null, id: string]>(
+    `UPDATE workspaces SET last_return_hook_sent_week_of = ? WHERE id = ?`,
   ),
   insert: db.prepare(`
     INSERT INTO workspaces
@@ -427,6 +432,7 @@ function workspaceToParams(ws: Workspace) {
     auto_publish_after_hours: ws.autoPublishAfterHours ?? 24,
     last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
     last_issue_pushed_week_of: ws.lastIssuePushedWeekOf ?? null,
+    last_return_hook_sent_week_of: ws.lastReturnHookSentWeekOf ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -505,7 +511,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'webflowFormSources' | 'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'webflowFormSources' | 'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf' | 'lastReturnHookSentWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -551,6 +557,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
     autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
     lastIssuePushedWeekOf: 'last_issue_pushed_week_of',
+    lastReturnHookSentWeekOf: 'last_return_hook_sent_week_of',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
@@ -629,6 +636,16 @@ export function getWorkspace(id: string): Workspace | undefined {
  */
 export function markIssuePushedWeek(workspaceId: string, weekOf: string): void {
   stmts().setIssuePushedWeek.run(weekOf, workspaceId);
+}
+
+/**
+ * Stamp the ISO-week marker for the weekly email return-hook cron (The Issue, P1c).
+ * Mirrors `markIssuePushedWeek`: the cron writes this once per ISO week per workspace
+ * so a later tick in the same week is a no-op (cross-process idempotency backstop to
+ * the throttle). A dedicated single-column setter keeps the write cheap and explicit.
+ */
+export function markReturnHookSentWeek(workspaceId: string, weekOf: string): void {
+  stmts().setReturnHookSentWeek.run(weekOf, workspaceId);
 }
 
 /**

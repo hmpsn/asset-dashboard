@@ -19,13 +19,23 @@
         },
         {
           "id": "the-issue-client-redesign-p1-return-hook",
-          "title": "The Issue (Client) P1 — return hook (event-driven SMS/email push + forwardable board/QBR one-pager export)",
+          "title": "The Issue (Client) P1 — return hook (forwardable one-pager export [P1b] + event-driven EMAIL pull-back [P1c]; NO SMS)",
           "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
           "est": "TBD",
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-20",
-          "notes": "Deferred. Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first). P1b bundle IN PROGRESS (docs/superpowers/plans/2026-06-20-the-issue-client-p1b-plan.md): Lane A (server contracts/assemblers/endpoints) committed; Lane B (admin front-half) BUILT 2026-06-20 — setup-readiness checklist (IssueSetupReadiness, one-click gap deep-links via ConversionSetupStep.onClick) + named-leads readout (AdminLeadsReadout + useAdminLeads) mounted in the KeywordStrategy cockpit, gated on the-issue-client-measured-capture, flag-OFF byte-identical; see FEATURE_AUDIT #531. Lane C (client export one-pager + own-leads) + Lane D (D7 leak + flag-OFF DOM-probe) land in the same bundle PR. Status stays pending until the full bundle is merged + green on staging."
+          "notes": "Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first). [P1b BUILT + review-fixed 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1b-plan.md — admin setup-readiness checklist (IssueSetupReadiness) + admin/client named-leads + forwardable one-pager export (print-from-browser, NO PDF lib); D7 PII boundary held; 12-finding scaled review all fixed (1 Important + 7 Minor). See FEATURE_AUDIT #531. [P1c BUILT + PR-READY 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md — EMAIL-ONLY (no SMS, owner-locked) weekly event-gated return-hook: a new weekly cron (server/return-hook-cron.ts, clone of strategy-issue-cron) sends ONE consolidated client_return_hook digest (new customers/leads + new measured money + decision-still-waiting) ONLY when ≥1 section has content, through the EXISTING email stack (nodemailer queue + new 'return' throttle category 1/wk + workspace_primary recipient policy). Additive — no new transport built (7-area infra discovery confirmed it exists). Owner decisions: weekly digest only-when-something-happened; match-existing opt-out + 'reply to stop' footer (platform-wide preference center deferred → email-preference-center). Migration 151 (last_return_hook_sent_week_of weekly marker). Money section activity-gated (only on new-leads-this-week + measured_action verdict). 19 new tests; full suite 26806 green; flag-OFF byte-identical. See FEATURE_AUDIT #532. Status stays pending until ALL of P1 is soaked on staging + the legacy-cutover/teardown (owner-locked sequence: build all P1 → one soak + cutover at the end)."
+        },
+        {
+          "id": "email-preference-center",
+          "title": "Platform-wide email preference center + CAN-SPAM compliance (unsubscribe / suppression / bounce)",
+          "source": "docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md",
+          "est": "TBD",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-20",
+          "notes": "Deferred (surfaced by the P1c return-hook discovery, owner-confirmed out of P1c scope). NO existing client email (all 22 EmailEventTypes) has unsubscribe today — this is a PLATFORM-WIDE gap, not return-hook-specific. Build: a List-Unsubscribe header + a suppression table + per-recipient/per-type opt-out toggles + a preference-center route + bounce/complaint handling, applied to every client email. P1c ships the relationship-email default (no infra) + a 'reply to stop' footer line as the interim courtesy; this item is the proper compliance investment when email volume justifies it. Its own spec + plan + PR."
         },
         {
           "id": "the-issue-client-redesign-p1-segments",

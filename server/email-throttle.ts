@@ -24,7 +24,7 @@ const log = createLogger('email-throttle');
 
 // ── Category mapping ──
 
-export type ThrottleCategory = 'status' | 'audit' | 'action' | 'alert' | 'transactional' | 'internal' | 'report';
+export type ThrottleCategory = 'status' | 'audit' | 'action' | 'alert' | 'transactional' | 'internal' | 'report' | 'return';
 
 const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   // Status — daily morning digest
@@ -63,6 +63,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   client_briefing_ready: 'action',
   work_order_comment_client: 'action',     // team → client reply
   curated_recs_sent: 'action',             // Strategy v3 — batched "N recs ready for your decision"
+  client_return_hook: 'return',            // The Issue P1c — weekly "what came in" pull-back digest
 };
 
 export function getThrottleCategory(type: EmailEventType): ThrottleCategory {
@@ -81,6 +82,7 @@ const LIMITS: Record<string, CategoryLimit> = {
   audit:  { maxPerWindow: 1, windowDays: 14 },
   action: { maxPerWindow: 3, windowDays: 1 },
   alert:  { maxPerWindow: 1, windowDays: 1 },
+  return: { maxPerWindow: 1, windowDays: 7 }, // P1c — at most one return-hook digest per client per week
 };
 
 const GLOBAL_DAILY_CAP = 5; // max non-transactional emails per client per day

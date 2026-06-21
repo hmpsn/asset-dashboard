@@ -451,6 +451,8 @@ export interface Workspace {
   lastBriefingRunWeekOf?: string | null;
   /** ISO-week marker (YYYY-MM-DD) of last pushed-Issue cron run (The Issue, Phase 3) — prevents duplicate weekly pushes */
   lastIssuePushedWeekOf?: string | null;
+  /** ISO-week marker (YYYY-MM-DD) of last weekly email return-hook send (The Issue, P1c) — prevents duplicate weekly sends */
+  lastReturnHookSentWeekOf?: string | null;
   folder: string;
   createdAt: string;
 }

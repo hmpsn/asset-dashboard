@@ -143,3 +143,33 @@ export interface OnePagerExportPayload {
   leads?: NamedLeadView[];
   generatedAt: string;              // ISO
 }
+
+/**
+ * P1c — weekly email return-hook digest. Assembled server-side by the weekly cron; consolidates the
+ * three "worth returning for" signals into ONE email. Each section is null when it has no content;
+ * `hasContent` is the send gate (the cron sends ONLY when at least one section is non-null). The
+ * recipient is the client's OWN contact (workspace.clientEmail), so lead names (their own customers)
+ * are intentionally present here — distinct from the PII-free public ROI/count path (D7).
+ */
+export interface ReturnHookLeadSection {
+  count: number;            // leads captured in the 7-day window
+  recentNames: string[];    // up to 3 most-recent lead display names (leadName ?? leadEmail ?? '—')
+  outcomeNoun: string;      // resolved segment plural noun ("new patients" | "qualified leads" | …)
+}
+export interface ReturnHookMoneySection {
+  estimatedValue: number;       // verdict.estimatedValue (measured_action only)
+  outcomeCount: number;         // verdict.outcomeCount
+  sinceStartDelta: number | null; // verdict.baselineDeltaCount — the "since we started" frame
+  outcomeNoun: string;
+}
+export interface ReturnHookDecisionSection {
+  pendingCount: number;     // client actions + approval batches still awaiting the client
+}
+export interface ReturnHookDigest {
+  workspaceId: string;
+  leads: ReturnHookLeadSection | null;
+  money: ReturnHookMoneySection | null;
+  decision: ReturnHookDecisionSection | null;
+  /** true when ≥1 section is non-null — the cron only sends (and only stamps the week) when true. */
+  hasContent: boolean;
+}

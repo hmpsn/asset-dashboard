@@ -364,6 +364,37 @@ export function notifyClientCuratedRecsSent(opts: {
   }));
 }
 
+/**
+ * The Issue (Client) P1c — weekly return-hook digest. Queues ONE consolidated "what came in this
+ * week" email. The cron is responsible for the flag gate + content gate + weekly idempotency; this
+ * helper only validates transport + recipient and enqueues (mirrors the other notifyClient* helpers).
+ * outcomeNoun is always sent (segment framing); the three sections are conditional fields.
+ */
+export function notifyClientReturnHook(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  outcomeNoun: string;
+  leadCount?: number;
+  recentNames?: string[];
+  moneyValue?: number;
+  sinceStartDelta?: number | null;
+  pendingCount?: number;
+  onePagerUrl?: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured() || !opts.clientEmail) return;
+  queueEmail(makeEvent('client_return_hook', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    outcomeNoun: opts.outcomeNoun,
+    leadCount: opts.leadCount,
+    recentNames: opts.recentNames,
+    moneyValue: opts.moneyValue,
+    sinceStartDelta: opts.sinceStartDelta,
+    pendingCount: opts.pendingCount,
+    onePagerUrl: opts.onePagerUrl,
+  }));
+}
+
 export function notifyClientAuditComplete(opts: {
   clientEmail: string;
   workspaceName: string;
