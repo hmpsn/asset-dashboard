@@ -7,10 +7,11 @@
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 
-// Mock ONLY notifyClientReturnHook; pass every other email export through.
+// Mock ONLY notifyClientReturnHook; pass every other email export through. Default returns true
+// (enqueued) — the cron now stamps the week marker ONLY on a confirmed enqueue.
 vi.mock('../../server/email.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../server/email.js')>();
-  return { ...actual, notifyClientReturnHook: vi.fn() };
+  return { ...actual, notifyClientReturnHook: vi.fn(() => true) };
 });
 
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
@@ -68,6 +69,21 @@ describe('runReturnHookForWorkspace', () => {
     expect(notifyMock.mock.calls[0][0]).toMatchObject({ clientEmail: 'client@acme.test', leadCount: 1 });
     expect(getWorkspace(s.workspaceId)!.lastReturnHookSentWeekOf).toBe(r.weekOf);
     expect(listActivityByType(s.workspaceId, 'client_return_hook_sent').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('enqueue fails (SMTP unconfigured / no recipient) → skipped, marker NOT stamped, no activity (so it re-sends once deliverable)', () => {
+    const s = seedWorkspace(); cleanups.push(s.cleanup);
+    updateWorkspace(s.workspaceId, { clientEmail: 'client@acme.test' });
+    enableReturnHook(s.workspaceId);
+    seedLeadThisWeek(s.workspaceId);
+    notifyMock.mockReturnValueOnce(false); // notifyClientReturnHook reports it did NOT enqueue
+    const r = runReturnHookForWorkspace(s.workspaceId);
+    expect(r.status).toBe('skipped');
+    expect(r.reason).toBe('email not configured');
+    // Critical: the week marker must NOT be burned on a no-op enqueue, or the duplicate guard would
+    // suppress the real send for the rest of the week.
+    expect(getWorkspace(s.workspaceId)!.lastReturnHookSentWeekOf ?? null).toBeNull();
+    expect(listActivityByType(s.workspaceId, 'client_return_hook_sent').length).toBe(0);
   });
 
   it('flag ON but NO content → skipped, no email, marker NOT stamped (re-runnable later this week)', () => {

@@ -9,6 +9,7 @@
  *   transactional (password_reset, welcome, trial_warning)  → unlimited
  *   internal     (request_new, content_request, payment…)   → admin inbox, unlimited
  *   report       (monthly/weekly)                           → handled by its own module
+ *   return       (client_return_hook)                       → exempt; ISO-week marker is the cap (P1c)
  *
  * Global cap: max 5 non-transactional client emails per day.
  *
@@ -82,7 +83,9 @@ const LIMITS: Record<string, CategoryLimit> = {
   audit:  { maxPerWindow: 1, windowDays: 14 },
   action: { maxPerWindow: 3, windowDays: 1 },
   alert:  { maxPerWindow: 1, windowDays: 1 },
-  return: { maxPerWindow: 1, windowDays: 7 }, // P1c — at most one return-hook digest per client per week
+  // NOTE: 'return' has NO LIMITS entry on purpose — it is short-circuited in canSend (the ISO-week
+  // marker is its authoritative cap). A rolling-window throttle would conflict with the Monday-anchored
+  // week and silently drop legitimate consecutive-week sends.
 };
 
 const GLOBAL_DAILY_CAP = 5; // max non-transactional emails per client per day
@@ -106,7 +109,7 @@ const stmts = createStmtCache(() => ({
   ),
   countGlobal: db.prepare<[recipient: string]>(
     `SELECT COUNT(*) as cnt FROM email_sends
-     WHERE recipient = ? AND category NOT IN ('transactional','internal','report')
+     WHERE recipient = ? AND category NOT IN ('transactional','internal','report','return')
      AND sent_at >= datetime('now', '-1 day')`,
   ),
   lastSend: db.prepare<[recipient: string, category: string]>(
@@ -133,8 +136,13 @@ export interface ThrottleResult {
  * Returns { allowed: true } or { allowed: false, reason: '...' }.
  */
 export function canSend(recipient: string, category: ThrottleCategory): ThrottleResult {
-  // Transactional & internal are never throttled
-  if (category === 'transactional' || category === 'internal' || category === 'report') {
+  // Transactional & internal are never throttled.
+  // 'return' (The Issue P1c weekly return-hook) is also exempt: its ≤1-per-ISO-week cadence is
+  // governed AUTHORITATIVELY by the per-workspace week marker (last_return_hook_sent_week_of), which
+  // is stamped only on a successful enqueue. A rolling-window throttle here cannot align with the
+  // Monday-anchored ISO week (consecutive weeks can be <7d apart), so it would silently DROP a
+  // legitimate weekly digest at flush — the throttle must never be the binding constraint for it.
+  if (category === 'transactional' || category === 'internal' || category === 'report' || category === 'return') {
     return { allowed: true };
   }
 

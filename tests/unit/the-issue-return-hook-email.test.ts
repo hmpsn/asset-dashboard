@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderDigest, getEmailEventPayloadIssues, type EmailEvent } from '../../server/email-templates.js';
-import { getThrottleCategory } from '../../server/email-throttle.js';
+import { getThrottleCategory, canSend, recordSend } from '../../server/email-throttle.js';
 import { CLIENT_NOTIFICATION_RECIPIENT_POLICIES } from '../../server/notification-recipients.js';
 
 function event(data: Record<string, unknown>): EmailEvent {
@@ -61,6 +61,16 @@ describe('client_return_hook email', () => {
 
   it('uses the weekly "return" throttle category', () => {
     expect(getThrottleCategory('client_return_hook')).toBe('return');
+  });
+
+  it('the "return" category is throttle-exempt — a prior send never blocks the next weekly digest', () => {
+    // The ISO-week marker is the authoritative cap; a rolling-window throttle would silently drop a
+    // legitimate consecutive-week send, so canSend must always allow 'return'.
+    const recipient = `rh-${Date.now()}@throttle.test`;
+    expect(canSend(recipient, 'return').allowed).toBe(true);
+    recordSend(recipient, 'return', 'client_return_hook', 'ws-1');
+    recordSend(recipient, 'return', 'client_return_hook', 'ws-1');
+    expect(canSend(recipient, 'return').allowed).toBe(true);
   });
 
   it('recipient policy targets the workspace primary contact', () => {

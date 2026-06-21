@@ -158,9 +158,8 @@ export interface ReturnHookLeadSection {
 }
 export interface ReturnHookMoneySection {
   estimatedValue: number;       // verdict.estimatedValue (measured_action only)
-  outcomeCount: number;         // verdict.outcomeCount
   sinceStartDelta: number | null; // verdict.baselineDeltaCount — the "since we started" frame
-  outcomeNoun: string;
+  outcomeNoun: string;          // segment plural noun (self-contained section framing)
 }
 export interface ReturnHookDecisionSection {
   pendingCount: number;     // client actions + approval batches still awaiting the client

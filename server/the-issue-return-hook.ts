@@ -13,7 +13,7 @@
  * Bounded context: outcomes-roi / The Issue (sibling to server/the-issue-outcome.ts).
  */
 import { getWorkspace, resolveSegmentProfile } from './workspaces.js';
-import { countFormSubmissions, loadFormSubmissionsPaged } from './form-submissions.js';
+import { countFormSubmissions, loadRecentFormSubmissions } from './form-submissions.js';
 import { listClientActions } from './client-actions.js';
 import { listBatches } from './approvals.js';
 import type {
@@ -44,9 +44,9 @@ export function assembleReturnHookDigest(workspaceId: string): ReturnHookDigest 
   const leadCount = countFormSubmissions(ws.id, { startDate, endDate });
   let leads: ReturnHookLeadSection | null = null;
   if (leadCount > 0) {
-    // Newest-first; keep only those inside the window (when in-window count < 3 the 3rd row could be
-    // older). recentNames is a sample (up to 3), not the full count.
-    const { leads: recent } = loadFormSubmissionsPaged(ws.id, { limit: 3, offset: 0 });
+    // Newest-first sample (no count query); keep only those inside the window (when in-window count < 3
+    // the 3rd row could be older). recentNames is a sample (up to 3), not the full count.
+    const recent = loadRecentFormSubmissions(ws.id, 3);
     const recentNames = recent
       .filter((l) => l.submittedAt.slice(0, 10) >= startDate)
       .map((l) => l.leadName ?? l.leadEmail ?? '—');

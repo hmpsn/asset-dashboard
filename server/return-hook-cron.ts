@@ -7,13 +7,17 @@
 // - Polls every hour. At most ONCE per ISO week per eligible workspace it assembles the weekly
 //   "what came in" digest (new customers/leads + new measured money + a decision still waiting) and,
 //   ONLY when ≥1 section has real content (DR-1), queues ONE `client_return_hook` email through the
-//   existing queue → throttle → batch → send pipeline, stamps `last_return_hook_sent_week_of`
-//   (cross-process idempotency), and logs an operator-only activity.
+//   existing queue → batch → send pipeline. It then stamps `last_return_hook_sent_week_of` ONLY on a
+//   confirmed enqueue (notifyClientReturnHook returns false when SMTP is unconfigured / no recipient)
+//   and logs an operator-only activity. The ISO-week marker is the SINGLE authoritative ≤1/week cap —
+//   `return` is throttle-exempt (a rolling window can't align with the Monday-anchored week), so the
+//   throttle can never silently drop a marker-authorized weekly send.
 // - Eligibility: feature flag `the-issue-client-return-hook` ON for the workspace AND a configured
 //   `clientEmail`. Whole cron is flag-gated globally → tick() returns immediately when OFF
 //   (byte-identical OFF: no email, no stamp, no activity).
-// - NO-CONTENT weeks do NOT stamp the marker or the in-memory memo, so a later tick the same week can
-//   still fire when content appears — but the marker + throttle cap it at one send per ISO week.
+// - NO-CONTENT (and unconfigured-SMTP) runs do NOT stamp the marker or the in-memory memo, so a later
+//   tick the same week can still fire when content appears / SMTP comes online; once a digest is
+//   actually enqueued the marker caps it at one send per ISO week.
 // - Money section is activity-gated (DR-8): present only when there were new leads this week AND the
 //   verdict is measured_action/actual_reconciled with a value (DR-9) — never a static weekly restate.
 // - Per-workspace single-flight mutex mirrors strategy-issue-cron's runningPushes.
@@ -131,7 +135,6 @@ function runReturnHookForWorkspaceInner(
     ) {
       money = {
         estimatedValue: v.estimatedValue,
-        outcomeCount: v.outcomeCount,
         sinceStartDelta: v.baselineDeltaCount ?? null,
         outcomeNoun,
       };
@@ -140,13 +143,15 @@ function runReturnHookForWorkspaceInner(
 
   const hasContent = !!(digest.leads || money || digest.decision);
   // No content → do NOT stamp (week-marker or memo): a later tick this week can fire when content
-  // appears. The marker + throttle still cap it at one send per ISO week once it does.
+  // appears. Once a digest IS sent the marker caps it at one send per ISO week.
   if (!hasContent) return { status: 'skipped', weekOf, reason: 'no content' };
 
-  // Stamp the week BEFORE the send so a crash between the two cannot double-send.
-  markReturnHookSentWeek(workspaceId, weekOf);
-
-  notifyClientReturnHook({
+  // Enqueue FIRST, then stamp on a confirmed enqueue. notifyClientReturnHook returns false when SMTP
+  // is unconfigured or the recipient is absent — in that case we must NOT stamp the week (it would
+  // burn the marker on a no-op and the duplicate guard would then suppress the real send all week).
+  // queueEmail is synchronous + persists to disk and 'return' is throttle-exempt, so a `true` return
+  // means committed delivery; the stamp follows immediately (no async gap to double-send across).
+  const enqueued = notifyClientReturnHook({
     clientEmail: ws.clientEmail,
     workspaceName: ws.name,
     workspaceId: ws.id,
@@ -158,6 +163,9 @@ function runReturnHookForWorkspaceInner(
     pendingCount: digest.decision?.pendingCount,
     dashboardUrl: getClientPortalUrl(ws),
   });
+  if (!enqueued) return { status: 'skipped', weekOf, reason: 'email not configured' };
+
+  markReturnHookSentWeek(workspaceId, weekOf);
 
   // Operator-only audit trail (PII-free metadata; client_return_hook_sent is NOT in CLIENT_VISIBLE_TYPES).
   // Best-effort: the email is already queued + the week stamped, so a logging failure must not propagate.
@@ -223,7 +231,11 @@ export function startReturnHookCron(): void {
   if (tickInterval) return;
 
   startupTimeout = setTimeout(() => {
-    tick();
+    try {
+      tick();
+    } catch (err) {
+      log.error({ err }, 'return-hook startup tick failed');
+    }
   }, 90_000);
   startupTimeout.unref?.();
 

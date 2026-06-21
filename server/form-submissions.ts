@@ -88,6 +88,17 @@ export function loadFormSubmissionsPaged(
   return { leads: rows.map(rowToFormSubmission), total };
 }
 
+/**
+ * Newest-first sample of named-lead rows (PII), WITHOUT the count query. For sampling callers (e.g.
+ * the P1c return-hook digest's "most recent N names") that do not need the unbounded total — avoids
+ * the wasted countByWorkspace round-trip loadFormSubmissionsPaged runs. NEVER call from a public
+ * unauthed serializer (PII); the route guard authorizes exposure (D7).
+ */
+export function loadRecentFormSubmissions(workspaceId: string, limit: number): FormSubmission[] {
+  const rows = stmts().selectByWorkspacePaged.all(workspaceId, limit, 0) as FormSubmissionRow[];
+  return rows.map(rowToFormSubmission);
+}
+
 /** Anonymous count of captured leads in a date range (inclusive). Safe for the public payload. */
 export function countFormSubmissions(workspaceId: string, range: { startDate: string; endDate: string }): number {
   const r = stmts().countInRange.get(workspaceId, range.startDate, `${range.endDate}T23:59:59.999Z`) as { n: number };

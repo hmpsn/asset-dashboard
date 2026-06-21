@@ -1093,18 +1093,15 @@ function renderClientReturnHook(events: EmailEvent[], _count: number, ws: string
       </div>`);
   }
 
-  const onePagerUrl = typeof d.onePagerUrl === 'string' ? d.onePagerUrl : undefined;
-  const onePagerLine = onePagerUrl
-    ? `<div style="text-align:center;margin-top:4px;"><a href="${esc(onePagerUrl)}" style="font-size:12px;color:#0d9488;text-decoration:none;font-weight:600;">Download your one-pager</a></div>`
-    : '';
-
   return {
     subject: `What came in this week at ${ws}`,
     html: layout({
       preheader: `Your weekly recap from ${STUDIO_NAME}`,
       headline: "Here's what came in this week",
       subtitle: ws,
-      body: sections.join('') + onePagerLine,
+      // The one-pager export is an authed client-portal page (no passwordless email link), so the CTA
+      // routes the client to their dashboard, where the P1b export bar offers the one-pager.
+      body: sections.join(''),
       cta: dashUrl ? { label: 'See your dashboard', url: dashUrl } : undefined,
       footer: `You're receiving this because ${STUDIO_NAME} manages your site — reply to stop these.`,
       logoUrl,
