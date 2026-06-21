@@ -75,6 +75,14 @@ describe('assembleOnePagerExport', () => {
     expect(p.methodologyLine.length).toBeGreaterThan(0);
     expect(p.verdictSentence.length).toBeGreaterThan(0);
     expect(p.generatedAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    // Gate D: estimate_ga4 (no measured/reconciled data) → BANDED estimatedValueLabel + a verdict
+    // sentence carrying the banded value with NO ≈ hedge and NO exact count × rate dollar ($11,200).
+    expect(p.provenance).toBe('estimate_ga4');
+    expect(p.estimatedValueLabel).toMatch(/^~\$/);
+    expect(p.estimatedValueLabel).toBe('~$11,000');
+    expect(p.verdictSentence).toContain('~$11,000');
+    expect(p.verdictSentence).not.toContain('≈');
+    expect(p.verdictSentence).not.toContain('$11,200');
   });
 
   it('no monthlyRetainer → valueVsRetainerRatio is null', () => {

@@ -18,6 +18,7 @@ import { loadRecommendations, isCuratedForClient } from './recommendations.js';
 import type { FormSubmission } from '../shared/types/form-submission.js';
 import type { NamedLeadView, OnePagerExportPayload } from '../shared/types/the-issue.js';
 import type { OutcomeProvenance } from '../shared/types/outcome-tracking.js';
+import { formatOutcomeMoney } from '../shared/format-money.js';
 
 const DEFAULT_EXPORT_PROFILE = 'board_one_pager' as const;
 
@@ -78,9 +79,14 @@ export function assembleOnePagerExport(workspaceId: string): OnePagerExportPaylo
     .slice(0, 3)
     .map((r) => ({ title: r.title, estimatedGain: r.estimatedGain }));
 
+  // Gate D: band the dollar UNLESS actual_reconciled (estimate_ga4 + measured_action are count ×
+  // estimated rate). The `~$` already conveys approximation, so the sentence drops the `≈` hedge;
+  // reconciled is exact with no hedge. Single-source banding via shared/format-money.ts.
+  const estimatedValueLabel = formatOutcomeMoney(estimatedValue, verdict.provenance);
+
   const verdictSentence = monthlyRetainer
-    ? `${verdict.outcomeCount} ${outcomeNoun} ≈ $${estimatedValue.toLocaleString('en-US')} in value vs. a $${monthlyRetainer.toLocaleString('en-US')} retainer`
-    : `${verdict.outcomeCount} ${outcomeNoun} ≈ $${estimatedValue.toLocaleString('en-US')} in value`;
+    ? `${verdict.outcomeCount} ${outcomeNoun} = ${estimatedValueLabel} in value vs. a $${monthlyRetainer.toLocaleString('en-US')} retainer`
+    : `${verdict.outcomeCount} ${outcomeNoun} = ${estimatedValueLabel} in value`;
 
   return {
     exportProfile,
@@ -88,6 +94,7 @@ export function assembleOnePagerExport(workspaceId: string): OnePagerExportPaylo
     outcomeNoun,
     verdictSentence,
     estimatedValue,
+    estimatedValueLabel,
     monthlyRetainer,
     adSpendEquivalent: roi.adSpendEquivalent,
     valueVsRetainerRatio,

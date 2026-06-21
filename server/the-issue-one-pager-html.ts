@@ -146,7 +146,7 @@ export function renderOnePagerHTML(payload: OnePagerExportPayload): string {
   const statRow = compact
     ? ''
     : `<div class="stat-row">
-        <div class="stat"><div class="label">Estimated value</div><div class="value">$${p.estimatedValue.toLocaleString('en-US')}</div></div>
+        <div class="stat"><div class="label">Estimated value</div><div class="value">${esc(p.estimatedValueLabel)}</div></div>
         <div class="stat"><div class="label">Ad-spend equivalent</div><div class="value">$${p.adSpendEquivalent.toLocaleString('en-US')}</div></div>
         <div class="stat"><div class="label">${p.monthlyRetainer != null ? 'Monthly retainer' : 'Outcomes'}</div><div class="value">${p.monthlyRetainer != null ? '$' + p.monthlyRetainer.toLocaleString('en-US') : p.outcomeCount.toLocaleString('en-US')}</div></div>
       </div>`;

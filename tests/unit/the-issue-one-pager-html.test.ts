@@ -16,8 +16,10 @@ function basePayload(over: Partial<OnePagerExportPayload> = {}): OnePagerExportP
     exportProfile: 'board_one_pager',
     workspaceName: 'Acme Dental',
     outcomeNoun: 'qualified leads',
-    verdictSentence: '14 qualified leads ≈ $11,200 in value vs. a $1,500 retainer',
+    // estimate_ga4 → banded (gate D). The `~$` conveys approximation, so the sentence drops the `≈`.
+    verdictSentence: '14 qualified leads = ~$11,000 in value vs. a $1,500 retainer',
     estimatedValue: 11200,
+    estimatedValueLabel: '~$11,000',
     monthlyRetainer: 1500,
     adSpendEquivalent: 420,
     valueVsRetainerRatio: 7.4667,
@@ -40,9 +42,26 @@ describe('renderOnePagerHTML', () => {
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('@media print');
     expect(html).toContain('14 qualified leads');
-    expect(html).toContain('$11,200');
+    // Gate D: estimate_ga4 → BANDED estimated value (verbatim from estimatedValueLabel). The exact
+    // count × rate dollar ($11,200) must NOT appear anywhere for a non-reconciled verdict.
+    expect(html).toContain('~$11,000');
+    expect(html).not.toContain('$11,200');
     expect(html).toContain('1,500'); // retainer in the verdict
     expect(html).toMatch(/420/); // ad-spend equivalent
+  });
+
+  it('gate D — actual_reconciled prints the EXACT estimated value (no ~ band)', () => {
+    const html = renderOnePagerHTML(
+      basePayload({
+        provenance: 'actual_reconciled',
+        estimatedValue: 11200,
+        estimatedValueLabel: '$11,200',
+        verdictSentence: '14 qualified leads = $11,200 in value vs. a $1,500 retainer',
+      }),
+    );
+    expect(html).toContain('$11,200');
+    // The exact reconciled value must not be banded.
+    expect(html).not.toContain('~$11,000');
   });
 
   it('renders the outcome-count-with-N band + the "since we started" baseline label', () => {

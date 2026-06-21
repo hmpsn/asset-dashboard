@@ -128,6 +128,10 @@ export interface OnePagerExportPayload {
   outcomeNoun: string;              // resolved segment plural noun
   verdictSentence: string;          // pre-templated dollar verdict (client never re-derives)
   estimatedValue: number;
+  /** Provenance-resolved money string (banded `~$` for estimate_ga4/measured_action, exact `$` for
+   *  actual_reconciled). The renderer prints this verbatim — gate D. Never re-format estimatedValue
+   *  downstream. */
+  estimatedValueLabel: string;
   monthlyRetainer: number | null;
   adSpendEquivalent: number;        // from ROIData.adSpendEquivalent
   valueVsRetainerRatio: number | null; // estimatedValue / monthlyRetainer, null when no retainer

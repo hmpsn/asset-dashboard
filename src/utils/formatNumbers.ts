@@ -3,6 +3,7 @@
  * Replaces duplicate fmtNum / formatNum / fmtMoney / fmtMoneyFull across components.
  */
 import type { OutcomeProvenance } from '../../shared/types/outcome-tracking';
+import { bandEstimateMoney, exactMoney, formatOutcomeMoney } from '../../shared/format-money';
 
 /** Compact number: 1234 → "1.2K", 1_500_000 → "1.5M" */
 export function fmtNum(n: number): string {
@@ -38,17 +39,12 @@ export function fmtMoneyFull(value: number): string {
 }
 
 /**
- * Estimate-labeled money band. Used ONLY when provenance === 'estimate_ga4'. Rounds to two
- * significant figures and prefixes "~"; never emits cents. Exact figures use fmtMoneyFull.
+ * Estimate-labeled money band. Rounds to two significant figures and prefixes "~"; never emits cents.
+ * Thin delegate to the shared single-source banding helper (shared/format-money.ts) so client + export
+ * share ONE definition (authority-layered-fields rule). Exact figures use fmtMoneyFull / fmtMeasuredMoney.
  */
 export function fmtEstimateMoney(value: number): string {
-  if (!Number.isFinite(value)) return '—';
-  if (value === 0) return '~$0';
-  const sign = value < 0 ? '-' : '';
-  const abs = Math.abs(value);
-  const magnitude = Math.pow(10, Math.floor(Math.log10(abs)) - 1);
-  const banded = Math.round(abs / magnitude) * magnitude;
-  return `~${sign}$${banded.toLocaleString('en-US')}`;
+  return bandEstimateMoney(value);
 }
 
 /**
@@ -71,13 +67,17 @@ export function fmtEstimateRatio(ratio: number): string {
  * we drop the estimate band because the underlying count is now a measured truth, not a projection.
  */
 export function fmtMeasuredMoney(value: number): string {
-  if (!Number.isFinite(value)) return '—';
-  return fmtMoneyFull(value);
+  return exactMoney(value);
 }
 
-/** The SINGLE place that maps an OutcomeProvenance → its money formatter (estimate band vs exact). */
+/**
+ * The SINGLE place that maps an OutcomeProvenance → its money formatter. Delegates to the shared
+ * canonical mapper (shared/format-money.ts): band UNLESS `actual_reconciled` (estimate_ga4 → banded,
+ * measured_action → banded, actual_reconciled → exact). This matches the hero's resolveProvenanceRender
+ * contract — measured_action's dollar stays banded because value = exact count × an estimated lead rate.
+ */
 export function fmtOutcomeMoney(value: number, provenance: OutcomeProvenance): string {
-  return provenance === 'estimate_ga4' ? fmtEstimateMoney(value) : fmtMeasuredMoney(value);
+  return formatOutcomeMoney(value, provenance);
 }
 
 /** Human-readable file size: 0 → "0 B", 1024 → "1.0 KB", 1048576 → "1.0 MB" */
