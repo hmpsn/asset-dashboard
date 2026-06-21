@@ -116,17 +116,21 @@ export function OverviewTab({
 
   const theIssueEnabled = useFeatureFlag('strategy-the-issue');
   const workFeedEnabled = useFeatureFlag('client-work-feed');
+  // P1a measured-capture flag — MUST be read here at the top level, NOT inside the `if (theIssueEnabled)`
+  // block below. useFeatureFlag is a hook; placing it inside the conditional changes the hook count when
+  // the strategy-the-issue flag query resolves (loading→loaded flips theIssueEnabled false→true), which
+  // throws "Rendered more hooks than during the previous render" and crashes the client dashboard. (A
+  // mocked useFeatureFlag in component tests consumes zero hook slots, so it hid this — caught only in a
+  // real loading→loaded browser render.) Flag-OFF this gates every per-unit outcomeType back to undefined
+  // so the typed render (type icons, [data-outcome-type] tags, byType rollup) vanishes byte-identically to
+  // P0 — the rollback must never leak typed-outcome UI just because eventConfig still carries types.
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
 
   // ── strategy-the-issue evergreen money surface (Phase 2) ─────────────────
-  // The Issue is the reimagined overview that supersedes the legacy body. Read
-  // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so
-  // the legacy overview body below is byte-identical.
+  // The Issue is the reimagined overview that supersedes the legacy body. All flags read
+  // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so the legacy
+  // overview body below is byte-identical.
   if (theIssueEnabled) {
-    // P1a measured-capture flag — read unconditionally at the top of the block (Rules of Hooks;
-    // useFeatureFlag is a hook). Flag-OFF this gates every per-unit outcomeType back to undefined so
-    // the typed render (type icons, [data-outcome-type] tags, byType rollup) vanishes byte-identically
-    // to P0. The rollback must never leak typed-outcome UI just because eventConfig still carries types.
-    const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
     // ── The Issue (Client) P0 spine props (additive; unread on the spine-flag-OFF path) ──
