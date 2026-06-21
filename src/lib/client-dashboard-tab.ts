@@ -45,15 +45,20 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
  *
  * Rules (mirror ClientDashboard.tsx):
  *  - 'search' and 'analytics' are legacy aliases that redirect to 'performance'.
- *  - 'roi' is a legacy alias that redirects to 'results' (Client IA v2 promoted
- *    ROI → Results, so old `?tab=roi` bookmarks survive).
  *  - Anything in KNOWN_CLIENT_TABS passes through unchanged.
  *  - Unknown / undefined / empty values fall back to 'overview'.
+ *
+ * NOTE: 'roi' deliberately resolves to ITSELF (it stays in KNOWN_CLIENT_TABS with its
+ * own panel). It is NOT aliased to 'results' — a pure helper can't read the
+ * client-ia-v2 flag, so an unconditional roi→results alias would silently change the
+ * flag-OFF ROI tab (the legacy nav still surfaces 'roi'; routing it to the evergreen
+ * Results panel drops the month-over-month stat AND breaks the nav highlight). Under
+ * IA v2 the nav surfaces 'results' (evergreen) instead; old `?tab=roi` bookmarks still
+ * render the working non-evergreen roi panel.
  */
 export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
-  if (t === 'roi') return 'results';
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

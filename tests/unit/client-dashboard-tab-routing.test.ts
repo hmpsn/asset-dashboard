@@ -17,8 +17,8 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('analytics')).toBe('performance');
   });
 
-  it('redirects legacy "roi" to "results" (Client IA v2 promoted ROI → Results)', () => {
-    expect(resolveClientTab('roi')).toBe('results');
+  it('does NOT alias "roi" → keeps it (pure helper cannot read the flag; an unconditional alias would break the flag-OFF ROI tab)', () => {
+    expect(resolveClientTab('roi')).toBe('roi');
   });
 
   it('passes through "brand"', () => {
@@ -35,16 +35,12 @@ describe('resolveClientTab', () => {
 
   // ── Pass-through for known tabs ──
 
-  it('passes through every value in KNOWN_CLIENT_TABS unchanged (except the roi→results alias)', () => {
+  it('passes through every value in KNOWN_CLIENT_TABS unchanged', () => {
     expect(KNOWN_CLIENT_TABS.length).toBeGreaterThan(0);
     for (const tab of KNOWN_CLIENT_TABS) {
-      // 'roi' is intentionally kept in KNOWN_CLIENT_TABS for back-compat on direct
-      // panel mounts, but resolveClientTab redirects it to 'results' so old
-      // `?tab=roi` bookmarks survive the IA v2 promotion.
-      if (tab === 'roi') {
-        expect(resolveClientTab(tab)).toBe('results');
-        continue;
-      }
+      // Every known tab (incl. 'roi') resolves to itself — no aliases out of
+      // KNOWN_CLIENT_TABS. (search/analytics are aliases but are intentionally NOT
+      // in KNOWN_CLIENT_TABS.)
       expect(resolveClientTab(tab)).toBe(tab);
     }
   });

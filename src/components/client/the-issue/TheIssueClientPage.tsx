@@ -181,8 +181,11 @@ export function TheIssueClientPage({
   };
   // IA v2: the strategy CTAs land in Deep Dive › Rankings (the folded home of the
   // keyword/strategy surfaces); flag-OFF they keep the standalone Strategy tab.
+  // `sub=rankings` selects the Deep Dive sub-tab; `tab=rankings` selects the nested
+  // StrategyTab's own interior Rankings tab (it reads ?tab=, default 'overview') — both
+  // are needed or the user lands on StrategyTab's Overview interior tab instead.
   const strategyDest = () => iaV2Enabled
-    ? `${clientPath(workspaceId, 'deep-dive', betaMode)}?sub=rankings`
+    ? `${clientPath(workspaceId, 'deep-dive', betaMode)}?sub=rankings&tab=rankings`
     : clientPath(workspaceId, 'strategy', betaMode);
   const openStrategy = () => navigate(strategyDest());
   const openGroup = (_archetype: Archetype) => navigate(strategyDest());
