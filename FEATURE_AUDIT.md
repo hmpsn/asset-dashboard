@@ -8330,3 +8330,19 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** DeepDiveTab collapsed-section cases (present under Rankings, absent under Analytics, absent when no slot); `ClientDashboard.iaV2` gate (totalCells>0 shows / totalCells=0 hides, end-to-end through the lazy path) + an inbox-reachable guard (content review preserved). Built controller + 1 test subagent → focused review: 0 Critical, 1 Important (dropped isPaid gate) fixed. Non-vacuousness verified.
 
 **Verification:** typecheck clean; vite build ok; full `vitest` green; pr-check 0; lint:hooks 0; verify:feature-flags ok. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p3-content-rehome.md`. Phase-per-PR: P3 → staging → P4 (Share/Export + per-piece attribution). P5 deferred (owner).
+
+---
+
+### 601. Client dashboard IA v2 — P4 export gate-D (band money by provenance) 2026-06-21 — **completes the single-site IA v2 track (P1–P4)**
+**Status:** Behind `client-ia-v2` / `the-issue-client-return-hook` (no behavior change when off). Pre-plan scan confirmed the tournament grafts A (Overview Share/Export = `IssueExportBar`, P1b) + B (per-piece attribution = `ROIDashboard.contentItems` table) were ALREADY built — the only open, release-blocking item was **gate D**: the forwardable one-pager export printed exact `count × rate` dollars for every provenance.
+
+**What was built:**
+- New single-source `shared/format-money.ts` (`bandEstimateMoney` = legacy `~$` 2-sig-fig logic, `exactMoney` = whole-dollar, `formatOutcomeMoney` = **band UNLESS `actual_reconciled`**). Client `src/utils/formatNumbers.ts` now delegates to it (ONE banding definition — authority rule).
+- `OnePagerExportPayload` gains a pre-resolved `estimatedValueLabel`; the assembler bands the `verdictSentence` (drops the `≈` hedge) + the field; the renderer prints it verbatim. `adSpendEquivalent`/`monthlyRetainer` stay exact (not count×rate).
+- Reconciled the pre-existing discrepancy where `fmtOutcomeMoney` wrongly EXACTED `measured_action` (no production caller — the hero uses `resolveProvenanceRender`, which already banded it); now band-unless-reconciled everywhere.
+
+**Gate D verified:** export shows `~$11,000` (banded) for estimate_ga4/measured_action and exact `$11,200` only for actual_reconciled; no exact count×rate dollar (or the `≈` hedge) leaks for a non-reconciled verdict (integration test on the real `GET /api/public/export/:id/one-pager` route; ratio back-out defeated by rounding). Controller + 1 build subagent → 2-lens focused review (gate-D correctness + exact-dollar leak-hunt): **both CLEAN, 0 findings**.
+
+**Verification:** typecheck clean; vite build ok; full `vitest` green; pr-check 0; lint:hooks 0; verify:feature-flags ok; coverage-ratchet 0 failing. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p4-export-gate-d.md`.
+
+**IA v2 single-site track (P1–P4) COMPLETE on staging behind the dark `client-ia-v2` flag.** Remaining: owner validates flag-ON on staging → release to main; **P5 (multi-location)** is a separate deferred session (owner). Tournament `docs/superpowers/audits/2026-06-21-client-ia-tournament.md`.
