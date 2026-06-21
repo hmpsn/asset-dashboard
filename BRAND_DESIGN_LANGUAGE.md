@@ -372,6 +372,7 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | Client "We Called It" highlight | `bg-teal-600/20 border-teal-500/30 text-teal-300` | Soft teal — client-facing positive signal |
 | Attributed dollar value (admin Top Wins + client WinsSurface) | `text-accent-info` (blue) | Realized $ attribution is a read-only data metric — blue, never teal/emerald |
 | Client "Your results" scorecard (`OutcomeSummary`, client Overview) | Win-rate stats: emerald ≥60% / amber ≥40% / red <40% via local `winRateColor()`; trend arrows emerald/red/neutral | Tiered via `<TierGate>` (free teaser → growth scorecard → premium breakdown); no purple |
+| Client verdict hero MoM + typed breakdown (`IssueVerdictHeadline`, IA v2 — gated on `client-ia-v2`) | Outcome counts emerald (`text-accent-success`); month-over-month clause muted (`text-[var(--brand-text-muted)]`) with ↑/↓/→ direction glyphs | MoM is an honest read-only delta (muted, never a fabricated ↑ on a decline); the typed breakdown ("41 calls · 12 form fills") emerald = success/count law. No purple, tokens only. Flag-OFF byte-identical |
 
 ### Diagnostic Report (`DiagnosticReport/`)
 
