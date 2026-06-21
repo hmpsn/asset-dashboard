@@ -120,7 +120,10 @@ vi.mock('../../../src/hooks/client/useClientQueries', () => ({
   // realistic flag-ON render is the whole point of this test.
   useClientStrategy: () => ({ data: { pages: [] }, isLoading: false, error: null }),
   useClientPricing: () => ({ data: null, isLoading: false, error: null }),
-  useClientContentPlan: () => ({ data: null, isLoading: false, error: null }),
+  // vi.fn (not a plain arrow) so individual tests can drive the contentPlanSummary gate
+  // (clientIaV2 && contentPlanSummary.totalCells > 0) that re-homes ContentPlanTab under DeepDive's
+  // Rankings sub-tab. Default mirrors the original "no plan" base (data: null → summary null).
+  useClientContentPlan: vi.fn(() => ({ data: null, isLoading: false, error: null })),
   useClientCopyEntries: () => ({ data: 0, isLoading: false, error: null }),
 }));
 
@@ -239,10 +242,12 @@ vi.mock('../../../src/lib/lazyWithRetry', () => ({
 import type { ClientDashboard as ClientDashboardType } from '../../../src/components/ClientDashboard';
 import type { get as getType, getOptional as getOptionalType } from '../../../src/api/client';
 import type { WorkspaceInfo } from '../../../src/components/client/types';
+import type { ContentPlanSummary, useClientContentPlan as useClientContentPlanType } from '../../../src/hooks/client/useClientQueries';
 
 let ClientDashboard: typeof ClientDashboardType;
 let mockGet: ReturnType<typeof vi.mocked<typeof getType>>;
 let mockGetOptional: ReturnType<typeof vi.mocked<typeof getOptionalType>>;
+let mockUseClientContentPlan: ReturnType<typeof vi.mocked<typeof useClientContentPlanType>>;
 
 async function loadFreshDashboard() {
   vi.resetModules();
@@ -252,6 +257,10 @@ async function loadFreshDashboard() {
   mockGet = vi.mocked(apiClient.get);
   mockGetOptional = vi.mocked(apiClient.getOptional);
   mockGetOptional.mockResolvedValue(null);
+  // Same rationale as api/client: re-acquire the contentPlan hook mock from the freshly-imported
+  // (mocked) module so per-test return overrides land on the instance ClientDashboard consumes.
+  const clientQueries = await import('../../../src/hooks/client/useClientQueries');
+  mockUseClientContentPlan = vi.mocked(clientQueries.useClientContentPlan);
   ({ ClientDashboard } = await import('../../../src/components/ClientDashboard'));
 }
 
@@ -270,6 +279,29 @@ function makeWorkspace(overrides?: Partial<WorkspaceInfo>): WorkspaceInfo {
 
 function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+}
+
+/**
+ * Drive the contentPlanSummary gate. ClientDashboard reads `contentPlanQ.data?.summary ?? null`, so the
+ * mock returns a useQuery-shaped object whose `data.summary` is a ContentPlanSummary with `totalCells`.
+ * `totalCells > 0` (with clientIaV2 ON) → DeepDive passes a contentPlanSlot; `0`/null → omits it.
+ */
+function setContentPlanCells(totalCells: number) {
+  const summary: ContentPlanSummary | null = totalCells > 0
+    ? {
+        totalCells,
+        publishedCells: 0,
+        reviewCells: 0,
+        approvedCells: 0,
+        inProgressCells: 0,
+        matrixCount: 1,
+      }
+    : null;
+  mockUseClientContentPlan.mockReturnValue({
+    data: summary ? { summary, keywords: new Map(), reviewCells: [] } : null,
+    isLoading: false,
+    error: null,
+  } as ReturnType<typeof useClientContentPlanType>);
 }
 
 function renderDashboard(
@@ -359,6 +391,61 @@ describe('ClientDashboard — IA v2 flag-ON real lazy/Suspense render (rule-13 g
     await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
     // Analytics slot is unmounted once Rankings is active.
     expect(screen.queryByTestId('performance-tab')).not.toBeInTheDocument();
+  });
+
+  // ── P3: Content roadmap re-homed under DeepDive > Rankings (end-to-end gate) ──
+  it('re-homes ContentPlanTab as a "Content roadmap" section under DeepDive > Rankings when a plan exists', async () => {
+    // clientIaV2 is ON (flag mock) and contentPlanSummary.totalCells > 0 → DeepDive gets a contentPlanSlot.
+    setContentPlanCells(5);
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    const view = renderDashboard({ initialTab: 'deep-dive' });
+
+    await assertWrappedInSuspenseThenResolve(view, 'DeepDiveTab', async () => {
+      await waitFor(() => expect(screen.getByTestId('performance-tab')).toBeInTheDocument());
+    });
+
+    // Switch to Rankings — the content roadmap lives under that sub-tab only.
+    fireEvent.click(screen.getByRole('tab', { name: /rankings/i }));
+
+    await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
+    // The "Content roadmap" section renders and the (mocked) ContentPlanTab mounts inside it.
+    expect(screen.getByText('Content roadmap')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('content-plan-tab')).toBeInTheDocument());
+  });
+
+  it('omits the DeepDive "Content roadmap" section when the plan has zero cells (gate off)', async () => {
+    // totalCells === 0 → contentPlanSummary null → ClientDashboard passes contentPlanSlot={undefined}.
+    setContentPlanCells(0);
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    const view = renderDashboard({ initialTab: 'deep-dive' });
+
+    await assertWrappedInSuspenseThenResolve(view, 'DeepDiveTab', async () => {
+      await waitFor(() => expect(screen.getByTestId('performance-tab')).toBeInTheDocument());
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /rankings/i }));
+
+    await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
+    // No plan → no content roadmap section and no ContentPlanTab anywhere under Rankings.
+    expect(screen.queryByText('Content roadmap')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-plan-tab')).not.toBeInTheDocument();
+  });
+
+  // ── Inbox-reachable guard (content brief / post review path preserved by IA v2) ──
+  it('mounts the Inbox panel without throwing under IA v2 (preserves the content brief/post review path)', async () => {
+    const ws = makeWorkspace();
+    mockGet.mockResolvedValue(ws);
+
+    renderDashboard({ initialTab: 'inbox' });
+
+    // Surrounding chrome + the Inbox panel (stub) mount; the brief/post review path lives in Inbox,
+    // so reaching it confirms IA v2 keeps that path reachable.
+    await waitFor(() => expect(screen.getByTestId('client-header')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('inbox-tab')).toBeInTheDocument());
   });
 
   // ── Results ────────────────────────────────────────────────────────────────
