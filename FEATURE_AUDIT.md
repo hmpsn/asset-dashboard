@@ -8315,3 +8315,18 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Deferred (documented):** landing-in-shell polish for the secondary/legacy nav links (they resolve correctly via retained panels — no dead ends) → built-surface persona review; DeepDiveTab `?sub=` re-sync on already-mounted (unreachable today — sender is cross-tab).
 
 **Verification:** `npm run typecheck` clean; `npx vite build` ok; full `npx vitest run` green; `npx tsx scripts/pr-check.ts` 0 errors; `npm run lint:hooks` 0; `npm run verify:feature-flags` exit 0. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p2-nav-shell.md`. Phase-per-PR: P2 → staging → P3 (content into Inbox). P5 deferred (owner).
+
+---
+
+### 600. Client dashboard IA v2 — P3 re-home the content-plan surface into Deep Dive › Rankings 2026-06-21
+**Status:** Built behind `client-ia-v2` (flag-OFF byte-identical — the standalone `content-plan` tab is untouched; the slot is populated only under the flag + a real paid plan). The P2 nav collapse removed `content-plan` from the nav; this re-homes its roadmap (matrix) + per-cell flag surface so a hands-on client can still reach it.
+
+**Architecture finding (pre-plan scan):** tracing every content path under IA v2, the content **brief/post review already works in Inbox** (a `content_request` deliverable → ProjectedReviewModal → ContentTab solo-mode with the full deep editor) — unchanged. Schema review unchanged. The ONLY orphan was the content-plan roadmap+cell-flag (cells are flag-only; no approve/decline action), so P3 is a *view re-home*, NOT a new Inbox-deliverable projection.
+
+**What was built:**
+- `DeepDiveTab` gains an optional `contentPlanSlot` rendered as a **default-collapsed "Content roadmap" `<details>`** under the Rankings sub-tab (reuses the under-the-hood `<details>` chrome; tokens only; teal "View plan" affordance).
+- `ClientDashboard` composes `ContentPlanTab` (verbatim props) into that slot when `clientIaV2 && effectiveTier !== 'free' && contentPlanSummary.totalCells > 0` (restores the legacy nav's `isPaid` tier gate — a focused review caught its omission). `ContentPlanTab` is lazy + Suspense-wrapped.
+
+**Tests:** DeepDiveTab collapsed-section cases (present under Rankings, absent under Analytics, absent when no slot); `ClientDashboard.iaV2` gate (totalCells>0 shows / totalCells=0 hides, end-to-end through the lazy path) + an inbox-reachable guard (content review preserved). Built controller + 1 test subagent → focused review: 0 Critical, 1 Important (dropped isPaid gate) fixed. Non-vacuousness verified.
+
+**Verification:** typecheck clean; vite build ok; full `vitest` green; pr-check 0; lint:hooks 0; verify:feature-flags ok. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p3-content-rehome.md`. Phase-per-PR: P3 → staging → P4 (Share/Export + per-piece attribution). P5 deferred (owner).
