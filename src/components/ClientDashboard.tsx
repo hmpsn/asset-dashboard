@@ -803,6 +803,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                       <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
                     </LazyClientTabPanel>
                   )}
+                  contentPlanSlot={(clientIaV2 && contentPlanSummary && contentPlanSummary.totalCells > 0) ? (
+                    <LazyClientTabPanel>
+                      <ErrorBoundary label="Content Plan">
+                        <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
+                      </ErrorBoundary>
+                    </LazyClientTabPanel>
+                  ) : undefined}
                 />
               </LazyClientTabPanel>
             ),

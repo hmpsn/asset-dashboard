@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { LineChart, Target } from 'lucide-react';
+import { ChevronDown, LineChart, Target } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { TabBar } from '../ui';
+import { TabBar, Icon } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 
 /**
@@ -33,9 +33,12 @@ export interface DeepDiveTabProps {
   analyticsSlot: React.ReactNode; // PerformanceTab (GSC search + GA4 analytics)
   healthSlot: React.ReactNode; // HealthTab (site-health fix-list), pinned under Analytics
   rankingsSlot: React.ReactNode; // StrategyTab (page→keyword map, validate/decline, gaps, authority, roadmap)
+  /** P3: the content-plan roadmap (matrix + per-cell flag), re-homed here as a default-collapsed
+   *  section under Rankings when a plan exists. Omitted (undefined) → the section is absent. */
+  contentPlanSlot?: React.ReactNode;
 }
 
-export function DeepDiveTab({ analyticsSlot, healthSlot, rankingsSlot }: DeepDiveTabProps) {
+export function DeepDiveTab({ analyticsSlot, healthSlot, rankingsSlot, contentPlanSlot }: DeepDiveTabProps) {
   const [searchParams] = useSearchParams();
   const [subTab, setSubTab] = useState<DeepDiveSubTab>(() => {
     const param = searchParams.get('sub');
@@ -64,7 +67,27 @@ export function DeepDiveTab({ analyticsSlot, healthSlot, rankingsSlot }: DeepDiv
         </div>
       )}
 
-      {subTab === 'rankings' && <ErrorBoundary>{rankingsSlot}</ErrorBoundary>}
+      {subTab === 'rankings' && (
+        <div className="space-y-4">
+          <ErrorBoundary>{rankingsSlot}</ErrorBoundary>
+          {/* P3: content-plan roadmap, re-homed as a default-collapsed reference section (it lost
+              its own tab in the IA v2 collapse). Only rendered when a plan slot is provided. */}
+          {contentPlanSlot != null && (
+            <details className="group bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 [&::-webkit-details-marker]:hidden">
+                <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">Content roadmap</span>
+                <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand flex-shrink-0">
+                  View plan
+                  <Icon as={ChevronDown} size="sm" className="transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              <div className="px-4 pb-4 pt-1">
+                <ErrorBoundary>{contentPlanSlot}</ErrorBoundary>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
 }
