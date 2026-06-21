@@ -60,6 +60,8 @@ export const queryKeys = {
     // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
     // forms-connected/last-lead). Invalidated by the FORM_SUBMISSION_CAPTURED workspace broadcast.
     conversionTrackingStatus: (wsId: string) => ['admin-conversion-tracking-status', wsId] as const,
+    // The Issue (Client) P1b — admin paginated named-leads readout (PII; requireWorkspaceAccess).
+    formSubmissions: (wsId: string) => ['admin-form-submissions', wsId] as const,
 
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
@@ -271,6 +273,8 @@ export const queryKeys = {
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     strategyGuidance: (wsId: string) => ['client-strategy-guidance', wsId] as const,
     roi: (wsId: string) => ['client-roi', wsId] as const,
+    // The Issue (Client) P1b — the client's OWN captured leads (authed client-portal read).
+    myLeads: (wsId: string) => ['client-my-leads', wsId] as const,
     keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
