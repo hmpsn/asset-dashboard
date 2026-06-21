@@ -22,7 +22,7 @@ export type Page =
   | 'outcomes-overview'
   | 'diagnostics';
 
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'plans' | 'roi' | 'content-plan' | 'brand';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'plans' | 'roi' | 'content-plan' | 'brand' | 'deep-dive' | 'results' | 'settings';
 export type ClientInboxFilter = 'decisions' | 'reviews' | 'conversations';
 export type ClientInboxRouteAlias = 'approvals' | 'requests' | 'content' | 'schema-review';
 

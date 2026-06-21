@@ -35,6 +35,9 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'roi',
   'content-plan',
   'brand',
+  'deep-dive',
+  'results',
+  'settings',
 ];
 
 /**
@@ -42,12 +45,15 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
  *
  * Rules (mirror ClientDashboard.tsx):
  *  - 'search' and 'analytics' are legacy aliases that redirect to 'performance'.
+ *  - 'roi' is a legacy alias that redirects to 'results' (Client IA v2 promoted
+ *    ROI → Results, so old `?tab=roi` bookmarks survive).
  *  - Anything in KNOWN_CLIENT_TABS passes through unchanged.
  *  - Unknown / undefined / empty values fall back to 'overview'.
  */
 export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
+  if (t === 'roi') return 'results';
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

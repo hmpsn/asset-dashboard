@@ -29,6 +29,7 @@ import { invalidateWorkspaceEventQueries } from '../lib/wsInvalidation';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
 import { useClientAuth } from '../hooks/useClientAuth';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useClientSearch } from '../hooks/client/useClientSearch';
 import { useClientGA4 } from '../hooks/client/useClientGA4';
 import {
@@ -77,6 +78,9 @@ const PerformanceTab = lazyWithRetry(() => import('./client/PerformanceTab').the
 const InboxTab = lazyWithRetry(() => import('./client/InboxTab').then(m => ({ default: m.InboxTab })));
 const OverviewTab = lazyWithRetry(() => import('./client/OverviewTab').then(m => ({ default: m.OverviewTab })));
 const BrandTab = lazyWithRetry(() => import('./client/BrandTab').then(m => ({ default: m.BrandTab })));
+const DeepDiveTab = lazyWithRetry(() => import('./client/DeepDiveTab').then(m => ({ default: m.DeepDiveTab })));
+const ResultsTab = lazyWithRetry(() => import('./client/ResultsTab').then(m => ({ default: m.ResultsTab })));
+const SettingsTab = lazyWithRetry(() => import('./client/SettingsTab').then(m => ({ default: m.SettingsTab })));
 
 function ClientTabFallback() {
   return <OverviewSkeleton />;
@@ -129,6 +133,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
+
+  // ── Client IA v2 flag ──
+  // Read unconditionally at the top level (Rules of Hooks). Drives the nav
+  // collapse to the 4-tab two-speed shell when ON; byte-identical legacy nav
+  // when OFF. Resolves the GLOBAL flag (client useFeatureFlag does not read
+  // per-workspace overrides — see CLAUDE.md).
+  const clientIaV2 = useFeatureFlag('client-ia-v2');
 
   // ── Recommendations → impact-bands-by-check adapter (R1-A → R1-B seam) ──
   // Shares the React Query cache with InsightsEngine / OverviewTab — no extra
@@ -569,6 +580,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     betaMode,
     contentPlanSummary,
     strategyData,
+    clientIaV2,
   });
 
   const hasData = (tabId: ClientTab): boolean => hasClientTabData({
@@ -757,6 +769,63 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     }}
                   />
                 </ErrorBoundary>
+              </LazyClientTabPanel>
+            ),
+            results: (
+              <LazyClientTabPanel>
+                <ResultsTab workspaceId={workspaceId} tier={effectiveTier} />
+              </LazyClientTabPanel>
+            ),
+            'deep-dive': (
+              <LazyClientTabPanel>
+                <DeepDiveTab
+                  analyticsSlot={(
+                    <LazyClientTabPanel>
+                      <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ga4DataUpdatedAt={ga4DataUpdatedAt} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                    </LazyClientTabPanel>
+                  )}
+                  healthSlot={(
+                    <LazyClientTabPanel>
+                      <ErrorBoundary label="Site Health">
+                        <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check Inbox > Reviews to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
+                          <ErrorBoundary label="Action Plan">
+                            <LazyClientTabPanel>
+                              <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />
+                            </LazyClientTabPanel>
+                          </ErrorBoundary>
+                        ) : undefined}
+                        />
+                      </ErrorBoundary>
+                    </LazyClientTabPanel>
+                  )}
+                  rankingsSlot={(
+                    <LazyClientTabPanel>
+                      <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+                    </LazyClientTabPanel>
+                  )}
+                />
+              </LazyClientTabPanel>
+            ),
+            settings: (
+              <LazyClientTabPanel>
+                <SettingsTab
+                  brandSlot={(
+                    <ErrorBoundary label="Brand">
+                      <BrandTab
+                        businessProfile={ws?.businessProfile ?? undefined}
+                        onSaveBusinessProfile={async (profile) => {
+                          const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                          if (res?.businessProfile) {
+                            setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+                          }
+                        }}
+                      />
+                    </ErrorBoundary>
+                  )}
+                  plansSlot={(!betaMode && !isExternalBilling) ? (
+                    <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} hidePrices={isExternalBilling} />
+                  ) : undefined}
+                />
               </LazyClientTabPanel>
             ),
           }}
