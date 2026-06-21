@@ -32,6 +32,12 @@ const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
     `SELECT * FROM form_submissions WHERE workspace_id = ? ORDER BY submitted_at DESC`,
   ),
+  selectByWorkspacePaged: db.prepare(
+    `SELECT * FROM form_submissions WHERE workspace_id = ? ORDER BY submitted_at DESC LIMIT ? OFFSET ?`,
+  ),
+  countByWorkspace: db.prepare(
+    `SELECT COUNT(*) AS n FROM form_submissions WHERE workspace_id = ?`,
+  ),
   countInRange: db.prepare(
     `SELECT COUNT(*) AS n FROM form_submissions
        WHERE workspace_id = ? AND submitted_at >= ? AND submitted_at <= ?`,
@@ -65,6 +71,21 @@ export function saveFormSubmission(s: Omit<FormSubmission, 'id'>): { inserted: b
 /** Admin-only: full named-lead rows (includes PII). NEVER call from a public serializer. */
 export function loadFormSubmissions(workspaceId: string): FormSubmission[] {
   return (stmts().selectByWorkspace.all(workspaceId) as FormSubmissionRow[]).map(rowToFormSubmission);
+}
+
+/**
+ * Admin/client-authed paginated named-lead read (P1b A5). Returns the page of leads (PII included)
+ * plus the UNBOUNDED total (rate-display-shares-source: the page length is NOT the total). NEVER call
+ * from a public unauthed serializer — the guard on the route (requireWorkspaceAccess /
+ * requireAuthenticatedClientPortalAuth) is what authorizes PII exposure (D7).
+ */
+export function loadFormSubmissionsPaged(
+  workspaceId: string,
+  opts: { limit: number; offset: number },
+): { leads: FormSubmission[]; total: number } {
+  const rows = stmts().selectByWorkspacePaged.all(workspaceId, opts.limit, opts.offset) as FormSubmissionRow[];
+  const total = (stmts().countByWorkspace.get(workspaceId) as { n: number }).n;
+  return { leads: rows.map(rowToFormSubmission), total };
 }
 
 /** Anonymous count of captured leads in a date range (inclusive). Safe for the public payload. */

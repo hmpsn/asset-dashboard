@@ -83,6 +83,7 @@ import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import { theIssueAdminRouter } from './routes/the-issue-admin.js';
 import { theIssueConversionTrackingRouter } from './routes/the-issue-conversion-tracking.js';
+import { theIssueExportRouter } from './routes/the-issue-export.js';
 import strategyPovRouter from './routes/strategy-pov.js';
 import strategyIssueLensesRouter from './routes/strategy-issue-lenses.js';
 import competitorAlertsRouter from './routes/competitor-alerts.js';
@@ -364,6 +365,7 @@ export function createApp(): express.Express {
   app.use(meetingBriefRouter);
   app.use(theIssueAdminRouter);
   app.use(theIssueConversionTrackingRouter);
+  app.use(theIssueExportRouter);
   app.use(strategyPovRouter);
   app.use(strategyIssueLensesRouter);
   app.use(competitorAlertsRouter);

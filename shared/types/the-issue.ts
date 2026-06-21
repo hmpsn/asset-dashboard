@@ -68,3 +68,67 @@ export interface Ga4ConversionSnapshot {
   totalUsers: number;
   byEvent: { eventName: string; conversions: number; users: number; rate: number }[];
 }
+
+/**
+ * P1b — admin setup-readiness rollup. Each signal is a ✓/⚠ gate the operator must clear to
+ * produce a trustworthy outcome verdict. PII-FREE: counts + booleans + timestamps only (D7).
+ * Backed by assembleSetupReadiness (server/the-issue-readiness.ts). Rides the ADMIN
+ * conversion-tracking-status endpoint (requireWorkspaceAccess), never the public payload.
+ */
+export interface SetupReadinessState {
+  ga4Connected: boolean;            // workspace.ga4PropertyId present
+  valueSet: boolean;                // workspace.outcomeValue present
+  basisOfValue: 'client_provided' | 'agency_estimate' | 'ai_enriched' | null;
+  segmentConfirmed: boolean;        // admin-confirmed segmentConfig OR deterministic local/multi
+  eventsPinned: boolean;            // ≥1 pinned eventConfig entry
+  eventsTyped: boolean;             // ≥1 pinned event carrying an outcomeType
+  webflowConnected: boolean;        // ≥1 webflowFormSources mapping
+  conversionTrackingConfirmedAt: string | null;
+  lastLeadAt: string | null;        // freshness of captured leads (count-only freshness, no PII)
+  povDrafted: boolean;              // Strategy POV exists for the workspace
+  /** Count of gates not yet cleared (drives the admin "N steps left" affordance). */
+  openGapCount: number;
+}
+
+/**
+ * P1b — named-lead view. Admin reads (requireWorkspaceAccess) and the client's OWN-leads read
+ * (requireAuthenticatedClientPortalAuth) BOTH return this shape — the guard, not the shape,
+ * enforces the boundary. NEVER public/unauthed (D7). leadMessage stays admin-internal (omitted).
+ */
+export interface NamedLeadView {
+  id: string;
+  formName: string;
+  leadName: string | null;
+  leadEmail: string | null;
+  outcomeType: OutcomeType;
+  submittedAt: string;
+}
+
+/**
+ * P1b — the forwardable one-pager export payload (the "zero-edit board summary"). Assembled
+ * server-side from computeROI().outcomeVerdict + curated top-moves + the segment exportProfile.
+ * Carries NO PII (lead names ride the separate NamedLeadView reads, embedded by the renderer
+ * only on the authed surface). NEVER on the public unauthed payload (D7).
+ */
+export interface OnePagerExportPayload {
+  exportProfile: 'sms_recap' | 'board_one_pager' | 'partner_summary' | 'owner_portfolio';
+  workspaceName: string;
+  brandLogoUrl: string | null;
+  outcomeNoun: string;              // resolved segment plural noun
+  verdictSentence: string;          // pre-templated dollar verdict (client never re-derives)
+  estimatedValue: number;
+  monthlyRetainer: number | null;
+  adSpendEquivalent: number;        // from ROIData.adSpendEquivalent
+  valueVsRetainerRatio: number | null; // estimatedValue / monthlyRetainer, null when no retainer
+  outcomeCount: number;
+  outcomeUnitLabel: string;
+  outcomeCountSinceStart: number | null; // baselineDeltaCount — the "since we started" frame
+  baselineCapturedAt: string | null;
+  outcomeTypeBreakdown: OutcomeTypeBreakdown[];
+  topMoves: { title: string; estimatedGain: string }[]; // curated, client-safe (NO EMV/value)
+  methodologyLine: string;          // provenance-aware honesty line
+  provenance: OutcomeProvenance;
+  /** Present ONLY when the renderer is fed leads on the authed surface; PII is the client's own. */
+  leads?: NamedLeadView[];
+  generatedAt: string;              // ISO
+}

@@ -19,14 +19,17 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { getWorkspace, getTokenForSite, updateWorkspace } from '../workspaces.js';
 import { listWebflowForms } from '../webflow-forms.js';
-import { getFormCaptureStatus } from '../form-submissions.js';
+import { getFormCaptureStatus, loadFormSubmissionsPaged } from '../form-submissions.js';
 import { loadGa4SnapshotHistory } from '../ga4-snapshots.js';
 import { aggregatePinnedOutcomes } from '../the-issue-outcome.js';
+import { assembleSetupReadiness } from '../the-issue-readiness.js';
+import { toNamedLeadView } from '../the-issue-export.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { webflowFormMappingSchema } from '../schemas/workspace-schemas.js';
 import type { WebflowFormMapping } from '../../shared/types/form-submission.js';
+import type { NamedLeadView } from '../../shared/types/the-issue.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('the-issue-conversion-tracking');
@@ -65,7 +68,47 @@ theIssueConversionTrackingRouter.get(
       lastSubmissionAt: status.lastSubmissionAt,
       submissionCount: status.count,
       recentOutcomeCount,
+      // P1b (A4): PII-free setup-readiness rollup — additive, admin-only. The public payload is
+      // untouched; this rides ONLY the requireWorkspaceAccess status endpoint.
+      readiness: assembleSetupReadiness(ws.id),
     });
+  },
+);
+
+// ── Admin: captured named-leads (PII, paginated) ─────────────────────────────
+// GET /api/workspaces/:id/form-submissions
+// requireWorkspaceAccess (HMAC admin) + flag-gated. PII rides ONLY this guarded route (D7); `total`
+// is the unbounded count so the readout's "N captured" badge is independent of the page length.
+// NOTE: validate() only checks req.body — query params are parsed inline against leadsQuerySchema.
+const leadsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
+});
+
+theIssueConversionTrackingRouter.get(
+  '/api/workspaces/:id/form-submissions',
+  requireWorkspaceAccess(),
+  (req, res) => {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) {
+      res.status(404).json({ error: 'Workspace not found' });
+      return;
+    }
+    if (!isFeatureEnabled(FLAG, ws.id)) {
+      res.sendStatus(404);
+      return;
+    }
+    const parsed = leadsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
+      return;
+    }
+    const limit = parsed.data.limit ?? 50;
+    const offset = parsed.data.offset ?? 0;
+    const { leads: rows, total } = loadFormSubmissionsPaged(ws.id, { limit, offset });
+    // Explicit lockstep map (do NOT spread) — a field drop fails the mapper, not silently here (D7).
+    const leads: NamedLeadView[] = rows.map(toNamedLeadView);
+    res.json({ leads, total });
   },
 );
 
