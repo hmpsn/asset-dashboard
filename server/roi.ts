@@ -18,7 +18,7 @@ import { isFeatureEnabled } from './feature-flags.js';
 import { loadGa4SnapshotHistory } from './ga4-snapshots.js';
 import { aggregatePinnedOutcomes, computeOutcomeBaseline, selectOutcomeProvenance } from './the-issue-outcome.js';
 import { countFormSubmissions } from './form-submissions.js';
-import type { OutcomeBaseline, OutcomeProvenance, OutcomeTypeBreakdown } from '../shared/types/the-issue.js';
+import type { Ga4ConversionSnapshot, OutcomeBaseline, OutcomeProvenance, OutcomeTypeBreakdown } from '../shared/types/the-issue.js';
 
 
 const log = createLogger('roi');
@@ -84,6 +84,29 @@ function computeGrowthPercent(workspaceId: string, currentValue: number): number
   return Math.round(((currentValue - closest.organicTrafficValue) / closest.organicTrafficValue) * 10000) / 100;
 }
 
+/**
+ * The GA4 conversion snapshot closest to 30 days before `latestCapturedAt`, but only if it lands
+ * within the 15–45-day window (mirrors computeGrowthPercent's guard so MoM is apples-to-apples and
+ * never anchored to a too-recent or too-stale snapshot). Excludes the latest snapshot itself.
+ * Returns null when nothing qualifies — caller surfaces the honest "establishing" state.
+ */
+export function findPriorOutcomeSnapshot(
+  history: Ga4ConversionSnapshot[],
+  latestCapturedAt: string,
+): Ga4ConversionSnapshot | null {
+  const target = new Date(latestCapturedAt).getTime() - 30 * 24 * 60 * 60 * 1000;
+  let closest: Ga4ConversionSnapshot | null = null;
+  let closestDiff = Infinity;
+  for (const s of history) {
+    if (s.capturedAt === latestCapturedAt) continue;
+    const diff = Math.abs(new Date(s.capturedAt).getTime() - target);
+    if (diff < closestDiff) { closest = s; closestDiff = diff; }
+  }
+  if (!closest) return null;
+  // closestDiff is distance from the 30-day mark; ≤15 days ⇒ snapshot is 15–45 days before latest.
+  return closestDiff <= 15 * 24 * 60 * 60 * 1000 ? closest : null;
+}
+
 export interface ROIData {
   /** Total estimated dollar value of organic traffic this period */
   organicTrafficValue: number;
@@ -123,6 +146,13 @@ export interface ROIData {
     monthlyRetainer: number | null;
     baseline: OutcomeBaseline;
     baselineDeltaCount: number | null;
+    /**
+     * P1 (IA v2): outcome count for the previous comparable 30-day period — the snapshot closest to
+     * 30 days before the latest, within a 15–45 day window. null when no qualifying prior snapshot
+     * exists (the client then shows the honest "establishing your trend" line, never a fabricated
+     * delta). The month-over-month delta is `outcomeCount − priorPeriodCount`.
+     */
+    priorPeriodCount: number | null;
     provenance: OutcomeProvenance;
     /** P1a: typed breakdown ("23 form fills + 41 calls"). Present when measured-capture is ON. */
     outcomeTypeBreakdown?: OutcomeTypeBreakdown[];
@@ -365,6 +395,12 @@ export function computeROI(workspaceId: string): ROIData | null {
         baseline.state === 'ready' && baseline.baselineConversions != null
           ? agg.totalConversions - baseline.baselineConversions
           : null;
+      // P1 (IA v2): real month-over-month — re-aggregate the SAME pinned outcomes from the prior
+      // snapshot so the delta is apples-to-apples. null when no snapshot lands in the window.
+      const priorSnapshot = findPriorOutcomeSnapshot(history, latest.capturedAt);
+      const priorPeriodCount = priorSnapshot
+        ? aggregatePinnedOutcomes(ws, priorSnapshot.byEvent).totalConversions
+        : null;
       // P1a current-period window for Webflow form-submission counts/reconciliation: the 30 days
       // ending at the latest snapshot. countFormSubmissions returns 0 when measured-capture is OFF
       // anyway (no leads captured), so the OFF path stays byte-identical.
@@ -384,6 +420,7 @@ export function computeROI(workspaceId: string): ROIData | null {
         monthlyRetainer: ws.outcomeValue.monthlyRetainer ?? null,
         baseline: verdictBaseline,
         baselineDeltaCount,
+        priorPeriodCount,
         provenance,
       };
       // P1a additive fields — only when measured-capture is ON, so the OFF path emits neither
