@@ -122,6 +122,16 @@ describe('GET /api/public/export/:id/one-pager (A6)', () => {
     expect(html).toContain('Counts are');
   });
 
+  it('gate D — estimate_ga4 verdict bands the money (~$) and NEVER prints the exact count × rate dollar', async () => {
+    // wsOn: 14 conversions × $800/outcome = $11,200 exact → banded to ~$11,000 (estimate_ga4).
+    const res = await api(`/api/public/export/${wsOn}/one-pager`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('~$11,000');      // banded estimated value (gate D)
+    expect(html).not.toContain('$11,200');    // the exact count × rate dollar must NOT leak
+    expect(html).not.toContain('≈');          // ~$ already conveys approximation; no extra hedge
+  });
+
   it('flag-OFF → 404', async () => {
     const res = await api(`/api/public/export/${wsOff}/one-pager`);
     expect(res.status).toBe(404);

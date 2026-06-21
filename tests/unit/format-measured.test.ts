@@ -11,8 +11,10 @@ describe('fmtMeasuredMoney (exact, measured-labeled)', () => {
     expect(fmtMeasuredMoney(Number.NaN)).toBe('—');
   });
 });
-describe('fmtOutcomeMoney (provenance-driven selector)', () => {
+describe('fmtOutcomeMoney (provenance-driven selector — band UNLESS actual_reconciled, gate D)', () => {
   it('estimate_ga4 → banded ~ estimate', () => { expect(fmtOutcomeMoney(11_234, 'estimate_ga4')).toBe('~$11,000'); });
-  it('measured_action → exact', () => { expect(fmtOutcomeMoney(11_234, 'measured_action')).toBe('$11,234'); });
-  it('actual_reconciled → exact (P3-ready)', () => { expect(fmtOutcomeMoney(11_234, 'actual_reconciled')).toBe('$11,234'); });
+  // Gate-D fix: measured_action's DOLLAR is banded (value = exact count × estimated lead rate),
+  // matching the hero's resolveProvenanceRender. Only the COUNT graduates to exact at measured_action.
+  it('measured_action → banded ~ (dollar still count × estimated rate)', () => { expect(fmtOutcomeMoney(11_234, 'measured_action')).toBe('~$11,000'); });
+  it('actual_reconciled → exact (value reconciled to closed records)', () => { expect(fmtOutcomeMoney(11_234, 'actual_reconciled')).toBe('$11,234'); });
 });
