@@ -110,6 +110,11 @@ export const FEATURE_FLAGS = {
   'the-issue-client-segment-inserts': false,
   // P1: "next bets" $-forecast reframe from existing recommendation estimatedGain.
   'the-issue-client-next-bets': false,
+  // Client IA v2 — master flag for the verdict-first Overview reframe (P1) → 4-tab shell (P2+).
+  // Gates every new IA-v2 render; flag-OFF the client dashboard is byte-identical to today's spine.
+  'client-ia-v2': false,
+  // Client IA v2 — conditional Locations tab + leaderboard for multi-location accounts (P5).
+  'client-locations': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -515,6 +520,32 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
+  'client-ia-v2': {
+    label: 'Client dashboard — IA v2 (verdict-first Overview reframe → 4-tab shell)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove once client IA v2 (P1 Overview reframe through P4) is validated on staging and shipped as the default client dashboard.',
+      linkedRoadmapItemId: 'client-dashboard-ia-restructure',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
+  'client-locations': {
+    label: 'Client dashboard — conditional Locations tab (multi-location track)',
+    group: 'The Issue (Client)',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-20',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove once the multi-location leaderboard + Locations drill-down (P5) is validated and becomes default for accounts with >1 location.',
+      linkedRoadmapItemId: 'client-dashboard-ia-restructure',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-20',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -548,7 +579,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'The Issue (Client)',
-    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets'],
+    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets', 'client-ia-v2', 'client-locations'],
   },
 ];
 
