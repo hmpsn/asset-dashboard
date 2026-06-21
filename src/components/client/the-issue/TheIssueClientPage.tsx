@@ -179,8 +179,13 @@ export function TheIssueClientPage({
     onOpenChat();
     setTimeout(() => onAskAi(`I'd like to talk through this move: "${rec.title}"${kw}.`), 100);
   };
-  const openStrategy = () => navigate(clientPath(workspaceId, 'strategy', betaMode));
-  const openGroup = (_archetype: Archetype) => navigate(clientPath(workspaceId, 'strategy', betaMode));
+  // IA v2: the strategy CTAs land in Deep Dive › Rankings (the folded home of the
+  // keyword/strategy surfaces); flag-OFF they keep the standalone Strategy tab.
+  const strategyDest = () => iaV2Enabled
+    ? `${clientPath(workspaceId, 'deep-dive', betaMode)}?sub=rankings`
+    : clientPath(workspaceId, 'strategy', betaMode);
+  const openStrategy = () => navigate(strategyDest());
+  const openGroup = (_archetype: Archetype) => navigate(strategyDest());
 
   // ── Loading state (real loading→loaded transition; hooks already ran) ────────
   if (issueQuery.isLoading) {
