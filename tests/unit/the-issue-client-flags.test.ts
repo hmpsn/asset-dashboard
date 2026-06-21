@@ -46,3 +46,51 @@ describe('the-issue-client-measured-capture (P1a website-native capture)', () =>
     expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation'].lifecycle.removalCondition).toMatch(/CRM|call.?tracking|P3/i);
   });
 });
+
+// Lane D (D1) — pin the P1b bundle's part→flag gating contract. P1b ships entirely on the two
+// already-declared, default-OFF child flags (no net-new flag, DR-6):
+//   - the-issue-client-measured-capture → admin setup-readiness checklist + admin named-leads
+//   - the-issue-client-return-hook      → client one-pager export + client own-leads
+// The negative is load-bearing: P1b parts MUST NOT be gated on the-issue-client-reconciliation
+// (that flag is reserved for P3 CRM/call-tracking reconciliation). This locks the gating decision so
+// a future refactor cannot silently re-home a P1b surface onto the wrong flag.
+describe('P1b bundle gating (Lane D, D1)', () => {
+  const P1B_CHILD_FLAGS = ['the-issue-client-measured-capture', 'the-issue-client-return-hook'] as const;
+
+  it('both P1b child flags exist in the catalog and default OFF (no net-new flag)', () => {
+    for (const key of P1B_CHILD_FLAGS) {
+      expect(FEATURE_FLAGS[key], `${key} must exist`).toBe(false);
+      expect(FEATURE_FLAG_CATALOG[key], `${key} must be in the catalog`).toBeDefined();
+    }
+  });
+
+  it('both P1b child flags are grouped under "The Issue (Client)"', () => {
+    const group = FEATURE_FLAG_GROUPS.find(g => g.label === 'The Issue (Client)');
+    expect(group).toBeDefined();
+    for (const key of P1B_CHILD_FLAGS) {
+      expect(group!.keys).toContain(key);
+      expect(FEATURE_FLAG_CATALOG[key].group).toBe('The Issue (Client)');
+    }
+  });
+
+  it('the admin-half flag (measured-capture) carries its P1a roadmap link', () => {
+    const meta = FEATURE_FLAG_CATALOG['the-issue-client-measured-capture'].lifecycle;
+    expect(meta.linkedRoadmapItemId).toBe('the-issue-client-redesign-p1a-measured-capture');
+    expect(meta.owner).toBeTruthy();
+  });
+
+  it('the client-half flag (return-hook) watches delivery cost on staging first + links its roadmap item', () => {
+    const meta = FEATURE_FLAG_CATALOG['the-issue-client-return-hook'].lifecycle;
+    expect(meta.rolloutTarget).toBe('staging-validation');
+    expect(meta.linkedRoadmapItemId).toBe('the-issue-client-redesign-p1-return-hook');
+    expect(meta.owner).toBeTruthy();
+  });
+
+  it('NEGATIVE — P1b parts are NOT gated on the P3 reconciliation flag (it stays CRM/call-tracking)', () => {
+    expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation'].lifecycle.removalCondition).toMatch(/CRM|call.?tracking|P3/i);
+    // The P1b child flags are distinct keys from the reconciliation flag.
+    for (const key of P1B_CHILD_FLAGS) {
+      expect(key).not.toBe('the-issue-client-reconciliation');
+    }
+  });
+});
