@@ -17,8 +17,20 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('analytics')).toBe('performance');
   });
 
+  it('does NOT alias "roi" → keeps it (pure helper cannot read the flag; an unconditional alias would break the flag-OFF ROI tab)', () => {
+    expect(resolveClientTab('roi')).toBe('roi');
+  });
+
   it('passes through "brand"', () => {
     expect(resolveClientTab('brand')).toBe('brand');
+  });
+
+  // ── Client IA v2 shell tabs pass through unchanged ──
+
+  it('passes through "deep-dive", "results", "settings" unchanged', () => {
+    expect(resolveClientTab('deep-dive')).toBe('deep-dive');
+    expect(resolveClientTab('results')).toBe('results');
+    expect(resolveClientTab('settings')).toBe('settings');
   });
 
   // ── Pass-through for known tabs ──
@@ -26,6 +38,9 @@ describe('resolveClientTab', () => {
   it('passes through every value in KNOWN_CLIENT_TABS unchanged', () => {
     expect(KNOWN_CLIENT_TABS.length).toBeGreaterThan(0);
     for (const tab of KNOWN_CLIENT_TABS) {
+      // Every known tab (incl. 'roi') resolves to itself — no aliases out of
+      // KNOWN_CLIENT_TABS. (search/analytics are aliases but are intentionally NOT
+      // in KNOWN_CLIENT_TABS.)
       expect(resolveClientTab(tab)).toBe(tab);
     }
   });

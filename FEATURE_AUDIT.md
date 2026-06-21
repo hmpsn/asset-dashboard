@@ -8298,3 +8298,20 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** unit (`roi-prior-snapshot` window guard), integration (`the-issue-roi-mom` — real `GET /api/public/roi`, +7 MoM, null on single-snapshot, null on out-of-window prior), component (`IssueVerdictHeadline.iaV2` MoM up/down/flat + typed row + flag-OFF parity; `TheIssueClientPage.iaV2Leads` document-order + no double-mount; `OutcomeCountBand` named-records upsell contract). Built subagent-per-task → 3-lens scaled review (correctness + flag-OFF parity + test quality): zero Critical, zero real code bugs; 3 Important test-coverage gaps closed + proven non-vacuous.
 
 **Verification:** `npm run typecheck` clean; `npx vite build` ok; full `npx vitest run` 26825 passed; `npx tsx scripts/pr-check.ts` 0 errors; `npm run lint:hooks` 0; `npm run verify:feature-flags` exit 0. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p1-overview-reframe.md`. Phase-per-PR: P1 → staging → P2 (4-tab nav). P5 (multi-location) deferred to its own session (owner).
+
+---
+
+### 599. Client dashboard IA v2 — P2 collapse to the 4-tab two-speed shell 2026-06-21
+**Status:** Built behind `client-ia-v2` (default OFF → nav + every tab byte-identical to today's 11-tab layout). Collapses the client nav to **Overview · Inbox · Results · Deep Dive** (+ a reachable **Settings** home) when the flag is ON.
+
+**What was built:**
+- **DeepDiveTab** (new) — the single opt-in depth tab with two named sub-tabs **Analytics** (folds `PerformanceTab` GSC/GA4 + the `HealthTab` fix-list, pinned) · **Rankings** (folds `StrategyTab`). Slot-based: ClientDashboard composes the existing data-heavy tabs (verbatim props) and passes them as ReactNode slots, so prop-threading stays where the data lives. Deep-links its sub-tab via `?sub=` (`tab-deeplink-ok` for the internal bar; it still reads `searchParams`).
+- **ResultsTab** (new) — the promoted ROI surface (evergreen `ROIDashboard`).
+- **SettingsTab** (new) — account home grouping Brand + (conditional) Plans; `plansSlot` omitted when billing is hidden (betaMode/external).
+- **Nav flag-branch** — `buildClientDashboardNav` early-returns the 4-tab set when `clientIaV2` is ON (overview label "Insights"→"Overview"); the OFF return is unchanged. `ClientTab` union + `KNOWN_CLIENT_TABS` + panels gain `deep-dive`/`results`/`settings`. `roi` deliberately resolves to itself (NOT aliased to results — a pure helper can't read the flag; an unconditional alias broke the flag-OFF ROI tab). The spine's strategy CTA lands in Deep Dive › Rankings (`?sub=rankings&tab=rankings`) under IA v2.
+
+**Contracts/tests:** new lockstep contract (`client-tab-panel-lockstep` — KNOWN_CLIENT_TABS == panels keys, robust brace-walk parse, fails on drift); nav-builder flag-ON/OFF byte-identical tests; routing unit tests; 3 component tests; and **`ClientDashboard.iaV2`** — a flag-ON real-render guard that mounts the new tabs through the REAL lazy+Suspense panel path (rule 13), non-vacuous (React 19 silently retries lazy-without-Suspense, so it gates the import + asserts the Suspense fallback/header stay mounted; proven to fail when a panel's wrapper is removed). Built subagent-per-task → 3-lens scaled review: **1 Critical** (flag-OFF roi→results regression) + **2 Important** (strategy CTA interior-tab, missing flag-ON render guard) all fixed.
+
+**Deferred (documented):** landing-in-shell polish for the secondary/legacy nav links (they resolve correctly via retained panels — no dead ends) → built-surface persona review; DeepDiveTab `?sub=` re-sync on already-mounted (unreachable today — sender is cross-tab).
+
+**Verification:** `npm run typecheck` clean; `npx vite build` ok; full `npx vitest run` green; `npx tsx scripts/pr-check.ts` 0 errors; `npm run lint:hooks` 0; `npm run verify:feature-flags` exit 0. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p2-nav-shell.md`. Phase-per-PR: P2 → staging → P3 (content into Inbox). P5 deferred (owner).

@@ -16,6 +16,7 @@ interface BuildClientDashboardNavOptions {
   betaMode: boolean;
   contentPlanSummary: { totalCells: number } | null;
   strategyData: unknown;
+  clientIaV2: boolean;
 }
 
 export function buildClientDashboardNav({
@@ -24,6 +25,7 @@ export function buildClientDashboardNav({
   betaMode,
   contentPlanSummary,
   strategyData,
+  clientIaV2,
 }: BuildClientDashboardNavOptions): ClientNavItem[] {
   const isPaid = effectiveTier !== 'free';
   const isExternalBilling = ws.billingMode === 'external';
@@ -35,6 +37,18 @@ export function buildClientDashboardNav({
   // workspace object skips the serializer.
   const strategyVisible = ws.seoClientView !== false;
   const strategyLocked = effectiveTier === 'free';
+
+  // Client IA v2 — collapse to the 4-tab two-speed shell (+ Settings home).
+  // Flag-ON only; the flag-OFF return below stays byte-identical to today's nav.
+  if (clientIaV2) {
+    return [
+      { id: 'overview', label: 'Overview', icon: Sparkles, locked: false },
+      ...(isPaid ? [{ id: 'inbox' as const, label: 'Inbox', icon: Zap, locked: false }] : []),
+      ...(isPaid && !betaMode && strategyData ? [{ id: 'results' as const, label: 'Results', icon: Trophy, locked: false }] : []),
+      { id: 'deep-dive' as const, label: 'Deep Dive', icon: LineChart, locked: false },
+      { id: 'settings' as const, label: 'Settings', icon: Building2, locked: false },
+    ];
+  }
 
   return [
     { id: 'overview', label: 'Insights', icon: Sparkles, locked: false },
@@ -72,5 +86,9 @@ export function hasClientTabData({
     || (tabId === 'performance' && !!(overview || ga4Overview))
     || (tabId === 'health' && !!audit)
     || tabId === 'inbox'
+    // Client IA v2 shell tabs are composition surfaces — always renderable.
+    || tabId === 'deep-dive'
+    || tabId === 'results'
+    || tabId === 'settings'
     || (tabId === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
 }
