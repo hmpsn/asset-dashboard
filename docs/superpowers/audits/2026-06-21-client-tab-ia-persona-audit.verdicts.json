@@ -1,0 +1,419 @@
+{
+  "date": "2026-06-21",
+  "mode": "persona-audit (evaluative+generative)",
+  "topic": "client tab IA simplification + progressive depth",
+  "tabsMapped": 11,
+  "personas": 7,
+  "maps": [
+    {
+      "tab": "overview",
+      "purpose": "Central landing hub for clients to see their SEO progress, action items, and next steps at a glance",
+      "whatItShows": "Welcome greeting + 2 timestamps (search/GA4 data freshness); composite health score; 4-5 key metrics (visitors, search clicks, impressions, avg ranking position, site health score) with delta % vs last period; action banner (pending approvals, content reviews, team replies, content plan pages) with count badges; single #1 priority recommendation with contribution breakdown; contextual CTA (content brief generation, site health fix, or traffic growth); monthly digest; intelligence summary card; outcome/wins scorecard; predictions showcase; insights feed (15+ computed signals about traffic, rankings, conversions, audit issues); sidebar with AI advisor quick questions, content opportunities preview (2 items), agency work feed or legacy activity timeline (5 recent work entries)",
+      "clientGoal": "Determine status at a glance (traffic up/down, site healthy, work pending) and know the next 1-3 actions (fix top priority, review approval, create content)",
+      "depth": "scan",
+      "overlapsWith": [
+        "performance",
+        "search",
+        "health",
+        "analytics",
+        "strategy",
+        "inbox"
+      ],
+      "emptyStateValue": "Large card with workspace name + 3-item setup checklist (GSC connect, GA4 connect, run audit); shows \"We're getting everything set up for you. Here's what we need:\" text; renders when all three core data sources (overview, audit, ga4Overview) are null"
+    },
+    {
+      "tab": "performance",
+      "purpose": "View search and analytics performance trends with detailed keyword insights, traffic source breakdowns, and event conversion tracking",
+      "whatItShows": "Search sub-tab: AI takeaway, keyword insight cards (low-hanging fruit, top performers, CTR opportunities, visibility without clicks), sortable query/page tables, rank history chart with annotations, competitor gaps (Premium). Analytics sub-tab: AI takeaway, 6 stat cards (users/sessions/pageviews/duration/bounce/new %), traffic trend area chart, device pie chart, top pages list, traffic sources list, organic snapshot, new vs returning breakdown, landing pages, grouped conversion events with selectable event trends, collapsible action explorer with page filtering",
+      "clientGoal": "Confirm organic search visibility and website traffic are moving in the right direction; identify quick-win keywords to rank; discover top-performing pages and traffic sources; understand which tracked actions are happening most",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "overview",
+        "roi"
+      ],
+      "emptyStateValue": "Free tier: full paywall gate. Growth+Premium no GSC/GA4: connect both. GSC-only: search data coming soon. GA4-only: analytics coming soon"
+    },
+    {
+      "tab": "search",
+      "purpose": "Show organic search performance from Google Search Console — clicks, impressions, ranking positions, keyword insights, and performance trends.",
+      "whatItShows": "1) Date range + freshness stamp (lines 89-91). 2) AI-generated takeaway summary (lines 95-100): builds insight from click trends, position changes, low-hanging-fruit keywords, CTR optimization opportunities, and top-3 rankings. 3) Compact stat bar (lines 103-108): total clicks, impressions, avg CTR (%), avg position, each with prior-period change and directional badges. 4) Search Health Summary section (lines 114-138): four metric cards showing page-1 rankings count, top-3 rankings count, avg CTR with health interpretation, opportunities count. 5) Up to 4 insight cards (lines 81-148): \"Low-Hanging Fruit\" (ranked 5-20 with impressions), \"Top Performers\" (top-3 high-click keywords), \"CTR Opportunities\" (page-1 under 3% CTR), \"Visibility Without Clicks\" (100+ impressions but under 5 clicks) — each shows up to 8 keyword examples with position, click count, or CTR. 6) Performance Trend dual-line chart (lines 152-156): clicks and impressions over time, annotated with timeline notes. 7) Rank Tracking section (line 159): tracks curated keywords over time with latest positions. 8) Competitor Gaps section (lines 163-165): premium-exclusive benchmarking, tier-gated upsell for free/growth. 9) Timeline Notes (lines 168-184): read-only annotations added by team. 10) Collapsible \"All Keywords & Pages\" tables (lines 191-278): two subtabs (Queries / Pages) showing all GSC data for the period, sortable by clicks, impressions, CTR, position.",
+      "clientGoal": "Diagnose organic search visibility and traffic — what keywords drive clicks, which are close to page 1 (quick wins), which rank but don't convert (CTR issues), and overall search health relative to prior period.",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "performance",
+        "analytics"
+      ],
+      "emptyStateValue": "If no Google Search Console connection: shows icon (Search), title \"Search data coming soon\", description \"Once Google Search Console is connected, you'll see how people find your site through Google — keywords, clicks, and ranking positions.\" (line 78). Tables remain hidden. Stats/health/insights sections don't render (gated on overview being null)."
+    },
+    {
+      "tab": "health",
+      "purpose": "Comprehensive site health audit with SEO score, technical defect reporting, Core Web Vitals metrics, and fix recommendations",
+      "whatItShows": "Site health score (0-100) with color-coded sentiment; audit diff showing resolved vs new issues; Core Web Vitals metrics (LCP/INP/CLS) for mobile and desktop with pass/fail badges; prioritized fix list by impact; site-wide recurring issues; filterable all-pages list (errors/warnings/info severity); historical score trend chart; fix cost cart summary",
+      "clientGoal": "Diagnose why site ranks poorly by surfacing search-relevant technical issues and enabling clients to track remediation progress",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "overview"
+      ],
+      "emptyStateValue": "Shield icon + \"Site health check coming soon\" + optional \"Request a health check\" button — no data shown"
+    },
+    {
+      "tab": "Strategy",
+      "purpose": "Shows the SEO keyword strategy with ranked priorities, content/page opportunities, and client feedback on suggested keywords.",
+      "whatItShows": "4-tab interior layout (Overview | Content | Rankings | Competitive). **Overview tab:** health score snapshot (0–100 readiness metric), keyword strategy health (content/quick-win/coverage scores), next steps callouts, business priorities tracker. **Content tab:** content gaps with opportunity scores, quick wins (existing page improvements). **Rankings tab:** page-keyword map with current rankings/search metrics, tracked keywords table (3-column: strategy keywords | keyword ideas | declined), searchability trend chart. **Competitive tab:** competitor keyword gaps. All keyword entries show: label, role type (strategy/page opportunity/content/idea), opportunity signal (strong/needs review/lower priority/etc. with scores 0–100), metrics (volume/difficulty/current rank/CTR), evidence links (from page map/content rec/competitor gap), search intent, and direct action buttons (request content, map page, decline, remove).",
+      "clientGoal": "Review and guide which keywords the agency should prioritize for content and page optimization, validate/reject suggested keywords, and see ranked pages mapped to keywords with current search visibility.",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "overview",
+        "performance",
+        "content-plan"
+      ],
+      "emptyStateValue": "When no strategy has been generated yet: full-page message \"SEO strategy is being prepared\" + \"Check back soon, or open Inbox to send your team a request\" + button to switch to Inbox tab. No partial UI, no empty tabs."
+    },
+    {
+      "tab": "analytics",
+      "purpose": "Show Google Analytics 4 visitor behavior, traffic composition, and custom event tracking broken down by configured groups.",
+      "whatItShows": "6 metric cards (users, sessions, pageviews, avg duration, bounce rate, new user %); a multi-line traffic trend chart (users/sessions/pageviews over time); device breakdown pie chart; top pages list; traffic sources with % stacked bars; organic search summary (from GA4Organic data); event modules grouped by workspace eventGroups config (each showing event count + conversion rate, with optional page-path filters); a collapsible \"Action Explorer\" table for ad-hoc event × page cross-tabs; and a per-event trend chart (users click an event card to view its daily count pattern).",
+      "clientGoal": "Understand where visitors come from, how they move through the site, which actions they take, and whether behavior is trending up or down — so the client can spot content gaps and validate what's working.",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "performance",
+        "overview"
+      ],
+      "emptyStateValue": "Full empty chrome with a single \"Analytics Coming Soon\" card (icon + title + description); no fallback data, no chrome leakage."
+    },
+    {
+      "tab": "inbox",
+      "purpose": "Unified centralized queue of all client actions needed: approvals, reviews, conversations, approved items ready to deploy, and work orders in progress",
+      "whatItShows": "Priority strip with actionable items segmented into 3 lanes: Decisions (awaiting_client/partial status items), Reviews (review kind items), Conversations (notification kind items + legacy free-form requests). Below: \"Ready to publish\" section with approved client-applyable items + \"Apply to Website\" button. \"Work in progress\" read-only track lane showing work-order status (ordered/in_progress/completed) with conversation threads. All items show title, summary (clamped 2 lines), age label (sent N days ago), and count metadata. Decisions render as DecisionCard or InlineApprovalCard with Approve/Request Changes/Decline verbs. Work orders show status stepper, page count, and team↔client comment thread. Detail modal available for batch items. \"Submit a request\" button at top (free-form + content request chooser)",
+      "clientGoal": "Review and act on all pending deliverables in one place—approve content, request changes, apply approved changes to live site, and track work the agency is doing",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "conversations (RequestsTab shows the same free-form request thread component, embedded in Inbox's Conversations section)",
+        "content-plan (ContentTab renders content request reviews; Inbox's projected deliverables delegate to bespoke content-request review modal, not a separate tab)",
+        "roi (no functional overlap but both show delivery status—ROI is historical/retrospective, Inbox is active/pending)"
+      ],
+      "emptyStateValue": "Low-data client sees \"Nothing needs your attention right now. New items will appear here.\" badge + the persistent \"Submit a request\" button (always visible so client can initiate even when empty). If no Ready-to-publish or Work-in-progress items exist, only the empty state badge renders."
+    },
+    {
+      "tab": "plans",
+      "purpose": "Let clients choose and manage SEO service tiers; display pricing and feature comparison; handle plan upgrades and billing.",
+      "whatItShows": "Three hard-coded plan cards (Starter/free, Growth, Premium) with names, prices, taglines, and grouped feature checklists (Insights & Data, AI & Tools, Strategy & Content, etc., with checkmarks for included features); trial status badge if applicable; Manage Billing or Contact Us buttons per plan; optional Content Services section showing brief + full-post pricing if those prices exist and not external-billing; optional Monthly Content Packages section showing active subscription status (posts delivered/month progress bar) or available subscription plan cards if subData.plans has items; ROI teaser section for free-tier users; contact-support call-to-action at bottom.",
+      "clientGoal": "Understand what each tier unlocks (keyword strategy, content creation, competitor analysis, dedicated strategist) and take action to upgrade, manage billing, or explore content services.",
+      "depth": "scan",
+      "overlapsWith": [
+        "roi",
+        "inbox",
+        "strategy"
+      ],
+      "emptyStateValue": "Three plan cards always render; Content Services section hidden if briefPrice and fullPostPrice are both null OR hidePrices is true; Monthly Content Packages hidden if subData.plans is empty or undefined. Client always sees the three tier comparison + ROI teaser (if free tier) + contact CTA; pure text + static feature lists, no data-dependent empty chrome."
+    },
+    {
+      "tab": "roi",
+      "purpose": "Quantify the monthly dollar value of organic traffic and measure content ROI attribution",
+      "whatItShows": "Outcome verdict showing conversion count and estimated value. Organic Traffic Value, Ad Spend Equivalent, Month-over-Month growth, Revenue at Stake. Per-page breakdown. Content ROI table. Methodology disclosure.",
+      "clientGoal": "Justify SEO investment by quantifying the dollar value of organic search",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "overview",
+        "performance",
+        "analytics"
+      ],
+      "emptyStateValue": "Free tier users see tier-gate card with lock icon. Growth-plus tier with no ROI data shows empty state with refresh and Open Strategy buttons. Low-data state always shows methodology disclosure to set expectations."
+    },
+    {
+      "tab": "content-plan",
+      "purpose": "Display strategist-created content matrices (multi-dimensional plans mapping page types × keywords) and track approval progress through a grid or list.",
+      "whatItShows": "**ContentPlanTab** displays: multiple content matrices (if strategy created >1), each showing a 2D grid (or list if 1D) of planned pages with cells. Each cell tracks a page type × keyword combination with status (planned → keyword_validated → brief_generated → review → flagged → approved → draft → published). Shows completion %, total page count, published count, and inline alerts for pages awaiting client review. Each cell is clickable to open a modal with URL, target keyword, client flags, and ability to flag for changes. Download buttons export matrix as CSV (spreadsheet) or JSON (raw data). Single matrix loads directly; multiple matrices show as a list with inline progress bars. **MatrixProgressView** renders the grid/list, progress bar with status badges, status legend, and cell preview modal with flag submission.",
+      "clientGoal": "Review the strategist's planned content roadmap (which pages should rank for what keywords), approve the plan page-by-page, and track writing progress from brief creation through publication—without leaving the client portal. Flag cells that need changes before the team produces content.",
+      "depth": "deep_dive",
+      "overlapsWith": [
+        "strategy",
+        "inbox",
+        "plans"
+      ],
+      "emptyStateValue": "Full empty state: \"No content plans yet — Your team hasn't created any content plans for this site yet. Content plans will appear here once your strategist sets up a content matrix.\" Shows Layers icon and no grid. Client sees zero chrome, no data to interact with."
+    },
+    {
+      "tab": "brand",
+      "purpose": "Display and edit business contact information; display AI-generated brand positioning summary",
+      "whatItShows": "Two panels: (1) Contact & Business Info — phone, email, address (street/city/state/zip/country), business hours, and social media profile URLs; (2) Brand Positioning — plain-language AI-generated brand voice summary (read-only, with \"AI-generated\" badge). Contact info is editable inline via an Edit mode that toggles form fields; positioning is read-only with call-to-action to contact the agency.",
+      "clientGoal": "Keep business profile data current so the agency can maintain accurate schema markup (business schema, NAP consistency); understand how the agency describes the brand's voice and positioning for reference.",
+      "depth": "scan",
+      "overlapsWith": [
+        "overview"
+      ],
+      "emptyStateValue": "Contact info: Shows full empty state with prompt to add info if zero fields filled. Positioning: Shows empty state with onboarding placeholder if brandVoiceSummary is not yet generated; no empty chrome — each panel has purpose-specific messaging."
+    }
+  ],
+  "panel": [
+    {
+      "persona": "Non-marketing SMB founder who personally signs the agency checks (glance-and-go)",
+      "lean": "glance_and_go",
+      "tabsOpenedWeekly": [
+        "overview",
+        "inbox"
+      ],
+      "tabsNeverTouched": [
+        "search",
+        "analytics",
+        "Strategy",
+        "content-plan",
+        "brand",
+        "plans",
+        "performance"
+      ],
+      "theOneThingICannotLose": "The plain-English \"is my money working\" answer at the top of Overview: real leads/calls/form-fills this month vs last, plus traffic up or down — phrased honestly, not as a vanity score or a CPC-equivalent dollar figure I can't tie to my own bank or phone.",
+      "overviewStandsAlone": "partly",
+      "overviewGaps": "Overview leads with a composite \"health score\" (vanity number I can't verify) and a \"#1 priority\" recommendation aimed at ME doing work — that's backwards. I sign checks; I want to see what the AGENCY did and what it produced. It needs, in one line, at the very top: (1) leads/calls/form-fills this period vs last in real counts I can cross-check against my phone and inbox, (2) work the agency shipped this month (the AgencyWorkFeed, not buried in a sidebar), (3) traffic direction in one sentence. The ROI dollar figures must stop leading with \"what this traffic would cost to buy\" — that's a number I don't believe; show actual conversion counts first and keep the dollar estimate clearly labeled as an estimate. Drop the health score and the action-banner clutter to a secondary line.",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "overview: yes, this is the only tab that matters to me — but it must be reframed around outcomes (leads/calls) and agency work delivered, not a health score + a to-do list pointed at me. content: I don't open a content tab; I just need to approve/decline a draft when asked, which belongs in inbox. analytics+performance: merging them is right, but for me this is one deep tab I'll basically never open — fine as long as nothing I NEED hides only there. rankings/keywords: not my world at all; combining Strategy + search keyword stuff into one nerd tab is good because it gets it out of MY way. site-health: I do NOT want this as its own tab — it's a vanity score and a fix-list I can't action; fold it into analytics or just surface \"site OK / N issues we're fixing\" as a line on Overview. inbox: yes, keep it — approvals and replies in one place is the only other thing I touch. Net: the 6-tab shape is a big improvement over 11, but it still has one tab too many for me (kill standalone site-health) and the Overview reframe is the whole ballgame.",
+      "recommendedTabs": [
+        "overview",
+        "inbox",
+        "analytics+performance",
+        "rankings/keywords"
+      ],
+      "mergeCutRename": [
+        "merge analytics + performance + search into one 'Analytics' deep tab",
+        "merge Strategy + keyword/rankings into one 'Rankings' deep tab (and get keyword approve/decline into inbox)",
+        "fold site-health into Analytics as a sub-section; surface only a one-line 'site OK / N issues we're fixing' on Overview — cut it as a standalone tab",
+        "fold ROI into Overview as the lead outcome line (real conversion counts first, dollar value as a clearly-labeled estimate) — cut standalone roi",
+        "cut content-plan as a client tab; route page approvals into inbox",
+        "cut brand — move 'edit my contact info' into account settings, not a dashboard tab",
+        "rename/keep plans but bury it; it's a billing link, not a weekly tab",
+        "rename Overview's '#1 priority' from a task-for-me into 'what we're working on next for you'"
+      ],
+      "verbatim": "I've got 20 seconds between calls — show me how many leads we got, that you actually did work this month, and whether traffic's up; I do not care about a health score I can't check against my own phone."
+    },
+    {
+      "persona": "Owner of a local dental practice (glance-and-go)",
+      "lean": "glance_and_go",
+      "tabsOpenedWeekly": [
+        "overview",
+        "inbox"
+      ],
+      "tabsNeverTouched": [
+        "search",
+        "strategy",
+        "analytics",
+        "performance",
+        "content-plan",
+        "brand",
+        "plans"
+      ],
+      "theOneThingICannotLose": "The outcome count in plain words — how many calls and how many new-patient form fills/bookings came from Google this month, and whether that number is up or down vs last month. That is the whole reason I log in.",
+      "overviewStandsAlone": "partly",
+      "overviewGaps": "Make the call/booking/form-fill count the hero at the very top (it already exists in OutcomeCountBand) and give it a REAL month-over-month delta — wire baseline and priorPeriod so it says '41 calls, +9 vs last month' instead of 'establishing your baseline'. One plain-English sentence: 'More people are calling you from Google than last month.' Demote the composite health score, impressions, avg position, and the 15-item insights feed below the fold or behind a 'more detail' link. Keep the action banner ('3 items need your attention' → inbox) — that plus the count is 100% of my weekly visit. Replace the SEO-jargon CTAs ('Find Keywords', 'View Issues') with outcome language.",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "Overview: this is the only screen I want, and the new 'The Issue' version is close — the OutcomeCountBand ('23 form fills + 41 calls', emerald, in my words) is exactly right and is the first thing that ever made this dashboard feel like it's about MY phone ringing. But two honesty problems hurt me: (1) the count is provenance 'estimate_ga4' with baseline/priorPeriod hard-coded null, so it says 'establishing your baseline' and can't tell me up-or-down — for a glance-and-go owner, 'is it more than last month?' IS the product, and right now it punts. (2) The legacy overview buries that under a composite health score, impressions, avg position, and a 15+ item insights feed — pure SEO noise to me. content (briefs/posts to approve): useful ONLY as a number on the overview action banner that deep-links into inbox; I do not want a standalone content tab. analytics+performance: merging two deep-dive tabs into one bigger deep-dive tab does nothing for me — I'd still never open it. Combining them is fine but it's not simplification for my goal; it's just relabeling shelf space I ignore. rankings/keywords: never. 'Avg position #8.4' does not map to the phone ringing. site-health: a 0-100 score I can't act on and don't understand; fold it to one word (Good/Needs work) on the overview, never its own tab for me. inbox: yes, keep — it's the one place I do work (approve the thing, reply to the team). The proposed 6 tabs are still 4 too many FOR ME, but they don't actively break anything as long as the overview carries the call/booking count with a real up/down number.",
+      "recommendedTabs": [
+        "overview",
+        "inbox"
+      ],
+      "mergeCutRename": [
+        "Make OutcomeCountBand the overview hero with a real MoM delta (wire baseline/priorPeriod, drop 'establishing your baseline' for active accounts)",
+        "Cut search, strategy, rankings/keywords entirely for this persona — none map to the phone ringing",
+        "Fold site-health into a one-word chip on the overview; cut the standalone health tab",
+        "Merge analytics+performance is fine but I still never open it — bury it as one optional 'Details' tab, not a headline tab",
+        "Cut content-plan and content tab; surface only as a count in the overview action banner that deep-links to inbox",
+        "Cut brand and plans from the weekly nav (settings/footer, not a tab)",
+        "Rename overview CTAs from 'Find Keywords'/'View Issues' to outcome phrasing ('Get more patient calls')",
+        "Keep inbox as the single do-work tab"
+      ],
+      "verbatim": "Just tell me how many people called or booked from Google this month and whether that's more than last month — everything else on here is your job, not mine."
+    },
+    {
+      "persona": "Client who fired a previous agency for fluff and busywork — skeptic, proof-only. Logs in to find the catch and confirm this isn't the last agency repackaged.",
+      "lean": "glance_and_go",
+      "tabsOpenedWeekly": [
+        "overview",
+        "inbox",
+        "roi"
+      ],
+      "tabsNeverTouched": [
+        "plans",
+        "brand",
+        "content-plan",
+        "analytics",
+        "performance",
+        "Strategy"
+      ],
+      "theOneThingICannotLose": "The measured-outcome verdict with its honest provenance label — the dollar/lead count tied to real conversions on MY site, stamped \"estimate\" vs \"measured\" vs \"reconciled.\" That single honest line is the entire reason I'd trust this over the last agency. Strip the provenance label and it becomes fluff.",
+      "overviewStandsAlone": "partly",
+      "overviewGaps": "The overview leads with the right thing (measured verdict + provenance + \"vs when we started\" baseline), and \"Your results\" is win-rate of measured actions, not self-grading — good. But to live on it alone I need two things tightened: (1) the proof must NOT be buried — on the current spine the verdict leads but the raw conversion counts and ROI tables sit under a collapsed \"Under the hood\"; a skeptic wants the count and the math one click in, not two. (2) Cut the credit-claiming theater that's mixed in with the proof: the 0–100 composite \"health score\" ring, \"Predictions that came true / We called it,\" the \"Curated by your strategist\" byline, and the \"intelligence summary\" card. Those are effort-signals and agency self-grading — exactly the fluff that got the last guys fired. Replace them with: a baseline-anchored delta (\"leads since we started\"), what changed on the site this period and what it did, and the honest \"establishing your baseline\" state when there's nothing measured yet (don't fabricate a win).",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "overview: works AS A SHELL but only if it leads with the measured-outcome verdict + provenance and demotes the health-score/predictions/curated-by-strategist theater — that's the make-or-break for me, not the tab count. content: irrelevant to me; I don't review briefs or watch a writing pipeline — fold any 'is the agency actually shipping' signal into the proof, don't give busywork its own tab. analytics+performance: correct merge, but I'd never open it; it's vanity-metric territory (impressions, sessions, bounce). Keep it as the ONE deep tab for the nerdy month, not a headline. rankings/keywords: don't care about positions in the abstract — a #4 ranking that drives zero calls is the exact fluff I'm allergic to; only matters if tied to outcomes, so it belongs as a column inside the deep tab, not its own destination. site-health: should NOT be its own tab — fold it into analytics; a standalone 'site health' tab is a classic effort-signal (look how much we audit!) that doesn't map to a result I care about. inbox: yes, keep — approve/reject and 'apply to site' is real, it's where I exert control and verify work is actually live. MISSING for me: nowhere does the proposed IA name an explicit ROI/dollar-verdict surface — that must be the spine of the overview, and I want the conversion count + retainer ratio + methodology reachable in one click, not buried under 'Under the hood.'",
+      "recommendedTabs": [
+        "overview",
+        "results",
+        "inbox",
+        "data"
+      ],
+      "mergeCutRename": [
+        "rename roi → 'Results' and make it the proof spine of overview (verdict + conversion count + retainer ratio + 'since we started' delta + one-click methodology)",
+        "merge analytics + performance + search + rankings + site-health into ONE deep tab named 'Data' for the nerdy month — none earn a standalone destination for me",
+        "cut Strategy as a client tab — keyword curation is agency busywork I don't want to babysit; surface only outcome-tied moves in the overview",
+        "cut content-plan — a writing-pipeline tracker is effort-signaling; collapse 'is content actually shipping + what did it earn' into Results",
+        "cut brand — NAP/positioning is a one-time settings field, not a weekly tab",
+        "cut plans — pricing/upsell does not belong in my results dashboard; move to a settings/billing link",
+        "on overview: cut the 0–100 composite health-score ring, 'Predictions that came true/We called it', the 'Curated by your strategist' byline, and the IntelligenceSummary card — all self-grading/effort theater"
+      ],
+      "verbatim": "Don't tell me how hard you worked or grade your own homework with a health score — show me the calls and form-fills my money bought, label exactly how sure you are of that number, and let me approve or kill the next move; everything else is the fluff I already fired once."
+    },
+    {
+      "persona": "VC / board member reviewing a portfolio company's SEO as a compounding asset vs. spend",
+      "lean": "glance_and_go",
+      "tabsOpenedWeekly": [
+        "overview",
+        "roi"
+      ],
+      "tabsNeverTouched": [
+        "search",
+        "health",
+        "Strategy",
+        "analytics",
+        "content-plan",
+        "brand",
+        "plans",
+        "performance",
+        "inbox"
+      ],
+      "theOneThingICannotLose": "The verdict-first money frame: a dollar value for organic (\"What your SEO is worth\"), the return-on-retainer ratio (value vs. $/mo spend), and the provenance label that tells me whether that number is an estimate, measured, or reconciled to closed records. That single block is the only thing on this whole dashboard a board cares about.",
+      "overviewStandsAlone": "partly",
+      "overviewGaps": "Three things the overview must add/promote so I can live on it alone: (1) make the verdict-first money spine the DEFAULT render, not a feature-flagged path behind the legacy composite-score wall; (2) surface a single trailing payback/compounding line — value this period vs. 'since we started' vs. cumulative spend — so I can see the curve, not a snapshot; (3) demote or kill the invented composite health score and the 15+ insight feed to a one-line 'site healthy / N issues' chip. Keep the provenance disclosure visible, not collapsed — an honest 'this is an estimate' is what earns my trust.",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "Overview: this is the make-or-break tab and it's close. The 'The Issue' verdict spine (IssueVerdictHeadline → outcome count in human units → ROI money frame → return-on-retainer ratio → honest 'estimate vs tracked vs reconciled' disclosure) is exactly right and is the reason I'd open this at all. But the LEGACY overview body (HealthScoreCard composite 0-100, 15+ signal InsightsDigest, predictions showcase, 'we called it') is vanity-metric noise to me — an invented composite score with no dollar tie is precisely what makes me distrust a dashboard. Make the verdict spine the default, not flag-gated. content / analytics+performance / rankings / site-health: I would never open any of these. They are operator tools — keyword tables, CWV pass/fail, device pie charts, traffic-source bars. Zero board relevance. inbox: not mine; that's the operator's approval queue. The proposal's biggest miss FOR ME: it has no ROI/value tab in the six. ROI is buried as a collapsed 'Under the hood' reveal and folded into overview — that's the ONE surface I'd want to deep-link a fellow board member to, and it isn't a first-class destination. Also: 'site health' as its own tab is wasted real estate for me; fold it into a single overview chip.",
+      "recommendedTabs": [
+        "Overview (verdict-first: dollar value, return-on-retainer, provenance, outcome count, trend-since-we-started)",
+        "Value/ROI (the money frame as a first-class, shareable tab — payback, organic value, content ROI, methodology)",
+        "Inbox (so my operator can act — I won't touch it, but it belongs)"
+      ],
+      "mergeCutRename": [
+        "MERGE performance + search + analytics into ONE operator-only 'Analytics' tab (I never open it; don't spend three tabs on it)",
+        "PROMOTE roi out of the 'Under the hood' collapse into a first-class 'Value' tab — it's the one surface worth sharing with a board",
+        "FOLD health into a single overview chip ('site healthy / N issues'); do not give it its own tab for my persona",
+        "CUT the composite 0-100 HealthScoreCard, PredictionShowcaseCard, and 'we called it' from the overview — invented scores with no $ tie erode trust",
+        "MERGE Strategy + content-plan into operator-side; client-facing they're noise for a board reviewer",
+        "RENAME 'Overview' framing to lead with 'What your SEO is worth' (the verdict), not a welcome greeting + freshness stamps"
+      ],
+      "verbatim": "Show me the dollar value of organic, what it cost to get it, and whether that number is real or a guess — everything else on here is the operator's problem, not mine."
+    },
+    {
+      "persona": "In-house SaaS marketing lead (hands-on, digs deep)",
+      "lean": "digs_deep",
+      "tabsOpenedWeekly": [
+        "overview",
+        "performance",
+        "search",
+        "roi",
+        "strategy",
+        "inbox"
+      ],
+      "tabsNeverTouched": [
+        "brand",
+        "plans",
+        "content-plan"
+      ],
+      "theOneThingICannotLose": "The keyword/query-level drill-down: the sortable GSC query + page tables with position, impressions, CTR, and the \"low-hanging fruit\" (ranked 5-20 with impressions) + \"CTR opportunity\" cuts. That is the raw lever list I actually pull on — losing it turns this into a vanity dashboard I'd stop opening.",
+      "overviewStandsAlone": "no",
+      "overviewGaps": "The overview is a strong weekly status read (health score, deltas, #1 priority with contribution bars, action banner) but it is deliberately summary-only — it shows ONE top recommendation and a 2-item content-opportunity teaser, then bounces me to deeper tabs. To stand alone for me it would need: (a) the top ~10 quick-win keywords (rank 5-20) inline or one expand away, not buried in search; (b) a real conversion/pipeline number with trend, not just an estimate count band; (c) a per-page winners/losers strip. I will always click through, so the right design is overview-as-launchpad with fast drill-in, NOT overview-as-everything.",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "overview: works as a launchpad, keep it. analytics+performance: correct merge — PerformanceTab already fuses Search + Analytics as sub-tabs, so a standalone 'search'/'analytics' is redundant; just make sure the GSC query/page tables, keyword-insight cards (low-hanging fruit, CTR opps, visibility-without-clicks) and the per-event conversion trends all survive the merge, because that is the value, not the chrome. rankings/keywords: good and necessary — this is where I validate/decline keywords and see page-keyword mapping; this is a real lever, keep the request-content/decline action buttons. site-health: keep it as its OWN tab, do NOT fold into analytics — health is a distinct diagnostic job (Core Web Vitals, defect list, fix cart) and burying it inside analytics makes the prioritized fix list undiscoverable; it earns a tab. inbox: essential, keep. THE BREAKING PROBLEM: the proposal silently DROPS the ROI tab. For an in-house SaaS lead, dollar value of organic + content ROI attribution is the single artifact I forward to my VP to defend the spend — cutting it is the one change that would make me distrust the simplification. Either keep ROI as a tab or guarantee a real money+pipeline block lives on the overview with a drill-in.",
+      "recommendedTabs": [
+        "overview",
+        "performance (search + analytics merged)",
+        "rankings/keywords",
+        "site-health",
+        "roi/value",
+        "inbox"
+      ],
+      "mergeCutRename": [
+        "merge search + analytics into one 'Performance' tab (sub-tabs already exist in PerformanceTab) — drop standalone search/analytics",
+        "merge strategy + content-plan into 'Rankings/Keywords' — content-plan grid is strategist effort-signaling I never act on; keep only the page-keyword map + keyword validate/decline actions",
+        "keep site-health as its own tab, do NOT fold into analytics",
+        "KEEP roi (rename to 'Value' or 'ROI') — the proposed IA wrongly cuts it; this is my spend-justification artifact",
+        "cut brand — contact/NAP editing is a one-time setup task, not a weekly dashboard tab; move to settings",
+        "cut plans — upgrade/billing belongs behind a settings/account menu, not a primary tab"
+      ],
+      "verbatim": "Give me the overview to triage in thirty seconds and then let me drill all the way down to the query table and the dollar value — kill the ROI tab and I lose the one screen I show my boss to keep paying you."
+    },
+    {
+      "persona": "Marketing team at a professional-services / consulting firm — owns authority, the content pipeline, and approve-before-publish. Digs deep; cares about expertise/E-E-A-T signal and never letting something go live that misrepresents the firm.",
+      "lean": "digs_deep",
+      "tabsOpenedWeekly": [
+        "inbox",
+        "content-plan",
+        "Strategy",
+        "performance"
+      ],
+      "tabsNeverTouched": [
+        "plans",
+        "brand",
+        "health",
+        "analytics"
+      ],
+      "theOneThingICannotLose": "The approve-before-publish path on the actual written article — the PostReviewCard inline edit of title/meta/intro/sections/conclusion plus Approve / Request Changes / Decline, AND the full content brief with its E-E-A-T guidance and \"Your Competitive Edge\" section. If a post can reach my live site without me editing and signing off on the finished copy, I'm gone.",
+      "overviewStandsAlone": "no",
+      "overviewGaps": "To let me live on the overview alone (which I don't actually want, but to be safe): it needs (1) the pending content/post reviews surfaced with a one-click jump straight into the review/edit surface, not just a count badge; (2) a real authority signal — a domain-authority/backlink trend line and a 'who's beating us on our core topics' snapshot, currently buried/Premium-gated; (3) per-published-piece outcome (did the article I approved actually earn clicks) so I can connect my approvals to results. Even then I'd dig — but those three would make the glance trustworthy.",
+      "ownerProposalVerdict": "needs_changes",
+      "proposalNotes": "overview: As a glance-and-go landing it's fine — the 'Your turn' / pending-decisions strip and the action banner (briefs ready, posts ready, content-plan pages to review) are exactly the triggers that bring me back. But it does NOT stand alone for me: every real action (editing a brief, editing the article, approving) lives one click deeper, and that's correct — my job is depth, not a glance. content: This is the make-or-break tab and the proposal NAMES it, which is the single best thing about the new IA. As long as 'content' = the current ContentTab pipeline (status stepper, full brief with E-E-A-T + competitive-edge + outline + schema, inline post editing, approve/request-changes/decline) PLUS the content-plan matrix (page×keyword roadmap, flag-a-cell-before-production), it works. My fear: 'content' becomes a thin feed and the real review surfaces get buried in inbox. Keep the deep brief + the post editor; do not dumb them down. inbox: Critical and must stay its own tab. It's where approvals, brief reviews, post reviews, and team conversations converge — collapsing it into overview would bury the one workflow I cannot miss. The Decisions/Reviews/Conversations split is right. Keep it. analytics+performance merged: Fine for me — I open it occasionally to confirm content is earning clicks/impressions and to see post-publish performance, but I don't live there. One combined tab is plenty; I don't need search and analytics as two separate deep tabs. rankings/keywords: KEEP as its own tab and do NOT fold it into analytics. This is where I steer the strategy — validate/decline suggested keywords, see page→keyword mapping, content gaps, and (Premium) competitor gaps. Authority work happens here. site-health: I'd cut it to its own low-priority tab or fold it into analytics; I never open it. It's the agency's job, surfaced as a score on overview is enough. The biggest GAP for me across the whole proposal: authority/competitive signal is thin. CompetitorGapsSection is keyword-gaps-only, Premium-gated, and shows nothing real to Growth ('Your strategist is mapping your competitive landscape'). For a consulting firm whose entire SEO case rests on demonstrating expertise, I want a visible authority/E-E-A-T signal (backlinks/domain authority trend, who's out-ranking us on our money topics, AI-overview/SERP-feature presence) — not just 'keywords they rank for that you don't.' Thin competitive signal is exactly what makes me distrust the dashboard.",
+      "recommendedTabs": [
+        "overview",
+        "content",
+        "rankings",
+        "performance",
+        "inbox"
+      ],
+      "mergeCutRename": [
+        "merge search + analytics + roi -> one 'performance' tab (I only need to confirm clicks/traffic/value and per-post performance, not three deep tabs)",
+        "merge content-plan + ContentTab -> one 'content' tab containing the roadmap matrix AND the brief/post review pipeline",
+        "rename Strategy -> 'rankings' (or 'strategy') and KEEP it standalone — keyword validation + page map + competitor/authority lives here, do not fold into analytics",
+        "cut 'plans' as a top-level tab — billing/upgrade is a settings/account concern, not a weekly tab",
+        "cut 'brand' as a top-level tab — fold contact/NAP edit into account settings; I touch it once a year",
+        "cut 'health' as a standalone weekly tab — keep the score on overview, move the detail behind a low-priority link or into performance; it's the agency's job",
+        "strengthen the authority surface inside 'rankings': add backlink/domain-authority trend + 'who outranks us on core topics' + SERP-feature/AI-overview presence, and stop showing Growth an empty 'mapping your landscape' placeholder"
+      ],
+      "verbatim": "Give me one 'content' tab where I can read the brief, edit the actual article, and sign off before it touches our site — and show me a real authority signal in 'rankings,' because a keyword-gap teaser locked behind Premium is not proof my firm is winning on expertise."
+    },
+    {
+      "persona": "Operator of a multi-location / franchise business (portfolio lean)",
+      "lean": "mixed",
+      "tabsOpenedWeekly": [
+        "overview",
+        "inbox",
+        "roi",
+        "performance"
+      ],
+      "tabsNeverTouched": [
+        "brand",
+        "plans",
+        "content-plan",
+        "search",
+        "analytics",
+        "strategy",
+        "health"
+      ],
+      "theOneThingICannotLose": "A roll-up that ranks my locations worst-to-best on one screen — which sites are bleeding, which are winning — so I know where to spend my attention this week. Today nothing does this; the per-page ROI breakdown is the closest fragment.",
+      "overviewStandsAlone": "no",
+      "overviewGaps": "The overview must add a per-location leaderboard: one row per site/market with its trend arrow (clicks, conversions, position) and a single flag (needs attention / on track / winning), sorted worst-first, with a total roll-up at the top. Without that, the overview is a single-site report card for one of my dozen locations and tells me nothing about where to act. It also needs a 'locations needing attention: N' count in the action banner, same as it counts pending approvals.",
+      "ownerProposalVerdict": "wrong_for_me",
+      "proposalNotes": "overview: fails me — it is single-site framing. It composites ONE workspace's health/clicks/visitors with no concept of N sites. For a franchise operator it reads as a report card for a store I didn't ask about. content: irrelevant — I don't manage editorial calendars across 12 markets in a portal; my GM or the agency does. analytics+performance: merging these is fine and correct (they overlap heavily today), but the merged tab is still single-site — useless to me unless it gains a location selector/filter. rankings/keywords: same problem — keyword work is per-site and I have no way to ask 'which locations rank for near-me terms.' site-health: as its own tab or folded in, I don't care either way — health is an agency chore, not my weekly question; fold it. inbox: works and I need it, but it must show which LOCATION each decision belongs to or I'm approving blind. The fatal flaw across the WHOLE proposal: every tab is scoped to one workspace with no location dimension, no switcher, no roll-up. Confirmed in code — client dashboard is single-workspace (ClientTab union, no location filter in src/components/client/), and 'locations' exists only in admin settings (hooks/admin/useLocalSeoLocations, server/client-locations.ts). The simplification is reasonable for a single-site client and structurally disqualifying for me.",
+      "recommendedTabs": [
+        "overview (with location leaderboard + portfolio roll-up at top)",
+        "locations (per-site drill-down: pick a location, see its rankings + traffic + conversions + health)",
+        "roi",
+        "inbox"
+      ],
+      "mergeCutRename": [
+        "merge analytics + performance + search into one 'Performance' tab (they overlap today) AND add a location selector to it",
+        "cut brand, plans, content-plan, strategy as standalone client tabs (agency/internal concerns, not my weekly job)",
+        "fold site-health into Performance as a single health score chip, not a tab",
+        "rename/rebuild overview to lead with a per-location leaderboard + portfolio roll-up",
+        "add a net-new 'Locations' tab: worst-to-best site list -> click into one site's rankings/traffic/conversions/health",
+        "keep roi but make it portfolio-aware (value per location, not just per page)",
+        "keep inbox but tag every item with its location"
+      ],
+      "verbatim": "I run twelve locations — if I can't see in one screen which three are bleeding and which two are winning, your dashboard is a report card for a store I never asked about."
+    }
+  ]
+}

@@ -61,6 +61,13 @@ export interface ROIData {
     monthlyRetainer: number | null;
     baseline: OutcomeBaseline;
     baselineDeltaCount: number | null; // null while establishing
+    /**
+     * P1 (IA v2): outcome count for the previous comparable 30-day period — the snapshot closest to
+     * 30 days before the latest, within a 15–45 day window. null when no qualifying prior snapshot
+     * exists (the client then shows the honest "establishing your trend" line, never a fabricated
+     * delta). The month-over-month delta is `outcomeCount − priorPeriodCount`.
+     */
+    priorPeriodCount: number | null;
     provenance: OutcomeProvenance;     // 'estimate_ga4' (P0/flag-OFF) | 'measured_action' (P1a)
     /**
      * P1a: typed outcome breakdown ("23 form fills + 41 calls"). Present ONLY when the

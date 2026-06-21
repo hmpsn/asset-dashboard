@@ -125,6 +125,13 @@ export function OverviewTab({
   // so the typed render (type icons, [data-outcome-type] tags, byType rollup) vanishes byte-identically to
   // P0 — the rollback must never leak typed-outcome UI just because eventConfig still carries types.
   const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  // P1 (IA v2) flags — MUST be read here at the top level, NOT inside the `if (theIssueEnabled)`
+  // block below (same Rules-of-Hooks trap as measuredCapture above: a hook gated on theIssueEnabled
+  // changes the hook count when its flag query resolves loading→loaded and crashes the dashboard).
+  // Together they drive whether the named-lead list is actually surfaced below the count, so
+  // namedRecordsAvailable can be set truthfully (see the outcomeCount assembly).
+  const iaV2 = useFeatureFlag('client-ia-v2');
+  const returnHookEnabled = useFeatureFlag('the-issue-client-return-hook');
 
   // ── strategy-the-issue evergreen money surface (Phase 2) ─────────────────
   // The Issue is the reimagined overview that supersedes the legacy body. All flags read
@@ -182,7 +189,9 @@ export function OverviewTab({
       // computeROI seam (Lane A), driven by confirmed conversion-tracking setup. This client-built
       // count feeds the count-band only; the dollar verdict's provenance rides ROIData.outcomeVerdict.
       provenance: 'estimate_ga4',
-      namedRecordsAvailable: false,
+      // Names ARE available below when IA v2 surfaces the leads section + the return-hook is on.
+      // Flag-OFF this stays false so the honest "names available with tracking" upsell is unchanged.
+      namedRecordsAvailable: iaV2 && returnHookEnabled,
     };
     // The public workspace view carries the flag-gated, pre-resolved segment profile (authority-
     // layered, typed on WorkspaceInfo). Absent → null → default-visible inserts.

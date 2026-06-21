@@ -102,6 +102,9 @@ export interface TheIssueClientPageProps {
   /** P1b (Lane C) — test override for the return-hook flag (export bar + your-leads). When provided,
    *  overrides useFeatureFlag (Rules-of-Hooks-safe). Flag-OFF → neither P1b surface mounts. */
   theIssueReturnHook?: boolean;
+  /** P1 (IA v2) — test override for the client-ia-v2 flag. When provided, overrides useFeatureFlag
+   *  (Rules-of-Hooks-safe). Flag-OFF → MoM/typed hero clauses absent + leads stay under-the-hood. */
+  iaV2?: boolean;
 }
 
 export function TheIssueClientPage({
@@ -123,6 +126,7 @@ export function TheIssueClientPage({
   segmentProfile,
   theIssueClientSpine,
   theIssueReturnHook,
+  iaV2,
 }: TheIssueClientPageProps) {
   const navigate = useNavigate();
 
@@ -143,6 +147,11 @@ export function TheIssueClientPage({
   // unconditionally at the top (Rules of Hooks); an explicit prop override wins for tests.
   const returnHookFlag = useFeatureFlag('the-issue-client-return-hook');
   const exportEnabled = theIssueReturnHook ?? returnHookFlag;
+  // P1 (IA v2) — master flag for the verdict-first Overview reframe (MoM clause + typed hero +
+  // surfaced leads). Read unconditionally at the top (Rules of Hooks); an explicit prop override
+  // wins for deterministic component tests. Flag-OFF → every iaV2-gated change is byte-identical.
+  const iaV2Flag = useFeatureFlag('client-ia-v2');
+  const iaV2Enabled = iaV2 ?? iaV2Flag;
   // Verdict source: explicit prop wins; otherwise the public ROI payload (deduped React Query).
   const resolvedVerdict = outcomeVerdict !== undefined ? outcomeVerdict : (roiData?.outcomeVerdict ?? null);
   // Default-visible preserves the current surface when the segment is unresolved.
@@ -212,7 +221,7 @@ export function TheIssueClientPage({
           {/* 1. Verdict — the dollar/outcome lead (no ring). */}
           <ErrorBoundary label="Verdict">
             <div data-testid="slot-verdict">
-              <IssueVerdictHeadline verdict={resolvedVerdict ?? null} topRec={topRec} />
+              <IssueVerdictHeadline verdict={resolvedVerdict ?? null} topRec={topRec} iaV2={iaV2Enabled} />
             </div>
           </ErrorBoundary>
 
@@ -234,6 +243,16 @@ export function TheIssueClientPage({
               <div data-testid="slot-outcome-count">
                 <OutcomeCountBand count={outcomeCount} />
               </div>
+            </ErrorBoundary>
+          )}
+
+          {/* 2.5 Your leads — surfaced directly under the count when IA v2 (the check-signer's
+              "show me the N people behind these numbers"). Gated on the return-hook flag; suppressed
+              in admin preview (client PII is not the operator's). When iaV2 OFF this stays in the
+              collapsed "Under the hood" block below (byte-identical). */}
+          {iaV2Enabled && exportEnabled && !previewMode && (
+            <ErrorBoundary label="Your captured leads">
+              <IssueYourLeadsSection workspaceId={workspaceId} />
             </ErrorBoundary>
           )}
 
@@ -324,8 +343,10 @@ export function TheIssueClientPage({
                 {statItems.length > 0 && <CompactStatBar items={statItems} />}
                 <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact={false} />
                 {/* P1b (Lane C) — the client's OWN captured leads (authed surface only). Gated on the
-                    return-hook flag; suppressed in admin preview (client PII is not the operator's). */}
-                {exportEnabled && !previewMode && (
+                    return-hook flag; suppressed in admin preview (client PII is not the operator's).
+                    P1 (IA v2): when iaV2 ON the leads section is surfaced above (slot 2.5), so guard
+                    this under-the-hood mount on !iaV2Enabled to avoid a double-mount. */}
+                {!iaV2Enabled && exportEnabled && !previewMode && (
                   <ErrorBoundary label="Your captured leads">
                     <IssueYourLeadsSection workspaceId={workspaceId} />
                   </ErrorBoundary>

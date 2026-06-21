@@ -75,4 +75,31 @@ describe('OutcomeCountBand', () => {
     expect(screen.getByText('calls')).toBeInTheDocument();
     expect(screen.getByText('form fills')).toBeInTheDocument();
   });
+
+  // ── namedRecordsAvailable contract — the boolean OverviewTab feeds (iaV2 && returnHookEnabled) ──
+  // This locks the downstream render: true hides the "names available" upsell, false shows it.
+  describe('namedRecordsAvailable upsell contract', () => {
+    const fixture = (namedRecordsAvailable: boolean): IssueOutcomeCount => ({
+      units: [
+        { label: 'form fills', current: 23, baseline: 10, priorPeriod: 18, eventName: 'form_submit', outcomeType: 'form_fill' },
+      ],
+      byType: [
+        { outcomeType: 'form_fill', label: 'form fills', current: 23, baseline: 10, priorPeriod: 18 },
+      ],
+      provenance: 'measured_action',
+      namedRecordsAvailable,
+    });
+
+    it('namedRecordsAvailable: true → the "Names available with call & CRM tracking" upsell is ABSENT', () => {
+      render(<OutcomeCountBand count={fixture(true)} />);
+      // The unit still renders — only the upsell is suppressed.
+      expect(screen.getByText('form fills')).toBeInTheDocument();
+      expect(screen.queryByText(/names available with call/i)).not.toBeInTheDocument();
+    });
+
+    it('namedRecordsAvailable: false → the "Names available with call & CRM tracking" upsell is PRESENT', () => {
+      render(<OutcomeCountBand count={fixture(false)} />);
+      expect(screen.getByText(/names available with call/i)).toBeInTheDocument();
+    });
+  });
 });

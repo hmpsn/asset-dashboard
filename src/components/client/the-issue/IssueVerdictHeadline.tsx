@@ -41,9 +41,11 @@ interface IssueVerdictHeadlineProps {
   verdict: OutcomeVerdict | null;
   /** The #1 curated rec — drives the optional "why" bars. Optional. */
   topRec?: Recommendation | null;
+  /** P1 (IA v2): when true, render the month-over-month clause + typed breakdown row. */
+  iaV2?: boolean;
 }
 
-export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlineProps) {
+export function IssueVerdictHeadline({ verdict, topRec, iaV2 = false }: IssueVerdictHeadlineProps) {
   const [showWhy, setShowWhy] = useState(false);
 
   const whyComponents = topRec?.opportunity && topRec.opportunity.components.length > 0
@@ -58,6 +60,11 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
   // editorial, not sourced. Intentionally NOT routed through prov.fmtMoney.
   const retainerRatio = verdict?.monthlyRetainer && verdict.monthlyRetainer > 0
     ? fmtEstimateRatio(verdict.estimatedValue / verdict.monthlyRetainer)
+    : null;
+  // P1 (IA v2): real month-over-month delta — only when the flag is on AND a prior period exists.
+  // null → the honest "establishing your trend" line, never a fabricated delta.
+  const momDelta = iaV2 && verdict != null && verdict.priorPeriodCount != null
+    ? verdict.outcomeCount - verdict.priorPeriodCount
     : null;
 
   return (
@@ -87,12 +94,37 @@ export function IssueVerdictHeadline({ verdict, topRec }: IssueVerdictHeadlinePr
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{retainerRatio} your retainer</span>
             )}
           </div>
+          {/* P1 (IA v2): real month-over-month clause. Number form when a prior period exists; the
+              honest "establishing your trend" line otherwise — never a fabricated delta. */}
+          {iaV2 && verdict != null && (
+            momDelta != null ? (
+              <p data-testid="verdict-mom" className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+                {momDelta > 0 ? '↑ ' : momDelta < 0 ? '↓ ' : '→ '}
+                {Math.abs(momDelta).toLocaleString()} {verdict.outcomeUnitLabel} vs last month
+              </p>
+            ) : (
+              <p data-testid="verdict-mom" className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+                Establishing your month-over-month trend
+              </p>
+            )
+          )}
           {/* The baseline-anchored verdict sentence — pure render via baselineVerdict (Lane C). */}
           <p className="t-page text-[var(--brand-text-bright)] mt-2 leading-snug">
             {isEstablishing
               ? baselineVerdict({ outcomeNoun: verdict.outcomeUnitLabel, current: verdict.outcomeCount, baseline: null })
               : baselineVerdict({ outcomeNoun: verdict.outcomeUnitLabel, current: verdict.outcomeCount, baseline: verdict.baseline.baselineConversions })}
           </p>
+          {/* P1 (IA v2): typed outcome breakdown surfaced in the hero ("41 calls · 12 form fills")
+              so the dentist sees the mix, not a blended count. emerald = the success/count law. */}
+          {iaV2 && verdict.outcomeTypeBreakdown && verdict.outcomeTypeBreakdown.length > 0 && (
+            <div data-testid="verdict-type-breakdown" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {verdict.outcomeTypeBreakdown.map((b) => (
+                <span key={b.outcomeType} className="t-caption-sm text-[var(--brand-text)]">
+                  <span className="text-accent-success font-medium">{b.current.toLocaleString()}</span> {b.label}
+                </span>
+              ))}
+            </div>
+          )}
           {/* Provenance disclosure — the honest label + precision come from the single render
               contract (estimate vs measured vs actual). No inline `provenance === …` branch. */}
           <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">

@@ -8282,3 +8282,19 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Flagged for controller review:** whether to retire the server briefing pipeline + admin review queue + the two flags + the now-caller-less `src/hooks/client/useClientBriefing.ts` is a larger decision than this client-variant teardown — left intact pending that call.
 
 **Verification:** `npm run typecheck` clean; `npx vite build` ok; `npx tsx scripts/pr-check.ts` 0 errors; `npm run verify:feature-flags` exit 0; OverviewTab / WorkspaceHome / The Issue / WinsSurface / ActionQueueStrip / feature-flag tests pass.
+
+---
+
+### 598. Client dashboard IA v2 — P1 Overview reframe + real month-over-month delta 2026-06-21
+**Status:** Built behind a new master flag `client-ia-v2` (default OFF → client dashboard byte-identical to today's spine). First phase of the owner-ratified client IA restructure (tournament + 7-persona gut-check → 4-tab two-speed shell `Overview · Inbox · Results · Deep Dive` + conditional Locations). The verdict-first spine (`the-issue-client-spine` → `TheIssueClientPage`) already implemented most of the reframe (dollar-lead verdict, health ring demoted, predictions cut, two-speed disclosure); P1 added the three remaining persona-driven enhancements.
+
+**What was built:**
+- **Real month-over-month delta** — `computeROI()` re-aggregates the same pinned outcomes from the GA4 conversion snapshot closest to 30 days before the latest (15–45-day window, mirrors `computeGrowthPercent`) → new `ROIData.outcomeVerdict.priorPeriodCount` (added to BOTH the shared contract `shared/types/roi.ts` and the duplicated local decl in `server/roi.ts`). `null` when no qualifying prior snapshot — the client shows an honest "establishing" line, never a fabricated delta. Exported pure helper `findPriorOutcomeSnapshot`. Rides the existing public read path `GET /api/public/roi/:id` (no serializer change).
+- **Typed outcome breakdown in the hero** (`IssueVerdictHeadline`) — renders `verdict.outcomeTypeBreakdown` ("41 calls · 12 form fills", emerald counts) so the hero is no longer a blended number (dentist gut-check). Plus the MoM clause (↑/↓/→ vs last month, never a fabricated ↑ on a decline).
+- **Named-lead list surfaced from the count** — when `client-ia-v2` ON, `IssueYourLeadsSection` moves from the collapsed "Under the hood" block to slot 2.5 (right under the outcome count) so the verifiable "receipts" are one tap away (check-signer gut-check); `namedRecordsAvailable` now reflects reality (`client-ia-v2 && the-issue-client-return-hook`). `!iaV2Enabled` guard prevents a double-mount.
+
+**Flags:** `client-ia-v2` (master, P1→P4) + `client-locations` (P5, declared/dark) added to `FEATURE_FLAGS` + `FEATURE_FLAG_CATALOG` + the `'The Issue (Client)'` group; roadmap item `client-dashboard-ia-restructure`.
+
+**Tests:** unit (`roi-prior-snapshot` window guard), integration (`the-issue-roi-mom` — real `GET /api/public/roi`, +7 MoM, null on single-snapshot, null on out-of-window prior), component (`IssueVerdictHeadline.iaV2` MoM up/down/flat + typed row + flag-OFF parity; `TheIssueClientPage.iaV2Leads` document-order + no double-mount; `OutcomeCountBand` named-records upsell contract). Built subagent-per-task → 3-lens scaled review (correctness + flag-OFF parity + test quality): zero Critical, zero real code bugs; 3 Important test-coverage gaps closed + proven non-vacuous.
+
+**Verification:** `npm run typecheck` clean; `npx vite build` ok; full `npx vitest run` 26825 passed; `npx tsx scripts/pr-check.ts` 0 errors; `npm run lint:hooks` 0; `npm run verify:feature-flags` exit 0. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p1-overview-reframe.md`. Phase-per-PR: P1 → staging → P2 (4-tab nav). P5 (multi-location) deferred to its own session (owner).
