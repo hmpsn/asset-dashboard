@@ -34,6 +34,7 @@
     "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
+    "lint:hooks": "eslint -c eslint.rules-of-hooks.config.js src",
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
     "verify:ai-reliability": "tsx scripts/report-ai-reliability.ts",

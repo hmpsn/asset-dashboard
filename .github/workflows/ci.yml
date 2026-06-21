@@ -126,6 +126,12 @@ jobs:
       - name: PR checks
         run: npm run pr-check
 
+      # Hard correctness gate: a conditionally-called React hook crashes the component at runtime
+      # ("Rendered more hooks than during the previous render"). eslint has the rule but was never run
+      # in CI; this focused config enforces ONLY react-hooks/rules-of-hooks (no exhaustive-deps noise).
+      - name: Rules-of-Hooks lint
+        run: npm run lint:hooks
+
       - name: Style drift checks
         run: npm run verify:style-drift
 
