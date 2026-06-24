@@ -201,7 +201,7 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
         businessContext: '',
         knowledgeBase: '',
         personas: [],
-        serpFeatures: { featuredSnippets: 1, peopleAlsoAsk: 2, localPack: false, videoCarousel: 0 },
+        serpFeatures: { featuredSnippets: 1, peopleAlsoAsk: 2, localPack: false, videoCarousel: 0, aiOverview: 0 },
         backlinkProfile: { referringDomains: 42 },
       } as never,
     } as never);
