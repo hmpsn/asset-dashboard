@@ -233,6 +233,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   STRATEGY_KEYWORD_SET_UPDATED: 'seo-health',
   RANK_TRACKING_UPDATED: 'seo-health',
   LOCAL_SEO_UPDATED: 'seo-health',
+  SERP_SNAPSHOTS_REFRESHED: 'seo-health',
   EEAT_ASSETS_UPDATED: 'analytics-intelligence',
 };
 
@@ -253,6 +254,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   STRATEGY_UPDATED: 'Strategy keyword/score updates and related summary invalidation payload.',
   RANK_TRACKING_UPDATED: 'Rank-tracking keyword lifecycle, snapshot, and strategy reconciliation updates.',
   LOCAL_SEO_UPDATED: 'Local SEO market configuration and visibility refresh updates.',
+  SERP_SNAPSHOTS_REFRESHED: 'National SERP rank-snapshot refresh progress/completion (SEO Decision Engine P6 / national-serp-tracking); refreshes keyword-hub + rank-tracking national-SERP consumers.',
   EEAT_ASSETS_UPDATED: 'E-E-A-T workspace trust-asset inventory updates for content, schema, and page-analysis consumers.',
   FORM_SUBMISSION_CAPTURED: 'The Issue (Client) P1a: anonymous Webflow named-lead capture signal — payload carries only { workspaceId, outcomeType } (PII stays in form_submissions, D7); refreshes the admin conversion-tracking-status readout.',
 };

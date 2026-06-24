@@ -420,6 +420,10 @@ function adminInvalidationKeys(
       return strategyMutationKeys(workspaceId);
     case WS_EVENTS.RANK_TRACKING_UPDATED:
       return rankTrackingMutationKeys(workspaceId);
+    case WS_EVENTS.SERP_SNAPSHOTS_REFRESHED:
+      // P6 national-serp-tracking: a national SERP refresh upserted serp_snapshots →
+      // re-pull the command center so the drawer's live-SERP / AI-Overview detail updates.
+      return [queryKeys.admin.keywordCommandCenter(workspaceId)] as const;
     case WS_EVENTS.LOCAL_SEO_UPDATED:
       return [
         queryKeys.admin.localSeo(workspaceId),

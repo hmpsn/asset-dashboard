@@ -75,6 +75,11 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     { expectedLabel: 'Keyword Strategy', expectedCancellable: false, expectedResultBehavior: 'domain-store' },
     'tests/integration/keyword-strategy-job-mutation-safety.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH]: entry(
+    'NATIONAL_SERP_REFRESH',
+    { expectedLabel: 'Refreshing national SERP ranks', expectedCancellable: true, expectedResultBehavior: 'domain-store' },
+    'tests/integration/national-serp-routes.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR]: entry(
     'SCHEMA_GENERATOR',
     { expectedLabel: 'Schema Generator', expectedCancellable: true, expectedResultBehavior: 'domain-store-and-result' },

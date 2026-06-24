@@ -33,6 +33,7 @@ export const BACKGROUND_JOB_TYPES = {
   CONTENT_POST_FIX: 'content-post-fix',
   CONTENT_POST_VOICE_SCORE: 'content-post-voice-score',
   INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
+  NATIONAL_SERP_REFRESH: 'national-serp-refresh',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -278,6 +279,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     label: 'Refreshing signals',
     description: 'Recomputes analytics insights / intelligence signals for a workspace.',
     cancellable: false,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH]: {
+    label: 'Refreshing national SERP ranks',
+    description: 'Reads national advanced-SERP rank + AI-Overview citation for tracked keywords.',
+    cancellable: true,
     resultBehavior: 'domain-store',
   },
 };

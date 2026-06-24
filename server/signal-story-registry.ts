@@ -16,6 +16,7 @@ import type {
   LostVisibilityData,
   MilestoneAttributionData,
   QuickWinData,
+  SerpFeatureOpportunityData,
   SiteHealthInsightData,
 } from '../shared/types/analytics.js';
 import type { BriefingStory } from '../shared/types/briefing.js';
@@ -161,6 +162,25 @@ const clientInsightStories: Partial<Record<InsightType, ClientInsightProjector>>
       headline: `Search visibility opportunity on ${title}`,
       narrative: `This page receives impressions but low clicks. Improving the page's search appearance can meaningfully increase visits.`,
       impact: data.impressions ? `${Number(data.impressions).toLocaleString()} monthly impressions` : undefined,
+    };
+  },
+  serp_feature_opportunity: (insight) => {
+    const data = insight.data as SerpFeatureOpportunityData;
+    const keyword = data.keyword ? `"${data.keyword}"` : 'a keyword you rank for';
+    const aiOverviewOpportunity = data.aiOverviewPresent && data.aiOverviewCited === false;
+    const position = typeof data.currentPosition === 'number' ? Math.round(data.currentPosition) : null;
+    const citations = typeof data.estimatedMonthlyCitations === 'number' ? data.estimatedMonthlyCitations : 0;
+    if (aiOverviewOpportunity) {
+      return {
+        headline: `Google's AI Overview is answering ${keyword} without citing you`,
+        narrative: `Google now shows an AI Overview for ${keyword}, and your page already ranks${position != null ? ` at position ${position}` : ''} — but it isn't being cited in that answer yet. We're optimizing the page to earn the citation and reclaim the visibility that now sits above the regular results.`,
+        impact: citations > 0 ? `~${citations.toLocaleString()} monthly searches where being cited would put you front and center` : undefined,
+      };
+    }
+    return {
+      headline: `Featured-result opportunity on ${keyword}`,
+      narrative: `${keyword} shows a featured result at the top of Google, and your page is close enough to compete for it. We're shaping the page to win that spot and the outsized clicks that come with it.`,
+      impact: citations > 0 ? `~${citations.toLocaleString()} monthly searches in play` : undefined,
     };
   },
   conversion_attribution: (insight) => {

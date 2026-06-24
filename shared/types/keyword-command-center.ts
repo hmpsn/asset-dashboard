@@ -122,6 +122,21 @@ export interface KeywordCommandCenterMetrics {
   clicks?: number;
   impressions?: number;
   ctr?: number;
+  // SEO Decision Engine P6 (national-serp-tracking) — true-SERP detail, additive + optional.
+  // Populated from serp_snapshots when the flag is on; undefined = no national snapshot yet.
+  // These NEVER override `currentPosition` (GSC average) — `nationalPosition` is a distinct,
+  // point-in-time live-SERP rank surfaced alongside it, so the value-score invariant with the
+  // candidate/skinny replay path is preserved (currentPosition is the only position that scores).
+  /** True point-in-time live advanced-SERP rank (1-based) for the client domain; undefined = not ranking / not tracked. */
+  nationalPosition?: number;
+  /** Client URL that ranks for this keyword on the live SERP (null/undefined = not ranking). */
+  matchedUrl?: string;
+  /** SERP feature labels present on the live SERP (e.g. 'ai_overview', 'featured_snippet'). */
+  serpFeatures?: string[];
+  /** True when the client domain appears in the AI Overview references. Tri-state: undefined = unknown. */
+  aiOverviewCited?: boolean;
+  /** True when an AI Overview block is present on the SERP at all. Tri-state: undefined = unknown. */
+  aiOverviewPresent?: boolean;
 }
 
 export interface KeywordCommandCenterAssignment {

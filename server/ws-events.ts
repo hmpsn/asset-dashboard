@@ -162,6 +162,9 @@ export const WS_EVENTS = {
   // canonical (execution-map §1.4), matching the STRATEGY_SIGNAL_FOLD_UPDATED sibling.
   STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+  // National SERP rank tracking (SEO Decision Engine P6 / national-serp-tracking) —
+  // fired after a national_serp_refresh job upserts a fresh batch of serp_snapshots.
+  SERP_SNAPSHOTS_REFRESHED: 'serp:snapshots_refreshed',
 
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',

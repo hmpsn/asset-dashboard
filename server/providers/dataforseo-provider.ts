@@ -36,6 +36,8 @@ import type {
   KeywordGapEntry,
   BacklinksOverview,
   ReferringDomain,
+  NationalSerpProviderRequest,
+  NationalSerpResult,
 } from '../seo-data-provider.js';
 import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
@@ -196,6 +198,7 @@ const CACHE_TTL_BACKLINKS = 168;       // 7 days
 const CACHE_TTL_COMPETITORS = 336;     // 14 days
 const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
 const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
+const CACHE_TTL_NATIONAL_SERP = 168;    // 7 days (P6 national-serp-tracking)
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -492,6 +495,78 @@ interface DataForSeoOperationOptions<T> {
 function rowsReturnedForValue(value: unknown): number {
   if (Array.isArray(value)) return value.length;
   return value == null ? 0 : 1;
+}
+
+// ── National SERP parser (P6 / national-serp-tracking) ──
+// Pure, fixture-grounded parser for `serp/google/organic/live/advanced` items.
+// Built against `tests/fixtures/dataforseo-serp-advanced.ts` — field names validated,
+// not guessed. Defensive against malformed items: never throws, skips bad entries.
+
+/** Strip a leading `www.` and lowercase, so 'www.Reddit.com' and 'reddit.com' compare equal. */
+function normalizeSerpDomain(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().replace(/^www\./, '');
+}
+
+/** Domain equality after `www.`-strip + lowercase normalization. Empty strings never match. */
+function domainMatches(a: unknown, b: unknown): boolean {
+  const na = normalizeSerpDomain(a);
+  const nb = normalizeSerpDomain(b);
+  return na !== '' && na === nb;
+}
+
+/**
+ * Parse a national advanced-SERP `items[]` array into a `NationalSerpResult` relative to
+ * `ownerDomain`. Logic derived from the ground-truth fixture:
+ *  - `features`: distinct top-level `item.type` values, first-seen order preserved.
+ *  - AI Overview: top-level `type === 'ai_overview'` item. `aiOverviewCited` matches `ownerDomain`
+ *    against the AGGREGATED top-level `references[].domain` (the canonical citation list). `null`
+ *    when no AI Overview is present.
+ *  - Client organic rank: lowest `rank_group` among `type === 'organic'` items whose `domain`
+ *    matches `ownerDomain`. Only `organic` items count toward the client's own rank.
+ */
+export function parseNationalSerp(items: unknown[], ownerDomain: string, query: string): NationalSerpResult {
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+
+  // features: distinct top-level types, first-seen order.
+  const features: string[] = [];
+  const seenTypes = new Set<string>();
+  for (const item of safeItems) {
+    const type = typeof item.type === 'string' ? item.type : '';
+    if (type && !seenTypes.has(type)) {
+      seenTypes.add(type);
+      features.push(type);
+    }
+  }
+
+  // AI Overview presence + citation (aggregated top-level references[]).
+  const aiOverviewItem = safeItems.find(item => item.type === 'ai_overview');
+  const aiOverviewPresent = !!aiOverviewItem;
+  let aiOverviewCited: boolean | null = null;
+  if (aiOverviewItem) {
+    const references = Array.isArray(aiOverviewItem.references) ? aiOverviewItem.references : [];
+    aiOverviewCited = references.some(ref =>
+      typeof ref === 'object' && ref !== null && domainMatches((ref as Record<string, unknown>).domain, ownerDomain),
+    );
+  }
+
+  // Client best organic rank: lowest rank_group among matching organic items only.
+  let position: number | null = null;
+  let matchedUrl: string | null = null;
+  for (const item of safeItems) {
+    if (item.type !== 'organic') continue;
+    if (!domainMatches(item.domain, ownerDomain)) continue;
+    const rank = typeof item.rank_group === 'number' ? item.rank_group : null;
+    if (rank === null) continue;
+    if (position === null || rank < position) {
+      position = rank;
+      matchedUrl = typeof item.url === 'string' ? item.url : null;
+    }
+  }
+
+  return { query, position, matchedUrl, features, aiOverviewPresent, aiOverviewCited };
 }
 
 async function runDataForSeoOperation<T>({
@@ -1689,6 +1764,57 @@ export class DataForSeoProvider implements SeoDataProvider {
         }
         log.error({ err }, `DataForSEO referring domains error for "${target}"`);
         return [];
+      },
+    });
+  }
+
+  // ── getNationalSerp → serp/google/organic/live/advanced (P6 national-serp-tracking) ──
+  async getNationalSerp(request: NationalSerpProviderRequest, workspaceId: string): Promise<NationalSerpResult> {
+    const keyword = request.keyword.trim();
+    const ownerDomain = request.ownerDomain;
+    const locationCode = request.locationCode ?? locationCodeFromDatabase('us');
+    const languageCode = request.languageCode ?? 'en';
+    const device = request.device ?? 'desktop';
+    const emptyResult: NationalSerpResult = {
+      query: keyword,
+      position: null,
+      matchedUrl: null,
+      features: [],
+      aiOverviewPresent: false,
+      aiOverviewCited: null,
+    };
+    const cacheKey = [
+      'national_serp',
+      cacheKeyPart(keyword),
+      cacheKeyPart(cleanDomain(ownerDomain)),
+      locationCode,
+      languageCode,
+      device,
+    ].join('_');
+
+    return runDataForSeoOperation<NationalSerpResult>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_NATIONAL_SERP,
+      endpointLabel: 'national_serp_google_organic_advanced',
+      query: keyword,
+      emptyValue: emptyResult,
+      endpoint: 'serp/google/organic/live/advanced',
+      body: [{
+        keyword,
+        location_code: locationCode,
+        language_code: languageCode,
+        device,
+      }],
+      mapResult: (json) => {
+        const result = getTaskResult(json)[0];
+        const items = Array.isArray(result?.items) ? (result.items as unknown[]) : [];
+        const value = parseNationalSerp(items, ownerDomain, keyword);
+        return { value, rowsReturned: value.position !== null ? 1 : 0 };
+      },
+      handleError: (err) => {
+        log.error({ err, keyword, ownerDomain }, `DataForSEO national SERP error for "${keyword}"`);
+        return emptyResult;
       },
     });
   }

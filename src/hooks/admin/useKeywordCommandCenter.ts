@@ -3,6 +3,8 @@ import { keywordCommandCenter } from '../../api/keywordCommandCenter';
 import { rankTracking } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { invalidateMany, keywordMutationInvalidationKeys } from '../../lib/queryInvalidation';
+import { useBackgroundTasks } from '../useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type {
   KeywordCommandCenterActionRequest,
   KeywordCommandCenterBulkActionRequest,
@@ -90,6 +92,27 @@ export function useRankTrackingAddKeyword(workspaceId: string) {
     mutationFn: (keyword: string) => rankTracking.addKeyword(workspaceId, { query: keyword }),
     onSuccess: () => {
       invalidateMany(queryClient, keywordMutationInvalidationKeys(workspaceId));
+    },
+  });
+}
+
+/**
+ * Start the national advanced-SERP rank refresh job (P6 / national-serp-tracking).
+ * POST /api/rank-tracking/:workspaceId/refresh-national — gated server-side by the flag +
+ * Growth+ tier. Tracks the returned job through useBackgroundTasks/NotificationBell; the
+ * command-center cache also refreshes live via the SERP_SNAPSHOTS_REFRESHED broadcast, so the
+ * onSuccess invalidate is just the optimistic local nudge.
+ */
+export function useNationalSerpRefresh(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
+  return useMutation({
+    mutationFn: () => rankTracking.refreshNational(workspaceId),
+    onSuccess: (result) => {
+      if (result?.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH, result.jobId, { workspaceId });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
     },
   });
 }
