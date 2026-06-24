@@ -801,6 +801,8 @@ export interface SerpFeatures {
   localPack: boolean;
   /** Pages where a video carousel is present for the primary keyword. */
   videoCarousel: number;
+  /** Pages whose primary keyword's SERP shows an AI Overview (answer-engine surface). */
+  aiOverview: number;
 }
 
 export interface EngagementMetrics {

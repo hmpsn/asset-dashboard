@@ -129,7 +129,7 @@ function formatDecayAlertsForClient(pipeline: ContentPipelineSlice): ClientDecay
 function countSerpOpportunities(seoContext: SeoContextSlice): number | null {
   const sf = seoContext.serpFeatures;
   if (!sf) return null;
-  return sf.featuredSnippets + sf.peopleAlsoAsk + sf.videoCarousel + (sf.localPack ? 1 : 0);
+  return sf.featuredSnippets + sf.peopleAlsoAsk + sf.videoCarousel + sf.aiOverview + (sf.localPack ? 1 : 0);
 }
 
 function formatCopyPipelineForClient(pipeline: ContentPipelineSlice): ClientCopyPipelineStatus | null {

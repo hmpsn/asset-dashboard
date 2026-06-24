@@ -203,6 +203,7 @@ const SERP_DESCRIPTIVE: Record<string, string> = {
   people_also_ask: 'People also ask',
   video: 'Video results',
   local_pack: 'Local results',
+  ai_overview: 'AI Overview',
 };
 
 const SERP_EMOJI: Record<string, string> = {
@@ -210,6 +211,7 @@ const SERP_EMOJI: Record<string, string> = {
   people_also_ask: '❓ PAA',
   video: '▶ Video',
   local_pack: '📍 Local',
+  ai_overview: '✨ AI Overview',
 };
 
 const SERP_PLAIN: Record<string, string> = {
@@ -217,6 +219,7 @@ const SERP_PLAIN: Record<string, string> = {
   people_also_ask: 'PAA',
   video: 'Video',
   local_pack: 'Local',
+  ai_overview: 'AI Overview',
 };
 
 /** Render the SERP-feature badges for the active label set, preserving order. */
@@ -232,9 +235,9 @@ function serpBadges(serpFeatures: string[] | undefined, set: 'plain' | 'descript
       </>
     );
   }
-  // admin (plain) + briefing (emoji): fixed ordered set, only the four known keys.
+  // admin (plain) + briefing (emoji): fixed ordered set, only the known keys.
   const labels = set === 'emoji' ? SERP_EMOJI : SERP_PLAIN;
-  const order = ['featured_snippet', 'people_also_ask', 'video', 'local_pack'];
+  const order = ['featured_snippet', 'people_also_ask', 'video', 'local_pack', 'ai_overview'];
   return (
     <div className="flex flex-wrap gap-1">
       {order.map((key) =>

@@ -1032,7 +1032,7 @@ describe('formatForPrompt — seoContext section', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({
         businessContext: 'Dental',
-        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true, videoCarousel: 0 },
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true, videoCarousel: 0, aiOverview: 0 },
       }),
     });
     const result = formatForPrompt(intel);

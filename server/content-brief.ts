@@ -1277,6 +1277,9 @@ export async function generateBrief(
     if (feats.includes('local_pack')) {
       directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
     }
+    if (feats.includes('ai_overview')) {
+      directives.push('AI OVERVIEW OPPORTUNITY: This query triggers a Google AI Overview — lead with a citable, extractable answer. Open with a direct 2-3 sentence definition or summary, use clear entity definitions and structured Q&A, and make claims authoritative and well-sourced so an answer engine can quote the page.');
+    }
     if (directives.length > 0) {
       serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (${providerLabel} data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
     }

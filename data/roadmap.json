@@ -32,9 +32,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group A quick win (no new credits). Free signal = 'keyword triggers an AI Overview', NOT 'are we cited' (that is P6). Sequence after P1 in same lane (shared keyword-strategy-enrichment.ts)."
+          "notes": "Done (2026-06-24). ai_overview recognized in hasSerpOpportunity (string label from ranked_keywords serp_item_types), pushed into stored serpFeatures at both enrichment build sites, added to the SerpFeatures intelligence type + seo-context aggregation + AI-context formatter + countSerpOpportunities (client serpOpportunities), a content-brief AI-Overview AEO directive, and the ContentGapRow chip maps (descriptive/plain/emoji) + ordered set. Free signal = 'this keyword triggers an AI Overview', NOT 'are we cited' (the paid P6 national-SERP fetch). Zero new credits. Brief directive is prompt-only by design (shapes the visible AI-generated brief)."
         },
         {
           "id": "seo-engine-p4-geo-correctness-target-geo",

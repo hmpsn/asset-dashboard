@@ -39,7 +39,7 @@ describe('Intelligence types', () => {
       knowledgeBase: '',
       businessProfile: { industry: 'Tech', goals: ['Growth'], targetAudience: 'B2B' },
       backlinkProfile: { totalBacklinks: 500, referringDomains: 100, trend: 'growing' },
-      serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true },
+      serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true, videoCarousel: 0, aiOverview: 0 },
       rankTracking: { trackedKeywords: 10, avgPosition: 15.2, positionChanges: { improved: 3, declined: 1, stable: 6 } },
       strategyHistory: { revisionsCount: 3, lastRevisedAt: '2026-03-15' },
     };
