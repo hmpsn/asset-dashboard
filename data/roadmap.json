@@ -1,6 +1,144 @@
 {
   "sprints": [
     {
+      "id": "sprint-seo-decision-engine-2026-06-23",
+      "name": "SEO Decision Engine — close the data→decision gap (8-phase program)",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "From the 2026-06-23 15-agent SEO audit (overall C, 'A-grade architecture wired to a C-grade decision surface'). Group A flips loops already built; Group B fixes geo correctness + adds a cost-governed foundation; Group C adds paid capabilities. Spec: docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md. Deferred items (status: deferred) are out-of-program backlog captured so nothing is lost.",
+      "items": [
+        {
+          "id": "seo-engine-p1-value-first-keyword-scoring",
+          "title": "P1 — Flip keyword-value-scoring on + delete crude Hub-sort path (one PR). Keep computeOpportunityScore as gate-failure/backfill fallback.",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "S",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group A quick win. Retires the keyword-value-scoring flag; re-ranks keywords by commercial value. Update feature-flags test + deprecation registry in same commit. Staging eyeball before main."
+        },
+        {
+          "id": "seo-engine-p2-emv-calibration-loop",
+          "title": "P2 — Close EMV calibration loop: effort priors + realized-ratio basis swap (in-place in computeOvCalibration), thread effortDays into 16 scorer calls",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "S",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group A quick win, fully independent (recommendations.ts + ov-calibration.ts). Reuse existing sample-size floors. Ranking-only change; predictedEmv unchanged. Open decision: single-multiplier vs per-actionType (default single)."
+        },
+        {
+          "id": "seo-engine-p3-serp-feature-surfacing",
+          "title": "P3 — Surface AI-Overview/SERP-feature triggers from ranked_keywords serp_item_types into SerpFeatures type + content-brief AEO directive + scoring",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group A quick win (no new credits). Free signal = 'keyword triggers an AI Overview', NOT 'are we cited' (that is P6). Sequence after P1 in same lane (shared keyword-strategy-enrichment.ts)."
+        },
+        {
+          "id": "seo-engine-p4-geo-correctness-target-geo",
+          "title": "P4 — Geo correctness: thread location/language through domain endpoints + workspace target-geo field (migration) + resolveWorkspaceTargetGeo()",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group B foundation. Fixes silent US/English corruption for non-US clients (the D-grade national/intl dimension). Flag geo-targeting (OFF = byte-identical). May run parallel to Group A (disjoint files)."
+        },
+        {
+          "id": "seo-engine-p5-reliability-cost-governance",
+          "title": "P5 — Reliability + cost: retry/backoff, activate dead markCapabilityDisabled, credit-usage read path + assertCreditBudget per-tier gate",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group B foundation. Prerequisite for paid Group C. Sequence after P4 (both touch dataforseo-provider.ts)."
+        },
+        {
+          "id": "seo-engine-p6-national-serp-rank-ai-overview",
+          "title": "P6 — National advanced-SERP rank + AI-Overview citation layer: new job, true rank + features, serp_feature_opportunity insight, historical backfill",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group C (paid). Flag national-serp-tracking. Depends on P4+P5. Absorbs the not-free half of audit move #2. Must call assertCreditBudget."
+        },
+        {
+          "id": "seo-engine-p7-gbp-reviews-local-layer",
+          "title": "P7 — GBP + reviews local layer: business_listings_search + capture ratings → review-gap recs",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group C (paid). Flag local-gbp. Depends on P4+P5. Turns local from local-pack-presence-only into a real local product."
+        },
+        {
+          "id": "seo-engine-p8-ai-visibility-llm-citation",
+          "title": "P8 — AI-visibility slice: ai_optimization/llm_mentions_* → 'are we cited by LLMs' KPI + AEO before/after proof",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-23",
+          "notes": "Group C (paid). Flag ai-visibility. Depends on P4+P5. Closes the open-loop AEO program with measurement."
+        },
+        {
+          "id": "seo-engine-deferred-revenue-grounding",
+          "title": "DEFERRED — Revenue grounding: replace CPC proxy in EMV with GA4 estimatedRevenue / Stripe conversion value",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "M",
+          "priority": "P3",
+          "status": "deferred",
+          "createdAt": "2026-06-23",
+          "notes": "Audit blind spot: we rank/recommend by ad-auction CPC, not client unit economics. Own brainstorm; not bolted into P2."
+        },
+        {
+          "id": "seo-engine-deferred-historical-seasonality",
+          "title": "DEFERRED — Historical/seasonality endpoints: google_trends, dfs_trends, historical_keyword_data, bulk_traffic_estimation for forecasting",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P3",
+          "status": "deferred",
+          "createdAt": "2026-06-23",
+          "notes": "Provider-grounded traffic/seasonality forecasting beyond the heuristic value bands. Lower leverage than the program; revisit after Group C."
+        },
+        {
+          "id": "seo-engine-deferred-link-gap-backlink-depth",
+          "title": "DEFERRED — Link-gap + backlink depth: domain/page_intersection, backlinks/competitors, anchors, bulk_spam_score, new/lost monitoring",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P3",
+          "status": "deferred",
+          "createdAt": "2026-06-23",
+          "notes": "Off-page link prospecting + toxicity + velocity; would turn backlinks from 'can I rank?' into 'what should I do about my links?'."
+        },
+        {
+          "id": "seo-engine-deferred-content-analysis-sentiment",
+          "title": "DEFERRED — Content-analysis: content_analysis/search, summary, phrase_trends for brand-mention / sentiment / share-of-conversation",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "M",
+          "priority": "P3",
+          "status": "deferred",
+          "createdAt": "2026-06-23",
+          "notes": "Brand-mention + review-sentiment signal for E-E-A-T and local reputation."
+        },
+        {
+          "id": "seo-engine-deferred-competitive-depth-intent",
+          "title": "DEFERRED — Competitive depth + intent: serp_competitors, search_intent labs, keyword_overview, share-of-voice scoring, competitor momentum trend, on_page/lighthouse",
+          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
+          "est": "L",
+          "priority": "P3",
+          "status": "deferred",
+          "createdAt": "2026-06-23",
+          "notes": "Replace manual getKeywordGap diff with intersection endpoints; authoritative intent classifier; true share-of-voice. CWV already covered via PageSpeed so on_page/lighthouse is lowest priority."
+        }
+      ]
+    },
+    {
       "id": "sprint-the-issue-client-redesign-2026-06-20",
       "name": "The Issue (Client) — Verdict-First Trust Spine",
       "hours": "TBD — phased, one PR per phase, staging-first",
