@@ -20,6 +20,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { addTrackedKeyword } from '../../server/rank-tracking.js';
 import { storeSerpSnapshots } from '../../server/serp-snapshots-store.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'national-serp-routes' });
 const { api, postJson } = ctx;
@@ -99,6 +100,8 @@ describe('POST /api/rank-tracking/:workspaceId/refresh-national — gating', () 
       const jobRes = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
       expect(jobRes.status).toBe(200);
       const job = await jobRes.json();
+      // The created job is the national-SERP refresh type (lifecycle signal anchor).
+      expect(job.type).toBe(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH);
       if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
         terminalStatus = job.status;
         break;
