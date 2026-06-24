@@ -261,6 +261,21 @@ describe('KeywordStrategyPanel — The Issue flag parity', () => {
       expect(screen.queryByText('Keyword Strategy')).toBeNull();
     });
 
+    it('restores the full-strategy Generate/Regenerate cluster in the IssueHeader (dropped-base-header regression)', () => {
+      renderPanel();
+      // "The Issue" suppresses the base PageHeader that used to host StrategyHeaderActions, so the
+      // full-strategy regenerate controls must now live in the IssueHeader beside Send issue.
+      // "Update changed pages" is unique to that cluster and only renders for a real strategy —
+      // its presence proves the cluster was restored (the POV editor's own "Regenerate" button is
+      // a different, narrower action and would collide on /regenerate/, so we assert this instead).
+      expect(screen.getByRole('button', { name: /update changed pages/i })).toBeInTheDocument();
+      // The primary teal button reads "Regenerate" (real strategy exists) — at least one such button
+      // is present (the strategy one; the POV editor may contribute another).
+      expect(screen.getAllByRole('button', { name: /regenerate/i }).length).toBeGreaterThanOrEqual(1);
+      // It lives in the same header as Send issue.
+      expect(screen.getByRole('button', { name: /send issue/i })).toBeInTheDocument();
+    });
+
     it('Send issue commits the STAGED set via the atomic bulk-send route (action:send)', () => {
       renderPanel();
       // Blocker 5 staging model: per-row "Stage for issue" stages locally (NO client write); the

@@ -625,6 +625,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         configPanelProps={issueConfigPanelProps}
         stagedCount={stagedCount}
         curatedCount={curatedCount}
+        regenerateActions={headerActions}
       />
       <StanceBar recs={cockpitRecs} />
       <DraftedPovEditor
