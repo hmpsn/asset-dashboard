@@ -18,7 +18,6 @@ import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './key
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
 import { computeKeywordValueScore, deriveValueIntent } from './scoring/keyword-value-score.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspace } from './workspaces.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -597,34 +596,29 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
   // break the `opportunityScore/100` math).
   //
-  // Phase 2 (keyword-value-scoring flag): build the base score ONCE at the top of the per-gap
-  // loop so all three computeOpportunityScore sites (spine input, OV fallback, P4-OFF write) use
-  // the same value. Flag-OFF keeps the legacy computeOpportunityScore (byte-identical regardless
-  // of the P4 / relaxConservatism state). ctx is built once per enrichment run, never per gap.
+  // Build the value-first base score ONCE at the top of the per-gap loop so the spine input
+  // and the OV fallback use the same value. computeKeywordValueScore is the base; the legacy
+  // computeOpportunityScore is the signal-gate fallback. Value-first scoring is unconditional
+  // (the keyword-value-scoring flag was retired in SEO Decision Engine P1). ctx is built once
+  // per enrichment run, never per gap.
   if (strategy.contentGaps?.length) {
-    // Build ctx once per enrichment run — only when the flag is ON (avoids extra DB reads on the
-    // flag-OFF path, preserving byte-identity and perf).
-    const valueScoringOn = isFeatureEnabled('keyword-value-scoring', workspaceId);
-    const scoringCtx = valueScoringOn ? (() => {
-      const ws = getWorkspace(workspaceId);
-      return {
-        posture: getLocalSeoPosture(workspaceId),
-        markets: listLocalSeoMarkets(workspaceId),
-        city: ws?.businessProfile?.address?.city?.toLowerCase(),
-        state: ws?.businessProfile?.address?.state?.toLowerCase(),
-      };
-    })() : null;
+    // Build the value-scoring ctx once per enrichment run.
+    const ws = getWorkspace(workspaceId);
+    const scoringCtx = {
+      posture: getLocalSeoPosture(workspaceId),
+      markets: listLocalSeoMarkets(workspaceId),
+      city: ws?.businessProfile?.address?.city?.toLowerCase(),
+      state: ws?.businessProfile?.address?.state?.toLowerCase(),
+    };
 
     for (const cg of strategy.contentGaps) {
-      // base = value-first score when the flag is ON; legacy score when OFF.
-      // computeKeywordValueScore may return undefined (signal gate) — fall back to
-      // computeOpportunityScore in that case so a gap is never silently dropped.
-      const base: number | undefined = valueScoringOn && scoringCtx != null
-        ? (computeKeywordValueScore(
-            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
-            scoringCtx,
-          ) ?? computeOpportunityScore(cg))
-        : computeOpportunityScore(cg);
+      // Value-first score; computeKeywordValueScore may return undefined (signal
+      // gate) — fall back to computeOpportunityScore so a gap is never silently dropped.
+      const base: number | undefined =
+        computeKeywordValueScore(
+          { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
+          scoringCtx,
+        ) ?? computeOpportunityScore(cg);
 
       if (relaxConservatism) {
         const ov = computeOpportunityValue({

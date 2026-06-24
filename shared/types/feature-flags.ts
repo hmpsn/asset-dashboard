@@ -47,11 +47,6 @@ export const FEATURE_FLAGS = {
   // unflagged. OFF = today's capped behavior, byte-identical.
   // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
   'keyword-universe-full': false,
-  // Keyword Value Scoring: replaces the Hub's crude volume×ease opportunity sort
-  // with a value-first, posture-driven keyword value score (commercial intent + CPC
-  // + local relevance multiplier). Also gates the content-gap opportunity spine.
-  // OFF = byte-identical to today. See docs/superpowers/plans/2026-06-05-keyword-value-scoring.md.
-  'keyword-value-scoring': false,
 
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
@@ -312,19 +307,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-02',
     },
   },
-  'keyword-value-scoring': {
-    label: 'Keyword Hub — value-first opportunity scoring (commercial intent + CPC + posture-driven local)',
-    group: 'Keyword Hub',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after value-first scoring is validated on staging and becomes the default; the crude computeOpportunityScore Hub path is then deleted.',
-      linkedRoadmapItemId: 'keyword-value-scoring',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
-    },
-  },
   'signal-auto-recompute': {
     label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
     group: 'Strategy',
@@ -571,7 +553,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-universe-full', 'keyword-value-scoring'],
+    keys: ['keyword-universe-full'],
   },
   {
     label: 'Strategy',

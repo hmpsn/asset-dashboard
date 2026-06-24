@@ -280,14 +280,15 @@ describe('discovered_queries integration', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 1 Task 1.5 — value-first opportunity sort (flag-gated). The flag is set
-// via the admin HTTP route so the server PROCESS's in-memory flag cache is
-// invalidated immediately (a direct in-process setWorkspaceFlagOverride would
-// not invalidate the spawned server's cache for ~10s). Seeding is via direct DB
-// writes the server reads fresh on each /rows request.
+// Value-first opportunity sort — now UNCONDITIONAL (the keyword-value-scoring flag
+// was retired in SEO Decision Engine P1). This exercises the full row-side pipeline
+// finalizeDraftRow → rowValueScore WeakMap → ROW_SORT_ACCESSORS.opportunity → the
+// real /rows HTTP response. The candidate-comparator unit test hand-sets valueScore
+// and never materializes a row, so this is the only coverage that fails if the
+// row-side opportunity accessor regresses (e.g. WeakMap read returns undefined).
 // ---------------------------------------------------------------------------
 
-describe('Keyword Command Center — value-first opportunity sort (flag-gated)', () => {
+describe('Keyword Command Center — value-first opportunity sort', () => {
   let wsId = '';
 
   function tracked(query: string, extra: Partial<TrackedKeyword>): TrackedKeyword {
@@ -301,15 +302,6 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
     };
   }
 
-  async function setFlag(enabled: boolean | null): Promise<void> {
-    const res = await api(`/api/admin/workspaces/${wsId}/feature-flags/keyword-value-scoring`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled }),
-    });
-    expect(res.status).toBe(200);
-  }
-
   async function rowOrder(): Promise<string[]> {
     const res = await api(`/api/webflow/keyword-command-center/${wsId}/rows?sort=opportunity&direction=desc&pageSize=50`);
     expect(res.status).toBe(200);
@@ -319,9 +311,9 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
 
   beforeEach(() => {
     wsId = createWorkspace(`Value Scoring Test ${Date.now()}`).id;
-    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query
-    // with real CPC. Volume-weighted opportunity (flag OFF) leads with bad-breath;
-    // value-first (flag ON) leads with the transactional+CPC keyword.
+    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query with
+    // real CPC. Value-first opportunity leads with the transactional+CPC keyword
+    // despite its far lower volume — it must NOT collapse to volume-weighting.
     updateTrackedKeywords(wsId, () => [
       tracked('what causes bad breath', { volume: 22000, difficulty: 40, intent: 'informational' }),
       tracked('teeth cleaning service', { volume: 480, difficulty: 30, cpc: 6, intent: 'transactional' }),
@@ -333,14 +325,7 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
     wsId = '';
   });
 
-  it('flag OFF: opportunity sort is volume-weighted (informational high-volume leads)', async () => {
-    await setFlag(false);
-    const order = await rowOrder();
-    expect(order.indexOf('what causes bad breath')).toBeLessThan(order.indexOf('teeth cleaning service'));
-  });
-
-  it('flag ON: opportunity sort is value-first (transactional + CPC leads despite far lower volume)', async () => {
-    await setFlag(true);
+  it('opportunity sort is value-first through the real /rows route (transactional + CPC leads despite far lower volume)', async () => {
     const order = await rowOrder();
     expect(order.indexOf('teeth cleaning service')).toBeLessThan(order.indexOf('what causes bad breath'));
   });
