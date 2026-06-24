@@ -61,9 +61,8 @@ describe('GbpReviewsPanel', () => {
     expect(screen.getByText(/4\.6★ · 80 reviews/)).toBeTruthy();
     // Review gap copy (80 - 12 = 68 behind).
     expect(screen.getByText(/68 behind the leader/)).toBeTruthy();
-    // Completeness state.
+    // Completeness state (score + concrete missing signals; no claim-status badge — unreliable).
     expect(screen.getByText('0/100')).toBeTruthy();
-    expect(screen.getByText('Unclaimed')).toBeTruthy();
     expect(screen.getByText(/Missing:/)).toBeTruthy();
     // Flag-gated refresh trigger present + wired.
     const refreshBtn = screen.getByRole('button', { name: /Refresh GBP & reviews/ });
@@ -86,6 +85,5 @@ describe('GbpReviewsPanel', () => {
     };
     render(<GbpReviewsPanel workspaceId="ws-1" />);
     expect(screen.getByText('100/100')).toBeTruthy();
-    expect(screen.getByText('Claimed')).toBeTruthy();
   });
 });

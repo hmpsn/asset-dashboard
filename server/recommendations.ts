@@ -2317,10 +2317,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const sameMarketCompetitors = owned.marketId
             ? competitors.filter(c => c.marketId === owned.marketId)
             : competitors;
-          const topCompetitor = sameMarketCompetitors.reduce<typeof sameMarketCompetitors[number] | undefined>(
-            (best, c) => ((c.reviewCount ?? 0) > (best?.reviewCount ?? -1) ? c : best),
-            undefined,
-          );
+          // Only competitors with a REAL review count anchor a review gap — a competitor with no
+          // review data isn't evidence the client is behind (review #3 from the P7 scaled review).
+          const topCompetitor = sameMarketCompetitors
+            .filter(c => c.reviewCount != null)
+            .reduce<typeof sameMarketCompetitors[number] | undefined>(
+              (best, c) => ((c.reviewCount ?? 0) > (best?.reviewCount ?? -1) ? c : best),
+              undefined,
+            );
 
           // ── Review-gap rec ──
           if (topCompetitor) {
@@ -2371,7 +2375,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             attributeCount: owned.attributes.length,
             category: owned.category,
           });
-          if (owned.claimed === false || completeness < GBP_COMPLETENESS_MIN) {
+          // Profile RICHNESS gap (photos / attributes / category / website). NOTE: claim status is
+          // intentionally NOT a trigger — business_listings_search defaults to is_claimed=true, so
+          // unclaimed owners aren't even returned and `claimed` is never reliably false (P7 scaled
+          // review). The rec frames profile completeness, not claim status.
+          if (completeness < GBP_COMPLETENESS_MIN) {
             const source = RecSource.localVisibility(`gbp_completeness:${key}`);
             const opportunity = computeOpportunityValue({
               branch: 'local',
@@ -2388,12 +2396,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
               workspaceId,
               priority: scoring.priority,
               type: 'local_visibility',
-              title: `Complete your Google Business Profile${owned.claimed === false ? ' — unclaimed' : ''} (completeness ${completeness}/100)`,
-              description: owned.claimed === false
-                ? `Your Google Business Profile isn't claimed yet, so you can't control your hours, photos, attributes, or respond to reviews — and Google ranks unclaimed profiles below claimed ones. Claiming and filling it out is the single highest-leverage local fix.`
-                : `Your Google Business Profile scores ${completeness}/100 on completeness — it's missing signals like photos, attributes, or a category that Google uses to rank and display you in the local pack. Filling these in lifts both your ranking and how compelling your listing looks.`,
-              insight: `A complete, claimed Google Business Profile is the foundation of local-pack visibility. Profiles with photos, accurate categories, and filled-in attributes rank higher and convert better than thin ones — this is addressable groundwork that compounds with every other local effort.`,
-              impact: owned.claimed === false ? 'high' : 'medium',
+              title: `Complete your Google Business Profile (completeness ${completeness}/100)`,
+              description: `Your Google Business Profile scores ${completeness}/100 on completeness — it's missing signals like photos, attributes, or a category that Google uses to rank and display you in the local pack. Filling these in lifts both your ranking and how compelling your listing looks.`,
+              insight: `A complete Google Business Profile is the foundation of local-pack visibility. Profiles with photos, accurate categories, and filled-in attributes rank higher and convert better than thin ones — this is addressable groundwork that compounds with every other local effort.`,
+              impact: 'medium',
               effort: 'low',
               impactScore: scoring.impactScore,
               opportunity,
@@ -2401,9 +2407,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
               affectedPages: [],
               trafficAtRisk: 0,
               impressionsAtRisk: 0,
-              estimatedGain: owned.claimed === false
-                ? `Claiming and completing your Google Business Profile unlocks local-pack visibility you currently can't compete for`
-                : `Completing your Google Business Profile lifts your local-pack ranking and makes your listing more compelling to nearby searchers`,
+              estimatedGain: `Completing your Google Business Profile lifts your local-pack ranking and makes your listing more compelling to nearby searchers`,
               actionType: 'manual',
               status: 'pending',
               assignedTo,

@@ -144,8 +144,10 @@ describe('generateRecommendations — GBP + reviews (P7 U5)', () => {
     expect(reviewGap!.opportunity?.modelVersion).toBe('ov-1');
     expect(reviewGap!.impactScore).toBe(reviewGap!.opportunity!.value);
 
-    // The unclaimed owned listing drives the unclaimed completeness copy.
-    expect(completeness!.title).toContain('unclaimed');
+    // The thin owned listing (completeness < 60) drives the GBP-completeness rec. Claim status
+    // is intentionally not a trigger (is_claimed defaults true → never reliably false).
+    expect(completeness!.title).toContain('Complete your Google Business Profile');
+    expect(completeness!.title).toContain('/100');
   });
 
   it('mints neither GBP rec when the flag is OFF', async () => {

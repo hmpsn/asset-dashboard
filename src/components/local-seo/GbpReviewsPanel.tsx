@@ -41,8 +41,10 @@ function ListingRow({ label, listing }: { label: string; listing: GbpListingAggr
 }
 
 function CompletenessReadout({ score, owned }: { score: number; owned: GbpListingAggregate }) {
+  // Claim status is intentionally NOT shown — business_listings_search defaults to is_claimed=true,
+  // so unclaimed owners aren't returned and `claimed` is never reliably false (P7 scaled review).
+  // The readout frames profile RICHNESS: the concrete missing signals Google uses to rank/display.
   const missing: string[] = [];
-  if (!owned.claimed) missing.push('listing not claimed');
   if ((owned.totalPhotos ?? 0) === 0) missing.push('no photos');
   if (owned.attributes.length === 0) missing.push('no attributes');
   if (!owned.category || !owned.category.trim()) missing.push('no category');
@@ -55,12 +57,6 @@ function CompletenessReadout({ score, owned }: { score: number; owned: GbpListin
           {/* Completeness is a SCORE → emerald/amber/red via scoreColorClass (Law 03). */}
           <p className={`t-h2 font-semibold tabular-nums ${scoreColorClass(score)}`}>{score}/100</p>
         </div>
-        <Badge
-          label={owned.claimed ? 'Claimed' : 'Unclaimed'}
-          tone={owned.claimed ? 'emerald' : 'amber'}
-          variant="outline"
-          shape="pill"
-        />
       </div>
       {missing.length > 0 && (
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">

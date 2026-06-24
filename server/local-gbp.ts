@@ -271,19 +271,26 @@ export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string):
         }
       }
 
-      // 2) Owner search by name (best name+location match → result[0]). The owner often has too
-      //    few reviews to surface in the review-count-sorted competitor search (that IS the gap).
+      // 2) Owner search by name. The owner often has too few reviews to surface in the review-
+      //    count-sorted competitor search (that IS the gap). getBusinessListings still sorts by
+      //    votes_count, so result[0] is the most-reviewed NAME match — which can be a different
+      //    same-name business. When we have an identity signal (gbp_place_id / live domain), trust
+      //    the parser's verified `isOwned` (place_id/cid/domain match) to pick the RIGHT listing,
+      //    and do NOT store a false owner if none of the candidates verify. Only fall back to the
+      //    top name match when the workspace has no identity to verify against. (P7 scaled review.)
       await waitForMemoryHeadroom();
       if (isCancelled(jobId)) { flushSnapshots(); return; }
       if (budgetAllows()) {
         try {
           const ownerResults = await getBusinessListings(
-            { title: searchName, locationCoordinate, ownerDomain, ownerPlaceIds, limit: 1 },
+            { title: searchName, locationCoordinate, ownerDomain, ownerPlaceIds, limit: 5 },
             workspaceId,
           );
           if (isCancelled(jobId)) { flushSnapshots(); return; }
-          const owner = ownerResults[0];
-          if (owner) {
+          const hasIdentity = ownerPlaceIds.length > 0 || ownerDomain !== '';
+          const verified = ownerResults.find(r => r.isOwned);
+          const owner = verified ?? (hasIdentity ? undefined : ownerResults[0]);
+          if (owner && owner.placeId) {
             addRow(toStoreRow(owner, { isOwned: true, marketId: market.id, locationId: location?.id, category }));
             ownerFound++;
           }

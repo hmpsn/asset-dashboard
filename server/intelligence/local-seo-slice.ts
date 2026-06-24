@@ -353,7 +353,7 @@ function renderLocalSeoBlock(args: {
       ? ` vs top local competitor ${comp.name} ${comp.reviewCount ?? 0}${comp.rating != null ? ` (${comp.rating}★)` : ''}`
       : '';
     const completeness = reviewSummary.completenessScore != null
-      ? `; GBP completeness ${reviewSummary.completenessScore}/100${reviewSummary.claimed === false ? ', unclaimed' : ''}`
+      ? `; GBP completeness ${reviewSummary.completenessScore}/100`
       : '';
     lines.push('');
     lines.push(`Reviews: ${own}${vs}${completeness}.`);

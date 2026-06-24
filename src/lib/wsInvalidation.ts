@@ -425,9 +425,12 @@ function adminInvalidationKeys(
       // re-pull the command center so the drawer's live-SERP / AI-Overview detail updates.
       return [queryKeys.admin.keywordCommandCenter(workspaceId)] as const;
     case WS_EVENTS.LOCAL_GBP_SNAPSHOTS_REFRESHED:
-      // P7 local-gbp: a GBP/reviews refresh upserted business_listing_snapshots →
-      // re-pull the local-SEO panel (GBP/reviews readout) + command center.
+      // P7 local-gbp: a GBP/reviews refresh upserted business_listing_snapshots → re-pull the
+      // GbpReviewsPanel's OWN query key (a distinct prefix; localSeo does NOT cascade to it),
+      // plus the local-SEO panel + command center. Without localGbpReviews the panel only refreshes
+      // from the triggering mutation — mid-job progress + other tabs would go stale (P7 review).
       return [
+        queryKeys.admin.localGbpReviews(workspaceId),
         queryKeys.admin.localSeo(workspaceId),
         queryKeys.admin.keywordCommandCenter(workspaceId),
       ] as const;
