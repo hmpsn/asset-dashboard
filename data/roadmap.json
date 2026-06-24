@@ -62,9 +62,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "in-progress",
           "createdAt": "2026-06-23",
-          "notes": "Group C (paid). Flag national-serp-tracking. Depends on P4+P5. Absorbs the not-free half of audit move #2. Must call assertCreditBudget."
+          "notes": "Group C (paid). Flag national-serp-tracking. Depends on P4+P5. PRE-PLAN-AUDIT DONE (docs/superpowers/audits/2026-06-24-seo-engine-p6-national-serp-audit.md). OWNER DECISIONS LOCKED 2026-06-24: tier=Growth+Premium (TierGate min=growth, Free excluded — 0 budget); backfill=NONE (start fresh, defer historical_serps); budget=observe-only (consistent w/ P5, assertCreditBudget wired+logs, no flip); cadence=weekly + per-ws override; keywords=100 default/25 min/300 max; insight fires only when ≥1 SERP feature + rank snapshot exist. AI-OVERVIEW API SHAPE VALIDATED via 2 live serp/advanced calls → fixture tests/fixtures/dataforseo-serp-advanced.ts. PARSING CONTRACT: ai_overview is top-level item {type:'ai_overview', references:[{source,domain,url,title,text}], items:[ai_overview_element]}; aiOverviewCited = clientDomain ∈ references[].domain; aiOverviewPresent = ai_overview item exists; featured_snippet has own domain/url/rank_absolute; rank_absolute=true cross-element position, rank_group=within-type; matched rank = organic/featured_snippet item where domain==clientDomain → rank_absolute + url. DATA MODEL: new serp_snapshots table (migration 153), NOT extending tracked_keywords. BUILD UNITS U0-U8 in the audit. NEXT: build U0 (contracts: NationalSerpResult type, getNationalSerp interface, flag catalog entry in SEO Decision Engine group + lifecycle anchor, migration 153) → U1 provider parser (fixture-grounded) → U2 serp-snapshots-store → U3 job+route → U4 insight (7-part lockstep mirror ranking_mover) → U5 renderers → U6 KeywordDetailDrawer → U7 public serialization → U8 tests."
         },
         {
           "id": "seo-engine-p7-gbp-reviews-local-layer",
