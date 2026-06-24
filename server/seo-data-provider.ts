@@ -123,16 +123,20 @@ export interface SeoDataProvider {
   getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
 
   // Domain Analysis
-  getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
-  getUrlKeywords?(url: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
-  getDomainOverview(domain: string, workspaceId: string, database?: string): Promise<DomainOverview | null>;
-  getCompetitors(domain: string, workspaceId: string, limit?: number, database?: string): Promise<OrganicCompetitor[]>;
+  // `locationCode`/`languageCode` (optional, P4 / geo-targeting) thread the resolved
+  // workspace target-geo so non-US clients' ranked keywords, domain overview, competitor
+  // set, and keyword gap reflect their own market, not the US/'en' SERP. Omitting both
+  // preserves the pre-P4 `locationCodeFromDatabase(database)` + 'en' behavior exactly.
+  getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<DomainKeyword[]>;
+  getUrlKeywords?(url: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<DomainKeyword[]>;
+  getDomainOverview(domain: string, workspaceId: string, database?: string, locationCode?: number, languageCode?: string): Promise<DomainOverview | null>;
+  getCompetitors(domain: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<OrganicCompetitor[]>;
 
   // Competitive Analysis
-  getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordGapEntry[]>;
+  getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordGapEntry[]>;
 
   // Backlinks
   getBacklinksOverview(domain: string, workspaceId: string, database?: string): Promise<BacklinksOverview | null>;

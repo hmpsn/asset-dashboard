@@ -64,7 +64,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
-import { outcomeValueSchema, segmentConfigSchema } from '../schemas/workspace-schemas.js';
+import { outcomeValueSchema, segmentConfigSchema, targetGeoSchema } from '../schemas/workspace-schemas.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
 const log = createLogger('workspaces');
@@ -340,6 +340,11 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     const parsed = segmentConfigSchema.safeParse(updates.segmentConfig);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid segmentConfig' });
     updates.segmentConfig = parsed.data;
+  }
+  if ('targetGeo' in updates && updates.targetGeo !== null) {
+    const parsed = targetGeoSchema.safeParse(updates.targetGeo);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid targetGeo' });
+    updates.targetGeo = parsed.data;
   }
   // Hash clientPassword with bcrypt before saving (empty string = remove password)
   if (typeof updates.clientPassword === 'string') {

@@ -21,7 +21,7 @@ import {
   keywordStrategySchema,
   contentPricingSchema, portalContactSchema, auditSuppressionSchema,
   publishTargetSchema, businessProfileSchema, audiencePersonaSchema, intelligenceProfileSchema,
-  outcomeValueSchema, segmentConfigSchema, webflowFormMappingSchema,
+  outcomeValueSchema, segmentConfigSchema, targetGeoSchema, webflowFormMappingSchema,
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { normalizeSocialProfiles } from './social-profiles.js';
@@ -154,6 +154,7 @@ interface WorkspaceRow {
   scoring_config: string | null;
   intelligence_profile: string | null;
   segment_config: string | null;
+  target_geo: string | null;
   outcome_value: string | null;
   // The Issue (Client) P1a — Webflow form-capture config (migration 149; secret dropped in 150). All admin-only.
   webflow_form_sources: string | null;
@@ -263,6 +264,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.segment_config) {
     const sc = parseJsonSafe(row.segment_config, segmentConfigSchema, null, { workspaceId: row.id, field: 'segment_config', table: 'workspaces' });
     if (sc) ws.segmentConfig = sc;
+  }
+  if (row.target_geo) {
+    const tg = parseJsonSafe(row.target_geo, targetGeoSchema, null, { workspaceId: row.id, field: 'target_geo', table: 'workspaces' });
+    if (tg) ws.targetGeo = tg;
   }
   if (row.outcome_value) {
     const ov = parseJsonSafe(row.outcome_value, outcomeValueSchema, null, { workspaceId: row.id, field: 'outcome_value', table: 'workspaces' });
@@ -421,6 +426,7 @@ function workspaceToParams(ws: Workspace) {
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     segment_config: ws.segmentConfig ? JSON.stringify(ws.segmentConfig) : null,
+    target_geo: ws.targetGeo ? JSON.stringify(ws.targetGeo) : null,
     outcome_value: ws.outcomeValue ? JSON.stringify(ws.outcomeValue) : null,
     // The Issue (Client) P1a — Webflow form-capture config (write boundary; secret dropped in 150).
     webflow_form_sources: ws.webflowFormSources ? JSON.stringify(ws.webflowFormSources) : null,
@@ -511,7 +517,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'webflowFormSources' | 'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf' | 'lastReturnHookSentWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'targetGeo' | 'webflowFormSources' |'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf' | 'lastReturnHookSentWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -551,7 +557,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
-    segmentConfig: 'segment_config', outcomeValue: 'outcome_value',
+    segmentConfig: 'segment_config', targetGeo: 'target_geo', outcomeValue: 'outcome_value',
     webflowFormSources: 'webflow_form_sources',
     conversionTrackingConfirmedAt: 'conversion_tracking_confirmed_at',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',

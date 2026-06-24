@@ -574,6 +574,16 @@ export const segmentConfigSchema = z.object({
   reportingAudience: z.enum(['self', 'board', 'partners', 'owners']).optional(),
 }).passthrough();
 
+// SEO Decision Engine P4 — workspace SERP target geo. Required fields (locationCode +
+// languageCode) MUST match what BusinessFootprintTab writes, or parseJsonSafe returns
+// the null fallback and the override silently vanishes (CLAUDE.md "Schema vs stored shape").
+export const targetGeoSchema = z.object({
+  locationCode: z.number(),
+  languageCode: z.string().min(1),
+  countryCode: z.string().optional(),
+  label: z.string().optional(),
+}).passthrough();
+
 // ── The Issue (Client) — Webflow form-source mapping (P1a) ────────
 
 /** Per-workspace mapping of a Webflow form to a typed outcome. Stored in the webflow_form_sources
