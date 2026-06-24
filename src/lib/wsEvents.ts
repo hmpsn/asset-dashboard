@@ -107,6 +107,9 @@ export const WS_EVENTS = {
   // (managed-keyword-set mutations) + the useWorkspaceEvents handler land in P3.
   STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+  // National SERP rank tracking (P6 / national-serp-tracking) — fired after a
+  // national_serp_refresh job upserts serp_snapshots; invalidates the command center.
+  SERP_SNAPSHOTS_REFRESHED: 'serp:snapshots_refreshed',
 
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',

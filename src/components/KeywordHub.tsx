@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Archive, Eye, MapPin, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
+import { Archive, Eye, MapPin, RefreshCw, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
 
 import { Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
@@ -39,6 +39,7 @@ import { adminPath } from '../routes';
 import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
+import { FeatureFlag } from './ui/FeatureFlag';
 import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterBulkAction,
@@ -46,6 +47,7 @@ import {
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useKeywordHardDelete,
+  useNationalSerpRefresh,
   useRankTrackingAddKeyword,
 } from '../hooks/admin/useKeywordCommandCenter';
 import { useKeywordHubState } from '../hooks/admin/useKeywordHubState';
@@ -208,6 +210,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const rowAction = useKeywordCommandCenterAction(workspaceId);
   const hardDelete = useKeywordHardDelete(workspaceId);
   const localRefresh = useLocalSeoRefresh(workspaceId);
+  const nationalRefresh = useNationalSerpRefresh(workspaceId);
   const addKeywordMutation = useRankTrackingAddKeyword(workspaceId);
 
   // Add-keyword input state (local — not a filter, not hub state).
@@ -266,6 +269,12 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const wsHandlers = useMemo(
     () => ({
       [WS_EVENTS.RANK_TRACKING_UPDATED]: () =>
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.admin.keywordCommandCenter(workspaceId),
+        }),
+      // P6 national-serp-tracking: a national SERP refresh upserted fresh serp_snapshots →
+      // re-pull the command center so the drawer's Live SERP / AI-Overview detail updates.
+      [WS_EVENTS.SERP_SNAPSHOTS_REFRESHED]: () =>
         queryClient.invalidateQueries({
           queryKey: queryKeys.admin.keywordCommandCenter(workspaceId),
         }),
@@ -441,7 +450,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   // Surface a failed row/drawer/local action (mirrors KCC's actionErrorMessage).
   // Without this a thrown mutation — e.g. a server-rejected lifecycle move — would
   // fail silently in the Hub.
-  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? bulkAction.error ?? addKeywordMutation.error;
+  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? nationalRefresh.error ?? bulkAction.error ?? addKeywordMutation.error;
   const actionErrorMessage = firstError instanceof Error
     ? firstError.message
     : firstError
@@ -487,6 +496,21 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
                 aria-label="Search keywords"
               />
             </div>
+
+            {/* P6 national-serp-tracking — flag-gated trigger for the national advanced-SERP
+                rank refresh. The route enforces Growth+ tier; a Free workspace gets a 403
+                surfaced via the shared error band. Progress shows in the NotificationBell. */}
+            <FeatureFlag flag="national-serp-tracking">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={RefreshCw}
+                disabled={nationalRefresh.isPending}
+                onClick={() => nationalRefresh.mutate()}
+              >
+                {nationalRefresh.isPending ? 'Refreshing ranks…' : 'Refresh national ranks'}
+              </Button>
+            </FeatureFlag>
           </div>
         }
       />

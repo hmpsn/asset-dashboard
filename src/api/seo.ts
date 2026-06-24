@@ -146,6 +146,11 @@ export const rankTracking = {
   snapshot: (wsId: string) =>
     post<unknown>(`/api/rank-tracking/${wsId}/snapshot`),
 
+  /** P6 national-serp-tracking: start the national advanced-SERP rank refresh job
+   *  (gated server-side by flag + Growth+ tier). Returns the background job id. */
+  refreshNational: (wsId: string) =>
+    post<{ jobId: string }>(`/api/rank-tracking/${wsId}/refresh-national`),
+
   publicLatest: (wsId: string) =>
     getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
 };
