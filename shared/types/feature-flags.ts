@@ -166,6 +166,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Keyword Hub',
+  'SEO Decision Engine',
   'Strategy',
   'The Issue (Client)',
 ] as const;
@@ -315,7 +316,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
   },
   'geo-targeting': {
     label: 'Geo targeting — query non-US clients in their own market (domain/keyword/competitor SERP)',
-    group: 'Keyword Hub',
+    group: 'SEO Decision Engine',
     lifecycle: {
       owner: 'analytics-intelligence',
       createdAt: '2026-06-24',
@@ -572,7 +573,11 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-universe-full', 'geo-targeting'],
+    keys: ['keyword-universe-full'],
+  },
+  {
+    label: 'SEO Decision Engine',
+    keys: ['geo-targeting'],
   },
   {
     label: 'Strategy',
