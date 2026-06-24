@@ -28,3 +28,25 @@ export function parseListingRating(rating: unknown): { rating?: number; reviewCo
     reviewCount: typeof votesCount === 'number' && Number.isFinite(votesCount) ? votesCount : undefined,
   };
 }
+
+/**
+ * Derive a 0..100 GBP completeness signal from the four cheapest presence signals on a business
+ * listing: claimed (+25), at least one photo (+25), any GBP attributes (+25), a category present
+ * (+25). Intentionally a simple equal-weight sum so the review/GBP recommendation thresholds stay
+ * legible (an unclaimed, photo-less, attribute-less listing scores 25). Shared by the provider
+ * parser (at fetch time) AND the recommendation generation (recomputed from the stored snapshot,
+ * which persists `attributes`/`claimed`/`total_photos`/`category` but not the derived score).
+ */
+export function deriveGbpCompletenessScore(args: {
+  claimed?: boolean;
+  totalPhotos?: number;
+  attributeCount: number;
+  category?: string;
+}): number {
+  let score = 0;
+  if (args.claimed) score += 25;
+  if ((args.totalPhotos ?? 0) > 0) score += 25;
+  if (args.attributeCount > 0) score += 25;
+  if (args.category && args.category.trim()) score += 25;
+  return score;
+}

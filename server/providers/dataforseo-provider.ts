@@ -45,7 +45,7 @@ import type {
 import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
-import { parseListingRating } from '../listing-rating.js';
+import { parseListingRating, deriveGbpCompletenessScore } from '../listing-rating.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -596,27 +596,6 @@ function flattenGbpAttributes(attributes: unknown): string[] {
     }
   }
   return items;
-}
-
-/**
- * Derive a 0..100 GBP completeness signal from the four cheapest presence signals available
- * on a business_listing: claimed (+25), at least one photo (+25), any GBP attributes (+25),
- * a category present (+25). Each is a coarse "this part of the profile is filled in" proxy;
- * the score is intentionally a simple equal-weight sum so the recommendation thresholds in U5
- * stay legible (e.g. an unclaimed, photo-less, attribute-less listing scores 25).
- */
-function deriveGbpCompletenessScore(args: {
-  claimed?: boolean;
-  totalPhotos?: number;
-  attributeCount: number;
-  category?: string;
-}): number {
-  let score = 0;
-  if (args.claimed) score += 25;
-  if ((args.totalPhotos ?? 0) > 0) score += 25;
-  if (args.attributeCount > 0) score += 25;
-  if (args.category && args.category.trim()) score += 25;
-  return score;
 }
 
 /** A valid rating_distribution is a plain object whose 1..5 keys are all numbers. */
