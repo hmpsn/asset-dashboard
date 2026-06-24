@@ -108,6 +108,7 @@ export const queryKeys = {
     localSeoVariant: (wsId: string, includeSnapshots: boolean) =>
       ['admin-local-seo', wsId, includeSnapshots ? 'with-snapshots' : 'summary'] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
+    localGbpReviews: (wsId: string) => ['admin-local-gbp-reviews', wsId] as const,
     eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,

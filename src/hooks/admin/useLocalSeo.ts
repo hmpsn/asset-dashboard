@@ -15,6 +15,17 @@ export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: b
   });
 }
 
+// SEO Decision Engine P7 (local-gbp): admin GBP/reviews readout (aggregates only). Returns the
+// empty shape when the flag is off (getSafe fallback), so consumers can gate on data presence.
+export function useGbpReviews(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.localGbpReviews(workspaceId),
+    queryFn: () => localSeo.gbpReviews(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
 export function useLocalSeoRefresh(workspaceId: string) {
   const queryClient = useQueryClient();
   const { trackJob } = useBackgroundTasks();
@@ -43,6 +54,7 @@ export function useLocalGbpRefresh(workspaceId: string) {
         trackJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, result.jobId, { workspaceId });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localGbpReviews(workspaceId) });
     },
   });
 }

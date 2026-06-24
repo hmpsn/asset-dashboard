@@ -1,7 +1,9 @@
 import type { LocalSeoSlice } from '../../shared/types/intelligence.js';
 import type { LocalSeoKeywordVisibility, LocalSeoVisibilityPosture } from '../../shared/types/local-seo.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { getLatestBusinessListings, getLatestOwnedListing } from '../business-listings-store.js';
 import { getClientLocations } from '../client-locations.js';
+import { deriveGbpCompletenessScore } from '../listing-rating.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('workspace-intelligence/local-seo');
@@ -162,6 +164,16 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       log.debug({ err, workspaceId }, 'competitor brands unavailable for local SEO slice; leaving empty');
     }
 
+    // SEO Decision Engine P7 (GBP + reviews) — aggregates-only review/GBP summary so AdminChat +
+    // AI context can reason about the client's listing vs the strongest local competitor. Best-effort:
+    // a failure degrades to undefined (no review data), never blocking the slice. AGGREGATES ONLY.
+    let reviewSummary: LocalSeoSlice['reviewSummary'];
+    try {
+      reviewSummary = buildReviewSummary(workspaceId);
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'review summary unavailable for local SEO slice; leaving undefined');
+    }
+
     const sampledCandidates = stratifiedSample(candidates, markets, PROMPT_BLOCK_PER_MARKET_CAP, PROMPT_BLOCK_TOTAL_CAP);
     const effectiveLocalSeoBlock = renderLocalSeoBlock({
       locations,
@@ -170,14 +182,59 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
       sampledCandidates,
       serviceGaps,
       competitorBrands,
+      reviewSummary,
       latestSnapshotAt,
     });
 
-    return { locations, enabled, markets, visibility, candidates, serviceGaps, competitorBrands, effectiveLocalSeoBlock, latestSnapshotAt };
+    return { locations, enabled, markets, visibility, candidates, serviceGaps, competitorBrands, reviewSummary, effectiveLocalSeoBlock, latestSnapshotAt };
   } catch (err) {
     log.warn({ err, workspaceId }, 'assembleLocalSeo: failed, degrading to empty slice');
     return baseline;
   }
+}
+
+/**
+ * SEO Decision Engine P7 — assemble the aggregates-only review/GBP summary.
+ *
+ * Owned half: the latest owned business listing (rating/reviewCount/claimed + a recomputed
+ * GBP completeness score from the stored presence signals). Competitor half: the strongest
+ * non-owned listing by review count. Returns undefined when there is neither an owned listing
+ * nor any competitor listing data, so an OFF / no-data workspace produces no `reviewSummary`
+ * (and therefore no prose change). AGGREGATES ONLY — never individual reviews or authors.
+ */
+function buildReviewSummary(workspaceId: string): LocalSeoSlice['reviewSummary'] {
+  const owned = getLatestOwnedListing(workspaceId);
+
+  // Strongest competitor = highest reviewCount among non-owned listings. A listing with no
+  // reviewCount (undefined = "no reviews yet") never wins over one that has a count.
+  let topCompetitor: { name: string; rating?: number; reviewCount?: number } | undefined;
+  for (const listing of getLatestBusinessListings(workspaceId)) {
+    if (listing.isOwned) continue;
+    const name = listing.title?.trim();
+    if (!name) continue;
+    const reviewCount = listing.reviewCount ?? 0;
+    const bestSoFar = topCompetitor?.reviewCount ?? -1;
+    if (reviewCount > bestSoFar) {
+      topCompetitor = { name, rating: listing.rating, reviewCount: listing.reviewCount };
+    }
+  }
+
+  if (!owned && !topCompetitor) return undefined;
+
+  return {
+    ownRating: owned?.rating,
+    ownReviewCount: owned?.reviewCount,
+    completenessScore: owned
+      ? deriveGbpCompletenessScore({
+          claimed: owned.claimed,
+          totalPhotos: owned.totalPhotos,
+          attributeCount: owned.attributes.length,
+          category: owned.category,
+        })
+      : undefined,
+    claimed: owned?.claimed,
+    topCompetitor,
+  };
 }
 
 /**
@@ -238,9 +295,10 @@ function renderLocalSeoBlock(args: {
   sampledCandidates: LocalSeoSlice['candidates'];
   serviceGaps: LocalSeoSlice['serviceGaps'];
   competitorBrands: LocalSeoSlice['competitorBrands'];
+  reviewSummary: LocalSeoSlice['reviewSummary'];
   latestSnapshotAt: string | null;
 }): string {
-  const { locations, markets, visibility, sampledCandidates, serviceGaps, competitorBrands, latestSnapshotAt } = args;
+  const { locations, markets, visibility, sampledCandidates, serviceGaps, competitorBrands, reviewSummary, latestSnapshotAt } = args;
   const lines: string[] = [];
   if (locations.length > 0) {
     lines.push(`Configured client locations (${locations.length} confirmed):`);
@@ -285,6 +343,20 @@ function renderLocalSeoBlock(args: {
       const starters = g.starterKeywords.slice(0, 3).join(', ');
       lines.push(`  - ${g.serviceLabel}${starters ? ` (e.g. ${starters})` : ''}`);
     }
+  }
+  if (reviewSummary) {
+    const own = reviewSummary.ownReviewCount != null
+      ? `${reviewSummary.ownReviewCount}${reviewSummary.ownRating != null ? ` (${reviewSummary.ownRating}★)` : ''}`
+      : 'no reviews yet';
+    const comp = reviewSummary.topCompetitor;
+    const vs = comp
+      ? ` vs top local competitor ${comp.name} ${comp.reviewCount ?? 0}${comp.rating != null ? ` (${comp.rating}★)` : ''}`
+      : '';
+    const completeness = reviewSummary.completenessScore != null
+      ? `; GBP completeness ${reviewSummary.completenessScore}/100${reviewSummary.claimed === false ? ', unclaimed' : ''}`
+      : '';
+    lines.push('');
+    lines.push(`Reviews: ${own}${vs}${completeness}.`);
   }
   if (latestSnapshotAt) {
     lines.push('');

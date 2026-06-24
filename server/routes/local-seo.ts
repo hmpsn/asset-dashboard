@@ -30,6 +30,8 @@ import {
 } from '../local-seo.js';
 import { enqueueLocationBackfill } from '../local-seo-location-backfill-queue.js';
 import { runLocalGbpRefreshJob } from '../local-gbp.js';
+import { getLatestBusinessListings, getLatestOwnedListing } from '../business-listings-store.js';
+import { deriveGbpCompletenessScore } from '../listing-rating.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
 import { validate, z } from '../middleware/validate.js';
@@ -259,6 +261,36 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
       message: 'Local SEO refresh failed unexpectedly',
     });
   });
+});
+
+// Admin readout for the GBP + reviews data (SEO Decision Engine P7 / local-gbp). Aggregates
+// ONLY — own rating/review-count + top competitors by review count + the derived GBP completeness
+// score. Never returns per-review/author data (the store holds none; keep it that way — PII rule).
+// When the flag is off, returns an empty payload (not 404) so the panel simply renders nothing.
+// `requireWorkspaceAccess` only (HMAC admin auth is covered by the global app gate — no requireAuth).
+router.get('/api/local-seo/:workspaceId/gbp-reviews', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  if (!isFeatureEnabled('local-gbp', workspaceId)) {
+    return res.json({ owned: null, competitors: [], completenessScore: null });
+  }
+
+  const owned = getLatestOwnedListing(workspaceId) ?? null;
+  const competitors = getLatestBusinessListings(workspaceId)
+    .filter(listing => !listing.isOwned)
+    .sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0))
+    .slice(0, 5);
+
+  const completenessScore = owned
+    ? deriveGbpCompletenessScore({
+        claimed: owned.claimed,
+        totalPhotos: owned.totalPhotos,
+        attributeCount: owned.attributes.length,
+        category: owned.category,
+      })
+    : null;
+
+  res.json({ owned, competitors, completenessScore });
 });
 
 // Trigger a GBP + reviews refresh (SEO Decision Engine P7 / local-gbp). Manual-trigger
