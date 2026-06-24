@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **530 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **531 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 531. National SERP rank + AI-Overview citation tracking (SEO Decision Engine P6)
+
+**What it does:** The first *paid* phase of the program — true national SERP position + SERP-feature tracking per keyword, behind the `national-serp-tracking` flag (Growth + Premium only). A new background job (`runNationalSerpRefreshJob`, ported from the local-SEO refresher: platform-wide concurrency-1, memory-headroom-gated, cancel-safe with incremental persistence, 100-keyword cap) calls DataForSEO `serp/google/organic/live/advanced` per tracked keyword and parses — against a **live-validated ground-truth fixture**, not guessed field names — the client's true organic rank (`rank_group` among `organic` items), the ranking URL, the present SERP features, and crucially whether the client's domain is **cited in the AI Overview** (owner domain ∈ the aggregated `ai_overview.references[].domain`). Results land in a new `serp_snapshots` time-series table (migration 153), kept strictly **parallel** to the GSC `rank_snapshots` table — the admin keyword drawer now shows the live-SERP rank, ranking URL, SERP-feature badges, and an **AI-Overview citation badge** (emerald = cited / zinc = not cited, never purple) *alongside* the GSC average position, never overwriting it. When an AI Overview answers a query the client ranks for but does **not** cite them, a `serp_feature_opportunity` insight fires (ownership-guarded — it never tells a client to "capture" a result they already hold) and reaches the client portal as a plain-language narrative ("Google's AI Overview is answering *X* without citing you — we're optimizing the page to earn that citation"). The route is gated flag → Growth+ tier → observe-only credit budget (P5) → global + per-workspace job serialization; OFF is byte-identical to pre-P6. Sixth phase of the SEO Decision Engine program (first Group C paid layer). Featured-snippet *capture* and historical backfill are deferred (P7+).
+
+**Why it matters to the agency:** Turns "we fetched the SERP" into a sellable, defensible answer to the #1 question clients now ask — *"are we showing up in Google's AI answers?"* — with per-keyword evidence (cited vs not, ranking URL, position) instead of a hand-wave. The cost is trivial ($0.002–0.003/call, <0.2% of the Growth budget at 100 keywords weekly) but the perceived value is high, and the observe-only budget wiring means the paid layer can scale to enforcement with a one-line flip.
+
+**Why it matters to clients:** Answers the AI-search anxiety directly — they can see, keyword by keyword, where they rank in the real SERP and whether Google's AI Overview is citing them or a competitor, with a clear "here's what we're doing about it" narrative rather than a raw metric.
 
 ---
 
