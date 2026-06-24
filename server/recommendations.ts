@@ -73,6 +73,7 @@ import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import type { StrategySignal } from '../shared/types/insights.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
+import { getEffortPriorDays } from './outcome-emv-calibration.js';
 import {
   LOCAL_SEO_POSTURE,
   LOCAL_SEO_VISIBILITY_POSTURE,
@@ -1385,6 +1386,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // intelligence SEO-context path (enrichWithBacklinks) — no duplicate API call.
   const ovAuthority = resolveOvAuthorityStrength(workspaceId, backlinkProfile);
 
+  // ── SEO Decision Engine P2 · effort priors ──
+  // Replace the per-branch DEFAULT_EFFORT_DAYS guess with the workspace's MEASURED
+  // median time-to-complete per action type (getEffortPriorDays), resolved ONCE per
+  // cycle. Absent (no prior, or < MIN_EFFORT_SAMPLES) → null → the scorer falls back
+  // to DEFAULT_EFFORT_DAYS[branch], byte-identical to today. Inert until outcomes accrue.
+  const ovEffortPriors = getEffortPriorDays(workspaceId);
+  const effortDaysFor = (type: RecType, source: string): number | null =>
+    ovEffortPriors[recommendationOutcomeActionType(type, source)] ?? null;
+
   // ── PR7 · Spine B — decaying Timing boosts (OV path). ──
   // Resolved ONCE per rec-gen cycle: Map<pageSlug, decaying boost> aggregated from the
   // active opportunity-event ledger. When the ledger is empty this is an EMPTY map
@@ -1497,6 +1507,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const source = RecSource.audit(group.check);
       const opportunity = computeOpportunityValue({
         branch: 'technical',
+        effortDays: effortDaysFor(recType, source),
         severity: group.severity,
         isCritical: isCrit,
         currentClicks: group.totalClicks,
@@ -1552,6 +1563,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const source = RecSource.auditSiteWide(issue.check);
       const opportunity = computeOpportunityValue({
         branch: 'technical',
+        effortDays: effortDaysFor('technical', source),
         severity: isCrit ? 'error' : 'warning',
         isCritical: isCrit,
         currentClicks: pageTraffic,
@@ -1608,6 +1620,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.strategyQuickWin();
         const opportunity = computeOpportunityValue({
           branch: 'quick_win',
+          effortDays: effortDaysFor('strategy', source),
           roiScore: qw.roiScore ?? null,
           llmLabel: qw.estimatedImpact,
           authorityStrength: ovAuthority ?? null,
@@ -1672,6 +1685,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.strategyContentGap();
         const opportunity = computeOpportunityValue({
           branch: 'content_gap',
+          effortDays: effortDaysFor('content', source),
           opportunityScore: cg.opportunityScore ?? null,
           volume: cg.volume ?? null,
           difficulty: cg.difficulty ?? null,
@@ -1740,6 +1754,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const source = RecSource.strategyRankingOpp();
           const opportunity = computeOpportunityValue({
             branch: 'ranking_opp',
+            effortDays: effortDaysFor('strategy', source),
             volume: pm.volume ?? null,
             currentPosition: pm.currentPosition ?? null,
             difficulty: pm.difficulty ?? null,
@@ -1797,6 +1812,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const source = RecSource.strategyIntentMismatch(pageSlug);
       const opportunity = computeOpportunityValue({
         branch: 'ranking_opp',
+        effortDays: effortDaysFor('strategy', source),
         volume: pk.volume ?? null,
         currentPosition: pk.currentPosition ?? null,
         difficulty: pk.difficulty ?? null,
@@ -1847,6 +1863,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const source = RecSource.keywordGap(kg.keyword);
           const opportunity = computeOpportunityValue({
             branch: 'ranking_opp',
+            effortDays: effortDaysFor('keyword_gap', source),
             volume: kg.volume,
             difficulty: kg.difficulty,
             currentPosition: kg.competitorPosition,
@@ -1899,6 +1916,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const source = RecSource.topicCluster(cluster.topic);
           const opportunity = computeOpportunityValue({
             branch: 'content_gap',
+            effortDays: effortDaysFor('topic_cluster', source),
             opportunityScore,
             authorityStrength: ovAuthority ?? null,
             ctrCurve: ovCtrCurve,
@@ -1975,6 +1993,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const source = RecSource.cannibalization(urlSetKey);
           const opportunity = computeOpportunityValue({
             branch: 'technical',
+            effortDays: effortDaysFor('cannibalization', source),
             severity,
             currentClicks,
             authorityStrength: ovAuthority ?? null,
@@ -2090,6 +2109,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.localServiceGap(gap.serviceId);
         const opportunity = computeOpportunityValue({
           branch: 'local',
+          effortDays: effortDaysFor('local_service_gap', source),
           volume: pooledVolume > 0 ? pooledVolume : null,
           opportunityScore: pooledVolume > 0 ? null : opportunityScore,
           intent: 'commercial',
@@ -2150,6 +2170,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.localVisibility(marketKey);
         const opportunity = computeOpportunityValue({
           branch: 'local',
+          effortDays: effortDaysFor('local_visibility', source),
           intent: 'transactional',
           localVisibilitySignal: Math.min(1, comp.winsAgainstClient / 5),
           authorityStrength: ovAuthority ?? null,
@@ -2217,6 +2238,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           const source = RecSource.localVisibility(marketKey);
           const opportunity = computeOpportunityValue({
             branch: 'local',
+            effortDays: effortDaysFor('local_visibility', source),
             intent: 'transactional',
             // A not_visible posture is a present, high-intent local miss → max urgency; a
             // possible_match is partially covered → lower urgency.
@@ -2290,6 +2312,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.decay(pageSlug);
         const opportunity = computeOpportunityValue({
           branch: 'decay',
+          effortDays: effortDaysFor('content_refresh', source),
           previousClicks: dp.previousClicks,
           currentClicks: dp.currentClicks,
           currentPosition: dp.currentPosition,
@@ -2362,6 +2385,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const source = RecSource.ctrOpportunity(pageSlug);
       const opportunity = computeOpportunityValue({
         branch: 'ranking_opp',
+        effortDays: effortDaysFor('metadata', source),
         expectedClickGap: d.estimatedClickGap ?? null,
         impressions: d.impressions ?? null,
         currentPosition: d.position ?? null,
@@ -2415,6 +2439,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const source = RecSource.diagnostic(report.id, actionIdx, action.title);
         const opportunity = computeOpportunityValue({
           branch: 'diagnostic',
+          effortDays: effortDaysFor(recType, source),
           llmLabel: action.impact,
           authorityStrength: ovAuthority ?? null,
           timingBoost: maxBoostForPages(timingBoosts, action.pageUrls?.map(toPageSlug) ?? []),
@@ -2471,6 +2496,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const source = RecSource.freshnessAlert(pageSlug);
       const opportunity = computeOpportunityValue({
         branch: 'freshness',
+        effortDays: effortDaysFor('content_refresh', source),
         impressions: trafficAtRisk,
         authorityStrength: ovAuthority ?? null,
         timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),

@@ -16,9 +16,13 @@
 //     creation (tracked_actions.created_at — recordAction fires at completion time) per
 //     action type. This is the "P5 derives real time-to-implement from action_outcomes
 //     once history accrues" calibration path on DEFAULT_EFFORT_DAYS
-//     (scoring/opportunity-value.ts:40). Consumers read getEffortPriorDays(); threading
-//     the prior into OpportunityInput.effortDays is deliberately out of A5 scope
-//     (recommendations.ts is another lane's file).
+//     (scoring/opportunity-value.ts:40). Consumers read getEffortPriorDays(); SEO Decision
+//     Engine P2 threads this prior into OpportunityInput.effortDays at all 16
+//     computeOpportunityValue call sites in recommendations.ts (via effortDaysFor()). It
+//     overrides the per-branch DEFAULT_EFFORT_DAYS but is inert until >= MIN_EFFORT_SAMPLES
+//     outcomes accrue (byte-identical fallback), and affects only ranking (roiPerEffortDay),
+//     never predictedEmv. The realized/predicted calibration-BASIS swap (signal #1) remains
+//     deferred pending GA4 revenue grounding.
 //
 // Honesty filters (A1 semantics):
 //  - attribution='not_acted_on' contributes to NEITHER signal — an unexecuted

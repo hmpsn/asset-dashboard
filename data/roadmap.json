@@ -18,13 +18,13 @@
         },
         {
           "id": "seo-engine-p2-emv-calibration-loop",
-          "title": "P2 — Close EMV calibration loop: effort priors + realized-ratio basis swap (in-place in computeOvCalibration), thread effortDays into 16 scorer calls",
+          "title": "P2 — Effort priors: thread getEffortPriorDays (measured time-to-implement) into the 16 OV scorer calls, overriding DEFAULT_EFFORT_DAYS. Calibration-basis swap deferred to GA4 revenue grounding.",
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group A quick win, fully independent (recommendations.ts + ov-calibration.ts). Reuse existing sample-size floors. Ranking-only change; predictedEmv unchanged. Open decision: single-multiplier vs per-actionType (default single)."
+          "notes": "Done (2026-06-24). Effort-priors only: getEffortPriorDays threaded per-actionType into all 16 computeOpportunityValue inputs via an effortDaysFor(type, source) helper. Inert until >=3 measured outcomes of an action type accrue (then falls back to DEFAULT_EFFORT_DAYS, byte-identical). The realized/predicted calibration-BASIS swap was DEFERRED (owner decision 2026-06-24): ov-calibration.ts deliberately gates the basis flip on GA4 estimatedRevenue (attributed_value is a CPC proxy today), and this program also deferred GA4 grounding. Basis flip now rides with seo-engine-deferred-revenue-grounding."
         },
         {
           "id": "seo-engine-p3-serp-feature-surfacing",
@@ -94,7 +94,7 @@
           "priority": "P3",
           "status": "deferred",
           "createdAt": "2026-06-23",
-          "notes": "Audit blind spot: we rank/recommend by ad-auction CPC, not client unit economics. Own brainstorm; not bolted into P2."
+          "notes": "Audit blind spot: we rank/recommend by ad-auction CPC, not client unit economics. Own brainstorm; not bolted into P2. ALSO absorbs the ov-calibration realized/predicted basis flip (deferred from P2 2026-06-24): ov-calibration.ts gates the basis swap on GA4-grounded attributed_value, so it lands with this work (getEmvCalibrationForWorkspace is the documented P6 basis-flip read path)."
         },
         {
           "id": "seo-engine-deferred-historical-seasonality",
