@@ -12,6 +12,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { z } from 'zod';
 import { getBrandscript } from './brandscript.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
@@ -191,8 +192,9 @@ export async function generateBlueprint(
   if (input.domain) {
     try {
       const provider = getConfiguredProvider(workspace?.seoDataProvider);
+      const geo = workspaceProviderGeo(workspaceId);
       const organicKeywords = provider
-        ? await provider.getDomainKeywords(input.domain, workspaceId, 50)
+        ? await provider.getDomainKeywords(input.domain, workspaceId, 50, undefined, geo.locationCode, geo.languageCode)
         : [];
       if (organicKeywords.length > 0) {
         keywordContext = `\n\nExisting organic keywords for ${input.domain}:\n` +

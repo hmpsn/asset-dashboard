@@ -996,6 +996,32 @@ export function resolveWorkspaceLanguageCode(workspaceId: string): string {
   return lang || DEFAULT_LANGUAGE_CODE;
 }
 
+/** DataForSEO location_code for the United States — the last-resort geo fallback. */
+const US_LOCATION_CODE = 2840;
+
+/**
+ * Resolve the SERP target geo {locationCode, languageCode} for a workspace's provider
+ * domain/keyword queries (SEO Decision Engine P4). Priority:
+ *   1. workspace.targetGeo — admin-set national/international target, decoupled from the
+ *      local primary-market table (carries its OWN co-resolved languageCode).
+ *   2. local primary-market location_code + its most-recent snapshot language.
+ *   3. US / 'en' (2840) last-resort fallback.
+ * locationCode ALWAYS resolves to a number. Callers thread this ONLY when the
+ * geo-targeting flag is ON; when OFF they pass nothing → the provider's
+ * locationCodeFromDatabase(database)/'en' defaults apply (byte-identical to pre-P4).
+ */
+export function resolveWorkspaceTargetGeo(workspaceId: string): { locationCode: number; languageCode: string } {
+  const ws = getWorkspace(workspaceId);
+  if (ws?.targetGeo) {
+    return { locationCode: ws.targetGeo.locationCode, languageCode: ws.targetGeo.languageCode };
+  }
+  const localLocation = resolveWorkspaceLocationCode(workspaceId);
+  if (localLocation != null) {
+    return { locationCode: localLocation, languageCode: resolveWorkspaceLanguageCode(workspaceId) };
+  }
+  return { locationCode: US_LOCATION_CODE, languageCode: DEFAULT_LANGUAGE_CODE };
+}
+
 export function setPrimaryMarket(workspaceId: string, marketId: string): void {
   db.transaction(() => {
     stmts().clearPrimary.run({ workspaceId });

@@ -42,9 +42,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group B foundation. Fixes silent US/English corruption for non-US clients (the D-grade national/intl dimension). Flag geo-targeting (OFF = byte-identical). May run parallel to Group A (disjoint files)."
+          "notes": "DONE 2026-06-24. Flag `geo-targeting` (OFF = byte-identical, incl. legacy un-versioned domain cache key via domainGeoToken — no re-warm). Interface + all 6 domain methods thread locationCode/languageCode; migration 152 target_geo column + TargetGeo type + workspaces.ts lockstep + PATCH boundary + toAdminWorkspaceView serializer + resolveWorkspaceTargetGeo() (field→local primary market→US/en). 12 caller sites threaded via workspaceProviderGeo() gate (competitor calls use CLIENT geo; backlinks excluded; getKeywordsForKeywords has no live caller yet). Admin BusinessFootprint TargetGeoEditor (curated DataForSEO country list = 2000+ISO numeric) gated behind flag. Tests: provider body/cache-key (4), PATCH boundary (3), row-mapper completeness, TargetGeoEditor render (4). Fixes silent US/English corruption for non-US clients (D-grade national/intl dimension)."
         },
         {
           "id": "seo-engine-p5-reliability-cost-governance",

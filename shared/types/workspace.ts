@@ -40,6 +40,24 @@ export interface SegmentConfig {
 }
 
 /**
+ * Workspace-level SERP target geo (SEO Decision Engine P4), decoupled from the local
+ * SEO primary-market table. Resolved ONCE at admin write-time (the picker drives a
+ * serp/locations lookup), so query-time needs no country→code mapping. Threaded through
+ * the DataForSEO domain/keyword methods when the `geo-targeting` flag is ON. Absent →
+ * resolveWorkspaceTargetGeo falls back to the local primary market, then US/'en'.
+ */
+export interface TargetGeo {
+  /** DataForSEO location_code (e.g. 2840 US, 2826 UK). */
+  locationCode: number;
+  /** DataForSEO language_code valid for the location (co-resolved — never default 'en' for a non-US location). */
+  languageCode: string;
+  /** Optional ISO country code for display (e.g. 'GB'). */
+  countryCode?: string;
+  /** Optional human label (e.g. 'United Kingdom'). */
+  label?: string;
+}
+
+/**
  * Single pre-resolved representation injected directly into the client surface
  * (authority-layered-fields rule). Sections read the boolean flags, never the raw segment,
  * so segment logic lives in one place (resolveSegmentProfile in server/workspaces.ts).
@@ -432,6 +450,8 @@ export interface Workspace {
    * deterministic from client_locations count and ignores this override.
    */
   segmentConfig?: SegmentConfig;
+  /** SERP target geo for non-local/national clients (P4, admin-only). Absent → local primary market → US/'en'. */
+  targetGeo?: TargetGeo;
   /**
    * The Issue (Client) P1a — Webflow form-capture config (website-native measured outcome capture).
    * Capture is via Webflow Data-API POLLING (server/webflow-form-poller.ts), not a webhook. ALL
@@ -503,6 +523,7 @@ export interface AdminWorkspaceView {
   scoringConfig?: Workspace['scoringConfig'];
   intelligenceProfile?: Workspace['intelligenceProfile'];
   segmentConfig?: Workspace['segmentConfig'];
+  targetGeo?: Workspace['targetGeo'];
   /** Pre-resolved segment profile (authority-layered) the admin segment UI reads to seed the override + gate the local/multi axis. */
   segmentProfile?: ResolvedSegmentProfile;
   // The Issue (Client) P1a — Webflow form-capture config (admin view). Capture is via Data-API polling;

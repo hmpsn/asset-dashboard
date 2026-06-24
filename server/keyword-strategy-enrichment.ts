@@ -3,6 +3,7 @@ import { createLogger } from './logger.js';
 import { normalizePageUrl } from './helpers.js';
 import { z } from 'zod';
 import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
@@ -231,6 +232,10 @@ async function applyUrlLevelKeywordIntelligence(options: {
   const getUrlKeywords = options.provider.getUrlKeywords;
   if (!getUrlKeywords || !options.strategy.pageMap?.length) return 0;
 
+  // CLIENT-workspace SERP geo for the per-URL ranked-keyword queries — `{}` when the
+  // geo-targeting flag is OFF (byte-identical to pre-P4), resolved geo when ON. (P4)
+  const geo = workspaceProviderGeo(options.workspaceId);
+
   const candidates = options.strategy.pageMap
     .filter(pm => !!pm.pagePath)
     .slice(0, URL_LEVEL_KEYWORD_PAGE_LIMIT);
@@ -241,7 +246,7 @@ async function applyUrlLevelKeywordIntelligence(options: {
     const pageUrl = _resolvePageUrl(options.baseUrl, pm.pagePath);
     if (!pageUrl) return false;
     try {
-      const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT);
+      const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT, undefined, geo.locationCode, geo.languageCode);
       const top = _chooseUrlLevelKeyword(urlKeywords);
       if (!top) return false;
       pm.urlLevelKeywords = urlKeywords.slice(0, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT).map(k => ({

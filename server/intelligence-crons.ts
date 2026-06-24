@@ -6,6 +6,7 @@ import { listWorkspaces } from './workspaces.js';
 import { hasRecentActivity } from './activity-log.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import {
   getLatestCompetitorSnapshot, saveCompetitorSnapshot,
   detectCompetitorAlerts, saveCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
@@ -132,6 +133,10 @@ async function runCompetitorCheck(): Promise<void> {
           log.warn({ workspaceId: ws.id, err: mapErr }, 'competitor event keyword map build failed — emitting domain-level events only');
         }
 
+        // Competitor snapshots are queried in the CLIENT workspace's target SERP geo
+        // (we compare competitors against the client's market, not their own). `{}` when
+        // the geo-targeting flag is OFF (byte-identical to pre-P4). (P4)
+        const geo = workspaceProviderGeo(ws.id);
         let anyDomainFailed = false;
         let anyDomainProcessed = false;
         for (const domain of ws.competitorDomains) {
@@ -140,7 +145,7 @@ async function runCompetitorCheck(): Promise<void> {
           try {
             // Read previous snapshot BEFORE saving current so diff is meaningful
             const previous = getLatestCompetitorSnapshot(ws.id, domain);
-            const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
+            const kwResults = await provider.getDomainKeywords(domain, ws.id, 50, undefined, geo.locationCode, geo.languageCode);
             const topKeywords = kwResults.map(k => ({
               keyword: k.keyword,
               position: k.position ?? 0,

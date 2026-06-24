@@ -37,6 +37,7 @@ import {
   getLocalSeoReadModel,
   listLocalSeoMarkets,
 } from './local-seo.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { getInsights } from './analytics-insights-store.js';
 import { buildStrategySignals } from './insight-feedback.js';
@@ -1196,7 +1197,8 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
   try {
     const provider = getConfiguredProvider(ws.seoDataProvider);
     if (!provider) return 0;
-    const overview = await provider.getDomainOverview(ws.liveDomain, workspaceId);
+    const geo = workspaceProviderGeo(workspaceId);
+    const overview = await provider.getDomainOverview(ws.liveDomain, workspaceId, undefined, geo.locationCode, geo.languageCode);
     if (!overview) return 0;
     if (overview.organicKeywords >= 1000) return 80;
     if (overview.organicKeywords >= 100)  return 50;

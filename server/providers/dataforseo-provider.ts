@@ -94,6 +94,19 @@ function discoveryGeoToken(database: string, locationCode?: number): string {
   return locationCode != null ? String(locationCode) : database;
 }
 
+/**
+ * Cache geo token for the DOMAIN-analysis methods (SEO Decision Engine P4). Unlike the
+ * discovery methods — whose caches are short-lived and already accept a one-time v2 re-warm
+ * — the domain caches have a 7-14 day TTL and are expensive to re-warm, so flag-OFF must stay
+ * BYTE-IDENTICAL: when no `locationCode` is threaded (flag-OFF), the token is the legacy
+ * `database` string, preserving the exact pre-P4 key. Flag-ON keys on the resolved location
+ * AND language (`v2:<loc>:<lang>`) so two workspaces sharing a location but differing in
+ * language (e.g. Canada en vs fr) cannot poison each other's cache.
+ */
+function domainGeoToken(database: string, locationCode: number | undefined, languageCode: string): string {
+  return locationCode != null ? cacheRegionToken(String(locationCode), languageCode) : database;
+}
+
 // ── Auth ──
 function getCredentials(): { login: string; password: string } | null {
   const login = process.env.DATAFORSEO_LOGIN;
@@ -1097,11 +1110,13 @@ export class DataForSeoProvider implements SeoDataProvider {
     });
   }
 
-  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
     const seeds = normalizeSeedKeywords(keywords, 20);
     if (seeds.length === 0) return [];
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
-    const cacheKey = `google_ads_keywords_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cacheKey = `google_ads_keywords_${domainGeoToken(database, locationCode, lang)}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
     const query = seeds.join(',').slice(0, 100);
     return runDataForSeoOperation<KeywordSourceEvidence[]>({
       workspaceId,
@@ -1113,8 +1128,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'keywords_data/google_ads/keywords_for_keywords/live',
       body: [{
         keywords: seeds,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         sort_by: 'relevance',
       }],
       mapResult: (json) => {
@@ -1286,9 +1301,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getDomainKeywords → ranked_keywords ──
-  async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
+  async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `domain_ranked_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}_${limit}_vol`;
     return runDataForSeoOperation<DomainKeyword[]>({
       workspaceId,
       cacheKey,
@@ -1299,8 +1316,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }],
@@ -1357,9 +1374,11 @@ export class DataForSeoProvider implements SeoDataProvider {
     });
   }
 
-  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
+  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainKeyword[]> {
     const target = cleanUrlTarget(url);
-    const cacheKey = `url_ranked_${database}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `url_ranked_${domainGeoToken(database, locationCode, lang)}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
     return runDataForSeoOperation<DomainKeyword[]>({
       workspaceId,
       cacheKey,
@@ -1370,8 +1389,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }],
@@ -1412,9 +1431,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
-  async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
+  async getDomainOverview(domain: string, workspaceId: string, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `domain_overview_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}`;
     return runDataForSeoOperation<DomainOverview | null>({
       workspaceId,
       cacheKey,
@@ -1425,8 +1446,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit: 1,
       }],
       mapResult: (json) => {
@@ -1457,9 +1478,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getCompetitors → competitors_domain ──
-  async getCompetitors(domain: string, workspaceId: string, limit = 10, database = 'us'): Promise<OrganicCompetitor[]> {
+  async getCompetitors(domain: string, workspaceId: string, limit = 10, database = 'us', locationCode?: number, languageCode?: string): Promise<OrganicCompetitor[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `competitors_${database}_${target.replace(/\./g, '_')}_${limit}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `competitors_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}_${limit}`;
     return runDataForSeoOperation<OrganicCompetitor[]>({
       workspaceId,
       cacheKey,
@@ -1470,8 +1493,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/competitors_domain/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         item_types: ['organic'],
       }],
@@ -1507,13 +1530,17 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getKeywordGap — same approach as semrush: compare domain keywords ──
-  async getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordGapEntry[]> {
+  async getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordGapEntry[]> {
+    // Geo is threaded entirely via the nested getDomainKeywords calls (gap has no own
+    // request body); both the client and competitor domains are queried in the CLIENT's
+    // market. `lang` only feeds the gap cache key (byte-identical on flag-OFF).
+    const lang = normalizeLanguageCode(languageCode);
     const allGaps: KeywordGapEntry[] = [];
     let clientKwSet: Set<string> | null = null;
 
     const getClientKeywordSet = async (): Promise<Set<string>> => {
       if (!clientKwSet) {
-        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database);
+        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database, locationCode, languageCode);
         clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
       }
       return clientKwSet;
@@ -1521,7 +1548,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     for (const comp of competitorDomains.slice(0, MAX_COMPETITORS)) {
       const cleanComp = cleanDomain(comp);
-      const cacheKey = `gap_${database}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
+      const cacheKey = `gap_${domainGeoToken(database, locationCode, lang)}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
       const cached = readCache<KeywordGapEntry[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
 
       if (cached) {
@@ -1530,7 +1557,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
 
       try {
-        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database);
+        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database, locationCode, languageCode);
         const clientKeywords = await getClientKeywordSet();
 
         const gaps: KeywordGapEntry[] = compKeywords

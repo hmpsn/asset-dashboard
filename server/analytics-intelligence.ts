@@ -36,6 +36,7 @@ import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
@@ -1120,6 +1121,12 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const gscUrl = ws.gscPropertyUrl;
   const ga4Id = ws.ga4PropertyId;
 
+  // CLIENT-workspace SERP geo for provider domain/competitor/gap queries below.
+  // `{}` when the geo-targeting flag is OFF (byte-identical to pre-P4); resolved
+  // { locationCode, languageCode } when ON. Folded into the apiCache.wrap keys so a
+  // geo change busts the workspace-scoped cache rather than serving stale US data. (P4)
+  const geo = workspaceProviderGeo(workspaceId);
+
   // Build enrichment context once for the full cycle
   const enrichCtx = await buildEnrichmentContext(workspaceId);
 
@@ -1314,11 +1321,11 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       if (provider?.isConfigured()) {
         const competitors = ws.competitorDomains?.length
           ? ws.competitorDomains
-          : await provider.getCompetitors(ws.liveDomain, workspaceId, 3).then(c => c.map(e => e.domain)).catch(() => []);
+          : await provider.getCompetitors(ws.liveDomain, workspaceId, 3, undefined, geo.locationCode, geo.languageCode).then(c => c.map(e => e.domain)).catch(() => []);
 
         if (competitors.length > 0) {
-          const gapData = await apiCache.wrap(workspaceId, 'keywordGap', { competitors }, () =>
-            provider.getKeywordGap(ws.liveDomain!, competitors, workspaceId, 50),
+          const gapData = await apiCache.wrap(workspaceId, 'keywordGap', { competitors, loc: geo.locationCode, lang: geo.languageCode }, () =>
+            provider.getKeywordGap(ws.liveDomain!, competitors, workspaceId, 50, undefined, geo.locationCode, geo.languageCode),
           );
           if (gapData.length > 0) {
             const gapInsights = computeCompetitorGapInsights(gapData, normQueryPageData);
@@ -1429,8 +1436,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     try {
       const provider = getConfiguredProvider(ws.seoDataProvider);
       if (provider?.isConfigured()) {
-        const domainKws = await apiCache.wrap(workspaceId, 'domainKeywords_emerging', {}, () =>
-          provider.getDomainKeywords(ws.liveDomain!, workspaceId, 200),
+        const domainKws = await apiCache.wrap(workspaceId, 'domainKeywords_emerging', { loc: geo.locationCode, lang: geo.languageCode }, () =>
+          provider.getDomainKeywords(ws.liveDomain!, workspaceId, 200, undefined, geo.locationCode, geo.languageCode),
         );
         // A keyword can rank on multiple pages; keep the BEST (lowest) position so
         // currentPosition reflects our strongest ranking, not an arbitrary last-seen page.

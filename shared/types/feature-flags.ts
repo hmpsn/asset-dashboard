@@ -48,6 +48,12 @@ export const FEATURE_FLAGS = {
   // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
   'keyword-universe-full': false,
 
+  // SEO Decision Engine P4: geo-targeting — thread the workspace target-geo (locationCode +
+  // languageCode) through the DataForSEO domain-analysis + keyword methods so non-US clients
+  // are queried in their own market, not the US/English SERP. OFF = today's US/'en' defaults,
+  // byte-identical (callers pass no geo; discoveryGeoToken keeps the legacy cache keys).
+  'geo-targeting': false,
+
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
@@ -160,6 +166,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Keyword Hub',
+  'SEO Decision Engine',
   'Strategy',
   'The Issue (Client)',
 ] as const;
@@ -305,6 +312,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'keyword-universe-overhaul',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-02',
+    },
+  },
+  'geo-targeting': {
+    label: 'Geo targeting — query non-US clients in their own market (domain/keyword/competitor SERP)',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-24',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after workspace target-geo threading is validated on staging and becomes the default; non-US clients are then always queried in their own market (US/en only as the last-resort fallback).',
+      linkedRoadmapItemId: 'seo-engine-p4-geo-correctness-target-geo',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-24',
     },
   },
   'signal-auto-recompute': {
@@ -554,6 +574,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'Keyword Hub',
     keys: ['keyword-universe-full'],
+  },
+  {
+    label: 'SEO Decision Engine',
+    keys: ['geo-targeting'],
   },
   {
     label: 'Strategy',

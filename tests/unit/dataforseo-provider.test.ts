@@ -1193,3 +1193,106 @@ describe('DataForSeoProvider — local visibility', () => {
     expect(result.degradedReason).toContain('Network error');
   });
 });
+
+// ── P4: geo correctness for the DOMAIN-analysis methods ──
+// Behavioral (request-body + cache-path) assertions. The six domain methods
+// (getDomainKeywords / getUrlKeywords / getDomainOverview / getCompetitors /
+// getKeywordGap / getKeywordsForKeywords) must (1) thread an explicit
+// locationCode+languageCode into the request body, (2) default to US (2840)/'en'
+// when none is passed (flag-OFF parity), and (3) keep the flag-OFF cache key on the
+// legacy un-versioned `database` token so the 7–14 day domain cache is NOT re-warmed.
+describe('DataForSeoProvider — P4 domain-method geo threading', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const okEmpty = () => ({ ok: true, json: async () => dfsTaskResponse([{ items: [] }]) } as Response);
+
+  it('threads location_code + language_code into all six domain-method request bodies', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const CA = 2124;
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(okEmpty())  // getDomainKeywords
+      .mockResolvedValueOnce(okEmpty())  // getUrlKeywords
+      .mockResolvedValueOnce(okEmpty())  // getDomainOverview
+      .mockResolvedValueOnce(okEmpty())  // getCompetitors
+      .mockResolvedValueOnce(okEmpty())  // getKeywordGap → competitor getDomainKeywords
+      .mockResolvedValueOnce(okEmpty())  // getKeywordGap → client getDomainKeywords
+      .mockResolvedValueOnce(okEmpty()); // getKeywordsForKeywords (google_ads)
+
+    const bodyOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0];
+
+    await provider.getDomainKeywords('example.com', 'ws-p4-1', 50, undefined, CA, 'fr');
+    expect(bodyOf(0)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getUrlKeywords('https://example.com/page', 'ws-p4-2', 20, undefined, CA, 'fr');
+    expect(bodyOf(1)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getDomainOverview('example.com', 'ws-p4-3', undefined, CA, 'fr');
+    expect(bodyOf(2)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getCompetitors('example.com', 'ws-p4-4', 10, undefined, CA, 'fr');
+    expect(bodyOf(3)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    // getKeywordGap has no own request body — geo flows through its nested
+    // getDomainKeywords calls (competitor queried first → call 4, then the client
+    // domain for the dedup set → call 5). BOTH must carry the client geo: a dropped
+    // geo on the client call (index 5) would compute the "already ranks" set against
+    // the wrong SERP and silently corrupt the gap output, yet the comp-only assert
+    // would still pass.
+    await provider.getKeywordGap('example.com', ['competitor.com'], 'ws-p4-5', 50, undefined, CA, 'fr');
+    expect(String(fetchSpy.mock.calls[4][0])).toContain('ranked_keywords');
+    expect(bodyOf(4)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'competitor.com' });
+    expect(String(fetchSpy.mock.calls[5][0])).toContain('ranked_keywords');
+    expect(bodyOf(5)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'example.com' });
+
+    await provider.getKeywordsForKeywords(['seo'], 'ws-p4-6', 50, undefined, CA, 'fr');
+    expect(bodyOf(6)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    flushCreditsToDisk();
+  });
+
+  it('defaults the domain methods to US (2840) / en when no geo is threaded (flag-OFF parity)', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty()).mockResolvedValueOnce(okEmpty());
+    const bodyOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0];
+
+    // Pre-P4 call shape: neither database nor geo passed. Exercise a ranked_keywords
+    // method AND a separate-endpoint method (competitors_domain) so a per-method
+    // omission of the `locationCode ?? locationCodeFromDatabase(database)` default
+    // resolution would be caught.
+    await provider.getDomainKeywords('example.com', 'ws-p4-default', 50);
+    expect(bodyOf(0)).toMatchObject({ location_code: 2840, language_code: 'en' });
+
+    await provider.getCompetitors('example.com', 'ws-p4-default-comp', 10);
+    expect(bodyOf(1)).toMatchObject({ location_code: 2840, language_code: 'en' });
+    flushCreditsToDisk();
+  });
+
+  it('keeps the flag-OFF cache key on the legacy un-versioned database token (no v2 re-warm)', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty());
+    // No geo → flag-OFF parity. Cache filename must use the legacy `database` token.
+    await provider.getDomainKeywords('example.com', 'ws-p4-cache-off', 100);
+    const domainWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('domain_ranked'));
+    expect(domainWrite).toBeDefined();
+    expect(String(domainWrite![0])).toContain('domain_ranked_us_');
+    expect(String(domainWrite![0])).not.toContain('v2_');
+    flushCreditsToDisk();
+  });
+
+  it('versions the flag-ON cache key on v2:<locationCode>:<language> (geo isolation)', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty());
+    await provider.getDomainKeywords('example.com', 'ws-p4-cache-on', 100, undefined, 2826, 'en');
+    const domainWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('domain_ranked'));
+    expect(domainWrite).toBeDefined();
+    // getCachePath sanitizes ':' → '_', so the v2:2826:en token lands as v2_2826_en.
+    expect(String(domainWrite![0])).toContain('domain_ranked_v2_2826_en_');
+    flushCreditsToDisk();
+  });
+});

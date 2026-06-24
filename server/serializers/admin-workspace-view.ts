@@ -62,6 +62,11 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     // admin Outcome Value / segment subsections silently never read back the persisted value.
     outcomeValue: ws.outcomeValue,
     segmentConfig: ws.segmentConfig,
+    // SEO Decision Engine P4 — admin-set national/international SERP target geo. Same
+    // explicit-field-list lockstep as outcomeValue above: the type carries it but the body
+    // must list it too, or the BusinessFootprint geo editor silently never reads back the
+    // persisted value.
+    targetGeo: ws.targetGeo,
     // The Issue (Client) P1a — admin reads back the persisted Webflow form-source mapping +
     // setup-confirmation timestamp (same explicit-field-list lockstep as outcomeValue above). The
     // signing secret is denied (see DENIED_KEYS) and intentionally absent here.
