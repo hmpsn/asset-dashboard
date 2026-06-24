@@ -21,7 +21,7 @@ import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { createLogger } from './logger.js';
 import { addKeywordToPageInTxn, deletePageKeyword, listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
 import { slugify } from './helpers.js';
-import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
+import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
@@ -104,13 +104,12 @@ const UNIVERSE_SAFETY_CEILING = 2000;
 const log = createLogger('keyword-command-center');
 
 const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
-const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
 
 /**
- * Phase 1: per-request transient carrier for a finalized row's precomputed
- * value-first score. Kept OFF the public `KeywordCommandCenterRow` type (it must
- * never serialize to the client) — the `opportunity` accessor reads it as a
- * trivial field read when the flag is ON. A WeakMap so finalized rows that fall
+ * Per-request transient carrier for a finalized row's precomputed value-first
+ * score. Kept OFF the public `KeywordCommandCenterRow` type (it must never
+ * serialize to the client) — the `opportunity` accessor reads it as a trivial
+ * field read. A WeakMap so finalized rows that fall
  * out of scope are collected without leaking. `undefined` (key absent) flows
  * through `compareMetric` as missing-last, exactly like a no-signal score.
  */
@@ -245,13 +244,12 @@ interface ValueScoringConfig {
 }
 
 /**
- * Build the per-request value-scoring config. When the flag is OFF, returns
- * `{ on: false }` WITHOUT touching the DB (no getLocalSeoPosture /
- * listLocalSeoMarkets). When ON, fetches posture + markets ONCE and captures the
- * business-profile city/state — never per keyword.
+ * Build the per-request value-scoring config. Fetches posture + markets ONCE and
+ * captures the business-profile city/state — never per keyword. Value-first
+ * scoring is always on (the `on` discriminator is retained so non-scoring paths
+ * — e.g. key-only candidate enumeration — can still opt out with `{ on: false }`).
  */
 function buildValueScoringConfig(workspace: Workspace): ValueScoringConfig {
-  if (!isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, workspace.id)) return { on: false };
   return {
     on: true,
     ctx: {
@@ -902,36 +900,19 @@ const ROW_SORT_ACCESSORS: SortFieldAccessors<KeywordCommandCenterRow> = {
   rank: (row) => row.metrics.currentPosition,
   clicks: (row) => row.metrics.clicks,
   difficulty: (row) => row.metrics.difficulty,
-  // Opportunity from demand + difficulty ONLY (the exact fields the Task-1
-  // resolver keeps identical between candidate and row) so the two sort stages
-  // cannot drift. computeOpportunityScore returns undefined with no signal →
-  // those keywords sort last (compareMetric missing-last).
-  opportunity: (row) => computeOpportunityScore({ volume: row.metrics.volume ?? row.metrics.impressions, difficulty: row.metrics.difficulty }),
-};
-
-/**
- * Phase 1 (flag ON): the `opportunity` accessor is a FIELD READ of the value
- * score precomputed once per key in finalizeDraftRow (stored on the rowValueScore
- * WeakMap) — NEVER recomputed inside the comparator. `undefined` (no signal /
- * key absent) flows through compareMetric as missing-last, identical to the
- * flag-OFF computeOpportunityScore(undefined). Every other accessor is identical
- * to ROW_SORT_ACCESSORS — only opportunity differs.
- */
-const ROW_SORT_ACCESSORS_VALUE_FIRST: SortFieldAccessors<KeywordCommandCenterRow> = {
-  ...ROW_SORT_ACCESSORS,
+  // Value-first opportunity: a FIELD READ of the value score precomputed once per
+  // key in finalizeDraftRow (rowValueScore WeakMap) — never recomputed inside the
+  // comparator. `undefined` (no signal / key absent) flows through compareMetric as
+  // missing-last. Mirrors candidate.valueScore so the two sort stages cannot drift.
   opportunity: (row) => rowValueScore.get(row),
 };
 
 export function sortRowsForQuery(
   sort: KeywordCommandCenterSort | undefined,
   direction?: 'asc' | 'desc',
-  valueScoringOn = false,
 ): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
   if (sort === undefined || sort === 'priority') return sortRows;
-  // One conditional at dispatch selects the accessor SET by the request flag —
-  // no per-comparison recompute, no buildSortAccessors factory.
-  const accessors = valueScoringOn ? ROW_SORT_ACCESSORS_VALUE_FIRST : ROW_SORT_ACCESSORS;
-  return keywordSortComparator(sort, direction, accessors);
+  return keywordSortComparator(sort, direction, ROW_SORT_ACCESSORS);
 }
 
 /**
@@ -2525,35 +2506,22 @@ const CANDIDATE_SORT_ACCESSORS: SortFieldAccessors<RowCandidateKey> = {
   rank: (c) => c.rank,
   clicks: (c) => c.clicks,
   difficulty: (c) => c.difficulty,
-  // Same fields + same formula as ROW_SORT_ACCESSORS.opportunity → identical
-  // score per key → no candidate↔row drift.
-  opportunity: (c) => computeOpportunityScore({ volume: c.demand, difficulty: c.difficulty }),
-};
-
-/**
- * Phase 1 (flag ON): the candidate `opportunity` accessor is a FIELD READ of the
- * precomputed candidate.valueScore (set once per key at merge-back with the SAME
- * fn + SAME ctx as the row finalize). Identical to ROW_SORT_ACCESSORS_VALUE_FIRST
- * except for the carrier (candidate.valueScore vs the row WeakMap) — same value
- * per key → no candidate↔row drift.
- */
-const CANDIDATE_SORT_ACCESSORS_VALUE_FIRST: SortFieldAccessors<RowCandidateKey> = {
-  ...CANDIDATE_SORT_ACCESSORS,
+  // Value-first opportunity: a FIELD READ of candidate.valueScore (precomputed once
+  // per key at merge-back with the SAME fn + SAME ctx as the row finalize). Mirrors
+  // ROW_SORT_ACCESSORS.opportunity (row WeakMap) — same value per key → no drift.
   opportunity: (c) => c.valueScore,
 };
 
 /**
  * Candidate-stage sorter. The `priority`/default branch keeps its original,
- * candidate-specific behavior (sourcePriority then demand then keyword) — it is
- * byte-identical to before this task. The explicit, directioned sorts delegate
- * to the SAME `keywordSortComparator` the row stage uses (via
- * `CANDIDATE_SORT_ACCESSORS`) so the two stages cannot drift. When the flag is
- * ON, BOTH stages select the *_VALUE_FIRST set from the SAME request flag.
+ * candidate-specific behavior (sourcePriority then demand then keyword). The
+ * explicit, directioned sorts delegate to the SAME `keywordSortComparator` the row
+ * stage uses (via `CANDIDATE_SORT_ACCESSORS`, whose `opportunity` reads the same
+ * value score) so the two stages cannot drift.
  */
 export function candidateSortForQuery(
   sort: KeywordCommandCenterSort | undefined,
   direction?: 'asc' | 'desc',
-  valueScoringOn = false,
 ): (a: RowCandidateKey, b: RowCandidateKey) => number {
   if (sort === undefined || sort === 'priority') {
     return (a, b) => {
@@ -2562,8 +2530,7 @@ export function candidateSortForQuery(
       return a.keyword.localeCompare(b.keyword);
     };
   }
-  const accessors = valueScoringOn ? CANDIDATE_SORT_ACCESSORS_VALUE_FIRST : CANDIDATE_SORT_ACCESSORS;
-  return keywordSortComparator(sort, direction, accessors);
+  return keywordSortComparator(sort, direction, CANDIDATE_SORT_ACCESSORS);
 }
 
 /**
@@ -2677,7 +2644,7 @@ function rowCandidateKeysForQuery(
       || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
       || candidate.searchText?.includes(rawSearch)
     )
-    .sort(candidateSortForQuery(query.sort, query.direction, valueScoring.on));
+    .sort(candidateSortForQuery(query.sort, query.direction));
   const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const requestedPage = Math.max(query.page ?? 1, 1);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -2950,15 +2917,14 @@ async function buildKeywordCommandCenterRowsViaModel(
     timingLabel: 'rows-local-candidate',
   });
   if (!payload) return null;
-  // Phase 1: the model builder already precomputed row valueScore in finalize
-  // when the flag is ON; the sort here selects the field-read accessor by the
-  // same flag (a cheap cached read — no extra DB work, no ScoringContext needed).
-  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, workspaceId);
+  // The model builder already precomputed each row's value score in finalize; the
+  // sort here is a cheap cached field read of that score (no extra DB work, no
+  // ScoringContext needed).
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const filtered = payload.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort, query.direction, valueScoringOn));
+    .sort(sortRowsForQuery(query.sort, query.direction));
   const page = paginateRows(filtered.map(stripRowForList), query);
   return {
     rows: page.rows,
@@ -3021,7 +2987,7 @@ async function buildKeywordCommandCenterRowsSkinny(
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
     .filter(row => matchesSearch(row, query.search))
-    .sort(sortRowsForQuery(query.sort, query.direction, valueScoring.on));
+    .sort(sortRowsForQuery(query.sort, query.direction));
 
   log.info({
     workspaceId,

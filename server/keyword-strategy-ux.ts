@@ -3,7 +3,6 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
@@ -415,29 +414,25 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     cpc: 0,
   }, evaluationContext);
 
-  // Task 2.3: build value reasons server-side when the flag is ON.
-  // One ScoringContext per payload build (flag-gated), reused across all keywords.
-  const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
-  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, options.workspaceId);
+  // Build value reasons server-side. One ScoringContext per payload build, reused
+  // across all keywords.
   let valueScoringCtx: ScoringContext | null = null;
-  if (valueScoringOn) {
-    try {
-      const posture = getLocalSeoPosture(options.workspaceId);
-      const markets = listLocalSeoMarkets(options.workspaceId);
-      // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
-      // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
-      // the admin Hub drawer and this client strategy path for the same keyword.
-      const ws = getWorkspace(options.workspaceId);
-      valueScoringCtx = {
-        posture: posture ?? 'unknown',
-        markets,
-        city: ws?.businessProfile?.address?.city?.toLowerCase(),
-        state: ws?.businessProfile?.address?.state?.toLowerCase(),
-      };
-    } catch (err) {
-      // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
-      log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
-    }
+  try {
+    const posture = getLocalSeoPosture(options.workspaceId);
+    const markets = listLocalSeoMarkets(options.workspaceId);
+    // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
+    // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
+    // the admin Hub drawer and this client strategy path for the same keyword.
+    const ws = getWorkspace(options.workspaceId);
+    valueScoringCtx = {
+      posture: posture ?? 'unknown',
+      markets,
+      city: ws?.businessProfile?.address?.city?.toLowerCase(),
+      state: ws?.businessProfile?.address?.state?.toLowerCase(),
+    };
+  } catch (err) {
+    // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
+    log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
   }
 
   const computeValueReasons = (

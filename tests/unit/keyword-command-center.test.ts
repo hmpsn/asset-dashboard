@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBroadcast } from '../../server/broadcast.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
@@ -1705,7 +1704,7 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
 });
 
 describe('valueReasons on KCC rows (Task 2.2)', () => {
-  it('a Hub row carries valueReasons (non-empty) for a scored keyword when flag is ON', async () => {
+  it('a Hub row carries valueReasons (non-empty) for a scored keyword', async () => {
     // Seed a page keyword with enough signal to trigger value scoring
     upsertPageKeyword(workspaceId, {
       pagePath: '/services/dental-implants',
@@ -1718,50 +1717,18 @@ describe('valueReasons on KCC rows (Task 2.2)', () => {
       cpc: 9,
     });
 
-    // Enable the value scoring flag for this workspace
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
-
-    try {
-      const payload = await buildKeywordCommandCenterRows(workspaceId, {
-        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
-        pageSize: 100,
-      });
-      expect(payload).not.toBeNull();
-      const dentalRow = payload!.rows.find(r => r.normalizedKeyword === 'dental implants');
-      expect(dentalRow).toBeDefined();
-      // valueReasons must be present and non-empty when flag is ON
-      expect(dentalRow!.valueReasons).toBeDefined();
-      expect(dentalRow!.valueReasons!.length).toBeGreaterThan(0);
-      // Must include an intent reason
-      expect(dentalRow!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
-    } finally {
-      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-    }
-  });
-
-  it('valueReasons is absent when the flag is OFF', async () => {
-    upsertPageKeyword(workspaceId, {
-      pagePath: '/services/dental-cleaning',
-      pageTitle: 'Dental Cleaning',
-      primaryKeyword: 'dental cleaning',
-      secondaryKeywords: [],
-      searchIntent: 'commercial',
-      volume: 1200,
-      difficulty: 30,
-      cpc: 5,
-    });
-
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-
     const payload = await buildKeywordCommandCenterRows(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
       pageSize: 100,
     });
     expect(payload).not.toBeNull();
-    const cleaningRow = payload!.rows.find(r => r.normalizedKeyword === 'dental cleaning');
-    expect(cleaningRow).toBeDefined();
-    // valueReasons must be absent when flag is OFF
-    expect(cleaningRow!.valueReasons).toBeUndefined();
+    const dentalRow = payload!.rows.find(r => r.normalizedKeyword === 'dental implants');
+    expect(dentalRow).toBeDefined();
+    // valueReasons must be present and non-empty (value-first is unconditional)
+    expect(dentalRow!.valueReasons).toBeDefined();
+    expect(dentalRow!.valueReasons!.length).toBeGreaterThan(0);
+    // Must include an intent reason
+    expect(dentalRow!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
   });
 });
 
@@ -1790,7 +1757,7 @@ describe('cpc join from page_keywords (Task 3.2)', () => {
 });
 
 describe('content-gap cpc on KCC rows (cross-surface consistency fix)', () => {
-  it('a content-gap-only row is cpc-aware in score/reasons (flag ON) but shows NO realized $ block', async () => {
+  it('a content-gap-only row is cpc-aware in score/reasons but shows NO realized $ block', async () => {
     // Real content-gap cpc (#1103) must reach the KCC value score the same way it
     // reaches enrichment/strategy — otherwise the same keyword scores/sorts
     // differently in the Hub vs the client. But content gaps have no GSC signal, so
@@ -1806,24 +1773,19 @@ describe('content-gap cpc on KCC rows (cross-surface consistency fix)', () => {
       cpc: 12,
     }]);
 
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
-    try {
-      const payload = await buildKeywordCommandCenterRows(workspaceId, {
-        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
-        pageSize: 100,
-      });
-      const row = payload!.rows.find(r => r.normalizedKeyword === 'invisalign cost');
-      expect(row).toBeDefined();
-      // cpc threaded into the row metrics → cpc-aware value score
-      expect(row!.metrics.cpc).toBe(12);
-      // Hub (admin) reasons are cpc-aware and may show the raw "$X CPC"
-      expect(row!.valueReasons).toBeDefined();
-      expect(row!.valueReasons!.some(r => /\$12/.test(r))).toBe(true);
-      // No realized-$ block: content gaps carry no clicks/impressions/rank
-      expect(row!.currentMonthly).toBeUndefined();
-      expect(row!.upsideMonthly).toBeUndefined();
-    } finally {
-      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-    }
+    const payload = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      pageSize: 100,
+    });
+    const row = payload!.rows.find(r => r.normalizedKeyword === 'invisalign cost');
+    expect(row).toBeDefined();
+    // cpc threaded into the row metrics → cpc-aware value score
+    expect(row!.metrics.cpc).toBe(12);
+    // Hub (admin) reasons are cpc-aware and may show the raw "$X CPC"
+    expect(row!.valueReasons).toBeDefined();
+    expect(row!.valueReasons!.some(r => /\$12/.test(r))).toBe(true);
+    // No realized-$ block: content gaps carry no clicks/impressions/rank
+    expect(row!.currentMonthly).toBeUndefined();
+    expect(row!.upsideMonthly).toBeUndefined();
   });
 });

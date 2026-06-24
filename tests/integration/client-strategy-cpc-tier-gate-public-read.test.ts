@@ -17,7 +17,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAndCleanPageKeywords } from '../../server/page-keywords.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import type { KeywordStrategy, PageKeywordMap } from '../../shared/types/workspace.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
@@ -31,8 +30,8 @@ const STRATEGY: KeywordStrategy = {
 };
 
 // Page map carrying a real, non-null cpc + commercial intent so presence/absence
-// is unambiguous AND the keyword-value-scoring valueReasons text path produces a
-// raw "$X CPC" reason (which the surface gate must then strip on the client path).
+// is unambiguous AND the valueReasons text path produces a raw "$X CPC" reason
+// (which the surface gate must then strip on the client path).
 const PAGE_MAP: PageKeywordMap[] = [
   { pagePath: '/a', pageTitle: 'A', primaryKeyword: 'kw a', secondaryKeywords: [], searchIntent: 'commercial', currentPosition: 3, impressions: 500, clicks: 50, volume: 1000, difficulty: 30, cpc: 4.25 },
   { pagePath: '/b', pageTitle: 'B', primaryKeyword: 'kw b', secondaryKeywords: [], searchIntent: 'commercial', currentPosition: 15, impressions: 200, clicks: 5, volume: 800, difficulty: 40, cpc: 2.1 },
@@ -68,18 +67,9 @@ beforeAll(async () => {
   const futureTrial = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   updateWorkspace(trialWsId, { keywordStrategy: STRATEGY, tier: 'free', trialEndsAt: futureTrial });
   upsertAndCleanPageKeywords(trialWsId, PAGE_MAP);
-
-  // Enable keyword-value-scoring so strategyUx.explanations[].valueReasons is
-  // actually computed — otherwise the raw-cpc-text guard below is vacuous.
-  for (const id of [freeWsId, growthWsId]) {
-    setWorkspaceFlagOverride('keyword-value-scoring', id, true);
-  }
 }, 25_000);
 
 afterAll(async () => {
-  for (const id of [freeWsId, growthWsId]) {
-    if (id) setWorkspaceFlagOverride('keyword-value-scoring', id, null);
-  }
   if (freeWsId) deleteWorkspace(freeWsId);
   if (growthWsId) deleteWorkspace(growthWsId);
   if (trialWsId) deleteWorkspace(trialWsId);
@@ -116,26 +106,26 @@ describe('GET /api/public/seo-strategy/:id — raw cpc is tier-gated server-side
   });
 });
 
-// Parallel raw-cpc path: the keyword-value-scoring `valueReasons` text ("Commercial
-// intent · $4.25 CPC") renders unconditionally in the client drawer, so raw cpc must
+// Parallel raw-cpc path: the `valueReasons` text ("Commercial intent · $4.25 CPC")
+// is now produced unconditionally and renders in the client drawer, so raw cpc must
 // be suppressed in the reason TEXT for the client surface regardless of tier — the
 // raw `$X CPC` substring is admin-only (#1103), same convention as content gaps.
 describe('GET /api/public/seo-strategy/:id — raw cpc never leaks via valueReasons text', () => {
   const collectReasons = (body: PublicStrategyBody): string[] =>
     (body.strategyUx?.explanations ?? []).flatMap((e) => e.valueReasons ?? []);
 
-  it('produces valueReasons (flag on) but with NO raw "$X CPC" text for a free-tier workspace', async () => {
+  it('produces valueReasons but with NO raw "$X CPC" text for a free-tier workspace', async () => {
     const res = await api(`/api/public/seo-strategy/${freeWsId}`);
     expect(res.status).toBe(200);
     const reasons = collectReasons((await res.json()) as PublicStrategyBody);
-    // Non-vacuous: the value-scoring path actually ran and emitted reasons.
+    // Non-vacuous: the value-scoring path ran unconditionally and emitted reasons.
     expect(reasons.length).toBeGreaterThan(0);
     expect(reasons.some((r) => /intent/i.test(r))).toBe(true);
     // The gate: no reason string carries a raw dollar figure.
     expect(reasons.some((r) => /\$\s*\d/.test(r))).toBe(false);
   });
 
-  it('produces valueReasons (flag on) but with NO raw "$X CPC" text for a growth-tier workspace', async () => {
+  it('produces valueReasons but with NO raw "$X CPC" text for a growth-tier workspace', async () => {
     const res = await api(`/api/public/seo-strategy/${growthWsId}`);
     expect(res.status).toBe(200);
     const reasons = collectReasons((await res.json()) as PublicStrategyBody);

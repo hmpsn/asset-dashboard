@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addTrackedKeyword, getTrackedKeywords } from '../../server/rank-tracking.js';
 import { buildKeywordStrategyRefreshSummary, buildKeywordStrategyUxPayload } from '../../server/keyword-strategy-ux.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking.js';
 import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -190,30 +189,7 @@ describe('buildKeywordStrategyUxPayload', () => {
 });
 
 describe('valueReasons on strategy explanations (Task 2.3)', () => {
-  it('explanation carries valueReasons when keyword-value-scoring flag is ON', async () => {
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
-    try {
-      const payload = await buildKeywordStrategyUxPayload({
-        workspaceId,
-        strategy: strategy(),
-        pageMap: [page({ volume: 2400, difficulty: 40, cpc: 9, searchIntent: 'commercial' })],
-        contentGaps: [contentGap()],
-        keywordGaps: [],
-        surface: 'client',
-        includeWorkspaceIntelligence: false,
-      });
-      const pageExplanation = payload.explanations.find(e => e.normalizedKeyword === 'cosmetic dentistry');
-      expect(pageExplanation).toBeDefined();
-      expect(pageExplanation!.valueReasons).toBeDefined();
-      expect(pageExplanation!.valueReasons!.length).toBeGreaterThan(0);
-      expect(pageExplanation!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
-    } finally {
-      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-    }
-  });
-
-  it('explanation has no valueReasons when keyword-value-scoring flag is OFF', async () => {
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
+  it('explanation carries valueReasons', async () => {
     const payload = await buildKeywordStrategyUxPayload({
       workspaceId,
       strategy: strategy(),
@@ -225,58 +201,50 @@ describe('valueReasons on strategy explanations (Task 2.3)', () => {
     });
     const pageExplanation = payload.explanations.find(e => e.normalizedKeyword === 'cosmetic dentistry');
     expect(pageExplanation).toBeDefined();
-    expect(pageExplanation!.valueReasons).toBeUndefined();
+    expect(pageExplanation!.valueReasons).toBeDefined();
+    expect(pageExplanation!.valueReasons!.length).toBeGreaterThan(0);
+    expect(pageExplanation!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
   });
 });
 
 describe('raw cpc is admin-only in reason text — content-gap AND page (public-leak fix)', () => {
   it('client reasons stay cpc-aware but NEITHER content-gap NOR page reasons print the raw "$X CPC"', async () => {
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
-    try {
-      const payload = await buildKeywordStrategyUxPayload({
-        workspaceId,
-        strategy: strategy(),
-        pageMap: [page({ volume: 2400, difficulty: 40, cpc: 9, searchIntent: 'commercial' })],
-        contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
-        keywordGaps: [],
-        surface: 'client',
-        includeWorkspaceIntelligence: false,
-      });
-      const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
-      const pageExp = payload.explanations.find(e => e.normalizedKeyword === 'cosmetic dentistry');
-      expect(gapExp!.valueReasons).toBeDefined();
-      expect(gapExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
-      // The raw content-gap cpc must NOT leak to the public payload via reason text.
-      expect(gapExp!.valueReasons!.some(r => /\$14/.test(r) || /CPC/i.test(r))).toBe(false);
-      // Raw page cpc must ALSO stay out of the client reason text: it is admin/scoring-internal
-      // money data, same convention as content gaps (#1103). The page cpc *field* is separately
-      // tier-gated on the public read path (free omitted, paid present); the raw "$X CPC" *text*
-      // is admin-surface-only for every client tier (narrative client framing, no admin jargon).
-      // The score stays cpc-aware — only the raw dollar substring is suppressed.
-      expect(pageExp!.valueReasons).toBeDefined();
-      expect(pageExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
-      expect(pageExp!.valueReasons!.some(r => /\$9/.test(r) || /CPC/i.test(r))).toBe(false);
-    } finally {
-      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-    }
+    const payload = await buildKeywordStrategyUxPayload({
+      workspaceId,
+      strategy: strategy(),
+      pageMap: [page({ volume: 2400, difficulty: 40, cpc: 9, searchIntent: 'commercial' })],
+      contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
+      keywordGaps: [],
+      surface: 'client',
+      includeWorkspaceIntelligence: false,
+    });
+    const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
+    const pageExp = payload.explanations.find(e => e.normalizedKeyword === 'cosmetic dentistry');
+    expect(gapExp!.valueReasons).toBeDefined();
+    expect(gapExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+    // The raw content-gap cpc must NOT leak to the public payload via reason text.
+    expect(gapExp!.valueReasons!.some(r => /\$14/.test(r) || /CPC/i.test(r))).toBe(false);
+    // Raw page cpc must ALSO stay out of the client reason text: it is admin/scoring-internal
+    // money data, same convention as content gaps (#1103). The page cpc *field* is separately
+    // tier-gated on the public read path (free omitted, paid present); the raw "$X CPC" *text*
+    // is admin-surface-only for every client tier (narrative client framing, no admin jargon).
+    // The score stays cpc-aware — only the raw dollar substring is suppressed.
+    expect(pageExp!.valueReasons).toBeDefined();
+    expect(pageExp!.valueReasons!.some(r => /intent/i.test(r))).toBe(true);
+    expect(pageExp!.valueReasons!.some(r => /\$9/.test(r) || /CPC/i.test(r))).toBe(false);
   });
 
   it('admin content-gap reasons may include the raw "$X CPC"', async () => {
-    setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, true);
-    try {
-      const payload = await buildKeywordStrategyUxPayload({
-        workspaceId,
-        strategy: strategy(),
-        pageMap: [],
-        contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
-        keywordGaps: [],
-        surface: 'admin',
-        includeWorkspaceIntelligence: false,
-      });
-      const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
-      expect(gapExp!.valueReasons!.some(r => /\$14/.test(r))).toBe(true);
-    } finally {
-      setWorkspaceFlagOverride('keyword-value-scoring', workspaceId, false);
-    }
+    const payload = await buildKeywordStrategyUxPayload({
+      workspaceId,
+      strategy: strategy(),
+      pageMap: [],
+      contentGaps: [contentGap({ targetKeyword: 'porcelain veneers cost', intent: 'commercial', volume: 1000, difficulty: 40, cpc: 14 })],
+      keywordGaps: [],
+      surface: 'admin',
+      includeWorkspaceIntelligence: false,
+    });
+    const gapExp = payload.explanations.find(e => e.normalizedKeyword === 'porcelain veneers cost');
+    expect(gapExp!.valueReasons!.some(r => /\$14/.test(r))).toBe(true);
   });
 });
