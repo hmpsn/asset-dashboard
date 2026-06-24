@@ -20,6 +20,7 @@
  * Phase 2: preview-as-client returns once TheIssueClientPage exists (the toggle had no client
  * preview surface to switch to in Phase 1, so it was removed as a dead control).
  */
+import type { ReactNode } from 'react';
 import { Target, Send } from 'lucide-react';
 import { PageHeader, Icon, Button } from '../../ui';
 import { StrategyConfigPanel, type StrategyConfigPanelProps } from '../StrategyConfigPanel';
@@ -49,6 +50,13 @@ export interface IssueHeaderProps {
    */
   stagedCount: number;
   curatedCount: number;
+  /**
+   * The strategy Generate/Regenerate control cluster (StrategyHeaderActions), forwarded
+   * verbatim from the orchestrator. "The Issue" suppresses the base PageHeader (which used
+   * to host it), so it is rendered here beside Send issue — regenerate the strategy on the
+   * left, send it on the right. Omitted (renders nothing) in states with no generate action.
+   */
+  regenerateActions?: ReactNode;
 }
 
 export function IssueHeader({
@@ -59,6 +67,7 @@ export function IssueHeader({
   configPanelProps,
   stagedCount,
   curatedCount,
+  regenerateActions,
 }: IssueHeaderProps) {
   // Inline visible disabled reason (NOT a tooltip) — a11y: wired to the button via aria-describedby.
   // staged===0 with nothing curated yet vs everything-curated produce different copy.
@@ -76,7 +85,10 @@ export function IssueHeader({
         icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              {/* Strategy generate/regenerate cluster — restored here because "The Issue"
+                  suppresses the base PageHeader that used to host it. */}
+              {regenerateActions}
               {/* Live counter beside the single commit button (numerator/denominator share a source). */}
               <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums whitespace-nowrap">
                 {stagedCount} staged · {curatedCount} already with client
