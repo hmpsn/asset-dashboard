@@ -230,13 +230,13 @@ export interface CommandCenterSourceBundle {
 }
 
 /**
- * Per-request value-scoring gate (Phase 1). Built ONCE per request in the
- * rows-build entry points. `ctx` is present ONLY when `on` is true — when the
- * flag is OFF we skip the getLocalSeoPosture/listLocalSeoMarkets DB reads
- * entirely, so the flag-OFF path does no extra DB work and stays byte-identical.
- * The SAME config (same `ctx`) is threaded into both the candidate merge-back
- * (Task 1.3) and the row finalize (Task 1.4), so the two stages compute the
- * identical valueScore per key by construction.
+ * Per-request value-scoring config. Built ONCE per request in the rows-build entry
+ * points. Value-first scoring is always on (`on: true` via buildValueScoringConfig);
+ * `ctx` carries the posture/markets/city/state captured once per request (never per
+ * keyword). Non-scoring key-only paths (e.g. candidate-key enumeration) may pass
+ * `{ on: false }` to skip the score. The SAME config (same `ctx`) is threaded into
+ * both the candidate merge-back (Task 1.3) and the row finalize (Task 1.4), so the
+ * two stages compute the identical valueScore per key by construction.
  */
 interface ValueScoringConfig {
   on: boolean;
@@ -2948,9 +2948,9 @@ async function buildKeywordCommandCenterRowsSkinny(
   const startedAt = Date.now();
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
-  // Phase 1: read the flag + build the ScoringContext ONCE per request (no DB
-  // reads when the flag is OFF). The SAME config is threaded into the candidate
-  // merge-back and the row finalize so both stages score identically per key.
+  // Build the ScoringContext ONCE per request. The SAME config is threaded into
+  // the candidate merge-back and the row finalize so both stages score identically
+  // per key.
   const valueScoring = buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const localVisibilityByKeyword = localVisibilityByFilter(workspace.id, filter, options.includeLocalSeo);

@@ -6,6 +6,9 @@ import {
 } from '../../server/client-discovered-queries.js';
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { updateTrackedKeywords } from '../../server/rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
+import type { KeywordCommandCenterRow } from '../../shared/types/keyword-command-center.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
@@ -273,5 +276,57 @@ describe('discovered_queries integration', () => {
       'SELECT snapshot_count FROM discovered_queries WHERE workspace_id = ? AND query = ?',
     ).get(wsId, 'teeth whitening') as { snapshot_count: number };
     expect(row.snapshot_count).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Value-first opportunity sort — now UNCONDITIONAL (the keyword-value-scoring flag
+// was retired in SEO Decision Engine P1). This exercises the full row-side pipeline
+// finalizeDraftRow → rowValueScore WeakMap → ROW_SORT_ACCESSORS.opportunity → the
+// real /rows HTTP response. The candidate-comparator unit test hand-sets valueScore
+// and never materializes a row, so this is the only coverage that fails if the
+// row-side opportunity accessor regresses (e.g. WeakMap read returns undefined).
+// ---------------------------------------------------------------------------
+
+describe('Keyword Command Center — value-first opportunity sort', () => {
+  let wsId = '';
+
+  function tracked(query: string, extra: Partial<TrackedKeyword>): TrackedKeyword {
+    return {
+      query,
+      pinned: false,
+      addedAt: '2026-01-01T00:00:00.000Z',
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      ...extra,
+    };
+  }
+
+  async function rowOrder(): Promise<string[]> {
+    const res = await api(`/api/webflow/keyword-command-center/${wsId}/rows?sort=opportunity&direction=desc&pageSize=50`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { rows: KeywordCommandCenterRow[] };
+    return body.rows.map(r => r.normalizedKeyword);
+  }
+
+  beforeEach(() => {
+    wsId = createWorkspace(`Value Scoring Test ${Date.now()}`).id;
+    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query with
+    // real CPC. Value-first opportunity leads with the transactional+CPC keyword
+    // despite its far lower volume — it must NOT collapse to volume-weighting.
+    updateTrackedKeywords(wsId, () => [
+      tracked('what causes bad breath', { volume: 22000, difficulty: 40, intent: 'informational' }),
+      tracked('teeth cleaning service', { volume: 480, difficulty: 30, cpc: 6, intent: 'transactional' }),
+    ]);
+  });
+
+  afterEach(() => {
+    if (wsId) deleteWorkspace(wsId);
+    wsId = '';
+  });
+
+  it('opportunity sort is value-first through the real /rows route (transactional + CPC leads despite far lower volume)', async () => {
+    const order = await rowOrder();
+    expect(order.indexOf('teeth cleaning service')).toBeLessThan(order.indexOf('what causes bad breath'));
   });
 });
