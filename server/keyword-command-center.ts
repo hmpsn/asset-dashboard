@@ -3,6 +3,7 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { getLatestSerpSnapshots } from './serp-snapshots-store.js';
 import { assembleStoredKeywordStrategy } from './keyword-strategy-assembler.js';
 import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import {
@@ -1310,6 +1311,25 @@ async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCen
       impressions: rank.impressions,
       ctr: rank.ctr,
     });
+  }
+
+  // National SERP overlay (P6 / national-serp-tracking). PURELY ADDITIVE — it never writes
+  // `currentPosition` (so the value score, which keys off GSC currentPosition, is identical to
+  // the candidate/skinny replay path; the row==candidate invariant holds). `nationalPosition`
+  // is the distinct live-SERP rank. Flag OFF → no read, no merge → byte-identical to pre-P6.
+  // snap.query is already keywordComparisonKey-normalized at write time (joins to GSC rows).
+  if (isFeatureEnabled('national-serp-tracking', bundle.workspaceId)) {
+    for (const snap of getLatestSerpSnapshots(bundle.workspaceId)) {
+      const row = rows.get(keywordComparisonKey(snap.query));
+      if (!row) continue;
+      mergeMetrics(row, {
+        nationalPosition: snap.position,
+        matchedUrl: snap.matchedUrl,
+        serpFeatures: snap.features,
+        aiOverviewCited: snap.aiOverviewCited,
+        aiOverviewPresent: snap.aiOverviewPresent,
+      });
+    }
   }
 
   for (const rank of bundle.latestRanks) {

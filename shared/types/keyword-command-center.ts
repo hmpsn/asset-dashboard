@@ -124,8 +124,11 @@ export interface KeywordCommandCenterMetrics {
   ctr?: number;
   // SEO Decision Engine P6 (national-serp-tracking) — true-SERP detail, additive + optional.
   // Populated from serp_snapshots when the flag is on; undefined = no national snapshot yet.
-  /** Provenance of `currentPosition`: live advanced-SERP rank vs GSC average vs tracking baseline. */
-  rankSource?: 'live_serp' | 'gsc_average' | 'tracking_baseline';
+  // These NEVER override `currentPosition` (GSC average) — `nationalPosition` is a distinct,
+  // point-in-time live-SERP rank surfaced alongside it, so the value-score invariant with the
+  // candidate/skinny replay path is preserved (currentPosition is the only position that scores).
+  /** True point-in-time live advanced-SERP rank (1-based) for the client domain; undefined = not ranking / not tracked. */
+  nationalPosition?: number;
   /** Client URL that ranks for this keyword on the live SERP (null/undefined = not ranking). */
   matchedUrl?: string;
   /** SERP feature labels present on the live SERP (e.g. 'ai_overview', 'featured_snippet'). */
