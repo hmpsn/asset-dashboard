@@ -1234,10 +1234,16 @@ describe('DataForSeoProvider — P4 domain-method geo threading', () => {
     expect(bodyOf(3)).toMatchObject({ location_code: CA, language_code: 'fr' });
 
     // getKeywordGap has no own request body — geo flows through its nested
-    // getDomainKeywords calls (competitor queried first, then client).
+    // getDomainKeywords calls (competitor queried first → call 4, then the client
+    // domain for the dedup set → call 5). BOTH must carry the client geo: a dropped
+    // geo on the client call (index 5) would compute the "already ranks" set against
+    // the wrong SERP and silently corrupt the gap output, yet the comp-only assert
+    // would still pass.
     await provider.getKeywordGap('example.com', ['competitor.com'], 'ws-p4-5', 50, undefined, CA, 'fr');
     expect(String(fetchSpy.mock.calls[4][0])).toContain('ranked_keywords');
-    expect(bodyOf(4)).toMatchObject({ location_code: CA, language_code: 'fr' });
+    expect(bodyOf(4)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'competitor.com' });
+    expect(String(fetchSpy.mock.calls[5][0])).toContain('ranked_keywords');
+    expect(bodyOf(5)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'example.com' });
 
     await provider.getKeywordsForKeywords(['seo'], 'ws-p4-6', 50, undefined, CA, 'fr');
     expect(bodyOf(6)).toMatchObject({ location_code: CA, language_code: 'fr' });
@@ -1248,12 +1254,18 @@ describe('DataForSeoProvider — P4 domain-method geo threading', () => {
   it('defaults the domain methods to US (2840) / en when no geo is threaded (flag-OFF parity)', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty());
-    // Pre-P4 call shape: neither database nor geo passed.
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty()).mockResolvedValueOnce(okEmpty());
+    const bodyOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0];
+
+    // Pre-P4 call shape: neither database nor geo passed. Exercise a ranked_keywords
+    // method AND a separate-endpoint method (competitors_domain) so a per-method
+    // omission of the `locationCode ?? locationCodeFromDatabase(database)` default
+    // resolution would be caught.
     await provider.getDomainKeywords('example.com', 'ws-p4-default', 50);
-    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)[0];
-    expect(body.location_code).toBe(2840);
-    expect(body.language_code).toBe('en');
+    expect(bodyOf(0)).toMatchObject({ location_code: 2840, language_code: 'en' });
+
+    await provider.getCompetitors('example.com', 'ws-p4-default-comp', 10);
+    expect(bodyOf(1)).toMatchObject({ location_code: 2840, language_code: 'en' });
     flushCreditsToDisk();
   });
 

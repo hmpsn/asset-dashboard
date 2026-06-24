@@ -63,6 +63,9 @@ describe('TargetGeoEditor', () => {
         { targetGeo: expect.objectContaining({ locationCode: 2276, languageCode: 'de', countryCode: 'DE' }) },
       );
     });
+    // Success contract: parent refetch (onSave) + success toast must both fire.
+    expect(baseProps.onSave).toHaveBeenCalledTimes(1);
+    expect(baseProps.toast).toHaveBeenCalledWith(expect.stringMatching(/saved/i));
   });
 
   it('clears the target geo (PATCH targetGeo: null) when Clear is clicked', async () => {
@@ -78,5 +81,21 @@ describe('TargetGeoEditor', () => {
     await waitFor(() => {
       expect(mockPatch).toHaveBeenCalledWith('/api/workspaces/ws-geo-1', { targetGeo: null });
     });
+    expect(baseProps.onSave).toHaveBeenCalledTimes(1);
+    expect(baseProps.toast).toHaveBeenCalledWith(expect.stringMatching(/cleared/i));
+  });
+
+  it('falls back to the country primary language when the persisted language is out-of-list', () => {
+    // Out-of-band PATCH could persist France (2250) + 'en', which France does not
+    // support. The Language select must show France's primary (fr), not blank.
+    renderInRouter(
+      <TargetGeoEditor
+        {...baseProps}
+        targetGeo={{ locationCode: 2250, languageCode: 'en', countryCode: 'FR' }}
+      />,
+    );
+
+    expect(screen.getByLabelText(/country/i)).toHaveValue('FR');
+    expect(screen.getByLabelText(/language/i)).toHaveValue('fr');
   });
 });

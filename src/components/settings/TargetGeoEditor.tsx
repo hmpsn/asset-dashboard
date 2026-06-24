@@ -65,16 +65,29 @@ interface TargetGeoEditorProps {
  */
 export function TargetGeoEditor({ workspaceId, targetGeo, toast, onSave }: TargetGeoEditorProps) {
   const initialCountry = findCountryByLocationCode(targetGeo?.locationCode);
+  // Resolve the language the picker should show for a persisted geo: only honor the
+  // stored languageCode if the resolved country actually supports it, else fall back
+  // to the country's primary. Prevents an out-of-band PATCH (e.g. France + 'en') from
+  // leaving the Language dropdown blank with Save stuck disabled.
+  const resolvePickerLanguage = (country: CountryTarget | undefined, lang?: string): string => {
+    if (!country) return NONE;
+    return country.languages.some(l => l.code === lang) ? lang! : country.languages[0]?.code ?? NONE;
+  };
   const [countryCode, setCountryCode] = useState<string>(initialCountry?.countryCode ?? NONE);
-  const [languageCode, setLanguageCode] = useState<string>(targetGeo?.languageCode ?? NONE);
+  const [languageCode, setLanguageCode] = useState<string>(resolvePickerLanguage(initialCountry, targetGeo?.languageCode));
   const [saving, setSaving] = useState(false);
+  // True between a successful Clear and the parent's React Query refetch landing (the
+  // prop still shows the old non-null geo for that window). Keeps the Clear button
+  // disabled so a fast double-click can't fire a second redundant PATCH.
+  const [justCleared, setJustCleared] = useState(false);
 
   // Re-sync when the workspace (and its persisted geo) loads/changes after mount.
   useEffect(() => {
     const country = findCountryByLocationCode(targetGeo?.locationCode);
     setCountryCode(country?.countryCode ?? NONE);
-    setLanguageCode(targetGeo?.languageCode ?? NONE);
-  }, [targetGeo?.locationCode, targetGeo?.languageCode]);
+    setLanguageCode(resolvePickerLanguage(country, targetGeo?.languageCode));
+    setJustCleared(false);
+  }, [targetGeo?.locationCode, targetGeo?.languageCode]); // eslint-disable-line react-hooks/exhaustive-deps -- resolvePickerLanguage is a stable pure helper; re-sync keys on the persisted geo only
 
   const selectedCountry = useMemo(
     () => COUNTRY_TARGETS.find(c => c.countryCode === countryCode),
@@ -135,6 +148,7 @@ export function TargetGeoEditor({ workspaceId, targetGeo, toast, onSave }: Targe
       await patch(`/api/workspaces/${workspaceId}`, { targetGeo: null });
       setCountryCode(NONE);
       setLanguageCode(NONE);
+      setJustCleared(true);
       toast('Cleared — defaulting to primary market');
       onSave();
     } catch {
@@ -195,7 +209,7 @@ export function TargetGeoEditor({ workspaceId, targetGeo, toast, onSave }: Targe
             variant="secondary"
             size="sm"
             onClick={handleClear}
-            disabled={saving}
+            disabled={saving || justCleared}
             icon={RotateCcw}
           >
             Clear

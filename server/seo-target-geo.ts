@@ -6,8 +6,12 @@ import { resolveWorkspaceTargetGeo } from './local-seo.js';
  * domain & keyword SERP queries, gated by the `geo-targeting` flag
  * (SEO Decision Engine P4).
  *
- * - **Flag OFF** → returns `{}`. Callers spread it into `SeoDataProvider` calls
- *   so nothing changes: the provider falls back to its
+ * - **Flag OFF** → returns `{}`. Callers destructure `geo.locationCode` /
+ *   `geo.languageCode` and pass them as the trailing positional args of the
+ *   `SeoDataProvider` domain methods (the 4th positional arg is `database`, so
+ *   pass `undefined` for it, then the two geo fields — do NOT `...spread` this
+ *   object into the call: that would mis-slot `locationCode` into `database`).
+ *   When both are `undefined` nothing changes: the provider falls back to its
  *   `locationCodeFromDatabase(database)` / `'en'` defaults, byte-identical to
  *   pre-P4 behavior (and cache keys stay on the legacy un-versioned token, so no
  *   expensive domain-cache re-warm).
