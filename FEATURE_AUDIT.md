@@ -1,10 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **529 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **530 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 530. Provider reliability + cost governance (SEO Decision Engine P5)
+
+**What it does:** Hardens the DataForSEO integration before paid Group C phases. Three reliability/cost mechanisms: (1) **Bounded retry-with-backoff** in `server/external-fetch.ts` — a transient `429`/`500`/`502`/`503`/`504` or network error is retried (exponential backoff + jitter, 2 retries by default on `fetchProviderJson`) instead of collapsing to an empty result; permanent errors (`402` credit-exhausted, `401`, other 4xx, timeouts) fail fast. (2) A **capability circuit breaker** — a `40204` "no subscription" error on backlinks now trips an in-memory breaker for 6h so `getBacklinksProvider()` short-circuits to null and callers degrade the optional backlink fields, instead of re-hitting the unsubscribed (paid) endpoint on every request. (3) A **per-tier credit-budget gate** (`server/credit-budget-gate.ts`): `CREDIT_BUDGETS` (free 0 · growth 2,000 · premium unlimited) + `evaluateCreditBudget()` + the `assertCreditBudget()` cross-phase contract that P6–P8 call before each paid fetch. Launched **observe-only** (owner decision): the gate computes and logs would-blocks and drives the DataForSEO health-card quota status (ok/warning/critical) but never blocks a call — flipping one constant turns on hard enforcement (429s + job messages). Also surfaces the previously **served-but-dark** DataForSEO credit usage in `AIUsageSection` (credits, calls, cache-hit rate, daily trend). Fifth phase of the SEO Decision Engine program (Group B foundation; no feature flag — reliability/cost infrastructure).
+
+**Agency value:** Transient provider blips no longer silently produce empty keyword/SERP data (the #1 "fetched-and-discarded" failure mode); unsubscribed endpoints stop quietly burning the request budget; and per-workspace credit consumption is finally visible (health card + usage section) with a margin-protection gate ready to enforce once budgets are validated.
+
+**Client value:** More reliable research data (fewer silently-empty results) and the foundation for cost-sustainable paid features (national SERP, GBP, AI-visibility) without runaway provider spend.
 
 ### 529. Geo-correct domain research — national/international SERP targeting (SEO Decision Engine P4)
 

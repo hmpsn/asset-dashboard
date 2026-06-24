@@ -228,7 +228,36 @@ export type ExternalFetchOptions = {
   defaultHeaders?: Record<string, string>;
   logContext?: Record<string, unknown>;
   urlSafety?: ExternalUrlSafetyMode;
+  /**
+   * Bounded retry-with-backoff for TRANSIENT failures (HTTP 429/500/502/503/504 +
+   * network errors). Permanent failures (4xx except 429, timeouts, invalid/unsafe
+   * URLs) are never retried. Omit/`maxRetries: 0` = single attempt (default for
+   * generic callers). `fetchProviderJson` opts provider calls in by default.
+   */
+  retry?: { maxRetries?: number; baseDelayMs?: number };
 };
+
+/** HTTP statuses worth retrying — transient server/throttle conditions only. */
+const RETRYABLE_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+function isRetryableExternalFetchError(err: ExternalFetchError): boolean {
+  if (err.kind === 'network') return true;
+  if (err.kind === 'http' && err.status != null) return RETRYABLE_HTTP_STATUSES.has(err.status);
+  // 'timeout' is NOT retried: the per-attempt budget was already spent, and an
+  // aborted outer signal (caller cancellation) surfaces as 'timeout' — respect it.
+  // 'invalid_url'/'unsafe_url' and non-retryable 4xx (incl. 402 credit-exhausted) are permanent.
+  return false;
+}
+
+/** Exponential backoff with full jitter, capped, so retries don't thundering-herd. */
+function retryBackoffMs(attempt: number, baseDelayMs: number): number {
+  const ceiling = Math.min(baseDelayMs * 2 ** attempt, 5_000);
+  return Math.floor(Math.random() * ceiling);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function isAbortLikeError(err: unknown): boolean {
   if (typeof err === 'object' && err !== null && 'name' in err && (err as { name?: unknown }).name === 'AbortError') {
@@ -396,6 +425,33 @@ async function fetchPublicWebWithValidatedRedirects(
 }
 
 export async function fetchExternal(options: ExternalFetchOptions): Promise<Response> {
+  const maxRetries = Math.max(0, options.retry?.maxRetries ?? 0);
+  const baseDelayMs = options.retry?.baseDelayMs ?? 300;
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fetchExternalOnce(options);
+    } catch (err) {
+      if (
+        attempt < maxRetries &&
+        isExternalFetchError(err) &&
+        isRetryableExternalFetchError(err)
+      ) {
+        const delayMs = retryBackoffMs(attempt, baseDelayMs);
+        log.debug(
+          { ...options.logContext, attempt: attempt + 1, maxRetries, kind: err.kind, status: err.status, delayMs },
+          'External fetch retrying after transient error',
+        );
+        await sleep(delayMs);
+        attempt += 1;
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+async function fetchExternalOnce(options: ExternalFetchOptions): Promise<Response> {
   const normalizedUrl = normalizeExternalUrl(options.url, { safety: options.urlSafety });
   const headers = buildHeaders(options);
   const { signal, cleanup } = composeTimeoutSignal(options.timeoutMs, options.signal);
@@ -492,6 +548,9 @@ export async function fetchProviderJson<T>(options: ExternalFetchOptions): Promi
     timeoutMs: options.timeoutMs ?? 20_000,
     redirect: options.redirect ?? 'follow',
     urlSafety: options.urlSafety ?? 'allow-private',
+    // Provider APIs (DataForSEO etc.) get bounded retry by default so a transient
+    // 429/5xx is not collapsed to []/null by the caller's degrade path (P5).
+    retry: options.retry ?? { maxRetries: 2, baseDelayMs: 300 },
   });
   return response.json() as Promise<T>;
 }

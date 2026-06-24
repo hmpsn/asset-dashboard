@@ -228,7 +228,11 @@ export function getProviderForCapability(capability: string, preferred?: Provide
   if (!primary) return null;
 
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
-  if (capability !== 'backlinks' && primaryName && isCapabilityDisabled(primaryName, capability)) {
+  // Backlinks IS gated here (P5): once a 40204 trips the backlinks breaker, this
+  // returns null and callers degrade the optional backlink fields — matching the
+  // getBacklinksProvider doc contract — instead of re-hitting the unsubscribed
+  // endpoint every call. (Previously `capability !== 'backlinks'` skipped the check.)
+  if (primaryName && isCapabilityDisabled(primaryName, capability)) {
     return null;
   }
 
