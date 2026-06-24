@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **531 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **532 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 532. GBP + reviews local layer (SEO Decision Engine P7)
+
+**What it does:** Turns local SEO from local-pack-presence-only into a real local product by capturing Google Business Profile health + review counts/ratings — the client's own and local competitors' — and surfacing **review-gap** and **GBP-completeness** findings as actionable recommendations. Behind the `local-gbp` flag (Growth + Premium). Two data paths (validated against live DataForSEO calls): a **free** half that extracts each business's star rating + review count from the `local_pack` results the local refresh *already* fetches (the parser previously dropped them — zero new cost, like P3's AI-Overview extraction), and a **paid** half (`business_data/business_listings_search`) that pulls the full category review landscape sorted by review count + the client's own GBP profile completeness. A separate `local-gbp-refresh` background job (ported from the P6 national-SERP job — concurrency-1, memory-headroom-gated, cancel-safe incremental persistence) runs a category search for competitors plus a **business-name search for the client's own listing** (who is often too review-poor to appear in a review-sorted search — that *is* the gap), stores both in a new `business_listing_snapshots` time-series table (own vs competitor distinguished by `is_owned`), and the recommendation engine then mints `local_visibility`-type recs: a review-gap rec (*"close the gap: 12 reviews / 3.9★ vs the local leader's 80 / 4.6★"*) and a GBP-completeness rec (*"complete your profile — missing photos / attributes / category"*). The findings flow through the existing curate→send→greenlight→outcome recommendation spine and feed the workspace intelligence (`LocalSeoSlice.reviewSummary`) so the AI advisor sees them. Aggregates only — never individual reviews or author data. Seventh phase of the SEO Decision Engine program; `local-gbp` OFF leaves the paid surface byte-identical.
+
+**Why it matters to the agency:** Answers the local client's most visceral question — *"why are my competitors getting all the calls?"* — with side-by-side review evidence and a concrete, sellable action (a review-generation program + GBP cleanup), not a vague "improve your reviews." The cost is trivial (~weekly, per market) and the free half adds review-count trends for the local pack at no cost.
+
+**Why it matters to clients:** Makes the invisible visible — they can see exactly how their reviews and Google Business Profile stack up against the specific local competitors winning the map pack, and get a clear plan to close the gap.
 
 ---
 
