@@ -42,33 +42,38 @@ describe('getProviderForCapability', () => {
     expect(provider).toBe(dfs);
   });
 
-  it('ignores legacy backlinks disable flags and stays on DataForSEO', () => {
+  // P5: the backlinks breaker is now RESPECTED. A 40204 trips markCapabilityDisabled
+  // and getProviderForCapability/getBacklinksProvider short-circuit to null so callers
+  // degrade the optional backlink fields instead of re-hitting the unsubscribed endpoint
+  // (previously a `capability !== 'backlinks'` guard ignored the flag).
+  it('returns null for backlinks once the backlinks breaker is tripped', () => {
     const dfs = makeProvider('dataforseo');
     registerProvider('dataforseo', dfs);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
     const provider = getProviderForCapability('backlinks', 'dataforseo');
-    expect(provider).toBe(dfs);
+    expect(provider).toBeNull();
   });
 
-  it('keeps DataForSEO for backlinks even if a legacy disable flag exists', () => {
+  it('breaker is per-capability: disabling backlinks does not disable other capabilities', () => {
     const dfs = makeProvider('dataforseo');
     registerProvider('dataforseo', dfs);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
 
-    const provider = getProviderForCapability('backlinks', 'dataforseo');
-    expect(provider).toBe(dfs);
+    // A non-backlinks capability is unaffected by the backlinks breaker.
+    expect(getProviderForCapability('domain_overview', 'dataforseo')).toBe(dfs);
+    expect(getProviderForCapability('backlinks', 'dataforseo')).toBeNull();
   });
 
-  it('getBacklinksProvider stays on DataForSEO instead of falling back', () => {
+  it('getBacklinksProvider returns null when the backlinks breaker is tripped', () => {
     const dfs = makeProvider('dataforseo');
     registerProvider('dataforseo', dfs);
 
     markCapabilityDisabled('dataforseo', 'backlinks');
     const provider = getBacklinksProvider('dataforseo');
-    expect(provider).toBe(dfs);
+    expect(provider).toBeNull();
   });
 
   it('treats legacy semrush backlink preference as DataForSEO', () => {

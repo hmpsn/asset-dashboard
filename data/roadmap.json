@@ -52,9 +52,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group B foundation. Prerequisite for paid Group C. Sequence after P4 (both touch dataforseo-provider.ts)."
+          "notes": "DONE 2026-06-24. (1) Bounded retry-with-backoff in external-fetch.ts for transient 429/500/502/503/504 + network (default 2 retries on fetchProviderJson; 402/401/4xx/timeout never retried) — transient errors no longer collapse to []/null. (2) Activated the dead markCapabilityDisabled: a 40204 on backlinks now trips a 6h in-memory breaker + removed the `capability !== 'backlinks'` guard so getBacklinksProvider short-circuits to null (callers degrade). (3) NEW server/credit-budget-gate.ts: CREDIT_BUDGETS {free:0, growth:2000, premium:Infinity} + evaluateCreditBudget + assertCreditBudget cross-phase contract (P6-P8 call at route entry). Owner decision: OBSERVE-ONLY launch (budgetEnforcementEnabled=false; assertCreditBudget logs would-block, never throws; flip one let to hard-enforce). (4) Health card quotaStatus now reflects MTD budget vs usage; (5) AIUsageSection surfaces the served-but-dark dataforseo/dataforseoDaily (credits/calls/cache-hit-rate + daily chart). DEVIATIONS from audit: U4 (provider-internal gate call) reverted — created a heavy provider→gate→workspaces import cycle that broke provider tests; gating belongs at P6-P8 route entry per the audit's own contract note. U7 (NotificationBell budget-blocked) deferred — observe-only means no blocks happen yet; CreditBudgetError contract is ready for the enforcement flip. Tests: retry (7), budget-gate (12), capability-breaker (8); updated seo-provider-routing + local-visibility for the new behaviors. No feature flag (reliability/cost infra)."
         },
         {
           "id": "seo-engine-p6-national-serp-rank-ai-overview",

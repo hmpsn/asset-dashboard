@@ -37,7 +37,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { normalizeProviderDate } from '../seo-data-provider.js';
+import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
 
@@ -175,6 +175,15 @@ function isSubscriptionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.includes('40204') || msg.includes('subscription');
 }
+
+/**
+ * TTL for the backlinks capability breaker (P5). A 40204 means the account has no
+ * backlinks subscription — re-hitting the paid endpoint every call just burns the
+ * request budget. Trip the in-memory breaker for 6h so `getBacklinksProvider()`
+ * short-circuits to null (callers degrade the optional backlink fields); it
+ * self-recovers after the TTL in case the subscription is added.
+ */
+const BACKLINKS_BREAKER_TTL_MS = 6 * 60 * 60 * 1000;
 
 // ── Per-workspace file cache ──
 
@@ -1629,6 +1638,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       },
       handleError: (err) => {
         if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'backlinks', BACKLINKS_BREAKER_TTL_MS);
           log.warn({ err }, `DataForSEO backlinks summary unavailable for "${target}"`);
           return null;
         }
@@ -1673,6 +1683,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       },
       handleError: (err) => {
         if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'backlinks', BACKLINKS_BREAKER_TTL_MS);
           log.warn({ err }, `DataForSEO referring domains unavailable for "${target}"`);
           return [];
         }

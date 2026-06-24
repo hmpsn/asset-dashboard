@@ -13,6 +13,7 @@ import { getStripeConfigSafe } from '../stripe-config.js';
 import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
 import { getDataForSeoUsage } from '../providers/dataforseo-provider.js';
+import { evaluateCreditBudget } from '../credit-budget-gate.js';
 import { listProviders } from '../seo-data-provider.js';
 import { getTokenUsage } from '../openai-helpers.js';
 import { requireWorkspaceAccess } from '../auth.js';
@@ -169,6 +170,8 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
   const dataforseoProvider = providerStatus.find(provider => provider.name === 'dataforseo');
 
   const dataforseoUsage = getDataForSeoUsage(workspaceId);
+  // P5 — month-to-date credit budget for the DataForSEO health card quota status.
+  const dataforseoBudget = dataforseoProvider?.configured ? evaluateCreditBudget(workspaceId) : null;
   const aiUsage = getTokenUsage(workspaceId);
   const openAiUsageEntries = aiUsage.entries.filter(entry => !entry.model.includes('claude'));
   const anthropicUsageEntries = aiUsage.entries.filter(entry => entry.model.includes('claude'));
@@ -255,10 +258,12 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       lastSuccessAt: latestTimestamp(dataforseoUsage.entries),
       lastErrorAt: null,
       lastError: dataforseoProvider?.configured ? null : 'DataForSEO credentials are not configured',
-      quotaStatus: 'unknown',
-      quotaDetail: dataforseoProvider?.configured
-        ? `Credits used: ${dataforseoUsage.totalCredits} across ${dataforseoUsage.totalCalls} calls.`
-        : 'DataForSEO usage unavailable until configured.',
+      quotaStatus: dataforseoBudget?.status ?? 'unknown',
+      quotaDetail: !dataforseoProvider?.configured
+        ? 'DataForSEO usage unavailable until configured.'
+        : dataforseoBudget && dataforseoBudget.budget !== Infinity
+          ? `${dataforseoBudget.mtdCredits.toFixed(2)} of ${dataforseoBudget.budget} monthly credits used (${dataforseoBudget.tier} tier). ${dataforseoUsage.totalCalls} calls all-time.`
+          : `Credits used this month: ${dataforseoBudget?.mtdCredits.toFixed(2) ?? dataforseoUsage.totalCredits} (Premium — unlimited). ${dataforseoUsage.totalCalls} calls all-time.`,
       tokenExpiresAt: null,
       affectedFeatures: ['Keyword strategy', 'SERP research', 'Backlink and domain analysis'],
       notes: dataforseoProvider?.configured ? null : 'Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.',

@@ -1177,7 +1177,9 @@ describe('DataForSeoProvider — local visibility', () => {
   it('degrades provider failures into a typed provider_failed result', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
-    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
+    // Persistent rejection (not Once): P5 bounded retry makes up to 3 attempts on a
+    // transient network error; provider_failed is the terminal state once they exhaust.
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'));
 
     const result = await provider.getLocalVisibility({
       keyword: 'austin dentist',
