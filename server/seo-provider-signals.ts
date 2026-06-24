@@ -47,6 +47,7 @@ export function hasSerpOpportunity(raw?: string): {
   paa: boolean;
   video: boolean;
   localPack: boolean;
+  aiOverview: boolean;
 } {
   const features = parseSerpFeatures(raw);
   return {
@@ -54,5 +55,9 @@ export function hasSerpOpportunity(raw?: string): {
     paa: features.includes('people_also_ask'),
     video: features.includes('video') || features.includes('video_carousel'),
     localPack: features.includes('local_pack'),
+    // ranked_keywords serp_item_types carries 'ai_overview' as a string label (no
+    // numeric code) — it passes through parseSerpFeatures unchanged. SEO Decision
+    // Engine P3 surfaces it so AI-Overview keywords get AEO content guidance.
+    aiOverview: features.includes('ai_overview'),
   };
 }

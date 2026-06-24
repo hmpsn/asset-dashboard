@@ -357,6 +357,7 @@ export async function assembleSeoContext(
           .length,
         localPack: allFeatures.some((f) => f === 'local_pack'),
         videoCarousel: allFeatures.filter((f) => f === 'video').length,
+        aiOverview: allFeatures.filter((f) => f === 'ai_overview').length,
       };
       base.serpFeatures = serpFeatures;
     }
