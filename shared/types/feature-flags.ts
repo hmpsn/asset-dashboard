@@ -54,6 +54,13 @@ export const FEATURE_FLAGS = {
   // byte-identical (callers pass no geo; discoveryGeoToken keeps the legacy cache keys).
   'geo-targeting': false,
 
+  // SEO Decision Engine P6: national-serp-tracking — first PAID Group C phase. Adds a true
+  // advanced-SERP rank + SERP-feature (AI Overview / featured snippet) time series per tracked
+  // keyword (serp_snapshots), an AI-Overview citation badge in the keyword drawer, and the
+  // serp_feature_opportunity insight. Growth+Premium only; budget observe-only; no backfill.
+  // OFF = no national-SERP fetch, no new UI, no insight (byte-identical to today).
+  'national-serp-tracking': false,
+
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
@@ -327,6 +334,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-24',
     },
   },
+  'national-serp-tracking': {
+    label: 'National SERP rank tracking — keyword position + SERP features in target market',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-24',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once national SERP snapshots + serp_feature_opportunity insights are validated on staging and per-workspace cost is acceptable; the flag is then removed and the refresh runs for all Growth+ workspaces.',
+      linkedRoadmapItemId: 'seo-engine-p6-national-serp-rank-ai-overview',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-24',
+    },
+  },
   'signal-auto-recompute': {
     label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
     group: 'Strategy',
@@ -577,7 +597,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting'],
+    keys: ['geo-targeting', 'national-serp-tracking'],
   },
   {
     label: 'Strategy',

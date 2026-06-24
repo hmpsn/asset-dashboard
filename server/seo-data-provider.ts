@@ -97,6 +97,43 @@ export interface ReferringDomain {
   lastSeen: string;
 }
 
+// ── National SERP (P6 / national-serp-tracking) ───────────────
+
+/**
+ * Request for a single national advanced-SERP read. `ownerDomain` is the client's live
+ * domain — the provider computes `position`/`matchedUrl`/`aiOverviewCited` RELATIVE to it.
+ * Mirrors the `(request, workspaceId)` shape of `getLocalVisibility`.
+ */
+export interface NationalSerpProviderRequest {
+  keyword: string;
+  /** Client domain to match against organic results + AI-Overview references. */
+  ownerDomain: string;
+  /** Target-geo location code (P4); omit for the US default. */
+  locationCode?: number;
+  /** Target-geo language code (P4); omit for 'en'. */
+  languageCode?: string;
+  device?: 'desktop' | 'mobile';
+}
+
+/**
+ * Parsed national advanced-SERP result for one keyword. All position/citation fields are
+ * relative to `request.ownerDomain`. Built from `serp/google/organic/live/advanced` against
+ * the ground-truth fixture `tests/fixtures/dataforseo-serp-advanced.ts` — not guessed shapes.
+ */
+export interface NationalSerpResult {
+  query: string;
+  /** Client best organic rank_group, or null when the client does not rank. */
+  position: number | null;
+  /** That ranking result's URL, or null when the client does not rank. */
+  matchedUrl: string | null;
+  /** Distinct SERP item types present (e.g. 'ai_overview', 'featured_snippet', 'people_also_ask', 'organic'). */
+  features: string[];
+  /** True when an ai_overview block is present on the SERP at all. */
+  aiOverviewPresent: boolean;
+  /** True when ownerDomain ∈ ai_overview.references[].domain; null when no AI Overview present. */
+  aiOverviewCited: boolean | null;
+}
+
 // ── Provider Interface ────────────────────────────────────────
 
 export interface SeoDataProvider {
@@ -145,6 +182,10 @@ export interface SeoDataProvider {
   // Local SEO visibility
   resolveLocalSeoLocation?(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse>;
   getLocalVisibility?(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult>;
+
+  // National SERP rank + features (P6 / national-serp-tracking). Optional: providers without
+  // advanced-SERP support omit it; callers must feature-detect before calling.
+  getNationalSerp?(request: NationalSerpProviderRequest, workspaceId: string): Promise<NationalSerpResult>;
 }
 
 // ── Provider Registry ─────────────────────────────────────────

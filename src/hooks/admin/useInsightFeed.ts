@@ -377,6 +377,28 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'serp_feature_opportunity': {
+      const keyword = data.keyword as string | undefined;
+      const currentPosition = data.currentPosition as number | undefined;
+      const aiOverviewPresent = data.aiOverviewPresent as boolean | undefined;
+      const aiOverviewCited = data.aiOverviewCited as boolean | undefined;
+      const presentFeatures = (data.presentFeatures as string[] | undefined) ?? [];
+      const estimatedMonthlyCitations = data.estimatedMonthlyCitations as number | undefined;
+      const kwLabel = keyword ? `"${keyword}"` : 'a ranked keyword';
+      if (aiOverviewPresent && aiOverviewCited === false) {
+        headline = `AI Overview opportunity for ${kwLabel}`;
+      } else if (presentFeatures.includes('featured_snippet')) {
+        headline = `Featured snippet opportunity for ${kwLabel}`;
+      } else {
+        headline = `SERP feature opportunity for ${kwLabel}`;
+      }
+      if (currentPosition !== undefined) contextParts.push(`Position ${currentPosition}`);
+      if (estimatedMonthlyCitations !== undefined && estimatedMonthlyCitations > 0) {
+        contextParts.push(`~${fmtNum(estimatedMonthlyCitations)} citations/mo`);
+      }
+      break;
+    }
+
     default: {
       // Exhaustive switch — all InsightType cases are handled above.
       // This branch exists as a runtime safety net for unexpected values.

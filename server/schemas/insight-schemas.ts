@@ -147,6 +147,17 @@ export const rankingMoverDataSchema = z.object({
   impressions: z.number(),
 });
 
+// --- SerpFeatureOpportunityData (InsightDataMap['serp_feature_opportunity']) ---
+export const serpFeatureOpportunityDataSchema = z.object({
+  keyword: z.string(),
+  matchedUrl: z.string(),
+  currentPosition: z.number(),
+  presentFeatures: z.array(z.string()),
+  aiOverviewPresent: z.boolean(),
+  aiOverviewCited: z.boolean(),
+  estimatedMonthlyCitations: z.number(),
+});
+
 // --- CtrOpportunityData (InsightDataMap['ctr_opportunity']) ---
 export const ctrOpportunityDataSchema = z.object({
   query: z.string(),
@@ -275,4 +286,5 @@ export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
   milestone_attribution: milestoneAttributionDataSchema.partial().passthrough(),
   lost_visibility: lostVisibilityDataSchema.partial().passthrough(),
   local_visibility_shift: localVisibilityShiftDataSchema.partial().passthrough(),
+  serp_feature_opportunity: serpFeatureOpportunityDataSchema.partial().passthrough(),
 };
