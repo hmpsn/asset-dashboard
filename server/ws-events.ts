@@ -168,6 +168,9 @@ export const WS_EVENTS = {
 
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',
+  // GBP + reviews (SEO Decision Engine P7 / local-gbp) — fired after a local-gbp-refresh
+  // job upserts business_listing_snapshots; refreshes the local-SEO panel + command center.
+  LOCAL_GBP_SNAPSHOTS_REFRESHED: 'local-gbp:snapshots_refreshed',
 
   // E-E-A-T asset inventory
   EEAT_ASSETS_UPDATED: 'eeat-assets:updated',

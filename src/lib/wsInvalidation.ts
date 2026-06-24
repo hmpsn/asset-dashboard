@@ -424,6 +424,13 @@ function adminInvalidationKeys(
       // P6 national-serp-tracking: a national SERP refresh upserted serp_snapshots →
       // re-pull the command center so the drawer's live-SERP / AI-Overview detail updates.
       return [queryKeys.admin.keywordCommandCenter(workspaceId)] as const;
+    case WS_EVENTS.LOCAL_GBP_SNAPSHOTS_REFRESHED:
+      // P7 local-gbp: a GBP/reviews refresh upserted business_listing_snapshots →
+      // re-pull the local-SEO panel (GBP/reviews readout) + command center.
+      return [
+        queryKeys.admin.localSeo(workspaceId),
+        queryKeys.admin.keywordCommandCenter(workspaceId),
+      ] as const;
     case WS_EVENTS.LOCAL_SEO_UPDATED:
       return [
         queryKeys.admin.localSeo(workspaceId),

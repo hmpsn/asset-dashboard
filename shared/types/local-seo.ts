@@ -237,6 +237,13 @@ export interface LocalVisibilityBusinessResult {
   phone?: string;
   address?: string;
   cid?: string;
+  // P7 free half (local-pack rating extraction, unflagged): the local_pack item already
+  // carries these; the parser populates them via parseListingRating. undefined = no reviews
+  // / absent (NEVER 0).
+  /** Star rating from the local_pack item. */
+  rating?: number;
+  /** Review count (rating.votes_count) from the local_pack item. */
+  reviewCount?: number;
 }
 
 export interface LocalVisibilityProviderRequest {
