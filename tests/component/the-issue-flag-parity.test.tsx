@@ -276,6 +276,25 @@ describe('KeywordStrategyPanel — The Issue flag parity', () => {
       expect(screen.getByRole('button', { name: /send issue/i })).toBeInTheDocument();
     });
 
+    it('surfaces content-gap AI-Overview chips in the supporting detail (P3 admin parity restored)', () => {
+      // Real strategy WITH a content gap carrying the ai_overview SERP feature. "The Issue"
+      // previously dropped the content-gaps section entirely, hiding P3's AI-Overview chips from
+      // admins; they now live in the collapsed "Supporting detail" (in the DOM even when closed).
+      mocks.strategy = {
+        ...makeStrategy(),
+        contentGaps: [{
+          topic: 'SaaS pricing guide',
+          targetKeyword: 'saas pricing guide',
+          intent: 'commercial',
+          priority: 'high',
+          rationale: 'High search demand with no page on the site yet.',
+          serpFeatures: ['ai_overview'],
+        }],
+      };
+      renderPanel();
+      expect(screen.getByText(/AI Overview/i)).toBeInTheDocument();
+    });
+
     it('Send issue commits the STAGED set via the atomic bulk-send route (action:send)', () => {
       renderPanel();
       // Blocker 5 staging model: per-row "Stage for issue" stages locally (NO client write); the

@@ -723,6 +723,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
           <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
           {orientEl}
+          {/* Content gaps — restored here so the SERP-feature / AI-Overview chips (rendered by the
+              shared ContentGapRow) are reachable to the admin in "The Issue" layout. They sit in the
+              collapsed supporting detail (decision-first spine stays untouched); ContentGaps self-nulls
+              when empty so a cold cockpit shows no chrome. */}
+          {realLeaves?.contentGaps}
           {realLeaves?.cannibalization}
           {realLeaves?.strategyDiff}
           <div className="flex justify-end">
