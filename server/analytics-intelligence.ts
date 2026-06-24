@@ -774,15 +774,21 @@ export function computeSerpFeatureOpportunities(
     // Requires a real ranking URL + position — "doesn't rank" stays owned elsewhere.
     if (!snap.matchedUrl || snap.position == null) continue;
 
-    // High-value feature present-but-uncaptured: AI Overview not citing us, OR a featured snippet.
+    // Fire ONLY on the ownership-guarded flagship signal: an AI Overview is present and does NOT
+    // cite the client. A featured-snippet trigger is deliberately NOT used — the parser records
+    // snippet PRESENCE but not its owning domain, so presence alone cannot distinguish "a snippet
+    // we could win" from "a snippet we already hold", and firing on it produces a false "capture
+    // the result you already own" insight. Featured-snippet capture is deferred until the parser
+    // tracks snippet ownership (P7); it still surfaces informationally via presentFeatures/badges.
     const aiOverviewOpportunity = snap.aiOverviewPresent === true && snap.aiOverviewCited === false;
-    const hasFeaturedSnippet = snap.features.includes('featured_snippet');
-    if (!aiOverviewOpportunity && !hasFeaturedSnippet) continue;
+    if (!aiOverviewOpportunity) continue;
 
     const volume = volumeMap.get(keywordComparisonKey(snap.query)) ?? 0;
     results.push({
       insightType: 'serp_feature_opportunity' as const,
-      pageId: snap.matchedUrl, // real URL → enrichment works; never null on this multi-row type
+      // Normalize to the bare pathname so this insight's page_id matches every other page-keyed
+      // insight for the same physical page (grouping/enrichment consistency). Never null here.
+      pageId: toInsightPageId(snap.matchedUrl),
       data: {
         keyword: snap.query,
         matchedUrl: snap.matchedUrl,

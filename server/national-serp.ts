@@ -145,11 +145,24 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
     const snapshots: Parameters<typeof storeSerpSnapshots>[2] = [];
     let processed = 0;
     let aiOverviewsCited = 0;
+    let keywordsPersisted = 0;
     let lastProgressBroadcastAt = 0;
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Persist + clear the accumulated buffer. Called periodically and on cancellation so a
+    // mid-run cancel keeps the (paid) SERP reads already completed — mirrors runLocalSeoRefreshJob,
+    // which persists incrementally, rather than discarding the whole batch. The upsert is
+    // idempotent on (workspace_id, date, query), so flushing in chunks is safe.
+    const flushSnapshots = (): void => {
+      if (snapshots.length === 0) return;
+      storeSerpSnapshots(workspaceId, today, snapshots);
+      keywordsPersisted += snapshots.length;
+      snapshots.length = 0;
+    };
 
     for (const keyword of trackedKeywords) {
-      // Pre-check cancellation BEFORE spending provider credits.
-      if (isCancelled(jobId)) return;
+      // Pre-check cancellation BEFORE spending provider credits — persist progress, then stop.
+      if (isCancelled(jobId)) { flushSnapshots(); return; }
       await waitForMemoryHeadroom();
 
       // P5 budget gate — call before each PAID provider read. Observe-only at launch
@@ -169,7 +182,7 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
 
       try {
         const result = await getNationalSerp({ keyword, ownerDomain, locationCode, languageCode }, workspaceId);
-        if (isCancelled(jobId)) return;
+        if (isCancelled(jobId)) { flushSnapshots(); return; }
         if (result.aiOverviewCited === true) aiOverviewsCited++;
         snapshots.push({
           query: keyword,
@@ -188,14 +201,16 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
         }
       }
 
-      // Mid-job invalidation broadcast every ~20 keywords so consumers refresh incrementally.
-      // Skip the final tick (processed === total) — the post-loop broadcast covers it.
+      // Mid-job: persist the batch so far + broadcast every ~20 keywords so consumers refresh
+      // incrementally (and a later cancel keeps the work). Skip the final tick (processed ===
+      // total) — the post-loop flush + completion broadcast cover it.
       if (
         !isCancelled(jobId)
         && processed < total
         && processed - lastProgressBroadcastAt >= NATIONAL_SERP_PROGRESS_BROADCAST_INTERVAL
       ) {
         lastProgressBroadcastAt = processed;
+        flushSnapshots();
         broadcastToWorkspace(workspaceId, WS_EVENTS.SERP_SNAPSHOTS_REFRESHED, {
           action: 'refresh_progress',
           processed,
@@ -205,27 +220,23 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
       }
     }
 
-    if (isCancelled(jobId)) return;
+    // Persist any remaining buffered snapshots (final partial batch).
+    flushSnapshots();
+    if (isCancelled(jobId)) return; // data already persisted above; leave the cancelled status.
 
-    // Persist the whole batch for today (one transaction inside storeSerpSnapshots).
-    const today = new Date().toISOString().slice(0, 10);
-    if (snapshots.length > 0) {
-      storeSerpSnapshots(workspaceId, today, snapshots);
-    }
-
-    const summary: NationalSerpRefreshSummary = { keywordsProcessed: snapshots.length, aiOverviewsCited };
+    const summary: NationalSerpRefreshSummary = { keywordsProcessed: keywordsPersisted, aiOverviewsCited };
 
     addActivity(
       workspaceId,
       'rank_snapshot',
       'National SERP ranks refreshed',
-      `${snapshots.length} national SERP positions captured for ${today}`,
-      { source: 'national_serp', keywordsProcessed: snapshots.length, aiOverviewsCited },
+      `${keywordsPersisted} national SERP positions captured for ${today}`,
+      { source: 'national_serp', keywordsProcessed: keywordsPersisted, aiOverviewsCited },
     );
     broadcastToWorkspace(workspaceId, WS_EVENTS.SERP_SNAPSHOTS_REFRESHED, {
       action: 'refresh_completed',
       date: today,
-      keywordsProcessed: snapshots.length,
+      keywordsProcessed: keywordsPersisted,
       aiOverviewsCited,
       updatedAt: new Date().toISOString(),
     });
@@ -234,7 +245,7 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
       status: 'done',
       progress: total,
       total,
-      message: `National SERP ranks refreshed — ${snapshots.length}/${total} keywords`,
+      message: `National SERP ranks refreshed — ${keywordsPersisted}/${total} keywords`,
       result: summary,
     });
   } finally {
