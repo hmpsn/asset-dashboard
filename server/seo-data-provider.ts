@@ -165,7 +165,14 @@ export interface BusinessListingResult {
 }
 
 export interface BusinessListingsRequest {
-  category: string;
+  /** Category search (competitor landscape, sorted by review count). Omit when doing a pure title lookup. */
+  category?: string;
+  /**
+   * Business-name search. Used to find the CLIENT's OWN listing directly — the owner often has too
+   * few reviews to surface in a review-count-sorted category search (that IS the review-gap case),
+   * so the job looks them up by name. At least one of `category`/`title` must be set.
+   */
+  title?: string;
   /** "lat,lng,radiusKm" per DataForSEO location_coordinate. */
   locationCoordinate: string;
   ownerDomain: string;

@@ -1968,11 +1968,16 @@ export class DataForSeoProvider implements SeoDataProvider {
 
   // ── getBusinessListings → business_data/business_listings_search (P7 local-gbp) ──
   async getBusinessListings(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]> {
-    const category = request.category.trim();
+    const category = request.category?.trim() || undefined;
+    const title = request.title?.trim() || undefined;
     const limit = request.limit ?? 20;
+    // At least one search axis is required by the endpoint. Category = competitor landscape;
+    // title = the client's own listing (often too few reviews to surface in a category search).
+    if (!category && !title) return [];
     const cacheKey = [
       'business_listings',
-      cacheKeyPart(category),
+      cacheKeyPart(category ?? ''),
+      cacheKeyPart(title ?? ''),
       cacheKeyPart(request.locationCoordinate),
       cacheKeyPart(cleanDomain(request.ownerDomain)),
       limit,
@@ -1983,11 +1988,12 @@ export class DataForSeoProvider implements SeoDataProvider {
       cacheKey,
       cacheTtlHours: CACHE_TTL_BUSINESS_LISTINGS,
       endpointLabel: 'business_listings_search',
-      query: category,
+      query: category ?? title ?? '',
       emptyValue: [],
       endpoint: 'business_data/business_listings_search',
       body: [{
-        categories: [category],
+        ...(category ? { categories: [category] } : {}),
+        ...(title ? { title } : {}),
         location_coordinate: request.locationCoordinate,
         order_by: ['rating.votes_count,desc'],
         limit,
