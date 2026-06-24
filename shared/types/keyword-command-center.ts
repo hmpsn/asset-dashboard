@@ -114,9 +114,8 @@ export interface KeywordCommandCenterMetrics {
   cpc?: number;
   /**
    * Raw keyword intent string from any source (trackedKeyword.intent, pageMap.searchIntent, contentGap.intent).
-   * Additive metrics metadata, like `cpc`: populated whenever a source carries intent, independent of the
-   * `keyword-value-scoring` flag. It feeds the value-first score when that flag is ON but is not read by any sort
-   * accessor when OFF, so rows/order/scores stay byte-identical with the flag OFF.
+   * Additive metrics metadata, like `cpc`: populated whenever a source carries intent. Feeds the value-first
+   * opportunity score (value-first scoring is unconditional).
    */
   intent?: string;
   currentPosition?: number;
@@ -236,9 +235,8 @@ export interface KeywordCommandCenterRow {
   isLostVisibility?: boolean;
   /**
    * Plain-language reasons explaining the keyword's value score (admin-only, Task 2.2).
-   * Built in finalizeDraftRow from computeKeywordValueComponents + keywordValueReasons
-   * when the keyword-value-scoring flag is ON. Absent when the flag is OFF or the
-   * keyword has no value signal (signal gate fails).
+   * Built in finalizeDraftRow from computeKeywordValueComponents + keywordValueReasons.
+   * Absent when the keyword has no value signal (signal gate fails).
    */
   valueReasons?: string[];
   /**

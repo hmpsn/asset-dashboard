@@ -60,8 +60,7 @@ export interface KeywordStrategyExplanation {
   nextAction: KeywordStrategyNextAction;
   /**
    * Plain-language reasons explaining the keyword's value score (Task 2.3).
-   * Populated server-side in buildKeywordStrategyUxPayload when the
-   * keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * Populated server-side in buildKeywordStrategyUxPayload. Absent when the
    * keyword has no value signal (signal gate fails).
    * Safe for all tiers (no $ amounts).
    */

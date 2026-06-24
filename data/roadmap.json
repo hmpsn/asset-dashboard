@@ -12,9 +12,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group A quick win. Retires the keyword-value-scoring flag; re-ranks keywords by commercial value. Update feature-flags test + deprecation registry in same commit. Staging eyeball before main."
+          "notes": "Done (2026-06-24). Retired the keyword-value-scoring flag; value-first scoring is unconditional. Crude Hub-sort accessors deleted; computeOpportunityScore kept as the gate-failure/backfill/projection fallback. 7 test files updated; pr-check anti-reintroduction guard added + deprecation registry advanced (hidden→removed, keyword-universe-full added as the hidden exemplar). PR to staging; staging eyeball of admin Hub + client Strategy ordering before main."
         },
         {
           "id": "seo-engine-p2-emv-calibration-loop",
@@ -910,8 +910,8 @@
           "source": "/docs/superpowers/plans/2026-06-05-keyword-value-scoring.md",
           "est": "phased",
           "priority": "P1",
-          "status": "in_progress",
-          "notes": "Phase 0 (flag + pure scoring module + types) done. Phase 1 (Hub wiring: intent resolution, ScoringContext, precomputed valueScore, flag-selected accessor, parity probe) done. Phase 2 (content-gap opportunity spine swap) done. All shipped DARK behind keyword-value-scoring flag (default OFF, byte-identical when OFF). Owner-gated: flip per-workspace on staging to verify value-first ordering (transactional local leads, national-informational demoted under local posture), then merge staging→main."
+          "status": "done",
+          "notes": "Done (2026-06-24) via SEO Decision Engine P1 (seo-engine-p1-value-first-keyword-scoring). Phases 0-2 (flag + pure scoring module + Hub wiring + content-gap spine) shipped dark; P1 made value-first scoring unconditional and retired the keyword-value-scoring flag (crude Hub-sort path deleted)."
         }
       ]
     },

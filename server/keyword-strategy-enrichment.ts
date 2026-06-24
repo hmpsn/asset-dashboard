@@ -596,10 +596,11 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
   // break the `opportunityScore/100` math).
   //
-  // Phase 2 (keyword-value-scoring flag): build the base score ONCE at the top of the per-gap
-  // loop so all three computeOpportunityScore sites (spine input, OV fallback, P4-OFF write) use
-  // the same value. Flag-OFF keeps the legacy computeOpportunityScore (byte-identical regardless
-  // of the P4 / relaxConservatism state). ctx is built once per enrichment run, never per gap.
+  // Build the value-first base score ONCE at the top of the per-gap loop so the spine input
+  // and the OV fallback use the same value. computeKeywordValueScore is the base; the legacy
+  // computeOpportunityScore is the signal-gate fallback. Value-first scoring is unconditional
+  // (the keyword-value-scoring flag was retired in SEO Decision Engine P1). ctx is built once
+  // per enrichment run, never per gap.
   if (strategy.contentGaps?.length) {
     // Build the value-scoring ctx once per enrichment run.
     const ws = getWorkspace(workspaceId);
