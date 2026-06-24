@@ -32,6 +32,21 @@ export function useLocalSeoRefresh(workspaceId: string) {
   });
 }
 
+// SEO Decision Engine P7 (local-gbp): trigger a GBP + reviews refresh and track the job.
+export function useLocalGbpRefresh(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
+  return useMutation({
+    mutationFn: () => localSeo.refreshGbp(workspaceId),
+    onSuccess: (result) => {
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, result.jobId, { workspaceId });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+    },
+  });
+}
+
 export function useLocalSeoUpdate(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({

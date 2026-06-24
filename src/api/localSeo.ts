@@ -60,6 +60,11 @@ export const localSeo = {
   refresh: (workspaceId: string, body: LocalSeoRefreshRequest = {}) =>
     post<LocalSeoRefreshStartResponse>(`/api/local-seo/${workspaceId}/refresh`, body),
 
+  // SEO Decision Engine P7 (local-gbp): trigger a GBP + reviews refresh. Returns a job id;
+  // progress surfaces through useBackgroundTasks + the LOCAL_GBP_SNAPSHOTS_REFRESHED broadcast.
+  refreshGbp: (workspaceId: string) =>
+    post<{ jobId: string }>(`/api/local-seo/${workspaceId}/refresh-gbp`),
+
   setPrimaryMarket: (workspaceId: string, marketId: string) =>
     put<{ ok: boolean }>(`/api/local-seo/${workspaceId}/markets/${marketId}/set-primary`, {}),
 

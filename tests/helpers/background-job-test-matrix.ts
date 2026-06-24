@@ -204,6 +204,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/local-seo-routes.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH]: entry(
+    'LOCAL_GBP_REFRESH',
+    {
+      expectedLabel: 'Refreshing GBP + reviews',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/integration/local-gbp-routes.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL]: entry(
     'LOCAL_SEO_LOCATION_BACKFILL',
     {

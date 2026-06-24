@@ -29,6 +29,8 @@ import { listQuickWins } from './quick-wins.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
+import { getLatestBusinessListings } from './business-listings-store.js';
+import { deriveGbpCompletenessScore } from './listing-rating.js';
 import {
   getLocalSeoPosture,
   getLocalSeoServiceGaps,
@@ -2286,6 +2288,134 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     } catch (err) {
       failedCategories.add('local_visibility');
       log.warn({ err, workspaceId }, 'Local keyword visibility unavailable for recommendations');
+    }
+
+    // ── B4. GBP + reviews → local_visibility rec (P7, behind the `local-gbp` flag). ──
+    // From the `business_listing_snapshots` time series (the client's OWN listing(s) + local
+    // competitors), surface two actionable gaps per owned location:
+    //   • Review gap — the client trails the top-review competitor in the same market by enough
+    //     review COUNT or star RATING that customers comparing the two pick the competitor.
+    //   • GBP completeness — the client's Google Business Profile is unclaimed or thin (missing
+    //     photos / attributes / category), so it underperforms in the local pack regardless of rank.
+    // Both reuse the `local_visibility` RecType (NO new insight type / RecType). Keyed on the
+    // owned listing's location/market/place id so status carries across runs and one location's
+    // fix doesn't auto-resolve another's. Recompute completeness from the stored snapshot (the
+    // derived score is not persisted).
+    if (isFeatureEnabled('local-gbp', ws.id)) {
+      // Gap thresholds — a rec only fires when the gap is material enough to act on.
+      const REVIEW_COUNT_GAP_MIN = 10; // trail the leader by ≥10 reviews
+      const STAR_GAP_MIN = 0.3;        // OR trail by ≥0.3 stars
+      const GBP_COMPLETENESS_MIN = 60; // a profile under 60/100 is materially incomplete
+      try {
+        const listings = getLatestBusinessListings(ws.id);
+        const ownedListings = listings.filter(l => l.isOwned === true);
+        const competitors = listings.filter(l => l.isOwned !== true);
+        for (const owned of ownedListings) {
+          const key = owned.locationId ?? owned.marketId ?? owned.placeId;
+          // Top competitor by review count within the SAME market (fall back to market-less if the
+          // owned listing has no market id — still a same-workspace local competitor comparison).
+          const sameMarketCompetitors = owned.marketId
+            ? competitors.filter(c => c.marketId === owned.marketId)
+            : competitors;
+          const topCompetitor = sameMarketCompetitors.reduce<typeof sameMarketCompetitors[number] | undefined>(
+            (best, c) => ((c.reviewCount ?? 0) > (best?.reviewCount ?? -1) ? c : best),
+            undefined,
+          );
+
+          // ── Review-gap rec ──
+          if (topCompetitor) {
+            const reviewCountGap = (topCompetitor.reviewCount ?? 0) - (owned.reviewCount ?? 0);
+            const ratingGap = (topCompetitor.rating ?? 0) - (owned.rating ?? 0);
+            if (reviewCountGap >= REVIEW_COUNT_GAP_MIN || ratingGap >= STAR_GAP_MIN) {
+              const source = RecSource.localVisibility(`review_gap:${key}`);
+              const opportunity = computeOpportunityValue({
+                branch: 'local',
+                effortDays: effortDaysFor('local_visibility', source),
+                intent: 'commercial',
+                localVisibilitySignal: Math.min(1, reviewCountGap / 50),
+                authorityStrength: ovAuthority ?? null,
+                ctrCurve: ovCtrCurve,
+                timingBoost: maxBoostForPages(timingBoosts, []),
+              }, { calibration: ovCalibration, weights: ovWeights });
+              const scoring = deriveCanonicalRecommendationFields(source, opportunity);
+              recs.push({
+                id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+                workspaceId,
+                priority: scoring.priority,
+                type: 'local_visibility',
+                title: `Close the review gap: ${owned.reviewCount ?? 0} reviews / ${owned.rating ?? 0}★ vs ${topCompetitor.title ?? 'a competitor'} ${topCompetitor.reviewCount ?? 0} / ${topCompetitor.rating ?? 0}★`,
+                description: `${topCompetitor.title ?? 'A local competitor'} has ${topCompetitor.reviewCount ?? 0} reviews at ${topCompetitor.rating ?? 0}★ while you have ${owned.reviewCount ?? 0} at ${owned.rating ?? 0}★. When nearby customers compare you side by side in the local pack, the higher review count and rating wins the click and the call.`,
+                insight: `Review count and star rating are among the strongest local-pack ranking and conversion signals. A consistent gap means you lose ready-to-act local customers at the comparison step even when you rank. Closing it with a steady review-generation cadence is direct, compounding local leverage.`,
+                impact: reviewCountGap >= REVIEW_COUNT_GAP_MIN * 2 ? 'high' : 'medium',
+                effort: 'medium',
+                impactScore: scoring.impactScore,
+                opportunity,
+                source,
+                affectedPages: [],
+                trafficAtRisk: 0,
+                impressionsAtRisk: 0,
+                estimatedGain: `Closing the review gap with ${topCompetitor.title ?? 'the local leader'} makes you the obvious choice for nearby customers comparing options`,
+                actionType: 'manual',
+                status: 'pending',
+                assignedTo,
+                createdAt: now,
+                updatedAt: now,
+              });
+            }
+          }
+
+          // ── GBP-completeness rec ──
+          const completeness = deriveGbpCompletenessScore({
+            claimed: owned.claimed,
+            totalPhotos: owned.totalPhotos,
+            attributeCount: owned.attributes.length,
+            category: owned.category,
+          });
+          if (owned.claimed === false || completeness < GBP_COMPLETENESS_MIN) {
+            const source = RecSource.localVisibility(`gbp_completeness:${key}`);
+            const opportunity = computeOpportunityValue({
+              branch: 'local',
+              effortDays: effortDaysFor('local_visibility', source),
+              intent: 'transactional',
+              localVisibilitySignal: (100 - completeness) / 100,
+              authorityStrength: ovAuthority ?? null,
+              ctrCurve: ovCtrCurve,
+              timingBoost: maxBoostForPages(timingBoosts, []),
+            }, { calibration: ovCalibration, weights: ovWeights });
+            const scoring = deriveCanonicalRecommendationFields(source, opportunity);
+            recs.push({
+              id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+              workspaceId,
+              priority: scoring.priority,
+              type: 'local_visibility',
+              title: `Complete your Google Business Profile${owned.claimed === false ? ' — unclaimed' : ''} (completeness ${completeness}/100)`,
+              description: owned.claimed === false
+                ? `Your Google Business Profile isn't claimed yet, so you can't control your hours, photos, attributes, or respond to reviews — and Google ranks unclaimed profiles below claimed ones. Claiming and filling it out is the single highest-leverage local fix.`
+                : `Your Google Business Profile scores ${completeness}/100 on completeness — it's missing signals like photos, attributes, or a category that Google uses to rank and display you in the local pack. Filling these in lifts both your ranking and how compelling your listing looks.`,
+              insight: `A complete, claimed Google Business Profile is the foundation of local-pack visibility. Profiles with photos, accurate categories, and filled-in attributes rank higher and convert better than thin ones — this is addressable groundwork that compounds with every other local effort.`,
+              impact: owned.claimed === false ? 'high' : 'medium',
+              effort: 'low',
+              impactScore: scoring.impactScore,
+              opportunity,
+              source,
+              affectedPages: [],
+              trafficAtRisk: 0,
+              impressionsAtRisk: 0,
+              estimatedGain: owned.claimed === false
+                ? `Claiming and completing your Google Business Profile unlocks local-pack visibility you currently can't compete for`
+                : `Completing your Google Business Profile lifts your local-pack ranking and makes your listing more compelling to nearby searchers`,
+              actionType: 'manual',
+              status: 'pending',
+              assignedTo,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      } catch (err) {
+        failedCategories.add('local_visibility');
+        log.warn({ err, workspaceId }, 'GBP + reviews listings unavailable for recommendations');
+      }
     }
   }
 
