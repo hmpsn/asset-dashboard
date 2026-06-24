@@ -14,7 +14,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-import type { AudiencePersona } from '../../shared/types/workspace';
+import type { AudiencePersona, TargetGeo } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
@@ -38,6 +38,7 @@ interface WorkspaceData {
   knowledgeBase?: string;
   brandVoice?: string;
   personas?: AudiencePersona[];
+  targetGeo?: TargetGeo | null;
   businessProfile?: {
     email?: string;
     phone?: string;
@@ -524,6 +525,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           workspaceName={ws?.name || 'Workspace'}
           liveDomain={ws?.liveDomain}
           businessProfile={ws?.businessProfile}
+          targetGeo={ws?.targetGeo}
           businessContext={ws?.keywordStrategy?.businessContext}
           brandLogoUrl={ws?.brandLogoUrl}
           siteHasSearch={ws?.siteHasSearch}

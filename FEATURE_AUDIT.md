@@ -1,10 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **527 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **529 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 529. Geo-correct domain research — national/international SERP targeting (SEO Decision Engine P4)
+
+**What it does:** Fixes a silent correctness bug where every domain/competitor/keyword-gap research call was hardcoded to the US SERP (`location_code` 2840) in English, corrupting results for non-US clients. The six DataForSEO domain-analysis methods (`getDomainKeywords`, `getUrlKeywords`, `getDomainOverview`, `getCompetitors`, `getKeywordGap`, `getKeywordsForKeywords`) now accept and thread `locationCode` + `languageCode`. A new workspace `targetGeo` field (`{ locationCode, languageCode, countryCode?, label? }`; migration 152) stores the admin-set national/international SERP target, resolved by `resolveWorkspaceTargetGeo()` (admin target-geo → local primary-market location/language → US/English fallback). The 12 production caller sites (keyword-strategy build, analytics-intelligence insights, recommendations, blueprint-generator, competitor crons, competitive-intel routes) thread geo through a single flag-gated `workspaceProviderGeo(workspaceId)` helper — competitor-domain calls use the **client's** market (apples-to-apples), backlinks calls are geo-agnostic and excluded. Admins set the target via a new **Search Target Geo** editor in BrandHub › Business Footprint (curated DataForSEO country list, country + language pickers), distinct from the local "Primary market". Gated behind the `geo-targeting` flag: OFF is byte-identical to pre-P4 (request body AND the 7–14 day domain cache key stay on the legacy un-versioned `database` token, so no costly cache re-warm); ON keys the cache on `v2:<locationCode>:<language>` so e.g. Canada-EN and Canada-FR can't poison each other. Fourth phase of the SEO Decision Engine program (Group B foundation).
+
+**Agency value:** Non-US and non-English clients finally get research against their real SERP instead of silently-wrong US/English data — the single biggest fix for the audit's D-grade "national/international" dimension. One admin picker controls the target; everything downstream (keywords, competitors, gaps, domain authority, blueprints, insights) follows.
+
+**Client value:** Keyword opportunities, competitor sets, and gap analysis reflect the country and language the client actually competes in, so recommendations and content briefs are grounded in the correct market.
 
 ### 528. AI-Overview SERP-feature surfacing (SEO Decision Engine P3)
 

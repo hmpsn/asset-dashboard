@@ -8,6 +8,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { getConfiguredProvider, getBacklinksProvider, listProviders, isAnyProviderConfigured } from '../seo-data-provider.js';
+import { workspaceProviderGeo } from '../seo-target-geo.js';
 import { getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
@@ -67,6 +68,11 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
   const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
+  // Resolve the client's target SERP geo once; all domains (own + competitors) are
+  // read in the CLIENT's market so the comparison is apples-to-apples. `{}` when the
+  // geo-targeting flag is OFF (byte-identical to pre-P4). (P4)
+  const geo = workspaceProviderGeo(workspaceId);
+
   try {
     // Fetch domain overviews in parallel (my domain + configured competitor cap).
     // Backlinks are optional; if they are unavailable, omit backlink fields.
@@ -104,16 +110,16 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
     };
 
     const [overviews, backlinks, keywordGaps] = await Promise.all([
-      Promise.all(allDomains.map(d => readProvider('overview', provider.name, () => provider.getDomainOverview(d, workspaceId), null, d))),
+      Promise.all(allDomains.map(d => readProvider('overview', provider.name, () => provider.getDomainOverview(d, workspaceId, undefined, geo.locationCode, geo.languageCode), null, d))),
       blProvider
         ? Promise.all(allDomains.map(d => readProvider('backlinks', blProvider.name, () => blProvider.getBacklinksOverview(d, workspaceId), null, d)))
         : Promise.resolve(allDomains.map(() => null)),
-      readProvider('keyword_gap', provider.name, () => provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30), []),
+      readProvider('keyword_gap', provider.name, () => provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30, undefined, geo.locationCode, geo.languageCode), []),
     ]);
 
     // Get top keywords for each domain (parallel, limit 20 for speed)
     const topKeywords = await Promise.all(
-      allDomains.map(d => readProvider('top_keywords', provider.name, () => provider.getDomainKeywords(d, workspaceId, 20), [], d))
+      allDomains.map(d => readProvider('top_keywords', provider.name, () => provider.getDomainKeywords(d, workspaceId, 20, undefined, geo.locationCode, geo.languageCode), [], d))
     );
 
     const hasPrimaryProviderData =
@@ -171,7 +177,8 @@ router.get('/api/seo/discover-competitors/:workspaceId', requireWorkspaceAccess(
   if (!provider) return res.status(400).json({ error: 'No SEO data provider configured' });
 
   try {
-    const competitors = await provider.getCompetitors(myDomain, ws.id, 10);
+    const geo = workspaceProviderGeo(ws.id);
+    const competitors = await provider.getCompetitors(myDomain, ws.id, 10, undefined, geo.locationCode, geo.languageCode);
     const filtered = filterDiscoveredCompetitors(competitors, myDomain);
     res.json({ competitors: filtered, domain: myDomain });
   } catch (err) {

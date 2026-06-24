@@ -5,6 +5,7 @@ import { MAX_COMPETITORS } from './constants.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { createLogger } from './logger.js';
 import { listProviders } from './seo-data-provider.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
@@ -134,9 +135,15 @@ export async function fetchAndCacheKeywordStrategySeoData({
     return { seoContext, domainKeywords, keywordGaps, discoveryKeywords, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
+  // Geo for this CLIENT workspace's domain/competitor/gap SERP queries. `{}` when
+  // the geo-targeting flag is OFF (byte-identical to pre-P4); resolved
+  // { locationCode, languageCode } when ON. Competitor-domain calls below also use
+  // the CLIENT geo — we want the client's target SERP, not the competitor's. (P4)
+  const geo = workspaceProviderGeo(ws.id);
+
   try {
     log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-    domainKeywords = await provider.getDomainKeywords(siteDomain, ws.id, 200);
+    domainKeywords = await provider.getDomainKeywords(siteDomain, ws.id, 200, undefined, geo.locationCode, geo.languageCode);
     log.info(`Got ${domainKeywords.length} domain keywords`);
 
     if (domainKeywords.length > 0) {
@@ -153,7 +160,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
   if (fetchCompetitors && competitorDomains.length === 0) {
     try {
       sendProgress('seo-data', 'Auto-discovering organic competitors...', 0.57);
-      const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
+      const discovered = await provider.getCompetitors(siteDomain, ws.id, 5, undefined, geo.locationCode, geo.languageCode);
       const autoCompetitors = filterDiscoveredCompetitors(discovered, siteDomain)
         .slice(0, MAX_COMPETITORS)
         .map(c => c.domain);
@@ -178,7 +185,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       for (const comp of cappedCompetitorDomains) {
         const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         try {
-          const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
+          const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit, undefined, geo.locationCode, geo.languageCode);
           const compKws = [...rawKws]
             .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
             .slice(0, compLimit);
@@ -219,7 +226,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
     try {
       sendProgress('seo-data', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
       log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
-      keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
+      keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50, undefined, geo.locationCode, geo.languageCode);
       log.info(`Found ${keywordGaps.length} keyword gaps`);
 
       if (keywordGaps.length > 0) {

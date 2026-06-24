@@ -1,0 +1,27 @@
+import { isFeatureEnabled } from './feature-flags.js';
+import { resolveWorkspaceTargetGeo } from './local-seo.js';
+
+/**
+ * Provider geo params (`location_code` / `language_code`) for a workspace's
+ * domain & keyword SERP queries, gated by the `geo-targeting` flag
+ * (SEO Decision Engine P4).
+ *
+ * - **Flag OFF** → returns `{}`. Callers spread it into `SeoDataProvider` calls
+ *   so nothing changes: the provider falls back to its
+ *   `locationCodeFromDatabase(database)` / `'en'` defaults, byte-identical to
+ *   pre-P4 behavior (and cache keys stay on the legacy un-versioned token, so no
+ *   expensive domain-cache re-warm).
+ * - **Flag ON** → returns the workspace's resolved `{ locationCode, languageCode }`
+ *   (see {@link resolveWorkspaceTargetGeo}: admin target-geo → local primary
+ *   market → US/'en'), so domain methods query the correct national/international
+ *   SERP instead of hardcoded US.
+ *
+ * `workspaceId` MUST be the CLIENT workspace whose SERP geo we care about — never
+ * a competitor's domain. Backlinks calls are geo-agnostic and do NOT use this.
+ */
+export function workspaceProviderGeo(
+  workspaceId: string,
+): { locationCode?: number; languageCode?: string } {
+  if (!isFeatureEnabled('geo-targeting', workspaceId)) return {};
+  return resolveWorkspaceTargetGeo(workspaceId);
+}
