@@ -16,13 +16,20 @@ import {
   getLatestRanks,
 } from '../rank-tracking.js';
 import { getSearchOverview } from '../search-console.js';
-import { getWorkspace } from '../workspaces.js';
+import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
+import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
+import { runNationalSerpRefreshJob } from '../national-serp.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { createLogger } from '../logger.js';
 
 const router = Router();
+const log = createLogger('rank-tracking-routes');
 
 function parseHistoryLimit(rawLimit: unknown): number | null {
   if (rawLimit == null) return 90;
@@ -118,6 +125,73 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
   } catch (err) {
     next(err);
   }
+});
+
+// Trigger a national SERP rank refresh (SEO Decision Engine P6 / national-serp-tracking).
+// Manual-trigger for P6 (no cron in this unit). Gated: feature flag → tier (Growth+) →
+// observe-only budget gate → global + per-workspace job serialization. Fire-and-forget.
+router.post('/api/rank-tracking/:workspaceId/refresh-national', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  // Flag gate — when off, the route does no work and returns a clean "not enabled" 404.
+  if (!isFeatureEnabled('national-serp-tracking', workspaceId)) {
+    return res.status(404).json({ error: 'National SERP tracking is not enabled' });
+  }
+
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // Tier gate — Growth + Premium only (owner decision); Free is excluded.
+  const tier = computeEffectiveTier(ws);
+  if (tier !== 'growth' && tier !== 'premium') {
+    return res.status(403).json({ error: 'National SERP tracking requires a Growth or Premium plan' });
+  }
+
+  // P5 budget gate at route entry — observe-only at launch (logs the would-block, returns).
+  // Wrapped so that if enforcement is later enabled, an over-budget workspace is logged and
+  // the refresh still proceeds (enforcement posture for this route is observe-only by decision).
+  try {
+    assertCreditBudget(workspaceId, 'national_serp', tier);
+  } catch (err) {
+    if (err instanceof CreditBudgetError) {
+      log.warn({ workspaceId, tier }, 'national-serp refresh: credit budget would-block at route entry (proceeding — observe-only)');
+    } else {
+      throw err;
+    }
+  }
+
+  // Per-workspace serialization.
+  const active = hasActiveJob(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH, workspaceId);
+  if (active) return res.status(409).json({ error: 'A national SERP refresh is already running for this workspace', jobId: active.id });
+
+  // Global cross-workspace coalescing — each refresh holds advanced-SERP responses in memory;
+  // on memory-constrained hosts concurrent refreshes from different workspaces stack and OOM the
+  // process. Serialize globally: only one national SERP refresh runs at a time platform-wide.
+  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH);
+  if (globalActive) {
+    return res.status(409).json({
+      error: 'Another workspace is currently running a national SERP refresh — please wait for it to complete',
+      jobId: globalActive.id,
+      blockingWorkspaceId: globalActive.workspaceId,
+    });
+  }
+
+  const job = createJob(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH, {
+    workspaceId,
+    message: 'Preparing national SERP rank refresh...',
+  });
+  registerAbort(job.id);
+  res.json({ jobId: job.id });
+  // .catch() (not void) so any unexpected throw becomes a logged error + failed job rather than
+  // an unhandled rejection that crashes the process.
+  runNationalSerpRefreshJob(workspaceId, job.id).catch(err => {
+    log.error({ err, jobId: job.id, workspaceId }, 'national-serp refresh: unhandled error escaped job runner — marking failed');
+    updateJob(job.id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : String(err),
+      message: 'National SERP refresh failed unexpectedly',
+    });
+  });
 });
 
 // Get rank history (for charting)

@@ -22,6 +22,7 @@ import type {
   RankingMoverData,
   CtrOpportunityData,
   SerpOpportunityData,
+  SerpFeatureOpportunityData,
   FreshnessAlertData,
 } from '../shared/types/analytics.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -39,6 +40,9 @@ import { getConfiguredProvider } from './seo-data-provider.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';
 import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { listPageKeywords } from './page-keywords.js';
+import { getLatestSerpSnapshots } from './serp-snapshots-store.js';
+import { listTrackedKeywordRows } from './tracked-keywords-store.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 import { normalizePageUrl as normalizePagePath, toInsightPageId } from './helpers.js';
@@ -725,6 +729,75 @@ export function computeRankingMovers(
     const bI = Math.abs(b.data.positionChange) * b.data.impressions;
     return bI - aI;
   }).slice(0, 30);
+}
+
+// ── SERP Feature Opportunities (P6, national-serp-tracking) ──────────
+
+/**
+ * Rough fraction of a keyword's monthly search volume realized as feature
+ * captures (AI-Overview citations / featured-snippet clicks) once the client
+ * owns the feature. A single sane heuristic — not a calibrated model.
+ */
+const SERP_FEATURE_CITATION_RATE = 0.15;
+
+/**
+ * From the latest national-SERP snapshots, flag tracked keywords whose live SERP
+ * shows a high-value feature (AI Overview present-but-not-cited, OR a featured
+ * snippet) that the client ranks for but is NOT capturing.
+ *
+ * Fires ONLY when the snapshot has BOTH a matched (ranking) URL AND a position —
+ * the "doesn't rank at all" case stays owned by existing insight types. pageId is
+ * the real matchedUrl (never null) so enrichment resolves the page. severity is
+ * always 'opportunity'.
+ *
+ * NO-OP (returns []) when the national-serp-tracking flag is OFF, so OFF is
+ * byte-identical to the pre-P6 cycle.
+ */
+export function computeSerpFeatureOpportunities(
+  workspaceId: string,
+): Array<{ insightType: 'serp_feature_opportunity'; pageId: string; data: SerpFeatureOpportunityData; severity: InsightSeverity }> {
+  // Flag-gated server-side: OFF → no-op (byte-identical to pre-P6).
+  if (!isFeatureEnabled('national-serp-tracking', workspaceId)) return [];
+
+  const snapshots = getLatestSerpSnapshots(workspaceId);
+  if (snapshots.length === 0) return [];
+
+  // volume lookup by normalized keyword (snapshot.query is already normalized at write).
+  const volumeMap = new Map<string, number>();
+  for (const kw of listTrackedKeywordRows(workspaceId)) {
+    volumeMap.set(keywordComparisonKey(kw.query), kw.volume ?? 0);
+  }
+
+  const results: Array<{ insightType: 'serp_feature_opportunity'; pageId: string; data: SerpFeatureOpportunityData; severity: InsightSeverity }> = [];
+
+  for (const snap of snapshots) {
+    // Requires a real ranking URL + position — "doesn't rank" stays owned elsewhere.
+    if (!snap.matchedUrl || snap.position == null) continue;
+
+    // High-value feature present-but-uncaptured: AI Overview not citing us, OR a featured snippet.
+    const aiOverviewOpportunity = snap.aiOverviewPresent === true && snap.aiOverviewCited === false;
+    const hasFeaturedSnippet = snap.features.includes('featured_snippet');
+    if (!aiOverviewOpportunity && !hasFeaturedSnippet) continue;
+
+    const volume = volumeMap.get(keywordComparisonKey(snap.query)) ?? 0;
+    results.push({
+      insightType: 'serp_feature_opportunity' as const,
+      pageId: snap.matchedUrl, // real URL → enrichment works; never null on this multi-row type
+      data: {
+        keyword: snap.query,
+        matchedUrl: snap.matchedUrl,
+        currentPosition: snap.position,
+        presentFeatures: snap.features,
+        aiOverviewPresent: snap.aiOverviewPresent === true,
+        aiOverviewCited: !!snap.aiOverviewCited,
+        estimatedMonthlyCitations: Math.round(volume * SERP_FEATURE_CITATION_RATE),
+      },
+      severity: 'opportunity',
+    });
+  }
+
+  // Highest estimated upside first.
+  return results.sort((a, b) => b.data.estimatedMonthlyCitations - a.data.estimatedMonthlyCitations);
 }
 
 // ── CTR Opportunities ────────────────────────────────────────────
@@ -1430,6 +1503,27 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
   // Always prune stale serp_opportunity rows — outside GSC-data guard so cleanup runs when GSC is disconnected
   deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
+
+  // P6: serp_feature_opportunity — flag-gated (no-op when national-serp-tracking is OFF).
+  // Reads the latest national-SERP snapshots; the compute itself enforces the flag guard.
+  {
+    const serpFeatureOpps = computeSerpFeatureOpportunities(workspaceId);
+    for (const insight of serpFeatureOpps) {
+      enrichAndUpsert({
+        insightType: 'serp_feature_opportunity',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    if (serpFeatureOpps.length > 0) {
+      log.info({ workspaceId, count: serpFeatureOpps.length }, 'Computed SERP feature opportunities');
+    }
+  }
+  // Always prune stale serp_feature_opportunity rows — outside the snapshot/flag guard so
+  // disconnecting the SERP provider (or turning the flag OFF) cleans up old insights instead
+  // of orphaning them.
+  deleteStaleInsightsByType(workspaceId, 'serp_feature_opportunity', cycleStart);
 
   // Phase 5: Emerging keyword detection (SEMRush trend analysis)
   if (ws.liveDomain) {

@@ -81,6 +81,7 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'ctr_opportunity',
     'ranking_opportunity',
     'serp_opportunity',
+    'serp_feature_opportunity',
     'cannibalization',
     'emerging_keyword',
     'competitor_alert',
