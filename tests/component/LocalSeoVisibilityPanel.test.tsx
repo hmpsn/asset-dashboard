@@ -49,6 +49,10 @@ vi.mock('../../src/hooks/admin', () => ({
     isLoading: false,
     isError: false,
   }),
+  // P7 (local-gbp): GbpReviewsPanel mounts inside this panel. Return the empty readout so it
+  // self-renders nothing here (its own behavior is covered by GbpReviewsPanel.test.tsx).
+  useGbpReviews: () => ({ data: { owned: null, competitors: [], completenessScore: null } }),
+  useLocalGbpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({

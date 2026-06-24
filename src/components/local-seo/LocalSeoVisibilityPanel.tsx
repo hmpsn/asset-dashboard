@@ -7,6 +7,7 @@ import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { useRankTrackingAddKeyword } from '../../hooks/admin/useKeywordCommandCenter';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn } from '../ui';
+import { GbpReviewsPanel } from './GbpReviewsPanel';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 import { LocalSeoVisibilityTrend } from './LocalSeoVisibilityTrend';
 
@@ -444,6 +445,10 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
         trackingErrors={trackingErrors}
       />
     )}
+    {/* SEO Decision Engine P7 (local-gbp): GBP + reviews readout. Self-gates on data presence
+        (server returns an empty payload when the flag is off), so this renders nothing until a
+        GBP refresh has captured listings. */}
+    {mode === 'keywords' && <GbpReviewsPanel workspaceId={workspaceId} />}
     </>
   );
 }

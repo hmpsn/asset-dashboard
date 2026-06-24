@@ -635,6 +635,22 @@ export interface LocalSeoSlice {
     winsAgainstClient: number;
     markets: ReadonlyArray<string>;
   }>;
+  /** SEO Decision Engine P7 (GBP + reviews) — aggregates-only review/GBP summary for the
+   *  workspace's OWN listing plus the single strongest local competitor (by review count).
+   *  AGGREGATES ONLY — never individual reviews or authors. Undefined when there is neither an
+   *  owned listing nor any competitor listing data (so flag-off / no-data = no change). */
+  reviewSummary?: {
+    /** Star rating of the client's own listing; undefined = no reviews yet (NEVER 0). */
+    ownRating?: number;
+    /** Review count of the client's own listing; undefined = no reviews yet (NEVER 0). */
+    ownReviewCount?: number;
+    /** 0..100 GBP completeness signal for the owned listing (deriveGbpCompletenessScore). */
+    completenessScore?: number;
+    /** Whether the owned listing is claimed; undefined when unknown. */
+    claimed?: boolean;
+    /** Strongest local competitor by review count (non-owned). */
+    topCompetitor?: { name: string; rating?: number; reviewCount?: number };
+  };
   /** Pre-formatted prompt block — stratified-sampled internally. Inject directly into prompts. */
   effectiveLocalSeoBlock: string;
   /** ISO timestamp of the latest visibility snapshot reflected here. */

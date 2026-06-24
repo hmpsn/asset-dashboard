@@ -34,6 +34,7 @@ export const BACKGROUND_JOB_TYPES = {
   CONTENT_POST_VOICE_SCORE: 'content-post-voice-score',
   INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
   NATIONAL_SERP_REFRESH: 'national-serp-refresh',
+  LOCAL_GBP_REFRESH: 'local-gbp-refresh',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -284,6 +285,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
   [BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH]: {
     label: 'Refreshing national SERP ranks',
     description: 'Reads national advanced-SERP rank + AI-Overview citation for tracked keywords.',
+    cancellable: true,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH]: {
+    label: 'Refreshing GBP + reviews',
+    description: 'Reads Google Business Profile health + review counts for the client and local competitors.',
     cancellable: true,
     resultBehavior: 'domain-store',
   },

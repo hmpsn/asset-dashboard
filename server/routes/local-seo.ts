@@ -29,8 +29,13 @@ import {
   updateLocalSeoConfiguration,
 } from '../local-seo.js';
 import { enqueueLocationBackfill } from '../local-seo-location-backfill-queue.js';
+import { runLocalGbpRefreshJob } from '../local-gbp.js';
+import { getLatestBusinessListings, getLatestOwnedListing } from '../business-listings-store.js';
+import { deriveGbpCompletenessScore } from '../listing-rating.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
 import { validate, z } from '../middleware/validate.js';
-import { getWorkspace } from '../workspaces.js';
+import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
@@ -254,6 +259,105 @@ router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('works
       status: 'error',
       error: err instanceof Error ? err.message : String(err),
       message: 'Local SEO refresh failed unexpectedly',
+    });
+  });
+});
+
+// Admin readout for the GBP + reviews data (SEO Decision Engine P7 / local-gbp). Aggregates
+// ONLY — own rating/review-count + top competitors by review count + the derived GBP completeness
+// score. Never returns per-review/author data (the store holds none; keep it that way — PII rule).
+// When the flag is off, returns an empty payload (not 404) so the panel simply renders nothing.
+// `requireWorkspaceAccess` only (HMAC admin auth is covered by the global app gate — no requireAuth).
+router.get('/api/local-seo/:workspaceId/gbp-reviews', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  if (!isFeatureEnabled('local-gbp', workspaceId)) {
+    return res.json({ owned: null, competitors: [], completenessScore: null });
+  }
+
+  const owned = getLatestOwnedListing(workspaceId) ?? null;
+  const competitors = getLatestBusinessListings(workspaceId)
+    .filter(listing => !listing.isOwned)
+    .sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0))
+    .slice(0, 5);
+
+  const completenessScore = owned
+    ? deriveGbpCompletenessScore({
+        claimed: owned.claimed,
+        totalPhotos: owned.totalPhotos,
+        attributeCount: owned.attributes.length,
+        category: owned.category,
+      })
+    : null;
+
+  res.json({ owned, competitors, completenessScore });
+});
+
+// Trigger a GBP + reviews refresh (SEO Decision Engine P7 / local-gbp). Manual-trigger
+// for P7 (no cron in this unit). Gating order mirrors the P6 national-SERP refresh:
+// feature flag → workspace → tier (Growth+) → observe-only budget gate → per-workspace +
+// global job serialization. Fire-and-forget. `requireWorkspaceAccess` only (HMAC admin
+// auth is covered by the global app gate — never add requireAuth here).
+router.post('/api/local-seo/:workspaceId/refresh-gbp', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  // Flag gate — when off, the route does no work and returns a clean "not enabled" 404.
+  if (!isFeatureEnabled('local-gbp', workspaceId)) {
+    return res.status(404).json({ error: 'GBP + reviews tracking is not enabled' });
+  }
+
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // Tier gate — Growth + Premium only (owner decision); Free is excluded.
+  const tier = computeEffectiveTier(ws);
+  if (tier !== 'growth' && tier !== 'premium') {
+    return res.status(403).json({ error: 'GBP + reviews tracking requires a Growth or Premium plan' });
+  }
+
+  // P5 budget gate at route entry — observe-only at launch (logs the would-block, returns).
+  // Wrapped so that if enforcement is later enabled, an over-budget workspace is logged and
+  // the refresh still proceeds (enforcement posture for this route is observe-only by decision).
+  try {
+    assertCreditBudget(workspaceId, 'business_listings', tier);
+  } catch (err) {
+    if (err instanceof CreditBudgetError) {
+      log.warn({ workspaceId, tier }, 'local-gbp refresh: credit budget would-block at route entry (proceeding — observe-only)');
+    } else {
+      throw err;
+    }
+  }
+
+  // Per-workspace serialization.
+  const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, workspaceId);
+  if (active) return res.status(409).json({ error: 'A GBP + reviews refresh is already running for this workspace', jobId: active.id });
+
+  // Global cross-workspace coalescing — each refresh holds business-listings responses in
+  // memory; on memory-constrained hosts concurrent refreshes from different workspaces stack
+  // and OOM the process. Serialize globally: only one GBP refresh runs at a time platform-wide.
+  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH);
+  if (globalActive) {
+    return res.status(409).json({
+      error: 'Another workspace is currently running a GBP + reviews refresh — please wait for it to complete',
+      jobId: globalActive.id,
+      blockingWorkspaceId: globalActive.workspaceId,
+    });
+  }
+
+  const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, {
+    workspaceId,
+    message: 'Preparing GBP + reviews refresh...',
+  });
+  registerAbort(job.id);
+  res.json({ jobId: job.id });
+  // .catch() (not void) so any unexpected throw becomes a logged error + failed job rather than
+  // an unhandled rejection that crashes the process.
+  runLocalGbpRefreshJob(workspaceId, job.id).catch(err => {
+    log.error({ err, jobId: job.id, workspaceId }, 'local-gbp refresh: unhandled error escaped job runner — marking failed');
+    updateJob(job.id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : String(err),
+      message: 'GBP + reviews refresh failed unexpectedly',
     });
   });
 });

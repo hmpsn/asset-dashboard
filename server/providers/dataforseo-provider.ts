@@ -38,10 +38,14 @@ import type {
   ReferringDomain,
   NationalSerpProviderRequest,
   NationalSerpResult,
+  BusinessListingResult,
+  BusinessListingsRequest,
+  GbpAttributes,
 } from '../seo-data-provider.js';
 import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
+import { parseListingRating, deriveGbpCompletenessScore } from '../listing-rating.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -199,6 +203,7 @@ const CACHE_TTL_COMPETITORS = 336;     // 14 days
 const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
 const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
 const CACHE_TTL_NATIONAL_SERP = 168;    // 7 days (P6 national-serp-tracking)
+const CACHE_TTL_BUSINESS_LISTINGS = 24; // 1 day (P7 local-gbp — GBP + reviews)
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -569,6 +574,111 @@ export function parseNationalSerp(items: unknown[], ownerDomain: string, query: 
   return { query, position, matchedUrl, features, aiOverviewPresent, aiOverviewCited };
 }
 
+// ── Business listings parser (P7 / local-gbp — GBP + reviews) ──
+// Pure, fixture-grounded parser for `business_data/business_listings_search` items.
+// Built against `tests/fixtures/dataforseo-business-listings.ts` — field names validated,
+// not guessed. Defensive against malformed items: never throws, skips non-objects.
+
+/** Flatten `attributes.available_attributes` ({ group: string[] }) into a deduped key list. */
+function flattenGbpAttributes(attributes: unknown): string[] {
+  if (typeof attributes !== 'object' || attributes === null) return [];
+  const available = (attributes as Record<string, unknown>).available_attributes;
+  if (typeof available !== 'object' || available === null) return [];
+  const items: string[] = [];
+  const seen = new Set<string>();
+  for (const group of Object.values(available as Record<string, unknown>)) {
+    if (!Array.isArray(group)) continue;
+    for (const key of group) {
+      if (typeof key === 'string' && key.trim() && !seen.has(key)) {
+        seen.add(key);
+        items.push(key);
+      }
+    }
+  }
+  return items;
+}
+
+/** A valid rating_distribution is a plain object whose 1..5 keys are all numbers. */
+function parseRatingDistribution(raw: unknown): Record<'1' | '2' | '3' | '4' | '5', number> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const keys = ['1', '2', '3', '4', '5'] as const;
+  const out = {} as Record<'1' | '2' | '3' | '4' | '5', number>;
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Parse a `business_listings_search` `items[]` array into `BusinessListingResult[]` relative to
+ * the request owner. Per item:
+ *  - rating/reviewCount via `parseListingRating` (undefined = no reviews, NEVER 0).
+ *  - attributes flattened from `attributes.available_attributes` + an equal-weight completeness score.
+ *  - claimed: derived from a claimed-ish signal (presence of url/domain). Unknowable → undefined.
+ *  - isOwned: `request.ownerPlaceIds` includes place_id OR cid, else domain matches ownerDomain.
+ */
+export function parseBusinessListings(items: unknown[], request: BusinessListingsRequest): BusinessListingResult[] {
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+
+  const ownerPlaceIds = new Set((request.ownerPlaceIds ?? []).filter(id => typeof id === 'string' && id.trim()));
+
+  const results: BusinessListingResult[] = [];
+  for (const item of safeItems) {
+    const title = stringFromUnknown(item.title) ?? stringFromUnknown(item.name);
+    if (!title) continue;
+
+    const placeId = stringFromUnknown(item.place_id) ?? '';
+    const cid = stringFromUnknown(item.cid);
+    const domain = stringFromUnknown(item.domain) ?? (stringFromUnknown(item.url) ? cleanDomain(stringFromUnknown(item.url)!) : undefined);
+    const category = stringFromUnknown(item.category);
+    const addressInfo = (typeof item.address_info === 'object' && item.address_info !== null)
+      ? item.address_info as Record<string, unknown>
+      : undefined;
+    const city = stringFromUnknown(addressInfo?.city);
+
+    const { rating, reviewCount } = parseListingRating(item.rating);
+    const ratingDistribution = parseRatingDistribution(item.rating_distribution);
+
+    const attributeItems = flattenGbpAttributes(item.attributes);
+    const totalPhotos = numberFromUnknown(item.total_photos);
+    // No explicit boolean claimed field in the response; presence of a url/domain is the
+    // best available claimed-ish signal. Absent both → unknowable → undefined.
+    const claimed: boolean | undefined = domain ? true : undefined;
+    const completenessScore = deriveGbpCompletenessScore({
+      claimed,
+      totalPhotos,
+      attributeCount: attributeItems.length,
+      category,
+    });
+    const attributes: GbpAttributes = { items: attributeItems, completenessScore };
+
+    const ownedByPlace = (placeId && ownerPlaceIds.has(placeId)) || (cid !== undefined && ownerPlaceIds.has(cid));
+    const isOwned = ownedByPlace || domainMatches(domain, request.ownerDomain);
+
+    results.push({
+      title,
+      placeId,
+      cid,
+      domain,
+      category,
+      city,
+      rating,
+      reviewCount,
+      ratingDistribution,
+      attributes,
+      totalPhotos,
+      claimed,
+      isOwned,
+    });
+  }
+  return results;
+}
+
 async function runDataForSeoOperation<T>({
   workspaceId,
   cacheKey,
@@ -780,6 +890,10 @@ function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: 
   let domain = stringFromUnknown(item.domain);
   if (!domain && url) domain = cleanDomain(url);
   const address = stringFromUnknown(item.address) ?? stringFromUnknown(item.description);
+  // P7 free half (local-gbp, unflagged): the local_pack item already carries
+  // rating.value / rating.votes_count — extract them via the shared parser (undefined,
+  // never 0, when a business has no reviews). Zero new endpoint cost.
+  const { rating, reviewCount } = parseListingRating(item.rating);
   return {
     title,
     rank: numberFromUnknown(item.rank_group) ?? numberFromUnknown(item.rank_absolute) ?? fallbackRank,
@@ -788,6 +902,8 @@ function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: 
     phone: stringFromUnknown(item.phone),
     address,
     cid: stringFromUnknown(item.cid) ?? stringFromUnknown(item.place_id),
+    rating,
+    reviewCount,
   };
 }
 
@@ -814,6 +930,16 @@ function extractLocalPackItems(result: Record<string, unknown>): LocalVisibility
     if (single) results.push(single);
   }
   return results;
+}
+
+/**
+ * TEST-ONLY: parse a raw `local_pack` SERP result envelope (the `{ items: [...] }` shape from
+ * `serp/google/organic/live/advanced`) into normalized business results. Exposes the otherwise
+ * private `extractLocalPackItems` path so the U3 free rating extraction can be unit-tested
+ * against the ground-truth fixture without spinning up the full provider/network stack.
+ */
+export function __testParseLocalPackResult(result: Record<string, unknown>): LocalVisibilityBusinessResult[] {
+  return extractLocalPackItems(result);
 }
 
 function localVisibilityLocationIdentity(market: LocalVisibilityProviderRequest['market']): string {
@@ -1815,6 +1941,59 @@ export class DataForSeoProvider implements SeoDataProvider {
       handleError: (err) => {
         log.error({ err, keyword, ownerDomain }, `DataForSEO national SERP error for "${keyword}"`);
         return emptyResult;
+      },
+    });
+  }
+
+  // ── getBusinessListings → business_data/business_listings_search (P7 local-gbp) ──
+  async getBusinessListings(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]> {
+    const category = request.category?.trim() || undefined;
+    const title = request.title?.trim() || undefined;
+    const limit = request.limit ?? 20;
+    // At least one search axis is required by the endpoint. Category = competitor landscape;
+    // title = the client's own listing (often too few reviews to surface in a category search).
+    if (!category && !title) return [];
+    const cacheKey = [
+      'business_listings',
+      cacheKeyPart(category ?? ''),
+      cacheKeyPart(title ?? ''),
+      cacheKeyPart(request.locationCoordinate),
+      cacheKeyPart(cleanDomain(request.ownerDomain)),
+      limit,
+    ].join('_');
+
+    return runDataForSeoOperation<BusinessListingResult[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_BUSINESS_LISTINGS,
+      endpointLabel: 'business_listings_search',
+      query: category ?? title ?? '',
+      emptyValue: [],
+      endpoint: 'business_data/business_listings_search',
+      body: [{
+        ...(category ? { categories: [category] } : {}),
+        ...(title ? { title } : {}),
+        location_coordinate: request.locationCoordinate,
+        order_by: ['rating.votes_count,desc'],
+        limit,
+      }],
+      mapResult: (json) => {
+        const items = Array.isArray(getTaskResult(json)[0]?.items)
+          ? (getTaskResult(json)[0]!.items as unknown[])
+          : [];
+        const value = parseBusinessListings(items, request);
+        return { value, rowsReturned: value.length };
+      },
+      handleError: (err) => {
+        // 40204 (no business_data subscription): trip the capability breaker like backlinks
+        // so we stop burning the request budget on an unsubscribed endpoint.
+        if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'business_listings', BACKLINKS_BREAKER_TTL_MS);
+          log.warn({ err, category }, `DataForSEO business listings unavailable for "${category}"`);
+          return [];
+        }
+        log.error({ err, category }, `DataForSEO business listings error for "${category}"`);
+        return [];
       },
     });
   }

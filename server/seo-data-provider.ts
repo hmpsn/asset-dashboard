@@ -134,6 +134,53 @@ export interface NationalSerpResult {
   aiOverviewCited: boolean | null;
 }
 
+// ── Business listings / GBP + reviews (P7 / local-gbp) ────────
+// Built against the ground-truth fixture `tests/fixtures/dataforseo-business-listings.ts`.
+// Gotcha: a zero-review business has NO rating value/votes_count (absent, not 0) → undefined.
+
+export interface GbpAttributes {
+  /** Flattened completeness attribute keys (e.g. 'has_wheelchair_accessible_entrance', 'recommends_appointment'). */
+  items: string[];
+  /** 0..100 derived completeness signal (presence of hours/photos/attributes/claimed). */
+  completenessScore: number;
+}
+
+export interface BusinessListingResult {
+  title: string;
+  placeId: string;
+  cid?: string;
+  domain?: string;
+  category?: string;
+  city?: string;
+  /** Star rating; undefined = no reviews (NEVER 0). */
+  rating?: number;
+  /** Review count; undefined = no reviews (NEVER 0). */
+  reviewCount?: number;
+  ratingDistribution?: Record<'1' | '2' | '3' | '4' | '5', number>;
+  attributes?: GbpAttributes;
+  totalPhotos?: number;
+  claimed?: boolean;
+  /** True when this listing matches the client (place_id/cid → client_locations, else domain). */
+  isOwned: boolean;
+}
+
+export interface BusinessListingsRequest {
+  /** Category search (competitor landscape, sorted by review count). Omit when doing a pure title lookup. */
+  category?: string;
+  /**
+   * Business-name search. Used to find the CLIENT's OWN listing directly — the owner often has too
+   * few reviews to surface in a review-count-sorted category search (that IS the review-gap case),
+   * so the job looks them up by name. At least one of `category`/`title` must be set.
+   */
+  title?: string;
+  /** "lat,lng,radiusKm" per DataForSEO location_coordinate. */
+  locationCoordinate: string;
+  ownerDomain: string;
+  /** client_locations.gbp_place_id values for isOwned matching (place_id/cid). */
+  ownerPlaceIds?: string[];
+  limit?: number;
+}
+
 // ── Provider Interface ────────────────────────────────────────
 
 export interface SeoDataProvider {
@@ -186,6 +233,9 @@ export interface SeoDataProvider {
   // National SERP rank + features (P6 / national-serp-tracking). Optional: providers without
   // advanced-SERP support omit it; callers must feature-detect before calling.
   getNationalSerp?(request: NationalSerpProviderRequest, workspaceId: string): Promise<NationalSerpResult>;
+
+  // GBP + reviews business listings (P7 / local-gbp). Optional: feature-detect before calling.
+  getBusinessListings?(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]>;
 }
 
 // ── Provider Registry ─────────────────────────────────────────

@@ -61,6 +61,13 @@ export const FEATURE_FLAGS = {
   // OFF = no national-SERP fetch, no new UI, no insight (byte-identical to today).
   'national-serp-tracking': false,
 
+  // SEO Decision Engine P7: local-gbp — gates the PAID half of the GBP + reviews local layer:
+  // business_listings_search fetch, the local-gbp-refresh job/route, business_listing_snapshots,
+  // the GBP/reviews admin panel, and the review-gap / GBP-completeness recommendations. Growth+
+  // only; budget observe-only. OFF = byte-identical PAID surface. (The FREE half — local_pack
+  // rating extraction — ships UNFLAGGED, P3 precedent.)
+  'local-gbp': false,
+
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
@@ -347,6 +354,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-24',
     },
   },
+  'local-gbp': {
+    label: 'Local GBP + reviews — profile health + review-gap vs local competitors',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-24',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once business_listings GBP + review snapshots and review-gap/GBP-completeness recommendations are validated on staging and per-workspace cost is acceptable; the flag is then removed and the refresh runs for all Growth+ workspaces.',
+      linkedRoadmapItemId: 'seo-engine-p7-gbp-reviews-local-layer',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-24',
+    },
+  },
   'signal-auto-recompute': {
     label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
     group: 'Strategy',
@@ -597,7 +617,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking'],
+    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp'],
   },
   {
     label: 'Strategy',
