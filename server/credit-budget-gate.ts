@@ -9,7 +9,7 @@ const log = createLogger('credit-budget-gate');
  * Per-tier monthly DataForSEO credit budgets (SEO Decision Engine P5). Premium is
  * unlimited. Tunable in ONE place; these drive the health-card status + the WARN /
  * would-block evaluation. Owner decision (2026-06-24): observe-first launch posture
- * (see {@link BUDGET_ENFORCEMENT_ENABLED}).
+ * (see {@link isBudgetEnforcementEnabled}).
  */
 export const CREDIT_BUDGETS: Record<UsageTier, number> = {
   free: 0,
@@ -60,7 +60,7 @@ export interface CreditBudgetEvaluation {
 }
 
 /**
- * Thrown by {@link assertCreditBudget} ONLY when {@link BUDGET_ENFORCEMENT_ENABLED}
+ * Thrown by {@link assertCreditBudget} ONLY when {@link isBudgetEnforcementEnabled}
  * is on and the workspace is over budget. The stable `code` lets route handlers map
  * to HTTP 429 and background jobs branch on `err.code === 'credit_budget_exceeded'`
  * to set a user-readable `job.message`.
@@ -90,6 +90,35 @@ function resolveTier(workspaceId: string): UsageTier {
 }
 
 /**
+ * Short-lived memo of month-to-date credits so the documented per-paid-fetch gate
+ * path (P6–P8 call assertCreditBudget before each fetch) does not re-scan the whole
+ * credit directory on every call. `getDataForSeoUsage` does a synchronous
+ * readdir+readFile over up to ~31 daily files; this bounds that to once per
+ * workspace+month per TTL window. A few seconds of staleness is acceptable for a soft
+ * cost-governance gate (the disk usage write is itself non-transactional).
+ */
+const MTD_CACHE_TTL_MS = 30_000;
+const mtdCreditsCache = new Map<string, { credits: number; expiresAt: number }>();
+
+function readMtdCredits(workspaceId: string, monthStart: string): number {
+  const key = `${workspaceId}:${monthStart}`;
+  const now = Date.now();
+  const cached = mtdCreditsCache.get(key);
+  if (cached && now < cached.expiresAt) return cached.credits;
+  const { totalCredits } = getDataForSeoUsage(workspaceId, monthStart);
+  mtdCreditsCache.set(key, { credits: totalCredits, expiresAt: now + MTD_CACHE_TTL_MS });
+  return totalCredits;
+}
+
+/** TEST-ONLY: clear the MTD memo so successive evaluations re-read mocked usage. */
+export function __resetCreditBudgetCacheForTesting(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('__resetCreditBudgetCacheForTesting must not be called in production');
+  }
+  mtdCreditsCache.clear();
+}
+
+/**
  * Evaluate a workspace's month-to-date DataForSEO credit budget. Pure read — never
  * throws, never blocks. Powers the DataForSEO health-card quota status, the
  * AIUsageSection budget chip, and {@link assertCreditBudget}. Pass `tier` to override
@@ -98,7 +127,7 @@ function resolveTier(workspaceId: string): UsageTier {
 export function evaluateCreditBudget(workspaceId: string, tier?: UsageTier): CreditBudgetEvaluation {
   const resolvedTier = tier ?? resolveTier(workspaceId);
   const budget = CREDIT_BUDGETS[resolvedTier];
-  const { totalCredits: mtdCredits } = getDataForSeoUsage(workspaceId, monthStartIso());
+  const mtdCredits = readMtdCredits(workspaceId, monthStartIso());
 
   if (budget === Infinity) {
     return { tier: resolvedTier, budget, mtdCredits, remaining: Infinity, status: 'ok', withinBudget: true };
@@ -115,7 +144,7 @@ export function evaluateCreditBudget(workspaceId: string, tier?: UsageTier): Cre
 /**
  * Cross-phase budget gate (P5 contract; P6–P8 call this before each PAID DataForSEO
  * fetch). OBSERVE-ONLY at launch: logs the would-block and returns. When
- * {@link BUDGET_ENFORCEMENT_ENABLED} is on, throws {@link CreditBudgetError} for an
+ * {@link isBudgetEnforcementEnabled} is on, throws {@link CreditBudgetError} for an
  * over-budget workspace.
  *
  * Call this ONLY on the network-call path — cached reads are 0-cost and must not be

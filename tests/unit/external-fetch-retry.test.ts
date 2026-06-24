@@ -117,4 +117,29 @@ describe('external-fetch bounded retry (P5)', () => {
       .rejects.toMatchObject({ status: 503 });
     expect(mocks.fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('each retry composes a FRESH signal: an outer abort mid-retry cancels further attempts', async () => {
+    const controller = new AbortController();
+    let call = 0;
+    // Signal-aware mock: the real fetch rejects with AbortError when its (per-attempt,
+    // freshly composed) signal is already aborted. Attempt 1 returns a retryable 429
+    // AND aborts the outer signal; attempt 2's fresh composed signal must therefore be
+    // aborted → AbortError → classified 'timeout' → NOT retried.
+    mocks.fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      call += 1;
+      if (init?.signal?.aborted) {
+        return Promise.reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      }
+      if (call === 1) {
+        controller.abort();
+        return Promise.resolve(errResponse(429));
+      }
+      return Promise.resolve(okResponse({ shouldNotReach: true }));
+    });
+
+    await expect(fetchProviderJson({ url: URL_UNDER_TEST, signal: controller.signal, retry: FAST_RETRY }))
+      .rejects.toMatchObject({ kind: 'timeout' });
+    // Did NOT run all 3 attempts — the outer abort short-circuited the retry loop.
+    expect(mocks.fetchMock.mock.calls.length).toBeLessThanOrEqual(2);
+  });
 });

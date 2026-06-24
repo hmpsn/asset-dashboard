@@ -258,12 +258,21 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       lastSuccessAt: latestTimestamp(dataforseoUsage.entries),
       lastErrorAt: null,
       lastError: dataforseoProvider?.configured ? null : 'DataForSEO credentials are not configured',
-      quotaStatus: dataforseoBudget?.status ?? 'unknown',
+      // A 0-budget tier (free) renders 'unknown' (neutral), never 'critical' (red): a
+      // post-trial free workspace legitimately has prior-trial same-month spend, which
+      // is not an overage/error — showing red there is a false alarm.
+      quotaStatus: !dataforseoBudget || dataforseoBudget.budget === 0
+        ? 'unknown'
+        : dataforseoBudget.status,
       quotaDetail: !dataforseoProvider?.configured
         ? 'DataForSEO usage unavailable until configured.'
-        : dataforseoBudget && dataforseoBudget.budget !== Infinity
-          ? `${dataforseoBudget.mtdCredits.toFixed(2)} of ${dataforseoBudget.budget} monthly credits used (${dataforseoBudget.tier} tier). ${dataforseoUsage.totalCalls} calls all-time.`
-          : `Credits used this month: ${dataforseoBudget?.mtdCredits.toFixed(2) ?? dataforseoUsage.totalCredits} (Premium — unlimited). ${dataforseoUsage.totalCalls} calls all-time.`,
+        : !dataforseoBudget
+          ? `Credits used: ${dataforseoUsage.totalCredits.toFixed(2)} across ${dataforseoUsage.totalCalls} calls.`
+          : dataforseoBudget.budget === 0
+            ? `DataForSEO is not included in the ${dataforseoBudget.tier} tier. ${dataforseoBudget.mtdCredits.toFixed(2)} credits used this month (e.g. during a prior trial). ${dataforseoUsage.totalCalls} calls all-time.`
+            : dataforseoBudget.budget !== Infinity
+              ? `${dataforseoBudget.mtdCredits.toFixed(2)} of ${dataforseoBudget.budget} monthly credits used (${dataforseoBudget.tier} tier). ${dataforseoUsage.totalCalls} calls all-time.`
+              : `Credits used this month: ${dataforseoBudget.mtdCredits.toFixed(2)} (Premium — unlimited). ${dataforseoUsage.totalCalls} calls all-time.`,
       tokenExpiresAt: null,
       affectedFeatures: ['Keyword strategy', 'SERP research', 'Backlink and domain analysis'],
       notes: dataforseoProvider?.configured ? null : 'Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.',

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const loggerMocks = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }));
+vi.mock('../../server/logger.js', () => ({ createLogger: () => loggerMocks }));
+
 // credit-budget-gate reads month-to-date credits from the provider's usage
 // aggregator. Mock it so we control mtdCredits without touching disk.
 vi.mock('../../server/providers/dataforseo-provider.js', () => ({
@@ -13,6 +16,7 @@ import {
   assertCreditBudget,
   evaluateCreditBudget,
   __setBudgetEnforcementForTesting,
+  __resetCreditBudgetCacheForTesting,
 } from '../../server/credit-budget-gate.js';
 
 const mockUsage = vi.mocked(getDataForSeoUsage);
@@ -25,6 +29,7 @@ describe('credit-budget-gate (P5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __setBudgetEnforcementForTesting(false); // default observe-only
+    __resetCreditBudgetCacheForTesting();    // drop the MTD memo so each test re-reads mocked usage
   });
 
   afterEach(() => {
@@ -76,6 +81,17 @@ describe('credit-budget-gate (P5)', () => {
     it('observe-only (default): never throws even when over budget', () => {
       setMtdCredits(5000); // way over growth
       expect(() => assertCreditBudget('ws-1', 'dataforseo_labs/google/ranked_keywords/live', 'growth')).not.toThrow();
+    });
+
+    it('observe-only over budget: logs the would-block with the operational context fields (no warn)', () => {
+      setMtdCredits(5000);
+      assertCreditBudget('ws-log', 'serp/google/organic/live/advanced', 'growth');
+      expect(loggerMocks.info).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-log', endpoint: 'serp/google/organic/live/advanced', tier: 'growth', mtdCredits: 5000, budget: 2000 }),
+        expect.stringMatching(/would-block/i),
+      );
+      // The enforce-path warn log must NOT fire in observe-only mode.
+      expect(loggerMocks.warn).not.toHaveBeenCalled();
     });
 
     it('enforcement on + over budget: throws CreditBudgetError with stable code', () => {

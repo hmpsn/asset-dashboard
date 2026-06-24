@@ -360,7 +360,9 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
           { keyword: 'some keyword', search_volume: 1000, competition_index: 45, cpc: 0.5, competition: 0.45, monthly_searches: [] },
         ]}] }),
       } as Response)
-      .mockRejectedValueOnce(new Error('KD endpoint unavailable'));
+      // Persistent (not Once): P5 retry makes 3 attempts on the KD network error; a
+      // single Once-reject would let retries fall through to the real global.fetch.
+      .mockRejectedValue(new Error('KD endpoint unavailable'));
 
     const results = await provider.getKeywordMetrics(['some keyword'], 'ws-kd-fallback', 'us');
     expect(results[0].difficulty).toBe(45); // falls back to competition_index
@@ -806,14 +808,18 @@ describe('DataForSeoProvider — keyword discovery endpoints', () => {
   it('returns an empty result when a discovery endpoint fails', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
-    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('provider unavailable'));
+    // Persistent (not Once): P5 retry makes 3 attempts; a single Once-reject would let
+    // the retries fall through to the real global.fetch (live network in a unit test).
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('provider unavailable'));
 
     await expect(provider.getKeywordSuggestions('seo dashboard', 'ws-discovery-failure', 20, 'us')).resolves.toEqual([]);
   });
 });
 
 describe('DataForSeoProvider — getReferringDomains date normalization', () => {
-  afterEach(() => vi.restoreAllMocks());
+  // The backlinks 40204 test below now trips the P5 capability breaker (markCapabilityDisabled);
+  // clear it so the in-memory breaker state can't leak into later describe blocks.
+  afterEach(() => { vi.restoreAllMocks(); clearCapabilityDisabled('dataforseo', 'backlinks'); });
 
   it('normalizes first_seen / last_visited via normalizeProviderDate', async () => {
     reapplyFsMocks();

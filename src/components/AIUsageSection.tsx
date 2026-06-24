@@ -118,6 +118,10 @@ export function AIUsageSection() {
         </div>
       }
     >
+      {/* AI cards + daily cost chart only when there IS AI activity — the section can
+          also be shown for DataForSEO usage alone, where these would read all-zero. */}
+      {hasAiUsage && (
+      <>
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
@@ -173,6 +177,8 @@ export function AIUsageSection() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      </>
+      )}
 
       {/* Feature breakdown */}
       {data.byFeature.length > 0 && (
