@@ -588,12 +588,26 @@ describe('Rule: Retired Keyword Hub feature flag key used in flag API', () => {
     expect(hits[0].line).toBe(2);
   });
 
-  it('allows the surviving Keyword Hub sub-flags', () => {
+  it('flags the retired keyword-value-scoring flag re-added to a flag API', () => {
+    // Build the key via join so this fixture source does not itself trip the rule.
+    const retiredKey = ['keyword', 'value', 'scoring'].join('-');
+    const file = write(
+      uniqPath('rule-retired-keyword-hub-flag', 'value-scoring.ts'),
+      lines(
+        `const c = isFeatureEnabled('${retiredKey}');`,
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('allows the surviving Keyword Hub sub-flag', () => {
     const file = write(
       uniqPath('rule-retired-keyword-hub-flag', 'negative.ts'),
       lines(
         "const a = isFeatureEnabled('keyword-universe-full');",
-        "const b = isFeatureEnabled('keyword-value-scoring');",
       ),
     );
 

@@ -1388,10 +1388,10 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['server/db/migrations/135-retire-keyword-hub-feature-flag.sql'],
     message:
-      'The keyword-hub umbrella flag was retired at the Phase C cutover (2026-06-11). The Hub is the only keyword surface — make the Hub path unconditional instead of using the retired key.',
+      'Retired Keyword Hub rollout flags must not re-enter flag APIs: the keyword-hub umbrella flag (Phase C cutover, 2026-06-11) and keyword-value-scoring (value-first scoring made unconditional, SEO Decision Engine P1, 2026-06-23). Make the canonical Hub path / value-first scoring unconditional instead of using a retired key.',
     severity: 'error',
     rationale:
-      'After the Keyword Hub cutover deleted KCC/Rank Tracker, the keyword-hub flag must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a legacy path that no longer exists.',
+      'After the Keyword Hub cutover deleted KCC/Rank Tracker, and after the keyword-value-scoring flag was retired (value-first scoring is the only path), these flags must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a path that no longer exists.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -1402,7 +1402,7 @@ export const CHECKS: Check[] = [
           ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
         ]))
         : files;
-      const retired = ['keyword-hub'];
+      const retired = ['keyword-hub', 'keyword-value-scoring'];
       const keyPattern = retired.join('|');
       const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
       const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
