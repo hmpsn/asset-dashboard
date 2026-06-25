@@ -6,8 +6,9 @@ import type {
   AiVisibilityTrendPoint,
 } from '../../api/seo';
 import { useAiVisibility, useAiVisibilityRefresh } from '../../hooks/admin/useAiVisibility';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { FeatureFlag } from '../ui/FeatureFlag';
-import { Badge, Button, Icon, MetricRing, SectionCard, StatCard } from '../ui';
+import { Badge, Button, EmptyState, Icon, MetricRing, SectionCard, StatCard } from '../ui';
 import { CHART_SERIES_COLORS, scoreColorClass } from '../ui/constants';
 
 /**
@@ -90,21 +91,11 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
   const { data } = useAiVisibility(workspaceId);
   const refresh = useAiVisibilityRefresh(workspaceId);
 
+  const flagOn = useFeatureFlag('ai-visibility');
   const latest = data?.latest ?? null;
   const trend = data?.trend ?? [];
   const competitors = data?.competitors ?? [];
   const sourceDomains = data?.sourceDomains ?? [];
-
-  // Render nothing until there is a latest snapshot — the server returns an empty payload
-  // (latest: null) when the flag is off, so this also covers the disabled-flag case.
-  if (!latest) return null;
-
-  // shareOfVoice is 0..1 in the store; the headline is a 0–100 SCORE. UNDEFINED/null = "not
-  // measured" (the client's brand wasn't identifiable among co-mentioned brands) — show that
-  // distinctly, NOT a red 0% that reads as broken next to a high mention count (P8 review).
-  const sovMeasured = latest.shareOfVoice != null;
-  const sovScore = Math.round((latest.shareOfVoice ?? 0) * 100);
-  const mentions = latest.mentions ?? 0;
 
   const refreshButton = (
     <FeatureFlag flag="ai-visibility">
@@ -120,6 +111,36 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
       </Button>
     </FeatureFlag>
   );
+
+  // No snapshot yet. With the flag OFF the panel stays hidden (the server also returns an
+  // empty payload then). With the flag ON, render the card with JUST the refresh trigger +
+  // an empty state — otherwise the bootstrap button lives below this return and the feature
+  // could never be kicked off from the UI (chicken-and-egg: no data hides the button that
+  // fetches the first data).
+  if (!latest) {
+    if (!flagOn) return null;
+    return (
+      <SectionCard
+        title="AI visibility"
+        titleExtra={<Badge label="Admin only" tone="zinc" variant="soft" shape="pill" />}
+        action={refreshButton}
+        variant="subtle"
+      >
+        <EmptyState
+          icon={Bot}
+          title="No AI-visibility data yet"
+          description="Run a refresh to capture how often your brand is cited in AI answers."
+        />
+      </SectionCard>
+    );
+  }
+
+  // shareOfVoice is 0..1 in the store; the headline is a 0–100 SCORE. UNDEFINED/null = "not
+  // measured" (the client's brand wasn't identifiable among co-mentioned brands) — show that
+  // distinctly, NOT a red 0% that reads as broken next to a high mention count (P8 review).
+  const sovMeasured = latest.shareOfVoice != null;
+  const sovScore = Math.round((latest.shareOfVoice ?? 0) * 100);
+  const mentions = latest.mentions ?? 0;
 
   return (
     <SectionCard

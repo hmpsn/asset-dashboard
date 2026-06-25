@@ -1,6 +1,7 @@
 import { MapPin, RefreshCw, Star } from 'lucide-react';
 import type { GbpListingAggregate } from '../../api/localSeo';
 import { useGbpReviews, useLocalGbpRefresh } from '../../hooks/admin';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { FeatureFlag } from '../ui/FeatureFlag';
 import { Badge, Button, EmptyState, Icon, SectionCard } from '../ui';
 import { scoreColorClass } from '../ui/constants';
@@ -71,14 +72,11 @@ export function GbpReviewsPanel({ workspaceId }: { workspaceId: string }) {
   const { data } = useGbpReviews(workspaceId);
   const refresh = useLocalGbpRefresh(workspaceId);
 
+  const flagOn = useFeatureFlag('local-gbp');
   const owned = data?.owned ?? null;
   const competitors = data?.competitors ?? [];
   const completenessScore = data?.completenessScore ?? null;
   const topCompetitor = competitors[0];
-
-  // Render nothing until there is at least an owned listing or a competitor — the server returns
-  // an empty payload when the flag is off, so this also covers the disabled-flag case.
-  if (!owned && competitors.length === 0) return null;
 
   const refreshButton = (
     <FeatureFlag flag="local-gbp">
@@ -94,6 +92,28 @@ export function GbpReviewsPanel({ workspaceId }: { workspaceId: string }) {
       </Button>
     </FeatureFlag>
   );
+
+  // No listings captured yet. With the flag OFF the panel stays hidden (the server also
+  // returns an empty payload then). With the flag ON, render the card with JUST the refresh
+  // trigger + an empty state — otherwise the bootstrap button lives below this return and the
+  // first GBP refresh could never be kicked off from the UI (chicken-and-egg).
+  if (!owned && competitors.length === 0) {
+    if (!flagOn) return null;
+    return (
+      <SectionCard
+        title="Reviews vs competitors"
+        titleExtra={<Badge label="Admin only" tone="zinc" variant="soft" shape="pill" />}
+        action={refreshButton}
+        variant="subtle"
+      >
+        <EmptyState
+          icon={MapPin}
+          title="No GBP data yet"
+          description="Run a GBP + reviews refresh to capture your Google Business Profile and competitor listings."
+        />
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard

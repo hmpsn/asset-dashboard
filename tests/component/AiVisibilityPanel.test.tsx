@@ -4,10 +4,12 @@ import { AiVisibilityPanel } from '../../src/components/strategy/AiVisibilityPan
 import type { AiVisibilityReadResponse } from '../../src/api/seo';
 
 // Flag-CI gotcha: AiVisibilityPanel renders <FeatureFlag flag="ai-visibility"> for the refresh
-// button, which calls useFeatureFlag — mock it so no QueryClientProvider / network is needed. ON
-// here so the refresh trigger renders when data is present.
+// button AND reads useFeatureFlag directly to decide whether to show the bootstrap (empty) card —
+// mock it so no QueryClientProvider / network is needed. `flagEnabled` is mutable so a test can
+// flip the flag off; the factory reads it at call time. Defaults ON (reset in beforeEach).
+let flagEnabled = true;
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: () => true,
+  useFeatureFlag: () => flagEnabled,
 }));
 
 const refreshMutate = vi.fn();
@@ -20,6 +22,7 @@ vi.mock('../../src/hooks/admin/useAiVisibility', () => ({
 
 beforeEach(() => {
   aiVisibilityData = undefined;
+  flagEnabled = true;
   refreshMutate.mockClear();
 });
 
@@ -70,11 +73,24 @@ describe('AiVisibilityPanel', () => {
     expect(refreshMutate).toHaveBeenCalledTimes(1);
   });
 
-  it('renders nothing when there is no latest snapshot', () => {
+  it('renders the bootstrap refresh button (not nothing) when the flag is ON but no snapshot yet', () => {
+    // Chicken-and-egg guard: with the flag on and no snapshot, the panel must still surface the
+    // "Refresh AI visibility" trigger so the very first refresh can be kicked off from the UI.
+    aiVisibilityData = { latest: null, trend: [], competitors: [], sourceDomains: [] };
+    render(<AiVisibilityPanel workspaceId="ws-1" />);
+    expect(screen.getByText(/No AI-visibility data yet/)).toBeTruthy();
+    const refreshBtn = screen.getByRole('button', { name: /Refresh AI visibility/ });
+    fireEvent.click(refreshBtn);
+    expect(refreshMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders nothing when the flag is OFF and there is no snapshot', () => {
+    flagEnabled = false;
     aiVisibilityData = { latest: null, trend: [], competitors: [], sourceDomains: [] };
     const { container } = render(<AiVisibilityPanel workspaceId="ws-1" />);
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText(/AI visibility/)).toBeNull();
+    expect(screen.queryByText(/No AI-visibility data yet/)).toBeNull();
   });
 
   it('shows "not measured" (not a 0%) when share-of-voice is undefined but mentions exist', () => {
