@@ -19,10 +19,17 @@ import {
 import type { RoadmapData } from '../../shared/types/roadmap.js';
 
 const ROADMAP_PATH = path.resolve(process.cwd(), 'data/roadmap.json');
+const ROADMAP_ARCHIVE_PATH = path.resolve(process.cwd(), 'data/roadmap.archive.json');
 
+// Shipped roadmap items move to roadmap.archive.json; a flag's linkedRoadmapItemId still
+// references its archived item until the flag is retired, so resolve links against BOTH
+// files (mirrors the archive-aware merge in feature-flag-lifecycle.ts main()).
 function loadRoadmap(): RoadmapData {
-  const raw = fs.readFileSync(ROADMAP_PATH, 'utf8');
-  return JSON.parse(raw) as RoadmapData;
+  const roadmap = JSON.parse(fs.readFileSync(ROADMAP_PATH, 'utf8')) as RoadmapData;
+  const archivedSprints = fs.existsSync(ROADMAP_ARCHIVE_PATH)
+    ? ((JSON.parse(fs.readFileSync(ROADMAP_ARCHIVE_PATH, 'utf8')) as RoadmapData).sprints ?? [])
+    : [];
+  return { sprints: [...roadmap.sprints, ...archivedSprints] };
 }
 
 describe('feature-flag lifecycle audit', () => {
