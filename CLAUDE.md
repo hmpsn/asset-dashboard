@@ -144,7 +144,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **Build mirror:** `public/tokens.css` is copied from `src/tokens.css` by `copyTokensPlugin()` in `vite.config.ts` at build time.
 - **Typography utilities:** 14 `.t-*` classes (`.t-hero`, `.t-h1`, `.t-h2`, `.t-stat-lg`, `.t-stat`, `.t-stat-sm`, `.t-page`, `.t-body`, `.t-ui`, `.t-label`, `.t-caption`, `.t-caption-sm`, `.t-mono`, `.t-micro`) defined in `src/index.css` and available globally.
 - **Visual source of truth:** `/styleguide` React route (or `/styleguide.html` static) demos all tokens + primitives.
-- **Verification:** `npx tsx scripts/verify-styleguide-parity.ts` asserts zero token duplication between `src/index.css` and `src/tokens.css`.
+- **Verification:** `npm run pr-check` enforces `styleguide-token-parity`, `styleguide-typography-parity`, `styleguide-css-must-import-public-tokens`, and `src-index-css-no-token-declarations`.
 - **Z-index scale (never use raw z-index values):** `--z-sticky: 10`, `--z-dropdown: 20`, `--z-tooltip: 30`, `--z-modal-backdrop: 40`, `--z-modal: 50`, `--z-modal-fullscreen: 55` (full-screen takeover modals above chat widget), `--z-toast: 60`. All defined in `src/tokens.css`.
 - **Token categories in `src/tokens.css`:** Surface, Text, Brand colors, Border, Shadows/overlays, Scrollbar, Border-radius, Icon sizes, Zinc scale, Accent hues, Chart, Z-index, Annotation colors.
 

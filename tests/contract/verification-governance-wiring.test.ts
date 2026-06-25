@@ -1,0 +1,73 @@
+import { readFileSync } from 'node:fs';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  buildVerificationGovernanceReport,
+  VERIFICATION_GOVERNANCE_REGISTRY,
+  type PackageJsonLike,
+} from '../../scripts/report-verification-governance.js';
+
+function readText(path: string): string {
+  return readFileSync(path, 'utf8'); // readFile-ok — governance contract: checks CI/docs/config wiring for verify scripts and deleted verifier references.
+}
+
+describe('verification governance wiring', () => {
+  it('classifies every package verify script and wires blocking checks into CI', () => {
+    const packageJson = JSON.parse(readText('package.json')) as PackageJsonLike;
+    const ci = readText('.github/workflows/ci.yml');
+    const activeDocs = [
+      'CLAUDE.md',
+      'docs/rules/design-system-enforcement.md',
+      'docs/rules/verification-governance.md',
+      'docs/testing/coverage-ratchet-ci.md',
+      'scripts/pr-check.ts',
+      'vite.config.ts',
+    ].map(path => ({ path, source: readText(path) }));
+
+    const report = buildVerificationGovernanceReport(
+      packageJson,
+      [{ path: '.github/workflows/ci.yml', source: ci }],
+      activeDocs,
+      VERIFICATION_GOVERNANCE_REGISTRY,
+    );
+
+    expect(report.pass).toBe(true);
+    expect(report.unclassifiedScripts).toEqual([]);
+    expect(report.missingPrCiScripts).toEqual([]);
+    expect(report.missingPushCiScripts).toEqual([]);
+    expect(report.secretBackedBlockingScripts).toEqual([]);
+    expect(report.deletedReferenceMatches).toEqual([]);
+  });
+
+  it('keeps verify:feature-flags and verify:governance in PR quality CI', () => {
+    const ci = readText('.github/workflows/ci.yml');
+
+    expect(ci).toContain('npm run verify:feature-flags');
+    expect(ci).toContain('npm run verify:governance');
+  });
+
+  it('keeps the deleted styleguide parity script out of active docs/tooling references', () => {
+    const activeFiles = [
+      'CLAUDE.md',
+      'docs/rules/design-system-enforcement.md',
+      'scripts/pr-check.ts',
+      '.github/workflows/ci.yml',
+      'package.json',
+    ];
+
+    for (const path of activeFiles) {
+      expect(readText(path)).not.toContain('verify-styleguide-parity.ts');
+    }
+  });
+
+  it('documents the coverage ratchet script as the coverage floor authority', () => {
+    const coverageDoc = readText('docs/testing/coverage-ratchet-ci.md');
+    const viteConfig = readText('vite.config.ts');
+
+    expect(coverageDoc).toContain('scripts/report-coverage-ratchet.ts');
+    expect(coverageDoc).toContain('COVERAGE_RATCHET_FLOORS');
+    expect(viteConfig).not.toContain('Baseline 2026-05-05');
+    expect(viteConfig).not.toContain('thresholds: {');
+  });
+});
