@@ -51,7 +51,7 @@ beforeAll(async () => {
 
   // wsGrowth: flag ON, tier growth → 200 { jobId }. A live domain so the job can
   // proceed past the domain guard; with no getNationalSerp on the test provider it
-  // finishes as a clean no-op.
+  // fails as a user-actionable precondition error (provider not configured).
   setWorkspaceFlagOverride('national-serp-tracking', wsGrowth, true);
   updateWorkspace(wsGrowth, { tier: 'growth', liveDomain: 'https://acme.example' });
 
@@ -90,12 +90,12 @@ describe('POST /api/rank-tracking/:workspaceId/refresh-national — gating', () 
     expect(body.jobId.length).toBeGreaterThan(0);
 
     // The job runs in the spawned server process. Poll the jobs API (live cache in
-    // the server process) until it reaches a terminal state — it should complete
-    // cleanly (no-op: the test provider has no getNationalSerp), never error out
-    // due to the route wiring itself.
+    // the server process) until it reaches a terminal state — with no provider
+    // configured (the test process registers no DataForSEO credentials), the
+    // provider-unsupported precondition surfaces as a user-actionable FAILURE.
     const jobId = body.jobId as string;
     const deadline = Date.now() + 10_000;
-    let terminalStatus = '';
+    let terminalJob: { status: string; error?: string; message?: string } | null = null;
     while (Date.now() < deadline) {
       const jobRes = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
       expect(jobRes.status).toBe(200);
@@ -103,13 +103,14 @@ describe('POST /api/rank-tracking/:workspaceId/refresh-national — gating', () 
       // The created job is the national-SERP refresh type (lifecycle signal anchor).
       expect(job.type).toBe(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH);
       if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
-        terminalStatus = job.status;
+        terminalJob = job;
         break;
       }
       await new Promise(resolve => setTimeout(resolve, 150));
     }
-    // The no-op path ends in 'done'; assert it did not error.
-    expect(terminalStatus).toBe('done');
+    // The provider-unsupported precondition path ends in 'error' with the actionable message.
+    expect(terminalJob?.status).toBe('error');
+    expect(terminalJob?.error).toBe('National SERP tracking requires the DataForSEO provider (not configured)');
   });
 });
 

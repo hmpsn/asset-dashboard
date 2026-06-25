@@ -14,15 +14,17 @@ vi.mock('../../src/hooks/useFeatureFlag', () => ({
 
 const refreshMutate = vi.fn();
 let aiVisibilityData: AiVisibilityReadResponse | undefined;
+let refreshError: Error | null = null;
 
 vi.mock('../../src/hooks/admin/useAiVisibility', () => ({
   useAiVisibility: () => ({ data: aiVisibilityData }),
-  useAiVisibilityRefresh: () => ({ mutate: refreshMutate, isPending: false, error: null }),
+  useAiVisibilityRefresh: () => ({ mutate: refreshMutate, isPending: false, error: refreshError }),
 }));
 
 beforeEach(() => {
   aiVisibilityData = undefined;
   flagEnabled = true;
+  refreshError = null;
   refreshMutate.mockClear();
 });
 
@@ -82,6 +84,16 @@ describe('AiVisibilityPanel', () => {
     const refreshBtn = screen.getByRole('button', { name: /Refresh AI visibility/ });
     fireEvent.click(refreshBtn);
     expect(refreshMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a failed refresh (route 403/404/409) instead of swallowing it', () => {
+    // Without the error band, every route failure looked like a dead click.
+    flagEnabled = true;
+    aiVisibilityData = { latest: null, trend: [], competitors: [], sourceDomains: [] };
+    refreshError = new Error('AI visibility tracking requires a Growth or Premium plan');
+    render(<AiVisibilityPanel workspaceId="ws-1" />);
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('requires a Growth or Premium plan');
   });
 
   it('renders nothing when the flag is OFF and there is no snapshot', () => {

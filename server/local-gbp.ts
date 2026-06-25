@@ -145,13 +145,8 @@ export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string):
     // Provider must support the optional business-listings capability; feature-detect before use.
     const provider = getConfiguredProvider();
     if (!provider?.getBusinessListings) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'Configured SEO provider does not support business-listings reads',
-        result: { listingsProcessed: 0, ownerFound: 0 } satisfies LocalGbpRefreshSummary,
-      });
+      const message = 'GBP + reviews tracking requires the DataForSEO provider (not configured)';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
     // Capture the narrowed method reference so TS sees it as non-undefined in the async loop.
@@ -183,13 +178,8 @@ export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string):
     }
 
     if (pairs.length === 0) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'No active markets with coordinates — add a market to track GBP + reviews',
-        result: { listingsProcessed: 0, ownerFound: 0 } satisfies LocalGbpRefreshSummary,
-      });
+      const message = 'No active markets with coordinates — add a market to track GBP + reviews';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
 

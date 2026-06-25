@@ -93,26 +93,16 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
 
     const ownerDomain = cleanDomain(workspace.liveDomain);
     if (!ownerDomain) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'No live domain configured — connect a domain to track national SERP ranks',
-        result: { keywordsProcessed: 0, aiOverviewsCited: 0 } satisfies NationalSerpRefreshSummary,
-      });
+      const message = 'No live domain configured — connect a domain to track national SERP ranks';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
 
     // Provider must support the optional national-SERP capability; feature-detect before use.
     const provider = getConfiguredProvider();
     if (!provider?.getNationalSerp) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'Configured SEO provider does not support national SERP reads',
-        result: { keywordsProcessed: 0, aiOverviewsCited: 0 } satisfies NationalSerpRefreshSummary,
-      });
+      const message = 'National SERP tracking requires the DataForSEO provider (not configured)';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
     // Capture the narrowed method reference so TS sees it as non-undefined in the async loop.
@@ -129,13 +119,8 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
       .slice(0, NATIONAL_SERP_KEYWORD_CAP);
 
     if (trackedKeywords.length === 0) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'No tracked keywords to refresh',
-        result: { keywordsProcessed: 0, aiOverviewsCited: 0 } satisfies NationalSerpRefreshSummary,
-      });
+      const message = 'No tracked keywords to refresh';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
 

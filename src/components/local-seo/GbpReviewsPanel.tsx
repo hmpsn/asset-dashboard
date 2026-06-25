@@ -93,6 +93,16 @@ export function GbpReviewsPanel({ workspaceId }: { workspaceId: string }) {
     </FeatureFlag>
   );
 
+  // Surface a failed refresh (mirrors P6's actionErrorMessage band). The route throws an
+  // ApiError on 403 (tier) / 404 (flag) / 409 (already-running) — without this band every
+  // failure was swallowed and the click looked dead.
+  const refreshError = refresh.error instanceof Error ? refresh.error.message : null;
+  const errorBand = refreshError ? (
+    <div role="alert" className="rounded-[var(--radius-xl)] border border-red-500/40 bg-red-500/10 px-4 py-3">
+      <p className="t-caption font-semibold text-red-400">{refreshError}</p>
+    </div>
+  ) : null;
+
   // No listings captured yet. With the flag OFF the panel stays hidden (the server also
   // returns an empty payload then). With the flag ON, render the card with JUST the refresh
   // trigger + an empty state — otherwise the bootstrap button lives below this return and the
@@ -106,11 +116,14 @@ export function GbpReviewsPanel({ workspaceId }: { workspaceId: string }) {
         action={refreshButton}
         variant="subtle"
       >
-        <EmptyState
-          icon={MapPin}
-          title="No GBP data yet"
-          description="Run a GBP + reviews refresh to capture your Google Business Profile and competitor listings."
-        />
+        <div className="space-y-4">
+          {errorBand}
+          <EmptyState
+            icon={MapPin}
+            title="No GBP data yet"
+            description="Add an active local market with coordinates first (Configure market), then run a GBP + reviews refresh to capture your Google Business Profile and competitor listings."
+          />
+        </div>
       </SectionCard>
     );
   }
@@ -123,6 +136,7 @@ export function GbpReviewsPanel({ workspaceId }: { workspaceId: string }) {
       variant="subtle"
     >
       <div className="space-y-4">
+        {errorBand}
         {owned ? (
           <div className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-3">
             <ListingRow label="Your listing" listing={owned} />
