@@ -985,6 +985,188 @@ export const GLOBALLY_APPLIED_LIMITERS: ReadonlySet<string> = new Set([
   'publicWriteLimiter',
 ]);
 
+type RetiredFlagGroup = {
+  label: string;
+  keys: readonly string[];
+  envPattern?: RegExp;
+  migrationException: string;
+  scanTests?: boolean;
+};
+
+const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
+  {
+    label: 'outcome',
+    keys: [
+      'outcome-tracking',
+      'outcome-dashboard',
+      'outcome-playbooks',
+      'outcome-external-detection',
+      'outcome-client-reporting',
+      'outcome-ai-injection',
+      'outcome-predictive',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/,
+    migrationException: 'server/db/migrations/122-retire-outcome-feature-flags.sql',
+  },
+  {
+    label: 'bridge/opportunity',
+    keys: [
+      'intelligence-shadow-mode',
+      'opportunity-value-scorer',
+      'opportunity-value-calibration',
+      'opportunity-value-events',
+      'bridge-outcome-reweight',
+      'bridge-decay-suggested-brief',
+      'bridge-strategy-invalidate',
+      'bridge-insight-to-action',
+      'bridge-page-analysis-invalidate',
+      'bridge-action-auto-resolve',
+      'bridge-content-to-insight',
+      'bridge-schema-to-insight',
+      'bridge-anomaly-boost',
+      'bridge-settings-cascade',
+      'bridge-audit-page-health',
+      'bridge-action-annotation',
+      'bridge-annotation-to-insight',
+      'bridge-audit-site-health',
+      'bridge-audit-auto-resolve',
+      'bridge-briefing-candidate-refresh',
+      'bridge-client-signal',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/,
+    migrationException: 'server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql',
+  },
+  {
+    label: 'unified inbox',
+    keys: [
+      'new-inbox-ia',
+      'unified-deliverables-approval-family',
+      'unified-deliverables-broken-family',
+      'unified-deliverables-rest',
+      'unified-inbox',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/,
+    migrationException: 'server/db/migrations/124-retire-unified-inbox-feature-flags.sql',
+  },
+  {
+    label: 'product/UI',
+    keys: [
+      'copy-engine',
+      'copy-engine-voice',
+      'copy-engine-pipeline',
+      'deep-diagnostics',
+      'client-brand-section',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:COPY_ENGINE(?:_VOICE|_PIPELINE)?|DEEP_DIAGNOSTICS|CLIENT_BRAND_SECTION)\b/,
+    migrationException: 'server/db/migrations/125-retire-product-ui-feature-flags.sql',
+  },
+  {
+    label: 'SEO/runtime',
+    keys: [
+      'local-seo-visibility',
+      'schema-ai-element-classifier',
+      'seo-generation-quality',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:LOCAL_SEO_VISIBILITY|SCHEMA_AI_ELEMENT_CLASSIFIER|SEO_GENERATION_QUALITY)\b/,
+    migrationException: 'server/db/migrations/126-retire-seo-runtime-feature-flags.sql',
+    scanTests: true,
+  },
+  {
+    label: 'Keyword Hub',
+    keys: [
+      'keyword-hub',
+      'keyword-value-scoring',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/,
+    migrationException: 'server/db/migrations/135-retire-keyword-hub-feature-flag.sql',
+    scanTests: true,
+  },
+];
+
+function escapedAlternation(values: readonly string[]): string {
+  return values.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+}
+
+function lineNumberForIndex(content: string, index: number): number {
+  return content.slice(0, index).split('\n').length;
+}
+
+function pushContentMatch(
+  hits: CustomCheckMatch[],
+  file: string,
+  content: string,
+  index: number,
+  fallback: string,
+): void {
+  const line = lineNumberForIndex(content, index);
+  const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+  hits.push({ file, line, text });
+}
+
+function findRetiredFlagUsage(files: string[]): CustomCheckMatch[] {
+  const hits: CustomCheckMatch[] = [];
+  const filesToScan = SCAN_ALL
+    ? Array.from(new Set([
+      ...files,
+      ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
+      ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
+    ]))
+    : files;
+
+  for (const file of filesToScan) {
+    if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+    if (file.endsWith('tests/pr-check.test.ts')) continue;
+
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    const normalizedFile = file.split(path.sep).join('/');
+    const isTestFile = normalizedFile.includes('/tests/') || normalizedFile.startsWith('tests/');
+
+    for (const group of RETIRED_FLAG_GROUPS) {
+      if (isTestFile && !group.scanTests) continue;
+      const keyPattern = escapedAlternation(group.keys);
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+
+      for (const match of content.matchAll(helperRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      for (const match of content.matchAll(componentRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      for (const match of content.matchAll(indexedRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      if (file.endsWith('shared/types/feature-flags.ts')) {
+        for (const match of content.matchAll(featureFlagLiteralRe)) {
+          pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+        }
+      }
+      if (group.envPattern) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (group.envPattern.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+    }
+  }
+
+  const deduped: CustomCheckMatch[] = [];
+  const seen = new Set<string>();
+  for (const hit of hits) {
+    const key = `${hit.file}:${hit.line}:${hit.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(hit);
+  }
+  return deduped;
+}
+
 // Maximum number of lines to scan forward in a route handler body
 // when looking for a broadcastToWorkspace/broadcast call.
 const ROUTE_BROADCAST_LOOKAHEAD = 120;
@@ -1122,443 +1304,17 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    name: 'Retired outcome feature flag key used in flag API',
+    name: 'Retired feature flag key used in flag API',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/122-retire-outcome-feature-flags.sql'],
+    exclude: RETIRED_FLAG_GROUPS.map(group => group.migrationException),
     message:
-      'Outcome feature flags were retired in PR1; make the enabled behavior unconditional instead of using retired keys.',
+      'Retired feature flag keys must not re-enter runtime/UI/test flag APIs. Make the canonical behavior unconditional instead of using retired keys.',
     severity: 'error',
     rationale:
-      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
     claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'outcome-tracking',
-        'outcome-dashboard',
-        'outcome-playbooks',
-        'outcome-external-detection',
-        'outcome-client-reporting',
-        'outcome-ai-injection',
-        'outcome-predictive',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`);
-      const componentRe = new RegExp(`<FeatureFlag\\b[^>]*\\bflag=['"](?:${keyPattern})['"]`);
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\[['"](?:${keyPattern})['"]\\]`);
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/;
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const lines = readFileOrEmpty(file).split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (helperRe.test(line) || componentRe.test(line) || indexedRe.test(line) || envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-      return hits;
-    },
-  },
-  {
-    name: 'Retired bridge/opportunity feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql'],
-    message:
-      'Bridge/opportunity feature flags were retired in PR2; keep bridge source identifiers but do not use retired keys in flag APIs.',
-    severity: 'error',
-    rationale:
-      'Retired bridge/opportunity rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'intelligence-shadow-mode',
-        'opportunity-value-scorer',
-        'opportunity-value-calibration',
-        'opportunity-value-events',
-        'bridge-outcome-reweight',
-        'bridge-decay-suggested-brief',
-        'bridge-strategy-invalidate',
-        'bridge-insight-to-action',
-        'bridge-page-analysis-invalidate',
-        'bridge-action-auto-resolve',
-        'bridge-content-to-insight',
-        'bridge-schema-to-insight',
-        'bridge-anomaly-boost',
-        'bridge-settings-cascade',
-        'bridge-audit-page-health',
-        'bridge-action-annotation',
-        'bridge-annotation-to-insight',
-        'bridge-audit-site-health',
-        'bridge-audit-auto-resolve',
-        'bridge-briefing-candidate-refresh',
-        'bridge-client-signal',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired unified inbox feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/124-retire-unified-inbox-feature-flags.sql'],
-    message:
-      'Unified inbox / deliverables rollout flags were retired in PR3; make the unified behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired inbox/deliverable rollout flags must not re-enter runtime/UI/test flag APIs after the unified path becomes canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'new-inbox-ia',
-        'unified-deliverables-approval-family',
-        'unified-deliverables-broken-family',
-        'unified-deliverables-rest',
-        'unified-inbox',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired product/UI feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/125-retire-product-ui-feature-flags.sql'],
-    message:
-      'Product/UI rollout flags were retired in PR4; make the enabled behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired product/UI rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'copy-engine',
-        'copy-engine-voice',
-        'copy-engine-pipeline',
-        'deep-diagnostics',
-        'client-brand-section',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:COPY_ENGINE(?:_VOICE|_PIPELINE)?|DEEP_DIAGNOSTICS|CLIENT_BRAND_SECTION)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired SEO/runtime feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/126-retire-seo-runtime-feature-flags.sql'],
-    message:
-      'SEO/runtime rollout flags were retired in PR5; make the canonical behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired SEO/runtime rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const filesToScan = SCAN_ALL
-        ? Array.from(new Set([
-          ...files,
-          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
-          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
-        ]))
-        : files;
-      const retired = [
-        'local-seo-visibility',
-        'schema-ai-element-classifier',
-        'seo-generation-quality',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:LOCAL_SEO_VISIBILITY|SCHEMA_AI_ELEMENT_CLASSIFIER|SEO_GENERATION_QUALITY)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of filesToScan) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('tests/pr-check.test.ts')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired Keyword Hub feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/135-retire-keyword-hub-feature-flag.sql'],
-    message:
-      'Retired Keyword Hub rollout flags must not re-enter flag APIs: the keyword-hub umbrella flag (Phase C cutover, 2026-06-11) and keyword-value-scoring (value-first scoring made unconditional, SEO Decision Engine P1, 2026-06-23). Make the canonical Hub path / value-first scoring unconditional instead of using a retired key.',
-    severity: 'error',
-    rationale:
-      'After the Keyword Hub cutover deleted KCC/Rank Tracker, and after the keyword-value-scoring flag was retired (value-first scoring is the only path), these flags must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a path that no longer exists.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const filesToScan = SCAN_ALL
-        ? Array.from(new Set([
-          ...files,
-          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
-          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
-        ]))
-        : files;
-      const retired = ['keyword-hub', 'keyword-value-scoring'];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of filesToScan) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('tests/pr-check.test.ts')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
+    customCheck: findRetiredFlagUsage,
   },
   {
     name: 'Retired seo-ranks route literal in src',

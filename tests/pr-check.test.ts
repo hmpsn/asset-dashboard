@@ -115,133 +115,114 @@ function expectRuleCases(ruleName: string, ruleId: string, cases: RuleFixtureCas
   }
 }
 
-describe('Rule: Retired outcome feature flag key used in flag API', () => {
-  const RULE = 'Retired outcome feature flag key used in flag API';
+describe('Rule: Retired feature flag key used in flag API', () => {
+  const RULE = 'Retired feature flag key used in flag API';
+  const cases = [
+    {
+      id: 'outcome',
+      helper: ['outcome', 'tracking'].join('-'),
+      component: ['outcome', 'dashboard'].join('-'),
+      catalog: ['outcome', 'client-reporting'].join('-'),
+      env: ['FEATURE', 'OUTCOME', 'TRACKING'].join('_'),
+    },
+    {
+      id: 'bridge-opportunity',
+      helper: ['opportunity', 'value', 'scorer'].join('-'),
+      component: ['bridge', 'anomaly', 'boost'].join('-'),
+      catalog: ['opportunity', 'value', 'events'].join('-'),
+      env: ['FEATURE', 'OPPORTUNITY', 'VALUE', 'EVENTS'].join('_'),
+    },
+    {
+      id: 'unified-inbox',
+      helper: ['unified', 'inbox'].join('-'),
+      component: ['new', 'inbox', 'ia'].join('-'),
+      catalog: ['unified', 'deliverables', 'approval', 'family'].join('-'),
+      env: ['FEATURE', 'UNIFIED', 'DELIVERABLES', 'REST'].join('_'),
+    },
+    {
+      id: 'product-ui',
+      helper: ['copy', 'engine'].join('-'),
+      component: ['client', 'brand', 'section'].join('-'),
+      catalog: ['deep', 'diagnostics'].join('-'),
+      env: ['FEATURE', 'COPY', 'ENGINE', 'PIPELINE'].join('_'),
+    },
+    {
+      id: 'seo-runtime',
+      helper: ['seo', 'generation', 'quality'].join('-'),
+      component: ['local', 'seo', 'visibility'].join('-'),
+      catalog: ['schema', 'ai', 'element', 'classifier'].join('-'),
+      env: ['FEATURE', 'SCHEMA', 'AI', 'ELEMENT', 'CLASSIFIER'].join('_'),
+    },
+    {
+      id: 'keyword-hub',
+      helper: ['keyword', 'hub'].join('-'),
+      component: ['keyword', 'hub'].join('-'),
+      catalog: ['keyword', 'value', 'scoring'].join('-'),
+      env: ['FEATURE', 'KEYWORD', 'HUB'].join('_'),
+    },
+  ];
 
-  it('flags retired keys passed to feature flag helpers', () => {
-    const retiredKey = ['outcome', 'tracking'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
+  for (const testCase of cases) {
+    it(`flags ${testCase.id} retired keys passed to feature flag helpers`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'helper.ts'),
+        lines(
+          'import { isFeatureEnabled } from "./feature-flags";',
+          `const enabled = isFeatureEnabled('${testCase.helper}');`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired keys passed to FeatureFlag components', () => {
-    const retiredKey = ['outcome', 'dashboard'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
+    it(`flags ${testCase.id} retired keys passed to FeatureFlag components`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'component.tsx'),
+        lines(
+          'import { FeatureFlag } from "./FeatureFlag";',
+          `export const Demo = () => <FeatureFlag flag="${testCase.component}">demo</FeatureFlag>;`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired keys indexed from feature flag catalog objects', () => {
-    const retiredKey = ['outcome', 'client-reporting'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'catalog.ts'),
-      lines(
-        'import { FEATURE_FLAG_CATALOG } from "./feature-flags";',
-        `const entry = FEATURE_FLAG_CATALOG['${retiredKey}'];`,
-      ),
-    );
+    it(`flags ${testCase.id} retired keys indexed from feature flag catalog objects`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'catalog.ts'),
+        lines(
+          'import { FEATURE_FLAG_CATALOG } from "./feature-flags";',
+          `const entry = FEATURE_FLAG_CATALOG['${testCase.catalog}'];`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired outcome feature env vars', () => {
-    const retiredEnv = ['FEATURE', 'OUTCOME', 'TRACKING'].join('_');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
+    it(`flags ${testCase.id} retired feature env vars`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'env.ts'),
+        lines(
+          `process.env.${testCase.env} = 'true';`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('allows active feature flags and non-flag historical strings', () => {
-    const retiredKey = ['outcome', 'ai-injection'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'negative.tsx'),
-      lines(
-        "const active = isFeatureEnabled('keyword-universe-full');",
-        `const historicalNote = '${retiredKey} was retired';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired bridge/opportunity feature flag key used in flag API', () => {
-  const RULE = 'Retired bridge/opportunity feature flag key used in flag API';
-
-  it('flags retired opportunity keys passed to feature flag helpers', () => {
-    const retiredKey = ['opportunity', 'value', 'scorer'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired bridge keys passed to FeatureFlag components', () => {
-    const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired bridge/opportunity env vars', () => {
-    const retiredEnv = ['FEATURE', 'OPPORTUNITY', 'VALUE', 'EVENTS'].join('_');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(1);
+    });
+  }
 
   it('flags multiline retired helper calls', () => {
     const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
     const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'multiline-helper.ts'),
+      uniqPath('rule-retired-feature-flags', 'multiline-helper.ts'),
       lines(
         'import { isFeatureEnabled } from "./feature-flags";',
         'const enabled = isFeatureEnabled(',
@@ -253,83 +234,6 @@ describe('Rule: Retired bridge/opportunity feature flag key used in flag API', (
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['opportunity', 'value', 'events'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows bridge source identifiers outside feature flag APIs', () => {
-    const bridgeSource = ['bridge', 'audit', 'page', 'health'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'negative.ts'),
-      lines(
-        `fireBridge('${bridgeSource}', workspaceId, fn);`,
-        `const historicalNote = '${bridgeSource} is a bridge source';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired unified inbox feature flag key used in flag API', () => {
-  const RULE = 'Retired unified inbox feature flag key used in flag API';
-
-  it('flags retired unified inbox keys passed to feature flag helpers', () => {
-    const retiredKey = ['unified', 'inbox'].join('-');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'helper.ts'),
-      lines(
-        'import { useFeatureFlag } from "./feature-flags";',
-        `const enabled = useFeatureFlag('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired unified inbox keys passed to FeatureFlag components', () => {
-    const retiredKey = ['new', 'inbox', 'ia'].join('-');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired unified inbox env vars', () => {
-    const retiredEnv = ['FEATURE', 'UNIFIED', 'DELIVERABLES', 'REST'].join('_');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
   });
 
   it('flags retired keys re-added to the shared feature flag registry', () => {
@@ -348,147 +252,9 @@ describe('Rule: Retired unified inbox feature flag key used in flag API', () => 
     expect(hits[0].line).toBe(2);
   });
 
-  it('allows active feature flags and historical unified-inbox strings', () => {
-    const retiredKey = ['unified', 'inbox'].join('-');
+  it('flags retired env vars inside tests when scanned by the shared rule', () => {
     const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'negative.tsx'),
-      lines(
-        "const active = useFeatureFlag('keyword-universe-full');",
-        `const note = '${retiredKey} was retired after cutover';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired product/UI feature flag key used in flag API', () => {
-  const RULE = 'Retired product/UI feature flag key used in flag API';
-
-  it('flags retired product keys passed to feature flag helpers', () => {
-    const retiredKey = ['copy', 'engine'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired product keys passed to FeatureFlag components', () => {
-    const retiredKey = ['client', 'brand', 'section'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired product env vars', () => {
-    const retiredEnv = ['FEATURE', 'COPY', 'ENGINE', 'PIPELINE'].join('_');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['deep', 'diagnostics'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows active feature flags and historical product strings', () => {
-    const retiredKey = ['copy', 'engine', 'pipeline'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'negative.tsx'),
-      lines(
-        "const active = useFeatureFlag('keyword-universe-full');",
-        `const note = '${retiredKey} was retired after rollout';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
-  const RULE = 'Retired SEO/runtime feature flag key used in flag API';
-
-  it('flags retired SEO/runtime keys passed to feature flag helpers', () => {
-    const retiredKey = ['seo', 'generation', 'quality'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired SEO/runtime keys passed to FeatureFlag components', () => {
-    const retiredKey = ['local', 'seo', 'visibility'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired SEO/runtime env vars', () => {
-    const retiredEnv = ['FEATURE', 'SCHEMA', 'AI', 'ELEMENT', 'CLASSIFIER'].join('_');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags retired SEO/runtime env vars inside tests', () => {
-    const file = write(
-      'tests/integration/rule-retired-seo-runtime-flags-env.test.ts',
+      'tests/integration/rule-retired-feature-flags-env.test.ts',
       lines(
         "process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';",
       ),
@@ -499,119 +265,15 @@ describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
     expect(hits[0].line).toBe(1);
   });
 
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['local', 'seo', 'visibility'].join('-');
+  it('allows active feature flags and non-flag historical strings', () => {
+    const retiredKey = ['outcome', 'ai-injection'].join('-');
+    const bridgeSource = ['bridge', 'audit', 'page', 'health'].join('-');
     const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows active feature flags and historical non-flag strings', () => {
-    const retiredKey = ['seo', 'generation', 'quality'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'negative.ts'),
+      uniqPath('rule-retired-feature-flags', 'negative.tsx'),
       lines(
         "const active = isFeatureEnabled('keyword-universe-full');",
         `const historicalNote = '${retiredKey} was retired';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired Keyword Hub feature flag key used in flag API', () => {
-  const RULE = 'Retired Keyword Hub feature flag key used in flag API';
-
-  it('flags keyword-hub passed to feature flag helpers', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags keyword-hub passed to a FeatureFlag component', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags the FEATURE_KEYWORD_HUB env var', () => {
-    const retiredEnv = ['FEATURE', 'KEYWORD', 'HUB'].join('_');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags keyword-hub re-added to the shared feature flag registry', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': true,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags the retired keyword-value-scoring flag re-added to a flag API', () => {
-    // Build the key via join so this fixture source does not itself trip the rule.
-    const retiredKey = ['keyword', 'value', 'scoring'].join('-');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'value-scoring.ts'),
-      lines(
-        `const c = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('allows the surviving Keyword Hub sub-flag', () => {
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'negative.ts'),
-      lines(
-        "const a = isFeatureEnabled('keyword-universe-full');",
+        `fireBridge('${bridgeSource}', workspaceId, fn);`,
       ),
     );
 
@@ -6133,21 +5795,9 @@ describe('Meta: customCheck rule name registry', () => {
     // the multi-phase generation-quality plan (no false positives on current code).
     'opportunity-money-field-must-be-stripped',
     'new-rec-type-source-needs-category-and-action-type',
-    // Outcome feature flag retirement PR1 (2026-06-04) — retired outcome
-    // rollout keys must not re-enter runtime/UI/test flag APIs.
-    'Retired outcome feature flag key used in flag API',
-    // Feature flag retirement PR2 (2026-06-04) — bridge/opportunity source
-    // identifiers remain valid, but retired keys cannot be used as flags.
-    'Retired bridge/opportunity feature flag key used in flag API',
-    // Feature flag retirement PR3 (2026-06-04) — unified inbox / deliverables
-    // cutover removed the rollout keys, so they cannot re-enter flag APIs.
-    'Retired unified inbox feature flag key used in flag API',
-    // Feature flag retirement PR4 (2026-06-04) — product/UI rollout keys
-    // became canonical and cannot re-enter runtime/UI/test flag APIs.
-    'Retired product/UI feature flag key used in flag API',
-    // Feature flag retirement PR5 (2026-06-05) — SEO/runtime rollout keys
-    // became canonical and cannot re-enter runtime/UI/test flag APIs.
-    'Retired SEO/runtime feature flag key used in flag API',
+    // Feature flag retirement waves — retired rollout keys must not re-enter
+    // runtime/UI/test flag APIs after their enabled paths become canonical.
+    'Retired feature flag key used in flag API',
     // OV cleanup PR2 (2026-06-05) — recommendation runtime scoring must flow
     // from the canonical Opportunity Value scorer, not local impact buckets.
     'recommendation impactScore must flow from canonical OV scorer',
@@ -6172,9 +5822,6 @@ describe('Meta: customCheck rule name registry', () => {
     // Sidebar/CommandPalette/Breadcrumbs and drifted; the nav registry is now
     // the single source of truth. Bans re-inlining label/needsSite in consumers.
     'Hardcoded nav metadata outside the nav registry',
-    // Keyword Hub cutover Phase C (2026-06-11) — the keyword-hub umbrella flag was
-    // retired once the Hub became the only keyword surface; it must not re-enter flag APIs.
-    'Retired Keyword Hub feature flag key used in flag API',
     // Keyword Hub cutover Phase C (2026-06-11) — the standalone Rank Tracker (seo-ranks)
     // was folded into the Hub; the 'seo-ranks' Page literal must not return to src/.
     'Retired seo-ranks route literal in src',

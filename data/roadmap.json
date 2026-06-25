@@ -1261,9 +1261,9 @@
           "source": "Complexity audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT med/small. pr-check.ts:980-1430 — six structurally identical ~75-line rules (451 LOC) differing only in a key array + migration exclusion; each retirement adds another copy and the shared regex drifts six ways. Fix: one data-driven rule fed by RETIRED_FLAG_GROUPS: {label, keys, envVars?, migrationException}[] (~350 LOC removed; next retirement is a one-line push)."
+          "notes": "DONE 2026-06-25: collapsed six duplicated retired-feature-flag pr-check rules into one registry-backed rule fed by RETIRED_FLAG_GROUPS. Preserved helper/component/catalog/registry/env detection, migration exceptions, multiline helper detection, deduping, and prior test-file scan behavior (SEO/runtime + Keyword Hub only). Regenerated docs/rules/automated-rules.md and updated verified-clean rule metadata. Focused pr-check harness covers every retired group plus bridge-source, active-flag, historical-string, registry, multiline, and test-path env cases."
         },
         {
           "id": "simp-audit-0624-docs-rules-lifecycle",
