@@ -1351,9 +1351,9 @@
           "source": "Delta audit 2026-06-24",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT F4 (med). strategy-issue-cron.ts:5 (\"Clone of briefing-cron.ts\"), return-hook-cron.ts:5 (\"Clone of strategy-issue-cron.ts\"). currentWeekOfUTC() is byte-identical in all three; the startup/unref + per-workspace mutex Set + lastTickRunWeek memo scaffold is re-implemented in each. Fix: one shared currentWeekOfUTC() util + a createWeeklyWorkspaceCron({flag,isEligible,run}) factory — do it before a 3rd clone."
+          "notes": "DONE 2026-06-25: added server/weekly-workspace-cron.ts as the shared owner for Monday ISO-week anchoring, sync/async per-workspace single-flight guards, and idempotent interval lifecycle. Rewired briefing, strategy Issue, and return-hook crons to those primitives while keeping their eligibility, tick/memo semantics, and domain work local. Removed stale clone-lineage comments and added focused helper coverage plus existing briefing/Issue/return-hook cron regression coverage."
         },
         {
           "id": "simp-delta-0624-narrative-ai-extraction",

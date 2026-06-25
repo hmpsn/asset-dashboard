@@ -2,7 +2,8 @@
 //
 // The Issue (Client) P1c — weekly email return-hook cron.
 //
-// Clone of strategy-issue-cron.ts, re-pointed at the CLIENT email digest:
+// Shares weekly workspace-cron primitives with briefing/strategy Issue while keeping
+// return-hook-specific eligibility and send semantics local:
 //
 // - Polls every hour. At most ONCE per ISO week per eligible workspace it assembles the weekly
 //   "what came in" digest (new customers/leads + new measured money + a decision still waiting) and,
@@ -37,22 +38,17 @@ import { assembleReturnHookDigest } from './the-issue-return-hook.js';
 import { notifyClientReturnHook } from './email.js';
 import { addActivity } from './activity-log.js';
 import { createLogger } from './logger.js';
+import {
+  createIntervalCron,
+  currentWeekOfUTC,
+  runWithWorkspaceSingleFlight,
+} from './weekly-workspace-cron.js';
 import type { ReturnHookMoneySection } from '../shared/types/the-issue.js';
 
 const log = createLogger('return-hook-cron');
 
 const FLAG = 'the-issue-client-return-hook';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // poll every hour
-
-// ── Time helper ────────────────────────────────────────────────────────────────
-// Local copy of strategy-issue-cron's currentWeekOfUTC (kept local per that file's convention so the
-// crons stay independently editable). ISO date (YYYY-MM-DD) of the Monday anchoring the week of `d`.
-function currentWeekOfUTC(d = new Date()): string {
-  const day = d.getUTCDay();
-  const diffToMonday = (day + 6) % 7; // Sunday(0) → 6 days back to its Monday
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - diffToMonday));
-  return monday.toISOString().slice(0, 10);
-}
 
 // ── Eligibility ──────────────────────────────────────────────────────────────
 function isEligible(workspaceId: string): boolean {
@@ -87,15 +83,12 @@ export function runReturnHookForWorkspace(
   workspaceId: string,
   opts: RunReturnHookOptions = {},
 ): RunReturnHookResult {
-  if (runningSends.has(workspaceId)) {
-    return { status: 'skipped', weekOf: '', reason: 'already running' };
-  }
-  runningSends.add(workspaceId);
-  try {
-    return runReturnHookForWorkspaceInner(workspaceId, opts);
-  } finally {
-    runningSends.delete(workspaceId);
-  }
+  return runWithWorkspaceSingleFlight(
+    runningSends,
+    workspaceId,
+    () => ({ status: 'skipped', weekOf: '', reason: 'already running' }),
+    () => runReturnHookForWorkspaceInner(workspaceId, opts),
+  );
 }
 
 function runReturnHookForWorkspaceInner(
@@ -223,41 +216,31 @@ function tick(now = new Date()): void {
   }
 }
 
-let startupTimeout: ReturnType<typeof setTimeout> | null = null;
-let tickInterval: ReturnType<typeof setInterval> | null = null;
-
-/** Idempotent — calling twice is a no-op. */
-export function startReturnHookCron(): void {
-  if (tickInterval) return;
-
-  startupTimeout = setTimeout(() => {
+const returnHookCronLifecycle = createIntervalCron({
+  startupDelayMs: 90_000,
+  intervalMs: CHECK_INTERVAL_MS,
+  runStartup: () => {
     try {
       tick();
     } catch (err) {
       log.error({ err }, 'return-hook startup tick failed');
     }
-  }, 90_000);
-  startupTimeout.unref?.();
-
-  tickInterval = setInterval(() => {
+  },
+  runInterval: () => {
     try {
       tick();
     } catch (err) {
       log.error({ err }, 'return-hook tick failed');
     }
-  }, CHECK_INTERVAL_MS);
-  tickInterval.unref?.();
+  },
+  onStart: () => log.info('return-hook cron started — checks hourly, at most once per ISO week per eligible workspace'),
+});
 
-  log.info('return-hook cron started — checks hourly, at most once per ISO week per eligible workspace');
+/** Idempotent — calling twice is a no-op. */
+export function startReturnHookCron(): void {
+  returnHookCronLifecycle.start();
 }
 
 export function stopReturnHookCron(): void {
-  if (startupTimeout) {
-    clearTimeout(startupTimeout);
-    startupTimeout = null;
-  }
-  if (tickInterval) {
-    clearInterval(tickInterval);
-    tickInterval = null;
-  }
+  returnHookCronLifecycle.stop();
 }
