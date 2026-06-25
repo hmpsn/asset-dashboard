@@ -13,6 +13,7 @@ const DISPATCHER_AND_HELPERS = new Set([
   'server/ai.ts',
   'server/anthropic-helpers.ts',
   'server/keyword-strategy-synthesis/ai-callers.ts',
+  'server/narrative-ai.ts',
   'server/openai-helpers.ts',
 ]);
 
@@ -83,7 +84,7 @@ function listTypeScriptFiles(dir: string): string[] {
 function isAiConsumer(relPath: string, source: string): boolean {
   if (DISPATCHER_AND_HELPERS.has(relPath)) return false;
   if (relPath.includes('/__tests__/')) return false;
-  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(|\bcallKeywordStrategyAI\(/.test(source);
+  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(|\bcallKeywordStrategyAI\(|\bcallNarrativeAI\(/.test(source);
 }
 
 function countByClassification(): Record<VoiceAuthorityClass, number> {

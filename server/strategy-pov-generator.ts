@@ -1,8 +1,6 @@
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
-import { callAI } from './ai.js';
-import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import {
   getStrategyPov,
@@ -16,6 +14,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
 import { assembleMeetingBriefMetrics } from './meeting-brief-generator.js';
+import { callNarrativeAI, withContentHashCache } from './narrative-ai.js';
 import type { WorkspaceIntelligence, IntelligenceSlice } from '../shared/types/intelligence.js';
 import type { Recommendation } from '../shared/types/recommendations.js';
 import type { StrategyPov, StrategyPovAIOutput, StrategyPovVariant } from '../shared/types/strategy-pov.js';
@@ -175,52 +174,19 @@ async function callPovAI(
   systemPrompt: string,
   prompt: string,
 ): Promise<StrategyPovAIOutput> {
-  const messages: { role: 'user' | 'assistant'; content: string }[] = [
-    { role: 'user', content: prompt },
-  ];
-  const result = await callAI({
-    operation: 'strategy-pov',
-    system: systemPrompt,
-    messages,
-    maxTokens: 1500,
-    temperature: 0.3,
+  return callNarrativeAI({
     workspaceId,
+    operation: 'strategy-pov',
+    systemPrompt,
+    prompt,
+    schema: strategyPovAIOutputSchema,
+    parserContext: 'strategy-pov',
+    maxTokens: 1500,
+    logger: log,
+    retryDebugMessage: 'strategy-pov-generator: AI returned invalid structured output — retrying',
+    retryFailureLogMessage: 'Strategy POV AI returned invalid structured output after retry',
+    retryFailureMessage: 'Strategy POV AI returned invalid structured output after retry',
   });
-
-  try {
-    return parseStructuredAIOutput(result.text, strategyPovAIOutputSchema, 'strategy-pov');
-  } catch (err) {
-    log.debug(
-      { err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined },
-      'strategy-pov-generator: AI returned invalid structured output — retrying',
-    );
-    const retryResult = await callAI({
-      operation: 'strategy-pov',
-      system: systemPrompt,
-      messages: [
-        ...messages,
-        { role: 'assistant', content: result.text },
-        { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
-      ],
-      maxTokens: 1500,
-      temperature: 0.1,
-      workspaceId,
-    });
-    try {
-      return parseStructuredAIOutput(retryResult.text, strategyPovAIOutputSchema, 'strategy-pov');
-    } catch (retryErr) {
-      log.error(
-        {
-          err: retryErr,
-          issues: retryErr instanceof StructuredAIOutputError ? retryErr.issues : undefined,
-          workspaceId,
-          rawRetry: retryResult.text.slice(0, 500),
-        },
-        'Strategy POV AI returned invalid structured output after retry',
-      );
-      throw new Error('Strategy POV AI returned invalid structured output after retry');
-    }
-  }
 }
 
 export interface GenerateStrategyPovOptions {
@@ -250,46 +216,51 @@ export async function generateStrategyPov(
   const hash = buildStrategyPovHash(povRecs, variant, regenerateNonce);
   const cachedHash = getStrategyPovHash(workspaceId);
 
-  if (regenerateNonce == null && hash === cachedHash) {
-    log.debug({ workspaceId }, 'Strategy POV unchanged — returning cached POV');
-    // Intentional control flow: the route catches POV_UNCHANGED and returns the stored POV (200).
-    throw new Error(POV_UNCHANGED);
-  }
+  return withContentHashCache({
+    workspaceId,
+    hash,
+    cachedHash,
+    unchangedSignal: POV_UNCHANGED,
+    unchangedLogMessage: 'Strategy POV unchanged — returning cached POV',
+    logger: log,
+    canUseCache: regenerateNonce == null,
+    run: async () => {
+      const slices = await withActiveLocalSeoSlice(workspaceId, POV_SLICES);
+      const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
+      const customPromptNotes = getCustomPromptNotes(workspaceId);
+      // assembleMeetingBriefMetrics reused verbatim (audit §2) — kept warm so the at-a-glance metrics
+      // are available to the cockpit even though the POV body itself is AI-drafted.
+      void assembleMeetingBriefMetrics(intel);
 
-  const slices = await withActiveLocalSeoSlice(workspaceId, POV_SLICES);
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
-  const customPromptNotes = getCustomPromptNotes(workspaceId);
-  // assembleMeetingBriefMetrics reused verbatim (audit §2) — kept warm so the at-a-glance metrics
-  // are available to the cockpit even though the POV body itself is AI-drafted.
-  void assembleMeetingBriefMetrics(intel);
-
-  const systemPrompt = buildSystemPrompt(workspaceId, `
+      const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic SEO advisor drafting a curated point of view for ${variant === 'client' ? 'the client' : 'the operator review'}. Your output must be valid JSON matching the StrategyPovAIOutput interface exactly.
 
 Write a confident, value-first narrative over the operator's CURATED moves. No admin jargon, no internal scoring language. Lead with momentum, name the single best move, and keep wins and flags short and client-safe.
 `.trim(), customPromptNotes);
 
-  const prompt = buildStrategyPovPrompt(intel, povRecs, variant);
-  const parsed = await callPovAI(workspaceId, systemPrompt, prompt);
+      const prompt = buildStrategyPovPrompt(intel, povRecs, variant);
+      const parsed = await callPovAI(workspaceId, systemPrompt, prompt);
 
-  const leadMoveRecId = povRecs.length > 0 ? povRecs[0].id : null;
+      const leadMoveRecId = povRecs.length > 0 ? povRecs[0].id : null;
 
-  const pov: StrategyPov = {
-    situation: parsed.situation,
-    leadMoveRecId,
-    leadSentence: parsed.leadSentence,
-    wins: parsed.wins,
-    flags: parsed.flags,
-    version,
-    generatedAt: new Date().toISOString(),
-    editedAt: null,
-  };
+      const pov: StrategyPov = {
+        situation: parsed.situation,
+        leadMoveRecId,
+        leadSentence: parsed.leadSentence,
+        wins: parsed.wins,
+        flags: parsed.flags,
+        version,
+        generatedAt: new Date().toISOString(),
+        editedAt: null,
+      };
 
-  saveStrategyPov(workspaceId, pov, hash);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_POV_GENERATED, {});
+      saveStrategyPov(workspaceId, pov, hash);
+      broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_POV_GENERATED, {});
 
-  log.info({ workspaceId, variant }, 'Strategy POV generated and stored');
-  return pov;
+      log.info({ workspaceId, variant }, 'Strategy POV generated and stored');
+      return pov;
+    },
+  });
 }
 
 /** Re-export for route convenience. */

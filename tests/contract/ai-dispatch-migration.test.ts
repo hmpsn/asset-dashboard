@@ -33,9 +33,15 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
 ];
 
-const migratedOperationBackedStructuredFiles: Array<{ path: string; aiImport: string; operations: string[] }> = [
+const migratedOperationBackedStructuredFiles: Array<{
+  path: string;
+  aiImport: string;
+  operations: string[];
+  callPattern?: string;
+}> = [
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
-  { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'", operations: ['meeting-brief'] },
+  { path: 'server/meeting-brief-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['meeting-brief'], callPattern: 'callNarrativeAI({' },
+  { path: 'server/strategy-pov-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['strategy-pov'], callPattern: 'callNarrativeAI({' },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
 ];
 
@@ -79,7 +85,7 @@ describe('AI dispatch migration', () => {
     for (const file of migratedOperationBackedStructuredFiles) {
       const source = readFileSync(file.path, 'utf-8');
       expect(source, file.path).toContain(file.aiImport);
-      expect(source, file.path).toContain('callAI({');
+      expect(source, file.path).toContain(file.callPattern ?? 'callAI({');
       for (const operation of file.operations) {
         expect(source, file.path).toContain(`operation: '${operation}'`);
       }
@@ -88,6 +94,17 @@ describe('AI dispatch migration', () => {
       );
       expect(source, file.path).not.toContain('callOpenAI({');
     }
+  });
+
+  it('keeps delegated narrative structured generation on the shared callAI helper', () => {
+    const source = readFileSync('server/narrative-ai.ts', 'utf-8'); // readFile-ok — narrative AI dispatch helper must remain on the unified dispatcher.
+    expect(source).toContain("from './ai.js'");
+    expect(source).toContain('callAI({');
+    expect(source).toContain('parseStructuredAIOutput');
+    expect(source).not.toMatch(
+      /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\/openai-helpers\.js['"]/,
+    );
+    expect(source).not.toContain('callOpenAI({');
   });
 
   it('keeps migrated parsed-JSON text generation paths on callAI', () => {
