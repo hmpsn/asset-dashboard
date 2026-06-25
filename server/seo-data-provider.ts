@@ -188,6 +188,12 @@ export interface BusinessListingsRequest {
 export interface LlmMentionsRequest {
   domain: string;
   platform?: 'chat_gpt' | 'google';   // default chat_gpt
+  /**
+   * The workspace's brand/business name(s) — used to identify the CLIENT's own brand among the
+   * co-mentioned `brand_entities_title`, so share-of-voice is computed like-to-like (client brand
+   * ÷ all brands) instead of mixing the domain-citation count with brand co-mention counts.
+   */
+  ownerBrandNames?: string[];
   locationName?: string;
   languageCode?: string;
 }
