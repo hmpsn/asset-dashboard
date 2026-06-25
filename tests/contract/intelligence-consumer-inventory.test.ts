@@ -73,7 +73,7 @@ function listTypeScriptFiles(dir: string): string[] {
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
   const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildSeoPromptContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
-  const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|callKeywordStrategyAI\(|generateAltText\(/.test(source);
+  const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|callKeywordStrategyAI\(|callNarrativeAI\(|generateAltText\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }
 

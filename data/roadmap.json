@@ -1361,9 +1361,10 @@
           "source": "Delta audit 2026-06-24",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT F5 (med). strategy-pov-generator.ts reproduces meeting-brief-generator.ts's SITE-CONTEXT block, wins-line formatting, the callAI→parse→retry-once ladder, and the hash/cache/UNCHANGED control-flow (\"clone, re-point\"). Two AI-narrative columns now drift independently — a retry-ladder or prompt-injection-guard fix must land twice. Fix: extract callNarrativeAI(operation,system,prompt,schema) + withContentHashCache({...}); keep prompt bodies per-feature."
+          "notes": "DONE 2026-06-25: added server/narrative-ai.ts as the shared owner for structured narrative AI retry-once behavior and content-hash unchanged short-circuiting. Rewired meeting-brief and strategy-POV generators through callNarrativeAI() and withContentHashCache() while keeping their prompts, hash inputs, stores, broadcasts, public exports, and response assembly feature-owned. Added helper-level retry/cache coverage plus a source-boundary contract preventing callAI/parseStructuredAIOutput retry ladders from returning to the feature generators.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-delta-0624-llm-mentions-geo",
