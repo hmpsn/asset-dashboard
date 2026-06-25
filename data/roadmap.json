@@ -7,86 +7,6 @@
       "rationale": "From the 2026-06-23 15-agent SEO audit (overall C, 'A-grade architecture wired to a C-grade decision surface'). Group A flips loops already built; Group B fixes geo correctness + adds a cost-governed foundation; Group C adds paid capabilities. Spec: docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md. Deferred items (status: deferred) are out-of-program backlog captured so nothing is lost.",
       "items": [
         {
-          "id": "seo-engine-p1-value-first-keyword-scoring",
-          "title": "P1 — Flip keyword-value-scoring on + delete crude Hub-sort path (one PR). Keep computeOpportunityScore as gate-failure/backfill fallback.",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "S",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "Done (2026-06-24). Retired the keyword-value-scoring flag; value-first scoring is unconditional. Crude Hub-sort accessors deleted; computeOpportunityScore kept as the gate-failure/backfill/projection fallback. 7 test files updated; pr-check anti-reintroduction guard added + deprecation registry advanced (hidden→removed, keyword-universe-full added as the hidden exemplar). PR to staging; staging eyeball of admin Hub + client Strategy ordering before main."
-        },
-        {
-          "id": "seo-engine-p2-emv-calibration-loop",
-          "title": "P2 — Effort priors: thread getEffortPriorDays (measured time-to-implement) into the 16 OV scorer calls, overriding DEFAULT_EFFORT_DAYS. Calibration-basis swap deferred to GA4 revenue grounding.",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "S",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "Done (2026-06-24). Effort-priors only: getEffortPriorDays threaded per-actionType into all 16 computeOpportunityValue inputs via an effortDaysFor(type, source) helper. Inert until >=3 measured outcomes of an action type accrue (then falls back to DEFAULT_EFFORT_DAYS, byte-identical). The realized/predicted calibration-BASIS swap was DEFERRED (owner decision 2026-06-24): ov-calibration.ts deliberately gates the basis flip on GA4 estimatedRevenue (attributed_value is a CPC proxy today), and this program also deferred GA4 grounding. Basis flip now rides with seo-engine-deferred-revenue-grounding."
-        },
-        {
-          "id": "seo-engine-p3-serp-feature-surfacing",
-          "title": "P3 — Surface AI-Overview/SERP-feature triggers from ranked_keywords serp_item_types into SerpFeatures type + content-brief AEO directive + scoring",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "Done (2026-06-24). ai_overview recognized in hasSerpOpportunity (string label from ranked_keywords serp_item_types), pushed into stored serpFeatures at both enrichment build sites, added to the SerpFeatures intelligence type + seo-context aggregation + AI-context formatter + countSerpOpportunities (client serpOpportunities), a content-brief AI-Overview AEO directive, and the ContentGapRow chip maps (descriptive/plain/emoji) + ordered set. Free signal = 'this keyword triggers an AI Overview', NOT 'are we cited' (the paid P6 national-SERP fetch). Zero new credits. Brief directive is prompt-only by design (shapes the visible AI-generated brief)."
-        },
-        {
-          "id": "seo-engine-p4-geo-correctness-target-geo",
-          "title": "P4 — Geo correctness: thread location/language through domain endpoints + workspace target-geo field (migration) + resolveWorkspaceTargetGeo()",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "DONE 2026-06-24. Flag `geo-targeting` (OFF = byte-identical, incl. legacy un-versioned domain cache key via domainGeoToken — no re-warm). Interface + all 6 domain methods thread locationCode/languageCode; migration 152 target_geo column + TargetGeo type + workspaces.ts lockstep + PATCH boundary + toAdminWorkspaceView serializer + resolveWorkspaceTargetGeo() (field→local primary market→US/en). 12 caller sites threaded via workspaceProviderGeo() gate (competitor calls use CLIENT geo; backlinks excluded; getKeywordsForKeywords has no live caller yet). Admin BusinessFootprint TargetGeoEditor (curated DataForSEO country list = 2000+ISO numeric) gated behind flag. Tests: provider body/cache-key (4), PATCH boundary (3), row-mapper completeness, TargetGeoEditor render (4). Fixes silent US/English corruption for non-US clients (D-grade national/intl dimension)."
-        },
-        {
-          "id": "seo-engine-p5-reliability-cost-governance",
-          "title": "P5 — Reliability + cost: retry/backoff, activate dead markCapabilityDisabled, credit-usage read path + assertCreditBudget per-tier gate",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "DONE 2026-06-24. (1) Bounded retry-with-backoff in external-fetch.ts for transient 429/500/502/503/504 + network (default 2 retries on fetchProviderJson; 402/401/4xx/timeout never retried) — transient errors no longer collapse to []/null. (2) Activated the dead markCapabilityDisabled: a 40204 on backlinks now trips a 6h in-memory breaker + removed the `capability !== 'backlinks'` guard so getBacklinksProvider short-circuits to null (callers degrade). (3) NEW server/credit-budget-gate.ts: CREDIT_BUDGETS {free:0, growth:2000, premium:Infinity} + evaluateCreditBudget + assertCreditBudget cross-phase contract (P6-P8 call at route entry). Owner decision: OBSERVE-ONLY launch (budgetEnforcementEnabled=false; assertCreditBudget logs would-block, never throws; flip one let to hard-enforce). (4) Health card quotaStatus now reflects MTD budget vs usage; (5) AIUsageSection surfaces the served-but-dark dataforseo/dataforseoDaily (credits/calls/cache-hit-rate + daily chart). DEVIATIONS from audit: U4 (provider-internal gate call) reverted — created a heavy provider→gate→workspaces import cycle that broke provider tests; gating belongs at P6-P8 route entry per the audit's own contract note. U7 (NotificationBell budget-blocked) deferred — observe-only means no blocks happen yet; CreditBudgetError contract is ready for the enforcement flip. Tests: retry (7), budget-gate (12), capability-breaker (8); updated seo-provider-routing + local-visibility for the new behaviors. No feature flag (reliability/cost infra)."
-        },
-        {
-          "id": "seo-engine-p6-national-serp-rank-ai-overview",
-          "title": "P6 — National advanced-SERP rank + AI-Overview citation layer: new job, true rank + features, serp_feature_opportunity insight, historical backfill",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "DONE 2026-06-24. Flag national-serp-tracking (SEO Decision Engine group; OFF=byte-identical). Built fixture-grounded U0-U8. (U0) migration 153 serp_snapshots — true SERP rank + features time series (position/matched_url NULLable; parallel to GSC rank_snapshots, joined on (ws,date,query), never conflated); KeywordCommandCenterMetrics +nationalPosition/matchedUrl/serpFeatures/aiOverviewCited/aiOverviewPresent (ADDITIVE — never overrides GSC currentPosition, so value-score/skinny-replay invariant holds); serp_feature_opportunity 7-part insight lockstep; NationalSerpProviderRequest/Result + optional getNationalSerp. (U1) parseNationalSerp pure+fixture-validated (rank_group among type==='organic' only for client rank; aggregated top-level references[].domain for AI-Overview citation; www-strip domain match) + getNationalSerp reusing runDataForSeoOperation/cache168h/credit-logging. (U2) serp-snapshots-store (tri-state mapper, parseJsonSafeArray, transaction upsert, keywordComparisonKey-normalized query). (U3) runNationalSerpRefreshJob ported from runLocalSeoRefreshJob (concurrency=1 global+per-ws hasActiveJob, memory headroom, cancel checks, INCREMENTAL flush so cancel keeps paid reads) + POST /api/rank-tracking/:ws/refresh-national gated flag→Growth+ tier→observe-only assertCreditBudget→serialization; 100-kw cap; target-geo (P4) threaded. (U4) computeSerpFeatureOpportunities fires ONLY on the ownership-guarded AI-Overview-uncited signal (featured-snippet trigger dropped after review — parser has presence not ownership; capture deferred to P7); deleteStaleInsightsByType unconditional (bridge rule). (U2b) admin metrics overlay in keyword-command-center. (client) serp_feature_opportunity narrative projector ('Google's AI Overview is answering X without citing you'). (U6) KeywordDetailDrawer live-SERP rank + ranking URL + serpBadges (extracted to shared/serpFeatureBadges) + AI-Overview citation badge emerald(cited)/zinc(not), never purple; flag-gated 'Refresh national ranks' Hub button. WS_EVENTS.SERP_SNAPSHOTS_REFRESHED (server broadcast + centralized useWsInvalidation + KeywordHub handler + platform-domain-event + background-job-matrix registrations). Client metrics admin-only (no public-portal serializer); client sees only the insight narrative. DEVIATIONS from audit: nationalPosition is a SEPARATE field (not a currentPosition override) to preserve the value-score invariant; 'public serialization of metrics' was N/A (no public command-center endpoint) — the client surface is the insight narrative instead; historical backfill stays deferred (owner decision). Scaled multi-agent review (4 reviewers): security + compliance clean; fixed 2 Important (snippet false-positive, cancel-discards-batch) + 2 Minor. Tests: parser(5)+store(6)+narrative(2)+drawer(2)+route integration(4); full unit 14129 / component 4123 / contract 1401 green."
-        },
-        {
-          "id": "seo-engine-p7-gbp-reviews-local-layer",
-          "title": "P7 — GBP + reviews local layer: business_listings_search + capture ratings → review-gap recs",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "DONE 2026-06-24. Flag local-gbp (SEO Decision Engine group; PAID surface OFF=byte-identical). FREE+PAID (audit-validated split). FREE half (unflagged, P3 precedent): parseListingRating extracts rating.value/votes_count from local_pack items the local refresh already fetches — populates LocalVisibilityBusinessResult.rating/reviewCount ($0). PAID half: getBusinessListings (business_data/business_listings_search, reuses runDataForSeoOperation/cache24h/credit-breaker) — category search (competitors, sorted by votes_count) + TITLE search (the owner, who's often too review-poor to surface in a count-sorted search); migration 154 business_listing_snapshots (own + competitors via is_owned; rating/review_count NULLable, zero reviews = absent never 0); business-listings-store. local-gbp-refresh job (ported from national-serp: serialization, memory, cancel, incremental flush; owner assigned by parser-VERIFIED isOwned, not result[0]) + POST /api/local-seo/:ws/refresh-gbp gated flag→Growth+→observe-only budget→serialization. DELIVERABLE: review-gap + GBP-completeness RECOMMENDATIONS (reuse local_visibility RecType, no new insight) — review-gap (count≥10 OR star≥0.3 vs top competitor with real review count) + GBP-completeness (profile richness <60/100; claim-status intentionally NOT a trigger — is_claimed defaults true so unclaimed owners aren't returned). Admin GbpReviewsPanel (reviews-vs-competitors blue, completeness scoreColorClass, aggregates only, never purple) + GET /api/local-seo/:ws/gbp-reviews + LocalSeoSlice.reviewSummary (AI context). WS LOCAL_GBP_SNAPSHOTS_REFRESHED full registry lockstep. DEVIATIONS: getBusinessListings gained optional title (owner lookup); shared deriveGbpCompletenessScore (parser + recs); 'claimed' reframed to profile-completeness after scaled review found it never reliably false. Scaled 4-agent review: security + PII clean (no review text/authors/contact_info captured); fixed 3 Important (dead unclaimed branches, owner name-collision, missing panel invalidation key) + 2 Minor. Tests: listing-rating(5)+parser(6)+store(9)+recs(2)+panel(3)+slice+route integration(4); full unit 14151 / component 4126 / contract green."
-        },
-        {
-          "id": "seo-engine-p8-ai-visibility-llm-citation",
-          "title": "P8 — AI-visibility slice: ai_optimization/llm_mentions_* → 'are we cited by LLMs' KPI + AEO before/after proof",
-          "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
-          "est": "L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-23",
-          "notes": "DONE 2026-06-24 — FINAL phase of the SEO Decision Engine program. Flag ai-visibility (SEO Decision Engine group; OFF=byte-identical). Mentions-DB only (no direct prompting); KPI-only deliverable (no new rec/insight — the existing aeo-* recs are the actions). getLlmMentions provider (ai_optimization/llm_mentions/aggregated_metrics, reuses runDataForSeoOperation/cache336h/40204-breaker; VERIFY-ON-LIVE note on the exact REST envelope — response shape is fixture-validated) + parseLlmMentions. Migration 155 llm_mention_snapshots (time-series; mentions/ai_search_volume NULLable → absent=0 never invented). HEADLINE = share-of-voice (client BRAND ÷ all co-mentioned brand_entities_title, like-to-like) — distinct from mention VOLUME (domain citations). llm-mentions-refresh job (ported national-serp pattern; resolves ownerBrandNames from workspace.name + domain-root fallback) + POST /api/rank-tracking/:ws/refresh-ai-visibility + GET .../ai-visibility, gated flag→Growth+→observe-only budget→serialization. Admin AiVisibilityPanel (share-of-voice MetricRing, mention volume, mentions-over-time trend sparkline = before/after proof, competitor share-of-voice, source-domain AEO targets; blue data/score colors, never purple) mounted in KeywordHub. SeoContextSlice.aiVisibility → AdminChat/AI context. WS LLM_MENTIONS_SNAPSHOTS_REFRESHED full registry lockstep. DEVIATIONS: route under /api/rank-tracking (existing registered group, not /api/strategy); CLIENT-facing KPI deferred (see seo-engine-followon-ai-visibility-client-kpi) — it needs accrued snapshots to be a meaningful before/after. Scaled 4-agent review: security + PII + compliance clean (no LLM transcripts captured — aggregates only); fixed 3 Important (all share-of-voice: 'not measured' undefined vs misleading 0%, over-matching brand matcher, blank-name degradation). Tests: parser(13)+store(7)+panel(4)+route integration(5); full unit 14170 / component 4129 / contract 1401 green. SEO Decision Engine P1-P8 COMPLETE."
-        },
-        {
           "id": "seo-engine-followon-ai-visibility-client-kpi",
           "title": "AI-visibility CLIENT-facing KPI (Overview/Results before-after card)",
           "source": "P8 ai-visibility follow-on",
@@ -178,17 +98,6 @@
           "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF). || [DELTA AUDIT 2026-06-24 · partially-done — re-scope]: website form-capture already shipped under the-issue-client-measured-capture. Remaining under THIS flag = the P3 graduation to actual_reconciled (currently a reserved enum member only, outcome-tracking.ts:67) + junk quality-scoring (zero today). The \"call tracking + CRM\" title is stale — owner to confirm whether junk-scoring is near-term or bundled with the deferred CRM item (the-issue-client-crm-reconciliation)."
         },
         {
-          "id": "the-issue-client-redesign-p1-return-hook",
-          "title": "The Issue (Client) P1 — return hook (forwardable one-pager export [P1b] + event-driven EMAIL pull-back [P1c]; NO SMS)",
-          "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
-          "est": "TBD",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-20",
-          "notes": "Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first). [P1b BUILT + review-fixed 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1b-plan.md — admin setup-readiness checklist (IssueSetupReadiness) + admin/client named-leads + forwardable one-pager export (print-from-browser, NO PDF lib); D7 PII boundary held; 12-finding scaled review all fixed (1 Important + 7 Minor). See FEATURE_AUDIT #531. [P1c BUILT + PR-READY 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md — EMAIL-ONLY (no SMS, owner-locked) weekly event-gated return-hook: a new weekly cron (server/return-hook-cron.ts, clone of strategy-issue-cron) sends ONE consolidated client_return_hook digest (new customers/leads + new measured money + decision-still-waiting) ONLY when ≥1 section has content, through the EXISTING email stack (nodemailer queue + throttle-exempt 'return' category — the ISO-week marker, stamped only on a confirmed enqueue, is the authoritative cap — + workspace_primary recipient policy). Additive — no new transport built (7-area infra discovery confirmed it exists). Owner decisions: weekly digest only-when-something-happened; match-existing opt-out + 'reply to stop' footer (platform-wide preference center deferred → email-preference-center). Migration 151 (last_return_hook_sent_week_of weekly marker). Money section activity-gated (only on new-leads-this-week + measured_action verdict). 19 new tests; full suite 26806 green; flag-OFF byte-identical. See FEATURE_AUDIT #532. Status stays pending until ALL of P1 is soaked on staging + the legacy-cutover/teardown (owner-locked sequence: build all P1 → one soak + cutover at the end). || [DELTA AUDIT 2026-06-24 · already-done]: both halves built + flag-gated — P1b one-pager export + P1c email pull-back via return-hook-cron.ts (idempotency mig 151). Residual is staging-soak + cutover gate, not unbuilt code.",
-          "shippedAt": "2026-06-24"
-        },
-        {
           "id": "email-preference-center",
           "title": "Platform-wide email preference center + CAN-SPAM compliance (unsubscribe / suppression / bounce)",
           "source": "docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md",
@@ -228,66 +137,6 @@
       "notes": "SUPERSEDED 2026-06-17 by the v2 'SEO command center' IA (docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md). Phases 0–5 shipped behind strategy-decision-bands; Phase R retired the 3-band layout + flag before removal, reusable leaves carried into v2. Branch series strategy-phase-*; one PR per phase, staging-first.",
       "items": [
         {
-          "id": "strategy-redesign-phase-0-decomposition",
-          "title": "Phase 0 — decompose KeywordStrategy.tsx into hooks + leaves",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1248): 1064->~350 line orchestrator; 5 hooks + 11 leaves; behavior-preserving; 16-file scaled review; 25,832 tests green."
-        },
-        {
-          "id": "strategy-redesign-phase-1a-ia-scaffold",
-          "title": "Phase 1a — decision-first 3-band IA scaffold behind strategy-decision-bands flag",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "M-L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1249, merged to staging): flag + StrategyBand containers + reorder existing leaves + RequestedKeywordTriage hoist + settings-collapsed + maxPages persistence fix + header summary. Flag OFF = byte-identical legacy layout. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-1a-ia-scaffold.md."
-        },
-        {
-          "id": "strategy-redesign-phase-1b-decision-queue",
-          "title": "Phase 1b — Decision Queue in the Decide band (admin rec engine + fix CTAs)",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "M-L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1250, merged to staging): DecisionQueue leads the Decide band; extracted shared RecommendationRow/OvBreakdown/formatEmv with additive onFixCta slot; useAdminRecommendationSet superset (emvPerWeek-safe); fix-CTA routing via src/lib/recTypeTab.ts (content→content-pipeline). Excludes dismissed + completed recs."
-        },
-        {
-          "id": "strategy-redesign-phase-2-act-band",
-          "title": "Phase 2 — Act band actionable (merged Opportunities, navigating What-Changed, decay + lost-query cards)",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "M-L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1251, merged to staging). OpportunitiesList merges Quick Wins + Low-Hanging Fruit (dedup by pagePath) with per-row Optimize-page CTAs; StrategyDiff migrated to useQuery (refetches on strategy:updated) with navigating nextAction CTAs (watch/review_evidence stay passive); new DecayingPagesCard (useContentDecay) + LostQueryRecoveryCard (useLostVisibility). Shared content-decay types promoted to shared/types/content-decay.ts. Scaled review caught + fixed a track_keyword dead-CTA. Bands Act band only; legacy layout untouched. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-2-act-band.md."
-        },
-        {
-          "id": "strategy-redesign-phase-3a-cannibalization-triage",
-          "title": "Phase 3a — Cannibalization triage UI + Fix-in-Editor CTA (read-only)",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1252, merged to staging). New CannibalizationTriage leaf replaces the passive CannibalizationAlert in the bands Act band only (legacy + ContentPipeline keep CannibalizationAlert). Per issue: keeper page marked (canonicalPath or best position), each duplicate gets a Fix-in-editor CTA → seo-editor prefilled by pageSlug. Relaxed the SEO-editor prefill gate (useSeoEditorSessionState) to fire on pageId||pageSlug (slug-fallback match already existed; also fixes latent no-prefill for PageIntelligence + DeadLinkPanel). Review caught + fixed a once-per-mount guard that blocked the 2nd Fix-in-editor (keyed to lastFixKey). Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3a-cannibalization-triage.md."
-        },
-        {
-          "id": "strategy-redesign-phase-3b-i-cannibalization-mark-resolved",
-          "title": "Phase 3b-i — Cannibalization Mark-resolved + resolved re-filter (admin-only)",
-          "source": "Strategy redesign spec 2026-06-16",
-          "est": "S-M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1254, merged to staging). Per-issue 'Mark resolved' in CannibalizationTriage records the existing cannibalization_resolved outcome (durable tracked_action, sourceType 'cannibalization', sourceId=normalized keyword); resolved issues drop out of the queue (read via useOutcomeActions, refetched by the global OUTCOME_ACTION_RECORDED invalidation). Fixed the stale actionTypeEnum (server/schemas/outcome-schemas.ts) which omitted cannibalization_resolved + 4 others. New: outcomesApi.recordAction, useRecordOutcomeAction, cannibalizationSourceId helper. No migration, no strategy-GET change. Review found zero issues. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-i-cannibalization-mark-resolved.md."
-        },
-        {
           "id": "strategy-redesign-phase-3b-ii-cannibalization-send",
           "title": "Phase 3b-ii — Cannibalization Send-to-client (dedicated 'cannibalization' client-action type)",
           "source": "Strategy redesign spec 2026-06-16",
@@ -298,56 +147,6 @@
           "notes": "PR opening to staging. New dedicated 'cannibalization' client-action / deliverable type (owner decision — purpose-built client card). Per-issue 'Send to client' in CannibalizationTriage → createAdminClientAction (grandfathered route) → dual-write mirrors a 'cannibalization' deliverable; new deliverable adapter (decision-kind, modeled on content-decay); new CannibalizationRenderer in both DeliverableDetailModal + DecisionDetailModal. Lockstep one-commit wiring across ClientActionSourceType + validSources + sourceTypeSchema + clientActionDeliverableType + CLIENT_ACTION_FAMILY_TYPES + DELIVERABLE_TYPES + pr-check list + DELIVERABLE_TYPE_BADGES + CLIENT_ACTION_BADGES + SOURCE_TYPE_LABELS + OUTCOME_ACTION_TYPE_BY_SOURCE. Completes Phase 3. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-3b-ii-cannibalization-send.md."
         },
         {
-          "id": "strategy-redesign-phase-4a-authority-backlinks",
-          "title": "Phase 4a — Reference band: Authority & Backlinks merge + BacklinkProfile RQ migration + competitor invalidation/cache-label fixes",
-          "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1257, merged to staging). First of three Phase 4 sub-PRs (4a/4b/4c). New AuthorityAndBacklinks leaf merges the Reference band's backlink + competitive children into one: composes BacklinkProfile + CompetitiveIntel variant='merged' (hides the own-domain stat grid + the embedded Keyword Gaps section, deduped; corrected cache-freshness label). BacklinkProfile migrated off raw useState+useEffect+fetch to a new useBacklinkProfile React Query hook (queryKeys.admin.backlinkProfile) — the last hand-rolled fetch in src/components/strategy/. Fixed the STRATEGY_UPDATED→competitorIntel invalidation gap (added backlinkProfile + competitorIntelAll to strategyMutationKeys) and the wrong 48h staleTime/cache-label (real DataForSEO TTL is 7d). Bands Reference band only; legacy layout byte-identical (CompetitiveIntel variant defaults to 'full'; flag NOT removed). Review: zero Critical/Important. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
-        },
-        {
-          "id": "strategy-redesign-phase-4b-competitor-evidence",
-          "title": "Phase 4b — Reference band: Competitor Evidence inline Track + Site Keywords→Hub deep-link + Opportunities Explore-in-Hub",
-          "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1259, merged to staging). Second of three Phase 4 sub-PRs. KeywordGaps (the 'Raw Competitor Evidence' surface) gains an OPTIONAL inline Track button (gated showTrack=!!onTrack; keyed Fragment keeps the no-track legacy row byte-identical) and MOVES from the bands Act band to the bands Reference band as the single deduped competitor-evidence surface (the embedded gaps in CompetitiveIntel were already dropped in 4a's merged variant). New ManageInHubCard replaces the full SiteTargetKeywords list in the bands Reference band with a compact 'Manage in Keyword Hub' deep-link (literal ?tab=in_strategy → two-halves contract honored by KeywordHub). KeywordOpportunities gains an OPTIONAL per-row 'Explore in Hub' deep-link (freeform AI prose → Hub research, NOT auto-Track which would pollute rank tracking). All three via NEW bands-only realLeaves keys (competitorEvidence/manageInHub/opportunitiesInteractive); legacy keeps keywordGaps/siteKeywords/opportunities byte-identical. Review: APPROVE, zero Critical/Important. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
-        },
-        {
-          "id": "strategy-redesign-phase-4c-visualization-help",
-          "title": "Phase 4c — Reference band: compact StatBar + RankingDistribution click-to-Hub + Guide→help disclosure",
-          "source": "Strategy redesign spec 2026-06-16 (Phase 4 reference consolidation)",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Done 2026-06-16 (PR #1260, merged to staging). ✅ PHASE 4 COMPLETE (4a+4b+4c). Third of three Phase 4 sub-PRs. New StrategyStatBar (CompactStatBar) replaces the hero StrategyStatGrid in the bands Reference band. RankingDistribution's 11–20 (striking-distance) legend row becomes a Hub deep-link (literal ?tab=striking_distance) — required fixing keywordHubDeepLink.HUB_SEGMENT_VALUES which had OMITTED striking_distance (a segment the Hub receiver honors → the sender was silently dropping it; sender==receiver restored + 'SIX'→'SEVEN' doc). New StrategyHelpDisclosure (collapsed, mirrors StrategySettings) consolidates StrategyHowItWorks + the exported METRIC_GLOSSARY and drops the stale 'Rank Tracker' reference; it replaces the howItWorks slot at the foot of the bands Reference band. Guide demotion: the top-level Analysis/Guide TabBar is now FLAG-CONDITIONAL (flag-on returns bandsAnalysis directly, no TabBar/Guide tab; flag-off renders the unchanged TabBar+Guide+legacyAnalysis — byte-identical). New bands-only realLeaves keys statBar/distributionInteractive/helpDisclosure; legacy keeps statGrid/distribution/howItWorks. NOTE: the spec's orphaned-ActionQueue dead-code delete was SPUN OFF to its own task (task_44eefd6b) — it touches the inbox bounded context + shared wsInvalidation + platform-org report (~10 files), scope-bleed for a Reference-band IA PR. Plan: docs/superpowers/plans/2026-06-16-strategy-redesign-phase-4-reference-consolidation.md."
-        },
-        {
-          "id": "strategy-redesign-phase-5a-strategy-history-snapshot",
-          "title": "Phase 5a — strategy_history snapshot on manual PATCH (What Changed misattribution fix)",
-          "source": "Strategy redesign spec 2026-06-16 §10 (Phase 5 signal generation)",
-          "est": "S",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-17",
-          "notes": "Done 2026-06-17 (PR #1262, merged to staging). First of three Phase 5 sub-PRs. The manual PATCH strategy-edit path (routes/keyword-strategy.ts) did NOT snapshot strategy_history (only the AI-regen writeKeywordStrategy did), so StrategyDiff ('What Changed') misattributed human edits to the last AI regeneration. Extracted the snapshot INSERT+prune-to-5 from keyword-strategy-persistence.ts into a reusable snapshotStrategyHistory(workspaceId, previousStrategy, priorArrays) helper (guards on prior generatedAt; must run inside db.transaction BEFORE the replaceAll/upsert clobber). Called it at the top of the PATCH applyPatch transaction (reads prior table-backed arrays + uses the PRIOR generatedAt). Behavior-preserving refactor of the regen path. Integration test: PATCH-then-/diff attributes the edit to the new boundary; no-blob PATCH records no snapshot (guard). Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md (decisions: cron conservative+kill-switch behind signal-auto-recompute flag; on-mutation always-enqueue)."
-        },
-        {
-          "id": "strategy-redesign-phase-5b-recompute-job",
-          "title": "Phase 5b — Recompute job + manual 'Recompute now' + 'Computed X ago' caption",
-          "source": "Strategy redesign spec 2026-06-16 §5 (Phase 5 signal generation)",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-17",
-          "notes": "Done 2026-06-17 (PR #1263, merged to staging). Second of three Phase 5 sub-PRs (always-on, no flag). New INTELLIGENCE_RECOMPUTE background job type (BACKGROUND_JOB_TYPES + metadata; resultBehavior domain-store; FM-2 transitions verified) + worker server/intelligence-recompute-job.ts (getOrComputeInsights force:true — computeAndPersistInsights stays private; NO addActivity, to avoid self-perpetuating 5c's activity-gated cron). New POST /api/webflow/keyword-strategy/:ws/signals/recompute (hasActiveJob reuse-or-create → createJob → setTimeout worker → {jobId}; recommendations.ts template). Threaded computedAt (MAX insight computed_at) onto the /signals payload (all 3 return branches) + SignalsResponse. IntelligenceSignals card: 'Computed X ago' muted caption (timeAgo) + teal 'Recompute now' Button (variant=link) in the SectionCard action slot, wired via useRecomputeSignals (POST → trackJob; NotificationBell surfaces progress; the existing INTELLIGENCE_SIGNALS_UPDATED broadcast auto-invalidates — no 2nd broadcast). Worker FM-2 + component tests. LESSON: adding to BACKGROUND_JOB_TYPES requires a lockstep entry in tests/helpers/background-job-test-matrix.ts (BACKGROUND_JOB_LIFECYCLE_MATRIX) or background-job-coverage-contract fails. Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md."
-        },
-        {
           "id": "strategy-redesign-phase-5c-auto-recompute",
           "title": "Phase 5c — Automated recompute: daily activity-gated cron + on-mutation enqueues (behind signal-auto-recompute)",
           "source": "Strategy redesign spec 2026-06-16 §5 (Phase 5 signal generation)",
@@ -356,17 +155,6 @@
           "status": "in_progress",
           "createdAt": "2026-06-17",
           "notes": "PR opening to staging. Third/last Phase 5 build sub-PR — dark-launched behind the new signal-auto-recompute feature flag (default OFF; server-read via isFeatureEnabled). OWNER DECISIONS: cron conservative+kill-switch (un-forced — skips workspaces already fresh <24h; hasRecentActivity(ws,2) tight window; enqueues the 5b INTELLIGENCE_RECOMPUTE job); on-mutation ALWAYS-enqueue (every trigger), bounded by hasActiveJob dedup + apiCache 15-min TTL. New shared enqueueIntelligenceRecompute(ws) (flag-gated + deduped) in intelligence-recompute-job.ts. New daily cron server/insight-recompute-cron.ts (modeled on intelligence-crons.ts: 24h interval + 10-min startup delay + unref + isRunning guard; start/stop wired into startup.ts startSchedulers + index.ts gracefulShutdown — symmetry). On-mutation hooks: queueKeywordStrategyPostUpdateFollowOns (covers strategy edit + publish + content/schema callers) + rank-tracking-scheduler after the rank snapshot. Flag added to FEATURE_FLAG_CATALOG + Strategy group; lifecycle test as-of bumped 2026-06-16→2026-06-17. After this merges: build work DONE — then the DEFERRED cumulative scaled-code-review over ALL redesign work, then flag-removal + legacyAnalysis deletion, then operator-keeper-override (P3). Plan: docs/superpowers/plans/2026-06-17-strategy-redesign-phase-5-signal-generation.md."
-        },
-        {
-          "id": "strategy-cannibalization-operator-keeper-override",
-          "title": "Cannibalization triage — operator-selectable keeper (override the auto-derived canonical page)",
-          "source": "Owner refinement 2026-06-16 (post Phase 3b-ii)",
-          "est": "M",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-06-16",
-          "notes": "Phase 3 follow-on. Today CannibalizationTriage auto-derives the keeper page (item.canonicalPath if set, else best-ranking via keeperPathOf). Owner wants to OVERRIDE which competing page is the keeper (real example: keep a keyword on a services page, not the auto-picked insights page). Scope: a per-issue keeper picker; the chosen keeper must flow into (a) which pages show 'Fix in editor' (non-keepers = duplicates), and (b) the Send-to-client payload canonicalPath. KEY CONSTRAINT: the override MUST persist across strategy regeneration — cannibalization_issues is delete-then-reinsert (replaceAllCannibalizationIssues clobbers canonical_path), so the operator's keeper choice can't live on that row. Store it durably keyed by normalized keyword (mirror the 3b-i resolution pattern: a tracked record / small override table / preserved-metadata Map on the delete-reinsert), and have keeperPathOf prefer the operator override over the auto-derivation. Do after the current Strategy redesign batch. Owner expects further refinements to surface as Strategy gets exercised. || [DELTA AUDIT 2026-06-24 · already-done]: fully built — mig 141 cannibalization_keeper_override keyed on order-independent url_set_key (clobber-immune), applied at the read boundary (cannibalization-issues.ts:176), UI KeeperSelector.tsx. The durable-key design satisfies the regen-persistence constraint.",
-          "shippedAt": "2026-06-24"
         }
       ]
     },
@@ -396,57 +184,6 @@
           "status": "pending",
           "createdAt": "2026-06-18",
           "notes": "DEFERRED. Gated behind the strategy-paid-topics child flag (default OFF). Until this lands, v3 renders Add-to-plan only where rec.productType already resolves a SKU. Enables a generic strategy_addon SKU + a rec→cart bridge for keyword/topic rec types so keyword/topic opportunities become purchasable add-ons."
-        },
-        {
-          "id": "strategy-redesign-phase-3-managed-set",
-          "title": "Strategy redesign Phase 3 — managed keyword working set (add/remove/keep/replenish)",
-          "source": "Strategy redesign synthesized plan 2026-06-18 §3.1, §7 Phase 3",
-          "est": "L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-18",
-          "notes": "Gated behind the strategy-keywords-managed-set child flag (default OFF, declared in the P2 pre-commit). Dedicated strategy_keyword_set table (migration 139) whose SOLE writer is reconcileStrategyKeywordSet, grafted into persistKeywordStrategy's writeKeywordStrategy transaction (NOT saveRecommendations, which has no db.transaction) — the one storage design provably immune to the tracked_keywords delete-then-reinsert clobber. Adds add/remove/keep + auto-replenish + search-and-add + add-from-client-requests, the three-visual-state managed-set UI, and managed Topic Clusters/Content Gaps via tracked_actions keep markers. P2 pre-commits the contracts (table, domain stub, shared types, FixContext extension, WS event, query key, ActivityType/ActionType enum values). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md. || [DELTA AUDIT 2026-06-24 · already-done]: built to spec — mig 139 dedicated strategy_keyword_set table, sole writer server/domains/strategy/managed-keyword-set.ts, grafted into the writeKeywordStrategy transaction (clobber-immune, NOT saveRecommendations). Done behind strategy-keywords-managed-set; awaiting staging flag promotion.",
-          "shippedAt": "2026-06-24"
-        },
-        {
-          "id": "strategy-redesign-phase-4-competitor-send",
-          "title": "Strategy redesign Phase 4 — competitor RecType send-to-client",
-          "source": "Strategy redesign synthesized plan 2026-06-18 §3.3, §7 Phase 4",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-18",
-          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane C). Gated behind the strategy-competitor-send child flag (default OFF). Adds the competitor RecType via a one-commit 5-map + Zod recommendationSchema + REC_POLICY_REGISTRY lockstep (review caught the Zod enum as a silent-drop risk — the P3 actionTypeEnum bug class — and it's covered). Holistic review found the per-row 'Send to client' button was permanently disabled because nothing ever minted a type:'competitor' rec, so this ships a NEW idempotent POST /:ws/competitor-rec mint endpoint: CompetitiveIntel mints-then-sends via sendRecommendation() (two-axis invariant: clientStatus only, never RecStatus). Client-visible competitor renderer in InsightsEngine.tsx ships gated. Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
-        },
-        {
-          "id": "strategy-redesign-phase-4-signal-fold",
-          "title": "Strategy redesign Phase 4 — fold Intelligence Signals into the cockpit as real recs",
-          "source": "Strategy redesign synthesized plan 2026-06-18 §3.4, §7 Phase 4",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-18",
-          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane A). Gated behind the strategy-signal-fold child flag (default OFF). Mints Intelligence Signals as real recs at strategy-gen time (mintSignalRecs inside generateRecommendations, AFTER carry-over) so the existing RECOMMENDATIONS_UPDATED broadcast + applyLifecycleCarryOver cover folded signals automatically; dedup via signal:<insightId> merge key. CRITICAL fix (caught in review): signal-sourced recs are exempted from the auto-resolve sweep — their producer never re-emits them, so 'absent from newSources' is always a false positive; without the exemption every un-actioned folded signal flipped to '✓ Auto-resolved' on the next daily/on-mutation recompute. Guarded by a status-continuity regression test (server/__tests__/signal-fold-carry-over.test.ts). Carry-over confirmed O(n). flag-OFF keeps the standalone IntelligenceSignals card (deletion deferred to the strategy-command-center cutover). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
-        },
-        {
-          "id": "strategy-redesign-phase-4-config-consolidation",
-          "title": "Strategy redesign Phase 4 — config consolidation (StrategyConfigPanel) + Local SEO de-dup",
-          "source": "Strategy redesign synthesized plan 2026-06-18 §7 Phase 4 (Lane B)",
-          "est": "S",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-19",
-          "notes": "Done 2026-06-19 (PR #1286, P4 Wave 1 Lane B). Ships under strategy-command-center (no separate flag). New StrategyConfigPanel collapses StrategySettings + Local SEO market config into one disclosure at the foot of the flag-ON Overview, wired to the LocalSeoMarketSetupDrawer + a market summary; removes the outside-tabs config leak. flag-ON de-dups Local SEO RESULTS to KeywordHub (mode='keywords'). flag-OFF preserves LocalSeoVisibilityPanel mode='strategy' byte-identical — the de-dup is scoped flag-ON only (holistic review caught an over-broad deletion that had dropped it for everyone; restored in commit a6ca7b5ae). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
-        },
-        {
-          "id": "strategy-redesign-phase-4-orphan-cleanup",
-          "title": "Strategy redesign Phase 4 — delete dead Strategy orphans (Lane D)",
-          "source": "Strategy redesign synthesized plan 2026-06-18 §7 Phase 4 (Lane D)",
-          "est": "S",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-06-19",
-          "notes": "Done 2026-06-19 (PR #1286, P4 Lane D). Deleted 3 components with zero live render sites after the tab redesign + folded-signal recs — OpportunitiesList, RequestedKeywordTriage, DecisionQueue — plus the cascade orphan buildOpportunityRows (its sole consumer) and their 4 unit tests. Cleaned barrel exports, the OpportunityRow union + props interfaces in types.ts, and stale 'decision-bands layout' comments. Kept IntelligenceSignals (flag-OFF render) + LostQueryRecoveryCard (keep-reserve). New orphan-cuts.test.ts guards both the deletions and the two intentional keeps. Supersedes the OpportunitiesList/buildOpportunityRows references in FEATURE_AUDIT #504."
         },
         {
           "id": "strategy-the-issue",
@@ -518,16 +255,6 @@
       "notes": "Source: docs/audits/2026-06-10-core-features-audit.md + the master plan parked-items table. Owner decisions (2026-06-11): #18 Keyword Hub flag flipped (keyword-hub + keyword-value-scoring + keyword-universe-full); #23 briefing-v2 stays owner-parked pending a cutover date; #24 rec-set normalization remains low-priority substrate, not promoted into this sprint.",
       "items": [
         {
-          "id": "audit0610-27-content-perf-joinback-term-grading",
-          "title": "Content performance join-back + term-coverage grading",
-          "source": "Core-features audit 2026-06-10 (#27)",
-          "est": "M-L",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done 2026-06-14 in codex/content-performance-joinback: moved content performance assembly into a content-domain read helper, preserved existing GSC/GA4 metrics, joined delivered/published request items back to linked briefs/posts, and added deterministic term-coverage grading from brief-prescribed keywords/questions/entities/SERP evidence against generated post text. Admin content performance now shows brief/post lineage, source-evidence availability, coverage badges, and capped missing-term diagnostics; public/client content-performance returns only a safe coverage summary with raw C4 source evidence and AI review internals scrubbed. Matrix items without reliable lineage degrade to coverage unavailable."
-        },
-        {
           "id": "audit0610-25-serp-position-checks",
           "title": "SERP position checks for client-requested + zero-impression keywords",
           "source": "Core-features audit 2026-06-10 (#25)",
@@ -565,17 +292,6 @@
           "status": "pending",
           "createdAt": "2026-06-11",
           "notes": "Incl. orange→teal active states, sky-* removal, aria-expanded on collapsibles, in-page nav for 16 stacked sections, dead discovery code delete, Guide claim fix. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · medium conf]: Re-scope and keep, P3. Reframe from the stale KeywordStrategy.tsx line refs to: (1) sweep sky-*/orange-* hue violations to blue/teal repo-wide (or land a pr-check hue rule), (2) delete the dead discovery block in keyword-strategy-seo-data.ts and its stale flag comments, (3) re-audit the redesigned KeywordStrategyPanel for aria-expanded + in-page nav, since the original section-stacking finding may no longer apply. The dead-code deletion is the highest-confidence, lowest-risk win."
-        },
-        {
-          "id": "awp-keyword-hub-sweep",
-          "title": "Keyword Hub polish sweep (report §2 minors)",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Incl. keepPreviousData, filter-aware empty states, mobile overflow, bulk-bar/pagination overlap, dead Not-Checked filter, O(n²) bulk lifecycle, sort affordances. || [AUDIT 2026-06-24 · CLOSED — ALREADY DONE · high conf]: Close/mark-done, P3. The cutover absorbed essentially all of this sweep. Only loose end: spin off a 1-line cleanup to remove (or implement) the dead 'Not Checked' filter at server/keyword-command-center.ts:1089/1136 so it stops rendering a permanently-empty filter. Do not keep the full sweep item open — it is stale relative to the cutover.",
-          "shippedAt": "2026-06-24"
         },
         {
           "id": "awp-local-seo-sweep",
@@ -616,16 +332,6 @@
           "status": "pending",
           "createdAt": "2026-06-11",
           "notes": "Incl. tab naming drift, SchemaSuggester PageHeader/TabBar adoption, WorkspaceHome hand-rolled stat card, ad-hoc z-index scale, palette no-workspace no-ops, ?tab= cleanup comment fix, duplicate sidebar icons. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3. Re-scope: drop the '?tab= cleanup comment fix' line (resolved) and keep the rest. Quick wins: de-duplicate the 4 sidebar icon collisions in navRegistry.tsx (pure icon swaps), convert WorkspaceHome's two hand-rolled cards to StatCard, and fix the CommandPalette no-workspace guard (hide/disable workspace-scoped items + don't addRecent on no-op). The z-index token consolidation (add --z-overlay/--z-system tiers + migrate 7 hatched raw values) is a slightly larger but worthwhile platform-foundation cleanup."
-        },
-        {
-          "id": "awp-inline-error-banner-extraction",
-          "title": "Extract <InlineBanner> ui primitive + extractErrorMessage(err, fallback) util — converge W1's 8 new error surfaces",
-          "source": "Scaled code review of fix/admin-surfaces-w1-silent-failures (2026-06-11)",
-          "est": "3-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done 2026-06-14 in codex/inline-banner-error-helper: added shared InlineBanner (alert/status roles, tone tokens, optional dismiss, compact mode) plus extractErrorMessage(err, fallback). Migrated scoped W1 drift surfaces in SchemaSuggester/SchemaPageCard, KeywordStrategy add/track errors, ContentPlanner, ContentPerformance, BulkAcceptPanel, SchemaVersionHistory, and ClientDashboard section-load errors. Added primitive/helper tests and bulk-start failure coverage."
         }
       ]
     },
@@ -637,56 +343,6 @@
       "notes": "Created by roadmap cleanup on 2026-06-11. Source items came from Client Dashboard 3–6 plus remaining inbox polish leftovers from unified-send/client-inbox deferred sprints. Preserve phase-per-PR discipline for larger items.",
       "items": [
         {
-          "id": "cda-sc3-fix-this-cart",
-          "title": "'Fix this ($X)' cart integration on Health audit issues",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
-          "est": "3-5d",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in feat/client-revenue-r1. FIX_CATALOG (MONETIZATION prices) + useCart wiring with per-page pageId merge semantics (review-critical fix: same-productType rows no longer block/drop pages); issueChecks end-to-end; cart persisted out-of-band of Stripe metadata (migration 137); external-billing + Premium render zero prices."
-        },
-        {
-          "id": "cda-sc3-impact-estimates",
-          "title": "Impact estimates on health fixes (surface emvPerWeek as '$X/week at stake')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
-          "est": "2-3d",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. impactBand projection at the public boundary (floor $25/mo, cap $2k/mo, conservative 0.7x nice-step ranges, band labels); emvPerWeek leak test green + banding contract test; HealthImpactLine + combined cart estimate; buildImpactBandsByCheck adapter (highest-band merge)."
-        },
-        {
-          "id": "cda-sc3-bundle-pricing",
-          "title": "Bundle pricing in cart (e.g. metadata pack when 10+ fixes added)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §5",
-          "est": "1-2d",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. Server-authoritative packs+remainder math (re-normalizes client splits), pack suggestions in rows/cart at threshold, SeoCart upsell fixed to only show positive savings (pre-existing negative-savings bug fixed per review); verify:stripe-prices drift guard added."
-        },
-        {
-          "id": "cda-sc3-pagination-enabler",
-          "title": "Pagination on unbounded client list endpoints (enabler)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
-          "est": "2-3d",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (R1-C lane). Optional limit/offset (max 200) added to approvals, client-actions, content-requests, requests, keyword-feedback, page-keywords. Back-compat: no params → original shape unchanged; params present → { items, pageInfo: { total, limit, offset, hasMore } }. audit-detail scoreHistory capped at 50. 27 new integration tests. Server helper: server/pagination.ts."
-        },
-        {
-          "id": "cda-sc4-competitor-gaps",
-          "title": "Competitor keyword gap analysis surface (Premium)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4 + §3",
-          "est": "4-6d",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in feat/client-revenue-r2. Premium-gated (server 402 + thin TierGate per tier-rediscussion coupling note), banded projection + leak test, R1 pagination."
-        },
-        {
           "id": "cda-sc4-implementation-hours",
           "title": "Implementation hours tracking (3 hrs/month Premium allowance)",
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
@@ -697,17 +353,6 @@
           "notes": "Track allowance usage, show remaining, enable hour-block purchases. Makes the Premium labor component visible instead of invisible. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep — still-relevant and now MORE urgent because the 'covered by hours' framing already shipped in the Health tab (FixableIssueRow.tsx) WITHOUT the accounting behind it, so Premium clients see an uncapped promise. BUT it must be re-scoped: (1) it is gated behind tier-model-rediscussion per its own roadmap note ('built thin so this session can re-map cheaply') — do not build the hours ledger until that owner session confirms the 3hr/$150 model survives beta; (2) it heavily overlaps assigned item 76 ('Strategy & implementation hours system', P3) — these are the same capability at different priorities and should be merged into one item. Recommend: collapse 76 into this item, re-scope to 'log + cap + display Premium implementation-hours consumption (table + admin logging + monthly reset + client ledger)', and block on the rediscussion. || [MERGE 2026-06-24]: absorbed roadmap item 76 (Strategy & implementation hours system, automation-ops sprint) — same Premium-hours capability; build on this item's usage-counter infra, do not fork. Still blocked on tier-model-rediscussion."
         },
         {
-          "id": "cda-sc4-content-discount",
-          "title": "10% Premium content discount at Stripe checkout",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
-          "est": "1-2d",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Documented perk, unimplemented. Tier check in createCheckoutSession applying discount to brief/post products. | ABSORBED into cda-content-in-cart (round 2) — implemented there as cart-aware checkout config. || [AUDIT 2026-06-24 · CLOSED — ALREADY DONE · high conf]: Close / mark done. The capability fully exists end-to-end (config constant → server checkout enforcement → client strikethrough display), is server-authoritative against tier-spoofing, and was explicitly absorbed into cda-content-in-cart (done). No remaining work. Note: the discount RATE itself is deliberately a one-line config (shared/pricing.ts) that the tier-model-rediscussion may re-map — but the wiring is complete.",
-          "shippedAt": "2026-06-24"
-        },
-        {
           "id": "cda-sc4-post-purchase-onboarding",
           "title": "Post-subscription confirmation + 'welcome to Growth/Premium' moment",
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §4",
@@ -716,16 +361,6 @@
           "status": "pending",
           "createdAt": "2026-06-11",
           "notes": "Today the Stripe return lands with no confirmation and possible stale-tier flash. Confirmation state + what-you-unlocked summary. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep — still-relevant. Re-scope slightly for the current architecture: the fix is (1) distinguish subscription upgrades from one-time content purchases on return (the success_url already differs by returnTab='plans', or pass a productType marker), (2) replace the wrong 'content request is being processed' toast with a tier-aware 'Welcome to Growth/Premium' confirmation + a what-you-unlocked summary (TierGate-anchored, mirrors the existing locked/unlocked NAV in ClientHeader.tsx), and (3) handle the stale-tier flash by refetching workspace tier on payment-success return. The referenced '#88 self-serve upgrade flow' no longer exists as a roadmap id (likely archived) — drop that cross-reference. Low effort (1-2d as estimated)."
-        },
-        {
-          "id": "cda-sc5-work-feed",
-          "title": "'Agency at work' feed: client-visible activity + in-progress jobs with narrative framing",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1",
-          "est": "4-6d",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. Dark behind client-work-feed flag — flip after owner eyeballs staging. CLIENT_VISIBLE_TYPES in SQL, job labels via helper, distinct workFeedActivity query key (review-critical collision fix)."
         },
         {
           "id": "cda-sc5-outcome-scorecard",
@@ -768,56 +403,6 @@
           "notes": "Optional show-resolved toggle rendering changes_requested items with an 'Awaiting team' tag, so clients can confirm their feedback landed. || [AUDIT 2026-06-24 · OWNER DECISION · high conf]: Escalate to founder. The platform made an explicit, deliberate 'items just leave' decision; reviving changes_requested as an 'Awaiting team' toggle reverses it. This is product/UX judgment (does the client benefit from confirming feedback landed vs the cleanliness of items leaving), not code-determinable. Either close as obsolete (superseded by the 'items just leave' decision + success toast) or re-open only after the founder reverses C1."
         },
         {
-          "id": "cda-sc6-jwt-refresh",
-          "title": "Client JWT refresh flow (enabler)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
-          "est": "1-2d",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done 2026-06-13: added /api/public/client-refresh/:id to renew valid client-user JWT + legacy client session cookies, wired useClientAuth to silently refresh auto-restored client-user sessions and renew every 12h, and covered valid/no-token/malformed/cross-workspace refresh cases plus hook behavior."
-        },
-        {
-          "id": "cda-sc6-legacy-deprecation",
-          "title": "Deprecate legacy approvals apply route + delete unmounted legacy tab components (enabler)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §9",
-          "est": "1-2d",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done 2026-06-13: added canonical POST /api/public/deliverables/:workspaceId/:id/apply so the client applies by deliverable id while the server resolves the legacy approval batch source and delegates to the existing apply service. Deprecated the legacy /api/public/approvals/:workspaceId/:batchId/apply compatibility URL with X-Deprecated-Route coverage. Removed the unmounted ApprovalsTab surface and its stale tests, added lifecycle registry entries, and preserved RequestsTab + SchemaReviewTab after grounding showed they are still live."
-        },
-        {
-          "id": "unified-inbox-deferred-ia-polish",
-          "title": "Deferred IA polish for the unified inbox (completed-order lane decay + WORK_ORDER realtime gap, ?tab= deep-link under the flag, PriorityStrip↔section-heading taxonomy alignment)",
-          "source": "/docs/superpowers/plans/2026-06-01-unified-send-to-client.md",
-          "est": "M",
-          "priority": "P3",
-          "status": "done",
-          "notes": "Done 2026-06-14 in codex/unified-inbox-ia-polish: locked the live unified inbox ?tab= contract with component coverage for canonical filters, legacy aliases, beta inbox review URLs, and mounted URL changes. Removed stale beta-mode coercion that rewrote Reviews links away from their destination. PriorityStrip decision chips now point to the visible attention section label while Reviews and Conversations keep their destination labels. WORK_ORDER_UPDATE realtime remained untouched because it was already closed; completed work orders intentionally remain visible until closed."
-        },
-        {
-          "id": "client-inbox-phase32-wins-enrichment",
-          "title": "InboxTab Phase 3.2 — Wins enrichment (more signal types in WinsSurface)",
-          "source": "Session 2026-05-11 — Phase 3 planning",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-11",
-          "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts.\n[Platform health recommendation pass 2026-05-26: promoted as the next ClientSignalsSlice expansion to avoid bespoke win-signal paths outside workspace intelligence.] || [AUDIT 2026-06-24 · CLOSED — SUPERSEDED · high conf]: Close as superseded. The outcome-tracking win pipeline expanded substantially since this May-2026 item (content published + client actions + 5+ new ActionTypes all now feed wins). The remaining two ideas (health-score improvement, anomaly resolution) are events, not measured-delta wins, and the 'ClientSignalsSlice' framing is incorrect. If page-health/anomaly wins are still wanted, file a NEW correctly-framed item against outcome-tracking ActionType + recordAction bridges, not ClientSignalsSlice.",
-          "shippedAt": "2026-06-24"
-        },
-        {
-          "id": "cda-content-in-cart",
-          "title": "Briefs/posts join the cart — mixed baskets + Premium 10% content discount (absorbs cda-sc4-content-discount)",
-          "source": "Owner request 2026-06-12 + client dashboard audit (sc4)",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-12",
-          "notes": "Done. cartItemId/kind model (content never merges; R1 fix semantics intact); PREMIUM_CONTENT_DISCOUNT config constant; dual-family webhook with per-family FM-2 + CONTENT_REQUEST_UPDATE broadcast; orphan cleanup on session-create failure; drift guard covers billable content."
-        },
-        {
           "id": "tier-model-rediscussion",
           "title": "[BRAINSTORM FIRST — owner session] Revisit and update the tier model (beta learnings)",
           "source": "Owner request 2026-06-12",
@@ -847,26 +432,6 @@
       "notes": "Source: 2026-06-09 parallel simplification explorer batch. All items are recommendation-only and pending. Before implementing any item: run the normal brainstorm/spec/pre-plan-audit/plan flow where the scope crosses multiple files; preserve behavior first; use phase-per-PR for high-blast-radius work; add parity tests before rewiring user-visible behavior. Recommended first PR: frontend invalidation helper extraction, starting with keyword mutation invalidation bundles before broader WS registry work.",
       "items": [
         {
-          "id": "simp-feature-keyword-hub-kcc-rank-consolidation",
-          "title": "Feature stack — keyword admin cutover and legacy shell retirement",
-          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
-          "est": "phased",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Audit update 2026-06-10: this is no longer a table/data-model unification item. The backend read model is already canonical through the Keyword Command Center routes/hooks, and the remaining work is admin-surface cutover + authority cleanup. Current state: `seo-keywords` already flag-switches between `KeywordHub` and legacy `KeywordCommandCenter`, `seo-ranks` already redirects into the Hub when the flag is on, and both Hub + KCC read the same KCC summary/rows/detail APIs. Remaining live duplication: `KeywordHub` and `KeywordCommandCenter` both still own search/deep-link/drawer/bulk-action UI concerns, and standalone `RankTracker` is still a writable surface (add/remove/pin/snapshot), not measurement-only yet. Safe follow-up scope: remove duplicated Hub-local websocket invalidation in favor of the shared admin invalidation registry, align rank-tracking route/error-contract and action-metadata drift with the KCC/Hub contract, extract one shared rank-tracking mutation/invalidation authority used by Hub/RankTracker/Strategy, then retire the flag-off `KeywordCommandCenter` shell and writable standalone `RankTracker` behavior only after parity is confirmed. Preserve keyword lifecycle actions, rank history, snapshot capture, pinned trends, strategy feedback, View-in-Hub deep links, and local SEO segments. Tests/guardrails: `KeywordHub.test.tsx`, `KeywordCommandCenterDeepLink.test.tsx`, `RankTracker.test.tsx`, rank/KCC route tests, `route-fold-in-seo-ranks`, shared-cache coherence tests, and a contract that `RANK_TRACKING_UPDATED` invalidates Hub, latest/history ranks, strategy, and client rank reads. | Admin surface audit 2026-06-11 (§7): HARD PRECONDITION — port LocalSeoVisibilityPanel mode=keywords + market-setup drawer entry into the Hub before flipping (KCC is their only keyword-mode mount; KeywordCommandCenter.tsx:433-450). Flag-ON blockers + cutover sequencing: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 4. | W4 Phase A complete (fix/keyword-hub-cutover-a): panel+KPIs+summary error ported, drawer pin/outcome/replaced-by/history-chart, UX blockers (filter reset, keepPreviousData, mobile, empty states, bulk clearance), redirect search-preservation, view_rankings repoint. | DONE 2026-06-11 (Keyword Hub cutover, fix/keyword-hub-cutover-c stacked on Phase B). Phase B flipped keyword-hub default to true; Phase C stripped the legacy stack: deleted KeywordCommandCenter.tsx + KCC-only subcomponents (KeywordRow/VariantSubRow) + RankTracker.tsx and their tests; folded seo-ranks into the Hub (every seo-ranks literal removed from src/; transitional redirect retained). Server: removed the RankTracker-only DELETE /api/rank-tracking/:workspaceId/keywords/:query untrack endpoint (pin endpoint survives; Hub drawer uses it). Flag: keyword-hub retired from FEATURE_FLAGS/catalog/groups + migration 135 drops its overrides; surviving Keyword Hub group keys = keyword-universe-full, keyword-value-scoring. Prevention: pr-check rules `Retired Keyword Hub feature flag key used in flag API` + `Retired seo-ranks route literal in src` (the latter promoted from the route-fold-in-seo-ranks drift test). Docs: keyword-command-center.md -> keyword-hub.md; route-removal-checklist refreshed for registry-driven nav; deprecation-lifecycle entries added (KeywordCommandCenter, RankTracker, seo-ranks -> removed). NEEDS_CONTEXT carried forward: the server full-model path (buildKeywordCommandCenterModel + buildKeywordCommandCenterRowsViaModel, ~1,200 lines) was NOT deleted — it is LIVE via the Hub's `local_candidates` advanced filter (buildKeywordCommandCenterRows dispatches to it; only producer of buildLocalSeoKeywordCandidates). The `includeLocalSeoDetails` branch is the only genuinely-dead sub-path (always passed false). Migrating local_candidates to the skinny path is non-trivial (OOM-guarded) — tracked separately.",
-          "createdAt": "2026-06-09"
-        },
-        {
-          "id": "simp-feature-inbox-deliverable-spine",
-          "title": "Feature stack — inbox deliverable cleanup and stale wrapper removal",
-          "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
-          "est": "phased",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Audit update 2026-06-10: this is no longer a 'complete the spine' item. The canonical runtime surface is already `InboxTab` -> `UnifiedInbox` over `ClientDeliverable` + `GET /api/public/deliverables/:workspaceId`; the remaining work is cleanup around that canonical path. Current state: `InboxTab` is already a thin wrapper over `UnifiedInbox`, unified deliverables are the canonical client read model, and deliverable reads are assembled centrally from physical + projected sources. Remaining live seams are intentional hybrid write boundaries: projected copy/content reviews still mutate through their source routes, approval apply now uses canonical `POST /api/public/deliverables/:workspaceId/:id/apply` while delegating to the proven approval-batch apply service (legacy approvals URL remains deprecated compatibility), and schema-plan/client-action/source-specific writes remain source-authoritative with mirror sync. Progress 2026-06-13: deliverable realtime parity is closed for physical mirror families. Approval-batch and client-action mirrors already broadcast `DELIVERABLE_SENT`/`DELIVERABLE_UPDATED`; schema-plan send already broadcasts `DELIVERABLE_SENT` at the route/service seam while schema-plan sync/cancel now broadcasts `DELIVERABLE_UPDATED`; work-order and briefing mirrors now broadcast `DELIVERABLE_SENT` on first mirror and `DELIVERABLE_UPDATED` on re-mirror, with regression coverage. Remaining cleanup scope: shrink `InboxTab`/`ClientDashboard` to the real unified prop contract, update stale dark-launch/cutover comments and tests, and retire or isolate legacy approval/client-action normalizers that no longer have production consumers without removing compatibility routes that are still intentionally authoritative. Preserve Decisions/Reviews/Conversations routing, note-based conversations, inline single-action approval, bulk modal, per-item edits, apply-to-website, projected copy/content reviews, requests, and the work-order track lane. Tests/guardrails: unified inbox read route, deliverables route, projected review route coverage, decision-adapter coverage for the canonical deliverable path, `InboxTab`/`UnifiedInbox` component coverage, approval dual-write tests, edited item propagation, public approval broadcast tests, schema-plan/work-order/briefing broadcast tests, and deliverable websocket subscriber wiring. DONE 2026-06-13: canonical inbox cleanup PR tightened the ClientDashboard/InboxTab test fixture contract to the real UnifiedInbox prop surface, removed stale dark-launch/flag-era comments and test names, and marked the old client_action/approval_batch normalizers as compatibility adapters while preserving their label helpers and all compatibility write/read routes. No product behavior changes; unified deliverables remain the canonical client inbox read path.",
-          "createdAt": "2026-06-09"
-        },
-        {
           "id": "simp-feature-client-insight-view-model",
           "title": "Feature stack — consolidate client-facing insight projections into a read-only view model",
           "source": "Parallel simplification explorer audit 2026-06-09 — Feature Stack Simplification",
@@ -895,15 +460,6 @@
           "status": "pending",
           "notes": "Scope: `server/scoring/keyword-value-score.ts`, `server/scoring/opportunity-value.ts`, `server/keyword-command-center.ts`, `server/keyword-strategy-enrichment.ts`, `server/keyword-recommendations.ts`, `server/briefing-client-projection.ts`, `src/components/client/strategy/StrategyKeywordDrawer.tsx`, `src/components/keyword-command-center/KeywordDetailDrawer.tsx`, `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`. User-facing behavior to preserve: Layer 1 Hub keyword value, Layer 2 recommendation opportunity value, client-safe explanations, content-gap ordering, and brief/request flows. Current complexity: scoring layers are intentionally separate, but display/ranking projections are scattered; surfaces consume `valueScore`, `opportunityScore`, fallback ordering, and 'why this matters' explanations differently. Behavior-preserving path: do not merge scoring algorithms. Add a shared projection helper for keyword-bearing opportunities that returns normalized keyword, display score, reasons, dollar value if allowed, client-safe explanation, and sort key. Use behind existing flags where ordering changes. Tests/guardrails: keyword value score tests, opportunity value tests, content gap scoring tests, keyword recommendation ranking tests, client strategy content gap tests, briefing preview tests, and flag-off parity tests. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P2. Framing is still correct — the 'do not merge scoring algorithms; add a shared display-projection helper returning normalized keyword + display score + reasons + client-safe explanation + sort key' approach is sound and the duplicate display helpers confirm the need. The duplicated `opportunityScore()` between pageIntelligenceDisplay.ts and the server scoring is the concrete consolidation target.",
           "createdAt": "2026-06-09"
-        },
-        {
-          "id": "generation-quality-intelligence-wiring",
-          "title": "Wire generation_quality store into an intelligence slice (Data Flow Rule 6 deferral from F1)",
-          "source": "Core-features remediation F1 review (2026-06-10) — migration 129 created the workspace-scoped generation_quality table; getLatestGenerationQuality is not yet surfaced in server/intelligence/, so AdminChat/AI context are blind to generation health",
-          "est": "small",
-          "priority": "P3",
-          "status": "done",
-          "notes": "Completed 2026-06-12: added a read-only `generationQuality` intelligence slice backed by `getLatestGenerationQuality(workspaceId)`. The slice exposes typed latest-row data and degrades to `{ latest: null }`; no UI, route, job, write path, or prompt-formatting surface was added."
         }
       ]
     },
@@ -931,15 +487,6 @@
           "priority": "P1",
           "status": "in_progress",
           "notes": "Phase-per-PR. Task 0 (shared contracts: sort enum +clicks/difficulty, rows direction param, RowCandidateKey clicks/difficulty, isJunkKeywordString Tier-1 gate, GSC_METRIC_WINDOW_DAYS constant, keyword-universe-full flag) done. Tasks 1 sort / 2 junk gate / 3 uncap (flag-gated) / 4 window+banner / 5 normalizer pending."
-        },
-        {
-          "id": "keyword-value-scoring",
-          "title": "Keyword Value Scoring — value-first, posture-driven opportunity score (Hub sort + content-gap spine)",
-          "source": "/docs/superpowers/plans/2026-06-05-keyword-value-scoring.md",
-          "est": "phased",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done (2026-06-24) via SEO Decision Engine P1 (seo-engine-p1-value-first-keyword-scoring). Phases 0-2 (flag + pure scoring module + Hub wiring + content-gap spine) shipped dark; P1 made value-first scoring unconditional and retired the keyword-value-scoring flag (crude Hub-sort path deleted)."
         }
       ]
     },
@@ -960,24 +507,6 @@
           "notes": "Wave 1. Four surfaces rank the SAME keywords four contradictory ways: Hub uses valueScore, content-plan uses legacy opportunityScore (keyword-recommendations.ts:159), the client briefing sorts by raw VOLUME buckets (briefing-client-projection.ts:81, demoting high-value low-volume gaps), titles/metas lead by strategy slot order. Make them all rank by the single Hub valueScore. HIGHEST-PRIORITY — fixes the client briefing sort, the exact surface the client keyword display sits on. Flag-gated where it changes ranking. || PLACEMENT [KEYSTONE — architecture decision, brainstorm first]: reconcile the new keyword-value-score vs the existing opportunity-value OV model (two value models today — Hub valueScore is a bare number; OV exposes components + is what client surfaces render). Decide ONE source of truth, then unify ranking across content-plan (keyword-recommendations.ts:159), titles/metas, briefs, client-briefing (fix the volume-bucket sort briefing-client-projection.ts:81), internal-linking. ALSO absorbs the only real need of the DROPPED kwv-client-wins-this-month: re-rank named rank-movement wins on InsightsBriefingPage so the most valuable named mover leads. || KEYSTONE FOUNDATION DONE (PR 1 + PR 2, 2026-06-05): one classifier (deriveValueIntent — shared by both layers; comparison-intent drift closed), layered contract documented (Layer 1 = computeKeywordValueScore / Layer 2 = computeOpportunityValue; surface ownership rule), and KeywordValueComponents interface exposed via computeKeywordValueComponents (commercialValue/demand/winnability/localMultiplier/intent). Signal-gate parity locked by test. 4 scalar callers byte-identical. Surface re-ranking (content-plan/briefs/client-briefing) remains this item's own work. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: KEEP — still-relevant, correctly framed. The keystone architecture decision (one source of truth: Layer 1 valueScore vs Layer 2 OV with surface-ownership rule) is already made and documented, so this is now pure wiring work. Highest-value sub-task remains fixing the client-briefing volume-bucket sort (briefing-client-projection.ts:69-83) to rank by the resolved value score — it is the exact surface the client sees. Re-scope the title to 'Wire the resolved value score into content-plan/briefs/client-briefing ranking' since the foundation is no longer pending."
         },
         {
-          "id": "kwv-gsc-per-keyword-context",
-          "title": "Per-keyword GSC breakdown in the AI/seoContext slice (named movers, not counts)",
-          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
-          "est": "small-medium",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Wave 3 (enabling join). seo-context-slice reads full per-keyword GSC (getLatestRanks: position/change/clicks/impressions) then collapses to 'N improved, M declined' before any prompt. Keep a top-N per-keyword breakdown (keyword, position, change, clicks, impressions, valueScore) on RankTrackingSummary so AdminChat + generation-context builders can NAME which keyword moved/gained clicks. Foundation for striking-distance + momentum. || PLACEMENT [new slice enrichment]: seoContext/RankTrackingSummary AI-context (named per-keyword movers into prompts). ranking_mover is already in the insights slice for AI — wire from existing data, keep top-N named breakdown. | DONE 2026-06-13: RankTrackingSummary now carries typed topKeywordMovers from latest rank snapshots (query, current position, signed movement, direction, clicks, impressions, CTR, page metadata, optional valueScore). assembleSeoContext keeps the existing aggregate counts and adds the top eight named movers sorted by absolute movement with impression tie-breaks; formatForPrompt emits compact named examples at standard+ verbosity and omits them in compact mode. valueScore remains optional because getLatestRanks() does not currently compute or join keyword value scoring."
-        },
-        {
-          "id": "kwv-striking-distance",
-          "title": "Striking-distance keywords — the page-2 nudge list (positions 11-20, value-ranked)",
-          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
-          "est": "medium",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done. striking_distance Hub segment, positions 11-20 inclusive, value-ranked; count/rows/prefilter unified on one predicate (review fix)."
-        },
-        {
           "id": "kwv-momentum-and-rank-recs",
           "title": "Named 28-day momentum + auto rank-gain/rank-loss recommendations",
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
@@ -987,15 +516,6 @@
           "notes": "Wave 3. Named risers/fallers ('emergency dentist #19→#8 +340 impr; [service] near me #4→#9 — defend it') from getLatestRanks change + getRankHistory 90-day slope. AND mint defend/push recommendations from tracked movement — the rec surface is 100% blind to rank movement today (ranking_mover insight exists but is never converted to a Recommendation). Reuses kwv-gsc-per-keyword-context. || PLACEMENT [split]: named risers/fallers ALREADY ship — ranking_mover insight + ranking-mover.ts client win story (signal-story-registry.ts:410 -> InsightsBriefingPage). The genuinely-NEW half = defend/push RECOMMENDATIONS: add a rank/defend/push RecType + RecActionType + RecSourceCategory via the four-line contract in recommendations.ts (overlaps the existing strategy:ranking-opportunity source). Do NOT re-render named movers as a new surface. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: KEEP — still-relevant, but re-scope to ONLY the movement-driven defend/push recommendation half (do not re-render named movers; they already ship). The four-line RecType/RecActionType/RecSourceCategory contract in recommendations.ts is the insertion point; reuse the existing strategyRankingOpp source family but feed it rank-history slope (riser→push, faller→defend) rather than the static currentPosition snapshot. The static 4-20 push rec partially covers 'push' but adds no 'defend' and ignores momentum."
         },
         {
-          "id": "kwv-client-rank-x-missing-y",
-          "title": "Client: 'You rank for X but you're missing Y' per-page cards",
-          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
-          "est": "medium",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done. Per-page story cards on client Strategy via the existing public payload; token pairing with generic-token denylist + anchor requirement (review fix); banded labels only, leak-tested on the real read path."
-        },
-        {
           "id": "kwv-intent-branded-split",
           "title": "Portfolio intent mix + branded-vs-non-branded split",
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
@@ -1003,15 +523,6 @@
           "priority": "P3",
           "status": "pending",
           "notes": "Wave 5 (framing). '82% of your targeted keywords are informational, only 6% commercial — that's why traffic is up but leads aren't.' + 'Branded clicks are 68%; non-branded (new demand) is 32% and flat.' Buckets existing per-keyword intent (deriveValueIntent adapter) + partitions existing GSC clicks/impr by brand-name regex. Zero new data; agency-report staples. || PLACEMENT [rollup new on Hub]: per-keyword intent already renders in 3 client places + isBrandedQuery branded-detection already exists in analytics-intelligence. NEW = only the workspace-level PORTFOLIO rollup (intent-mix + branded share) as a Hub header strip — not a per-page card/insight. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: KEEP — still-relevant and correctly framed as a thin rollup (zero new data, an agency-report staple). Build only the workspace-level rollup: bucket existing per-keyword intent into the mix and partition existing GSC clicks/impressions by the existing isBrandedQuery, rendered as a Hub header strip — not a per-page card or insight. Small/P3 estimate is accurate."
-        },
-        {
-          "id": "kwv-brief-per-page-metrics",
-          "title": "Briefs: surface per-page intent/volume/KD/CPC + thread topic→page into MCP brief context",
-          "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
-          "est": "small-medium",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Done. formatPageMapForPrompt now preserves the legacy keyword-map shape while appending available per-page intent, volume/monthlyVolume, difficulty/KD, CPC, and optional score fields; absent metrics are omitted. MCP prepare_brief_context now accepts target_keyword + target_page_path, threads pagePath into buildContentGenerationContext for page-specific intelligence, returns the target hints, and prepends a compact Brief Target block only when hints are provided. Content/post generation inherits this through the existing brief context path; no UI, DB, or product-route changes."
         },
         {
           "id": "kwv-cannibalization-click-winner",
@@ -1183,16 +694,6 @@
           "priority": "P2",
           "status": "pending",
           "notes": "Follow-up after the selector-only PR. Explore generating standard/concise/hybrid candidates for briefs and posts, storing the selected variant, measuring edit distance, approval outcomes, client/page-type preferences, and eventually recommending default styles per workspace or client. Keep live model quality scoring advisory and human-reviewed. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P2. Framing is still correct as the explicit 'follow-up after the selector-only PR'. Worth re-confirming demand before building (5-8h) — the value hinges on whether variant generation cost and edit-distance learning produce a default good enough to justify the extra generation calls; keep the live-model quality scoring advisory/human-reviewed per the item's own note and the ai-quality-evals rule."
-        },
-        {
-          "id": "content-blueprint-section-plan-compression",
-          "title": "Compress copy blueprint section plans for conversion pages",
-          "source": "Outline compression planning 2026-05-26",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "owner": "brand-engine",
-          "notes": "Follow-up to audit `server/blueprint-generator.ts` service/location/landing section plans, remove old NAP/local SEO reader-facing guidance, align copy pipeline section counts and word budgets with the page-type copy contract, and add blueprint/copy-pipeline prompt tests. DONE 2026-06-13: compressed conversion-page defaults to match the page-type outline/copy contracts. Added an explicit landing plan, reduced service from seven sections/1,450 target words to five sections/980 target words, reduced location from six sections/1,100 target words to five sections/790 target words, and removed seeded NAP/schema/local-SEO-operations wording from location/contact defaults. Added unit guardrails for conversion-page section/word bounds and SEO-ops wording."
         },
         {
           "id": "intel-quality-keyword-per-market-relevance",
@@ -1389,15 +890,6 @@
           "priority": "P3",
           "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant. Re-scope to 'per-user email notification preferences (opt-out per event-type + digest frequency)', building on the existing CLIENT_NOTIFICATION_RECIPIENT_POLICIES table in notification-recipients.ts (the codebase already anticipates this as the branch point). Add a per-user prefs column/table and a settings UI. P3 is fair — low value until you have multiple seats per workspace generating notification noise. ~2-3h estimate is reasonable given the foundation.",
           "status": "pending"
-        },
-        {
-          "id": "notification-client-email-surface-audit",
-          "title": "Audit every client-facing email trigger and content contract",
-          "source": "Post-merge notification gap review 2026-05-26",
-          "est": "2-4h",
-          "priority": "P1",
-          "notes": "Completed 2026-06-12 in `docs/audits/2026-06-12-client-email-surface-audit.md`. Matrix covers live client-facing triggers, adjacent team-only/dormant paths, throttling/dedupe, payload contracts, and follow-up PRs. Follow-up maintenance resolved the concrete contract drift: work-order and anomaly emails now pass dashboard CTAs, unified deliverable reminders use reminder copy plus `sent_reminders` dedupe, Stripe-hosted receipts are documented as the client receipt authority, dormant `audit_improved` was retired, `server/notification-recipients.ts` now records workspace-primary vs client-user vs explicit-recipient authority, and client-facing email payloads are validated before rendering so malformed queued events dead-letter instead of sending fallback copy.",
-          "status": "done"
         }
       ]
     },
@@ -1908,560 +1400,6 @@
           "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before."
         }
       ]
-    },
-    {
-      "id": "sprint-strategy-v2-command-center-2026-06-17",
-      "name": "✅ SHIPPED — Strategy v2 — SEO Command Center",
-      "hours": "TBD — phased, one PR per phase, staging-first",
-      "rationale": "Rebuild the admin Strategy page into a decision-first 'SEO command center' (Orient → Act → Evidence + interior Content/Rankings/Competitive tabs), monetization-led. Supersedes the retired decision-bands layout. Spec: docs/superpowers/specs/2026-06-17-strategy-v2-command-center.md; plan: docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.",
-      "notes": "Behind the strategy-command-center flag (default OFF). Flag OFF = legacy sequential layout, byte-identical, until v2 is the default — then legacy is deleted.",
-      "items": [
-        {
-          "id": "strategy-redesign-v2-command-center",
-          "title": "Strategy v2 — command-center IA (Orient/Act/Evidence + interior tabs)",
-          "source": "Strategy v2 spec 2026-06-17",
-          "est": "XL",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-17",
-          "notes": "Merged to staging: Phase R (#1266), Phase 0 (#1267), Phase 1 (Orient, #1268), Phase 2 (Act queue, #1269), Phase 3 (interior ?tab= shell — Overview/Content tabs + Content money page, #1270), Phase 4 (Rankings tab — interactive position distribution moved off Overview + a 'Position movements' summary; deep-links to Keyword Hub, #1271). Phase 4 follow-up: the previousPosition producer landed (FEATURE_AUDIT #518) — page_keywords.previous_position now rotates current→previous on the strategy-refresh write (gated, persistKeywordStrategy only), so the movements card surfaces real data from the 2nd refresh on. Phase 5 (Competitive tab — net-new ShareBar share-of-voice + CompetitiveIntel merged head-to-head + KeywordGaps with a Create-brief CTA + BacklinkProfile, composed in research order; backlink/competitive moved off Overview; orphaned AuthorityAndBacklinks wrapper retired; admin tab ungated, Premium gating deferred to Phase 6) merged to staging (#1272). Phase 6 SPLIT into 6a + 6b for focused PRs: Phase 6a (client-safe visibility score — attach strategyUx.orient to the public GET /api/public/seo-strategy/:id read path; OrientMetrics is money-free by construction so no EMV leak; leak-guard integration test; ungated; FEATURE_AUDIT #520) merged to staging (#1273). Phase 6a follow-up: closed a pre-existing raw-cpc-to-all-tiers exposure on the same public read path — pageMap.cpc (admin/scoring-internal money input) is now server-side tier-gated via computeEffectiveTier(ws) !== 'free' (trial-aware), matching the contentGaps no-raw-cpc convention; the Growth+ Revenue-potential drawer is unaffected (it renders server-computed currentMonthly/upsideMonthly, not raw pageMap.cpc). Code review caught a parallel raw-cpc-as-text leak: the keyword-value-scoring valueReasons page-keyword branch emitted '$X CPC' to all client tiers (missing the exposeCpc:surface==='admin' guard the content-gap branch already had, eecacd4f/#1103); owner decision = raw cpc text is admin-surface-only for every client tier. FEATURE_AUDIT #522. Phase 6b (client StrategyTab reframe — flag branch + section-const refactor → Orient header [StrategyClientOrientHeader] + interior Overview/Content/Rankings/Competitive tabs behind strategy-command-center, flag-OFF byte-identical; reuses existing sections + money flows; Competitive reuses the server-402-gated CompetitorGapsSection [no leak]; legacy ?tab= deep-links bridged via legacyAliases; flag read in ClientDashboard + passed as a prop so StrategyTab stays QueryClient-free; FEATURE_AUDIT #521; 3-reviewer pass caught+fixed a Critical Rules-of-Hooks bug + an Important broken deep-link) merged to staging. DONE 2026-06-18 (Strategy v3 Phase 0 — v2 cutover): deleted legacyAnalysis (admin) + the flag-OFF legacy StrategyTab branch (client); command-center is now the unconditional baseline. commandCenterEnabled prop threading removed (ClientDashboard → StrategyTab); strategy-command-center flag KEPT as v3 umbrella (REUSE — no retirement migration). Orphaned StrategyStatGrid + KeywordStrategyGuide deleted. FEATURE_AUDIT #521 updated."
-        }
-      ],
-      "shippedAt": "2026-06-18"
-    },
-    {
-      "id": "sprint-platform-health-cleanup-followups-2026-06-11",
-      "name": "✅ SHIPPED — Platform Health Cleanup — Auth, Aliases & Helper Tail",
-      "hours": "phased",
-      "rationale": "Consolidates the few remaining platform-health cleanup items after completed work was moved to the archive, so auth sweep, inbox alias sunset, useToggleSet adoption, and helper-tail cleanup stay visible together.",
-      "notes": "Created by roadmap cleanup on 2026-06-11 from Platform Health Wave 7/8 leftovers. Keep changes small and guardrail-backed.",
-      "items": [
-        {
-          "id": "platform-health-inbox-alias-sunset-execution",
-          "title": "Execute inbox legacy alias sunset plan",
-          "source": "Platform health recommendation pass 2026-05-26",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done 2026-06-14: owner confirmed the new Inbox is already in active use after the feature-flag rollout. First-party content purchase/navigation now lands on canonical `/inbox?tab=reviews` links. Follow-up retro-review restored external/bookmark compatibility redirects for `/approvals`, `/requests`, `/content`, and `/schema-review` so retired aliases land in the matching Inbox section instead of falling through to Overview. Product-surface and deprecation registries track the first-party link sunset while runtime compatibility remains."
-        },
-        {
-          "id": "audit-drift-public-route-auth-sweep-followup",
-          "title": "Sweep remaining /api/public/ routes onto explicit portal auth or public hatches",
-          "source": "Plan A Task 1 implementation discovery 2026-05-27",
-          "est": "8-14h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done 2026-06-13: closed the broad pr-check grandfather gap. The public-route auth rule now has no file-level exclude list, recognizes same-file auth aliases that wrap requireClientPortalAuth()/requireAuthenticatedClientPortalAuth(), strips comments from route signatures so TODO text cannot satisfy the rule, and allowlists only bootstrap/login resources. Classified reports.ts share-link reads with explicit // public-no-auth-ok hatches for /api/public/report/:id and /api/public/client/:siteId, while /api/public/reports/:workspaceId remains authenticated. Updated fixture coverage and verified the full route scan passes."
-        },
-        {
-          "id": "audit-drift-use-toggle-set-adoption",
-          "title": "useToggleSet adoption sweep + pr-check lock",
-          "source": "Platform audit 2026-05-27",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done 2026-06-13 across PR 3 + PR 4. PR 3 generalized `useToggleSet` for string/number keys, lazy defaults, and empty/unbounded accordion state, then migrated high-confidence expand/collapse surfaces. PR 4 extended the hook with an optional setter for reset/seed cases, migrated the remaining straightforward disclosure and multi-select call sites (sidebar, CMS/SEO editor shells, schema/SEO audit disclosure, strategy/client schema sections, request/asset/keyword/copy selections), and added pr-check guardrail `Hand-rolled Set toggle outside useToggleSet`. The guardrail targets simple `toggle*` functions that clone/check/add/delete Set state, while preserving async operation-state sets, controlled prop selections, range selection, and documented complex side-effect transitions."
-        },
-        {
-          "id": "audit-drift-p2-helper-tail",
-          "title": "P2 helper consolidation tail",
-          "source": "Platform audit 2026-05-27",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "(a) Migrate 4 custom relative-time formatters onto `src/lib/timeAgo.ts` (`LlmsTxtGenerator.tsx:25`, `WorkspaceHome.tsx:207`, `client/Briefing/WinsSurface.tsx:30`, `admin/MeetingBrief/BriefHeader.tsx:10`); (b) move status→badge ternaries into `<Badge>`/`<StatusBadge>` or `lib/copyStatusConfig.ts` (`PendingApprovals.tsx:186`, `RankTracker.tsx:507`, `ContentBriefs.tsx:479`, `cms-editor/CmsEditorShellPanels.tsx:163-164`, `brand/BatchGenerationPanel.tsx:98`, `workspace-home/SeoWorkStatus.tsx:40,46`); (c) consolidate `uniq`/`uniqueStrings`/`uniqueSeoTexts`/`uniqueEntities` into `uniqStrings(values, opts)`; (d) collapse `sanitizeForPrompt` duplicates between `briefing-prompt.ts:169` and `helpers.ts:278,294`; (e) introduce typed shape in `shared/types/` for `matchedPage`/`meta` to replace the 8+ `(matchedPage as Record<string, unknown>)` ladder in `server/schema-suggester.ts:692-876`; (f) Lock `callAI()` adoption: delete the stale `// callAnthropic` comment at `server/copy-generation.ts:116` (actual call at line 106 already uses `callAI()`) and add a pr-check rule blocking new direct imports of `callOpenAI`/`callAnthropic` outside `server/ai.ts`. [Rescoped 2026-05-27 — originally proposed as a migration based on stale audit + stale CLAUDE.md note; re-verification confirmed full adoption is already complete, so item now mechanizes the invariant rather than migrating to it.] [PARTIAL 2026-05-27 — Plan C systemic: sub-item (f) callAI dispatcher lock done (pr-check rule \"Direct callOpenAI/callAnthropic import outside dispatcher\" added; stale comment in copy-generation.ts removed). Sub-items a-e remain: timeAgo migration (4 sites), Badge/StatusBadge ternary consolidation, uniqStrings consolidation, sanitizeForPrompt dedup.] | DONE 2026-06-13: re-audited the live helper tail and closed the remaining active-source items. Existing PRs had already migrated the four relative-time call sites to `timeAgo()` and collapsed briefing prompt sanitization onto `sanitizeInlinePromptText()`. This PR moved the remaining schema entity dedupe helper to shared `dedupeBy()`, added shared `SchemaSourcePageMeta`, updated `fetchPageMeta()` and `schema-suggester` to use typed Webflow timestamp metadata instead of `Record<string, unknown>` casts, and replaced the live `PendingApprovals`/`ContentBriefs` status ternaries with `StatusBadge` registry usage. Other old status examples are current-state non-issues: `BatchGenerationPanel` already delegates job status display to `StatusBadge`, `CmsEditorShellPanels` is send-button progress text rather than a badge/status map, `SeoWorkStatus` is count-stat color mapping, and the stale `RankTracker` target is obsolete because that component has been removed."
-        }
-      ],
-      "shippedAt": "2026-06-14"
-    },
-    {
-      "id": "sprint-admin-surfaces-w6-quality-debias-2026-06-11",
-      "name": "✅ SHIPPED — ⚖️ Admin Surfaces W6 — Quality & De-bias",
-      "hours": "~20-30h",
-      "rationale": "Wave 6: systematic-quality fixes — first-client bias in classifiers, sync AI in route handlers, unbounded tables, state-machine bypasses. Some lanes gated on owner decisions D2/D3.",
-      "notes": "PR map + decisions D1-D4: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 6. Schema value-prioritization is NOT here — merged into existing kwv-titles-metas-schema-priority (notes updated).",
-      "items": [
-        {
-          "id": "aw6-local-seo-debias",
-          "title": "Local SEO: derive city/service classifiers from configured markets + business profile (kill hardcoded Texas cities + dental/legal regexes)",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-8h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w6-final. Geo/service classifiers derived per-workspace (markets + business profile + industry taxonomy + strategy siteKeywords with stopword filter; documented generic fallback); precomputed per candidate cycle; Chicago-HVAC + leak-guard + stopword tests."
-        },
-        {
-          "id": "aw6-sync-ai-to-jobs",
-          "title": "Move the 5 synchronous heavyweight AI route handlers onto the job platform + paginate unbounded post/brief list endpoints + prune schema_snapshots",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (AI half). 4 new job types (CONTENT_BRIEF_REGENERATE, CONTENT_POST_REVIEW, CONTENT_POST_FIX ephemeral, CONTENT_POST_VOICE_SCORE); 202 jobId + 409 dedupe; PostEditor/ContentManager via useBackgroundTasks; coverage-contract anchored. NOTE: unbounded post/brief list pagination was descoped from this item (no db-layer owner this round) — landed in R1-C lane (cda-sc3-pagination-enabler, done 2026-06-12); schema_snapshots pruning shipped under aw6-state-machine-validation scope."
-        },
-        {
-          "id": "aw6-wire-or-delete",
-          "title": "Wire suggested-briefs store into AiSuggested (D2) + forward-planning calendar v1 (D3) + pending-schemas wire-or-delete",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. D2: AiSuggested reads the persistent store (dismiss/snooze/accept + addActivity, SHA dedup, TTL-guarded ranking-signal seeding on the real read path). D3: calendar planning v1 (migration 136, future view, clickable rows + ContentPipeline tab-sync fix, schedule-a-draft, noon-UTC suggest-dates). Pending-schemas half-pipeline deleted (zero callers, documented)."
-        },
-        {
-          "id": "aw6-state-machine-validation",
-          "title": "Schema plan transitions through validateTransition + content-templates routes onto validate() Zod middleware",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. SCHEMA_PLAN transitions (incl. draft→active per the live Activate button) via validateTransition + 422 send precondition + feedback guard; schema_snapshots id-reuse fix + orphan pruning + transactional RMW; content-templates on validate() Zod (middleware now prefixes field paths in errors)."
-        }
-      ],
-      "shippedAt": "2026-06-12"
-    },
-    {
-      "id": "sprint-client-dashboard-qw2-tell-the-story-2026-06-11",
-      "name": "✅ SHIPPED — 📖 Client Dashboard Quick Wins 2 — Tell the Story",
-      "hours": "~22-32h",
-      "rationale": "Second quick-win wave from the 2026-06 client dashboard audit: narrative, freshness, and feedback-loop polish. The audit's core theme is that clients see raw results without interpretation or confirmation — these items add the missing 'what this means / we heard you' layer without restructuring any tab.",
-      "notes": "Source: docs/audits/client-dashboard-2026-06/01-quick-wins.md. Several items touch the same components — sequence within the sprint to avoid merge churn. assembledAt (server half) ships with freshness stamps (client half) in one PR per the typed-contract data-flow rule.",
-      "items": [
-        {
-          "id": "cda-qw2-assembledat-freshness-stamps",
-          "title": "assembledAt on intelligence payload + 'Data as of …' freshness stamps on metric surfaces",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.4 + §2.1",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 1. Server half already existed via ClientIntelligence.assembledAt; this PR adds a shared FreshnessStamp primitive, real React Query dataUpdatedAt plumbing for client GA4/GSC hooks, visible stamps on Search/Analytics/Overview metric surfaces, and removes the synthetic client-intelligence fallback timestamp so failed intelligence reads cannot render as fresh."
-        },
-        {
-          "id": "cda-qw2-analytics-takeaway",
-          "title": "Analytics sub-tab: deterministic takeaway summary + conversion-rate color coding",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.2",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 2. AnalyticsTab now renders a deterministic, template-based takeaway from GA4 traffic, top source/page, and top tracked action with no AI call. Conversion rates remain display percentages and use judgment colors only: emerald for 5%+, amber for 2-4.9%, red below 2%, while raw conversion counts remain neutral metric text."
-        },
-        {
-          "id": "cda-qw2-roi-methodology-explainer",
-          "title": "ROI methodology explainer ('How we calculate this')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 4. ROIDashboard now includes an expandable 'How we calculate this' explainer that describes organic traffic value, ad spend equivalent, revenue-at-stake/content attribution, and conservative assumptions without changing ROI formulas or adding route reads."
-        },
-        {
-          "id": "cda-qw2-health-ring-breakdown",
-          "title": "Composite health ring breakdown (churn 40 / ROI 30 / engagement 30)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §2.4",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 5. Client intelligence now projects a sanitized composite health breakdown for Growth+ workspaces, and the existing HealthScoreCard renders an expandable component view for retention signals, ROI momentum, and portal engagement without exposing raw churnRisk or adding route reads."
-        },
-        {
-          "id": "cda-qw2-post-approval-toast",
-          "title": "Post-approval 'next step' toast in Inbox",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.1",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 3. Successful unified-inbox approve responses now show a next-step toast: \"Approved. We're publishing this. Track it in your inbox.\" This covers both standard DecisionCard approval and inline approval-family cards while preserving held-item, declined, feedback, and apply-to-website flows."
-        },
-        {
-          "id": "cda-qw2-flag-confirmation",
-          "title": "Flag-submission confirmation + optimistic flagged-state on Content Plan cells",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.2",
-          "est": "1-2h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 3. Content Plan cell flagging now updates the visible cell to flagged immediately with the submitted note, reconciles from the server after success, rolls back on API failure, and shows success/error toasts so the tab confirms the client was heard."
-        },
-        {
-          "id": "cda-qw2-comment-count-badges",
-          "title": "Comment-count badges on work-order conversation threads",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 6. Work-order deliverables now serialize a list-side commentCount from a single batched work_order_comments aggregate, including 0 for empty threads, and the client Work in progress cards render a blue comment-count Badge for 0/1/plural conversation counts without using per-thread reads for the badge."
-        },
-        {
-          "id": "cda-qw2-keyword-feedback-card",
-          "title": "Keyword feedback summary card on Strategy ('You approved 91% of suggestions')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.4",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 7. Growth+ client intelligence now projects a sanitized keywordFeedbackSummary from ClientSignalsSlice, and Strategy renders a blue data SectionCard with approve/reject counts, approval rate, display samples, and top rejection reasons."
-        },
-        {
-          "id": "cda-qw2-we-called-it-expansion",
-          "title": "'We Called It' prediction card narrative expansion",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §3.5",
-          "est": "3h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 7. PredictionShowcaseCard now renders each stored outcome as a Before/After story with the recorded score badge, page, and confirmation date, using existing WeCalledItEntry fields only."
-        },
-        {
-          "id": "cda-qw2-inline-prices",
-          "title": "Inline prices on every purchase CTA before Stripe redirect",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.5",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped in PR 8. Content and Inbox submit-request service choosers now show brief/full-post prices and selected CTA price before checkout, PlansTab upgrade/subscription CTAs include monthly prices, and external billing workspaces hide platform prices while billing actions route to contact/chat instead of Stripe; content subscription checkout also has a server-side external-billing guard."
-        }
-      ],
-      "shippedAt": "2026-06-12"
-    },
-    {
-      "id": "sprint-admin-surfaces-w3-unlocks-handoffs-2026-06-11",
-      "name": "✅ SHIPPED — 🔗 Admin Surfaces W3 — Unlocks & Broken Handoffs",
-      "hours": "~22-32h",
-      "rationale": "Wave 3: finished pipelines gated off and cross-surface handoffs that drop their payload. The integration intent exists everywhere; the receiving half keeps failing.",
-      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 3. 3.2 depends on aw2-schema-persistence. 3.4 is sequential (shared nav files) and adds a pr-check rule. Every repaired link gets a ?tab= two-halves contract test.",
-      "items": [
-        {
-          "id": "aw3-ai-suggested-keyword",
-          "title": "Pipeline: AI Suggested 'Create Brief' carries the suggestion's keyword via fixContext prefill + refresh_suggestion button",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w3-w5-batch. handleCreateBrief carries keyword+pageUrl via internal fixContext prefill (pageSlug targeting per W2.5 contract); refresh_suggestion gets a Refresh brief action; repeat-click prefill remount via nonce key."
-        },
-        {
-          "id": "aw3-cms-publish-unlock",
-          "title": "Schema: unlock CMS-field publishing — add cmsDeliveryStatus to frontend type, show Publish for 'ready', route retract/rollback through CMS mode",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. cmsDeliveryStatus typed frontend-side (serialization already existed); status-aware Publish for ready CMS pages through the existing dispatch endpoint; honest reasons for blocked; Publish-All respects readiness; retract/restore honestly gated — server-side CMS retract does not exist (gap documented for a future lane)."
-        },
-        {
-          "id": "aw3-deeplink-repair-batch",
-          "title": "Deep-link repair: PI→Schema pageSlug→pageId; WorkspaceHome's 3 broken senders; Strategy KeywordGaps→Hub; RepeatCompetitorList one-click Track; Decay→pipeline/PI handoffs",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead of schedule with W2). WorkspaceHome senders fixed (?tab=requests two-halves + content→content-pipeline), KeywordGaps→Hub links, RepeatCompetitorList one-click Track, Decay→briefs (pageSlug contract) + Decay→PI handoffs, pipeline decay banner clickable. PI→Schema receiver accepts pageSlug (handled in schema lane)."
-        },
-        {
-          "id": "aw3-nav-registry",
-          "title": "Single nav metadata registry for Sidebar + CommandPalette + Breadcrumbs + drop needsSite from requests + pr-check rule",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. src/lib/navRegistry.tsx single source consumed by Sidebar/CommandPalette/Breadcrumbs; drift fixed (diagnostics everywhere, requests un-site-gated, stale palette entries removed, keyword-hub flag relabel deduplicated); Page-union contract test; pr-check rule hardcoded-nav-metadata-outside-registry with fixtures."
-        },
-        {
-          "id": "aw3-journey-visibility",
-          "title": "Journey: resolve TaskPanel-vs-NotificationBell (delete dead TaskPanel, fix CLAUDE.md ref, verify cross-tab job visibility) + live audit progress/cancel + real Webflow-link path from onboarding",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch. TaskPanel retired (stub + doc sweep incl. CLAUDE.md and golden-paths); NotificationBell cross-tab visibility verified (no gap — provider rehydrates from GET /api/jobs); SEO audit shows live job progress (non-cancellable job type, progress-only); ConnectionsTab gets a real link-site flow via useLinkSiteFlow with per-row pending + error surfacing."
-        }
-      ],
-      "shippedAt": "2026-06-12"
-    },
-    {
-      "id": "sprint-admin-surfaces-w5-close-the-loop-2026-06-11",
-      "name": "✅ SHIPPED — ♻️ Admin Surfaces W5 — Close the Loop (read-side)",
-      "hours": "~16-24h",
-      "rationale": "Wave 5: the platform already writes outcome baselines, AI review verdicts, and a visibility time series — nothing reads them back. Read-side work only; the write halves are done.",
-      "notes": "PR map: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 5. Wave 4 (Keyword Hub cutover) is tracked on the existing simp-feature-keyword-hub-kcc-rank-consolidation item — see its updated notes for the audit's precondition + blocker list.",
-      "items": [
-        {
-          "id": "aw5-outcome-chips",
-          "title": "Outcome read-back: tracked_actions/outcome_actions chips on Strategy pageMap/Quick Wins, Hub drawer (baseline→current + verdict), and Briefs/Posts lists (90-day delta)",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. Shared OutcomeReadback reader + OutcomeReadbackChip on Strategy pageMap, Hub drawer, published Posts; OUTCOME_SCORED central invalidation was MISSING (audit/plan claimed mapped) — added. One indexed query per payload, no N+1."
-        },
-        {
-          "id": "aw5-ai-review-readback",
-          "title": "Posts: seed ReviewChecklist from persisted post.aiReview",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch (ran ahead with W2). ReviewChecklist seeds from persisted post.aiReview with from-last-review provenance note; fresh runs overwrite; key={postId} guards remount seeding."
-        },
-        {
-          "id": "aw5-local-visibility-insights",
-          "title": "Local SEO: insights bridge on refresh-job snapshot diffs (visible↔not_visible transitions, repeat competitors) + visibility trend from the existing time series",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "6-9h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. local_visibility_shift insight (4-part lockstep) minted edge-triggered from refresh diffs (risk/win/competitor, degraded excluded, win retires stale risk); per-market visibility sparkline on the 180d daily window."
-        }
-      ],
-      "shippedAt": "2026-06-12"
-    },
-    {
-      "id": "sprint-admin-surfaces-w2-data-integrity-2026-06-11",
-      "name": "✅ SHIPPED — 🔒 Admin Surfaces W2 — Data Integrity & Protection",
-      "hours": "~24-34h",
-      "rationale": "Wave 2: silent data loss, a real server-side protection bypass, unpersisted state, and unbounded storage. Five parallel lanes.",
-      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 2. Read-path integration tests mandatory (not admin-GET-only). W2.4 retention values blocked on owner decision D4.",
-      "items": [
-        {
-          "id": "aw2-strategy-sitekeywordmetrics",
-          "title": "Strategy: thread assembled.siteKeywordMetrics into buildKeywordStrategyUxPayload + broadcast/activity on POST /api/seo/competitors + fix dead entity-resolution pageMap read",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-5h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w2-batch. Metrics threaded at all 4 strategyUx call sites (admin GET, diff, public, KCC); competitors POST broadcasts STRATEGY_UPDATED + addActivity; entity-resolution slice reads listPageKeywords. Read-path integration tests."
-        },
-        {
-          "id": "aw2-hub-protection-holes",
-          "title": "Keyword Hub: fix gap-approved protection bypass (findTracked vs stripUndefinedKeys, 409 + test) + ConfirmDialog on drawer force-bypass",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. findTracked removed; lifecycle path resolves un-stripped rows so gap-approved protection 409s server-side (integration-tested incl. forced path); Hub drawer protected actions gated behind ConfirmDialog with action-captured keyword + onClose cleanup."
-        },
-        {
-          "id": "aw2-schema-persistence",
-          "title": "Schema: persist single-page generation to snapshot + broadcast; seed published state from lastPublishedAt; guard stale manual edits",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "5-7h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. Single-page generation persisted via transactional insert-if-missing upsert + SCHEMA_SNAPSHOT_UPDATED broadcast; published Set seeded from lastPublishedAt (merge-only, retraction-safe); stale manual edits cleared on regenerate/rescan; fixContext receiver resolves pageSlug (and the auto-trigger timer bug found in review was fixed + regression-tested)."
-        },
-        {
-          "id": "aw2-local-seo-storage",
-          "title": "Local SEO: GROUP BY MAX(captured_at) replaces both LIMIT 500 callers; stream backfill; retention policy; honest Remove semantics",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. GROUP BY MAX read (4-col identity + tiebreaker) replaces LIMIT 500 for all callers; keyset-paginated backfill; D4 retention prune (180d raw / weekly thin to 18mo / latest-per-(market,keyword,device,lang) immortal, week-start bucketing); honest Deactivate/Reactivate with primary auto-promotion."
-        },
-        {
-          "id": "aw2-content-brief-wiring",
-          "title": "Content: brief job dispatcher stops dropping fixContext targetPageId/Slug; dedupe repeat Send-to-Client; fix regenerateBrief orphan accumulation",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done. fixContext targetPageSlug threaded through dispatcher (targetPageId documented slug-only); send-to-client deduped inside the transaction with state-machine-derived concluded statuses (delivered no longer blocks re-send); superseded_by lineage (migration 134, ON DELETE SET NULL) with filtered list reads + count stats in lockstep."
-        }
-      ],
-      "shippedAt": "2026-06-11"
-    },
-    {
-      "id": "sprint-admin-surfaces-w1-silent-failures-2026-06-11",
-      "name": "✅ SHIPPED — 🩹 Admin Surfaces W1 — Stop the Silent Failures",
-      "hours": "~18-26h",
-      "rationale": "Wave 1 of the 2026-06-11 admin surface audit. Every item is a fetch/mutation failure currently rendering as success or an empty state — the audit's #1 defect class. Six parallel lanes, exclusive file ownership, all S-effort.",
-      "notes": "PR map + file ownership: docs/audits/2026-06-11-admin-surface-remediation-plan.md §Wave 1. Per-lane FM-2 error-path test required. All findings adversarially verified (0/187 refuted).",
-      "items": [
-        {
-          "id": "aw1-strategy-error-channels",
-          "title": "Strategy: stop swallowing fetch errors + decouple add-to-strategy errors from the credit-burning generation retry",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done in fix/admin-surfaces-w1 (95691558). Main-query swallow removed; ErrorState+refetch before empty state; add-keyword failures get own role=alert banner; trackKeyword distinguishes duplicates, per-keyword pending+errors. 9 behavioral tests."
-        },
-        {
-          "id": "aw1-local-seo-panel-errorstate",
-          "title": "Local SEO: ErrorState before the panel's null return (3 mounts) + drawer edit-wipe guard + in-view save errors",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (3adcdeb4). ErrorState before featureEnabled return covers all 3 mounts; drawer dirty-guard via last-synced ref (project external-sync gotcha); role=alert + footer indicator for save errors; focus restore only on close. 8 new tests."
-        },
-        {
-          "id": "aw1-editor-silent-save",
-          "title": "Content: editor stops claiming 'Saved' after failed saves + un-swallow ContentManager/PostEditor mutation errors",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (319f0b9d + review-fix commit). saveField rethrows; SaveStatus 'error'; Done-exit blocked on failed flush; fire-and-forget callers caught; cross-section retry corruption edge fixed; FM-2 component tests added. NOTE: 319f0b9d is mislabeled fix(w1.1) — contains this lane's content."
-        },
-        {
-          "id": "aw1-kcc-ws-wiring",
-          "title": "KCC: copy Hub's wsHandlers block — production surface has zero useWorkspaceEvents wiring",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "1-2h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "CLOSED — AUDIT CLAIM REFUTED during implementation (b2f5674f). KCC was never dead air: RANK_TRACKING_UPDATED/STRATEGY_UPDATED/INTELLIGENCE_SIGNALS_UPDATED already map centrally to the admin-keyword-command-center prefix key in useWsInvalidation (active via App.tsx). Adding component handlers would violate the centralized-event pr-check rule. Shipped a regression test locking central coverage instead. Spec-reviewer adjudicated the counter-claim with full evidence chain."
-        },
-        {
-          "id": "aw1-schema-silent-failures",
-          "title": "Schema: un-silence send-to-client/save-as-template/page-type/rollback failures + scoped single-page error UI",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "3-4h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (60f3e7ef + review-fix commit). All six swallows surfaced (incl. fetchPages made reachable via throwing get, page-type honest revert, regeneratePage); single-page failures separated from full-scan; fixContext-failure false-success state fixed; raw dismiss buttons -> IconButton, style exceptions removed; component-level tests."
-        },
-        {
-          "id": "aw1-shell-palette-badge",
-          "title": "Admin shell: palette 'Run Audit' actually runs an audit + pendingContentRequests badge onto React Query/WS",
-          "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Done (52fcc9cb + cleanup). Palette Run Audit now startJob('seo-audit') matching SeoAudit's exact payload, with toasts + no-site fallback; anomaly scan honestly relabeled 'Scan All Workspaces' (server gap flagged: no workspace-scoped variant); badges on useWorkspaceBadges React Query hook invalidated by CONTENT_REQUEST_* events; onRequestCountChange threading fully removed."
-        }
-      ],
-      "shippedAt": "2026-06-11"
-    },
-    {
-      "id": "sprint-client-dashboard-qw1-stop-the-leaks-2026-06-11",
-      "name": "✅ SHIPPED — 🩹 Client Dashboard Quick Wins 1 — Stop the Leaks",
-      "hours": "~20-28h",
-      "rationale": "First wave of the 2026-06 client dashboard audit. Items where silence is actively costing us: silent data-layer failures, Google API quota burn, silent trial expiry, and an unenforced Growth chat limit. Every item is a no-regret, hours-sized fix with no architectural change.",
-      "notes": "Source: docs/audits/client-dashboard-2026-06/ (00-findings + 01-quick-wins). Ship as small independent PRs, staging-first. Per-PR: data-flow rules 1-2 for any new broadcast, Four Laws for UI, npm run pr-check.",
-      "items": [
-        {
-          "id": "cda-qw1-statetime-ga4-gsc",
-          "title": "Add staleTime to GA4/GSC client hooks (quota + perf risk)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.1",
-          "est": "1-2h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: added 15-minute STALE_TIMES.ANALYTICS plumbing through shared GA4/GSC base hooks, applied only to client analytics wrappers, and pinned admin/client behavior plus disabled-query coverage.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-getsafe-to-get-inbox",
-          "title": "Convert getSafe()→get() on critical inbox/decision query paths",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.2",
-          "est": "3-5h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: critical client inbox/decision hooks now use throwing get() so React Query surfaces endpoint failures instead of silent empty arrays; optional decorative queries still use getSafe().",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-ws-handlers-top5",
-          "title": "Wire top-5 missing WS event handlers (BRIEF_UPDATED, ANOMALIES_UPDATE, INTELLIGENCE_SIGNALS_UPDATED, OUTCOME_*, SCHEMA_*)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §1.3",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: added confirmed client-facing invalidation mappings and ClientDashboard subscriptions for BRIEF_UPDATED, OUTCOME_ACTION_RECORDED, and OUTCOME_PLAYBOOK_DISCOVERED; left speculative producer cleanup for a separate PR.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-trial-countdown-banner",
-          "title": "Trial countdown banner in client shell (trialDaysRemaining <= 5)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.1",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: existing client trial banner now appears only for active non-beta, non-external-billing trials with 1-5 days remaining, supports per-trial dismissal, and routes CTA to Plans.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-day10-trial-email",
-          "title": "Day-10 trial warning email (scheduled, dedup-flagged)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.2",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: formalized the 4-days-remaining reminder as the Day-10 warning for 14-day trials, preserved trial:{workspaceId}:4 dedupe, links to Plans, and only marks sent after sendEmail() succeeds.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-chat-usage-counter",
-          "title": "Chat usage counter in client chat widget ('2 of 3 free conversations left')",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.3",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: added shared typed chat usage response, React Query client usage hook/key, Free/Growth counters in the chat widget, Premium unlimited hiding, and tier-specific exhausted messaging.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-growth-chat-enforcement",
-          "title": "Enforce Growth 50-chat/month limit (counted today, not enforced)",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §4.4",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: usage_tracking.ai_chats now gates new chat sessions for Free/Growth/trial-as-Growth before AI calls, preserves existing-session continuation, refunds failed reservations, and returns typed 429 usage_limit responses.",
-          "shippedAt": "2026-06-11"
-        },
-        {
-          "id": "cda-qw1-hygiene-sweep",
-          "title": "Code hygiene sweep: eslint-disable justification + role=dialog on DecisionDetailModal + ClientHeader menu roles/aria-labels",
-          "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/01-quick-wins.md §5.1-5.3",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-11",
-          "notes": "Shipped 2026-06-11: removed the bare hook-deps suppression with real dependencies, converted ClientHeader account controls to accessible Popover/menu roles, labeled date range trigger, and pinned DecisionDetailModal dialog semantics.",
-          "shippedAt": "2026-06-11"
-        }
-      ],
-      "shippedAt": "2026-06-11"
     }
   ]
 }

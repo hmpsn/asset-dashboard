@@ -324,7 +324,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 
   const roadmap = loadRoadmap(options.roadmapPath);
-  const report = buildFeatureFlagLifecycleReport(roadmap, options.asOf);
+  // Shipped roadmap items are moved out to roadmap.archive.json. A feature flag's
+  // linkedRoadmapItemId legitimately references its now-archived (shipped) item until the
+  // flag itself is retired, so resolve links against BOTH the active roadmap and the archive.
+  const archivePath = path.resolve(path.dirname(options.roadmapPath), 'roadmap.archive.json');
+  const archivedSprints = fs.existsSync(archivePath)
+    ? ((JSON.parse(fs.readFileSync(archivePath, 'utf8')) as RoadmapData).sprints ?? [])
+    : [];
+  const combined: RoadmapData = { sprints: [...roadmap.sprints, ...archivedSprints] };
+  const report = buildFeatureFlagLifecycleReport(combined, options.asOf);
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
