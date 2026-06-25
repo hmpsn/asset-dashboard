@@ -2,7 +2,8 @@
 //
 // The Issue — pushed weekly Issue cron (Phase 3).
 //
-// Clone of briefing-cron.ts, re-pointed at the strategy POV:
+// Shares weekly workspace-cron primitives with briefing/return-hook while keeping
+// strategy-specific eligibility and push behavior local:
 //
 // - Polls every hour. Once per ISO week per ELIGIBLE workspace, it (a) pre-bakes
 //   the admin-variant strategy POV via generateStrategyPov (cheap content-hash
@@ -47,33 +48,22 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { createLogger } from './logger.js';
+import {
+  createIntervalCron,
+  currentWeekOfUTC,
+  runAsyncWithWorkspaceSingleFlight,
+} from './weekly-workspace-cron.js';
 
 const log = createLogger('strategy-issue-cron');
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // poll every hour
 
-// ── Time helpers ─────────────────────────────────────────────────────────────
-
 /**
- * ISO date (YYYY-MM-DD) of the Monday that anchors the week containing `d`.
- * Identical to briefing-cron's currentWeekOfUTC — kept local so the two crons
- * stay independently editable (briefing cadence may diverge).
- *
  * Exported (scaled-review fix #2) so the workspace-overview doorbell summary computes the SAME
  * "this week" the cron stamps — the bell's `ready` flag MUST agree with the cron's week semantics
  * or it would either never light or never clear.
  */
-export function currentWeekOfUTC(d = new Date()): string {
-  const day = d.getUTCDay();
-  // Treat Sunday (0) as the *end* of last week so its Monday is 6 days back.
-  const diffToMonday = (day + 6) % 7;
-  const monday = new Date(Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() - diffToMonday,
-  ));
-  return monday.toISOString().slice(0, 10);
-}
+export { currentWeekOfUTC };
 
 // ── Eligibility ──────────────────────────────────────────────────────────────
 
@@ -124,15 +114,12 @@ export async function runIssuePushForWorkspace(
   workspaceId: string,
   opts: RunIssuePushOptions = {},
 ): Promise<RunIssuePushResult> {
-  if (runningPushes.has(workspaceId)) {
-    return { status: 'duplicate', weekOf: '', reason: 'already running' };
-  }
-  runningPushes.add(workspaceId);
-  try {
-    return await runIssuePushForWorkspaceInner(workspaceId, opts);
-  } finally {
-    runningPushes.delete(workspaceId);
-  }
+  return runAsyncWithWorkspaceSingleFlight(
+    runningPushes,
+    workspaceId,
+    () => ({ status: 'duplicate', weekOf: '', reason: 'already running' }),
+    () => runIssuePushForWorkspaceInner(workspaceId, opts),
+  );
 }
 
 async function runIssuePushForWorkspaceInner(
@@ -337,33 +324,23 @@ async function tick(now = new Date()): Promise<void> {
   }
 }
 
-let startupTimeout: ReturnType<typeof setTimeout> | null = null;
-let tickInterval: ReturnType<typeof setInterval> | null = null;
+const strategyIssueCronLifecycle = createIntervalCron({
+  startupDelayMs: 90_000,
+  intervalMs: CHECK_INTERVAL_MS,
+  runStartup: () => {
+    tick().catch((err) => log.error({ err }, 'first issue-push tick failed'));
+  },
+  runInterval: () => {
+    tick().catch((err) => log.error({ err }, 'issue-push tick failed'));
+  },
+  onStart: () => log.info('strategy issue-push cron started — checks hourly, once per ISO week per eligible workspace'),
+});
 
 /** Idempotent — calling twice is a no-op. */
 export function startStrategyIssueCron(): void {
-  if (tickInterval) return;
-
-  startupTimeout = setTimeout(() => {
-    tick().catch((err) => log.error({ err }, 'first issue-push tick failed'));
-  }, 90_000);
-  startupTimeout.unref?.();
-
-  tickInterval = setInterval(() => {
-    tick().catch((err) => log.error({ err }, 'issue-push tick failed'));
-  }, CHECK_INTERVAL_MS);
-  tickInterval.unref?.();
-
-  log.info('strategy issue-push cron started — checks hourly, once per ISO week per eligible workspace');
+  strategyIssueCronLifecycle.start();
 }
 
 export function stopStrategyIssueCron(): void {
-  if (startupTimeout) {
-    clearTimeout(startupTimeout);
-    startupTimeout = null;
-  }
-  if (tickInterval) {
-    clearInterval(tickInterval);
-    tickInterval = null;
-  }
+  strategyIssueCronLifecycle.stop();
 }
