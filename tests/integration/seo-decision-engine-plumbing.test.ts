@@ -45,6 +45,7 @@ const providerState = vi.hoisted(() => ({
   // (where locationCode/languageCode land) so the test can assert the workspace
   // target-geo flowed all the way into the provider call body.
   nationalRequests: [] as Array<{ locationCode?: number; languageCode?: string }>,
+  llmRequests: [] as Array<{ locationCode?: number; locationName?: string; languageCode?: string }>,
 }));
 
 // broadcastToWorkspace() throws if setBroadcast() was never called (it normally is, in
@@ -77,8 +78,15 @@ vi.mock('../../server/seo-data-provider.js', async (importActual) => {
       providerState.listingCalls++;
       return providerState.listings;
     },
-    async getLlmMentions(): Promise<LlmMentionsResult> {
+    async getLlmMentions(
+      request?: { locationCode?: number; locationName?: string; languageCode?: string },
+    ): Promise<LlmMentionsResult> {
       providerState.llmCalls++;
+      providerState.llmRequests.push({
+        locationCode: request?.locationCode,
+        locationName: request?.locationName,
+        languageCode: request?.languageCode,
+      });
       if (!providerState.llm) throw new Error('test bug: providerState.llm not set');
       return providerState.llm;
     },
@@ -143,6 +151,7 @@ afterEach(() => {
   providerState.listingCalls = 0;
   providerState.llmCalls = 0;
   providerState.nationalRequests = [];
+  providerState.llmRequests = [];
 });
 
 afterAll(() => {
@@ -367,6 +376,12 @@ describe('SEO Decision Engine plumbing — P8 ai-visibility', () => {
     //   tier growth ✓ · liveDomain ✓ · provider.getLlmMentions ✓ (mock). The seoContext
     //   aiVisibility summary is flag-gated on 'ai-visibility', so enable it.
     setWorkspaceFlagOverride('ai-visibility', wsId, true);
+    // P8 reuses P4 target-geo: with geo-targeting ON, the LLM mentions provider request must carry
+    // the non-US market instead of falling back to United States.
+    setWorkspaceFlagOverride('geo-targeting', wsId, true);
+    updateWorkspace(wsId, {
+      targetGeo: { locationCode: 2124, languageCode: 'fr', countryCode: 'CA', label: 'Canada · French' },
+    });
 
     // Parsed LLM-mentions result: mentions > 0, shareOfVoice defined, competitors + sourceDomains
     // (derived from the LLM_MENTIONS_AGG fixture shape — chat_gpt platform, co-mentioned brands).
@@ -394,6 +409,10 @@ describe('SEO Decision Engine plumbing — P8 ai-visibility', () => {
       providerState.llmCalls,
       'P8: job never called provider.getLlmMentions — it no-op\'d on a gate (tier / liveDomain / provider method / budget). Workspace not set up to pass the job gates.',
     ).toBeGreaterThan(0);
+    expect(
+      providerState.llmRequests[0],
+      'P8: job called provider.getLlmMentions but the fake captured no request object — cannot assert geo threading.',
+    ).toMatchObject({ locationCode: 2124, locationName: 'Canada', languageCode: 'fr' });
 
     // ── Link 1: store write ──
     const snapshot = getLatestLlmMentions(wsId, 'chat_gpt');

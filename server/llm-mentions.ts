@@ -111,9 +111,9 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
 
     // Target-geo (P4): admin target-geo → local primary market → US/'en'. Flag-gated inside the
     // helper; returns {} when geo-targeting is off, so the provider falls back to its US default.
-    // The LLM-mentions request takes `languageCode` (the provider defaults `locationName` to
-    // "United States"); we pass through the resolved language only.
-    const { languageCode } = workspaceProviderGeo(workspaceId);
+    // LLM-mentions uses DataForSEO `location_name` rather than `location_code`; pass both the
+    // resolved name and code so non-US workspaces do not silently fall back to United States.
+    const { locationCode, locationName, languageCode } = workspaceProviderGeo(workspaceId);
 
     // P5 budget gate — observe-only at launch (logs the would-block, returns). Wrapped so a thrown
     // CreditBudgetError (only possible once enforcement is enabled) is logged-and-skipped: the job
@@ -143,7 +143,7 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
     if (isCancelled(jobId)) return;
 
     const result = await getLlmMentions(
-      { domain: ownerDomain, platform: LLM_MENTIONS_PLATFORM, ownerBrandNames, languageCode },
+      { domain: ownerDomain, platform: LLM_MENTIONS_PLATFORM, ownerBrandNames, locationCode, locationName, languageCode },
       workspaceId,
     );
 

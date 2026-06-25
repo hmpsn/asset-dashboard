@@ -194,6 +194,9 @@ export interface LlmMentionsRequest {
    * ÷ all brands) instead of mixing the domain-citation count with brand co-mention counts.
    */
   ownerBrandNames?: string[];
+  /** Optional DataForSEO country/location code; used as a fallback to resolve `locationName`. */
+  locationCode?: number;
+  /** DataForSEO location_name. LLM mentions accepts a name rather than a location_code. */
   locationName?: string;
   languageCode?: string;
 }

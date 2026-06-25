@@ -64,6 +64,29 @@ const LOCATION_CODES: Record<string, number> = {
   fr: 2250,
 };
 
+const LLM_LOCATION_NAMES_BY_CODE: Record<number, string> = {
+  2036: 'Australia',
+  2056: 'Belgium',
+  2076: 'Brazil',
+  2124: 'Canada',
+  2250: 'France',
+  2276: 'Germany',
+  2356: 'India',
+  2372: 'Ireland',
+  2380: 'Italy',
+  2392: 'Japan',
+  2484: 'Mexico',
+  2528: 'Netherlands',
+  2554: 'New Zealand',
+  2616: 'Poland',
+  2702: 'Singapore',
+  2710: 'South Africa',
+  2724: 'Spain',
+  2752: 'Sweden',
+  2826: 'United Kingdom',
+  2840: 'United States',
+};
+
 function locationCodeFromDatabase(database = 'us'): number {
   return LOCATION_CODES[database.toLowerCase()] ?? 2840;
 }
@@ -2124,8 +2147,8 @@ export class DataForSeoProvider implements SeoDataProvider {
   async getLlmMentions(request: LlmMentionsRequest, workspaceId: string): Promise<LlmMentionsResult> {
     const domain = cleanDomain(request.domain);
     const platform = request.platform ?? 'chat_gpt';
-    const locationName = request.locationName ?? 'United States';
-    const languageCode = request.languageCode ?? 'en';
+    const locationName = request.locationName?.trim() || LLM_LOCATION_NAMES_BY_CODE[request.locationCode ?? 0] || 'United States';
+    const languageCode = normalizeLanguageCode(request.languageCode);
     const ownerBrandNames = request.ownerBrandNames ?? [];
     const emptyResult: LlmMentionsResult = {
       domain,
@@ -2140,7 +2163,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       'llm_mentions',
       cacheKeyPart(domain),
       cacheKeyPart(platform),
-      cacheKeyPart(locationName),
+      cacheKeyPart(request.locationCode != null ? String(request.locationCode) : locationName),
+      cacheKeyPart(languageCode),
     ].join('_');
 
     return runDataForSeoOperation<LlmMentionsResult>({
