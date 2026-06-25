@@ -87,6 +87,17 @@
           "notes": "Group C (paid). Flag ai-visibility. Depends on P4+P5. Closes the open-loop AEO program with measurement."
         },
         {
+          "id": "integrations-gbp-direct-oauth",
+          "title": "Direct Google Business Profile integration (OAuth) — owner-authenticated read + write actions",
+          "source": "P7 GBP+reviews follow-on (owner request 2026-06-24)",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "integrations",
+          "notes": "FOLLOW-ON to P7 (seo-engine-p7-gbp-reviews-local-layer), which benchmarks PUBLIC GBP data via DataForSEO business_listings_search (rating, review count, public completeness signals — no auth, read-only, advisory recs). This item is the AUTHENTICATED connection via the Google Business Profile API (My Business Account Management + Business Information + Reviews + Performance APIs): (a) READ owner-only metrics not in public data — profile views/searches, call/direction/website/booking action counts, query discovery; and (b) WRITE — reply to reviews, publish GBP posts, edit hours/attributes/categories/photos, all from inside the platform, turning P7's advisory review-gap/GBP-completeness recs into one-click executable actions. Requires: a Google Cloud OAuth client + GBP API access APPROVAL (Google gates this behind an application/allowlist — non-trivial lead time and the biggest risk), a per-location encrypted OAuth token store (mirror the Stripe AES-256-GCM config-on-disk pattern), a 'Connect Google Business Profile' flow in the locations editor (server/local-seo locations CRUD already stores gbp_place_id), token refresh, and activity/audit logging for write actions. Distinct from intel-quality-google-business-profile-health (read-only PUBLIC health signals). Until GBP API access is approved, P7's public benchmarking stands as the read-only product."
+        },
+        {
           "id": "seo-engine-deferred-revenue-grounding",
           "title": "DEFERRED — Revenue grounding: replace CPC proxy in EMV with GA4 estimatedRevenue / Stripe conversion value",
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
