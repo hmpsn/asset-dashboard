@@ -324,6 +324,12 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomePlaybooks(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
       ] as const;
+    case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
+      return [
+        queryKeys.admin.conversionTrackingStatus(workspaceId),
+        queryKeys.admin.roi(workspaceId),
+        queryKeys.client.roi(workspaceId),
+      ] as const;
     case WS_EVENTS.SUGGESTED_BRIEF_UPDATED:
       return [
         queryKeys.admin.aiSuggestedBriefs(workspaceId),
@@ -601,6 +607,10 @@ function clientDashboardInvalidationKeys(
       // client.roi carries the outcomeVerdict (The Issue P0), which depends on the workspace's
       // outcomeValue/segmentConfig — refresh it when those are saved.
       return [queryKeys.client.pricing(workspaceId), queryKeys.client.roi(workspaceId)] as const;
+    case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
+      // client.roi carries the outcomeVerdict provenance label; saving tracked forms can flip it to
+      // measured_action before the next capture poll.
+      return [queryKeys.client.roi(workspaceId)] as const;
     case WS_EVENTS.PAGE_STATE_UPDATED:
       return [
         queryKeys.shared.pageEditStates(workspaceId, false),

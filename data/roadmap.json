@@ -1391,9 +1391,9 @@
           "source": "Delta audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT wiring (low). (a) PUT /form-sources (the-issue-conversion-tracking.ts:152) flips conversionTrackingConfirmedAt (the D6 \"measured\" provenance marker) via updateWorkspace + logs activity but NEVER broadcasts — other admin tabs / the client provenance label stay stale until the next poller capture. Fix: broadcast FORM_CAPTURE_CONFIG_UPDATED (add to ws-events.ts) + matching useWorkspaceEvents invalidation. (b) STRATEGY_ISSUE_PUSHED (strategy-issue-cron.ts:201) is broadcast with ZERO frontend subscribers; the bell is poll-derived. The inline comment at :198-199 FALSELY claims a handler invalidates on this event (the header at :24-29 correctly admits there isn't one). Fix: delete the dead broadcast (poll covers it) OR add the promised handler; either way fix the contradicting comment."
+          "notes": "DONE 2026-06-25: added FORM_CAPTURE_CONFIG_UPDATED for PUT /form-sources with admin/client invalidation so measured provenance refreshes immediately; removed the dead STRATEGY_ISSUE_PUSHED broadcast and stale event exemptions/comments, leaving the weekly Issue bell poll-derived as documented."
         },
         {
           "id": "simp-delta-0624-reserved-flag-stub-cleanup",

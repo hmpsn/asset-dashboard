@@ -26,8 +26,10 @@ import { assembleSetupReadiness } from '../the-issue-readiness.js';
 import { toNamedLeadView } from '../the-issue-export.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { validate, z } from '../middleware/validate.js';
 import { webflowFormMappingSchema } from '../schemas/workspace-schemas.js';
+import { WS_EVENTS } from '../ws-events.js';
 import type { WebflowFormMapping } from '../../shared/types/form-submission.js';
 import type { NamedLeadView } from '../../shared/types/the-issue.js';
 import { createLogger } from '../logger.js';
@@ -177,6 +179,10 @@ theIssueConversionTrackingRouter.put(
     // NOT in CLIENT_VISIBLE_TYPES). PII-free metadata — only the count of mapped forms (D7).
     addActivity(ws.id, 'form_capture_configured', `Tracked Webflow forms updated (${sources.length} mapped)`, undefined, {
       formCount: sources.length,
+    });
+    broadcastToWorkspace(ws.id, WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED, {
+      formCount: sources.length,
+      confirmed: sources.length > 0,
     });
     res.json({
       saved: true,

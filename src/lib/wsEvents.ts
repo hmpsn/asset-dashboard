@@ -43,10 +43,13 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
-  // The Issue (Client) P1a — Webflow named-lead captured via the form webhook. Handled by
+  // The Issue (Client) P1a — Webflow named-lead captured via the forms Data API poller. Handled by
   // src/hooks/admin/useConversionTrackingStatus.ts (useWorkspaceEvents → invalidate the
   // conversion-tracking-status query) so the admin verification readout refreshes live.
   FORM_SUBMISSION_CAPTURED: 'outcome:form_captured',
+  // The Issue (Client) P1a — tracked Webflow form-source mapping saved. This can flip measured
+  // provenance immediately, so admin status and client ROI/provenance caches refresh live.
+  FORM_CAPTURE_CONFIG_UPDATED: 'outcome:form_capture_config_updated',
   SUGGESTED_BRIEF_UPDATED: 'suggested-brief:updated',
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
@@ -65,7 +68,6 @@ export const WS_EVENTS = {
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate/operator-edit; handled by
   // src/hooks/admin/useStrategyPov.ts (useWorkspaceEvents → invalidate queryKeys.admin.strategyPov).
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',
-  STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
   // The Issue — trust ladder (Phase 4). Operator toggled a per-archetype auto-send policy; handled
   // locally by src/hooks/admin/useAutoSendPolicy.ts (useWorkspaceEvents → invalidate admin.autoSendPolicy).
   STRATEGY_AUTOSEND_POLICY_UPDATED: 'strategy:autosend-policy-updated',
