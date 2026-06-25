@@ -8,7 +8,7 @@ describe('AI operation registry usage contracts', () => {
       { path: 'server/schema-plan.ts', operation: "operation: 'schema-plan-generate'" },
       { path: 'server/routes/public-analytics.ts', operation: "operation: 'client-search-chat'" },
       { path: 'server/content-decay.ts', operation: "operation: 'content-decay'" },
-      { path: 'server/keyword-strategy-ai-synthesis.ts', operation: "operation: 'keyword-strategy'" },
+      { path: 'server/keyword-strategy-synthesis/ai-callers.ts', operation: "operation: 'keyword-strategy'" },
       { path: 'server/workspace-context-generation-job.ts', operation: "operation: 'knowledge-base-gen'" },
       { path: 'server/workspace-context-generation-job.ts', operation: "operation: 'brand-voice-gen'" },
       { path: 'server/workspace-context-generation-job.ts', operation: "operation: 'personas-gen'" },
@@ -20,4 +20,3 @@ describe('AI operation registry usage contracts', () => {
     }
   });
 });
-

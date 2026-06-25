@@ -1210,9 +1210,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/large. keyword-strategy-ai-synthesis.ts lines 255-1717 — the single largest backend function, unreviewable and a magnet for the guessed-field-name silent-data-loss bugs CLAUDE.md warns about. Fix: split into a named-stage pipeline (input assembly → pool build → prompt assembly → AI call → parse/validate → page-map/conflict → persist). Start with the already-cohesive pool-build + prompt-assembly blocks whose helpers exist in-file. Sequence after the cheap wins."
+          "notes": "AUDIT high/large. keyword-strategy-ai-synthesis.ts lines 255-1717 — the single largest backend function, unreviewable and a magnet for the guessed-field-name silent-data-loss bugs CLAUDE.md warns about. Fix: split into a named-stage pipeline (input assembly → pool build → prompt assembly → AI call → parse/validate → page-map/conflict → persist). Start with the already-cohesive pool-build + prompt-assembly blocks whose helpers exist in-file. Sequence after the cheap wins. || DONE 2026-06-25: split keyword strategy synthesis into explicit stage-owned modules under server/keyword-strategy-synthesis for public types, AI callers, keyword pool helpers, prompt builders, prompt blocks, and finalization. The facade keeps the public exports and orchestrates the pipeline while prompt templates, local PageMapping/MasterStrategyData contracts, closed-set helpers, hard filters, requested re-add, and synthesis backfill live in leaf modules. Added docs/rules/keyword-strategy-synthesis.md plus source-boundary, prompt-stage, named-op, and persistence field-survival tests proving rich page-map/content-gap fields survive normalized storage while transient requested markers do not persist.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-god-module-decompose",

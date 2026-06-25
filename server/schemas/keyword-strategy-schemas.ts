@@ -10,7 +10,7 @@
  *
  * Field names are cross-referenced against the SOURCE interfaces so a wrong name
  * cannot silently `safeParse`-fail to empty (the exact failure mode P3 kills):
- *   - OP1 item ↔ the `PageMapping` local type in `keyword-strategy-ai-synthesis.ts`
+ *   - OP1 item ↔ the `PageMapping` synthesis stage type
  *     (`pagePath`, `pageTitle`, `primaryKeyword`, `secondaryKeywords`, `searchIntent`)
  *     plus `PageKeywordMap` in `shared/types/workspace.ts`. `primaryKeywordSourceId`
  *     is the P3 closed-set id (the normalized keyword) the AI selected from.
@@ -24,6 +24,10 @@
  * for the retry-once repair turn. See docs/rules/ai-operation-contracts.md.
  */
 import { z } from 'zod';
+
+const contentGapIntentSchema = z.enum(['informational', 'commercial', 'transactional', 'navigational']).catch('informational');
+const contentGapPrioritySchema = z.enum(['high', 'medium', 'low']).catch('medium');
+const contentGapPageTypeSchema = z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional().catch(undefined);
 
 // ── OP1: keyword-page-assignment ────────────────────────────────────────────
 
@@ -58,10 +62,10 @@ export type PageAssignmentResponse = z.infer<typeof pageAssignmentResponseSchema
 export const siteSynthesisContentGapSchema = z.object({
   topic: z.string(),
   targetKeyword: z.string(),
-  intent: z.string().optional(),
-  priority: z.string().optional(),
-  rationale: z.string().optional(),
-  suggestedPageType: z.string().optional(),
+  intent: contentGapIntentSchema,
+  priority: contentGapPrioritySchema,
+  rationale: z.string().trim().min(1).catch('AI-identified keyword opportunity.'),
+  suggestedPageType: contentGapPageTypeSchema,
   competitorProof: z.string().optional(),
   /** P3 closed-set id (the normalized candidate keyword) the AI selected from. */
   targetKeywordSourceId: z.string().optional(),

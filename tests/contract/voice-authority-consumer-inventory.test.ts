@@ -12,6 +12,7 @@ const BRAND_ENGINE_RULES = resolve(ROOT_DIR, 'docs/rules/brand-engine.md');
 const DISPATCHER_AND_HELPERS = new Set([
   'server/ai.ts',
   'server/anthropic-helpers.ts',
+  'server/keyword-strategy-synthesis/ai-callers.ts',
   'server/openai-helpers.ts',
 ]);
 
@@ -82,7 +83,7 @@ function listTypeScriptFiles(dir: string): string[] {
 function isAiConsumer(relPath: string, source: string): boolean {
   if (DISPATCHER_AND_HELPERS.has(relPath)) return false;
   if (relPath.includes('/__tests__/')) return false;
-  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(/.test(source);
+  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(|\bcallKeywordStrategyAI\(/.test(source);
 }
 
 function countByClassification(): Record<VoiceAuthorityClass, number> {

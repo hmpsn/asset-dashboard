@@ -3,6 +3,7 @@
  * Entries are broadcast in real time via WebSocket.
  */
 
+import { randomUUID } from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -326,7 +327,7 @@ const stmts = createStmtCache(() => ({
 
 export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>, actor?: { id?: string; name?: string }): ActivityEntry {
   const entry: ActivityEntry = {
-    id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `act_${randomUUID()}`,
     workspaceId,
     type,
     title,
