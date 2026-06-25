@@ -73,8 +73,17 @@ export function useLocalSeoUpdate(workspaceId: string) {
 }
 
 export function useSetPrimaryMarket(workspaceId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (marketId: string) => localSeo.setPrimaryMarket(workspaceId, marketId),
+    onSuccess: () => {
+      // Changing the primary market re-weights local visibility + keyword surfaces;
+      // mirror the invalidation set used by useLocalSeoUpdate so dependents refresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
   });
 }
 
