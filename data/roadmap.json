@@ -601,7 +601,7 @@
           "priority": "P3",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Incl. StatusBadge registry adoption (4 hand-rolled maps), cyan→teal CTAs, dual Send-to-Client label split, briefs IA inversion, FAB collision, checkbox/hover a11y, undo on delete."
+          "notes": "Incl. StatusBadge registry adoption (4 hand-rolled maps), cyan→teal CTAs, dual Send-to-Client label split, briefs IA inversion, FAB collision, checkbox/hover a11y, undo on delete. || [2026-06-24 SPINOFF DONE]: Content-briefs cyan→teal CTAs (RequestList Send/Resubmit/Send-post + BriefDetail send) + dual Send-to-Client label split (RequestList 'Send to client' status-bump vs BriefDetail 'Send brief to client' create-request) + Admin Send Convention optional inline note field on BOTH brief send paths (status-bump threads internalNote via existing PATCH; create-request path now accepts note → clientNote/internalNote, mirroring sendPostToClientForReview). REMAINING DELTA: StatusBadge registry adoption (status-indicator cyan drift on client_review/post_review), checkbox/hover a11y, FAB collision, undo on delete."
         },
         {
           "id": "awp-shell-sweep",

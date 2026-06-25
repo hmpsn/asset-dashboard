@@ -235,11 +235,17 @@ router.get('/api/content-briefs/:workspaceId/:briefId/export', requireWorkspaceA
 });
 
 // Send a standalone brief to client for review
-// Creates a content request linked to this brief and sets status to client_review
-router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireWorkspaceAccess('workspaceId'), (req, res) => {
+// Creates a content request linked to this brief and sets status to client_review.
+// Admin Send Convention: a single "Send to client" action + an OPTIONAL inline note (the
+// operator's message to the client). Mirrors the post path (sendPostToClientForReview).
+const sendBriefToClientSchema = z.object({
+  note: z.string().max(5000).optional(),
+}).strict();
+router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireWorkspaceAccess('workspaceId'), validate(sendBriefToClientSchema), (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
+  const { note } = req.body as { note?: string };
   const ws = getWorkspace(req.params.workspaceId);
 
   // Bug 2 fix: wrap dedupe-check + create + link in a single transaction so the
@@ -266,12 +272,14 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
       serviceType: 'brief_only',
       pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
       initialStatus: 'brief_generated',
+      clientNote: note,
       dedupe: false,
     });
     // Link the brief and set to client_review
     updateContentRequest(req.params.workspaceId, request!.id, {
       briefId: brief.id,
       status: 'client_review',
+      internalNote: note,
     });
   })();
 
@@ -288,7 +296,7 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     'brief_generated',
     `Sent brief "${brief.suggestedTitle}" to client`,
     `Keyword: ${brief.targetKeyword}`,
-    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' },
+    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client', note },
   );
 
   // Send email notification

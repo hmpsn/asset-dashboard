@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Loader2, Trash2, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap,
@@ -33,7 +34,7 @@ export interface RequestListProps {
   onGenerateBriefForRequest: (req: ContentTopicRequest, generationStyle?: ContentGenerationStyle) => void;
   generationStyle: ContentGenerationStyle;
   onGenerationStyleChange: (value: ContentGenerationStyle) => void;
-  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => void;
+  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string; internalNote?: string }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
   onSetDeliveryUrl: (value: string) => void;
@@ -96,6 +97,11 @@ export function RequestList({
   onGeneratePost,
   onOpenPost,
 }: RequestListProps) {
+  // Send-to-client inline note (Admin Send Convention: one button + optional note).
+  // Tracks which request's brief is in note-entry mode, plus the note text.
+  const [sendNoteFor, setSendNoteFor] = useState<string | null>(null);
+  const [sendNote, setSendNote] = useState('');
+
   if (clientRequests.length === 0) return null;
 
   return (
@@ -174,8 +180,8 @@ export function RequestList({
                           <Button onClick={() => onUpdateRequestStatus(req.id, 'declined')} variant="ghost" size="sm" className="rounded bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">Decline</Button>
                         </>
                       )}
-                      {req.status === 'brief_generated' && (
-                        <Button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} variant="ghost" size="sm" className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</Button>
+                      {req.status === 'brief_generated' && sendNoteFor !== req.id && (
+                        <Button onClick={() => { setSendNoteFor(req.id); setSendNote(''); }} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
                       )}
                       {req.status === 'client_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Awaiting client feedback</span>
@@ -224,10 +230,10 @@ export function RequestList({
                             onClick={() => onUpdateRequestStatus(req.id, 'client_review', { clientFeedback: '' })}
                             variant="ghost"
                             size="sm"
-                            className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
                             title="Send the revised brief back to client for review"
                           >
-                            <Icon as={Send} size="sm" /> Resubmit to Client
+                            <Icon as={Send} size="sm" /> Resubmit to client
                           </Button>
                         );
                       })()}
@@ -241,10 +247,10 @@ export function RequestList({
                             onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
                             variant="ghost"
                             size="sm"
-                            className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
                             title="Send post to client for review and approval"
                           >
-                            <Icon as={Send} size="sm" /> Send Post to Client
+                            <Icon as={Send} size="sm" /> Send post to client
                           </Button>
                         );
                       })()}
@@ -254,6 +260,19 @@ export function RequestList({
                     </div>
                   </div>
                 </div>
+                {/* Send-to-client note form — bumps an existing request's brief to client_review
+                    (status bump, NOT a new request). Optional inline note per the Admin Send Convention. */}
+                {req.status === 'brief_generated' && sendNoteFor === req.id && (
+                  <div className="mt-2 bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 mb-1"><Icon as={Send} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Send to client</span></div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">Send this brief to the client for review. Add an optional note:</div>
+                    <FormInput value={sendNote} onChange={setSendNote} placeholder="Optional note for the client…" maxLength={5000} aria-label="Optional note for the client" className="w-full" />
+                    <div className="flex items-center gap-2">
+                      <Button onClick={async () => { await onUpdateRequestStatus(req.id, 'client_review', { internalNote: sendNote.trim() || undefined }); setSendNoteFor(null); setSendNote(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
+                      <Button onClick={() => { setSendNoteFor(null); setSendNote(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</Button>
+                    </div>
+                  </div>
+                )}
                 {/* Delivery form */}
                 {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
                   <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
