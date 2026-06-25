@@ -194,7 +194,10 @@ jobs:
   # Keep PR feedback aligned with Vitest's real project boundaries.
   # The prior mixed 6-way shard pool consistently left one hot lane around
   # 188-195s at the job level, so we split the heaviest projects directly:
-  # integration gets 3 lanes, unit gets 2, and component/contract stay discrete.
+  # integration gets 3 lanes, unit and component get 2 each, contract stays discrete.
+  # Component is the heaviest jsdom project (~300 files) and was being OOM-killed as a
+  # single un-sharded process (killed mid-run, no assertion) — sharding it ×2 halves the
+  # per-process memory accumulation, the same way unit/integration are split.
   test-lane:
     name: pr-test (${{ matrix.lane.name }})
     needs: changes
@@ -203,8 +206,10 @@ jobs:
       fail-fast: false
       matrix:
         lane:
-          - name: component
-            command: npm run test:component -- --reporter=dot
+          - name: component (1/2)
+            command: npm run test:component -- --reporter=dot --shard=1/2
+          - name: component (2/2)
+            command: npm run test:component -- --reporter=dot --shard=2/2
           - name: contract
             command: npm run test:contract -- --reporter=dot
           - name: unit (1/2)
