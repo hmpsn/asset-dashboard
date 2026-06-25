@@ -92,6 +92,10 @@ export function rowToLlmMentionSnapshot(row: LlmMentionSnapshotRow): LlmMentionS
 
 // ── Lazy prepared statements ──
 
+// Retention: keep only the most recent N distinct snapshot dates per workspace
+// so the table cannot grow unbounded (mirrors rank_snapshots' 180-date cap).
+const SNAPSHOT_RETAIN_DATES = 180;
+
 const stmts = createStmtCache(() => ({
   upsert: db.prepare(`
     INSERT INTO llm_mention_snapshots (
@@ -131,6 +135,17 @@ const stmts = createStmtCache(() => ({
     SELECT * FROM llm_mention_snapshots
     WHERE workspace_id = ? AND platform = ?
     ORDER BY snapshot_date ASC
+  `),
+  // Drop rows older than the most recent SNAPSHOT_RETAIN_DATES distinct snapshot_dates
+  // for this workspace (no baseline/earliest-row reader → plain date-window prune).
+  // Served by idx_llm_mentions_ws (workspace_id, platform, snapshot_date).
+  prune: db.prepare(`
+    DELETE FROM llm_mention_snapshots
+    WHERE workspace_id = @ws
+      AND snapshot_date NOT IN (
+        SELECT DISTINCT snapshot_date FROM llm_mention_snapshots
+        WHERE workspace_id = @ws ORDER BY snapshot_date DESC LIMIT @keep
+      )
   `),
 }));
 
@@ -179,6 +194,7 @@ export function storeLlmMentionSnapshot(
       source_domains: JSON.stringify(data.sourceDomains ?? []),
       fetched_at: new Date().toISOString(),
     });
+    stmts().prune.run({ ws: workspaceId, keep: SNAPSHOT_RETAIN_DATES });
   });
   run();
 }

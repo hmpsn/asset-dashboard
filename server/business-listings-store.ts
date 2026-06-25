@@ -123,6 +123,10 @@ export function rowToBusinessListingSnapshot(
 
 // ── Lazy prepared statements ──
 
+// Retention: keep only the most recent N distinct snapshot dates per workspace
+// so the table cannot grow unbounded (mirrors rank_snapshots' 180-date cap).
+const SNAPSHOT_RETAIN_DATES = 180;
+
 const stmts = createStmtCache(() => ({
   upsert: db.prepare(`
     INSERT INTO business_listing_snapshots (
@@ -173,6 +177,17 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND is_owned = 1 AND location_id = ?
     ORDER BY snapshot_date DESC
     LIMIT 1
+  `),
+  // Drop rows older than the most recent SNAPSHOT_RETAIN_DATES distinct snapshot_dates
+  // for this workspace (no baseline/earliest-row reader → plain date-window prune).
+  // Served by idx_business_listings_owned/_market (both lead with workspace_id, snapshot_date).
+  prune: db.prepare(`
+    DELETE FROM business_listing_snapshots
+    WHERE workspace_id = @ws
+      AND snapshot_date NOT IN (
+        SELECT DISTINCT snapshot_date FROM business_listing_snapshots
+        WHERE workspace_id = @ws ORDER BY snapshot_date DESC LIMIT @keep
+      )
   `),
 }));
 
@@ -247,6 +262,7 @@ export function storeBusinessListingSnapshots(
         fetched_at: fetchedAt,
       });
     }
+    stmts().prune.run({ ws: workspaceId, keep: SNAPSHOT_RETAIN_DATES });
   });
   run();
 }

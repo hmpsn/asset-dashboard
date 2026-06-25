@@ -175,7 +175,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-20",
-          "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF)."
+          "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF). || [DELTA AUDIT 2026-06-24 · partially-done — re-scope]: website form-capture already shipped under the-issue-client-measured-capture. Remaining under THIS flag = the P3 graduation to actual_reconciled (currently a reserved enum member only, outcome-tracking.ts:67) + junk quality-scoring (zero today). The \"call tracking + CRM\" title is stale — owner to confirm whether junk-scoring is near-term or bundled with the deferred CRM item (the-issue-client-crm-reconciliation)."
         },
         {
           "id": "the-issue-client-redesign-p1-return-hook",
@@ -183,9 +183,10 @@
           "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
           "est": "TBD",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-20",
-          "notes": "Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first). [P1b BUILT + review-fixed 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1b-plan.md — admin setup-readiness checklist (IssueSetupReadiness) + admin/client named-leads + forwardable one-pager export (print-from-browser, NO PDF lib); D7 PII boundary held; 12-finding scaled review all fixed (1 Important + 7 Minor). See FEATURE_AUDIT #531. [P1c BUILT + PR-READY 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md — EMAIL-ONLY (no SMS, owner-locked) weekly event-gated return-hook: a new weekly cron (server/return-hook-cron.ts, clone of strategy-issue-cron) sends ONE consolidated client_return_hook digest (new customers/leads + new measured money + decision-still-waiting) ONLY when ≥1 section has content, through the EXISTING email stack (nodemailer queue + throttle-exempt 'return' category — the ISO-week marker, stamped only on a confirmed enqueue, is the authoritative cap — + workspace_primary recipient policy). Additive — no new transport built (7-area infra discovery confirmed it exists). Owner decisions: weekly digest only-when-something-happened; match-existing opt-out + 'reply to stop' footer (platform-wide preference center deferred → email-preference-center). Migration 151 (last_return_hook_sent_week_of weekly marker). Money section activity-gated (only on new-leads-this-week + measured_action verdict). 19 new tests; full suite 26806 green; flag-OFF byte-identical. See FEATURE_AUDIT #532. Status stays pending until ALL of P1 is soaked on staging + the legacy-cutover/teardown (owner-locked sequence: build all P1 → one soak + cutover at the end)."
+          "notes": "Flag: the-issue-client-return-hook (declared OFF, staging-validation rollout to watch delivery cost first). [P1b BUILT + review-fixed 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1b-plan.md — admin setup-readiness checklist (IssueSetupReadiness) + admin/client named-leads + forwardable one-pager export (print-from-browser, NO PDF lib); D7 PII boundary held; 12-finding scaled review all fixed (1 Important + 7 Minor). See FEATURE_AUDIT #531. [P1c BUILT + PR-READY 2026-06-20] docs/superpowers/plans/2026-06-20-the-issue-client-p1c-plan.md — EMAIL-ONLY (no SMS, owner-locked) weekly event-gated return-hook: a new weekly cron (server/return-hook-cron.ts, clone of strategy-issue-cron) sends ONE consolidated client_return_hook digest (new customers/leads + new measured money + decision-still-waiting) ONLY when ≥1 section has content, through the EXISTING email stack (nodemailer queue + throttle-exempt 'return' category — the ISO-week marker, stamped only on a confirmed enqueue, is the authoritative cap — + workspace_primary recipient policy). Additive — no new transport built (7-area infra discovery confirmed it exists). Owner decisions: weekly digest only-when-something-happened; match-existing opt-out + 'reply to stop' footer (platform-wide preference center deferred → email-preference-center). Migration 151 (last_return_hook_sent_week_of weekly marker). Money section activity-gated (only on new-leads-this-week + measured_action verdict). 19 new tests; full suite 26806 green; flag-OFF byte-identical. See FEATURE_AUDIT #532. Status stays pending until ALL of P1 is soaked on staging + the legacy-cutover/teardown (owner-locked sequence: build all P1 → one soak + cutover at the end). || [DELTA AUDIT 2026-06-24 · already-done]: both halves built + flag-gated — P1b one-pager export + P1c email pull-back via return-hook-cron.ts (idempotency mig 151). Residual is staging-soak + cutover gate, not unbuilt code.",
+          "shippedAt": "2026-06-24"
         },
         {
           "id": "email-preference-center",
@@ -205,7 +206,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-06-20",
-          "notes": "Deferred. Flag: the-issue-client-segment-inserts (declared OFF). P0 ships only the manual segment confirm/override; the non-local AI 3-way derivation op + endpoint are P1."
+          "notes": "Deferred. Flag: the-issue-client-segment-inserts (declared OFF). P0 ships only the manual segment confirm/override; the non-local AI 3-way derivation op + endpoint are P1. || [DELTA AUDIT 2026-06-24 · partially-done]: P0 substrate done (manual segment + competitor insert). The two named P1 deliverables remain unbuilt: the non-local AI 3-way derivation op/endpoint (explicitly deferred at the-issue-admin.ts:8) and the local map-pack / portfolio inserts (currently && null stubs). Paired with the reserved flag the-issue-client-segment-inserts."
         },
         {
           "id": "the-issue-client-redesign-p1-next-bets",
@@ -362,9 +363,10 @@
           "source": "Owner refinement 2026-06-16 (post Phase 3b-ii)",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-16",
-          "notes": "Phase 3 follow-on. Today CannibalizationTriage auto-derives the keeper page (item.canonicalPath if set, else best-ranking via keeperPathOf). Owner wants to OVERRIDE which competing page is the keeper (real example: keep a keyword on a services page, not the auto-picked insights page). Scope: a per-issue keeper picker; the chosen keeper must flow into (a) which pages show 'Fix in editor' (non-keepers = duplicates), and (b) the Send-to-client payload canonicalPath. KEY CONSTRAINT: the override MUST persist across strategy regeneration — cannibalization_issues is delete-then-reinsert (replaceAllCannibalizationIssues clobbers canonical_path), so the operator's keeper choice can't live on that row. Store it durably keyed by normalized keyword (mirror the 3b-i resolution pattern: a tracked record / small override table / preserved-metadata Map on the delete-reinsert), and have keeperPathOf prefer the operator override over the auto-derivation. Do after the current Strategy redesign batch. Owner expects further refinements to surface as Strategy gets exercised."
+          "notes": "Phase 3 follow-on. Today CannibalizationTriage auto-derives the keeper page (item.canonicalPath if set, else best-ranking via keeperPathOf). Owner wants to OVERRIDE which competing page is the keeper (real example: keep a keyword on a services page, not the auto-picked insights page). Scope: a per-issue keeper picker; the chosen keeper must flow into (a) which pages show 'Fix in editor' (non-keepers = duplicates), and (b) the Send-to-client payload canonicalPath. KEY CONSTRAINT: the override MUST persist across strategy regeneration — cannibalization_issues is delete-then-reinsert (replaceAllCannibalizationIssues clobbers canonical_path), so the operator's keeper choice can't live on that row. Store it durably keyed by normalized keyword (mirror the 3b-i resolution pattern: a tracked record / small override table / preserved-metadata Map on the delete-reinsert), and have keeperPathOf prefer the operator override over the auto-derivation. Do after the current Strategy redesign batch. Owner expects further refinements to surface as Strategy gets exercised. || [DELTA AUDIT 2026-06-24 · already-done]: fully built — mig 141 cannibalization_keeper_override keyed on order-independent url_set_key (clobber-immune), applied at the read boundary (cannibalization-issues.ts:176), UI KeeperSelector.tsx. The durable-key design satisfies the regen-persistence constraint.",
+          "shippedAt": "2026-06-24"
         }
       ]
     },
@@ -401,9 +403,10 @@
           "source": "Strategy redesign synthesized plan 2026-06-18 §3.1, §7 Phase 3",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-18",
-          "notes": "Gated behind the strategy-keywords-managed-set child flag (default OFF, declared in the P2 pre-commit). Dedicated strategy_keyword_set table (migration 139) whose SOLE writer is reconcileStrategyKeywordSet, grafted into persistKeywordStrategy's writeKeywordStrategy transaction (NOT saveRecommendations, which has no db.transaction) — the one storage design provably immune to the tracked_keywords delete-then-reinsert clobber. Adds add/remove/keep + auto-replenish + search-and-add + add-from-client-requests, the three-visual-state managed-set UI, and managed Topic Clusters/Content Gaps via tracked_actions keep markers. P2 pre-commits the contracts (table, domain stub, shared types, FixContext extension, WS event, query key, ActivityType/ActionType enum values). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md."
+          "notes": "Gated behind the strategy-keywords-managed-set child flag (default OFF, declared in the P2 pre-commit). Dedicated strategy_keyword_set table (migration 139) whose SOLE writer is reconcileStrategyKeywordSet, grafted into persistKeywordStrategy's writeKeywordStrategy transaction (NOT saveRecommendations, which has no db.transaction) — the one storage design provably immune to the tracked_keywords delete-then-reinsert clobber. Adds add/remove/keep + auto-replenish + search-and-add + add-from-client-requests, the three-visual-state managed-set UI, and managed Topic Clusters/Content Gaps via tracked_actions keep markers. P2 pre-commits the contracts (table, domain stub, shared types, FixContext extension, WS event, query key, ActivityType/ActionType enum values). Plan: docs/superpowers/plans/2026-06-18-strategy-redesign-synthesized-plan.md. || [DELTA AUDIT 2026-06-24 · already-done]: built to spec — mig 139 dedicated strategy_keyword_set table, sole writer server/domains/strategy/managed-keyword-set.ts, grafted into the writeKeywordStrategy transaction (clobber-immune, NOT saveRecommendations). Done behind strategy-keywords-managed-set; awaiting staging flag promotion.",
+          "shippedAt": "2026-06-24"
         },
         {
           "id": "strategy-redesign-phase-4-competitor-send",
@@ -493,7 +496,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-06-20",
-          "notes": "After the re-designed Issue client surface (the-issue-client-redesign-p0) proves out on staging, retire the other two client overview variants so The Issue is the only one. Teardown analysis (2026-06-20): three variants today, selected in OverviewTab.tsx:121-179 (priority Issue > Briefing > Legacy); betaMode (/client/beta) is ORTHOGONAL -> keep BetaContext. EASY: delete Briefing-v2 (9 isolated Briefing/* files + ~6 flag-check removals, zero shared render, ~1-2h). MEDIUM: legacy Overview -- OverviewTab.tsx mixes selection logic (121-179) + legacy render (203-669); extract the legacy render to its own file first, then delete; InsightsDigest.tsx is the only legacy-exclusive component (deletable). PRESERVE shared: WinsSurface (3-way shared!), ROIDashboard, OutcomeSummary, ActionQueueStrip, MonthlyDigest. Server: flip flag gates to always-on (recommendations.ts clientStatus projection, briefing.ts 404 guard, the two crons). Then collapse the client-briefing-v2 + spine flags per the feature-flag-lifecycle + route-removal checklists; delete the variant test files. ~1200 lines deleted, ~15 file changes, ~6-8h, low-moderate risk. Ship as its own PR after P0 is verified on staging. || PROGRESS 2026-06-20 (Briefing-v2 client variant done): deleted the 9 Briefing-v2-exclusive client components + drillIn.ts, removed the briefingV2Enabled read + import + render branch from OverviewTab.tsx (Issue branch + legacy fallback byte-unchanged), and deleted/adjusted the variant tests (InsightsBriefingPage.risky, briefing-deeplink, RecommendedForYou, briefing-data-spread, OverviewTab/OverviewTabTopPriority stubs). PRESERVED WinsSurface + ActionQueueStrip (3-way shared). FINDING: the two flags (client-briefing-v2, client-briefing-v2-ai-polish) and the entire SERVER briefing pipeline + admin BriefingReviewQueue were NOT removed — they are shared infrastructure (ClientSignalsSlice intelligence, public-portal projection, strategy-issue-cron/The Issue all read briefing-store; isFeatureEnabled('client-briefing-v2') is typed FeatureFlagKey so removing the key breaks server typecheck). The original note's 'flip flag gates to always-on' is WRONG for the briefing crons/routes — they gate live shared behavior; collapsing them needs a deliberate server decision, not an always-on flip. STILL PENDING: legacy Overview removal + InsightsDigest deletion + flag collapse + server briefing-pipeline retirement decision (controller review). FEATURE_AUDIT #528. Gates: typecheck/build/pr-check(0 err)/verify:feature-flags all green."
+          "notes": "After the re-designed Issue client surface (the-issue-client-redesign-p0) proves out on staging, retire the other two client overview variants so The Issue is the only one. Teardown analysis (2026-06-20): three variants today, selected in OverviewTab.tsx:121-179 (priority Issue > Briefing > Legacy); betaMode (/client/beta) is ORTHOGONAL -> keep BetaContext. EASY: delete Briefing-v2 (9 isolated Briefing/* files + ~6 flag-check removals, zero shared render, ~1-2h). MEDIUM: legacy Overview -- OverviewTab.tsx mixes selection logic (121-179) + legacy render (203-669); extract the legacy render to its own file first, then delete; InsightsDigest.tsx is the only legacy-exclusive component (deletable). PRESERVE shared: WinsSurface (3-way shared!), ROIDashboard, OutcomeSummary, ActionQueueStrip, MonthlyDigest. Server: flip flag gates to always-on (recommendations.ts clientStatus projection, briefing.ts 404 guard, the two crons). Then collapse the client-briefing-v2 + spine flags per the feature-flag-lifecycle + route-removal checklists; delete the variant test files. ~1200 lines deleted, ~15 file changes, ~6-8h, low-moderate risk. Ship as its own PR after P0 is verified on staging. || PROGRESS 2026-06-20 (Briefing-v2 client variant done): deleted the 9 Briefing-v2-exclusive client components + drillIn.ts, removed the briefingV2Enabled read + import + render branch from OverviewTab.tsx (Issue branch + legacy fallback byte-unchanged), and deleted/adjusted the variant tests (InsightsBriefingPage.risky, briefing-deeplink, RecommendedForYou, briefing-data-spread, OverviewTab/OverviewTabTopPriority stubs). PRESERVED WinsSurface + ActionQueueStrip (3-way shared). FINDING: the two flags (client-briefing-v2, client-briefing-v2-ai-polish) and the entire SERVER briefing pipeline + admin BriefingReviewQueue were NOT removed — they are shared infrastructure (ClientSignalsSlice intelligence, public-portal projection, strategy-issue-cron/The Issue all read briefing-store; isFeatureEnabled('client-briefing-v2') is typed FeatureFlagKey so removing the key breaks server typecheck). The original note's 'flip flag gates to always-on' is WRONG for the briefing crons/routes — they gate live shared behavior; collapsing them needs a deliberate server decision, not an always-on flip. STILL PENDING: legacy Overview removal + InsightsDigest deletion + flag collapse + server briefing-pipeline retirement decision (controller review). FEATURE_AUDIT #528. Gates: typecheck/build/pr-check(0 err)/verify:feature-flags all green. || [DELTA AUDIT 2026-06-24 · partially-done]: briefing-v2 teardown DONE (9 components removed); the legacy-Overview half is still pending (OverviewTab.tsx ~717 lines still renders the legacy body + InsightsDigest.tsx undeleted). Correctly gated behind P1 soak."
         },
         {
           "id": "the-issue-client-crm-reconciliation",
@@ -1652,7 +1655,7 @@
       "name": "🧭 Platform Simplification — Complexity Audit (2026-06-24)",
       "hours": "Mixed S–L; prioritize P1 structural fixes first",
       "rationale": "Findings from the 22-agent double-focused platform audit (2026-06-24). Captures complexity/simplification work NOT handled as immediate quick-win code fixes. Every item is evidence-backed with file:line refs. Full report: the audit synthesis (complexity lens).",
-      "notes": "Sequence: P1 structural correctness/scale fixes first (activity_log retention, recommendation_sets normalize, facade cycles + madge ratchet, CTR-curve reconcile, normalizePageUrl disambiguate, verify:* triage), then P2 decompositions/tuning, then P3 sweeps. Multi-node readiness (P4) is a gated checklist — do not act until a 2nd instance is on the roadmap.",
+      "notes": "Sequence: P1 structural correctness/scale fixes first (activity_log retention, recommendation_sets normalize, facade cycles + madge ratchet, CTR-curve reconcile, normalizePageUrl disambiguate, verify:* triage), then P2 decompositions/tuning, then P3 sweeps. Multi-node readiness (P4) is a gated checklist — do not act until a 2nd instance is on the roadmap. || [DELTA AUDIT 2026-06-24]: F1 (snapshot retention + serp index, mig 157), F2 (auto-send activity logging), and the reserved-flag lifecycle marker were FIXED in the delta-audit follow-up PR; the items above are the un-fixed delta findings.",
       "items": [
         {
           "id": "simp-audit-0624-activity-log-retention",
@@ -1833,6 +1836,76 @@
           "status": "pending",
           "createdAt": "2026-06-24",
           "notes": "AUDIT high-confidence but CONDITIONAL — every item is correct on a single node TODAY; this is a future migration checklist, not a present defect. Gate behind \"a 2nd instance is actually on the roadmap.\" Then: WS fan-out is in-process only (websocket.ts) — needs a shared bus; 16 schedulers start unconditionally on every node (startup.ts:20-39) → duplicate AI spend + emails — need leader election; background jobs run unbounded on the single event loop with no global concurrency cap and aren’t durable (restart marks in-flight \"error\") — need a durable queue; rate limiter + DataForSEO credit guard + SERP L2 file-cache are per-process — need shared state; single SQLite writer is the throughput ceiling — plan the Postgres/LiteFS path. Keep as the gating dependency doc behind any horizontal-scaling work."
+        },
+        {
+          "id": "simp-delta-0624-seo-refresh-extraction",
+          "title": "Extract the SEO refresh-route gate + job-runner safety skeleton (4 routes / 3 runners)",
+          "source": "Delta audit 2026-06-24",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT F3 (med). The flag-gate→404→tier 403→observe-only assertCreditBudget→per-ws hasActiveJob 409→global hasActiveJob 409→createJob/registerAbort→.catch(markFailed) block is near-verbatim in rank-tracking.ts:155-197/202-256 and local-seo.ts (x2); waitForMemoryHeadroom()+its 3 constants (HEAP_HEADROOM_THRESHOLD_MB=320 etc.), isCancelled, the budget wrapper, and broadcast/activity scaffold are verbatim in national-serp.ts, local-gbp.ts, local-seo.ts. The observe-only→enforced budget flip and the 320MB tuning become 3-4-file edits with no compiler help. Fix: extract startTrackedRefresh(req,res,{jobType,flag,budgetOp,run,...}) + a server/seo-refresh-runtime.ts for the runner primitives."
+        },
+        {
+          "id": "simp-delta-0624-weekly-cron-factory",
+          "title": "Weekly-workspace-cron factory (3 clone-lineage cron files)",
+          "source": "Delta audit 2026-06-24",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT F4 (med). strategy-issue-cron.ts:5 (\"Clone of briefing-cron.ts\"), return-hook-cron.ts:5 (\"Clone of strategy-issue-cron.ts\"). currentWeekOfUTC() is byte-identical in all three; the startup/unref + per-workspace mutex Set + lastTickRunWeek memo scaffold is re-implemented in each. Fix: one shared currentWeekOfUTC() util + a createWeeklyWorkspaceCron({flag,isEligible,run}) factory — do it before a 3rd clone."
+        },
+        {
+          "id": "simp-delta-0624-narrative-ai-extraction",
+          "title": "Extract callNarrativeAI + withContentHashCache (strategy-POV ≈ meeting-brief clone)",
+          "source": "Delta audit 2026-06-24",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT F5 (med). strategy-pov-generator.ts reproduces meeting-brief-generator.ts's SITE-CONTEXT block, wins-line formatting, the callAI→parse→retry-once ladder, and the hash/cache/UNCHANGED control-flow (\"clone, re-point\"). Two AI-narrative columns now drift independently — a retry-ladder or prompt-injection-guard fix must land twice. Fix: extract callNarrativeAI(operation,system,prompt,schema) + withContentHashCache({...}); keep prompt bodies per-feature."
+        },
+        {
+          "id": "simp-delta-0624-llm-mentions-geo",
+          "title": "llm-mentions: thread resolved geo (currently hardcodes \"United States\")",
+          "source": "Delta audit 2026-06-24",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT F6 (low). llm-mentions.ts:126 destructures only {languageCode}; the provider hardcodes locationName ?? \"United States\" (dataforseo-provider.ts:2127) while national-serp.ts:123 threads both location+language. UK/CA/AU workspaces get US-scoped AI-visibility with only language adjusted (the prior \"wrong geo defaults\" theme). Bounded today (flag-gated, admin-only, US launch) but silently wrong if rolled out. Fix: thread locationName/locationCode through LlmMentionsRequest, or document the provider constraint explicitly."
+        },
+        {
+          "id": "simp-delta-0624-export-html-domain-dedup",
+          "title": "Export-HTML helper + inline domain-normalization duplication",
+          "source": "Delta audit 2026-06-24",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT F7 (low). LOGO_SVG now in 3 files, esc() in 5 (the-issue-one-pager-html.ts added the newest copies). Separately seo-provider.ts repeats the inline host-normalization replace-chain 5x instead of the canonical normalizeDomainHost (server/domain-normalization.ts). Fix: extract export-html-shared.ts; replace the 5 chains with the canonical call."
+        },
+        {
+          "id": "simp-delta-0624-the-issue-wiring-gaps",
+          "title": "The Issue wiring gaps — missing broadcast + dead broadcast with a lying comment",
+          "source": "Delta audit 2026-06-24",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT wiring (low). (a) PUT /form-sources (the-issue-conversion-tracking.ts:152) flips conversionTrackingConfirmedAt (the D6 \"measured\" provenance marker) via updateWorkspace + logs activity but NEVER broadcasts — other admin tabs / the client provenance label stay stale until the next poller capture. Fix: broadcast FORM_CAPTURE_CONFIG_UPDATED (add to ws-events.ts) + matching useWorkspaceEvents invalidation. (b) STRATEGY_ISSUE_PUSHED (strategy-issue-cron.ts:201) is broadcast with ZERO frontend subscribers; the bell is poll-derived. The inline comment at :198-199 FALSELY claims a handler invalidates on this event (the header at :24-29 correctly admits there isn't one). Fix: delete the dead broadcast (poll covers it) OR add the promised handler; either way fix the contradicting comment."
+        },
+        {
+          "id": "simp-delta-0624-reserved-flag-stub-cleanup",
+          "title": "Reserved-flag stub cleanup (delete && null placeholders; trim resolveSegmentProfile)",
+          "source": "Delta audit 2026-06-24",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-24",
+          "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before."
         }
       ]
     },

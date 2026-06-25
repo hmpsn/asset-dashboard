@@ -16,6 +16,7 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { validate } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import {
   getAutoSendPolicies,
@@ -71,6 +72,15 @@ router.patch(
 
     try {
       setAutoSendPolicyEnabled(workspaceId, parsedArchetype.data, enabled);
+      // Audit trail for the operator opt-in that lets recommendations auto-send to the client
+      // WITHOUT per-item review (admin-only type; PII-free metadata). Data-Flow Rule #4.
+      addActivity(
+        workspaceId,
+        'autosend_policy_changed',
+        `Auto-send ${enabled ? 'enabled' : 'disabled'} for ${parsedArchetype.data}`,
+        undefined,
+        { archetype: parsedArchetype.data, enabled },
+      );
       broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_AUTOSEND_POLICY_UPDATED, {
         archetype: parsedArchetype.data,
         enabled,
