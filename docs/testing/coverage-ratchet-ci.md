@@ -4,6 +4,10 @@ This document defines the Wave 2b coverage ratchet operating model.
 
 Source of truth: `scripts/report-coverage-ratchet.ts`
 
+`vite.config.ts` is coverage collection configuration only. It does not own
+coverage floors or thresholds; `COVERAGE_RATCHET_FLOORS` in
+`scripts/report-coverage-ratchet.ts` is the only required floor authority.
+
 Run:
 
 ```bash
@@ -59,7 +63,8 @@ Any floor regression fails the coverage job.
 
 When coverage improves and remains stable for multiple merges:
 
-1. raise the floor values in `COVERAGE_RATCHET_FLOORS`,
+1. raise the floor values in `COVERAGE_RATCHET_FLOORS` in
+   `scripts/report-coverage-ratchet.ts`,
 2. run `npm run test:coverage`,
 3. run `npm run verify:coverage-ratchet`,
 4. update this document if thresholds changed.

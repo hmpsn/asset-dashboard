@@ -129,6 +129,12 @@ jobs:
       - name: Circular dependency ratchet
         run: npm run check:circular-deps
 
+      - name: Feature flag lifecycle checks
+        run: npm run verify:feature-flags
+
+      - name: Verification governance checks
+        run: npm run verify:governance
+
       # Hard correctness gate: a conditionally-called React hook crashes the component at runtime
       # ("Rendered more hooks than during the previous render"). eslint has the rule but was never run
       # in CI; this focused config enforces ONLY react-hooks/rules-of-hooks (no exhaustive-deps noise).

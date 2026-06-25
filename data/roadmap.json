@@ -1241,9 +1241,9 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high (largest accidental-complexity surface). 19 verify:* scripts (~16k LOC) are manual-only and gate NOTHING in CI — incl. verify:feature-flags, which CLAUDE.md lists as a required gate but runs nowhere. Triage each: wire into CI, demote to scripts/audits/, or delete. Also delete orphaned verify-styleguide-parity.ts (134 LOC, logic now in pr-check) + fix CLAUDE.md:145 which still cites it as THE command. Reconcile the 3 conflicting coverage numbers (stale 28.6% comment vite.config.ts:177, vite floor 50, ratchet floor 61.33) → make the ratchet authoritative."
+          "notes": "DONE 2026-06-25: added verify governance registry/report (`npm run verify:governance`) classifying every verify:* script into PR/push/local/release/secret/scenario/advisory buckets; wired verify:feature-flags + verify:governance into PR quality CI while keeping coverage ratchet in push coverage CI after `npm run test:coverage`. Deleted stale `verify-styleguide-parity.ts` and replaced active references with current pr-check rule names. Removed Vitest coverage thresholds so `scripts/report-coverage-ratchet.ts` is the single floor authority. Added docs/rules/verification-governance.md plus unit/contract tests for unclassified scripts, deleted references, CI wiring, secret-backed non-blocking posture, and coverage authority."
         },
         {
           "id": "simp-audit-0624-prcheck-diff-perf",

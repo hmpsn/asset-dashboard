@@ -6389,7 +6389,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.css'],
     message:
       'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
-      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+      'Run `npm run pr-check` and review the styleguide token parity rules for details.',
     rationale:
       'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
       'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
