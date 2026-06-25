@@ -3153,6 +3153,11 @@ export async function buildKeywordCommandCenterDetail(
       localVisibilityByKeyword,
       activeLocalMarketCount,
       lostVisibilityKeys: safeLostVisibilityKeys(workspace.id),
+      // P1 dark-loop fix: the rows/model path (line ~1645) passes valueScoring so
+      // finalizeDraftRow computes valueReasons, but the detail path omitted it —
+      // KeywordDetailDrawer renders row.valueReasons, so the value-first reason chips
+      // were silently absent in the admin drawer. Pass the same per-request config.
+      valueScoring: buildValueScoringConfig(workspace),
     })
     : null;
   if (!row) return null;
