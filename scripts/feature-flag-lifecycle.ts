@@ -138,7 +138,11 @@ export function buildFeatureFlagLifecycleReport(
       invalidLifecycle.push(`${key}: lastReviewedAt is in the future (${lifecycle.lastReviewedAt})`);
     }
 
-    const reviewDue = daysSinceReview != null && daysSinceReview > cadenceThreshold;
+    // Reserved flags (catalog pre-registered for an in-progress/deferred feature whose gating code
+    // isn't wired yet) are intentionally unwired — exempt them from the review-due/stale nag so
+    // genuine phantom flags stay distinguishable. They flip to active/omit when the gating ships.
+    const reserved = lifecycle.status === 'reserved';
+    const reviewDue = !reserved && daysSinceReview != null && daysSinceReview > cadenceThreshold;
     const staleCandidate =
       reviewDue &&
       daysSinceCreated != null &&

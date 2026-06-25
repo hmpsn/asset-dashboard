@@ -162,6 +162,11 @@ export type FeatureFlagAuditCadence = (typeof FEATURE_FLAG_AUDIT_CADENCES)[numbe
 
 export interface FeatureFlagLifecycleMeta {
   owner: string;
+  /** 'reserved' = catalog entry pre-registered for an in-progress/deferred feature whose gating
+   *  code is not wired yet (intentionally unwired, NOT a phantom flag). The lifecycle verifier
+   *  exempts reserved flags from the stale/review-due nag so genuine phantoms stay distinguishable.
+   *  Omit (or 'active') for normally-wired flags. Flip to active/omit once the gating code ships. */
+  status?: 'active' | 'reserved';
   createdAt: string;
   rolloutTarget: FeatureFlagRolloutTarget;
   removalCondition: string;
@@ -359,6 +364,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     label: 'Strategy v3 — paid-topic monetization spine (DEFERRED roadmap)',
     group: 'Strategy',
     lifecycle: {
+      status: 'reserved',
       owner: 'analytics-intelligence',
       createdAt: '2026-06-17',
       rolloutTarget: 'staging-validation',
@@ -463,6 +469,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     label: 'The Issue (Client) — named-record reconciliation (P3, actual_reconciled)',
     group: 'The Issue (Client)',
     lifecycle: {
+      status: 'reserved',
       owner: 'analytics-intelligence',
       createdAt: '2026-06-20',
       rolloutTarget: 'pilot-clients',
@@ -489,6 +496,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     label: 'The Issue (Client) — segment-conditional inserts (P1)',
     group: 'The Issue (Client)',
     lifecycle: {
+      status: 'reserved',
       owner: 'analytics-intelligence',
       createdAt: '2026-06-20',
       rolloutTarget: 'pilot-clients',
@@ -502,6 +510,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     label: 'The Issue (Client) — next-bets $-forecast (P1)',
     group: 'The Issue (Client)',
     lifecycle: {
+      status: 'reserved',
       owner: 'analytics-intelligence',
       createdAt: '2026-06-20',
       rolloutTarget: 'pilot-clients',

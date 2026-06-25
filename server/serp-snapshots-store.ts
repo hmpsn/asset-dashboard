@@ -76,6 +76,10 @@ export function rowToSerpSnapshot(row: SerpSnapshotRow): SerpSnapshot {
   };
 }
 
+// Retention: keep only the most recent N distinct snapshot dates per workspace
+// so the table cannot grow unbounded (mirrors rank_snapshots' 180-date cap).
+const SNAPSHOT_RETAIN_DATES = 180;
+
 // ── Lazy prepared statements ──
 
 const stmts = createStmtCache(() => ({
@@ -109,6 +113,18 @@ const stmts = createStmtCache(() => ({
   byQuery: db.prepare<[workspaceId: string, query: string]>(
     'SELECT * FROM serp_snapshots WHERE workspace_id = ? AND query = ? ORDER BY date DESC',
   ),
+  // Drop rows older than the most recent SNAPSHOT_RETAIN_DATES distinct dates for
+  // this workspace. serp_snapshots has no baseline/earliest-row reader (the
+  // engagement baseline anchors on ga4_conversion_snapshots), so a plain date-window
+  // prune is safe — no anchor guard needed. Served by idx_serp_snapshots_query_date.
+  prune: db.prepare(`
+    DELETE FROM serp_snapshots
+    WHERE workspace_id = @ws
+      AND date NOT IN (
+        SELECT DISTINCT date FROM serp_snapshots
+        WHERE workspace_id = @ws ORDER BY date DESC LIMIT @keep
+      )
+  `),
 }));
 
 // ── Public API ──
@@ -162,6 +178,7 @@ export function storeSerpSnapshots(
         ai_overview_present: boolToTriState(snapshot.aiOverviewPresent),
       });
     }
+    stmts().prune.run({ ws: workspaceId, keep: SNAPSHOT_RETAIN_DATES });
   });
   run();
 }

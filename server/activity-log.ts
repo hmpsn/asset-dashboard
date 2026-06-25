@@ -187,7 +187,12 @@ export type ActivityType =
   // The Issue (Client) P1c: the weekly return-hook cron sent the client their "what came in" digest.
   // ADMIN-ONLY (operator audit trail) — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata:
   // only counts/flags ({ weekOf, leadCount, hasMoney, pendingCount }), never lead identity.
-  | 'client_return_hook_sent';
+  | 'client_return_hook_sent'
+  // Strategy trust-ladder: the operator enabled/disabled auto-send for an archetype — the opt-in that
+  // lets recommendations auto-send to the client WITHOUT per-item review (the single most audit-worthy
+  // operation in the trust-ladder). ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free
+  // metadata: only { archetype, enabled }.
+  | 'autosend_policy_changed';
 
 export interface ActivityEntry {
   id: string;
