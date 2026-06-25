@@ -68,6 +68,13 @@ export const FEATURE_FLAGS = {
   // rating extraction — ships UNFLAGGED, P3 precedent.)
   'local-gbp': false,
 
+  // SEO Decision Engine P8 (FINAL): ai-visibility — the LLM-citation measurement layer. Reads
+  // DataForSEO's LLM-mentions database for the client's domain → an AI-visibility KPI (share-of-
+  // voice vs co-mentioned competitors + mention volume + before/after trend + source domains LLMs
+  // cite) on admin + client. KPI-only (no new rec/insight). Growth+; budget observe-only.
+  // OFF = no LLM-mentions fetch, no snapshot, no UI (byte-identical).
+  'ai-visibility': false,
+
   // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
   // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
   // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
@@ -367,6 +374,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-24',
     },
   },
+  'ai-visibility': {
+    label: 'AI visibility — LLM citation share-of-voice vs competitors',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-24',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once LLM-mention snapshots + the AI-visibility KPI (share-of-voice, trend, source domains) are validated on staging and per-workspace cost is acceptable; the flag is then removed and the KPI runs for all Growth+ workspaces.',
+      linkedRoadmapItemId: 'seo-engine-p8-ai-visibility-llm-citation',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-24',
+    },
+  },
   'signal-auto-recompute': {
     label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
     group: 'Strategy',
@@ -617,7 +637,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp'],
+    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'ai-visibility'],
   },
   {
     label: 'Strategy',

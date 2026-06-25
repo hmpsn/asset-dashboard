@@ -181,6 +181,32 @@ export interface BusinessListingsRequest {
   limit?: number;
 }
 
+// ── LLM mentions / AI visibility (P8 / ai-visibility) ─────────
+// Built against the ground-truth fixture `tests/fixtures/dataforseo-llm-mentions.ts`.
+// Gotcha: a zero-presence target returns EMPTY group arrays → mentions 0, never invented.
+
+export interface LlmMentionsRequest {
+  domain: string;
+  platform?: 'chat_gpt' | 'google';   // default chat_gpt
+  locationName?: string;
+  languageCode?: string;
+}
+export interface LlmMentionCompetitor { name: string; mentions: number; aiSearchVolume?: number; }
+export interface LlmMentionSource { domain: string; mentions: number; }
+export interface LlmMentionsResult {
+  domain: string;
+  platform: string;
+  /** Headline mention count; 0 when no LLM presence (NEVER invented). */
+  mentions: number;
+  aiSearchVolume: number;
+  /** 0..1 = own mentions ÷ (own + co-mentioned competitor mentions). */
+  shareOfVoice: number;
+  /** Co-mentioned brands (brand_entities_title) — the AI-answer competitive set. */
+  competitors: LlmMentionCompetitor[];
+  /** Domains LLM answers cite when mentioning the target (sources_domain) — the AEO targets. */
+  sourceDomains: LlmMentionSource[];
+}
+
 // ── Provider Interface ────────────────────────────────────────
 
 export interface SeoDataProvider {
@@ -236,6 +262,9 @@ export interface SeoDataProvider {
 
   // GBP + reviews business listings (P7 / local-gbp). Optional: feature-detect before calling.
   getBusinessListings?(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]>;
+
+  // LLM mentions / AI visibility (P8 / ai-visibility). Optional: feature-detect before calling.
+  getLlmMentions?(request: LlmMentionsRequest, workspaceId: string): Promise<LlmMentionsResult>;
 }
 
 // ── Provider Registry ─────────────────────────────────────────

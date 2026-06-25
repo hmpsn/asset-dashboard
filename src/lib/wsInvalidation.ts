@@ -434,6 +434,15 @@ function adminInvalidationKeys(
         queryKeys.admin.localSeo(workspaceId),
         queryKeys.admin.keywordCommandCenter(workspaceId),
       ] as const;
+    case WS_EVENTS.LLM_MENTIONS_SNAPSHOTS_REFRESHED:
+      // P8 ai-visibility: a llm-mentions refresh upserted llm_mention_snapshots → re-pull the
+      // AI-visibility KPI's OWN query key (distinct prefix; must be listed explicitly) + the
+      // strategy/intelligence surfaces that carry the AI-visibility slice summary.
+      return [
+        queryKeys.admin.aiVisibility(workspaceId),
+        queryKeys.admin.keywordStrategy(workspaceId),
+        queryKeys.admin.intelligenceAll(workspaceId),
+      ] as const;
     case WS_EVENTS.LOCAL_SEO_UPDATED:
       return [
         queryKeys.admin.localSeo(workspaceId),

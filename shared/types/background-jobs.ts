@@ -35,6 +35,7 @@ export const BACKGROUND_JOB_TYPES = {
   INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
   NATIONAL_SERP_REFRESH: 'national-serp-refresh',
   LOCAL_GBP_REFRESH: 'local-gbp-refresh',
+  LLM_MENTIONS_REFRESH: 'llm-mentions-refresh',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -291,6 +292,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
   [BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH]: {
     label: 'Refreshing GBP + reviews',
     description: 'Reads Google Business Profile health + review counts for the client and local competitors.',
+    cancellable: true,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH]: {
+    label: 'Refreshing AI visibility',
+    description: 'Reads the LLM-mention share-of-voice + source domains for the client domain.',
     cancellable: true,
     resultBehavior: 'domain-store',
   },
