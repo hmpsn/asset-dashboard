@@ -21,7 +21,8 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, getLocalSeoPosture } from './local-seo.js';
 import { LOCAL_SEO_POSTURE } from '../shared/types/local-seo.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
-import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
+import { formatPersonasForPrompt } from './intelligence/persona-format.js';
 import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
 import { backfillContentGapsToFloor, buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate, STRATEGY_CONTENT_GAP_FLOOR, type BackfillContentGapCandidate } from './keyword-strategy-helpers.js';
 import { pageAssignmentResponseSchema, siteSynthesisResponseSchema } from './schemas/keyword-strategy-schemas.js';

@@ -31,7 +31,7 @@ import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructur
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 

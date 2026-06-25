@@ -40,7 +40,7 @@ vi.mock('../../server/ws-events.js', () => ({
     PAGE_STATE_UPDATED: 'page-state:updated',
   },
 }));
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 

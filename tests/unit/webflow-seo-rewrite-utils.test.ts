@@ -2,10 +2,11 @@
  * Unit tests: server/webflow-seo-rewrite-utils.ts
  *
  * Tests pure functions: enforceSeoTextLimit, normalizeSeoRewriteVariations,
- * normalizeSeoRewritePairs.
+ * normalizeSeoRewritePairs, ctrUnderperformanceFlag.
  */
 import { describe, it, expect } from 'vitest';
 import {
+  ctrUnderperformanceFlag,
   enforceSeoTextLimit,
   normalizeSeoRewriteVariations,
   normalizeSeoRewritePairs,
@@ -170,5 +171,36 @@ describe('normalizeSeoRewritePairs', () => {
       pairs: [{ title: 'T', description: 'D' }],
     });
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+// ── ctrUnderperformanceFlag ────────────────────────────────────────────────
+
+describe('ctrUnderperformanceFlag', () => {
+  it('uses the canonical industry CTR curve for underperformance prompts', () => {
+    const result = ctrUnderperformanceFlag([
+      { clicks: 4, impressions: 100, position: 3 },
+    ], { field: 'title' });
+
+    expect(result).toContain('CTR UNDERPERFORMANCE');
+    expect(result).toContain('expected ~10%');
+    expect(result).toContain('current title');
+  });
+
+  it('returns an outperformer prompt when requested', () => {
+    const result = ctrUnderperformanceFlag([
+      { clicks: 20, impressions: 100, position: 3 },
+    ], { includeOutperformer: true });
+
+    expect(result).toContain('CTR OUTPERFORMER');
+    expect(result).toContain('above average');
+  });
+
+  it('returns an empty string below the minimum impression floor', () => {
+    const result = ctrUnderperformanceFlag([
+      { clicks: 0, impressions: 49, position: 3 },
+    ]);
+
+    expect(result).toBe('');
   });
 });

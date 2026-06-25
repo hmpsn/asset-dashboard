@@ -23,7 +23,7 @@ import { getAllGscPages } from '../search-console.js';
 import { getTokenForSite, getWorkspaceBySiteId } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const router = Router();
 const log = createLogger('webflow-analysis');

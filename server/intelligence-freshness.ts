@@ -1,5 +1,5 @@
 import { invalidateContentPipelineCache } from './workspace-data.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 export function invalidateContentPipelineIntelligence(workspaceId: string): void {
   try {

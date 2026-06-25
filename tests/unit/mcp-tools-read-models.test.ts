@@ -66,6 +66,8 @@ vi.mock('../../server/social-profiles.js', () => ({
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: h.buildWorkspaceIntelligence,
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: h.invalidateIntelligenceCache,
 }));
 

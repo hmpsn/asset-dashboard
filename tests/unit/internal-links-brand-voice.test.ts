@@ -64,9 +64,11 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
     pageProfile: null,
   })),
   formatKeywordsForPrompt: vi.fn(() => ''),
-  formatPersonasForPrompt: vi.fn(() => ''),
   formatKnowledgeBaseForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
+}));
+vi.mock('../../server/intelligence/persona-format.js', () => ({
+  formatPersonasForPrompt: vi.fn(() => ''),
 }));
 
 vi.mock('../../server/webflow.js', () => ({
@@ -96,8 +98,8 @@ vi.mock('../../server/logger.js', () => ({
 
 import {
   formatKnowledgeBaseForPrompt,
-  formatPersonasForPrompt,
 } from '../../server/workspace-intelligence.js';
+import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 import { analyzeInternalLinks } from '../../server/internal-links.js';
 
 // ── fetch mock: sitemap + page HTML ─────────────────────────────────────────

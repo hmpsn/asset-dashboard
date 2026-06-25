@@ -12,7 +12,7 @@ import {
   generateCalibrationVariations, refineVariation,
   saveVariationFeedback,
 } from '../voice-calibration.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { sanitizeErrorMessage } from '../helpers.js';

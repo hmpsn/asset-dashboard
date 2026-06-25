@@ -3,7 +3,7 @@ import { isProgrammingError } from './errors.js';
 import { getJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
 import { generateRecommendations } from './recommendations.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 const log = createLogger('recommendation-generation-job');
 

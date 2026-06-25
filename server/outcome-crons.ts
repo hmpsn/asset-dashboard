@@ -3,7 +3,7 @@
 // Registered at startup via startOutcomeCrons(); safe to call multiple times (idempotent).
 
 import { createLogger } from './logger.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
 import { runBackfill } from './outcome-backfill.js';
 import type * as OutcomeMeasurement from './outcome-measurement.js';

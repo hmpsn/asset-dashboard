@@ -45,7 +45,7 @@ import type {
 } from '../../shared/types/outcome-tracking.js';
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('outcomes');
 

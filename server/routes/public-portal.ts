@@ -25,7 +25,7 @@ import db from '../db/index.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
 import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import {

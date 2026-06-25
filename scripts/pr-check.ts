@@ -32,6 +32,15 @@ import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
 
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_PREFIX;
+  return env;
+}
+
 function getFiles(dir: string, pattern: string): string[] {
   try {
     // maxBuffer: 50MB. The default 1MB is not enough for `find <repo-root>
@@ -71,6 +80,7 @@ function getTrackedChangedFiles(cwd: string = ROOT): string[] {
       try {
         const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
           cwd,
+          env: cleanGitEnv(),
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
         }).trim();
@@ -85,6 +95,7 @@ function getTrackedChangedFiles(cwd: string = ROOT): string[] {
       try {
         const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
           cwd,
+          env: cleanGitEnv(),
           encoding: 'utf-8',
         }).trim();
         if (out) return out.split('\n').filter(Boolean);
@@ -97,6 +108,7 @@ function getTrackedChangedFiles(cwd: string = ROOT): string[] {
     try {
       const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
         cwd,
+        env: cleanGitEnv(),
         encoding: 'utf-8',
       }).trim();
       if (out) return out.split('\n').filter(Boolean);
@@ -120,6 +132,7 @@ export function getUntrackedFiles(cwd: string = ROOT): string[] {
   try {
     const out = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
       cwd,
+      env: cleanGitEnv(),
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
@@ -384,6 +397,46 @@ function readFileOrEmpty(file: string): string {
   try { return readFileSync(file, 'utf-8'); } catch { return ''; }
 }
 
+function loadJsonArrayColumnBaseline(): Set<string> {
+  try {
+    const raw = readFileSync(JSON_ARRAY_COLUMN_BASELINE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as { allowedMigrationFiles?: unknown };
+    if (!Array.isArray(parsed.allowedMigrationFiles)) return new Set();
+    return new Set(
+      parsed.allowedMigrationFiles
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => entry.split(path.sep).join('/')),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function findJsonArrayColumnSites(migrationsDirOverride?: string): CustomCheckMatch[] {
+  const migrationsDir = migrationsDirOverride ?? path.join(ROOT, 'server/db/migrations');
+  const files = getFiles(migrationsDir, '*.sql');
+  const hits: CustomCheckMatch[] = [];
+  const arrayColumnRe = /^\s*(?:"([^"]+)"|(\w+))\s+TEXT\b[^,\n;]*\bDEFAULT\s*(?:\(\s*)?['"]\[\]['"]/i;
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(arrayColumnRe);
+      if (!match) continue;
+      if (line.includes('json-array-column-ok')) continue;
+      const columnName = match[1] ?? match[2];
+      hits.push({
+        file,
+        line: i + 1,
+        text: `JSON-array TEXT column "${columnName}" uses DEFAULT '[]'`,
+      });
+    }
+  }
+  return hits;
+}
+
 type StyleExceptionEntry = {
   id: string;
   rule: string;
@@ -395,6 +448,7 @@ type StyleExceptionEntry = {
 };
 
 const STYLE_EXCEPTIONS_PATH = path.join(ROOT, 'data/style-exceptions.json');
+const JSON_ARRAY_COLUMN_BASELINE_PATH = path.join(ROOT, 'data/json-array-column-baseline.json');
 
 let _styleExceptionsCache: StyleExceptionEntry[] | null = null;
 function loadStyleExceptions(): StyleExceptionEntry[] {
@@ -2273,6 +2327,42 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/json-validation.ts', 'server/db/migrate-json.ts'],
     message: 'Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data.',
     severity: 'error',
+  },
+  {
+    name: 'New JSON-array TEXT column without normalization review',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    excludeLines: ['json-array-column-ok'],
+    message: 'New TEXT columns defaulting to [] must be normalized or explicitly hatched with -- json-array-column-ok: <reason>.',
+    severity: 'error',
+    rationale: 'Large/filterable JSON arrays in SQLite columns caused recommendation_sets to rewrite hundreds of items for single-row changes; new array blobs need an intentional normalization review.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const allowedFiles = loadJsonArrayColumnBaseline();
+      const hits: CustomCheckMatch[] = [];
+      const arrayColumnRe = /^\s*(?:"([^"]+)"|(\w+))\s+TEXT\b[^,\n;]*\bDEFAULT\s*(?:\(\s*)?['"]\[\]['"]/i;
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).replaceAll('\\', '/');
+        if (allowedFiles.has(rel)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(arrayColumnRe);
+          if (!match) continue;
+          if (line.includes('json-array-column-ok')) continue;
+          const columnName = match[1] ?? match[2];
+          hits.push({
+            file,
+            line: i + 1,
+            text: `JSON-array TEXT column "${columnName}" uses DEFAULT '[]'`,
+          });
+        }
+      }
+      return hits;
+    },
   },
   {
     // FM-5: Direct SET status without a validation function.
@@ -8565,7 +8655,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'shared/types/recommendations.ts',
     message:
       'An admin-money field on OpportunityScore (matching emv*/roiPer*/*revenue*/predictedEmv) is ' +
-      'not destructured in stripEmvFromPublicRecs (server/routes/recommendations.ts). It would LEAK ' +
+      'not destructured in stripEmvFromPublicRecs (server/recommendation-public-projection.ts). It would LEAK ' +
       'raw $/wk to clients on the public route. Add it to the strip destructure (and the PATCH ' +
       'response). Add // opportunity-strip-ok on the field line if it is intentionally client-safe.',
     severity: 'error',
@@ -8584,7 +8674,7 @@ export const CHECKS: Check[] = [
       };
       const typesContent = pickFile('shared/types/recommendations.ts', 'shared/types/recommendations.ts');
       if (!typesContent) return hits;
-      const stripContent = pickFile('server/routes/recommendations.ts', 'server/routes/recommendations.ts');
+      const stripContent = pickFile('server/recommendation-public-projection.ts', 'server/recommendation-public-projection.ts');
 
       // Isolate the OpportunityScore interface body.
       const ifaceMatch = typesContent.match(/export interface OpportunityScore\s*\{([\s\S]*?)\n\}/);

@@ -11,7 +11,7 @@ import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { applyBulkKeywordGuards, normalizePageUrl, sanitizeForPromptInjection, stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from '../eeat-trust-signals.js';
 import { broadcastToWorkspace } from '../broadcast.js';

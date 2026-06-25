@@ -25,7 +25,7 @@ import { listClientUsers } from './client-users.js';
 import { notifyTeamChurnSignal } from './email.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 const log = createLogger('churn-signals');
 

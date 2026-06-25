@@ -4,7 +4,7 @@ import { aiLimiter } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { getStrategyPov, bumpStrategyPovVersion } from '../strategy-pov-store.js';
 import { generateStrategyPov, POV_UNCHANGED } from '../strategy-pov-generator.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';

@@ -27,9 +27,7 @@ import { listEeatAssets } from './eeat-assets.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import {
-  invalidateIntelligenceCache,
-} from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('page-analysis-job');

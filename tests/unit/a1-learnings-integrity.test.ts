@@ -21,6 +21,7 @@ const backfillMocks = vi.hoisted(() => ({
   parseJsonSafeArray: vi.fn(() => []),
   recordAction: vi.fn(),
   getActionBySource: vi.fn(() => null),
+  loadRecommendationSet: vi.fn(() => null),
 }));
 
 vi.mock('../../server/db/index.js', () => ({ default: { prepare: vi.fn() } }));
@@ -35,6 +36,9 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   // Consumed by computeWorkspaceLearnings (A1.2 not_acted_on exclusion).
   getActionsByWorkspace: vi.fn(() => []),
   getOutcomesForAction: vi.fn(() => []),
+}));
+vi.mock('../../server/recommendation-storage.js', () => ({
+  loadRecommendationSet: backfillMocks.loadRecommendationSet,
 }));
 
 import { backfillCompletedRecommendations } from '../../server/outcome-backfill.js';
@@ -51,6 +55,7 @@ describe('A1.1 backfill rec-type mapping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     backfillMocks.getActionBySource.mockReturnValue(null);
+    backfillMocks.loadRecommendationSet.mockReturnValue(null);
   });
 
   it.each([
@@ -59,10 +64,12 @@ describe('A1.1 backfill rec-type mapping', () => {
     ['schema', 'audit:schema', 'schema_deployed'],
     ['content_refresh', 'decay', 'content_refreshed'],
   ])('maps completed %s rec → %s (not audit_fix_applied)', (type, source, expected) => {
-    backfillMocks.stmts.recommendationSet.get.mockReturnValue({ workspace_id: 'ws_1', recommendations: '[]' });
-    backfillMocks.parseJsonSafeArray.mockReturnValue([
-      { id: `rec_${type}`, status: 'completed', type, source, affectedPages: ['/p'] },
-    ]);
+    backfillMocks.loadRecommendationSet.mockReturnValue({
+      workspaceId: 'ws_1',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      recommendations: [{ id: `rec_${type}`, status: 'completed', type, source, affectedPages: ['/p'] }],
+      summary: {},
+    });
 
     backfillCompletedRecommendations('ws_1');
 
@@ -75,10 +82,12 @@ describe('A1.1 backfill rec-type mapping', () => {
   });
 
   it('maps an audit-family type (technical) → audit_fix_applied', () => {
-    backfillMocks.stmts.recommendationSet.get.mockReturnValue({ workspace_id: 'ws_1', recommendations: '[]' });
-    backfillMocks.parseJsonSafeArray.mockReturnValue([
-      { id: 'rec_tech', status: 'completed', type: 'technical', source: 'audit:speed', affectedPages: [] },
-    ]);
+    backfillMocks.loadRecommendationSet.mockReturnValue({
+      workspaceId: 'ws_1',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      recommendations: [{ id: 'rec_tech', status: 'completed', type: 'technical', source: 'audit:speed', affectedPages: [] }],
+      summary: {},
+    });
 
     backfillCompletedRecommendations('ws_1');
 
@@ -88,10 +97,12 @@ describe('A1.1 backfill rec-type mapping', () => {
   });
 
   it('defaults a legacy rec missing type to audit_fix_applied without throwing', () => {
-    backfillMocks.stmts.recommendationSet.get.mockReturnValue({ workspace_id: 'ws_1', recommendations: '[]' });
-    backfillMocks.parseJsonSafeArray.mockReturnValue([
-      { id: 'rec_legacy', status: 'completed', affectedPages: [] },
-    ]);
+    backfillMocks.loadRecommendationSet.mockReturnValue({
+      workspaceId: 'ws_1',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      recommendations: [{ id: 'rec_legacy', status: 'completed', affectedPages: [] }],
+      summary: {},
+    });
 
     expect(() => backfillCompletedRecommendations('ws_1')).not.toThrow();
     expect(backfillMocks.recordAction).toHaveBeenCalledWith(

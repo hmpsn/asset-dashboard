@@ -38,7 +38,7 @@ vi.mock('../../server/jobs.js', () => ({
   hasActiveJob: mockHasActiveJob,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
 }));
 

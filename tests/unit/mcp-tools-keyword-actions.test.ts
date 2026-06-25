@@ -40,7 +40,7 @@ vi.mock('../../server/seo-data-provider.js', () => ({
   normalizeRuntimeSeoDataProvider: (provider?: string | null) => provider === 'dataforseo' || provider === 'semrush' ? 'dataforseo' : 'dataforseo',
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: h.invalidateIntelligenceCache,
 }));
 

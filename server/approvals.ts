@@ -8,7 +8,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { approvalItemSchema } from './schemas/approval-schemas.js';
 import { createLogger } from './logger.js';
 import { validateTransition, APPROVAL_ITEM_TRANSITIONS } from './state-machines.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 const log = createLogger('approvals');
 

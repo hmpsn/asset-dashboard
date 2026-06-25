@@ -7,7 +7,7 @@ import { updatePageSeo } from './webflow.js';
 import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { resolveRecommendationsForChange } from './recommendations.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 

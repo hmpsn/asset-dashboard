@@ -9,7 +9,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { invalidateContentPipelineCache } from './workspace-data.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import type { WorkOrderComment, WorkOrderCommentAuthor } from '../shared/types/payments.ts';
 
 // ── SQLite row shape ──

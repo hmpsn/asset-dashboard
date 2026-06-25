@@ -12,7 +12,7 @@
 //     requires >= MIN_CALIBRATION_PAIRS pairs; below that the row is honestly
 //     `inconclusive` with a NULL ratio (FM-2: missing data is never fabricated).
 //
-//  2. EFFORT PRIORS — median days from rec creation (rec blob createdAt) to action
+//  2. EFFORT PRIORS — median days from rec creation (recommendation read-model createdAt) to action
 //     creation (tracked_actions.created_at — recordAction fires at completion time) per
 //     action type. This is the "P5 derives real time-to-implement from action_outcomes
 //     once history accrues" calibration path on DEFAULT_EFFORT_DAYS
@@ -47,9 +47,8 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafeArray } from './db/json-validation.js';
-import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
+import { loadRecommendationSet } from './recommendation-storage.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 
 const log = createLogger('outcome-emv-calibration');
@@ -136,7 +135,7 @@ const stmts = createStmtCache(() => ({
   `),
   // Effort sample candidates: live, platform-executed, recommendation-sourced actions.
   // created_at is the completion timestamp (recordAction fires at completion); the
-  // start timestamp comes from the rec blob's createdAt, joined in JS.
+  // start timestamp comes from the recommendation read model's createdAt, joined in JS.
   effortCandidates: db.prepare(`
     SELECT action_type, source_id, created_at
     FROM tracked_actions
@@ -145,11 +144,6 @@ const stmts = createStmtCache(() => ({
       AND source_flag = 'live'
       AND attribution = 'platform_executed'
       AND source_id IS NOT NULL
-  `),
-  recommendationSet: db.prepare(`
-    SELECT recommendations
-    FROM recommendation_sets
-    WHERE workspace_id = ?
   `),
   deleteForWorkspace: db.prepare(`DELETE FROM outcome_emv_calibration WHERE workspace_id = ?`),
   insertEntry: db.prepare(`
@@ -165,13 +159,6 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND median_effort_days IS NOT NULL
   `),
 }));
-
-// Only `createdAt` is read from the blob here; `id` keys the join from
-// tracked_actions.source_id.
-const recCreatedAtSchema = z.object({
-  id: z.string(),
-  createdAt: z.string().optional(),
-});
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -204,20 +191,14 @@ function recomputeWorkspace(workspaceId: string, computedAt: string): { conclusi
     ratiosByType.set(pair.action_type, list);
   }
 
-  // 2. Effort samples: rec blob createdAt → action created_at, grouped by action type.
+  // 2. Effort samples: recommendation createdAt → action created_at, grouped by action type.
   const effortByType = new Map<string, number[]>();
   const candidates = stmts().effortCandidates.all(workspaceId) as EffortCandidateRow[];
   if (candidates.length > 0) {
     const recCreatedAtById = new Map<string, number>();
-    const row = stmts().recommendationSet.get(workspaceId) as { recommendations: string } | undefined;
-    if (row) {
-      const recs = parseJsonSafeArray(row.recommendations, recCreatedAtSchema, {
-        workspaceId,
-        field: 'recommendations',
-        table: 'recommendation_sets',
-      });
-      for (const rec of recs) {
-        if (!rec.id || !rec.createdAt) continue;
+    const set = loadRecommendationSet(workspaceId);
+    if (set) {
+      for (const rec of set.recommendations) {
         const ts = new Date(rec.createdAt).getTime();
         if (Number.isFinite(ts)) recCreatedAtById.set(rec.id, ts);
       }
@@ -228,7 +209,7 @@ function recomputeWorkspace(workspaceId: string, computedAt: string): { conclusi
       const completedMs = new Date(candidate.created_at).getTime();
       if (!Number.isFinite(completedMs)) continue;
       const days = (completedMs - startMs) / DAY_MS;
-      if (days < 0) continue; // clock skew / inconsistent blob — never emit a negative effort
+      if (days < 0) continue; // clock skew / inconsistent read model — never emit a negative effort
       const list = effortByType.get(candidate.action_type) ?? [];
       list.push(days);
       effortByType.set(candidate.action_type, list);

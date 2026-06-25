@@ -18,7 +18,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { trackedKeywordSourceForFeedback } from './keyword-feedback-tracking.js';
 import { addTrackedKeyword, addTrackedKeywords } from './rank-tracking.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 

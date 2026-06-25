@@ -21,7 +21,7 @@ import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, normalize
 import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { normalizeDomainValue } from './domain-normalization.js';
 import { sleep } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';

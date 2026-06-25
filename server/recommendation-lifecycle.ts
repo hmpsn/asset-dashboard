@@ -14,17 +14,16 @@
  *
  * Concurrency: the regen scheduler's per-workspace single-flight (server/recommendation-regen-
  * scheduler.ts `runRecommendationRegen`) serializes the long-running regen. Lifecycle mutations
- * are short *synchronous* read-modify-write txns, so the better-sqlite3 transaction itself is the
- * atomicity guard (it re-reads the freshest blob inside the txn, never a stale route copy) — a
- * regen that commits between a route read and this write cannot be clobbered (spec §6.2).
+ * are short *synchronous* row-level read-modify-write txns, so the better-sqlite3 transaction itself
+ * is the atomicity guard (it re-reads the freshest recommendation rows inside the txn, never a stale
+ * route copy) — a regen that commits between a route read and this write cannot be clobbered
+ * (spec §6.2).
  */
-import db from './db/index.js';
 import {
-  loadRecommendations,
-  saveRecommendations,
   computeRecommendationSummary,
   updateRecommendationStatus,
 } from './recommendations.js';
+import { mutateRecommendationItem } from './recommendation-storage.js';
 import { validateTransition, RECOMMENDATION_TRANSITIONS, CLIENT_REC_TRANSITIONS } from './state-machines.js';
 import { creditArchetypeCycleOnSend } from './strategy-autosend-store.js';
 import { createLogger } from './logger.js';
@@ -61,18 +60,7 @@ function mutateRec(
   recId: string,
   apply: (rec: Recommendation) => void,
 ): Recommendation | null {
-  const txn = db.transaction((): Recommendation | null => {
-    const set = loadRecommendations(workspaceId);
-    if (!set) return null;
-    const rec = set.recommendations.find(r => r.id === recId);
-    if (!rec) return null;
-    apply(rec);
-    rec.updatedAt = new Date().toISOString();
-    set.summary = computeRecommendationSummary(set.recommendations);
-    saveRecommendations(set);
-    return rec;
-  });
-  return txn();
+  return mutateRecommendationItem(workspaceId, recId, apply, computeRecommendationSummary);
 }
 
 /** Send a curated rec to the client (clientStatus: curated → sent). Validates the operator

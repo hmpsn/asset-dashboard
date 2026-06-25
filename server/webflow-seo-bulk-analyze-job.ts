@@ -10,9 +10,7 @@ import { getPageKeyword, upsertPageKeyword } from './page-keywords.js';
 import { resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
-import {
-  invalidateIntelligenceCache,
-} from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { getTokenForSite, type Workspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SeoBulkAnalyzePage } from './schemas/seo-bulk-jobs.js';

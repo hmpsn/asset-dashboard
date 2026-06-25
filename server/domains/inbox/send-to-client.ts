@@ -48,7 +48,7 @@ import { renderApprovalReminder } from '../../email-templates.js';
 import { getReminderSentAt, upsertReminder } from '../../sent-reminders-db.js';
 import { assertSchemaPlanFeedbackAllowed } from '../schema/schema-plan-feedback.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import type { ClientDeliverable, DeliverableType } from '../../../shared/types/client-deliverable.js';
 
 const log = createLogger('send-to-client');

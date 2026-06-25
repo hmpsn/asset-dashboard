@@ -62,7 +62,7 @@ vi.mock('../../server/schema-plan-generation-job.js', () => ({
   getActiveSchemaPlanGenerationJobId: mockGetActiveSchemaPlanGenerationJobId,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
 }));
 

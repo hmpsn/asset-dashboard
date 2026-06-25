@@ -3,6 +3,7 @@
  */
 
 import { z } from './middleware/validate.js';
+import { industryCtr } from './scoring/ctr-curve.js';
 import { uniqStrings } from './utils/collections.js';
 
 /**
@@ -91,4 +92,50 @@ export function normalizeSeoRewritePairs(raw: unknown, expectedCount = 3): Array
     pairs.push({ title, description });
   }
   return pairs.slice(0, expectedCount);
+}
+
+interface CtrPromptQuery {
+  clicks: number;
+  impressions: number;
+  position: number;
+}
+
+interface CtrUnderperformanceFlagOptions {
+  field?: string;
+  compact?: boolean;
+  includeOutperformer?: boolean;
+}
+
+export function ctrUnderperformanceFlag(
+  pageQueries: readonly CtrPromptQuery[],
+  options: CtrUnderperformanceFlagOptions = {},
+): string {
+  const totalImpressions = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
+  if (totalImpressions < 50) return '';
+
+  const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
+  const actualCtrPercent = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const averagePosition = pageQueries.reduce(
+    (sum, q) => sum + q.position * q.impressions,
+    0,
+  ) / totalImpressions;
+  const expectedCtrPercent = industryCtr(averagePosition) * 100;
+  const expectedLabel = Number.isInteger(expectedCtrPercent)
+    ? String(expectedCtrPercent)
+    : expectedCtrPercent.toFixed(1);
+  const positionLabel = averagePosition.toFixed(0);
+
+  if (actualCtrPercent < expectedCtrPercent * 0.7) {
+    if (options.compact) {
+      return `\n\n⚠️ CTR UNDERPERFORMANCE: ${actualCtrPercent.toFixed(1)}% CTR (expected ~${expectedLabel}% for position ${positionLabel}).`;
+    }
+    const field = options.field ?? 'SEO copy';
+    return `\n\n⚠️ CTR UNDERPERFORMANCE: This page gets ${totalImpressions} impressions/month but only ${actualCtrPercent.toFixed(1)}% CTR (expected ~${expectedLabel}% for position ${positionLabel}). The current ${field} is failing to convert searchers into clicks — make it significantly more compelling.`;
+  }
+
+  if (options.includeOutperformer && actualCtrPercent >= expectedCtrPercent * 1.3) {
+    return `\n\n✅ CTR OUTPERFORMER: This page has ${actualCtrPercent.toFixed(1)}% CTR (above average for position ${positionLabel}). Preserve the elements that are working — focus on keyword optimization while keeping the compelling angle.`;
+  }
+
+  return '';
 }

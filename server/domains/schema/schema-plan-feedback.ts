@@ -3,7 +3,7 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { createLogger } from '../../logger.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { broadcastSchemaPlanUpdated } from '../../schema-plan-generation-job.js';
 import { hasActiveJob } from '../../jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.js';

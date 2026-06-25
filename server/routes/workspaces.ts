@@ -51,7 +51,8 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
-import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import type { Workspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';

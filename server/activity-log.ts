@@ -1,5 +1,5 @@
 /**
- * Activity Log — per-workspace activity feed with 500-entry cap.
+ * Activity Log — per-workspace activity feed with a per-workspace entry cap.
  * Entries are broadcast in real time via WebSocket.
  */
 
@@ -206,7 +206,7 @@ export interface ActivityEntry {
   createdAt: string;
 }
 
-const MAX_ENTRIES = 500;
+const MAX_ENTRIES_PER_WORKSPACE = 500;
 
 // --- SQLite row shape ---
 
@@ -295,7 +295,6 @@ const stmts = createStmtCache(() => ({
   countByType: db.prepare(
     `SELECT COUNT(*) as count FROM activity_log WHERE workspace_id = ? AND type = ? AND created_at > datetime('now', ? || ' days')`,
   ),
-  countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
   clientActivitySummary: db.prepare(`
     SELECT
       COUNT(DISTINCT date(created_at)) AS distinct_days,
@@ -305,13 +304,20 @@ const stmts = createStmtCache(() => ({
       AND type IN (${CLIENT_ENGAGEMENT_TYPES.map(() => '?').join(',')})
       AND created_at > datetime('now', ? || ' days')
   `),
-  // Global retention policy: prune the N oldest rows across all workspaces
-  // to enforce the global activity-log size cap. Scoping to a single workspace
-  // here would defeat the purpose of the global cap.
-  // ws-scope-ok
-  pruneOldest: db.prepare(`
-        DELETE FROM activity_log WHERE id IN (
-          SELECT id FROM activity_log ORDER BY created_at ASC LIMIT ?
+  pruneRetention: db.prepare(`
+        DELETE FROM activity_log
+        WHERE rowid IN (
+          SELECT rowid
+          FROM (
+            SELECT
+              rowid,
+              ROW_NUMBER() OVER (
+                PARTITION BY workspace_id
+                ORDER BY created_at DESC, rowid DESC
+              ) AS retention_rank
+            FROM activity_log
+          )
+          WHERE retention_rank > ?
         )
       `),
 }));
@@ -343,16 +349,15 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     created_at: entry.createdAt,
   });
 
-  // Enforce 500-entry cap
-  const { count } = stmts().countAll.get() as { count: number };
-  if (count > MAX_ENTRIES) {
-    stmts().pruneOldest.run(count - MAX_ENTRIES);
-  }
-
   // Broadcast to subscribed workspace clients
   _broadcastFn?.(workspaceId, 'activity:new', entry);
 
   return entry;
+}
+
+export function pruneActivityLogRetention(): number {
+  const result = stmts().pruneRetention.run(MAX_ENTRIES_PER_WORKSPACE);
+  return result.changes;
 }
 
 export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] {

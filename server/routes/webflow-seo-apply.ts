@@ -20,7 +20,7 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-apply');

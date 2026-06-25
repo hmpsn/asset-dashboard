@@ -10,7 +10,7 @@ import {
   listTemplates, createTemplate,
   importBrandscript, completeBrandscript,
 } from '../brandscript.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { sanitizeErrorMessage } from '../helpers.js';

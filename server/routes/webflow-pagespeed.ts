@@ -13,7 +13,7 @@ import { createLogger } from '../logger.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { normalizePageUrl, resolvePagePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('webflow-pagespeed');
 const MAX_PAGESPEED_PAGES = 25;

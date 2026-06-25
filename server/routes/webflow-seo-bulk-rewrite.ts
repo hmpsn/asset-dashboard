@@ -22,6 +22,7 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
+  ctrUnderperformanceFlag,
   normalizeSeoRewritePairs,
   normalizeSeoRewriteVariations,
 } from '../webflow-seo-rewrite-utils.js';
@@ -125,20 +126,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
         if (pageQueries.length > 0) {
           gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
 
-          // CTR performance flag — highlight underperforming pages
-          const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
-          const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
-          const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
-          const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
-          if (totalImpr >= 50) {
-            // Expected CTR benchmarks by position (approximate)
-            const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
-            if (avgCtr < expectedCtr * 0.7) {
-              ctrFlag = `\n\n⚠️ CTR UNDERPERFORMANCE: This page gets ${totalImpr} impressions/month but only ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}). The current ${field} is failing to convert searchers into clicks — make it significantly more compelling.`;
-            } else if (avgCtr >= expectedCtr * 1.3) {
-              ctrFlag = `\n\n✅ CTR OUTPERFORMER: This page has ${avgCtr.toFixed(1)}% CTR (above average for position ${avgPos.toFixed(0)}). Preserve the elements that are working — focus on keyword optimization while keeping the compelling angle.`;
-            }
-          }
+          ctrFlag = ctrUnderperformanceFlag(pageQueries, { field, includeOutperformer: true });
         }
       }
 

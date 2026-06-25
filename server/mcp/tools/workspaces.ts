@@ -22,7 +22,7 @@ import { toAdminWorkspaceView } from '../../serializers/admin-workspace-view.js'
 import { normalizeSocialProfiles } from '../../social-profiles.js';
 import { normalizeRuntimeSeoDataProvider } from '../../seo-data-provider.js';
 import { WS_EVENTS, ADMIN_EVENTS } from '../../ws-events.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {

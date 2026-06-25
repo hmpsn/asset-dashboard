@@ -37,11 +37,13 @@ vi.mock('../../server/workspace-intelligence.js', async (importOriginal) => {
         },
       };
     }),
-    invalidateIntelligenceCache: vi.fn((workspaceId: string) => {
-      state.invalidateCalls.push(workspaceId);
-    }),
   };
 });
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: vi.fn((workspaceId: string) => {
+    state.invalidateCalls.push(workspaceId);
+  }),
+}));
 
 vi.mock('../../server/content-posts-ai.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../server/content-posts-ai.js')>();
