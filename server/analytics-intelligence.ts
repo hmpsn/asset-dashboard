@@ -45,7 +45,8 @@ import { listTrackedKeywordRows } from './tracked-keywords-store.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
-import { normalizePageUrl as normalizePagePath, toInsightPageId } from './helpers.js';
+import { normalizePageUrl, toInsightPageId } from './helpers.js';
+import { industryCtr } from './scoring/ctr-curve.js';
 
 // ── Shared types for computation results ─────────────────────────
 
@@ -61,10 +62,10 @@ interface ComputedInsight<T> {
 // (trailing slashes, query params, fragments). Normalize before
 // using as grouping keys or DB page_id values.
 
-export function normalizePageUrl(url: string): string {
+export function normalizePageUrlWithOrigin(url: string): string {
   try {
     const u = new URL(url);
-    const normalizedPath = normalizePagePath(u.pathname);
+    const normalizedPath = normalizePageUrl(u.pathname);
     return normalizedPath === '/' ? `${u.origin}/` : `${u.origin}${normalizedPath}`;
   } catch (err) {
     // Not a valid URL — preserve legacy best-effort behavior.
@@ -80,7 +81,7 @@ export function normalizePageUrl(url: string): string {
 export function deduplicatePages(pages: SearchPage[]): SearchPage[] {
   const map = new Map<string, SearchPage>();
   for (const p of pages) {
-    const key = normalizePageUrl(p.page);
+    const key = normalizePageUrlWithOrigin(p.page);
     const existing = map.get(key);
     if (!existing) {
       map.set(key, { ...p, page: key });
@@ -106,7 +107,7 @@ export function deduplicatePages(pages: SearchPage[]): SearchPage[] {
 export function deduplicateQueryPages(rows: QueryPageRow[]): QueryPageRow[] {
   const map = new Map<string, QueryPageRow>();
   for (const r of rows) {
-    const normPage = normalizePageUrl(r.page);
+    const normPage = normalizePageUrlWithOrigin(r.page);
     const key = `${r.query}::${normPage}`;
     const existing = map.get(key);
     if (!existing) {
@@ -126,16 +127,10 @@ export function deduplicateQueryPages(rows: QueryPageRow[]): QueryPageRow[] {
   return Array.from(map.values());
 }
 
-// ── Expected CTR by position (industry average approximation) ────
-
-const EXPECTED_CTR_BY_POSITION: Record<number, number> = {
-  1: 0.30, 2: 0.17, 3: 0.11, 4: 0.08, 5: 0.065,
-  6: 0.05, 7: 0.04, 8: 0.035, 9: 0.03, 10: 0.025,
-};
+// ── Expected CTR by position (canonical industry curve) ──────────
 
 export function expectedCtrForPosition(pos: number): number {
-  const rounded = Math.max(1, Math.min(Math.round(pos), 10));
-  return EXPECTED_CTR_BY_POSITION[rounded] ?? 0.02;
+  return industryCtr(pos);
 }
 
 // ── Emerging keyword detection ───────────────────────────────────
@@ -241,7 +236,7 @@ export function computePageHealthScores(
 
   return significantPages.map(page => {
     // Extract path from full URL for GA4 matching
-    const pagePath = normalizePagePath(page.page);
+    const pagePath = normalizePageUrl(page.page);
 
     const ga4 = ga4Map.get(pagePath);
     const ga4Available = !!ga4;
@@ -895,7 +890,7 @@ export function computeSerpOpportunities(
     if (page.impressions < SERP_OPPORTUNITY_MIN_IMPRESSIONS) continue;
 
     // Normalise URL to pathname for schema lookup
-    const pathname = normalizePagePath(page.page);
+    const pathname = normalizePageUrl(page.page);
 
     if (pagesWithSchema.has(pathname) || pagesWithSchema.has(page.page)) continue;
 

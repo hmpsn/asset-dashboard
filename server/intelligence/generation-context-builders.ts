@@ -6,14 +6,8 @@ import type {
   SeoContextSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
-import {
-  buildWorkspaceIntelligence,
-  formatForPrompt,
-  formatKeywordsForPrompt,
-  formatKnowledgeBaseForPrompt,
-  formatPageMapForPrompt,
-  formatPersonasForPrompt,
-} from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
+import { formatPersonasForPrompt } from './persona-format.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
 

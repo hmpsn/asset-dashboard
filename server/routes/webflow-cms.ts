@@ -18,7 +18,7 @@ import { getPageState } from '../page-edit-states.js';
 import { resolveRecommendationsForChange } from '../recommendations.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('webflow-cms');
 

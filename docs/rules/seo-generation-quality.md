@@ -44,7 +44,7 @@ real money, until P6 threads GA4 `estimatedRevenue` — its JSDoc must say so. I
   here (CLAUDE.md "Schema vs stored shape"). Recs are a JSON blob
   (`recommendation_sets.recommendations` TEXT) — the lockstep is the **Zod schema**, not a
   DB column.
-- `server/routes/recommendations.ts` → **`stripEmvFromPublicRecs`** — destructure-and-spread
+- `server/recommendation-public-projection.ts` → **`stripEmvFromPublicRecs`** — destructure-and-spread
   strip. A new admin-money field **LEAKS to clients** unless added to the destructure
   (and mirrored at the PATCH response). **This is enforced by pr-check rule
   `opportunity-money-field-must-be-stripped`.**
@@ -102,7 +102,7 @@ it to the public strip (no dollarized string may reach a client).
   `src/components/client/Briefing/RecommendedForYou.tsx` (its independent `volume × 0.103`
   clicks estimate + the legacy `/100` badge are **flag-gated**, not unconditionally removed —
   see the client-gate contract below).
-- `server/routes/recommendations.ts` → `stripEmvFromPublicRecs` (must add `estimatedGain`).
+- `server/recommendation-public-projection.ts` → `stripEmvFromPublicRecs` (must add `estimatedGain`).
 
 **Client-gate contract (`ovGainActive`) — `RecommendedForYou` flag exposure (P4 review C2).**
 The client has **no** per-workspace flag mechanism for `seo-generation-quality`. The two

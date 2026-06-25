@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-25",
+  "cycles": {
+    "server": 92,
+    "src": 10
+  },
+  "allowedDirectRouteDbIndexImports": [
+    "server/routes/content-briefs.ts",
+    "server/routes/copy-pipeline.ts",
+    "server/routes/health.ts",
+    "server/routes/keyword-strategy.ts",
+    "server/routes/local-seo.ts",
+    "server/routes/public-portal.ts",
+    "server/routes/recommendations.ts"
+  ]
+}

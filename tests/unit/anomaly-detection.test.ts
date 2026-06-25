@@ -84,9 +84,11 @@ vi.mock('../../server/insight-score-adjustments.js', () => ({
   applyScoreAdjustment: mockApplyScoreAdjustment,
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
-  invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
   buildWorkspaceIntelligence: vi.fn(),
   buildIntelPrompt: vi.fn(),
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
 }));
 vi.mock('../../server/bridge-infrastructure.js', () => ({
   debouncedAnomalyBoost: vi.fn(),

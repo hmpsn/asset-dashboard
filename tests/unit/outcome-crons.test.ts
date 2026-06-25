@@ -19,8 +19,10 @@ vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
-  invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
   getWorkspaceHealthScore: mocks.getWorkspaceHealthScore,
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 vi.mock('../../server/outcome-measurement.js', () => ({
   measurePendingOutcomes: mocks.measurePendingOutcomes,

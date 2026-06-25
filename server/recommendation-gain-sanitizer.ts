@@ -9,7 +9,7 @@
 //
 // Two consumers MUST run their client-facing gain through this single function so neither
 // path can drift from the other (B1):
-//   - server/routes/recommendations.ts (`stripEmvFromPublicRecs`) — the public rec read.
+//   - server/recommendation-public-projection.ts (`stripEmvFromPublicRecs`) — the public rec read.
 //   - server/domains/inbox/deliverable-adapters/recommendation.ts (`buildRecPayload`) —
 //     the rec→deliverable mint, which bypasses the public route entirely.
 //

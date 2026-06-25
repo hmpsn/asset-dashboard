@@ -6,7 +6,7 @@ import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
 import { queueDelayedRecommendationRegen, RECOMMENDATION_REFRESH_DELAY_MS } from './recommendation-regen-scheduler.js';
 import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 import { createLogger } from './logger.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
 

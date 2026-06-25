@@ -24,7 +24,7 @@ import {
   updateEeatAssetSchema,
 } from '../schemas/eeat-assets.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import {
   mutationError,
   runWorkspaceMutation,

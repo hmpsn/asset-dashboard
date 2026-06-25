@@ -1155,9 +1155,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/small. server/activity-log.ts:166 MAX_ENTRIES=500 is GLOBAL; pruneOldest (lines 265-269) deletes oldest across ALL workspaces. Already pinned at 500 rows for 7 workspaces → at 70 workspaces each keeps ~7 entries, silently degrading client activity feeds + engagement signals. Fix: per-workspace cap or time cutoff (created_at < now-180d); move prune to a schedule, not synchronously on every insert (231 call sites hit a COUNT(*)+prune in a hot path)."
+          "notes": "AUDIT high/small. server/activity-log.ts:166 MAX_ENTRIES=500 is GLOBAL; pruneOldest (lines 265-269) deletes oldest across ALL workspaces. Already pinned at 500 rows for 7 workspaces → at 70 workspaces each keeps ~7 entries, silently degrading client activity feeds + engagement signals. Fix: per-workspace cap or time cutoff (created_at < now-180d); move prune to a schedule, not synchronously on every insert (231 call sites hit a COUNT(*)+prune in a hot path). || DONE 2026-06-25: replaced the global activity_log cap with scheduled per-workspace retention (`MAX_ENTRIES_PER_WORKSPACE`) run through the existing daily data-retention cycle, so high-volume workspaces cannot evict quiet workspace feeds and `addActivity()` no longer runs count/prune work in the hot insert path. Added unit coverage proving quiet-workspace rows survive unrelated noisy-workspace writes and busy workspaces prune to 500 during the retention sweep.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-recommendation-sets-normalize",
@@ -1165,9 +1166,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/med. recommendation_sets is \"workspace_id PRIMARY KEY ... recommendations TEXT\" — one row holds the whole array (avg 222KB, max 492KB, one workspace at 210 recs). updateRecommendationStatus() (recommendations.ts:415-436) parses+rewrites the ENTIRE blob for a single status flip; loadRecommendations is on warm intelligence/chat paths. Same anti-pattern migrations 088-090 fixed for keyword_gaps/topic_clusters. Fix: dedicated recommendations table (status/source/impact indexed); status updates become single-row UPDATEs. Add a pr-check rule for new large filterable JSON-array columns."
+          "notes": "AUDIT high/med. recommendation_sets is \"workspace_id PRIMARY KEY ... recommendations TEXT\" — one row holds the whole array (avg 222KB, max 492KB, one workspace at 210 recs). updateRecommendationStatus() (recommendations.ts:415-436) parses+rewrites the ENTIRE blob for a single status flip; loadRecommendations is on warm intelligence/chat paths. Same anti-pattern migrations 088-090 fixed for keyword_gaps/topic_clusters. Fix: dedicated recommendations table (status/source/impact indexed); status updates become single-row UPDATEs. Add a pr-check rule for new large filterable JSON-array columns. || DONE 2026-06-25: added `recommendation_items` as the row-authoritative store while keeping `recommendation_sets` for generated_at/summary and legacy fallback. `loadRecommendations()` now reads normalized rows when present, falls back to the legacy blob when absent, and row-level status/lifecycle mutations update only the target row plus summary instead of rewriting the whole blob. Extracted public recommendation projection and route mutation helpers, added `docs/rules/recommendation-storage.md`, and added a pr-check ratchet (`data/json-array-column-baseline.json`) that blocks new unreviewed `TEXT DEFAULT '[]'` migration columns.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-intelligence-facade-cycles",
@@ -1175,9 +1177,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high. 109 backend circular-dependency cycles funnel through workspace-intelligence.ts. (a) Extract invalidateIntelligenceCache (workspace-intelligence.ts:128, 49 importers) + formatPersonasForPrompt into leaf modules (intelligence/intelligence-cache.ts, intelligence/persona-format.ts); the keyword-feedback.ts:21 → helpers.ts:11 back-edge closes ~60 of 109 cycles. (b) Make slice-metadata-registry.ts slice refs lazy import thunks (it eagerly imports all 14 slices). (c) Add a madge --circular CI ratchet (madge already a devDependency, runs clean) baselined 109 server / 9 frontend, fail-on-increase; plus a routes→db/index import guard (only 6/93 route files touch the DB today). Re-export moved fns for one release; verify with madge."
+          "notes": "AUDIT high. 109 backend circular-dependency cycles funnel through workspace-intelligence.ts. (a) Extract invalidateIntelligenceCache (workspace-intelligence.ts:128, 49 importers) + formatPersonasForPrompt into leaf modules (intelligence/intelligence-cache.ts, intelligence/persona-format.ts); the keyword-feedback.ts:21 → helpers.ts:11 back-edge closes ~60 of 109 cycles. (b) Make slice-metadata-registry.ts slice refs lazy import thunks (it eagerly imports all 14 slices). (c) Add a madge --circular CI ratchet (madge already a devDependency, runs clean) baselined 109 server / 9 frontend, fail-on-increase; plus a routes→db/index import guard (only 6/93 route files touch the DB today). Re-export moved fns for one release; verify with madge. || DONE 2026-06-25: moved cache invalidation to `server/intelligence/cache-invalidation.ts`, shared cache state to `server/intelligence/cache-state.ts`, and persona formatting to `server/intelligence/persona-format.ts` while preserving facade re-exports. Migrated production invalidation/persona consumers off `workspace-intelligence.ts`, converted slice metadata registry assemblers to lazy dynamic imports, installed `madge`, and added `npm run check:circular-deps` plus a CI gate. Post-refactor ratchet baseline is 92 server cycles / 10 src cycles; the direct route DB import guard documents the current 7 route exceptions and blocks new ones. Added leaf invalidation and source-contract coverage.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-ctr-curve-reconcile",
@@ -1185,9 +1188,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/med (correctness footgun). Three models disagree on \"is this page underperforming?\": scoring/ctr-curve.ts:46 industryCtr() (28%@pos1, canonical), analytics-intelligence.ts:131 expectedCtrForPosition() (30%@pos1, separate table), and an inline avgPos<=3?8:... (8%@pos1-3) copy-pasted into webflow-seo-bulk-rewrite-job.ts:127, routes/webflow-seo-rewrite.ts:77, routes/webflow-seo-bulk-rewrite.ts:135. Fix: make ctr-curve.ts sole owner; expectedCtrForPosition calls it; extract the triplicated Webflow block into one ctrUnderperformanceFlag() helper."
+          "notes": "AUDIT high/med (correctness footgun). Three models disagree on \"is this page underperforming?\": scoring/ctr-curve.ts:46 industryCtr() (28%@pos1, canonical), analytics-intelligence.ts:131 expectedCtrForPosition() (30%@pos1, separate table), and an inline avgPos<=3?8:... (8%@pos1-3) copy-pasted into webflow-seo-bulk-rewrite-job.ts:127, routes/webflow-seo-rewrite.ts:77, routes/webflow-seo-bulk-rewrite.ts:135. Fix: make ctr-curve.ts sole owner; expectedCtrForPosition calls it; extract the triplicated Webflow block into one ctrUnderperformanceFlag() helper. || DONE 2026-06-25: `expectedCtrForPosition()` now delegates to canonical `industryCtr()`, and the Webflow rewrite route, bulk route, and background job share `ctrUnderperformanceFlag()` from `webflow-seo-rewrite-utils.ts`. Updated CTR expectations and helper coverage.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-normalize-pageurl-disambiguate",
@@ -1195,9 +1199,10 @@
           "source": "Complexity audit 2026-06-24",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/small (silent page-identity mismatch). helpers.ts:161 re-exports the path-normalizer from shared/page-address-utils.ts:11; analytics-intelligence.ts:59 defines its OWN that preserves origin — and imports the shared one aliased as normalizePagePath, using both. Both feed dedup Map keys, so importing the wrong one silently produces mismatched page identities (~50 modules reference the name). Fix: rename the origin-preserving one to normalizePageUrlWithOrigin; drop the confusing local alias."
+          "notes": "AUDIT high/small (silent page-identity mismatch). helpers.ts:161 re-exports the path-normalizer from shared/page-address-utils.ts:11; analytics-intelligence.ts:59 defines its OWN that preserves origin — and imports the shared one aliased as normalizePagePath, using both. Both feed dedup Map keys, so importing the wrong one silently produces mismatched page identities (~50 modules reference the name). Fix: rename the origin-preserving one to normalizePageUrlWithOrigin; drop the confusing local alias. || DONE 2026-06-25: renamed the analytics-only origin-preserving helper to `normalizePageUrlWithOrigin`, switched analytics path-only call sites back to the canonical `normalizePageUrl`, and updated unit coverage to make the distinction explicit.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-audit-0624-synthesize-keyword-strategy-decompose",

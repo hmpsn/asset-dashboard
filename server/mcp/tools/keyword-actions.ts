@@ -22,7 +22,7 @@ import {
   upsertPageKeywordsBatch,
 } from '../../page-keywords.js';
 import { getConfiguredProvider, normalizeRuntimeSeoDataProvider } from '../../seo-data-provider.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { consumeHandle, issueHandle } from '../handles.js';
 import { slugify } from '../../helpers.js';

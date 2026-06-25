@@ -10,7 +10,8 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { getTrackedKeywords } from '../rank-tracking.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';

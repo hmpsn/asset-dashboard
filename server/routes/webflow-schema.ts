@@ -36,7 +36,7 @@ import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import {
   syncSchemaPlanDeliverable,
 } from '../domains/inbox/schema-plan-dual-write.js';

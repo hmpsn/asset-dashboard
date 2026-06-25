@@ -33,6 +33,7 @@ import {
   checkDirectory,
   checkFile,
   buildWorkspaceScopedTables,
+  findJsonArrayColumnSites,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
   compareStudioConstants,
@@ -3330,6 +3331,88 @@ describe('buildWorkspaceScopedTables ALTER TABLE workspace_id detection', () => 
   });
 });
 
+describe('Rule: New JSON-array TEXT column without normalization review', () => {
+  const RULE = 'New JSON-array TEXT column without normalization review';
+
+  it('raw scanner finds TEXT columns that default to []', () => {
+    const dir = path.join(TMPDIR, 'json-array-scanner', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, '999-fixture.sql'), [
+      'CREATE TABLE IF NOT EXISTS sample_rows (',
+      '  id TEXT PRIMARY KEY,',
+      "  items TEXT NOT NULL DEFAULT '[]'",
+      ');',
+    ].join('\n'), 'utf-8');
+
+    const hits = findJsonArrayColumnSites(dir);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('flags an unbaselined migration array column', () => {
+    const file = write(
+      uniqPath('rule-json-array-column', 'server/db/migrations/999-new-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS new_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  items TEXT NOT NULL DEFAULT '[]'",
+        ');',
+      ].join('\n'),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('flags quoted identifiers and parenthesized array defaults', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-quoted', 'server/db/migrations/999-quoted-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS quoted_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        '  "items" TEXT NOT NULL DEFAULT (\'[]\')',
+        ');',
+      ].join('\n'),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('allows an explicitly hatched array column', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-hatch', 'server/db/migrations/999-hatched-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS new_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  items TEXT NOT NULL DEFAULT '[]' -- json-array-column-ok: bounded small append-only metadata",
+        ');',
+      ].join('\n'),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores non-array TEXT defaults', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-negative', 'server/db/migrations/999-negative.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS scalar_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  label TEXT NOT NULL DEFAULT ''",
+        ');',
+      ].join('\n'),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: TabBar component without ?tab= deep-link support
 // ════════════════════════════════════════════════════════════════════════════
@@ -5882,6 +5965,7 @@ describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
+    'New JSON-array TEXT column without normalization review',
     'AI call before db.prepare without transaction guard',
     'Ad hoc domain normalization helper outside canonical authority',
     'Ad hoc HTML extraction helper outside canonical authority',
@@ -10931,7 +11015,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     expect(runRule(RULE, [types, strip])).toHaveLength(0);
   });
 
@@ -10948,7 +11032,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',                                   // 7
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     const hits = runRule(RULE, [types, strip]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(5);
@@ -10967,7 +11051,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
       ),
     );
     const strip = write(
-      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'),
       'function stripEmvFromPublicRecs(recs) {\n' +
         '  const { emvPerWeek: _e, roiPerEffortDay: _r, predictedEmv: _p, ...rest } = r.opportunity;\n' +
         '}\n',
@@ -10988,7 +11072,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
     );
     // predictedEmv is mentioned only in a doc-comment, never destructured → must still flag.
     const strip = write(
-      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'),
       '// NOTE: predictedEmv: is admin-only and handled elsewhere (this is just prose).\n' +
         'function stripEmvFromPublicRecs(recs) {\n' +
         '  const { emvPerWeek: _e, roiPerEffortDay: _r, ...rest } = r.opportunity;\n' +
@@ -11010,7 +11094,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     expect(runRule(RULE, [types, strip])).toHaveLength(0);
   });
 
@@ -11654,8 +11738,14 @@ describe('getChangedFiles: untracked-file coverage (net-new-file false-green)', 
   });
 
   function git(cwd: string, ...args: string[]): string {
+    const env = { ...process.env };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    delete env.GIT_INDEX_FILE;
+    delete env.GIT_PREFIX;
     return execFileSync('git', args, {
       cwd,
+      env,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();

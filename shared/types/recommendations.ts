@@ -36,7 +36,7 @@ export interface Recommendation {
   targetKeyword?: string;
   status: RecStatus;
   /** Client-safe banded monthly impact (D-IMPACT). Set ONLY on the public projection
-   *  (server/routes/recommendations.ts stripEmvFromPublicRecs), derived from the
+   *  (server/recommendation-public-projection.ts stripEmvFromPublicRecs), derived from the
    *  admin/AI-only opportunity.emvPerWeek which is stripped in the same pass. Absent on
    *  admin-facing payloads (they carry the raw opportunity instead) and when the projected
    *  monthly value is below the display floor. NEVER populated from raw emv client-side. */
@@ -286,7 +286,7 @@ export type ClientFacingClientStatus = 'sent' | 'approved' | 'declined' | 'discu
  * Lane A (Track C) implements the projection; Lane B (Track E) consumes it.
  *
  * DO NOT add fields here without updating `stripEmvFromPublicRecs` in
- * `server/routes/recommendations.ts` to project them.
+ * `server/recommendation-public-projection.ts` to project them.
  */
 export interface ClientFacingRecommendation {
   id: string;

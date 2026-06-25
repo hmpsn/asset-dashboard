@@ -37,7 +37,7 @@ import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js'
 import { validate, z } from '../middleware/validate.js';
 import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {

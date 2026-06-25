@@ -677,12 +677,92 @@ describe('recommendation persistence integrity', () => {
     expect(loaded?.recommendations.find((rec) => rec.id === 'rec-2')?.status).toBe('in_progress');
   });
 
-  it('falls back gracefully when stored recommendations/summary JSON is malformed', () => {
+  it('writes normalized item rows on save and loads them in rank order', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_rows');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+
+    saveRecommendations(set);
+
+    const rows = db.prepare(
+      `SELECT id, rank_order, status, source, payload
+       FROM recommendation_items
+       WHERE workspace_id = ?
+       ORDER BY rank_order ASC`,
+    ).all(workspaceId) as Array<{ id: string; rank_order: number; status: string; source: string; payload: string }>;
+    expect(rows.map(row => row.id)).toEqual(['rec-1', 'rec-2']);
+    expect(rows.map(row => row.rank_order)).toEqual([0, 1]);
+    expect(rows[0].status).toBe('pending');
+    expect(rows[1].source).toBe('audit:structured-data');
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded).toEqual(set);
+  });
+
+  it('uses normalized rows over divergent legacy recommendations blob', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_row_wins');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+
+    db.prepare(
+      'UPDATE recommendation_sets SET recommendations = ? WHERE workspace_id = ?',
+    ).run(
+      JSON.stringify([{ ...set.recommendations[0], id: 'legacy-only', title: 'Legacy blob should not win' }]),
+      workspaceId,
+    );
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded?.recommendations.map(rec => rec.id)).toEqual(['rec-1', 'rec-2']);
+  });
+
+  it('falls back to the legacy recommendations blob when normalized rows are absent', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_legacy_fallback');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+    db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded).toEqual(set);
+  });
+
+  it('uses normalized rows when the legacy recommendations blob is malformed', () => {
     const workspaceId = makeWorkspaceId('ws_rec_corrupt');
     recWorkspaceIds.add(workspaceId);
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
 
+    db.prepare(
+      'UPDATE recommendation_sets SET recommendations = ?, summary = ? WHERE workspace_id = ?',
+    ).run(
+      '{"broken"',
+      '{"broken"',
+      workspaceId,
+    );
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded).toBeDefined();
+    expect(loaded?.recommendations).toEqual(set.recommendations);
+    expect(loaded?.summary).toEqual({
+      fixNow: 0,
+      fixSoon: 0,
+      fixLater: 0,
+      ongoing: 0,
+      totalImpactScore: 0,
+      trafficAtRisk: 0,
+      totalOpportunityValue: 0,
+      actionableOpportunityValue: 0,
+      topRecommendationId: null,
+    });
+  });
+
+  it('falls back gracefully when legacy recommendations/summary JSON is malformed and no rows exist', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_legacy_corrupt');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+    db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
     db.prepare(
       'UPDATE recommendation_sets SET recommendations = ?, summary = ? WHERE workspace_id = ?',
     ).run(
@@ -707,26 +787,85 @@ describe('recommendation persistence integrity', () => {
     });
   });
 
-  it('keeps valid recommendations when one stored item is malformed', () => {
+  it('keeps valid normalized rows when one item payload is malformed', () => {
     const workspaceId = makeWorkspaceId('ws_rec_partial');
     recWorkspaceIds.add(workspaceId);
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
 
-    const row = db.prepare('SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?')
-      .get(workspaceId) as { recommendations: string } | undefined;
-    expect(row).toBeDefined();
-    const parsed = JSON.parse(row!.recommendations) as Array<Record<string, unknown>>;
-    const mixed = [
-      parsed[0],
-      { ...parsed[1], impactScore: 'not-a-number' },
-    ];
-    db.prepare('UPDATE recommendation_sets SET recommendations = ? WHERE workspace_id = ?')
-      .run(JSON.stringify(mixed), workspaceId);
+    db.prepare(
+      `UPDATE recommendation_items
+       SET payload = ?
+       WHERE workspace_id = ? AND id = ?`,
+    ).run(
+      JSON.stringify({ ...set.recommendations[1], impactScore: 'not-a-number' }),
+      workspaceId,
+      'rec-2',
+    );
 
     const loaded = loadRecommendations(workspaceId);
     expect(loaded?.recommendations).toHaveLength(1);
     expect(loaded?.recommendations[0].id).toBe('rec-1');
+  });
+
+  it('updates only the target normalized row on status changes', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_row_update');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+
+    const legacyBefore = (db.prepare(
+      'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
+    ).get(workspaceId) as { recommendations: string }).recommendations;
+    const updated = updateRecommendationStatus(workspaceId, 'rec-1', 'completed');
+    expect(updated?.status).toBe('completed');
+
+    const legacyAfter = (db.prepare(
+      'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
+    ).get(workspaceId) as { recommendations: string }).recommendations;
+    expect(legacyAfter).toBe(legacyBefore);
+
+    const rows = db.prepare(
+      `SELECT id, status, payload FROM recommendation_items
+       WHERE workspace_id = ?
+       ORDER BY rank_order ASC`,
+    ).all(workspaceId) as Array<{ id: string; status: string; payload: string }>;
+    expect(rows.find(row => row.id === 'rec-1')?.status).toBe('completed');
+    expect(rows.find(row => row.id === 'rec-2')?.status).toBe('in_progress');
+    expect((JSON.parse(rows.find(row => row.id === 'rec-1')!.payload) as { status: string }).status).toBe('completed');
+
+    const loaded = loadRecommendations(workspaceId);
+    expect(loaded?.summary.topRecommendationId).toBe('rec-2');
+  });
+
+  it('materializes legacy blob rows before a status update', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_materialize');
+    recWorkspaceIds.add(workspaceId);
+    const set = makeRecommendationSet(workspaceId);
+    saveRecommendations(set);
+    db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
+
+    const updated = updateRecommendationStatus(workspaceId, 'rec-1', 'completed');
+
+    expect(updated?.status).toBe('completed');
+    const count = db.prepare(
+      'SELECT COUNT(*) as cnt FROM recommendation_items WHERE workspace_id = ?',
+    ).get(workspaceId) as { cnt: number };
+    expect(count.cnt).toBe(2);
+    expect(loadRecommendations(workspaceId)?.recommendations.find(rec => rec.id === 'rec-1')?.status).toBe('completed');
+  });
+
+  it('deleting the set cascades normalized recommendation rows', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_cascade');
+    recWorkspaceIds.add(workspaceId);
+    saveRecommendations(makeRecommendationSet(workspaceId));
+
+    db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(workspaceId);
+
+    const count = db.prepare(
+      'SELECT COUNT(*) as cnt FROM recommendation_items WHERE workspace_id = ?',
+    ).get(workspaceId) as { cnt: number };
+    expect(count.cnt).toBe(0);
   });
 
   it('dismissRecommendation returns false for unknown recommendation ids', () => {

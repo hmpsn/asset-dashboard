@@ -30,7 +30,7 @@ import { notifyClientBriefingReady } from '../email.js';
 import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { buildBriefingClientView } from '../briefing-client-projection.js';
 import { mirrorBriefingToDeliverable } from '../domains/inbox/briefing-dual-write.js';
 

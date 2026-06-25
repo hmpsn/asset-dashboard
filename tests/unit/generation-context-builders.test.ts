@@ -12,8 +12,8 @@ import {
   formatKeywordsForPrompt,
   formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
-  formatPersonasForPrompt,
 } from '../../server/workspace-intelligence.js';
+import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 import { listLocalSeoMarkets } from '../../server/local-seo.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -22,6 +22,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatKeywordsForPrompt: vi.fn(),
   formatKnowledgeBaseForPrompt: vi.fn(),
   formatPageMapForPrompt: vi.fn(),
+}));
+
+vi.mock('../../server/intelligence/persona-format.js', () => ({
   formatPersonasForPrompt: vi.fn(),
 }));
 

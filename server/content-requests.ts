@@ -3,7 +3,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback, parseJsonSafe } from './db/json-validation.js';
 import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
 import { invalidateContentPipelineCache } from './workspace-data.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { z } from './middleware/validate.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';

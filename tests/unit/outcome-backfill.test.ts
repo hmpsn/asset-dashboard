@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   recordAction: vi.fn(),
   getActionBySource: vi.fn(() => null),
   fillPredictedEmvIfNull: vi.fn(() => true),
+  loadRecommendationSet: vi.fn(() => null),
   warn: vi.fn(),
   error: vi.fn(),
   info: vi.fn(),
@@ -39,6 +40,9 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getActionBySource: mocks.getActionBySource,
   fillPredictedEmvIfNull: mocks.fillPredictedEmvIfNull,
 }));
+vi.mock('../../server/recommendation-storage.js', () => ({
+  loadRecommendationSet: mocks.loadRecommendationSet,
+}));
 
 import {
   backfillCompletedRecommendations,
@@ -57,6 +61,7 @@ beforeEach(() => {
   mocks.parseJsonSafeArray.mockReturnValue([]);
   mocks.getActionBySource.mockReturnValue(null);
   mocks.fillPredictedEmvIfNull.mockReturnValue(true);
+  mocks.loadRecommendationSet.mockReturnValue(null);
 });
 
 describe('outcome-backfill', () => {
@@ -123,18 +128,18 @@ describe('outcome-backfill', () => {
   });
 
   it('backfillCompletedRecommendations tolerates malformed/partial payload entries and only records valid completed recommendations', () => {
-    mocks.stmts.recommendationSet.get.mockReturnValue({
-      workspace_id: 'ws_2',
-      recommendations: '[]',
+    mocks.loadRecommendationSet.mockReturnValue({
+      workspaceId: 'ws_2',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      recommendations: [
+        { id: 'rec_ok', status: 'completed', affectedPages: ['/good-page'] },
+        { id: '', status: 'completed', affectedPages: ['/empty-id'] },
+        { id: 'rec_existing', status: 'completed', affectedPages: ['/existing'] },
+        { id: 'rec_pending', status: 'pending', affectedPages: ['/pending'] },
+        { id: 'rec_bad_pages', status: 'completed', affectedPages: [42, null] },
+      ],
+      summary: {},
     });
-
-    mocks.parseJsonSafeArray.mockReturnValue([
-      { id: 'rec_ok', status: 'completed', affectedPages: ['/good-page'] },
-      { id: '', status: 'completed', affectedPages: ['/empty-id'] },
-      { id: 'rec_existing', status: 'completed', affectedPages: ['/existing'] },
-      { id: 'rec_pending', status: 'pending', affectedPages: ['/pending'] },
-      { id: 'rec_bad_pages', status: 'completed', affectedPages: [42, null] },
-    ]);
 
     mocks.getActionBySource.mockImplementation((sourceType: string, sourceId: string) => {
       if (sourceType === 'recommendation' && sourceId === 'rec_existing') return { id: 'existing' };
@@ -173,11 +178,12 @@ describe('outcome-backfill', () => {
         resolved_at: '2026-01-01T00:00:00.000Z',
       },
     ]);
-    mocks.stmts.recommendationSet.get.mockReturnValue({
-      workspace_id: 'ws_1',
-      recommendations: '[{"id":"r1","status":"completed"}]',
+    mocks.loadRecommendationSet.mockReturnValue({
+      workspaceId: 'ws_1',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      recommendations: [{ id: 'r1', status: 'completed', affectedPages: ['/page'] }],
+      summary: {},
     });
-    mocks.parseJsonSafeArray.mockReturnValue([{ id: 'r1', status: 'completed', affectedPages: ['/page'] }]);
 
     mocks.getActionBySource.mockImplementation((sourceType: string, sourceId: string) => {
       return seen.has(`${sourceType}:${sourceId}`) ? ({ id: 'existing' }) : null;
@@ -204,7 +210,7 @@ describe('outcome-backfill', () => {
       ];
     });
     mocks.stmts.resolvedInsights.all.mockReturnValue([]);
-    mocks.stmts.recommendationSet.get.mockReturnValue(undefined);
+    mocks.loadRecommendationSet.mockReturnValue(null);
 
     const result = runBackfill();
 

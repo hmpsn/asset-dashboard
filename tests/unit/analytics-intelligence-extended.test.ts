@@ -2,7 +2,7 @@
  * Wave 10 — Extended unit tests for server/analytics-intelligence.ts.
  *
  * Covers functions and branches not exercised by existing test files:
- * - normalizePageUrl / deduplicatePages / deduplicateQueryPages
+ * - normalizePageUrlWithOrigin / deduplicatePages / deduplicateQueryPages
  * - expectedCtrForPosition (boundary values)
  * - wordJaccard (edge cases)
  * - computeRankingMovers (threshold boundaries, ties, no-match, dedup, severity)
@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  normalizePageUrl,
+  normalizePageUrlWithOrigin,
   deduplicatePages,
   deduplicateQueryPages,
   expectedCtrForPosition,
@@ -33,35 +33,35 @@ import {
 import type { SearchPage, QueryPageRow } from '../../server/search-console.js';
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 
-// ── normalizePageUrl ──────────────────────────────────────────────
+// ── normalizePageUrlWithOrigin ────────────────────────────────────
 
-describe('normalizePageUrl', () => {
+describe('normalizePageUrlWithOrigin', () => {
   it('strips query params from a full URL', () => {
-    expect(normalizePageUrl('https://example.com/blog?utm_source=google')).toBe('https://example.com/blog');
+    expect(normalizePageUrlWithOrigin('https://example.com/blog?utm_source=google')).toBe('https://example.com/blog');
   });
 
   it('strips fragment from a full URL', () => {
-    expect(normalizePageUrl('https://example.com/contact#section')).toBe('https://example.com/contact');
+    expect(normalizePageUrlWithOrigin('https://example.com/contact#section')).toBe('https://example.com/contact');
   });
 
   it('strips trailing slash from a path (not root)', () => {
-    expect(normalizePageUrl('https://example.com/about/')).toBe('https://example.com/about');
+    expect(normalizePageUrlWithOrigin('https://example.com/about/')).toBe('https://example.com/about');
   });
 
   it('preserves root URL (single slash)', () => {
-    expect(normalizePageUrl('https://example.com/')).toBe('https://example.com/');
+    expect(normalizePageUrlWithOrigin('https://example.com/')).toBe('https://example.com/');
   });
 
   it('falls back for invalid URLs — strips trailing slash', () => {
-    expect(normalizePageUrl('/relative/path/')).toBe('/relative/path');
+    expect(normalizePageUrlWithOrigin('/relative/path/')).toBe('/relative/path');
   });
 
   it('falls back for invalid URLs — no trailing slash unchanged', () => {
-    expect(normalizePageUrl('/no-slash')).toBe('/no-slash');
+    expect(normalizePageUrlWithOrigin('/no-slash')).toBe('/no-slash');
   });
 
   it('preserves root slash fallback', () => {
-    expect(normalizePageUrl('/')).toBe('/');
+    expect(normalizePageUrlWithOrigin('/')).toBe('/');
   });
 });
 
@@ -143,27 +143,25 @@ describe('deduplicateQueryPages', () => {
 // ── expectedCtrForPosition ────────────────────────────────────────
 
 describe('expectedCtrForPosition', () => {
-  it('returns 0.30 for position 1', () => {
-    expect(expectedCtrForPosition(1)).toBe(0.30);
+  it('returns the canonical industry curve value for position 1', () => {
+    expect(expectedCtrForPosition(1)).toBe(0.28);
   });
 
-  it('returns 0.025 for position 10', () => {
-    expect(expectedCtrForPosition(10)).toBe(0.025);
+  it('returns the canonical industry curve value for position 10', () => {
+    expect(expectedCtrForPosition(10)).toBe(0.018);
   });
 
   it('clamps position < 1 to 1', () => {
-    expect(expectedCtrForPosition(0)).toBe(0.30);
+    expect(expectedCtrForPosition(0)).toBe(0.28);
   });
 
-  it('clamps position > 10 to 10, returning 0.025', () => {
-    expect(expectedCtrForPosition(15)).toBe(0.025);
+  it('keeps positions beyond 10 on the canonical tracked curve', () => {
+    expect(expectedCtrForPosition(15)).toBe(0.009);
   });
 
   it('rounds fractional position to nearest integer', () => {
-    // 1.4 rounds to 1 → 0.30
-    expect(expectedCtrForPosition(1.4)).toBe(0.30);
-    // 1.6 rounds to 2 → 0.17
-    expect(expectedCtrForPosition(1.6)).toBe(0.17);
+    expect(expectedCtrForPosition(1.4)).toBe(0.28);
+    expect(expectedCtrForPosition(1.6)).toBe(0.15);
   });
 });
 
@@ -314,17 +312,17 @@ describe('computeRankingMovers', () => {
 
 describe('computeCtrOpportunities', () => {
   it('identifies query-page with CTR well below expected', () => {
-    // Position 1 → expected 30% CTR. Actual 6% (decimal 0.06) → ratio 0.2 < 0.70
+    // Position 1 → expected 28% CTR. Actual 6% (decimal 0.06) → ratio ≈0.214 < 0.70
     const rows: QueryPageRow[] = [
       { query: 'seo tools', page: 'https://example.com/tools', clicks: 60, impressions: 1000, ctr: 6, position: 1 },
     ];
     const results = computeCtrOpportunities(rows);
     expect(results).toHaveLength(1);
-    expect(results[0].data.ctrRatio).toBeCloseTo(0.06 / 0.30, 2);
+    expect(results[0].data.ctrRatio).toBeCloseTo(0.06 / 0.28, 2);
   });
 
   it('assigns critical severity when ctrRatio < 0.3', () => {
-    // Actual CTR = 8%, expected for position 1 = 30% → ratio ≈ 0.267
+    // Actual CTR = 8%, expected for position 1 = 28% → ratio ≈ 0.286
     const rows: QueryPageRow[] = [
       { query: 'test kw', page: 'https://example.com/page', clicks: 80, impressions: 1000, ctr: 8, position: 1 },
     ];
@@ -333,7 +331,7 @@ describe('computeCtrOpportunities', () => {
   });
 
   it('assigns warning severity when 0.3 <= ctrRatio < 0.5', () => {
-    // Actual CTR = 10%, expected for position 1 = 30% → ratio ≈ 0.333
+    // Actual CTR = 10%, expected for position 1 = 28% → ratio ≈ 0.357
     const rows: QueryPageRow[] = [
       { query: 'test kw', page: 'https://example.com/page', clicks: 100, impressions: 1000, ctr: 10, position: 1 },
     ];

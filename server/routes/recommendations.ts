@@ -1,7 +1,6 @@
 /**
  * recommendations routes — extracted from server/index.ts
  */
-import crypto from 'crypto';
 import { Router } from 'express';
 
 import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
@@ -13,7 +12,6 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
   loadRecommendations,
-  saveRecommendations,
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
@@ -48,26 +46,30 @@ import type { EffectiveTier } from '../workspaces.js';
 import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { addActivity } from '../activity-log.js';
+import { stripEmvFromPublicRecs, toPublicRecommendationSet } from '../recommendation-public-projection.js';
+import {
+  applyBulkRecommendationAction,
+  mintCompetitorRecommendation,
+  mintManualRecommendation,
+} from '../recommendation-route-mutations.js';
 import {
   RECOMMENDATION_TRANSITIONS,
   validateTransition,
   InvalidTransitionError,
 } from '../state-machines.js';
-import type { Recommendation, RecommendationSet, ClientFacingClientStatus, ClientRecResponseSummary } from '../../shared/types/recommendations.js';
+import type { Recommendation, ClientFacingClientStatus, ClientRecResponseSummary } from '../../shared/types/recommendations.js';
 import {
   MANUAL_REC_ALLOWED_TYPES,
   REC_WORDING_TITLE_MAX,
   REC_WORDING_INSIGHT_MAX,
   type OperatorOverridesResponse,
 } from '../../shared/types/rec-operator-steering.js';
-import { computeImpactBand } from '../../shared/types/impact-band.js';
 import { mirrorRecommendationToDeliverable } from '../domains/inbox/recommendation-dual-write.js';
 import { createContentRequest } from '../content-requests.js';
 import { buildStrategyCardContextFromRec } from '../recommendation-strategy-card-context.js';
-import { sanitizePublicGain } from '../recommendation-gain-sanitizer.js';
 import type { StrategyCardContext } from '../../shared/types/content.js';
 
 const log = createLogger('routes:recommendations');
@@ -76,160 +78,6 @@ const router = Router();
 /** Internal sentinel (L6): thrown inside the act-on transaction when the rec vanishes mid-flight
  *  so the whole greenlight+request unit rolls back and the route can map it to a 404. */
 class RecGoneError extends Error {}
-
-/**
- * Strip the admin/AI-only dollar/ROI fields from each rec before responding on a
- * PUBLIC (client-facing) route. Per owner decision the client sees the ROI badge +
- * relative value + component breakdown bars, never the raw $/wk exposure
- * (`emvPerWeek`), the horizon projection (`predictedEmv`, P4 — a CPC-proxy that
- * would read as a dollar figure), nor the internal ROI quantity (`roiPerEffortDay`).
- * The OpportunityScore is allow-listed (value, confidence, groundedSpine, components,
- * calibration, calibrationVersion, modelVersion pass through; the raw $/ROI fields above
- * are dropped) so the client #1 card can still render its "why this is #1" breakdown.
- * (The projection below is an explicit allow-list, not a strip-from-spread — see the
- * note above stripEmvFromPublicRecs.)
- *
- * `estimatedGain` (P4, Contract 3) is a TOP-LEVEL rec field, NOT inside `opportunity`,
- * and it renders LIVE at InsightsEngine.tsx. The chosen gain form is NON-DOLLARIZED
- * (an outcome-oriented relative-magnitude phrase — see buildOvGainString in
- * server/recommendations.ts), so the client sees a real gain string. This function is
- * the always-on safety net: it SANITIZES `estimatedGain` by neutralizing any dollar
- * exposure (a `$nnn` / `$/wk` substring), so even a future dollarized variant (P6) or a
- * renderer that forgets to gate cannot leak a raw money figure to a client. Non-dollarized
- * strings pass through unchanged.
- *
- * The implementation lives in the shared leaf util `server/recommendation-gain-sanitizer.ts`
- * (B1) so the rec→deliverable adapter — which mints client-facing payloads OUTSIDE this route —
- * runs the SAME safety net (imported at the top of this file).
- */
-
-/** Restricted post-send statuses a client may ever observe (mirrors ClientFacingClientStatus). A
- *  rec in 'system'/'curated' (pre-send operator axis) must NEVER expose its clientStatus to the
- *  client — only the post-send states leak, and only as the restricted value. */
-const CLIENT_FACING_STATUSES: readonly ClientFacingClientStatus[] = ['sent', 'approved', 'declined', 'discussing'];
-function clientFacingStatus(status: Recommendation['clientStatus']): ClientFacingClientStatus | undefined {
-  return status && (CLIENT_FACING_STATUSES as readonly string[]).includes(status)
-    ? (status as ClientFacingClientStatus)
-    : undefined;
-}
-
-/** The shape a public rec read emits: the allow-listed Recommendation fields plus the two
- *  Strategy "The Issue" §7 client-facing projections (restricted clientStatus + synthetic
- *  `delivered`), plus the audit-blocker #1 server-authoritative `actOn` descriptor. `delivered`
- *  is NOT a DB column — it is derived from the rec's completion state. `actOn` is computed once
- *  per rec from the effective tier + the rec's monetizable policy (see actOnDescriptor). */
-type PublicRecommendation = Recommendation & {
-  delivered?: boolean;
-  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth'; monetizable: boolean };
-};
-
-/**
- * The Issue audit-blocker #1 — server-authoritative "Request this" descriptor. Computed ONCE per
- * rec from the workspace's effective tier + the rec's monetizable policy (REC_POLICY_REGISTRY), so
- * the client can never be tricked by a hidden button: the act-on route is the gate, this descriptor
- * is the matching projection. Free + monetizable → `locked` (client renders <TierGate>; the route
- * also 403s). Growth/Premium, or any non-monetizable rec → `included` (covered by the plan; confirm,
- * no charge at click). `priced` is reserved for the future à-la-carte path and is NOT emitted now.
- * Gated by the caller exactly like the restricted clientStatus projection so it is ABSENT when
- * strategy-the-issue is OFF (flag-OFF byte-identical).
- */
-function actOnDescriptor(rec: Recommendation, effectiveTier: EffectiveTier): NonNullable<PublicRecommendation['actOn']> {
-  // `monetizable` drives the client greenlight verb ("Request this" vs "Discuss this") AND the gate —
-  // it travels on the descriptor so the client never re-derives it (non-monetizable authority_bet
-  // recs like keyword_gap/topic_cluster must read "Discuss this").
-  const monetizable = REC_POLICY_REGISTRY[rec.type]?.monetizable ?? false;
-  if (effectiveTier === 'free' && monetizable) {
-    return { mode: 'locked', requiredTier: 'growth', monetizable };
-  }
-  return { mode: 'included', monetizable };
-}
-
-// Strategy v3 (spec §7.4 / 00-contracts §4 readers) — the public rec projection is an explicit
-// ALLOW-LIST, not a blocklist. A blocklist (`...rec` minus a few keys) silently leaks every NEW
-// admin-only field the moment it is added (the v3 lifecycle axis: throttledUntil/struckAt/sentAt/
-// cascade/lifecycle/clientStatus/sendChannel). This names ONLY client-safe fields, so a future
-// admin-only field is leak-proof by default. The OpportunityScore is itself allow-listed (raw
-// emvPerWeek/predictedEmv/roiPerEffortDay never copied), and estimatedGain is dollar-sanitized.
-//
-// Strategy "The Issue" §7 (P2-5): a RESTRICTED clientStatus (only the post-send states sent/
-// approved/declined/discussing — never the operator-axis system/curated) + a synthetic `delivered`
-// flag are projected so the curated client feed can render the loop ("you've greenlit N moves") and
-// "what's working" (the client's own delivered moves). A pre-send rec exposes NEITHER (clientStatus
-// stays absent → byte-identical to the legacy/flag-OFF read).
-function stripEmvFromPublicRecs(
-  recs: Recommendation[],
-  exposeClientStatus = false,
-  effectiveTier: EffectiveTier = 'free',
-): PublicRecommendation[] {
-  return recs.map((r) => {
-    const safeGain = typeof r.estimatedGain === 'string' ? sanitizePublicGain(r.estimatedGain) : r.estimatedGain;
-    const out: PublicRecommendation = {
-      id: r.id,
-      workspaceId: r.workspaceId,
-      priority: r.priority,
-      type: r.type,
-      title: r.title,
-      description: r.description,
-      insight: r.insight,
-      impact: r.impact,
-      effort: r.effort,
-      impactScore: r.impactScore,
-      source: r.source,
-      affectedPages: r.affectedPages,
-      trafficAtRisk: r.trafficAtRisk,
-      impressionsAtRisk: r.impressionsAtRisk,
-      estimatedGain: safeGain,
-      actionType: r.actionType,
-      status: r.status,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    };
-    // Client-safe optional fields — copied only when present (preserves byte-identical absence).
-    if (r.productType !== undefined) out.productType = r.productType;
-    if (r.productPrice !== undefined) out.productPrice = r.productPrice;
-    if (r.targetKeyword !== undefined) out.targetKeyword = r.targetKeyword;
-    if (r.assignedTo !== undefined) out.assignedTo = r.assignedTo;
-    if (r.backfilled !== undefined) out.backfilled = r.backfilled;
-    // OpportunityScore: allow-list the client-safe sub-fields; raw $/ROI never copied.
-    if (r.opportunity) {
-      const { emvPerWeek: rawEmvPerWeek, predictedEmv: _predictedEmv, roiPerEffortDay: _roiPerEffortDay, ...publicOpportunity } = r.opportunity;
-      out.opportunity = publicOpportunity as Recommendation['opportunity'];
-      // D-IMPACT: project the stripped weekly EMV into a banded monthly impactBand (undefined below floor).
-      const impactBand = computeImpactBand(rawEmvPerWeek);
-      if (impactBand) out.impactBand = impactBand;
-    }
-    // Strategy "The Issue" §7 — restricted clientStatus + synthetic `delivered`, projected ONLY when
-    // the caller passes exposeClientStatus=true (gated on the per-workspace strategy-the-issue flag).
-    // A non-Issue workspace's public read is byte-identical to the legacy payload (NO clientStatus/
-    // delivered key). Post-send states only (pre-send recs expose nothing even when ON). `delivered`
-    // (RecStatus 'completed') powers "what's working" — the client's own greenlit-and-delivered moves.
-    if (exposeClientStatus) {
-      const cfStatus = clientFacingStatus(r.clientStatus);
-      if (cfStatus) {
-        out.clientStatus = cfStatus;
-        out.delivered = r.status === 'completed';
-      }
-      // Audit-blocker #1 — the server-authoritative "Request this" descriptor. UNLIKE clientStatus/
-      // delivered above (post-send only), actOn is intentionally projected for EVERY flag-ON rec —
-      // the client needs it on any card it can act on (pre-send included). Gated by THIS same
-      // exposeClientStatus flag (per-workspace strategy-the-issue), so it is ABSENT when the flag is
-      // OFF (flag-OFF byte-identical). Computed once from the effective tier + the rec's monetizable
-      // policy; the client renders <TierGate> for `locked` and the act-on route 403s in lock-step.
-      out.actOn = actOnDescriptor(r, effectiveTier);
-    }
-    return out;
-  });
-}
-
-/** Public-route response: a RecommendationSet whose recs have emvPerWeek stripped. */
-function toPublicRecommendationSet(
-  set: RecommendationSet,
-  recs: Recommendation[],
-  exposeClientStatus = false,
-  effectiveTier: EffectiveTier = 'free',
-): RecommendationSet {
-  return { ...set, recommendations: stripEmvFromPublicRecs(recs, exposeClientStatus, effectiveTier) };
-}
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace.
@@ -787,27 +635,14 @@ router.post(
       return res.status(400).json({ error: 'Throttle requires throttleDays (7, 30, or 90)' });
     }
 
-    // ONE transaction over all N (spec §4.4). The single-writer re-reads the set inside its own
-    // txn per rec; better-sqlite3 nests these into this outer txn so the batch commits atomically.
-    // Collect mutated recs so activity logging happens AFTER commit (no logs on a rolled-back batch).
-    const mutated: Recommendation[] = [];
-    const apply = db.transaction(() => {
-      for (const recId of recIds) {
-        let rec: Recommendation | null = null;
-        try {
-          if (action === 'send') rec = sendRecommendation(workspaceId, recId);
-          else if (action === 'throttle') rec = throttleRecommendation(workspaceId, recId, throttleDays!);
-          else rec = strikeRecommendation(workspaceId, recId);
-        } catch (err) {
-          // An illegal edge for one rec (e.g. already approved/declined on Send) must not roll
-          // back the whole batch — skip it. Non-transition errors still propagate (real failures).
-          if (err instanceof InvalidTransitionError) continue;
-          throw err;
-        }
-        if (rec) mutated.push(rec);
-      }
+    // ONE transaction over all N (spec §4.4). The helper returns committed recs so activity logging
+    // happens AFTER commit (no logs on a rolled-back batch).
+    const mutated = applyBulkRecommendationAction({
+      workspaceId,
+      recIds,
+      action,
+      throttleDays,
     });
-    apply();
 
     // Post-commit side effects (one broadcast, per-rec activity) — mirror the per-row routes.
     for (const rec of mutated) {
@@ -890,53 +725,15 @@ router.post(
     const { keyword, competitorDomain, title, description, insight } =
       req.body as z.infer<typeof competitorRecMintSchema>;
 
-    const set = loadRecommendations(workspaceId) ?? {
-      workspaceId,
-      generatedAt: new Date().toISOString(),
-      recommendations: [] as Recommendation[],
-      summary: computeRecommendationSummary([]),
-    };
+    const { rec, created } = mintCompetitorRecommendation(workspaceId, {
+      keyword,
+      competitorDomain,
+      title,
+      description,
+      insight,
+    });
+    if (!created) return res.json(rec);
 
-    // Idempotent: a competitor rec for the same targetKeyword already exists → return it (no dup).
-    const existing = set.recommendations.find(
-      r => r.type === 'competitor' && r.targetKeyword === keyword,
-    );
-    if (existing) return res.json(existing);
-
-    const now = new Date().toISOString();
-    const competitorLabel = competitorDomain ? `${competitorDomain} ` : 'A competitor ';
-    const rec: Recommendation = {
-      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-      workspaceId,
-      type: 'competitor',
-      priority: 'fix_soon',
-      title: title || `Target "${keyword}" (competitor gap)`,
-      description:
-        description ||
-        `${competitorLabel}ranks for "${keyword}" — you don't. Targeting this term captures demand a competitor already owns.`,
-      insight:
-        insight ||
-        `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${keyword}" lets you compete for a term with proven search demand.`,
-      impact: 'medium',
-      effort: 'medium',
-      impactScore: 60,
-      source: `competitor:${keyword}`,
-      affectedPages: [],
-      trafficAtRisk: 0,
-      impressionsAtRisk: 0,
-      estimatedGain: `Capturing "${keyword}" targets a term a competitor already ranks for`,
-      actionType: 'manual',
-      targetKeyword: keyword,
-      status: 'pending',
-      clientStatus: 'system',
-      lifecycle: 'active',
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    set.recommendations.push(rec);
-    set.summary = computeRecommendationSummary(set.recommendations);
-    saveRecommendations(set);
     invalidateIntelligenceCache(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {
       recId: rec.id,
@@ -1042,46 +839,15 @@ router.post(
     const { type, title, insight, description, priority, targetKeyword, affectedPages } =
       req.body as z.infer<typeof createManualRecSchema>;
 
-    const now = new Date().toISOString();
-    const rec: Recommendation = {
-      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-      workspaceId,
+    const rec = mintManualRecommendation(workspaceId, {
       type,
-      priority: priority ?? 'fix_soon',
       title,
-      description: description || insight,
       insight,
-      impact: 'medium',
-      effort: 'medium',
-      impactScore: 40,
-      source: `manual:${crypto.randomBytes(6).toString('hex')}`,
-      affectedPages: affectedPages ?? [],
-      trafficAtRisk: 0,
-      impressionsAtRisk: 0,
-      estimatedGain: 'Operator-authored recommendation',
-      actionType: 'manual',
-      status: 'pending',
-      clientStatus: 'system',
-      lifecycle: 'active',
-      createdAt: now,
-      updatedAt: now,
-    };
-    if (targetKeyword) rec.targetKeyword = targetKeyword;
-
-    // load → push → recompute summary → save in ONE transaction so a regen racing this mint can
-    // never see a half-written set (multi-step DB write rule).
-    const persist = db.transaction(() => {
-      const set = loadRecommendations(workspaceId) ?? {
-        workspaceId,
-        generatedAt: now,
-        recommendations: [] as Recommendation[],
-        summary: computeRecommendationSummary([]),
-      };
-      set.recommendations.push(rec);
-      set.summary = computeRecommendationSummary(set.recommendations);
-      saveRecommendations(set);
+      description,
+      priority,
+      targetKeyword,
+      affectedPages,
     });
-    persist();
 
     invalidateIntelligenceCache(workspaceId);
     broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, {

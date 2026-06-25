@@ -12,9 +12,6 @@
  */
 
 import crypto from 'crypto';
-import db from './db/index.js';
-import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { recommendationSchema, recommendationSummarySchema } from './schemas/workspace-schemas.js';
 import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
 import { getPageState } from './page-edit-states.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
@@ -48,7 +45,7 @@ import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { normalizePageUrl } from './helpers.js';
 import { toPageSlug as toPageSlugShared, cannibalizationUrlSetKey as cannibalizationUrlSetKeyShared } from '../shared/page-address-utils.js';
 import { isActiveRec, isCuratedForClient } from '../shared/recommendation-predicates.js';
@@ -68,6 +65,12 @@ import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
 import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
+import {
+  loadRecommendationSet,
+  replaceRecommendationItems,
+  saveRecommendationSet,
+  setRecommendationItemStatus,
+} from './recommendation-storage.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -377,63 +380,16 @@ export function isIntentMismatch(pageType: string, searchIntent: string): { mism
   return { mismatch: false, reason: '' };
 }
 
-// ─── Storage ──────────────────────────────────────────────────────
-
-interface RecSetRow {
-  workspace_id: string;
-  generated_at: string;
-  recommendations: string;
-  summary: string;
-}
-
-interface RecStmts {
-  select: ReturnType<typeof db.prepare>;
-  upsert: ReturnType<typeof db.prepare>;
-}
-
-let _recStmts: RecStmts | null = null;
-function recStmts(): RecStmts {
-  if (!_recStmts) {
-    _recStmts = {
-      select: db.prepare(
-        `SELECT * FROM recommendation_sets WHERE workspace_id = ?`,
-      ),
-      upsert: db.prepare(
-        `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-         VALUES (@workspace_id, @generated_at, @recommendations, @summary)
-         ON CONFLICT(workspace_id) DO UPDATE SET
-           generated_at = @generated_at, recommendations = @recommendations, summary = @summary`,
-      ),
-    };
-  }
-  return _recStmts;
-}
-
 export function loadRecommendations(workspaceId: string): RecommendationSet | null {
-  const row = recStmts().select.get(workspaceId) as RecSetRow | undefined;
-  if (!row) return null;
-  return {
-    workspaceId: row.workspace_id,
-    generatedAt: row.generated_at,
-    recommendations: parseJsonSafeArray(row.recommendations, recommendationSchema, {
-      table: 'recommendation_sets', field: 'recommendations', workspaceId,
-    }) as Recommendation[],
-    summary: parseJsonSafe(row.summary, recommendationSummarySchema, {
-      fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
-      totalImpactScore: 0, trafficAtRisk: 0,
-      totalOpportunityValue: 0, actionableOpportunityValue: 0,
-      topRecommendationId: null,
-    }, { table: 'recommendation_sets', field: 'summary', workspaceId }) as RecommendationSet['summary'],
-  };
+  return loadRecommendationSet(workspaceId);
 }
 
 export function saveRecommendations(set: RecommendationSet): void {
-  recStmts().upsert.run({
-    workspace_id: set.workspaceId,
-    generated_at: set.generatedAt,
-    recommendations: JSON.stringify(set.recommendations),
-    summary: JSON.stringify(set.summary),
-  });
+  saveRecommendationSet(set);
+}
+
+function saveRecommendationMutation(set: RecommendationSet): void {
+  replaceRecommendationItems(set, set.recommendations, set.summary);
 }
 
 export function updateRecommendationStatus(
@@ -441,22 +397,17 @@ export function updateRecommendationStatus(
   recId: string,
   status: RecStatus
 ): Recommendation | null {
-  const set = loadRecommendations(workspaceId);
-  if (!set) return null;
-  const rec = set.recommendations.find(r => r.id === recId);
-  if (!rec) return null;
-  if (rec.status !== status) {
-    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, status);
-  }
-  rec.status = status;
-  rec.updatedAt = new Date().toISOString();
   // Recompute the summary so topRecommendationId stays consistent after a
   // status flip — completing or dismissing a rec must not leave the pointer
   // referencing that now-inactive rec. computeRecommendationSummary already
   // excludes completed/dismissed recs when picking activeRecs[0].
-  set.summary = computeRecommendationSummary(set.recommendations);
-  saveRecommendations(set);
-  return rec;
+  return setRecommendationItemStatus(
+    workspaceId,
+    recId,
+    status,
+    computeRecommendationSummary,
+    (current, next) => validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, current, next),
+  );
 }
 
 export function dismissRecommendation(workspaceId: string, recId: string): boolean {
@@ -521,7 +472,7 @@ export function resolveRecommendationsForChange(
   // Value totals reflect the resolved recs — otherwise the rendered list drops
   // the item but the numbers stay inflated until the next full regen.
   set.summary = computeRecommendationSummary(set.recommendations);
-  saveRecommendations(set);
+  saveRecommendationMutation(set);
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
@@ -607,7 +558,7 @@ export function resolveContentRecommendationsForPublishedPost(
   // Recompute the summary so headline counts / OV totals drop the resolved recs
   // immediately (same contract as resolveRecommendationsForChange).
   set.summary = computeRecommendationSummary(set.recommendations);
-  saveRecommendations(set);
+  saveRecommendationMutation(set);
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
   log.info(`Resolved ${resolved} content recommendation(s) for ${workspaceId} after publishing "${targetKeyword}"`);

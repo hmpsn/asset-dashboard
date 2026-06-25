@@ -1,4 +1,4 @@
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { updateWorkspace } from './workspaces.js';
 import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from './page-keywords.js';

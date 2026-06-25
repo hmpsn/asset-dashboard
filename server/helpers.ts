@@ -24,7 +24,7 @@ import {
 } from '../shared/page-address-utils.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
-import { formatPersonasForPrompt } from './workspace-intelligence.js';
+import { formatPersonasForPrompt } from './intelligence/persona-format.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
 import {
   getAuditTrafficForWorkspace as getWorkspaceAuditTraffic,

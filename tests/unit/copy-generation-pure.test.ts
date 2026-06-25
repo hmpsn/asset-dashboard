@@ -50,8 +50,10 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatForPrompt: vi.fn().mockReturnValue(''),
   formatKeywordsForPrompt: vi.fn().mockReturnValue(''),
   formatPageMapForPrompt: vi.fn().mockReturnValue(''),
-  formatPersonasForPrompt: vi.fn().mockReturnValue(''),
   formatKnowledgeBaseForPrompt: vi.fn().mockReturnValue(''),
+}));
+vi.mock('../../server/intelligence/persona-format.js', () => ({
+  formatPersonasForPrompt: vi.fn().mockReturnValue(''),
 }));
 
 vi.mock('../../server/copy-intelligence.js', () => ({
@@ -104,9 +106,9 @@ import { generateBrief, getPageTypeConfig } from '../../server/content-brief.js'
 import {
   buildWorkspaceIntelligence,
   formatKeywordsForPrompt,
-  formatPersonasForPrompt,
   formatKnowledgeBaseForPrompt,
 } from '../../server/workspace-intelligence.js';
+import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 import { getActivePatterns } from '../../server/copy-intelligence.js';
 import { getSectionsForEntry } from '../../server/copy-review.js';
 

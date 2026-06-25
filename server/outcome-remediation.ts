@@ -25,10 +25,10 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
-import { z } from './middleware/validate.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { recommendationOutcomeActionType } from './recommendations.js';
+import { loadRecommendationSet } from './recommendation-storage.js';
 import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-remediation');
@@ -56,11 +56,6 @@ interface RecommendationActionRow {
   source_id: string | null;
 }
 
-interface RecommendationSetRow {
-  workspace_id: string;
-  recommendations: string;
-}
-
 interface PhantomOutcomeRow {
   id: string;
   delta_summary: string;
@@ -73,11 +68,6 @@ const stmts = createStmtCache(() => ({
     SELECT id, workspace_id, source_id
     FROM tracked_actions
     WHERE source_type = 'recommendation' AND action_type = 'audit_fix_applied'
-  `),
-  recommendationSet: db.prepare(`
-    SELECT workspace_id, recommendations
-    FROM recommendation_sets
-    WHERE workspace_id = ?
   `),
   relabelAction: db.prepare(`
     UPDATE tracked_actions
@@ -98,16 +88,10 @@ const stmts = createStmtCache(() => ({
   `),
 }));
 
-const recommendationSchema = z.object({
-  id: z.string(),
-  type: z.string().optional(),
-  source: z.string().optional(),
-});
-
 /**
  * Pass (a): relabel recommendation-sourced tracked actions that were hardcoded to
  * audit_fix_applied by the pre-A1 backfill. Joins each action's source_id back to the
- * rec in recommendation_sets and re-derives the correct ActionType via the same
+ * current recommendation read model and re-derives the correct ActionType via the same
  * recommendationOutcomeActionType mapping the fixed backfill now uses.
  *
  * - A rec that genuinely maps to audit_fix_applied (technical/performance/etc.) is left
@@ -128,14 +112,10 @@ export function remediateMislabeledRecommendationActions(): number {
     const cached = recIndexByWorkspace.get(workspaceId);
     if (cached) return cached;
     const index = new Map<string, { type?: string; source?: string }>();
-    const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
-    if (row) {
-      const recs = parseJsonSafeArray(row.recommendations, recommendationSchema, {
-        field: 'recommendations',
-        table: 'recommendation_sets',
-      });
-      for (const rec of recs) {
-        if (rec.id) index.set(rec.id, { type: rec.type, source: rec.source });
+    const set = loadRecommendationSet(workspaceId);
+    if (set) {
+      for (const rec of set.recommendations) {
+        index.set(rec.id, { type: rec.type, source: rec.source });
       }
     }
     recIndexByWorkspace.set(workspaceId, index);

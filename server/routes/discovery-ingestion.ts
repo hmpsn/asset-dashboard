@@ -12,7 +12,7 @@ import {
   updateExtractionStatus, updateExtractionContent,
   SourceAlreadyProcessedError,
 } from '../discovery-ingestion.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 

@@ -36,7 +36,7 @@ import { recordKeywordTrackingAction } from './outcome-measurement-keywords.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from './outcome-tracking.js';
 import { InvalidTransitionError, TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import { getWorkspace } from './workspaces.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createVariantParentIndex, findBestParent, isJunkKeywordString, keywordComparisonKey, type VariantParentIndex } from '../shared/keyword-normalization.js';

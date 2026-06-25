@@ -2,17 +2,23 @@
  * Unit tests for server/activity-log.ts — activity CRUD, filtering, broadcast.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import db from '../../server/db/index.js';
 import {
   addActivity,
   getClientActivitySummary,
   listActivity,
   listClientActivity,
   initActivityBroadcast,
+  pruneActivityLogRetention,
 } from '../../server/activity-log.js';
 
 // ── addActivity ──
 
 describe('addActivity', () => {
+  beforeEach(() => {
+    db.prepare("DELETE FROM activity_log WHERE workspace_id LIKE 'ws_retention_%'").run();
+  });
+
   it('returns an activity entry with correct fields', () => {
     const entry = addActivity('ws_act_1', 'audit_completed', 'Audit done', 'Full audit', { pages: 5 });
 
@@ -42,6 +48,37 @@ describe('addActivity', () => {
 
     // Reset broadcast to avoid affecting other tests
     initActivityBroadcast(() => {});
+  });
+
+  it('does not globally prune quiet workspaces when unrelated workspaces write activity', () => {
+    const quietWsId = `ws_retention_quiet_${Date.now()}`;
+    const noisyWsId = `ws_retention_noisy_${Date.now()}`;
+
+    for (let i = 0; i < 500; i++) {
+      addActivity(quietWsId, 'note', `Quiet ${i}`);
+    }
+    for (let i = 0; i < 10; i++) {
+      addActivity(noisyWsId, 'note', `Noisy ${i}`);
+    }
+
+    expect(listActivity(quietWsId, 1000)).toHaveLength(500);
+    expect(listActivity(noisyWsId, 1000)).toHaveLength(10);
+  });
+
+  it('prunes retention per workspace when the scheduled retention sweep runs', () => {
+    const busyWsId = `ws_retention_busy_${Date.now()}`;
+    const quietWsId = `ws_retention_quiet_${Date.now()}`;
+
+    for (let i = 0; i < 510; i++) {
+      addActivity(busyWsId, 'note', `Busy ${i}`);
+    }
+    for (let i = 0; i < 10; i++) {
+      addActivity(quietWsId, 'note', `Quiet ${i}`);
+    }
+
+    expect(pruneActivityLogRetention()).toBe(10);
+    expect(listActivity(busyWsId, 1000)).toHaveLength(500);
+    expect(listActivity(quietWsId, 1000)).toHaveLength(10);
   });
 });
 

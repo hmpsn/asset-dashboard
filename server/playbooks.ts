@@ -4,7 +4,7 @@ import { updateClientAction } from './client-actions.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { sanitizeQueryForPrompt } from './helpers.js';
 import { createLogger } from './logger.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';

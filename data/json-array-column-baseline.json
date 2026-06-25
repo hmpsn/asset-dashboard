@@ -1,0 +1,27 @@
+{
+  "allowedMigrationFiles": [
+    "server/db/migrations/002-global-singletons.sql",
+    "server/db/migrations/003-per-workspace.sql",
+    "server/db/migrations/004-per-site-and-config.sql",
+    "server/db/migrations/014-content-templates.sql",
+    "server/db/migrations/016-content-matrices.sql",
+    "server/db/migrations/019-cascade-workspace-delete.sql",
+    "server/db/migrations/021-client-participation.sql",
+    "server/db/migrations/023-seo-suggestions.sql",
+    "server/db/migrations/024-page-keywords.sql",
+    "server/db/migrations/025-keyword-metrics-cache.sql",
+    "server/db/migrations/041-outcome-tracking.sql",
+    "server/db/migrations/047-client-signals.sql",
+    "server/db/migrations/049-client-signals-v2.sql",
+    "server/db/migrations/054-meeting-briefs.sql",
+    "server/db/migrations/057-page-strategy-engine.sql",
+    "server/db/migrations/058-copy-pipeline.sql",
+    "server/db/migrations/059-diagnostic-reports.sql",
+    "server/db/migrations/070-competitor-snapshots.sql",
+    "server/db/migrations/077-briefing-drafts.sql",
+    "server/db/migrations/096-local-seo-visibility.sql",
+    "server/db/migrations/153-serp-snapshots.sql",
+    "server/db/migrations/154-business-listing-snapshots.sql",
+    "server/db/migrations/155-llm-mention-snapshots.sql"
+  ]
+}

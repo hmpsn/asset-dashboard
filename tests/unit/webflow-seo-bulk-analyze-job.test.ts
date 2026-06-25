@@ -54,6 +54,8 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: mocks.buildWorkspaceIntelligence,
   formatForPrompt: mocks.formatForPrompt,
   formatPageMapForPrompt: mocks.formatPageMapForPrompt,
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 vi.mock('../../server/workspaces.js', () => ({ getTokenForSite: mocks.getTokenForSite }));

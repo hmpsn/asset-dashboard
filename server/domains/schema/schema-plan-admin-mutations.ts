@@ -16,7 +16,7 @@ import {
   updateSchemaPlanStatus,
 } from '../../schema-store.js';
 import { broadcastSchemaPlanUpdated, getActiveSchemaPlanGenerationJobId } from '../../schema-plan-generation-job.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import {
   getClientPortalUrl,
   getWorkspace,
