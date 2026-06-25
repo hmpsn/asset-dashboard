@@ -298,6 +298,80 @@ describe('persistKeywordStrategy', () => {
     expect(mockUpsertAndCleanPageKeywords).not.toHaveBeenCalled();
   });
 
+  it('preserves existing page keyword metrics when incremental extra paths carry a skinny mapping', async () => {
+    const { persistKeywordStrategy } = await import('../../server/keyword-strategy-persistence.js');
+    const existing: PageKeywordMap = {
+      pagePath: '/preserved',
+      pageTitle: 'Preserved',
+      primaryKeyword: 'preserved keyword',
+      secondaryKeywords: ['existing secondary'],
+      searchIntent: 'commercial',
+      currentPosition: 8,
+      previousPosition: 11,
+      impressions: 1200,
+      clicks: 48,
+      volume: 900,
+      difficulty: 22,
+      cpc: 6.5,
+      metricsSource: 'semrush',
+      secondaryMetrics: [{ keyword: 'existing secondary', volume: 300, difficulty: 18 }],
+      validated: true,
+      urlLevelKeywords: [{ keyword: 'preserved keyword', position: 8, volume: 900, difficulty: 22, cpc: 6.5, url: '/preserved' }],
+      urlLevelKeywordSource: 'semrush',
+    };
+    mockListPageKeywords.mockReturnValue([existing]);
+
+    persistKeywordStrategy({
+      ws: makeWorkspace(),
+      strategy: makeStrategyOutput({
+        pageMap: [
+          {
+            pagePath: '/preserved',
+            pageTitle: 'Preserved',
+            primaryKeyword: 'preserved keyword',
+            secondaryKeywords: ['existing secondary'],
+          },
+        ],
+      }) as Parameters<typeof persistKeywordStrategy>[0]['strategy'],
+      strategyMode: 'incremental',
+      pagesToAnalyze: [],
+      extraPagePaths: ['/preserved'],
+      siteKeywordMetrics: [],
+      keywordGaps: [],
+      competitorKeywordData: [],
+      topicClusters: [],
+      cannibalization: [],
+      questionKeywords: [],
+      businessContext: '',
+      seoDataMode: 'quick',
+      seoDataStatus: { mode: 'quick', status: 'available' },
+      searchData: makeSearchData(),
+    });
+
+    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalledWith(
+      'ws_persist',
+      [
+        expect.objectContaining({
+          pagePath: '/preserved',
+          searchIntent: 'commercial',
+          currentPosition: 8,
+          previousPosition: 11,
+          impressions: 1200,
+          clicks: 48,
+          volume: 900,
+          difficulty: 22,
+          cpc: 6.5,
+          metricsSource: 'semrush',
+          secondaryMetrics: [{ keyword: 'existing secondary', volume: 300, difficulty: 18 }],
+          validated: true,
+          urlLevelKeywords: [{ keyword: 'preserved keyword', position: 8, volume: 900, difficulty: 22, cpc: 6.5, url: '/preserved' }],
+          urlLevelKeywordSource: 'semrush',
+        }),
+      ],
+      true,
+    );
+  });
+
   it('returns keywordStrategy and pageMap', async () => {
     const { persistKeywordStrategy } = await import('../../server/keyword-strategy-persistence.js');
     const ws = makeWorkspace();

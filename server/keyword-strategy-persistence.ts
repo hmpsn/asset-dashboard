@@ -57,6 +57,44 @@ export interface PersistKeywordStrategyResult {
   pageMap: PageKeywordMap[];
 }
 
+function mergeIncrementalPageKeyword(previous: PageKeywordMap | undefined, next: PageKeywordMap): PageKeywordMap {
+  if (!previous) return next;
+  return {
+    ...previous,
+    ...next,
+    searchIntent: next.searchIntent ?? previous.searchIntent,
+    currentPosition: next.currentPosition ?? previous.currentPosition,
+    previousPosition: next.previousPosition ?? previous.previousPosition,
+    impressions: next.impressions ?? previous.impressions,
+    clicks: next.clicks ?? previous.clicks,
+    gscKeywords: next.gscKeywords ?? previous.gscKeywords,
+    volume: next.volume ?? previous.volume,
+    difficulty: next.difficulty ?? previous.difficulty,
+    cpc: next.cpc ?? previous.cpc,
+    secondaryMetrics: next.secondaryMetrics ?? previous.secondaryMetrics,
+    metricsSource: next.metricsSource ?? previous.metricsSource,
+    validated: next.validated ?? previous.validated,
+    urlLevelKeywords: next.urlLevelKeywords ?? previous.urlLevelKeywords,
+    urlLevelKeywordSource: next.urlLevelKeywordSource ?? previous.urlLevelKeywordSource,
+    optimizationScore: next.optimizationScore ?? previous.optimizationScore,
+    analysisGeneratedAt: next.analysisGeneratedAt ?? previous.analysisGeneratedAt,
+    optimizationIssues: next.optimizationIssues ?? previous.optimizationIssues,
+    recommendations: next.recommendations ?? previous.recommendations,
+    contentGaps: next.contentGaps ?? previous.contentGaps,
+    primaryKeywordPresence: next.primaryKeywordPresence ?? previous.primaryKeywordPresence,
+    longTailKeywords: next.longTailKeywords ?? previous.longTailKeywords,
+    competitorKeywords: next.competitorKeywords ?? previous.competitorKeywords,
+    estimatedDifficulty: next.estimatedDifficulty ?? previous.estimatedDifficulty,
+    keywordDifficulty: next.keywordDifficulty ?? previous.keywordDifficulty,
+    monthlyVolume: next.monthlyVolume ?? previous.monthlyVolume,
+    topicCluster: next.topicCluster ?? previous.topicCluster,
+    searchIntentConfidence: next.searchIntentConfidence ?? previous.searchIntentConfidence,
+    serpFeatures: next.serpFeatures ?? previous.serpFeatures,
+    missingTrustSignals: next.missingTrustSignals ?? previous.missingTrustSignals,
+    eeatAssetRecommendations: next.eeatAssetRecommendations ?? previous.eeatAssetRecommendations,
+  };
+}
+
 /**
  * Snapshot the prior strategy state into strategy_history (capped to 5 rows), so the "What Changed"
  * (StrategyDiff) boundary moves to this point. Reused by BOTH the AI-regen path and the manual PATCH
@@ -194,9 +232,13 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       const extraPagePaths = new Set((options.extraPagePaths ?? []).map(pagePath => normalizePageUrl(pagePath)));
       const pathsToUpdate = new Set([...analyzedPaths, ...extraPagePaths]);
       const explicitlyRemovedPaths = new Set((options.removedPagePaths ?? []).map(pagePath => normalizePageUrl(pagePath)));
+      const previousByPath = new Map(prevPageMapForHistory.map((pm) => [normalizePageUrl(pm.pagePath), pm]));
       const analyzedMappings = pageMap
         .filter((pm) => pathsToUpdate.has(normalizePageUrl(pm.pagePath)))
-        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
+        .map((pm) => {
+          const normalizedPath = normalizePageUrl(pm.pagePath);
+          return mergeIncrementalPageKeyword(previousByPath.get(normalizedPath), { ...pm, analysisGeneratedAt: now });
+        }) as PageKeywordMap[];
       // rotate=true: incremental is still a refresh boundary for the pages it touches,
       // so re-analyzed pages rotate prior current_position → previous_position. Untouched
       // pages aren't upserted, so their movement baseline stays frozen until next refreshed.
