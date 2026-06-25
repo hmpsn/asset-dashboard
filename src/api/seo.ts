@@ -151,6 +151,11 @@ export const rankTracking = {
   refreshNational: (wsId: string) =>
     post<{ jobId: string }>(`/api/rank-tracking/${wsId}/refresh-national`),
 
+  /** P8 ai-visibility: start the LLM-mention (AI visibility) refresh job
+   *  (gated server-side by the `ai-visibility` flag + Growth+ tier). Returns the job id. */
+  refreshAiVisibility: (wsId: string) =>
+    post<{ jobId: string }>(`/api/rank-tracking/${wsId}/refresh-ai-visibility`),
+
   publicLatest: (wsId: string) =>
     getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
 };

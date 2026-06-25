@@ -25,6 +25,7 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
 import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
 import { runNationalSerpRefreshJob } from '../national-serp.js';
+import { runLlmMentionsRefreshJob } from '../llm-mentions.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { createLogger } from '../logger.js';
 
@@ -190,6 +191,72 @@ router.post('/api/rank-tracking/:workspaceId/refresh-national', requireWorkspace
       status: 'error',
       error: err instanceof Error ? err.message : String(err),
       message: 'National SERP refresh failed unexpectedly',
+    });
+  });
+});
+
+// P8 ai-visibility: start the LLM-mention (AI visibility) refresh job. Gated server-side by the
+// `ai-visibility` flag + Growth/Premium tier. Mirrors the refresh-national route exactly (the
+// READ route — GET /ai-visibility — is added in U4 to this same file).
+router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  // Flag gate — when off, the route does no work and returns a clean "not enabled" 404.
+  if (!isFeatureEnabled('ai-visibility', workspaceId)) {
+    return res.status(404).json({ error: 'AI visibility tracking is not enabled' });
+  }
+
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // Tier gate — Growth + Premium only (owner decision); Free is excluded.
+  const tier = computeEffectiveTier(ws);
+  if (tier !== 'growth' && tier !== 'premium') {
+    return res.status(403).json({ error: 'AI visibility tracking requires a Growth or Premium plan' });
+  }
+
+  // P5 budget gate at route entry — observe-only at launch (logs the would-block, returns). Wrapped
+  // so that if enforcement is later enabled, an over-budget workspace is logged and the refresh
+  // still proceeds (enforcement posture for this route is observe-only by decision).
+  try {
+    assertCreditBudget(workspaceId, 'llm_mentions', tier);
+  } catch (err) {
+    if (err instanceof CreditBudgetError) {
+      log.warn({ workspaceId, tier }, 'ai-visibility refresh: credit budget would-block at route entry (proceeding — observe-only)');
+    } else {
+      throw err;
+    }
+  }
+
+  // Per-workspace serialization.
+  const active = hasActiveJob(BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH, workspaceId);
+  if (active) return res.status(409).json({ error: 'An AI visibility refresh is already running for this workspace', jobId: active.id });
+
+  // Global cross-workspace coalescing — keep at most one LLM-mention refresh in flight platform-wide
+  // (consistent with refresh-national; the provider read is a paid external call).
+  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH);
+  if (globalActive) {
+    return res.status(409).json({
+      error: 'Another workspace is currently running an AI visibility refresh — please wait for it to complete',
+      jobId: globalActive.id,
+      blockingWorkspaceId: globalActive.workspaceId,
+    });
+  }
+
+  const job = createJob(BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH, {
+    workspaceId,
+    message: 'Preparing AI visibility refresh...',
+  });
+  registerAbort(job.id);
+  res.json({ jobId: job.id });
+  // .catch() (not void) so any unexpected throw becomes a logged error + failed job rather than
+  // an unhandled rejection that crashes the process.
+  runLlmMentionsRefreshJob(workspaceId, job.id).catch(err => {
+    log.error({ err, jobId: job.id, workspaceId }, 'ai-visibility refresh: unhandled error escaped job runner — marking failed');
+    updateJob(job.id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : String(err),
+      message: 'AI visibility refresh failed unexpectedly',
     });
   });
 });
