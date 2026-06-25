@@ -26,6 +26,7 @@ import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
 import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
 import { runNationalSerpRefreshJob } from '../national-serp.js';
 import { runLlmMentionsRefreshJob } from '../llm-mentions.js';
+import { getLatestLlmMentions, getLlmMentionsTrend } from '../llm-mentions-store.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { createLogger } from '../logger.js';
 
@@ -258,6 +259,36 @@ router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWork
       error: err instanceof Error ? err.message : String(err),
       message: 'AI visibility refresh failed unexpectedly',
     });
+  });
+});
+
+// P8 ai-visibility: admin AI-visibility (LLM-mention) KPI readout. Aggregates ONLY — own
+// share-of-voice + mention volume + the dated trend (the before/after AEO proof) + the
+// co-mentioned competitor breakdown + the cited source domains (AEO targets). Never returns
+// raw LLM transcripts/answers (the store holds none). When the `ai-visibility` flag is off,
+// returns an empty payload (not 404) so the panel simply renders nothing — mirrors the P7
+// gbp-reviews read endpoint. `requireWorkspaceAccess` only (HMAC admin auth is covered by the
+// global app gate — never add requireAuth here).
+router.get('/api/rank-tracking/:workspaceId/ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  if (!isFeatureEnabled('ai-visibility', workspaceId)) {
+    return res.json({ latest: null, trend: [], competitors: [], sourceDomains: [] });
+  }
+
+  // chat_gpt is the only platform for v1 (the column leaves room for 'google').
+  const latest = getLatestLlmMentions(workspaceId, 'chat_gpt') ?? null;
+  const trend = getLlmMentionsTrend(workspaceId, 'chat_gpt').map(snapshot => ({
+    date: snapshot.snapshotDate,
+    mentions: snapshot.mentions ?? 0,
+    shareOfVoice: snapshot.shareOfVoice ?? 0,
+  }));
+
+  res.json({
+    latest,
+    trend,
+    competitors: latest?.competitors ?? [],
+    sourceDomains: latest?.sourceDomains ?? [],
   });
 });
 

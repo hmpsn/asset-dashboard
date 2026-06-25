@@ -1,9 +1,25 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { rankTracking } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { useBackgroundTasks } from '../useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
+
+/**
+ * Read the admin AI-visibility (LLM-mention) KPI for a workspace (P8 / ai-visibility).
+ * GET /api/rank-tracking/:workspaceId/ai-visibility — aggregates only. Returns the empty
+ * shape when the `ai-visibility` flag is off (getSafe fallback), so consumers can gate on
+ * data presence (`latest === null`) without a separate flag read. Refreshes live via the
+ * LLM_MENTIONS_SNAPSHOTS_REFRESHED broadcast (see wsInvalidation).
+ */
+export function useAiVisibility(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.aiVisibility(workspaceId),
+    queryFn: () => rankTracking.aiVisibility(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
 
 /**
  * Start the LLM-mention (AI visibility) refresh job (P8 / ai-visibility).
