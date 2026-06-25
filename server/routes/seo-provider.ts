@@ -16,6 +16,7 @@ import { MAX_COMPETITORS } from '../constants.js';
 import { cleanCompetitorDomains, filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { normalizeDomainValue } from '../domain-normalization.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
@@ -25,6 +26,10 @@ import { isProgrammingError } from '../errors.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 
 const log = createLogger('seo-provider-routes');
+
+function normalizeSeoDomain(value: string | null | undefined): string {
+  return normalizeDomainValue(value) ?? '';
+}
 
 function parseCsvQuery(rawValue: unknown): string[] {
   const rawParts = Array.isArray(rawValue) ? rawValue : [rawValue];
@@ -65,7 +70,7 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
   const provider = getConfiguredProvider(ws.seoDataProvider);
   if (!provider) return res.status(503).json({ error: 'No SEO data provider configured' });
 
-  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const myDomain = normalizeSeoDomain(ws.liveDomain);
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   // Resolve the client's target SERP geo once; all domains (own + competitors) are
@@ -170,7 +175,7 @@ router.get('/api/seo/discover-competitors/:workspaceId', requireWorkspaceAccess(
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const myDomain = normalizeSeoDomain(ws.liveDomain);
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   const provider = getConfiguredProvider(ws.seoDataProvider);
@@ -196,7 +201,7 @@ router.post('/api/seo/competitors/:workspaceId', requireWorkspaceAccess('workspa
   const domainList = domains || competitors;
   if (!Array.isArray(domainList)) return res.status(400).json({ error: 'domains must be an array of domain strings' });
 
-  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const myDomain = normalizeSeoDomain(ws.liveDomain);
   const cleaned = cleanCompetitorDomains(domainList, myDomain).slice(0, MAX_COMPETITORS);
 
   updateWorkspace(ws.id, { competitorDomains: cleaned });
@@ -258,10 +263,8 @@ router.get('/api/seo/diagnose/:workspaceId', requireWorkspaceAccess('workspaceId
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const rawDomain = ws.liveDomain || '';
-  const cleanDomain = rawDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
-  const competitors = (ws.competitorDomains || []).map(d =>
-    d.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '')
-  );
+  const cleanDomain = normalizeSeoDomain(rawDomain);
+  const competitors = (ws.competitorDomains || []).map(normalizeSeoDomain);
 
   // Check cache directory for existing entries
   const cacheDir = path.join(getUploadRoot(), ws.id, '.dataforseo-cache');
