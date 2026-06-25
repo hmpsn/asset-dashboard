@@ -1381,9 +1381,9 @@
           "source": "Delta audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT F7 (low). LOGO_SVG now in 3 files, esc() in 5 (the-issue-one-pager-html.ts added the newest copies). Separately seo-provider.ts repeats the inline host-normalization replace-chain 5x instead of the canonical normalizeDomainHost (server/domain-normalization.ts). Fix: extract export-html-shared.ts; replace the 5 chains with the canonical call."
+          "notes": "DONE 2026-06-25: extracted server/export-html-shared.ts as the single owner for export logo SVGs + escapeHtml, kept brief/post apostrophe behavior and one-pager defensive single-quote escaping via focused tests, and replaced seo-provider inline host-normalization chains with the canonical normalizeDomainValue wrapper."
         },
         {
           "id": "simp-delta-0624-the-issue-wiring-gaps",
