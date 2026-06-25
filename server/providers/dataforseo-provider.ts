@@ -41,6 +41,10 @@ import type {
   BusinessListingResult,
   BusinessListingsRequest,
   GbpAttributes,
+  LlmMentionsRequest,
+  LlmMentionsResult,
+  LlmMentionCompetitor,
+  LlmMentionSource,
 } from '../seo-data-provider.js';
 import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
@@ -204,6 +208,7 @@ const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
 const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
 const CACHE_TTL_NATIONAL_SERP = 168;    // 7 days (P6 national-serp-tracking)
 const CACHE_TTL_BUSINESS_LISTINGS = 24; // 1 day (P7 local-gbp — GBP + reviews)
+const CACHE_TTL_LLM_MENTIONS = 336;     // ~14 days (P8 ai-visibility — slow-moving LLM mentions DB)
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -677,6 +682,123 @@ export function parseBusinessListings(items: unknown[], request: BusinessListing
     });
   }
   return results;
+}
+
+// ── LLM mentions parser (P8 / ai-visibility — AI citation) ──
+// Pure, fixture-grounded parser for `ai_optimization/llm_mentions/aggregated_metrics` items.
+// Built against `tests/fixtures/dataforseo-llm-mentions.ts` — field names validated, not guessed.
+// Defensive against malformed items: never throws, skips non-objects.
+//
+// Shape: items[0].total.{platform,brand_entities_title,sources_domain,...} — each is an ARRAY of
+// `{ type:'group_element', key, mentions, ai_search_volume }`. A zero-presence target returns
+// EMPTY group arrays → mentions 0, NEVER invented.
+
+interface LlmGroupElement {
+  key: string;
+  mentions: number;
+  aiSearchVolume?: number;
+}
+
+/** Coerce a raw group array into typed `{ key, mentions, aiSearchVolume }` elements, skipping bad rows. */
+function parseLlmGroup(raw: unknown): LlmGroupElement[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LlmGroupElement[] = [];
+  for (const el of raw) {
+    if (typeof el !== 'object' || el === null) continue;
+    const obj = el as Record<string, unknown>;
+    const key = stringFromUnknown(obj.key);
+    if (!key) continue;
+    const mentions = numberFromUnknown(obj.mentions) ?? 0;
+    const aiSearchVolume = numberFromUnknown(obj.ai_search_volume);
+    out.push({ key, mentions, aiSearchVolume });
+  }
+  return out;
+}
+
+/**
+ * Parse an aggregated-metrics `items[]` array into an `LlmMentionsResult` relative to `ownerDomain`
+ * + `platform`. Derived from the ground-truth fixture (`items[0].total`):
+ *  - `mentions` / `aiSearchVolume`: the `platform` group element matching `platform` (else the first
+ *    element when no exact key match) → its mentions / ai_search_volume, else 0.
+ *  - `competitors`: `brand_entities_title[]` → `{ name: key, mentions, aiSearchVolume }`.
+ *  - `sourceDomains`: `sources_domain[]` → `{ domain: key, mentions }`.
+ *  - `shareOfVoice`: own mentions ÷ (own + Σ competitor mentions), clamped 0..1; 0 when denom ≤ 0.
+ *  - Empty arrays / missing `total` → mentions 0, aiSearchVolume 0, shareOfVoice 0, empty lists.
+ */
+export function parseLlmMentions(
+  items: unknown[],
+  ownerDomain: string,
+  platform: string,
+  ownerBrandNames: string[] = [],
+): LlmMentionsResult {
+  const empty: LlmMentionsResult = {
+    domain: ownerDomain,
+    platform,
+    mentions: 0,
+    aiSearchVolume: 0,
+    shareOfVoice: undefined, // no data → not measured, NOT a real 0%
+    competitors: [],
+    sourceDomains: [],
+  };
+  // Normalize a brand name for owner-vs-competitor matching (lowercase, strip non-alphanumerics).
+  const normBrand = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ownerKeys = ownerBrandNames.map(normBrand).filter(Boolean);
+  // Owner-vs-competitor match: exact normalized equality, OR a substring match ONLY when the
+  // shorter token is ≥4 chars AND ≥60% of the longer's length. The ratio+length floor stops the
+  // over-match the P8 review flagged: 'Pay'→'Apple Pay'/'Google Pay', 'Square'→'Squarespace' (6/11=
+  // 0.55 <0.6, rejected), while still matching 'Square'↔'Square Up' (6/8=0.75) and 'Square Inc'↔'Square'.
+  const isOwnerBrand = (name: string): boolean => {
+    const n = normBrand(name);
+    if (n === '') return false;
+    return ownerKeys.some(k => {
+      if (k === n) return true;
+      const [shorter, longer] = k.length <= n.length ? [k, n] : [n, k];
+      return shorter.length >= 4 && longer.includes(shorter) && shorter.length / longer.length >= 0.6;
+    });
+  };
+
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+  const first = safeItems[0];
+  if (!first) return empty;
+  const total = (typeof first.total === 'object' && first.total !== null)
+    ? first.total as Record<string, unknown>
+    : undefined;
+  if (!total) return empty;
+
+  // Headline VOLUME: how often the client's content/domain is cited in LLM answers on this platform.
+  const platformGroup = parseLlmGroup(total.platform);
+  const platformEl = platformGroup.find(el => el.key === platform) ?? platformGroup[0];
+  const mentions = platformEl?.mentions ?? 0;
+  const aiSearchVolume = platformEl?.aiSearchVolume ?? 0;
+
+  // Co-mentioned brands (brand_entities_title) — the category's AI-answer brand set. Split the
+  // client's OWN brand out of the competitor list so share-of-voice is like-to-like.
+  const allBrands = parseLlmGroup(total.brand_entities_title);
+  const ownerMatched = allBrands.some(el => isOwnerBrand(el.key));
+  const ownBrandMentions = allBrands.filter(el => isOwnerBrand(el.key)).reduce((s, el) => s + el.mentions, 0);
+  const allBrandMentions = allBrands.reduce((s, el) => s + el.mentions, 0);
+  const competitors: LlmMentionCompetitor[] = allBrands
+    .filter(el => !isOwnerBrand(el.key))
+    .map(el => ({ name: el.key, mentions: el.mentions, aiSearchVolume: el.aiSearchVolume }));
+
+  // Content domains cited when the target is mentioned (AEO targeting list).
+  const sourceDomains: LlmMentionSource[] = parseLlmGroup(total.sources_domain).map(el => ({
+    domain: el.key,
+    mentions: el.mentions,
+  }));
+
+  // shareOfVoice (like-to-like): the client's BRAND mentions ÷ ALL co-mentioned brand mentions.
+  // UNDEFINED ("not measured") when we couldn't identify the client's brand among the co-mentioned
+  // brands (no brand provided, or it isn't in the set) — NOT a real 0% (the P8 review: a red 0%
+  // next to a high citation count reads as broken). A real 0 only when the client IS in the set
+  // but has 0 brand mentions. Never mix the domain-citation count with brand counts.
+  const shareOfVoice = (ownerMatched && allBrandMentions > 0)
+    ? Math.min(1, Math.max(0, ownBrandMentions / allBrandMentions))
+    : undefined;
+
+  return { domain: ownerDomain, platform, mentions, aiSearchVolume, shareOfVoice, competitors, sourceDomains };
 }
 
 async function runDataForSeoOperation<T>({
@@ -1994,6 +2116,67 @@ export class DataForSeoProvider implements SeoDataProvider {
         }
         log.error({ err, category }, `DataForSEO business listings error for "${category}"`);
         return [];
+      },
+    });
+  }
+
+  // ── getLlmMentions → ai_optimization/llm_mentions/aggregated_metrics (P8 ai-visibility) ──
+  async getLlmMentions(request: LlmMentionsRequest, workspaceId: string): Promise<LlmMentionsResult> {
+    const domain = cleanDomain(request.domain);
+    const platform = request.platform ?? 'chat_gpt';
+    const locationName = request.locationName ?? 'United States';
+    const languageCode = request.languageCode ?? 'en';
+    const ownerBrandNames = request.ownerBrandNames ?? [];
+    const emptyResult: LlmMentionsResult = {
+      domain,
+      platform,
+      mentions: 0,
+      aiSearchVolume: 0,
+      shareOfVoice: undefined, // no data → not measured, NOT a real 0%
+      competitors: [],
+      sourceDomains: [],
+    };
+    const cacheKey = [
+      'llm_mentions',
+      cacheKeyPart(domain),
+      cacheKeyPart(platform),
+      cacheKeyPart(locationName),
+    ].join('_');
+
+    return runDataForSeoOperation<LlmMentionsResult>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_LLM_MENTIONS,
+      endpointLabel: 'ai_optimization_llm_mentions_aggregated_metrics',
+      query: domain,
+      emptyValue: emptyResult,
+      // VERIFY-ON-LIVE: this REST path + body key (`target` vs `targets`) is the deploy-time unknown —
+      // confirm against DataForSEO docs on the first live run. The RESPONSE shape the parser reads is
+      // fixture-validated and certain; only the request envelope is unverified until a live call.
+      endpoint: 'ai_optimization/llm_mentions/aggregated_metrics/live',
+      body: [{
+        target: [{ domain }],
+        platform,
+        location_name: locationName,
+        language_code: languageCode,
+      }],
+      mapResult: (json) => {
+        // This endpoint's result object IS the `items`-bearing object: getTaskResult(json)[0] = { items: [...] }.
+        const result = getTaskResult(json)[0];
+        const items = Array.isArray(result?.items) ? (result.items as unknown[]) : [];
+        const value = parseLlmMentions(items, domain, platform, ownerBrandNames);
+        return { value, rowsReturned: value.mentions > 0 ? 1 : 0 };
+      },
+      handleError: (err) => {
+        // 40204 (no ai_optimization subscription): trip the capability breaker so we stop burning
+        // the request budget on an unsubscribed endpoint (mirrors backlinks / business_listings).
+        if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'ai_optimization', BACKLINKS_BREAKER_TTL_MS);
+          log.warn({ err, domain }, `DataForSEO LLM mentions unavailable for "${domain}"`);
+          return emptyResult;
+        }
+        log.error({ err, domain }, `DataForSEO LLM mentions error for "${domain}"`);
+        return emptyResult;
       },
     });
   }

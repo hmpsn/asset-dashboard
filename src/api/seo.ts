@@ -111,6 +111,54 @@ export const keywords = {
     post<unknown>('/api/webflow/seo-copy', body),
 };
 
+// ── AI visibility (P8 / ai-visibility) ──────────────────────────
+/** A co-mentioned competitor brand in LLM answers (mirrors server LlmMentionCompetitor). */
+export interface AiVisibilityCompetitor {
+  name: string;
+  mentions: number;
+  aiSearchVolume?: number;
+}
+/** A source domain LLMs cite (mirrors server LlmMentionSource). */
+export interface AiVisibilitySourceDomain {
+  domain: string;
+  mentions: number;
+}
+/** Latest dated AI-visibility snapshot (mirrors server LlmMentionSnapshot; NULLs → undefined). */
+export interface AiVisibilitySnapshot {
+  workspaceId: string;
+  snapshotDate: string;
+  platform: string;
+  domain?: string;
+  /** undefined = no data (never 0 invented). */
+  mentions?: number;
+  aiSearchVolume?: number;
+  /** 0..1 share of voice vs co-mentioned competitors. */
+  shareOfVoice?: number;
+  competitors: AiVisibilityCompetitor[];
+  sourceDomains: AiVisibilitySourceDomain[];
+  fetchedAt: string;
+}
+/** One trend point (date-ascending) for the before/after mention-volume chart. */
+export interface AiVisibilityTrendPoint {
+  date: string;
+  mentions: number;
+  shareOfVoice: number;
+}
+/** Response shape of GET /api/rank-tracking/:workspaceId/ai-visibility. Empty when flag off. */
+export interface AiVisibilityReadResponse {
+  latest: AiVisibilitySnapshot | null;
+  trend: AiVisibilityTrendPoint[];
+  competitors: AiVisibilityCompetitor[];
+  sourceDomains: AiVisibilitySourceDomain[];
+}
+
+const EMPTY_AI_VISIBILITY: AiVisibilityReadResponse = {
+  latest: null,
+  trend: [],
+  competitors: [],
+  sourceDomains: [],
+};
+
 // ── Rank tracking ───────────────────────────────────────────────
 export const rankTracking = {
   keywords: (wsId: string) =>
@@ -150,6 +198,16 @@ export const rankTracking = {
    *  (gated server-side by flag + Growth+ tier). Returns the background job id. */
   refreshNational: (wsId: string) =>
     post<{ jobId: string }>(`/api/rank-tracking/${wsId}/refresh-national`),
+
+  /** P8 ai-visibility: start the LLM-mention (AI visibility) refresh job
+   *  (gated server-side by the `ai-visibility` flag + Growth+ tier). Returns the job id. */
+  refreshAiVisibility: (wsId: string) =>
+    post<{ jobId: string }>(`/api/rank-tracking/${wsId}/refresh-ai-visibility`),
+
+  /** P8 ai-visibility: admin AI-visibility KPI readout (aggregates only). getSafe with an
+   *  empty fallback so a missing/disabled-flag response degrades to "nothing to show". */
+  aiVisibility: (wsId: string) =>
+    getSafe<AiVisibilityReadResponse>(`/api/rank-tracking/${wsId}/ai-visibility`, EMPTY_AI_VISIBILITY),
 
   publicLatest: (wsId: string) =>
     getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),

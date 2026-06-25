@@ -82,9 +82,31 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-23",
-          "notes": "Group C (paid). Flag ai-visibility. Depends on P4+P5. Closes the open-loop AEO program with measurement."
+          "notes": "DONE 2026-06-24 — FINAL phase of the SEO Decision Engine program. Flag ai-visibility (SEO Decision Engine group; OFF=byte-identical). Mentions-DB only (no direct prompting); KPI-only deliverable (no new rec/insight — the existing aeo-* recs are the actions). getLlmMentions provider (ai_optimization/llm_mentions/aggregated_metrics, reuses runDataForSeoOperation/cache336h/40204-breaker; VERIFY-ON-LIVE note on the exact REST envelope — response shape is fixture-validated) + parseLlmMentions. Migration 155 llm_mention_snapshots (time-series; mentions/ai_search_volume NULLable → absent=0 never invented). HEADLINE = share-of-voice (client BRAND ÷ all co-mentioned brand_entities_title, like-to-like) — distinct from mention VOLUME (domain citations). llm-mentions-refresh job (ported national-serp pattern; resolves ownerBrandNames from workspace.name + domain-root fallback) + POST /api/rank-tracking/:ws/refresh-ai-visibility + GET .../ai-visibility, gated flag→Growth+→observe-only budget→serialization. Admin AiVisibilityPanel (share-of-voice MetricRing, mention volume, mentions-over-time trend sparkline = before/after proof, competitor share-of-voice, source-domain AEO targets; blue data/score colors, never purple) mounted in KeywordHub. SeoContextSlice.aiVisibility → AdminChat/AI context. WS LLM_MENTIONS_SNAPSHOTS_REFRESHED full registry lockstep. DEVIATIONS: route under /api/rank-tracking (existing registered group, not /api/strategy); CLIENT-facing KPI deferred (see seo-engine-followon-ai-visibility-client-kpi) — it needs accrued snapshots to be a meaningful before/after. Scaled 4-agent review: security + PII + compliance clean (no LLM transcripts captured — aggregates only); fixed 3 Important (all share-of-voice: 'not measured' undefined vs misleading 0%, over-matching brand matcher, blank-name degradation). Tests: parser(13)+store(7)+panel(4)+route integration(5); full unit 14170 / component 4129 / contract 1401 green. SEO Decision Engine P1-P8 COMPLETE."
+        },
+        {
+          "id": "seo-engine-followon-ai-visibility-client-kpi",
+          "title": "AI-visibility CLIENT-facing KPI (Overview/Results before-after card)",
+          "source": "P8 ai-visibility follow-on",
+          "est": "S",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "analytics-intelligence",
+          "notes": "Surface the P8 AI-visibility KPI to the CLIENT (Overview/Results tab) as before/after proof ('you're cited in AI answers N times — X% share of voice in your category, up since we started'). P8 shipped the ADMIN measurement panel + the SeoContextSlice.aiVisibility summary; the client surface was deferred because the 'up since we started' framing only becomes meaningful once weekly snapshots accrue. Needs: a ClientIntelligence projection field (Growth+ gated, aggregates only) in server/routes/client-intelligence.ts + a compact KPI block in the client OverviewTab. Do once a few workspaces have accrued AI-visibility snapshots on staging. (Also a fast-follow: weekly cron to auto-accrue snapshots instead of manual trigger.)"
+        },
+        {
+          "id": "integrations-gbp-direct-oauth",
+          "title": "Direct Google Business Profile integration (OAuth) — owner-authenticated read + write actions",
+          "source": "P7 GBP+reviews follow-on (owner request 2026-06-24)",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "owner": "integrations",
+          "notes": "FOLLOW-ON to P7 (seo-engine-p7-gbp-reviews-local-layer), which benchmarks PUBLIC GBP data via DataForSEO business_listings_search (rating, review count, public completeness signals — no auth, read-only, advisory recs). This item is the AUTHENTICATED connection via the Google Business Profile API (My Business Account Management + Business Information + Reviews + Performance APIs): (a) READ owner-only metrics not in public data — profile views/searches, call/direction/website/booking action counts, query discovery; and (b) WRITE — reply to reviews, publish GBP posts, edit hours/attributes/categories/photos, all from inside the platform, turning P7's advisory review-gap/GBP-completeness recs into one-click executable actions. Requires: a Google Cloud OAuth client + GBP API access APPROVAL (Google gates this behind an application/allowlist — non-trivial lead time and the biggest risk), a per-location encrypted OAuth token store (mirror the Stripe AES-256-GCM config-on-disk pattern), a 'Connect Google Business Profile' flow in the locations editor (server/local-seo locations CRUD already stores gbp_place_id), token refresh, and activity/audit logging for write actions. Distinct from intel-quality-google-business-profile-health (read-only PUBLIC health signals). Until GBP API access is approved, P7's public benchmarking stands as the read-only product."
         },
         {
           "id": "seo-engine-deferred-revenue-grounding",

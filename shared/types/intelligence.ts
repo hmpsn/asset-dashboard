@@ -229,6 +229,21 @@ export interface SeoContextSlice {
     emvPerWeek: number;
     components: OpportunityComponent[];
   };
+  /** SEO Decision Engine P8 (AI-visibility / LLM citation) — aggregates-only AI-visibility
+   *  summary from the latest `chat_gpt` LLM-mention snapshot. AGGREGATES ONLY — never raw
+   *  LLM transcripts. Undefined when the `ai-visibility` flag is off for the workspace OR
+   *  there is no snapshot yet (so flag-off / no-data = no change). All numerics are absent
+   *  rather than 0 when the underlying snapshot column is NULL (never invented). */
+  aiVisibility?: {
+    /** Times the client domain was cited in LLM answers; undefined when not measured. */
+    mentions?: number;
+    /** Share of voice vs co-mentioned brands, 0..1; undefined when not measured. */
+    shareOfVoice?: number;
+    /** Most-cited co-mentioned competitor brand (max by mentions). */
+    topCompetitor?: { name: string; mentions: number };
+    /** Most-cited source domain feeding LLM answers (max by mentions) — the AEO target. */
+    topSourceDomain?: { domain: string; mentions: number };
+  };
 }
 
 export interface InsightsSlice {

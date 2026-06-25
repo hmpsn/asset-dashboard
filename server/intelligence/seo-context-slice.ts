@@ -499,5 +499,38 @@ export async function assembleSeoContext(
   );
   if (topOpportunity) base.topOpportunity = topOpportunity;
 
+  // AI visibility — aggregates-only LLM-citation summary (SEO Decision Engine P8).
+  // Gated on the `ai-visibility` flag (per-workspace): OFF / no-snapshot = undefined,
+  // so a flag-off or no-data workspace produces no `aiVisibility` and no prose change.
+  // Reads the latest `chat_gpt` snapshot and derives the top competitor / top source
+  // domain (each max by mentions). AGGREGATES ONLY — never raw LLM transcripts. Mirrors
+  // the P7 reviewSummary best-effort pattern.
+  const aiVisibility = await readOptionalSlicePart<SeoContextSlice['aiVisibility']>(
+    'assembleSeoContext: ai visibility',
+    workspaceId,
+    undefined,
+    async () => {
+      const { isFeatureEnabled } = await import('../feature-flags.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      if (!isFeatureEnabled('ai-visibility', workspaceId)) return undefined;
+      const { getLatestLlmMentions } = await import('../llm-mentions-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const snapshot = getLatestLlmMentions(workspaceId, 'chat_gpt');
+      if (!snapshot) return undefined;
+      const topCompetitor = snapshot.competitors.reduce<
+        { name: string; mentions: number } | undefined
+      >((best, c) => (best && best.mentions >= c.mentions ? best : { name: c.name, mentions: c.mentions }), undefined);
+      const topSourceDomain = snapshot.sourceDomains.reduce<
+        { domain: string; mentions: number } | undefined
+      >((best, s) => (best && best.mentions >= s.mentions ? best : { domain: s.domain, mentions: s.mentions }), undefined);
+      return {
+        mentions: snapshot.mentions,
+        shareOfVoice: snapshot.shareOfVoice,
+        ...(topCompetitor ? { topCompetitor } : {}),
+        ...(topSourceDomain ? { topSourceDomain } : {}),
+      };
+    },
+    { logger: log },
+  );
+  if (aiVisibility) base.aiVisibility = aiVisibility;
+
   return base;
 }

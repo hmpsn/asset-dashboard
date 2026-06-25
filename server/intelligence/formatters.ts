@@ -403,6 +403,19 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     if (parts.length > 0) lines.push(`SERP features: ${parts.join(', ')}`);
   }
 
+  // AI visibility — aggregates-only LLM-citation summary (SEO Decision Engine P8); only
+  // present when the `ai-visibility` flag is on AND a snapshot exists. At standard+ verbosity.
+  if (ctx.aiVisibility && verbosity !== 'compact') {
+    const av = ctx.aiVisibility;
+    if (av.mentions != null || av.shareOfVoice != null) {
+      const sov = av.shareOfVoice != null ? `${Math.round(av.shareOfVoice * 100)}% share of voice vs co-mentioned brands` : null;
+      const top = av.topCompetitor ? ` (top: ${av.topCompetitor.name})` : '';
+      const cited = av.mentions != null ? `cited ${av.mentions.toLocaleString()} time${av.mentions === 1 ? '' : 's'} in LLM answers` : null;
+      const parts = [cited, sov ? `${sov}${top}` : null].filter(Boolean);
+      if (parts.length > 0) lines.push(`AI visibility: ${parts.join('; ')}.`);
+    }
+  }
+
   // Site keywords — always include when present; compact shows fewer
   if (ctx.strategy?.siteKeywords?.length) {
     const kw = verbosity === 'compact'

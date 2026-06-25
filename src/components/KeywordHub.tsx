@@ -30,6 +30,7 @@ import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkCo
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
+import { AiVisibilityPanel } from './strategy/AiVisibilityPanel';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
 import { isServerAction } from './keyword-command-center/kccDisplayHelpers';
 import { queryKeys } from '../lib/queryKeys';
@@ -576,6 +577,10 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           </div>
         </SectionCard>
       )}
+
+      {/* AI-visibility (LLM-mention) KPI panel — P8 / ai-visibility. Self-gating: renders nothing
+          when the `ai-visibility` flag is off (the read endpoint returns latest: null). */}
+      <AiVisibilityPanel workspaceId={workspaceId} />
 
       <SectionCard noPadding variant="subtle">
         <div className="px-3 py-3 border-b border-[var(--brand-border)] flex flex-wrap items-center gap-2">

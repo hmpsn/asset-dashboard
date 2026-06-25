@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **532 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **533 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 533. AI-visibility / LLM citation tracking (SEO Decision Engine P8 — FINAL)
+
+**What it does:** Closes the AEO (Answer Engine Optimization) loop with **measurement** — it answers *"are we actually cited by LLMs?"*, the payoff metric for all the answer-first content + author/E-E-A-T work the platform already produces. Behind the `ai-visibility` flag (Growth + Premium). It queries DataForSEO's LLM-mentions database for the client's domain and computes an **AI-visibility KPI**: the headline **share-of-voice** (the client's brand vs the competitor brands LLM answers co-mention in their category — a like-to-like comparison, distinct from raw citation volume), the **mention volume** (how often the client's content is cited in AI answers), a **mentions-over-time trend** (the before/after proof of the AEO work), the **co-mentioned competitor** breakdown, and the **source domains** LLM answers pull from when citing the client (the off-site AEO targeting list). A `llm-mentions-refresh` background job (ported from the P6 national-SERP job — cancel-safe, observe-only budget) writes a dated `llm_mention_snapshots` row each run; the trend accrues over time. The data surfaces as an admin KPI panel (share-of-voice MetricRing + mention StatCard + trend sparkline + competitor/source breakdowns) on the Keyword Hub and into the workspace intelligence (`SeoContextSlice.aiVisibility`) so the AI advisor sees it. The deliverable is **measurement only** — no new recommendation/insight; the existing `aeo-*` recs remain the actions. Aggregates only — the platform never captures raw LLM answer text. Where the client's brand can't be identified among the co-mentioned set, share-of-voice reads **"not measured"** rather than a misleading 0%. The **eighth and final phase** of the SEO Decision Engine program; `ai-visibility` OFF is byte-identical.
+
+**Why it matters to the agency:** Turns "we did AEO work" into a defensible, trending KPI — *"your AI share-of-voice went from 15% to 38% since we started, and here are the source sites getting you cited"* — which is the single most future-facing thing an SEO agency can show right now. It also makes the AEO recommendations the platform already generates provably worth doing.
+
+**Why it matters to clients:** Answers the question every business is suddenly asking — *"do ChatGPT and AI answers ever recommend us?"* — with a real number, a trend, and the specific competitors winning the AI conversation, instead of a hand-wave.
 
 ---
 
