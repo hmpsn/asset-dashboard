@@ -30,9 +30,11 @@ import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import {
   CHECKS,
+  checkFiles,
   checkDirectory,
   checkFile,
   buildWorkspaceScopedTables,
+  createSourceCache,
   findJsonArrayColumnSites,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
@@ -40,6 +42,7 @@ import {
   getChangedFiles,
   getUntrackedFiles,
   mergeChangedFiles,
+  resolveRelevantChangedFilesForCheck,
   BRAND_ENGINE_ROUTE_BASENAMES,
   REQUIRE_AUTH_ALLOWED_BASENAMES,
   GLOBALLY_APPLIED_LIMITERS,
@@ -11766,6 +11769,13 @@ describe('getChangedFiles: untracked-file coverage (net-new-file false-green)', 
     return dir;
   }
 
+  function commitFile(repo: string, fileName: string, source: string, message: string): string {
+    writeFileSync(path.join(repo, fileName), source, 'utf-8');
+    git(repo, 'add', fileName);
+    git(repo, 'commit', '-m', message);
+    return git(repo, 'rev-parse', 'HEAD');
+  }
+
   it('mergeChangedFiles unions tracked + untracked, tracked-first, de-duplicated', () => {
     expect(mergeChangedFiles(['a.ts', 'b.ts'], ['b.ts', 'c.ts'])).toEqual(['a.ts', 'b.ts', 'c.ts']);
     expect(mergeChangedFiles([], ['x.ts'])).toEqual(['x.ts']);
@@ -11808,5 +11818,119 @@ describe('getChangedFiles: untracked-file coverage (net-new-file false-green)', 
     const changed = getChangedFiles(repo);
     expect(changed).toContain('baseline.ts'); // tracked (HEAD~1 diff)
     expect(changed).toContain('added.ts'); // untracked
+  });
+
+  it('uses origin/staging three-dot diff and does not fall through to origin/main when staging has no changes', () => {
+    const repo = makeTempRepo();
+    const stagingHead = commitFile(repo, 'staging-only.ts', 'export const staging = true;\n', 'staging work');
+    git(repo, 'update-ref', 'refs/remotes/origin/staging', stagingHead);
+
+    git(repo, 'checkout', '-b', 'main-sim', stagingHead);
+    const mainHead = commitFile(repo, 'main-only.ts', 'export const main = true;\n', 'main work');
+    git(repo, 'update-ref', 'refs/remotes/origin/main', mainHead);
+    git(repo, 'checkout', '-B', 'work', stagingHead);
+
+    expect(getChangedFiles(repo)).toEqual([]);
+  });
+
+  it('includes uncommitted tracked working-tree changes when the base diff is empty', () => {
+    const repo = makeTempRepo();
+    const stagingHead = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'update-ref', 'refs/remotes/origin/staging', stagingHead);
+    writeFileSync(path.join(repo, 'baseline.ts'), 'export const baseline = 2;\n', 'utf-8');
+
+    expect(getChangedFiles(repo)).toEqual(['baseline.ts']);
+  });
+
+  it('uses GITHUB_BASE_REF as the PR base when present', () => {
+    const repo = makeTempRepo();
+    const baseHead = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'update-ref', 'refs/remotes/origin/main', baseHead);
+    commitFile(repo, 'branch-change.ts', 'export const branch = true;\n', 'branch work');
+
+    process.env.GITHUB_BASE_REF = 'main';
+    try {
+      expect(getChangedFiles(repo)).toEqual(['branch-change.ts']);
+    } finally {
+      delete process.env.GITHUB_BASE_REF;
+    }
+  });
+
+  it('excludes deleted-only tracked files from the diff scan', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, 'delete-me.ts'), 'export const doomed = true;\n', 'utf-8');
+    git(repo, 'add', 'delete-me.ts');
+    git(repo, 'commit', '-m', 'add delete-me');
+    rmSync(path.join(repo, 'delete-me.ts'));
+    git(repo, 'add', 'delete-me.ts');
+    git(repo, 'commit', '-m', 'delete delete-me');
+
+    expect(getChangedFiles(repo)).not.toContain('delete-me.ts');
+  });
+});
+
+describe('pr-check runner file resolution and source caching', () => {
+  it('uses one diff-slice resolver for pattern and custom checks', () => {
+    const check: Check = {
+      name: 'fixture',
+      fileGlobs: ['**/*.ts'],
+      pathFilter: 'tests/',
+      pattern: 'forbidden',
+      message: 'fixture',
+      severity: 'error',
+    };
+
+    expect(resolveRelevantChangedFilesForCheck([
+      'tests/allowed.ts',
+      'tests/ignored.tsx',
+      'server/not-in-path.ts',
+      'tests/ignored.md',
+    ], check)).toEqual(['tests/allowed.ts']);
+  });
+
+  it('pattern scanning handles multiple changed files in one call', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-batched-grep-'));
+    const first = path.join(dir, 'first.ts');
+    const second = path.join(dir, 'second.ts');
+    try {
+      writeFileSync(first, 'const ok = true;\nconst bad = "forbidden";\n', 'utf-8');
+      writeFileSync(second, 'const bad = "forbidden";\n', 'utf-8');
+      const check: Check = {
+        name: 'fixture',
+        fileGlobs: ['*.ts'],
+        pattern: 'forbidden',
+        message: 'fixture',
+        severity: 'error',
+      };
+
+      expect(checkFiles([first, second], check)).toEqual([
+        `${first}:2:const bad = "forbidden";`,
+        `${second}:1:const bad = "forbidden";`,
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('source cache returns stable content and avoids duplicate physical reads', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-source-cache-'));
+    const first = path.join(dir, 'example.ts');
+    const second = path.join(dir, 'other.ts');
+    let reads = 0;
+    try {
+      writeFileSync(first, 'first', 'utf-8');
+      writeFileSync(second, 'second', 'utf-8');
+      const cache = createSourceCache((file, encoding) => {
+        reads += 1;
+        return readFileSync(file, encoding);
+      });
+
+      expect(cache(first)).toBe('first');
+      expect(cache(first)).toBe('first');
+      expect(cache(second)).toBe('second');
+      expect(reads).toBe(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

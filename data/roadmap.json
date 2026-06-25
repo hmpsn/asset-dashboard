@@ -1251,9 +1251,9 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT med. pr-check \"diff mode\" runs a per-file grep subprocess per rule with no shared file-content cache, and a two-dot origin/staging base resolves 2,559 \"changed\" files. Fix: three-dot merge-base + a shared file-content cache. Target the documented 3-5s."
+          "notes": "DONE 2026-06-25: fixed diff-mode base selection to use three-dot PR/local base semantics and stop falling through from an empty origin/staging diff to origin/main; preserved staged/unstaged tracked changes plus untracked files; excluded deleted-only paths via --diff-filter=ACMR; added shared source cache with mtime/size invalidation; batched diff-mode grep per rule. Baseline on fresh branch: default pr-check reported 1011 changed files and took 171.22s; after fix on this branch: 2 changed files and 0.75s. pr-check:all remains full scan (baseline 88.10s). Added regression coverage in tests/pr-check.test.ts for local staging/main divergence, GITHUB_BASE_REF, push fallback, untracked files, deleted files, diff-slice consistency, batched pattern scans, and source-cache behavior."
         },
         {
           "id": "simp-audit-0624-collapse-retired-flag-rules",
