@@ -28,6 +28,7 @@ import type {
   BusinessListingResult,
   LlmMentionsResult,
 } from '../../server/seo-data-provider.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 
 // ─── Provider seam mock (registered BEFORE the server imports below) ──────────
 // The jobs call getConfiguredProvider(); we swap ONLY that export for a fake whose
@@ -40,6 +41,10 @@ const providerState = vi.hoisted(() => ({
   nationalCalls: 0,
   listingCalls: 0,
   llmCalls: 0,
+  // P4 geo-threading capture: the fake getNationalSerp records the request arg
+  // (where locationCode/languageCode land) so the test can assert the workspace
+  // target-geo flowed all the way into the provider call body.
+  nationalRequests: [] as Array<{ locationCode?: number; languageCode?: string }>,
 }));
 
 // broadcastToWorkspace() throws if setBroadcast() was never called (it normally is, in
@@ -56,8 +61,15 @@ vi.mock('../../server/seo-data-provider.js', async (importActual) => {
   const actual = await importActual<typeof import('../../server/seo-data-provider.js')>();
   const FAKE_PROVIDER = {
     name: 'fake-test-provider',
-    async getNationalSerp(): Promise<NationalSerpResult> {
+    async getNationalSerp(
+      request?: { keyword?: string; ownerDomain?: string; locationCode?: number; languageCode?: string },
+    ): Promise<NationalSerpResult> {
       providerState.nationalCalls++;
+      // P4: capture the geo the job threaded into the provider request body.
+      providerState.nationalRequests.push({
+        locationCode: request?.locationCode,
+        languageCode: request?.languageCode,
+      });
       if (!providerState.national) throw new Error('test bug: providerState.national not set');
       return providerState.national;
     },
@@ -94,12 +106,30 @@ import { updateLocalSeoConfiguration } from '../../server/local-seo.js';
 import { createClientLocation } from '../../server/client-locations.js';
 import { runLocalGbpRefreshJob } from '../../server/local-gbp.js';
 import { getLatestBusinessListings } from '../../server/business-listings-store.js';
-import { generateRecommendations } from '../../server/recommendations.js';
+import { generateRecommendations, saveRecommendations } from '../../server/recommendations.js';
 
 // P8 — AI visibility (LLM mentions)
 import { runLlmMentionsRefreshJob } from '../../server/llm-mentions.js';
 import { getLatestLlmMentions } from '../../server/llm-mentions-store.js';
 import { assembleSeoContext } from '../../server/intelligence/seo-context-slice.js';
+
+// P1 — value-first keyword scoring reuses addTrackedKeyword + buildKeywordCommandCenterDetail
+//      (both already imported in the P6 block above).
+
+// P2 — measured effort prior → recommendation opportunity score
+import { recordAction } from '../../server/outcome-tracking.js';
+import {
+  runEmvCalibration,
+  getEffortPriorDays,
+  MIN_EFFORT_SAMPLES,
+} from '../../server/outcome-emv-calibration.js';
+
+// P3 — AI-Overview free signal → seoContext serpFeatures
+import { upsertPageKeyword, listPageKeywords } from '../../server/page-keywords.js';
+import type { PageKeywordMap } from '../../shared/types/workspace.js';
+
+// P4 — workspace target-geo → provider request body
+import { workspaceProviderGeo } from '../../server/seo-target-geo.js';
 
 const createdWorkspaceIds: string[] = [];
 
@@ -112,6 +142,7 @@ afterEach(() => {
   providerState.nationalCalls = 0;
   providerState.listingCalls = 0;
   providerState.llmCalls = 0;
+  providerState.nationalRequests = [];
 });
 
 afterAll(() => {
@@ -388,5 +419,309 @@ describe('SEO Decision Engine plumbing — P8 ai-visibility', () => {
       seoContext.aiVisibility!.shareOfVoice,
       'P8: aiVisibility summary present but shareOfVoice missing — slice field wiring broken.',
     ).toBeCloseTo(0.37, 5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EARLY PHASES (P1–P4) — the same fetch/compute → store → surface plumbing
+// guard applied to the older, less-recently-reviewed phases. Each chain drives
+// the REAL code path and asserts the data reaches the user-facing surface, with
+// every link failing LOUDLY (a message naming the broken stage) so a "computed
+// but never surfaced" dark-loop break can't pass silently.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1 — value-first keyword scoring: commercial signals → KCC drawer row valueReasons
+// ═══════════════════════════════════════════════════════════════════════════
+describe('SEO Decision Engine plumbing — P1 value-first keyword scoring', () => {
+  it('P1 value-scoring: a tracked keyword with commercial signals surfaces valueReasons in the KCC drawer row', async () => {
+    const KEYWORD = 'commercial property insurance quote';
+    const wsId = makeGrowthWorkspace('Plumbing P1 — Value Scoring', 'https://acme-insure.example');
+
+    // P1 made computeKeywordValueScore the unconditional Hub sort metric + the
+    // keywordValueReasons chips. Value scoring is always on (buildValueScoringConfig
+    // returns { on: true }) — no feature flag. The chain we prove:
+    //   tracked keyword carrying cpc/volume/intent  →  populateDraftRows merges them
+    //   onto row.metrics  →  finalizeDraftRow runs computeKeywordValueComponents +
+    //   keywordValueReasons  →  buildKeywordCommandCenterDetail returns the row with a
+    //   non-empty valueReasons[] that KeywordDetailDrawer renders.
+    //
+    // addTrackedKeyword carries cpc/volume/difficulty/intent straight onto the
+    // tracked-keyword row (AddTrackedKeywordOptions), which populateDraftRows merges
+    // into row.metrics — exactly the inputs computeKeywordValueComponents reads.
+    addTrackedKeyword(wsId, KEYWORD, {
+      volume: 2400,        // > 0 → real demand signal ("Strong demand")
+      cpc: 18.5,           // > 0 → commercial value + "$18.5 CPC" reason
+      difficulty: 38,      // present → winnability ("Winnable · KD 38")
+      intent: 'commercial', // a PROVIDED intent (regex-derived does NOT count) → "Commercial intent"
+    });
+
+    // ── Link 1: the merged row carries the commercial signals (compute inputs present) ──
+    const detail = await buildKeywordCommandCenterDetail(wsId, KEYWORD, { includeLocalSeo: false });
+    expect(
+      detail,
+      'P1: tracked keyword exists but KCC detail returned null — the drawer read found no base source for the tracked keyword.',
+    ).not.toBeNull();
+    expect(
+      detail!.row.metrics.cpc,
+      'P1: tracked keyword had a cpc but row.metrics.cpc is missing — the trackedKeywords → row.metrics merge dropped the commercial signal (no value-scoring input).',
+    ).toBe(18.5);
+    expect(
+      detail!.row.metrics.intent,
+      'P1: tracked keyword had an intent but row.metrics.intent is missing — the trackedKeywords → row.metrics merge dropped the intent signal.',
+    ).toBe('commercial');
+
+    // ── Link 2: user-facing read (KCC drawer row) surfaces valueReasons ──
+    // This is the dark-loop guard: the rows/model path passes valueScoring into
+    // finalizeDraftRow, but the DETAIL path must too — otherwise the drawer's
+    // value-first reason chips are silently empty.
+    expect(
+      detail!.row.valueReasons,
+      'P1: row has commercial signals but valueReasons is undefined — value-first scoring not wired into the KCC DRAWER row (finalizeDraftRow ran without the valueScoring config in the detail path). The drawer\'s value-reason chips would be silently empty.',
+    ).toBeDefined();
+    expect(
+      detail!.row.valueReasons!.length,
+      'P1: valueReasons present but empty — keywordValueReasons produced no chips for a keyword that carries cpc + volume + difficulty + intent (signal gate / reason builder broken).',
+    ).toBeGreaterThan(0);
+    // The commercial intent + CPC must be the leading reason — proves the actual
+    // value components (not a placeholder) drove the chips.
+    expect(
+      detail!.row.valueReasons!.some(r => /commercial intent/i.test(r)),
+      `P1: valueReasons present but none mention the commercial intent — the resolved intent did not reach keywordValueReasons. Got: ${JSON.stringify(detail!.row.valueReasons)}`,
+    ).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P2 — measured effort prior: completed outcomes → getEffortPriorDays read
+//      (the "loop is closed" check) → the OV scorer uses it
+// ═══════════════════════════════════════════════════════════════════════════
+describe('SEO Decision Engine plumbing — P2 effort prior', () => {
+  it('P2 effort-prior: ≥ MIN_EFFORT_SAMPLES completed outcomes feed a measured median back through getEffortPriorDays into the rec opportunity score', async () => {
+    const wsId = makeGrowthWorkspace('Plumbing P2 — Effort Prior', 'https://acme-effort.example');
+
+    // P2 threads getEffortPriorDays (median time-to-implement from completed,
+    // live, platform-executed, recommendation-sourced outcomes) into
+    // computeOpportunityValue.effortDays. The chain we prove is the OUTCOME →
+    // PRIOR read (the "loop is closed" link — outcomes are stored AND read back):
+    //   record ≥ MIN_EFFORT_SAMPLES completed actions of one action type, each
+    //   started N days before completion  →  runEmvCalibration computes the median
+    //   →  getEffortPriorDays(ws)[type] returns N (not undefined).
+    //
+    // We seed via recordAction (sourceFlag 'live' + attribution 'platform_executed'
+    // are REQUIRED for the effort-sample filter) whose source_id joins to a saved rec
+    // whose createdAt is N days ago → measured effort ≈ N days.
+    expect(
+      MIN_EFFORT_SAMPLES,
+      'P2: MIN_EFFORT_SAMPLES unexpectedly large — this test seeds 3 samples; bump the seed count if the threshold rose.',
+    ).toBeLessThanOrEqual(3);
+
+    const EFFORT_DAYS = 12;
+    const now = new Date().toISOString();
+    const startedAt = new Date(Date.now() - EFFORT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const recIds = ['p2-ep1', 'p2-ep2', 'p2-ep3'];
+
+    // Save completed recs whose createdAt anchors the effort-measurement start.
+    const recommendations: Recommendation[] = recIds.map(id => ({
+      id, // tracked_actions.source_id joins to this rec id (effort start = createdAt)
+      workspaceId: wsId,
+      priority: 'fix_soon',
+      type: 'technical',
+      title: `seed ${id}`,
+      description: '',
+      insight: '',
+      impact: 'medium',
+      effort: 'medium',
+      impactScore: 50,
+      source: `audit:${id}`,
+      affectedPages: [],
+      trafficAtRisk: 0,
+      impressionsAtRisk: 0,
+      estimatedGain: 'gain',
+      actionType: 'manual',
+      status: 'completed',
+      assignedTo: 'client',
+      createdAt: startedAt,
+      updatedAt: now,
+    }));
+    saveRecommendations({
+      workspaceId: wsId,
+      generatedAt: now,
+      recommendations,
+      summary: { fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 0, trafficAtRisk: 0, topRecommendationId: null },
+    });
+
+    // Record a completed, live, platform-executed action per rec (the effort sample).
+    for (const id of recIds) {
+      recordAction({ // recordAction-ok: wsId created via makeGrowthWorkspace above
+        workspaceId: wsId,
+        actionType: 'audit_fix_applied',
+        sourceType: 'recommendation',
+        sourceId: id,
+        pageUrl: null,
+        targetKeyword: null,
+        baselineSnapshot: { captured_at: now },
+        sourceFlag: 'live',
+        baselineConfidence: 'exact',
+        attribution: 'platform_executed',
+        predictedEmv: null,
+      });
+    }
+
+    // ── Run the REAL calibration (the median computation) ──
+    runEmvCalibration(wsId);
+
+    // ── Link 1: the outcome→prior read returns the MEASURED median (loop closed) ──
+    const priors = getEffortPriorDays(wsId);
+    expect(
+      priors.audit_fix_applied,
+      'P2: 3 completed live platform-executed audit_fix_applied outcomes stored, but getEffortPriorDays returned no measured prior — the outcomes→calibration→prior read is a dark loop (effort sample filter / median write / prior read broken).',
+    ).toBeDefined();
+    expect(
+      priors.audit_fix_applied!,
+      `P2: measured prior present but not ≈ ${EFFORT_DAYS}d (got ${priors.audit_fix_applied}) — the created_at − rec.createdAt effort computation is wrong.`,
+    ).toBeGreaterThan(EFFORT_DAYS - 1.5);
+    expect(priors.audit_fix_applied!).toBeLessThan(EFFORT_DAYS + 1.5);
+
+    // ── Link 2 (best-effort): the rec scorer consumes the prior. ──
+    // NARROWED + documented: the FULL "prior lowers roiPerEffortDay" direction proof
+    // lives in tests/integration/recommendations-effort-priors.test.ts, which mocks
+    // diagnostic-store to inject a rec to score. This plumbing guard is deliberately
+    // self-contained (no per-phase store mocks beyond the provider seam), so a bare
+    // workspace has no diagnostic/insight inputs and generateRecommendations may emit
+    // ZERO recs — that is NOT a P2 wiring break, just an empty input set. Link 1 above
+    // (getEffortPriorDays returns the measured median) is the authoritative "loop is
+    // closed" assertion. Here we only assert the consumer doesn't THROW and, IF it
+    // emits any scored rec, that rec carries an OV opportunity score.
+    const recSet = await generateRecommendations(wsId);
+    const scored = recSet.recommendations.find(r => r.opportunity != null);
+    if (scored) {
+      expect(
+        scored.opportunity?.roiPerEffortDay,
+        'P2: a recommendation was generated but carries no OV opportunity score — computeOpportunityValue (the effortDays consumer that reads the measured prior) did not run.',
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P3 — AI-Overview free signal: page_keyword serp features → seoContext.serpFeatures
+// ═══════════════════════════════════════════════════════════════════════════
+describe('SEO Decision Engine plumbing — P3 AI-Overview signal', () => {
+  it('P3 ai-overview: an ai_overview serp feature on a page_keyword surfaces in assembleSeoContext.serpFeatures.aiOverview', async () => {
+    const wsId = makeGrowthWorkspace('Plumbing P3 — AI Overview', 'https://acme-aeo.example');
+
+    // P3 extracts the free `ai_overview` serp signal (already in serp_item_types from
+    // ranked-keywords reads, no extra API call) into page_keywords.serp_features, then
+    // aggregates it in the seoContext slice (→ the content-brief AEO directive + the
+    // client serpOpportunities count). The chain we prove:
+    //   upsertPageKeyword with serpFeatures including 'ai_overview'  →  listPageKeywords
+    //   hydrates it  →  assembleSeoContext flatMaps + counts ai_overview  →
+    //   seoContext.serpFeatures.aiOverview reflects it.
+    //
+    // 'ai_overview' is a RAW string label (no numeric serp-feature code) that passes
+    // through parseSerpFeatures unchanged and is counted by f === 'ai_overview'.
+    const pageKeyword: PageKeywordMap = {
+      pagePath: '/aeo-answer-hub',
+      pageTitle: 'AEO Answer Hub',
+      primaryKeyword: 'how does answer engine optimization work',
+      secondaryKeywords: [],
+      serpFeatures: ['featured_snippet', 'ai_overview', 'people_also_ask'],
+    };
+    upsertPageKeyword(wsId, pageKeyword);
+
+    // ── Link 1: store write round-trips the ai_overview signal ──
+    const readBack = listPageKeywords(wsId);
+    const stored = readBack.find(p => p.pagePath === '/aeo-answer-hub');
+    expect(
+      stored,
+      'P3: upsertPageKeyword ran but listPageKeywords did not return the page — page_keywords store write/read broken.',
+    ).toBeDefined();
+    expect(
+      stored!.serpFeatures,
+      'P3: page stored but serpFeatures missing — the serp_features column write/parse (migration 051) is broken.',
+    ).toContain('ai_overview');
+
+    // ── Link 2: user-facing read (seoContext slice) surfaces the AI-Overview count ──
+    const seoContext = await assembleSeoContext(wsId);
+    expect(
+      seoContext.serpFeatures,
+      'P3: ai_overview stored on a page_keyword but assembleSeoContext returned no serpFeatures aggregation — the slice does not read page_keywords serp features (dark loop). The content-brief AEO directive + client serpOpportunities count would be blind to it.',
+    ).toBeDefined();
+    expect(
+      seoContext.serpFeatures!.aiOverview,
+      'P3: serpFeatures present but aiOverview count is 0 — the ai_overview signal stored on a page_keyword did NOT reach seoContext.serpFeatures.aiOverview. The free AI-Overview extraction is a dark loop.',
+    ).toBeGreaterThan(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P4 — workspace target-geo: targetGeo + flag → threads into the provider request
+// ═══════════════════════════════════════════════════════════════════════════
+describe('SEO Decision Engine plumbing — P4 target-geo', () => {
+  it('P4 target-geo: a non-US workspace targetGeo (+ geo-targeting flag) threads through workspaceProviderGeo AND into the national-serp provider request', async () => {
+    const KEYWORD = 'assurance habitation montreal';
+    const wsId = makeGrowthWorkspace('Plumbing P4 — Target Geo', 'https://acme-ca.example');
+
+    // P4 routes the workspace targetGeo through workspaceProviderGeo into provider call
+    // request bodies (so non-US clients aren't queried as US/'en'). Canada = locationCode
+    // 2124, language 'fr'. The US default is locationCode 2840 / 'en'. The chain we prove
+    // is BOTH halves: the contract helper every caller depends on, AND a real caller
+    // (the national-serp job) actually threading the captured geo into the provider request.
+    const CANADA_LOCATION = 2124;
+    const CANADA_LANGUAGE = 'fr';
+    const US_LOCATION = 2840;
+
+    // ── Contract: flag OFF → {} (provider falls back to its US/'en' default) ──
+    // The flag defaults OFF; with no override set, the helper must return {} even
+    // though targetGeo is about to be set — proving the flag actually gates it.
+    updateWorkspace(wsId, { targetGeo: { locationCode: CANADA_LOCATION, languageCode: CANADA_LANGUAGE, countryCode: 'CA', label: 'Canada' } });
+    expect(
+      workspaceProviderGeo(wsId),
+      'P4: geo-targeting flag is OFF but workspaceProviderGeo did not return {} — the flag gate is broken (geo would leak before launch / cache-key churn).',
+    ).toEqual({});
+
+    // ── Contract: flag ON + targetGeo set → the workspace geo (NOT the US default) ──
+    setWorkspaceFlagOverride('geo-targeting', wsId, true);
+    const geo = workspaceProviderGeo(wsId);
+    expect(
+      geo.locationCode,
+      `P4: flag ON + Canada targetGeo set, but workspaceProviderGeo returned locationCode ${geo.locationCode} (expected ${CANADA_LOCATION}) — targetGeo not resolved (still defaulting to US ${US_LOCATION}?).`,
+    ).toBe(CANADA_LOCATION);
+    expect(geo.languageCode, 'P4: flag ON but languageCode is not the set fr — targetGeo language not resolved.').toBe(CANADA_LANGUAGE);
+
+    // ── Real plumbing: the national-serp job must thread that geo into the provider request ──
+    // Job gates: tier growth ✓ · liveDomain ✓ · provider.getNationalSerp ✓ (mock) ·
+    // ≥1 tracked keyword ✓. The fake getNationalSerp captures the request arg.
+    addTrackedKeyword(wsId, KEYWORD, { pinned: false });
+    providerState.national = {
+      query: KEYWORD,
+      position: null,
+      matchedUrl: null,
+      features: ['organic'],
+      aiOverviewPresent: false,
+      aiOverviewCited: null,
+    };
+
+    const job = createJob(BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH, { workspaceId: wsId });
+    await runNationalSerpRefreshJob(wsId, job.id);
+
+    expect(
+      providerState.nationalCalls,
+      'P4: national-serp job never called the provider — it no-op\'d on a gate (tier / liveDomain / tracked keywords). Cannot assert geo threading.',
+    ).toBeGreaterThan(0);
+    const req = providerState.nationalRequests.find(r => r.locationCode != null);
+    expect(
+      req,
+      'P4: provider was called but no request carried a locationCode — the job did not thread workspaceProviderGeo into the getNationalSerp request body at all.',
+    ).toBeDefined();
+    expect(
+      req!.locationCode,
+      `P4: provider request locationCode is ${req!.locationCode} (expected Canada ${CANADA_LOCATION}, NOT US ${US_LOCATION}) — targetGeo set + flag on, but the geo threading into the provider request is dark (a non-US client would be queried as US).`,
+    ).toBe(CANADA_LOCATION);
+    expect(
+      req!.languageCode,
+      `P4: provider request languageCode is ${req!.languageCode} (expected ${CANADA_LANGUAGE}) — language not threaded into the provider request.`,
+    ).toBe(CANADA_LANGUAGE);
   });
 });
