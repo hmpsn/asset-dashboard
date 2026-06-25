@@ -59,6 +59,13 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({ findActiveJob: () => null }),
 }));
 
+// GbpReviewsPanel (mounted in keywords mode) now reads useFeatureFlag directly to decide whether
+// to show its bootstrap card — mock it so the test renderer needs no QueryClientProvider. OFF here
+// so the empty GBP payload keeps the panel hidden (this suite asserts the non-GBP local-SEO UI).
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+
 // Wave 1 added useRankTrackingAddKeyword to LocalSeoVisibilityPanel; mock it here so
 // the test renderer doesn't need a QueryClientProvider wrapper.
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
