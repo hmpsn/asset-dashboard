@@ -27,7 +27,7 @@ export interface BriefListProps {
   onSetBriefSort: (value: 'date' | 'keyword' | 'difficulty') => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
-  onSendToClient: (brief: ContentBrief) => void;
+  onSendToClient: (brief: ContentBrief, note?: string) => void;
   onConfirmDeleteBrief: (brief: ContentBrief) => void;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;

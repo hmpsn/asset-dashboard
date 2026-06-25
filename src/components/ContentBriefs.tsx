@@ -396,10 +396,10 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
       .catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${b.id}/export`; });
   };
 
-  const handleSendToClient = async (b: ContentBrief) => {
+  const handleSendToClient = async (b: ContentBrief, note?: string) => {
     setSendingToClient(b.id);
     try {
-      const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`);
+      const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`, note ? { note } : {});
       if (result.ok) {
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
         toast('Brief sent to client');
@@ -454,7 +454,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     }
   };
 
-  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => {
+  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string; internalNote?: string }) => {
     try {
       const body: Record<string, unknown> = { ...extra };
       if (status !== undefined) body.status = status;
