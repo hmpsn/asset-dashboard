@@ -1304,3 +1304,63 @@ describe('DataForSeoProvider — P4 domain-method geo threading', () => {
     flushCreditsToDisk();
   });
 });
+
+describe('DataForSeoProvider — P8 LLM mentions geo threading', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const okLlmEmpty = () => ({ ok: true, json: async () => dfsTaskResponse([{ items: [] }]) } as Response);
+
+  it('threads location_name + normalized language_code into the LLM mentions request body', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationName: 'Canada', languageCode: 'FR' },
+      'ws-llm-geo-body',
+    );
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)[0];
+    expect(body).toMatchObject({
+      platform: 'chat_gpt',
+      location_name: 'Canada',
+      language_code: 'fr',
+    });
+    flushCreditsToDisk();
+  });
+
+  it('resolves a known locationCode to location_name when no explicit name is passed', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationCode: 2826, languageCode: 'en' },
+      'ws-llm-geo-code',
+    );
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)[0];
+    expect(body).toMatchObject({
+      location_name: 'United Kingdom',
+      language_code: 'en',
+    });
+    flushCreditsToDisk();
+  });
+
+  it('keys the LLM mentions cache by geo token and language', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationCode: 2124, locationName: 'Canada', languageCode: 'fr' },
+      'ws-llm-geo-cache',
+    );
+
+    const llmWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('llm_mentions'));
+    expect(llmWrite).toBeDefined();
+    expect(String(llmWrite![0])).toContain('llm_mentions_example_com_chat_gpt_2124_fr');
+    flushCreditsToDisk();
+  });
+});

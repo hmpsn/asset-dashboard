@@ -15,17 +15,19 @@ import { resolveWorkspaceTargetGeo } from './local-seo.js';
  *   `locationCodeFromDatabase(database)` / `'en'` defaults, byte-identical to
  *   pre-P4 behavior (and cache keys stay on the legacy un-versioned token, so no
  *   expensive domain-cache re-warm).
- * - **Flag ON** → returns the workspace's resolved `{ locationCode, languageCode }`
+ * - **Flag ON** → returns the workspace's resolved `{ locationCode, languageCode, locationName }`
  *   (see {@link resolveWorkspaceTargetGeo}: admin target-geo → local primary
  *   market → US/'en'), so domain methods query the correct national/international
- *   SERP instead of hardcoded US.
+ *   SERP instead of hardcoded US. Most callers use only the code/language; endpoints
+ *   such as LLM mentions use `locationName` because the provider accepts a named
+ *   location rather than a location code.
  *
  * `workspaceId` MUST be the CLIENT workspace whose SERP geo we care about — never
  * a competitor's domain. Backlinks calls are geo-agnostic and do NOT use this.
  */
 export function workspaceProviderGeo(
   workspaceId: string,
-): { locationCode?: number; languageCode?: string } {
+): { locationCode?: number; languageCode?: string; locationName?: string } {
   if (!isFeatureEnabled('geo-targeting', workspaceId)) return {};
   return resolveWorkspaceTargetGeo(workspaceId);
 }

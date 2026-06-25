@@ -1371,9 +1371,9 @@
           "source": "Delta audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT F6 (low). llm-mentions.ts:126 destructures only {languageCode}; the provider hardcodes locationName ?? \"United States\" (dataforseo-provider.ts:2127) while national-serp.ts:123 threads both location+language. UK/CA/AU workspaces get US-scoped AI-visibility with only language adjusted (the prior \"wrong geo defaults\" theme). Bounded today (flag-gated, admin-only, US launch) but silently wrong if rolled out. Fix: thread locationName/locationCode through LlmMentionsRequest, or document the provider constraint explicitly."
+          "notes": "DONE 2026-06-25: threaded resolved workspace geo into LLM mentions refreshes by extending workspaceProviderGeo/resolveWorkspaceTargetGeo with locationName, passing locationCode/locationName/languageCode through runLlmMentionsRefreshJob, and making the DataForSEO LLM mentions request/cache key geo+language-aware. Added provider and end-to-end plumbing tests proving Canada/French targetGeo reaches getLlmMentions instead of falling back to United States."
         },
         {
           "id": "simp-delta-0624-export-html-domain-dedup",

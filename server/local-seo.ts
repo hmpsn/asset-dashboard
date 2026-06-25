@@ -76,6 +76,29 @@ const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
 
+const TARGET_GEO_LOCATION_NAMES_BY_CODE: Record<number, string> = {
+  2036: 'Australia',
+  2056: 'Belgium',
+  2076: 'Brazil',
+  2124: 'Canada',
+  2250: 'France',
+  2276: 'Germany',
+  2356: 'India',
+  2372: 'Ireland',
+  2380: 'Italy',
+  2392: 'Japan',
+  2484: 'Mexico',
+  2528: 'Netherlands',
+  2554: 'New Zealand',
+  2616: 'Poland',
+  2702: 'Singapore',
+  2710: 'South Africa',
+  2724: 'Spain',
+  2752: 'Sweden',
+  2826: 'United Kingdom',
+  2840: 'United States',
+};
+
 function notifyLocalSeoUpdated(workspaceId: string, payload: Record<string, unknown>): void {
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.LOCAL_SEO_UPDATED, {
@@ -999,8 +1022,27 @@ export function resolveWorkspaceLanguageCode(workspaceId: string): string {
 /** DataForSEO location_code for the United States — the last-resort geo fallback. */
 const US_LOCATION_CODE = 2840;
 
+const US_LOCATION_NAME = 'United States';
+
+export interface ResolvedWorkspaceTargetGeo {
+  locationCode: number;
+  languageCode: string;
+  /** DataForSEO `location_name` where an endpoint requires a name instead of a code. */
+  locationName: string;
+}
+
+function normalizeTargetGeoLabel(label: string | undefined): string | undefined {
+  const clean = label?.split('·')[0]?.trim();
+  if (!clean || /^Location\s+\d+$/i.test(clean)) return undefined;
+  return clean;
+}
+
+function resolveLocationName(locationCode: number, label: string | undefined): string {
+  return normalizeTargetGeoLabel(label) ?? TARGET_GEO_LOCATION_NAMES_BY_CODE[locationCode] ?? US_LOCATION_NAME;
+}
+
 /**
- * Resolve the SERP target geo {locationCode, languageCode} for a workspace's provider
+ * Resolve the SERP target geo {locationCode, languageCode, locationName} for a workspace's provider
  * domain/keyword queries (SEO Decision Engine P4). Priority:
  *   1. workspace.targetGeo — admin-set national/international target, decoupled from the
  *      local primary-market table (carries its OWN co-resolved languageCode).
@@ -1010,16 +1052,24 @@ const US_LOCATION_CODE = 2840;
  * geo-targeting flag is ON; when OFF they pass nothing → the provider's
  * locationCodeFromDatabase(database)/'en' defaults apply (byte-identical to pre-P4).
  */
-export function resolveWorkspaceTargetGeo(workspaceId: string): { locationCode: number; languageCode: string } {
+export function resolveWorkspaceTargetGeo(workspaceId: string): ResolvedWorkspaceTargetGeo {
   const ws = getWorkspace(workspaceId);
   if (ws?.targetGeo) {
-    return { locationCode: ws.targetGeo.locationCode, languageCode: ws.targetGeo.languageCode };
+    return {
+      locationCode: ws.targetGeo.locationCode,
+      languageCode: ws.targetGeo.languageCode,
+      locationName: resolveLocationName(ws.targetGeo.locationCode, ws.targetGeo.label),
+    };
   }
-  const localLocation = resolveWorkspaceLocationCode(workspaceId);
-  if (localLocation != null) {
-    return { locationCode: localLocation, languageCode: resolveWorkspaceLanguageCode(workspaceId) };
+  const localLocation = getPrimaryMarketLocationCode(workspaceId);
+  if (localLocation) {
+    return {
+      locationCode: localLocation.locationCode,
+      languageCode: resolveWorkspaceLanguageCode(workspaceId),
+      locationName: resolveLocationName(localLocation.locationCode, localLocation.label),
+    };
   }
-  return { locationCode: US_LOCATION_CODE, languageCode: DEFAULT_LANGUAGE_CODE };
+  return { locationCode: US_LOCATION_CODE, languageCode: DEFAULT_LANGUAGE_CODE, locationName: US_LOCATION_NAME };
 }
 
 export function setPrimaryMarket(workspaceId: string, marketId: string): void {
