@@ -10,16 +10,6 @@
  *   VITE_FEATURE_KEYWORD_UNIVERSE_FULL=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
-  // Self-service onboarding
-  'self-service-onboarding': false,
-  'self-service-gsc-ga4': false,
-
-  // Team & Collaboration
-  'team-collaboration': false,
-
-  // White-label
-  'white-label': false,
-
   // Platform Intelligence Enhancements
   'smart-placeholders': false,
 
@@ -181,9 +171,6 @@ export interface FeatureFlagLifecycleMeta {
 }
 
 export const FEATURE_FLAG_GROUP_LABELS = [
-  'Self-Service Onboarding',
-  'Team & Collaboration',
-  'White-Label',
   'Platform Intelligence Enhancements',
   'Client Insights Briefing',
   'Keyword Hub',
@@ -201,9 +188,6 @@ export interface FeatureFlagCatalogEntry {
 }
 
 const LEGACY_ROADMAP = {
-  selfServe: 'legacy-self-service-onboarding',
-  team: 'legacy-team-collaboration',
-  whiteLabel: 'legacy-white-label',
   outcome: 'legacy-outcome-intelligence',
   briefing: 'legacy-client-briefing-v2',
   schema: 'legacy-schema-ai',
@@ -215,61 +199,6 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'self-service-onboarding': {
-    label: 'Self-service Webflow onboarding',
-    group: 'Self-Service Onboarding',
-    lifecycle: {
-      owner: 'integrations',
-      createdAt: '2026-02-01',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove when the self-service onboarding flow is default for all eligible workspaces.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.selfServe,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-  'self-service-gsc-ga4': {
-    label: 'Self-service GSC / GA4 connection',
-    group: 'Self-Service Onboarding',
-    lifecycle: {
-      owner: 'integrations',
-      createdAt: '2026-02-03',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Remove once self-serve provider connection reliability meets release thresholds for 2 consecutive releases.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.selfServe,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'team-collaboration': {
-    label: 'Team management',
-    group: 'Team & Collaboration',
-    lifecycle: {
-      owner: 'workspace-command-center',
-      createdAt: '2026-01-18',
-      rolloutTarget: 'internal-operators',
-      removalCondition: 'Remove when team collaboration permissions are stable and no staged fallback is required.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.team,
-      staleAuditCadence: 'quarterly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
-  'white-label': {
-    label: 'White-label domains',
-    group: 'White-Label',
-    lifecycle: {
-      owner: 'billing-monetization',
-      createdAt: '2026-01-25',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove when white-label setup is generalized and no compatibility fallback is needed.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.whiteLabel,
-      staleAuditCadence: 'quarterly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'smart-placeholders': {
     label: 'Smart placeholders (admin chips + client ghost text)',
     group: 'Platform Intelligence Enhancements',
@@ -611,18 +540,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
-  {
-    label: 'Self-Service Onboarding',
-    keys: ['self-service-onboarding', 'self-service-gsc-ga4'],
-  },
-  {
-    label: 'Team & Collaboration',
-    keys: ['team-collaboration'],
-  },
-  {
-    label: 'White-Label',
-    keys: ['white-label'],
-  },
   {
     label: 'Platform Intelligence Enhancements',
     keys: ['smart-placeholders'],

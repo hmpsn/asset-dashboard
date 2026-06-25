@@ -63,8 +63,8 @@ describe('feature-flags shared types', () => {
     }
   });
 
-  it('known flag white-label defaults to false', () => {
-    expect(FEATURE_FLAGS['white-label']).toBe(false);
+  it('known flag smart-placeholders defaults to false', () => {
+    expect(FEATURE_FLAGS['smart-placeholders']).toBe(false);
   });
 });
 

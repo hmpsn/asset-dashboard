@@ -337,17 +337,9 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
     expect(result.current).toBe(false);
   });
 
-  it('returns false for "white-label" while loading', () => {
+  it('returns false for "smart-placeholders" while loading', () => {
     const { result } = renderHook(
-      () => useFeatureFlag('white-label' as FeatureFlagKey),
-      { wrapper: makeWrapper() },
-    );
-    expect(result.current).toBe(false);
-  });
-
-  it('returns false for "white-label" while loading', () => {
-    const { result } = renderHook(
-      () => useFeatureFlag('white-label' as FeatureFlagKey),
+      () => useFeatureFlag('smart-placeholders' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
     expect(result.current).toBe(false);
@@ -376,7 +368,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('white-label' as FeatureFlagKey),
+      () => useFeatureFlag('smart-placeholders' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
