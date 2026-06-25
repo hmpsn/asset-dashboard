@@ -5,9 +5,10 @@
  *   Gated on the caller's flag (measuredCapture) AND a GA4 property being configured. Flag-OFF →
  *   no fetch, no network traffic (byte-identical OFF).
  * - useWorkspaceEvents: the SECOND half of the WS contract (CLAUDE.md §Data Flow Rule #2) — the
- *   conversion-tracking webhook receiver broadcasts FORM_SUBMISSION_CAPTURED on a NEW capture; this
- *   handler invalidates the status query so the readout's last-lead / connected state refreshes
- *   live without a poll. The broadcast payload is PII-free ({ workspaceId, outcomeType }).
+ *   conversion-tracking poller broadcasts FORM_SUBMISSION_CAPTURED on a NEW capture, and the admin
+ *   form-source save broadcasts FORM_CAPTURE_CONFIG_UPDATED; this handler invalidates the status
+ *   query so the readout's last-lead / connected state refreshes live without a poll. The broadcast
+ *   payload is PII-free.
  */
 import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +48,8 @@ export function useConversionTrackingStatus(
   const wsHandlers = useMemo(
     () => ({
       [WS_EVENTS.FORM_SUBMISSION_CAPTURED]: () =>
+        qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) }),
+      [WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED]: () =>
         qc.invalidateQueries({ queryKey: queryKeys.admin.conversionTrackingStatus(workspaceId) }),
     }),
     [qc, workspaceId],

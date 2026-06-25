@@ -21,12 +21,12 @@
 // The operator "doorbell" reuses the EXISTING admin notification rail — it does
 // NOT invent a new one. Two halves:
 //   1. addActivity('strategy_issue_pushed', …) — operator-only activity entry.
-//   2. broadcastToWorkspace(STRATEGY_ISSUE_PUSHED) — a bookkeeping broadcast that
-//      NO frontend handler consumes directly. The visible bell entry is derived
-//      in `useNotifications` from the polled workspace-overview summary's `issue`
-//      block (`issue.ready`, set by the route from the stamp above + the active-rec
-//      + not-acted-this-week gate, scaled-review fix #2), which self-refreshes on a
-//      5-minute interval, deep-linking to the standing Strategy page (`seo-strategy`).
+//   2. The visible bell entry is derived in `useNotifications` from the polled
+//      workspace-overview summary's `issue` block (`issue.ready`, set by the route
+//      from the stamp above + the active-rec + not-acted-this-week gate,
+//      scaled-review fix #2), which self-refreshes on a 5-minute interval,
+//      deep-linking to the standing Strategy page (`seo-strategy`). No frontend
+//      handler consumes a pushed-Issue broadcast.
 
 import {
   listWorkspaces,
@@ -108,8 +108,8 @@ export interface RunIssuePushResult {
 /**
  * Per-process mutex preventing concurrent runs for the same workspace. Mirrors
  * runningBriefings in briefing-cron.ts. Two POV pre-bakes for the same workspace
- * (a cron tick racing a future push-now button) would double-broadcast and waste
- * an AI call. The DB-level last_issue_pushed_week_of guard handles cross-process
+ * (a cron tick racing a future push-now button) would double-run and waste an AI
+ * call. The DB-level last_issue_pushed_week_of guard handles cross-process
  * duplicates after the first completes; this Set handles the in-process race.
  */
 const runningPushes = new Set<string>();
@@ -195,10 +195,6 @@ async function runIssuePushForWorkspaceInner(
       unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
       { weekOf, unchanged },
     );
-    // 2) Workspace broadcast — the admin NotificationBell invalidates its
-    //    notifications cache on this event so the bell entry (derived from the
-    //    workspace-overview `issuePushedWeekOf` field) appears without a full poll.
-    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_ISSUE_PUSHED, { weekOf });
   } catch (err) {
     log.error({ err, workspaceId, weekOf }, 'issue doorbell failed (swallowed) — push stands, auto-send proceeds');
   }
@@ -207,7 +203,7 @@ async function runIssuePushForWorkspaceInner(
   // After the Issue is pushed + stamped + the doorbell rung, auto-send the active recs of every
   // earned+enabled+eligible archetype. GUARDED behind the OFF-by-default child flag
   // `strategy-trust-ladder-autosend`: with the flag OFF (default) auto-send is NOT invoked at all —
-  // the doorbell + STRATEGY_ISSUE_PUSHED push above stand untouched, so no client receives a rec
+  // the doorbell above stands untouched, so no client receives a rec
   // without a manual operator send. The whole step is best-effort: a failure must not roll back the
   // push (the Issue is already drafted and the operator doorbell already queued). Idempotent within
   // the week — a rec sent this cycle is no longer isActiveRec, so a re-run skips it.

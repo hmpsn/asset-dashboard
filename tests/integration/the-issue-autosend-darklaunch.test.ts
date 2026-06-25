@@ -1,12 +1,11 @@
 /**
  * Audit-resolution launch PR — Blocker 3: trust-ladder auto-send dark-launch (Lane E).
  *
- * The weekly Issue cron (runIssuePushForWorkspace) must keep ringing the operator doorbell +
- * broadcasting STRATEGY_ISSUE_PUSHED, but with the OFF-by-default child flag
- * `strategy-trust-ladder-autosend` it must NOT auto-send any rec — even when a quick_win archetype
- * is fully earned+enabled. No rec flips to clientStatus 'sent' via the cron; no `strategy_autosent`
- * activity is written. With the child flag ON (+ earned+enabled policy) auto-send still works
- * (regression guard).
+ * The weekly Issue cron (runIssuePushForWorkspace) must keep ringing the operator doorbell, but with
+ * the OFF-by-default child flag `strategy-trust-ladder-autosend` it must NOT auto-send any rec — even
+ * when a quick_win archetype is fully earned+enabled. No rec flips to clientStatus 'sent' via the
+ * cron; no `strategy_autosent` activity is written; no recommendation update is broadcast. With the
+ * child flag ON (+ earned+enabled policy) auto-send still works (regression guard).
  *
  * Mirrors strategy-autosend-cron.test.ts: generateStrategyPov + broadcast are module-mocked,
  * activity-log is partially mocked to assert the doorbell vs autosent entries. The autosend store +
@@ -148,18 +147,15 @@ describe('Blocker 3 — trust-ladder auto-send is dark-launched behind strategy-
     vi.mocked(broadcastToWorkspace).mockClear();
   });
 
-  it('with the child flag OFF (default): the cron rings the doorbell + broadcasts but auto-sends NOTHING', async () => {
+  it('with the child flag OFF (default): the cron rings the doorbell but auto-sends NOTHING', async () => {
     saveRecs([makeRec(wsId, 'qw-1', 'strategy')]); // 'strategy' → quick_win (eligible)
     seedPolicy('quick_win', 3, true); // earned + enabled — would auto-send IF the child flag were on
 
     const r = await runIssuePushForWorkspace(wsId);
     expect(r.status).toBe('pushed');
 
-    // Doorbell rung + STRATEGY_ISSUE_PUSHED broadcast — untouched by the dark-launch guard.
+    // Doorbell activity rung — the visible bell is poll-derived, not pushed by a WS broadcast.
     expect(pushedActivityCalls()).toHaveLength(1);
-    expect(
-      vi.mocked(broadcastToWorkspace).mock.calls.some((c) => c[1] === WS_EVENTS.STRATEGY_ISSUE_PUSHED),
-    ).toBe(true);
 
     // NO auto-send: the rec stays curated (never flips to 'sent' via the cron); no autoSent stamp.
     const rec = reloadRec('qw-1');
@@ -168,14 +164,8 @@ describe('Blocker 3 — trust-ladder auto-send is dark-launched behind strategy-
 
     // No `strategy_autosent` activity row written.
     expect(autoSentActivityCalls()).toHaveLength(0);
-    // No auto-send RECOMMENDATIONS_UPDATED broadcast either (the auto-send block never ran).
-    expect(
-      vi
-        .mocked(broadcastToWorkspace)
-        .mock.calls.some(
-          (c) => c[1] === WS_EVENTS.RECOMMENDATIONS_UPDATED && (c[2] as { reason?: string })?.reason === 'auto-send',
-        ),
-    ).toBe(false);
+    // No broadcast at all: the pushed-Issue bell is poll-derived, and the auto-send block never ran.
+    expect(vi.mocked(broadcastToWorkspace)).not.toHaveBeenCalled();
   });
 
   it('regression: with the child flag ON + earned+enabled policy, auto-send still works', async () => {

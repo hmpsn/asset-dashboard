@@ -76,12 +76,16 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
-  // The Issue (Client) P1a — Webflow named-lead captured via the HMAC-verified form webhook.
-  // Broadcast by the conversion-tracking webhook receiver on a NEW (non-duplicate) insert; the
+  // The Issue (Client) P1a — Webflow named-lead captured via the forms Data API poller.
+  // Broadcast by the conversion-tracking poller on a NEW (non-duplicate) insert; the
   // admin conversion-tracking-status query handler (useConversionTrackingStatus) invalidates so the
   // verification readout's last-lead/connected state refreshes without a poll. PII is never in the
   // payload (D7) — only { workspaceId, outcomeType }.
   FORM_SUBMISSION_CAPTURED: 'outcome:form_captured',
+  // The Issue (Client) P1a — operator saved the tracked Webflow form-source mapping. This can flip
+  // the measured_action provenance basis before the next poller capture, so admin setup readouts and
+  // client ROI/provenance caches refresh immediately.
+  FORM_CAPTURE_CONFIG_UPDATED: 'outcome:form_capture_config_updated',
 
   // Intelligence layer cache
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
@@ -107,11 +111,6 @@ export const WS_EVENTS = {
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate and on every operator
   // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',
-
-  // The Issue — pushed weekly Issue (Phase 3). The cron rings the OPERATOR doorbell after it
-  // pre-bakes the week's POV draft. The admin NotificationBell invalidates its notifications
-  // cache on this so the "Issue drafted and ready to curate" entry appears without a full poll.
-  STRATEGY_ISSUE_PUSHED: 'strategy:issue-pushed',
 
   // The Issue — trust ladder (Phase 4). Broadcast when an operator toggles a per-archetype
   // auto-send policy; handled locally by src/hooks/admin/useAutoSendPolicy.ts via

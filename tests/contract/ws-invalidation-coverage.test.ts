@@ -33,6 +33,7 @@ import { parseCoveredWsEventKeys, parseWsEventKeys } from '../../scripts/ws-cont
 const ROOT = join(__dirname, '../..');
 const WS_EVENTS_FILE = join(ROOT, 'src/lib/wsEvents.ts');
 const USE_WS_INVALIDATION_FILE = join(ROOT, 'src/hooks/useWsInvalidation.ts');
+const THE_ISSUE_CONVERSION_ROUTE_FILE = join(ROOT, 'server/routes/the-issue-conversion-tracking.ts');
 
 // ---------------------------------------------------------------------------
 // LOCAL_ONLY_EVENTS — events intentionally excluded from useWsInvalidation.ts
@@ -79,16 +80,6 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // consumes it, so a centralized useWsInvalidation.ts handler would invalidate nothing else.
   'STRATEGY_POV_GENERATED',
 
-  // STRATEGY_ISSUE_PUSHED (The Issue, Phase 3): the pushed-Issue cron's operator-doorbell signal.
-  // It is NOT consumed by ANY frontend handler. The visible NotificationBell entry is derived from
-  // the polled /api/workspace-overview summary (`issue.ready` + `issue.pushedWeekOf`) via the
-  // admin-notifications query, which self-refreshes on a 5-minute interval — the same poll-driven
-  // pattern as the requests/approvals/rec-responses entries (none of which have WS handlers either).
-  // The cockpit's POV cache is refreshed separately by generateStrategyPov's OWN
-  // STRATEGY_POV_GENERATED broadcast (and only on the changed path — POV_UNCHANGED does not
-  // broadcast), not by this event. No centralized React Query cache keys off STRATEGY_ISSUE_PUSHED.
-  'STRATEGY_ISSUE_PUSHED',
-
   // STRATEGY_AUTOSEND_POLICY_UPDATED (The Issue, Phase 4 trust ladder): handled locally by
   // src/hooks/admin/useAutoSendPolicy.ts via useWorkspaceEvents (invalidates
   // queryKeys.admin.autoSendPolicy(workspaceId)). Only that hook's query — the TrustLadderPanel's
@@ -127,6 +118,7 @@ function extractCoveredEventKeys(source: string): Set<string> {
 
 const wsEventsSource = readFileSync(WS_EVENTS_FILE, 'utf8'); // readFile-ok — intentional static analysis of event registry
 const useWsInvalidationSource = readFileSync(USE_WS_INVALIDATION_FILE, 'utf8'); // readFile-ok — intentional static analysis of handler registry
+const theIssueConversionRouteSource = readFileSync(THE_ISSUE_CONVERSION_ROUTE_FILE, 'utf8'); // readFile-ok — intentional static analysis of broadcast producer
 
 const expectedEvents = extractWsEventKeys(wsEventsSource);
 const coveredEvents = extractCoveredEventKeys(useWsInvalidationSource);
@@ -199,5 +191,11 @@ describe('WS_EVENTS invalidation coverage contract', () => {
     }
 
     expect(phantom).toHaveLength(0);
+  });
+
+  it('form-source saves broadcast the config-update event that invalidates measured provenance', () => {
+    expect(expectedEvents.has('FORM_CAPTURE_CONFIG_UPDATED')).toBe(true);
+    expect(coveredEvents.has('FORM_CAPTURE_CONFIG_UPDATED')).toBe(true);
+    expect(theIssueConversionRouteSource).toContain('broadcastToWorkspace(ws.id, WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED');
   });
 });

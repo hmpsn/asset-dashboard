@@ -192,6 +192,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   OUTCOME_LEARNINGS_UPDATED: 'outcomes-roi',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcomes-roi',
   FORM_SUBMISSION_CAPTURED: 'outcomes-roi',
+  FORM_CAPTURE_CONFIG_UPDATED: 'outcomes-roi',
   INTELLIGENCE_CACHE_UPDATED: 'analytics-intelligence',
   SUGGESTED_BRIEF_UPDATED: 'content-pipeline',
   INSIGHT_BRIDGE_UPDATED: 'analytics-intelligence',
@@ -203,7 +204,6 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   DELIVERABLE_UPDATED: 'inbox',
   MEETING_BRIEF_GENERATED: 'analytics-intelligence',
   STRATEGY_POV_GENERATED: 'analytics-intelligence',
-  STRATEGY_ISSUE_PUSHED: 'analytics-intelligence',
   STRATEGY_AUTOSEND_POLICY_UPDATED: 'analytics-intelligence',
   BRANDSCRIPT_UPDATED: 'brand-engine',
   DISCOVERY_UPDATED: 'brand-engine',
@@ -261,6 +261,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'AI-visibility snapshot refresh progress/completion (SEO Decision Engine P8 / ai-visibility); refreshes the LLM share-of-voice KPI + strategy/intelligence consumers.',
   EEAT_ASSETS_UPDATED: 'E-E-A-T workspace trust-asset inventory updates for content, schema, and page-analysis consumers.',
   FORM_SUBMISSION_CAPTURED: 'The Issue (Client) P1a: anonymous Webflow named-lead capture signal — payload carries only { workspaceId, outcomeType } (PII stays in form_submissions, D7); refreshes the admin conversion-tracking-status readout.',
+  FORM_CAPTURE_CONFIG_UPDATED: 'The Issue (Client) P1a: tracked Webflow form-source mapping saved; payload carries { formCount, confirmed } and no PII; refreshes admin setup status and ROI/provenance caches.',
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -282,6 +283,7 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   LOCAL_SEO_UPDATED: ['queryKeys.admin.localSeo', 'queryKeys.admin.keywordCommandCenter', 'queryKeys.admin.keywordStrategy'],
   EEAT_ASSETS_UPDATED: ['queryKeys.admin.eeatAssets', 'queryKeys.admin.intelligence', 'queryKeys.admin.keywordStrategy'],
   FORM_SUBMISSION_CAPTURED: ['queryKeys.admin.conversionTrackingStatus'],
+  FORM_CAPTURE_CONFIG_UPDATED: ['queryKeys.admin.conversionTrackingStatus', 'queryKeys.admin.roi', 'queryKeys.client.roi'],
 };
 
 const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -307,6 +309,7 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   LOCAL_SEO_UPDATED: ['local_seo_updated'],
   EEAT_ASSETS_UPDATED: ['eeat_asset_created', 'eeat_asset_updated', 'eeat_asset_deleted'],
   FORM_SUBMISSION_CAPTURED: ['form_submission_captured'],
+  FORM_CAPTURE_CONFIG_UPDATED: ['form_capture_configured'],
 };
 
 function collectTsFiles(dir: string): string[] {

@@ -408,6 +408,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => invalidateClientEvent(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED]: () => invalidateClientEvent(WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.INSIGHT_BRIDGE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.INSIGHT_RESOLVED]: () => invalidateClientEvent(WS_EVENTS.INSIGHT_RESOLVED),

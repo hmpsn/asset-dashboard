@@ -10,8 +10,9 @@
  *   - manual-bypass forces a run even when the week is already stamped;
  *   - POV_UNCHANGED still counts as "ready" (the cheap no-op path).
  *
- * generateStrategyPov is mocked at module level so no live AI call fires. broadcast +
- * activity-log are mocked so we can assert the doorbell rang without a real WS/DB write.
+ * generateStrategyPov is mocked at module level so no live AI call fires. activity-log is mocked
+ * so we can assert the doorbell rang without a real DB write; broadcast is mocked to prove the
+ * pushed-Issue doorbell stays poll-derived unless the auto-send child flag fires.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
@@ -134,7 +135,8 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
     // (b) marked the week on the workspace row
     expect(getWorkspace(wsId)?.lastIssuePushedWeekOf).toBe(r.weekOf);
 
-    // (c) rang the operator doorbell — activity entry + broadcast, exactly once each
+    // (c) rang the operator doorbell — activity entry only. The visible bell is poll-derived from
+    // workspace overview; there is intentionally no pushed-Issue WS broadcast.
     expect(addActivityMock).toHaveBeenCalledTimes(1);
     expect(addActivityMock).toHaveBeenCalledWith(
       wsId,
@@ -143,12 +145,7 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
       undefined,
       expect.objectContaining({ weekOf: r.weekOf }),
     );
-    expect(broadcastToWorkspace).toHaveBeenCalledTimes(1);
-    expect(broadcastToWorkspace).toHaveBeenCalledWith(
-      wsId,
-      'strategy:issue-pushed',
-      expect.objectContaining({ weekOf: r.weekOf }),
-    );
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('a second run in the same week is a no-op (idempotent — DB week guard)', async () => {
@@ -162,7 +159,7 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
     // The POV was pre-baked + doorbell rung only on the FIRST run.
     expect(generateStrategyPovMock).toHaveBeenCalledTimes(1);
     expect(addActivityMock).toHaveBeenCalledTimes(1);
-    expect(broadcastToWorkspace).toHaveBeenCalledTimes(1);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('POV_UNCHANGED still counts as ready (cheap no-op path) and marks the week + rings the doorbell', async () => {
@@ -172,7 +169,7 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
     expect(getWorkspace(wsId)?.lastIssuePushedWeekOf).toBe(r.weekOf);
     // Still rings the doorbell (the draft is already ready).
     expect(addActivityMock).toHaveBeenCalledTimes(1);
-    expect(broadcastToWorkspace).toHaveBeenCalledTimes(1);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('skips a flag-OFF workspace — never pre-bakes, never rings the doorbell', async () => {
@@ -206,6 +203,6 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
     // Manual bypass pre-baked + rang the doorbell a SECOND time.
     expect(generateStrategyPovMock).toHaveBeenCalledTimes(2);
     expect(addActivityMock).toHaveBeenCalledTimes(2);
-    expect(broadcastToWorkspace).toHaveBeenCalledTimes(2);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 });
