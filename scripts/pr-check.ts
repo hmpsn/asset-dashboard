@@ -24,7 +24,7 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { existsSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws-contract-parser.js';
@@ -72,33 +72,55 @@ function getFiles(dir: string, pattern: string): string[] {
 // Returns paths relative to the repo root. NOTE: `git diff` reports only
 // *tracked* changes — untracked new files are handled separately by
 // getUntrackedFiles() and folded in by getChangedFiles().
+function parseGitNameOnlyOutput(out: string): string[] {
+  return out.trim().split('\n').filter(Boolean);
+}
+
+function gitDiffNameOnly(cwd: string, args: string[]): string[] {
+  const out = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', ...args], {
+    cwd,
+    env: cleanGitEnv(),
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return parseGitNameOnlyOutput(out);
+}
+
+function getTrackedWorkingTreeChangedFiles(cwd: string = ROOT): string[] {
+  try {
+    return mergeChangedFiles(
+      gitDiffNameOnly(cwd, ['--cached']),
+      gitDiffNameOnly(cwd, []),
+    );
+  } catch {
+    return [];
+  }
+}
+
 function getTrackedChangedFiles(cwd: string = ROOT): string[] {
   try {
     // In GitHub Actions PR context, GITHUB_BASE_REF is set (e.g., "main")
     const ghBase = process.env.GITHUB_BASE_REF;
     if (ghBase) {
       try {
-        const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
-          cwd,
-          env: cleanGitEnv(),
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        }).trim();
-        if (out) return out.split('\n').filter(Boolean);
+        return mergeChangedFiles(
+          gitDiffNameOnly(cwd, [`origin/${ghBase}...HEAD`]),
+          getTrackedWorkingTreeChangedFiles(cwd),
+        );
       } catch {
         // fall through
       }
     }
 
-    // Local dev: diff against staging or main
+    // Local dev: diff against staging or main. An empty diff against an
+    // existing staging ref is authoritative; do not fall through to main and
+    // accidentally report staging-vs-main as this branch's changed files.
     for (const base of ['origin/staging', 'origin/main']) {
       try {
-        const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
-          cwd,
-          env: cleanGitEnv(),
-          encoding: 'utf-8',
-        }).trim();
-        if (out) return out.split('\n').filter(Boolean);
+        return mergeChangedFiles(
+          gitDiffNameOnly(cwd, [`${base}...HEAD`]),
+          getTrackedWorkingTreeChangedFiles(cwd),
+        );
       } catch {
         // try next
       }
@@ -106,12 +128,10 @@ function getTrackedChangedFiles(cwd: string = ROOT): string[] {
 
     // On a push to main/staging (squash merge): diff against previous commit
     try {
-      const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
-        cwd,
-        env: cleanGitEnv(),
-        encoding: 'utf-8',
-      }).trim();
-      if (out) return out.split('\n').filter(Boolean);
+      return mergeChangedFiles(
+        gitDiffNameOnly(cwd, ['HEAD~1', 'HEAD']),
+        getTrackedWorkingTreeChangedFiles(cwd),
+      );
     } catch {
       // no previous commit (initial commit) — fall through to empty
     }
@@ -393,8 +413,35 @@ function workspaceScopedTables(): Set<string> {
   return _workspaceScopedTablesCache;
 }
 
+type SourceReader = (file: string, encoding: BufferEncoding) => string;
+
+export function createSourceCache(reader: SourceReader = readFileSync): (file: string) => string {
+  const cache = new Map<string, { mtimeMs: number; size: number; source: string }>();
+  return (file: string): string => {
+    const key = path.resolve(file);
+    let stat;
+    try {
+      stat = statSync(file);
+    } catch {
+      cache.delete(key);
+      return '';
+    }
+    const cached = cache.get(key);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.source;
+    try {
+      const source = reader(file, 'utf-8');
+      cache.set(key, { mtimeMs: stat.mtimeMs, size: stat.size, source });
+      return source;
+    } catch {
+      return '';
+    }
+  };
+}
+
+const readSource = createSourceCache();
+
 function readFileOrEmpty(file: string): string {
-  try { return readFileSync(file, 'utf-8'); } catch { return ''; }
+  return readSource(file);
 }
 
 function loadJsonArrayColumnBaseline(): Set<string> {
@@ -9099,28 +9146,50 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
   return lines.filter(line => !excludeLines.some(ex => line.includes(ex)));
 }
 
+function globToExtension(glob: string): string {
+  return glob.replace('**/', '').replace('*.', '.');
+}
+
+export function resolveRelevantChangedFilesForCheck(changedFiles: string[], check: Check): string[] {
+  const exts = check.fileGlobs.map(globToExtension);
+  return changedFiles.filter(f =>
+    exts.some(ext => f.endsWith(ext)) &&
+    !isExcluded(f, check.exclude) &&
+    (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+    (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+     (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
+    !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
+  );
+}
+
+export function checkFiles(files: string[], check: Check): string[] {
+  if (!check.pattern) return [];
+  const filtered = files.filter(file => !isExcluded(file, check.exclude));
+  if (filtered.length === 0) return [];
+  try {
+    const out = execFileSync('grep', ['-Hn', '-E', '-e', check.pattern, '--', ...filtered], {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    const lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    return applyExcludeLines(lines, check.excludeLines);
+  } catch (err) {
+    const status = typeof err === 'object' && err !== null && 'status' in err
+      ? (err as { status?: number }).status
+      : undefined;
+    // grep returns 1 for "no matches"; retain the historical "no hits" result.
+    if (status === 1) return [];
+    return [];
+  }
+}
+
 // Exported for tests/pr-check.test.ts — regression-test harness for the
 // `-`-prefix-pattern silent-bug class fixed in PR #299. Not part of the public
 // API; do not import from anywhere except the test harness.
 export function checkFile(file: string, check: Check): string[] {
-  if (isExcluded(file, check.exclude)) return [];
-  if (!check.pattern) return [];
-  try {
-    const safePattern = check.pattern.replace(/"/g, '\\"');
-    // Pass the pattern via `-e` so grep does not interpret patterns that
-    // start with `-` (e.g. `--radius-signature-lg`) as command-line flags.
-    // Without `-e`, grep errors with "unrecognized option `--…`", the error
-    // is swallowed by `2>/dev/null || true`, and the rule silently reports
-    // ✓ — the exact silent-false-negative class the audit prevents.
-    const out = execSync(
-      `grep -n -E -e "${safePattern}" "${file}" 2>/dev/null || true`,
-      { cwd: ROOT, encoding: 'utf-8' }
-    );
-    const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
-    return applyExcludeLines(lines, check.excludeLines);
-  } catch {
-    return [];
-  }
+  return checkFiles([file], check);
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
@@ -9197,15 +9266,7 @@ console.log(`\n🔍 Running PR checks (${mode})...\n`);
 // same file set the ripgrep path would have scanned.
 function resolveCheckFileList(check: Check): string[] {
   if (!SCAN_ALL && changedFiles.length > 0) {
-    const exts = check.fileGlobs.map(g => g.replace('*.', '.').replace('**/', ''));
-    return changedFiles.filter(f =>
-      exts.some(ext => f.endsWith(ext)) &&
-      !isExcluded(f, check.exclude) &&
-      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-    ).map(f => path.join(ROOT, f));
+    return resolveRelevantChangedFilesForCheck(changedFiles, check).map(f => path.join(ROOT, f));
   }
   // Full scan: walk the pathFilter dir (or project root) for each fileGlob.
   // A rule that opts into a normally-excluded directory via pathFilter (e.g.
@@ -9275,20 +9336,7 @@ for (const check of CHECKS) {
     continue;
   } else if (!SCAN_ALL && changedFiles.length > 0) {
     // Only check changed files that match the glob extensions
-    const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
-    const relevant = changedFiles.filter(f =>
-      exts.some(ext => f.endsWith(ext)) &&
-      !isExcluded(f, check.exclude) &&
-      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      // When a check declares an explicit pathFilter, allow files from otherwise-excluded dirs
-      // that match it (e.g. pathFilter:'tests/' targets the excluded 'tests' dir intentionally).
-      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-    );
-    for (const file of relevant) {
-      matches.push(...checkFile(file, check));
-    }
+    matches.push(...checkFiles(resolveRelevantChangedFilesForCheck(changedFiles, check), check));
   } else {
     // Full scan — scope to pathFilter if set
     matches = checkDirectory(check.pathFilter ?? '.', check);
