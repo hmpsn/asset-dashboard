@@ -92,26 +92,16 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
 
     const ownerDomain = cleanDomain(workspace.liveDomain);
     if (!ownerDomain) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'No live domain configured — connect a domain to track AI visibility',
-        result: EMPTY_SUMMARY,
-      });
+      const message = 'No live domain configured — connect a domain to track AI visibility';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
 
     // Provider must support the optional LLM-mentions capability; feature-detect before use.
     const provider = getConfiguredProvider();
     if (!provider?.getLlmMentions) {
-      updateJob(jobId, {
-        status: 'done',
-        progress: 100,
-        total: 100,
-        message: 'Configured SEO provider does not support LLM-mention reads',
-        result: EMPTY_SUMMARY,
-      });
+      const message = 'AI visibility tracking requires the DataForSEO provider (not configured)';
+      updateJob(jobId, { status: 'error', message, error: message });
       return;
     }
     const getLlmMentions = provider.getLlmMentions.bind(provider);

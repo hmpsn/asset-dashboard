@@ -112,6 +112,16 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
     </FeatureFlag>
   );
 
+  // Surface a failed refresh (mirrors P6's actionErrorMessage band). The route throws an
+  // ApiError on 403 (tier) / 404 (flag) / 409 (already-running) — without this band every
+  // failure was swallowed and the click looked dead.
+  const refreshError = refresh.error instanceof Error ? refresh.error.message : null;
+  const errorBand = refreshError ? (
+    <div role="alert" className="rounded-[var(--radius-xl)] border border-red-500/40 bg-red-500/10 px-4 py-3">
+      <p className="t-caption font-semibold text-red-400">{refreshError}</p>
+    </div>
+  ) : null;
+
   // No snapshot yet. With the flag OFF the panel stays hidden (the server also returns an
   // empty payload then). With the flag ON, render the card with JUST the refresh trigger +
   // an empty state — otherwise the bootstrap button lives below this return and the feature
@@ -126,11 +136,14 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
         action={refreshButton}
         variant="subtle"
       >
-        <EmptyState
-          icon={Bot}
-          title="No AI-visibility data yet"
-          description="Run a refresh to capture how often your brand is cited in AI answers."
-        />
+        <div className="space-y-4">
+          {errorBand}
+          <EmptyState
+            icon={Bot}
+            title="No AI-visibility data yet"
+            description="Connect a live domain first, then run a refresh to capture how often your brand is cited in AI answers."
+          />
+        </div>
       </SectionCard>
     );
   }
@@ -150,6 +163,7 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
       variant="subtle"
     >
       <div className="space-y-4">
+        {errorBand}
         {/* Headline: share-of-voice score ring + mention-volume StatCard + trend. */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">

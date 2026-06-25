@@ -50,8 +50,9 @@ beforeAll(async () => {
   updateWorkspace(wsFree, { tier: 'free', trialEndsAt: undefined });
 
   // wsGrowth: flag ON, tier growth → 200 { jobId }. A live domain so the job can
-  // proceed past the domain guard; with no active markets the job finishes as a
-  // clean no-op ("No active markets with coordinates").
+  // proceed past the domain guard; with no provider configured (the test process
+  // registers no DataForSEO credentials) the provider-unsupported precondition
+  // fires first and the job fails as a user-actionable error.
   setWorkspaceFlagOverride('local-gbp', wsGrowth, true);
   updateWorkspace(wsGrowth, { tier: 'growth', liveDomain: 'https://acme.example' });
 
@@ -90,11 +91,12 @@ describe('POST /api/local-seo/:workspaceId/refresh-gbp — gating', () => {
     expect(body.jobId.length).toBeGreaterThan(0);
 
     // The job runs in the spawned server process. Poll the jobs API (live cache in
-    // the server process) until it reaches a terminal state — with no active markets
-    // it should complete cleanly (no-op), never error out due to the route wiring.
+    // the server process) until it reaches a terminal state — with no provider
+    // configured it should surface a user-actionable precondition FAILURE the admin
+    // will notice.
     const jobId = body.jobId as string;
     const deadline = Date.now() + 10_000;
-    let terminalStatus = '';
+    let terminalJob: { status: string; error?: string; message?: string } | null = null;
     while (Date.now() < deadline) {
       const jobRes = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
       expect(jobRes.status).toBe(200);
@@ -102,13 +104,14 @@ describe('POST /api/local-seo/:workspaceId/refresh-gbp — gating', () => {
       // The created job is the local-GBP refresh type (lifecycle-matrix signal anchor).
       expect(job.type).toBe(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH);
       if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
-        terminalStatus = job.status;
+        terminalJob = job;
         break;
       }
       await new Promise(resolve => setTimeout(resolve, 150));
     }
-    // The no-op path ends in 'done'; assert it did not error.
-    expect(terminalStatus).toBe('done');
+    // The provider-unsupported precondition path ends in 'error' with the actionable message.
+    expect(terminalJob?.status).toBe('error');
+    expect(terminalJob?.error).toBe('GBP + reviews tracking requires the DataForSEO provider (not configured)');
   });
 });
 

@@ -14,10 +14,11 @@ vi.mock('../../src/hooks/useFeatureFlag', () => ({
 
 const refreshMutate = vi.fn();
 let gbpData: GbpReviewsReadResponse | undefined;
+let refreshError: Error | null = null;
 
 vi.mock('../../src/hooks/admin', () => ({
   useGbpReviews: () => ({ data: gbpData }),
-  useLocalGbpRefresh: () => ({ mutate: refreshMutate, isPending: false, error: null }),
+  useLocalGbpRefresh: () => ({ mutate: refreshMutate, isPending: false, error: refreshError }),
 }));
 
 function makeListing(over: Partial<GbpReviewsReadResponse['owned'] & object> = {}) {
@@ -38,6 +39,7 @@ function makeListing(over: Partial<GbpReviewsReadResponse['owned'] & object> = {
 beforeEach(() => {
   gbpData = undefined;
   flagEnabled = true;
+  refreshError = null;
   refreshMutate.mockClear();
 });
 
@@ -82,6 +84,16 @@ describe('GbpReviewsPanel', () => {
     const refreshBtn = screen.getByRole('button', { name: /Refresh GBP & reviews/ });
     fireEvent.click(refreshBtn);
     expect(refreshMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a failed refresh (route 403/404/409) instead of swallowing it', () => {
+    // Without the error band, every route failure looked like a dead click.
+    flagEnabled = true;
+    gbpData = { owned: null, competitors: [], completenessScore: null };
+    refreshError = new Error('GBP + reviews tracking requires a Growth or Premium plan');
+    render(<GbpReviewsPanel workspaceId="ws-1" />);
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('requires a Growth or Premium plan');
   });
 
   it('renders nothing when the flag is OFF and there are no listings', () => {
