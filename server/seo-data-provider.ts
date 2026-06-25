@@ -205,8 +205,13 @@ export interface LlmMentionsResult {
   /** Headline mention count; 0 when no LLM presence (NEVER invented). */
   mentions: number;
   aiSearchVolume: number;
-  /** 0..1 = own mentions ÷ (own + co-mentioned competitor mentions). */
-  shareOfVoice: number;
+  /**
+   * 0..1 = the client's BRAND mentions ÷ ALL co-mentioned brand mentions (like-to-like).
+   * `undefined` = NOT MEASURED — the client's brand could not be identified among the
+   * co-mentioned brands (no brand name provided, or the brand isn't in brand_entities_title).
+   * Never conflate undefined with a real 0% (a red "0%" next to a high mention count reads as broken).
+   */
+  shareOfVoice?: number;
   /** Co-mentioned brands (brand_entities_title) — the AI-answer competitive set. */
   competitors: LlmMentionCompetitor[];
   /** Domains LLM answers cite when mentioning the target (sources_domain) — the AEO targets. */

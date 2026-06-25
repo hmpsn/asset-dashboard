@@ -736,16 +736,25 @@ export function parseLlmMentions(
     platform,
     mentions: 0,
     aiSearchVolume: 0,
-    shareOfVoice: 0,
+    shareOfVoice: undefined, // no data → not measured, NOT a real 0%
     competitors: [],
     sourceDomains: [],
   };
   // Normalize a brand name for owner-vs-competitor matching (lowercase, strip non-alphanumerics).
   const normBrand = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const ownerKeys = ownerBrandNames.map(normBrand).filter(Boolean);
+  // Owner-vs-competitor match: exact normalized equality, OR a substring match ONLY when the
+  // shorter token is ≥4 chars AND ≥60% of the longer's length. The ratio+length floor stops the
+  // over-match the P8 review flagged: 'Pay'→'Apple Pay'/'Google Pay', 'Square'→'Squarespace' (6/11=
+  // 0.55 <0.6, rejected), while still matching 'Square'↔'Square Up' (6/8=0.75) and 'Square Inc'↔'Square'.
   const isOwnerBrand = (name: string): boolean => {
     const n = normBrand(name);
-    return n !== '' && ownerKeys.some(k => k === n || k.includes(n) || n.includes(k));
+    if (n === '') return false;
+    return ownerKeys.some(k => {
+      if (k === n) return true;
+      const [shorter, longer] = k.length <= n.length ? [k, n] : [n, k];
+      return shorter.length >= 4 && longer.includes(shorter) && shorter.length / longer.length >= 0.6;
+    });
   };
 
   const safeItems: Record<string, unknown>[] = Array.isArray(items)
@@ -767,6 +776,7 @@ export function parseLlmMentions(
   // Co-mentioned brands (brand_entities_title) — the category's AI-answer brand set. Split the
   // client's OWN brand out of the competitor list so share-of-voice is like-to-like.
   const allBrands = parseLlmGroup(total.brand_entities_title);
+  const ownerMatched = allBrands.some(el => isOwnerBrand(el.key));
   const ownBrandMentions = allBrands.filter(el => isOwnerBrand(el.key)).reduce((s, el) => s + el.mentions, 0);
   const allBrandMentions = allBrands.reduce((s, el) => s + el.mentions, 0);
   const competitors: LlmMentionCompetitor[] = allBrands
@@ -780,11 +790,13 @@ export function parseLlmMentions(
   }));
 
   // shareOfVoice (like-to-like): the client's BRAND mentions ÷ ALL co-mentioned brand mentions.
-  // 0 when the brand set is empty or the client's brand isn't identifiable (do NOT mix the
-  // domain-citation count with brand co-mention counts — that overstates share, P8 review).
-  const shareOfVoice = allBrandMentions > 0
+  // UNDEFINED ("not measured") when we couldn't identify the client's brand among the co-mentioned
+  // brands (no brand provided, or it isn't in the set) — NOT a real 0% (the P8 review: a red 0%
+  // next to a high citation count reads as broken). A real 0 only when the client IS in the set
+  // but has 0 brand mentions. Never mix the domain-citation count with brand counts.
+  const shareOfVoice = (ownerMatched && allBrandMentions > 0)
     ? Math.min(1, Math.max(0, ownBrandMentions / allBrandMentions))
-    : 0;
+    : undefined;
 
   return { domain: ownerDomain, platform, mentions, aiSearchVolume, shareOfVoice, competitors, sourceDomains };
 }
@@ -2120,7 +2132,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       platform,
       mentions: 0,
       aiSearchVolume: 0,
-      shareOfVoice: 0,
+      shareOfVoice: undefined, // no data → not measured, NOT a real 0%
       competitors: [],
       sourceDomains: [],
     };

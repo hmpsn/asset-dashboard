@@ -49,10 +49,21 @@ describe('parseLlmMentions', () => {
       expect(result.shareOfVoice).toBeLessThan(0.6);
     });
 
-    it('shareOfVoice falls back to 0 when the client brand is not identifiable', () => {
+    it('shareOfVoice is UNDEFINED ("not measured") when the client brand is not identifiable', () => {
+      // No brand name → cannot identify the client among co-mentioned brands → not a real 0%.
       const noBrand = parseLlmMentions(LLM_MENTIONS_AGG.items, 'squareup.com', 'chat_gpt', []);
-      expect(noBrand.shareOfVoice).toBe(0);
+      expect(noBrand.shareOfVoice).toBeUndefined();
       expect(noBrand.competitors).toHaveLength(5); // no brand split → all 5 are "competitors"
+    });
+
+    it('does NOT over-match a short/generic owner name (e.g. "Pay" vs "Apple Pay"/"Google Pay")', () => {
+      // 'pay' is 3 chars → the substring arm is disabled; only exact 'pay'=='pay' would match, and
+      // it is not in the set → owner not identified → shareOfVoice undefined, all 5 stay competitors.
+      const pay = parseLlmMentions(LLM_MENTIONS_AGG.items, 'pay.example', 'chat_gpt', ['Pay']);
+      expect(pay.shareOfVoice).toBeUndefined();
+      expect(pay.competitors.some(c => c.name === 'Apple Pay')).toBe(true);
+      expect(pay.competitors.some(c => c.name === 'Google Pay')).toBe(true);
+      expect(pay.competitors).toHaveLength(5);
     });
   });
 
@@ -64,8 +75,8 @@ describe('parseLlmMentions', () => {
       expect(result.aiSearchVolume).toBe(0);
     });
 
-    it('returns shareOfVoice 0 when the denominator is zero', () => {
-      expect(result.shareOfVoice).toBe(0);
+    it('returns shareOfVoice undefined ("not measured") when there is no brand data', () => {
+      expect(result.shareOfVoice).toBeUndefined();
     });
 
     it('returns empty competitor + source lists', () => {
@@ -83,7 +94,7 @@ describe('parseLlmMentions', () => {
     it('returns an empty result for a non-array / missing items', () => {
       const result = parseLlmMentions([], 'squareup.com', 'chat_gpt');
       expect(result.mentions).toBe(0);
-      expect(result.shareOfVoice).toBe(0);
+      expect(result.shareOfVoice).toBeUndefined();
       expect(result.competitors).toEqual([]);
       expect(result.sourceDomains).toEqual([]);
     });

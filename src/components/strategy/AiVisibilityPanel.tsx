@@ -99,7 +99,10 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
   // (latest: null) when the flag is off, so this also covers the disabled-flag case.
   if (!latest) return null;
 
-  // shareOfVoice is 0..1 in the store; the headline is a 0–100 SCORE.
+  // shareOfVoice is 0..1 in the store; the headline is a 0–100 SCORE. UNDEFINED/null = "not
+  // measured" (the client's brand wasn't identifiable among co-mentioned brands) — show that
+  // distinctly, NOT a red 0% that reads as broken next to a high mention count (P8 review).
+  const sovMeasured = latest.shareOfVoice != null;
   const sovScore = Math.round((latest.shareOfVoice ?? 0) * 100);
   const mentions = latest.mentions ?? 0;
 
@@ -129,12 +132,24 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
         {/* Headline: share-of-voice score ring + mention-volume StatCard + trend. */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            {/* Share of voice is a SCORE → emerald/amber/red via the ring's scoreColor (Law 03). */}
-            <MetricRing score={sovScore} size={96} noAnimation />
-            <div>
-              <p className={`t-h2 font-semibold tabular-nums ${scoreColorClass(sovScore)}`}>{sovScore}%</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">share of voice in AI answers</p>
-            </div>
+            {sovMeasured ? (
+              <>
+                {/* Share of voice is a SCORE → emerald/amber/red via the ring's scoreColor (Law 03). */}
+                <MetricRing score={sovScore} size={96} noAnimation />
+                <div>
+                  <p className={`t-h2 font-semibold tabular-nums ${scoreColorClass(sovScore)}`}>{sovScore}%</p>
+                  {/* Clarify the two axes: share is measured among co-mentioned BRANDS, not citations. */}
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">share of voice vs co-mentioned brands</p>
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="t-h2 font-semibold tabular-nums text-[var(--brand-text-muted)]">—</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                  share of voice not measured yet (brand not identified among AI-co-mentioned brands)
+                </p>
+              </div>
+            )}
           </div>
           <div className="sm:ml-auto">
             {/* Mention volume is read-only DATA → blue (Law 02). */}

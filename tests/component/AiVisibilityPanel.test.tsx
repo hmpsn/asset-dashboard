@@ -52,7 +52,7 @@ describe('AiVisibilityPanel', () => {
 
     // Share-of-voice headline: 0.55 → 55% score (emerald/amber/red via scoreColorClass).
     expect(screen.getByText('55%')).toBeTruthy();
-    expect(screen.getByText(/share of voice in AI answers/)).toBeTruthy();
+    expect(screen.getByText(/share of voice vs co-mentioned brands/)).toBeTruthy();
     // Mention volume (blue data tone).
     expect(screen.getByText('2,704')).toBeTruthy();
     expect(screen.getByText(/Mentions in AI answers/)).toBeTruthy();
@@ -75,5 +75,20 @@ describe('AiVisibilityPanel', () => {
     const { container } = render(<AiVisibilityPanel workspaceId="ws-1" />);
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText(/AI visibility/)).toBeNull();
+  });
+
+  it('shows "not measured" (not a 0%) when share-of-voice is undefined but mentions exist', () => {
+    aiVisibilityData = {
+      latest: {
+        workspaceId: 'ws-1', snapshotDate: '2026-06-24', platform: 'chat_gpt', domain: 'acme.com',
+        mentions: 2704, aiSearchVolume: 58439, shareOfVoice: undefined,
+        competitors: [{ name: 'Stripe', mentions: 14 }], sourceDomains: [], fetchedAt: '2026-06-24T00:00:00.000Z',
+      },
+      trend: [], competitors: [{ name: 'Stripe', mentions: 14 }], sourceDomains: [],
+    };
+    render(<AiVisibilityPanel workspaceId="ws-1" />);
+    expect(screen.getByText('2,704')).toBeTruthy(); // mention volume still shows
+    expect(screen.getByText(/not measured/)).toBeTruthy(); // share-of-voice shows "not measured"
+    expect(screen.queryByText('0%')).toBeNull(); // NEVER a misleading red 0%
   });
 });

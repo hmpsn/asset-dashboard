@@ -37,11 +37,15 @@ const LLM_MENTIONS_PLATFORM = 'chat_gpt' as const;
 export interface LlmMentionsRefreshSummary {
   /** Headline mention count from the latest snapshot (0 when no LLM presence). */
   mentions: number;
-  /** 0..1 share-of-voice (own mentions ÷ own + competitor mentions). */
-  shareOfVoice: number;
+  /** 0..1 share-of-voice (client brand ÷ all co-mentioned brands); undefined = not measured. */
+  shareOfVoice?: number;
 }
 
-const EMPTY_SUMMARY: LlmMentionsRefreshSummary = { mentions: 0, shareOfVoice: 0 };
+const EMPTY_SUMMARY: LlmMentionsRefreshSummary = { mentions: 0 };
+/** "55%" or "not measured" — share-of-voice is undefined when the client's brand isn't identifiable. */
+function formatSov(shareOfVoice: number | undefined): string {
+  return shareOfVoice == null ? 'not measured' : `${Math.round(shareOfVoice * 100)}% share of voice`;
+}
 
 /** True while the job has been cancelled (route registers an AbortController). */
 function isCancelled(jobId: string): boolean {
@@ -53,8 +57,13 @@ function isCancelled(jobId: string): boolean {
  * CLIENT among the co-mentioned brands. The only brand-name source today is
  * `workspace.name` (BusinessProfile has no name field). Deduped + non-empty.
  */
-function resolveOwnerBrandNames(name: string | undefined): string[] {
-  const names = [name]
+function resolveOwnerBrandNames(name: string | undefined, ownerDomain: string): string[] {
+  // workspace.name first; fall back to the domain root (e.g. 'squareup.com' → 'squareup') so the
+  // client is still identifiable among co-mentioned brands when the workspace name is blank (P8
+  // review: a blank name otherwise leaves share-of-voice unmeasured + the client in its own
+  // competitor list). The provider's brand matcher has a length/ratio guard against over-matching.
+  const domainRoot = ownerDomain.split('.')[0]?.trim() ?? '';
+  const names = [name, domainRoot]
     .map(value => value?.trim())
     .filter((value): value is string => typeof value === 'string' && value.length > 0);
   return Array.from(new Set(names));
@@ -108,7 +117,7 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
     const getLlmMentions = provider.getLlmMentions.bind(provider);
 
     // Own brand name(s) — passed so share-of-voice identifies the client among co-mentioned brands.
-    const ownerBrandNames = resolveOwnerBrandNames(workspace.name);
+    const ownerBrandNames = resolveOwnerBrandNames(workspace.name, ownerDomain);
 
     // Target-geo (P4): admin target-geo → local primary market → US/'en'. Flag-gated inside the
     // helper; returns {} when geo-targeting is off, so the provider falls back to its US default.
@@ -169,7 +178,7 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
       workspaceId,
       'rank_snapshot',
       'AI visibility refreshed',
-      `${result.mentions} AI-answer mentions captured for ${today} (${Math.round(result.shareOfVoice * 100)}% share of voice)`,
+      `${result.mentions} AI-answer mentions captured for ${today} (${formatSov(result.shareOfVoice)})`,
       {
         source: 'llm_mentions',
         platform: LLM_MENTIONS_PLATFORM,
@@ -191,7 +200,7 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
       status: 'done',
       progress: 1,
       total: 1,
-      message: `AI visibility refreshed — ${result.mentions} mentions, ${Math.round(result.shareOfVoice * 100)}% share of voice`,
+      message: `AI visibility refreshed — ${result.mentions} mentions, ${formatSov(result.shareOfVoice)}`,
       result: summary,
     });
   } finally {
