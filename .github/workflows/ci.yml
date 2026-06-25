@@ -267,7 +267,7 @@ jobs:
         run: ${{ matrix.lane.command }}
 
   test:
-    if: always() && github.event_name == 'pull_request'
+    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     needs: [changes, test-lane]
     runs-on: ubuntu-latest
     steps:
@@ -335,7 +335,7 @@ jobs:
           retention-days: 14
 
   check:
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [changes, quality, test, coverage]
     runs-on: ubuntu-latest
     steps:
