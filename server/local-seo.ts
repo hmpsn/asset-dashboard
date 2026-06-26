@@ -41,6 +41,11 @@ import {
   titleLooksLikeServiceKeyword,
   normalizeText,
 } from './domains/local-seo/keyword-intent.js';
+import {
+  buildWorkspaceGeoRegex,
+  buildWorkspaceServiceTermRegex,
+  deriveLocalSeoPosture,
+} from './domains/local-seo/workspace-classifiers.js';
 import type { LocalSeoKeywordCandidate } from './domains/local-seo/types.js';
 import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
@@ -796,148 +801,8 @@ function isUsableLocalVisibilitySnapshot(snapshot: Pick<LocalVisibilitySnapshot,
   return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
 }
 
-// ── Per-workspace classifier builders ────────────────────────────────────────
-//
-// These replace the original workspace's hardcoded Texas city names and
-// dental/legal vocabulary. Classifiers are derived from the workspace's own
-// markets and business profile so every workspace gets relevant matching.
-// Call once per hot loop (e.g. per candidate build invocation) and reuse.
-
-/**
- * Builds a geo-term regex from the workspace's configured local SEO markets and
- * business profile city/state. Always includes `near me` and `/location/` as
- * universal local-intent signals.
- *
- * Returns null when no workspace-specific geo terms are available (the caller
- * should fall back to the universal patterns only).
- *
- * Performance: O(n markets) string ops, called once per build cycle.
- */
-function buildWorkspaceGeoRegex(workspace: Workspace, markets: LocalSeoMarket[]): RegExp | null {
-  const terms: string[] = [];
-
-  // Markets: city and state/region from each configured market
-  for (const market of markets) {
-    const city = normalizeText(market.city);
-    const state = normalizeText(market.stateOrRegion);
-    if (city) terms.push(city);
-    if (state) terms.push(state);
-  }
-
-  // Business profile: primary address city and state as fallback geo evidence
-  const bpCity = normalizeText(workspace.businessProfile?.address?.city);
-  const bpState = normalizeText(workspace.businessProfile?.address?.state);
-  if (bpCity) terms.push(bpCity);
-  if (bpState) terms.push(bpState);
-
-  // Universal patterns always apply
-  const uniqueTerms = [...new Set(terms.filter(Boolean))];
-  const geoTermPart = uniqueTerms.map(t => `\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).join('|');
-  const combined = geoTermPart
-    ? `\\bnear me\\b|\\/location\\/${geoTermPart ? `|${geoTermPart}` : ''}`
-    : null;
-
-  return combined ? new RegExp(combined, 'i') : null;
-}
-
-/**
- * Builds a service-term regex from the workspace's own data:
- *  1. Industry taxonomy match terms (from service-taxonomy.ts via industry field)
- *  2. Site keywords from the keyword strategy
- *  3. Knowledge base / business context keyword extraction (simple word tokens)
- *  4. Generic cross-industry fallback ONLY when no workspace-specific terms are found
- *
- * Performance: called once per candidate build cycle; result reused per keyword.
- */
-function buildWorkspaceServiceTermRegex(workspace: Workspace): RegExp {
-  const terms: string[] = [];
-
-  // Layer 1a: industry taxonomy via explicit intelligenceProfile.industry field.
-  const taxonomy = getTaxonomyForIndustry(workspace.intelligenceProfile?.industry);
-  if (taxonomy) {
-    for (const service of taxonomy) {
-      for (const term of service.matchTerms) {
-        terms.push(term.toLowerCase());
-      }
-    }
-  }
-
-  // Layer 1b: industry taxonomy via implicit detection from workspace name and
-  // business context text. This handles workspaces where the admin hasn't
-  // explicitly set intelligenceProfile.industry but the context clearly signals
-  // an industry (e.g. "Dental office." business context → dental taxonomy).
-  if (!taxonomy) {
-    const implicitIndustryHints = [
-      workspace.name,
-      workspace.keywordStrategy?.businessContext,
-      workspace.knowledgeBase,
-    ].filter(Boolean).join(' ');
-    const implicitTaxonomy = getTaxonomyForIndustry(implicitIndustryHints);
-    if (implicitTaxonomy) {
-      for (const service of implicitTaxonomy) {
-        for (const term of service.matchTerms) {
-          terms.push(term.toLowerCase());
-        }
-      }
-    }
-  }
-
-  // Layer 2: strategy site keywords — the keywords the admin has already identified
-  // as the core services. Extract individual word tokens (4+ chars) so that
-  // multi-word phrases like "cosmetic dentist" contribute both "cosmetic" and "dentist".
-  // Generic stopwords that appear in almost every keyword phrase are excluded: they
-  // carry no discriminating signal and produce false-positive service-keyword matches
-  // against unrelated page titles. Keep the list small and limited to words that are
-  // truly universal noise across all industries.
-  const KEYWORD_TOKEN_STOPWORDS = new Set([
-    'best', 'near', 'your', 'with', 'guide', 'this', 'that', 'from', 'into',
-    'over', 'than', 'then', 'when', 'more', 'also', 'have', 'will', 'what',
-    'where', 'which', 'they', 'them', 'their', 'been', 'were', 'very',
-  ]);
-  for (const kw of workspace.keywordStrategy?.siteKeywords ?? []) {
-    const tokens = kw.toLowerCase().trim().split(/\s+/);
-    for (const token of tokens) {
-      if (token.length >= 4 && !KEYWORD_TOKEN_STOPWORDS.has(token)) terms.push(token);
-    }
-  }
-
-  // Note: raw business context text is intentionally NOT added to the service term
-  // regex here. Context prose (e.g. "HVAC contractor serving Chicago") produces too
-  // many general nouns (management, software, contractor, serving…) that would
-  // cause false positives against unrelated page titles. Business context is instead
-  // used for implicit industry detection above (Layer 1b), which extracts the
-  // industry taxonomy's authoritative match terms instead of raw prose words.
-
-  if (terms.length === 0) {
-    // Generic fallback: broad cross-industry service signals used ONLY when the workspace
-    // has no profile data at all. This is explicitly documented as a last resort.
-    // Note: no dental/legal-specific terms here — those belong in taxonomy (Layer 1).
-    return /\bservice\b|\bclinic\b|\bcontractor\b|\brestaurant\b|\bsalon\b|\bspa\b|\boffice\b/i;
-  }
-
-  const escaped = [...new Set(terms.filter(Boolean))]
-    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(escaped.join('|'), 'i');
-}
-
 function derivePosture(workspace: Workspace): Pick<LocalSeoWorkspaceSettings, 'suggestedPosture' | 'suggestionReasons'> {
-  const reasons: string[] = [];
-  const profile = workspace.businessProfile;
-  if (profile?.address?.city && profile.address.state) reasons.push('Business profile has city/state contact evidence');
-  const industry = workspace.intelligenceProfile?.industry?.toLowerCase() ?? '';
-  if (/dent|clinic|medical|legal|law|restaurant|contractor|home service|salon|spa/.test(industry)) reasons.push('Industry commonly depends on local intent');
-  const pageTerms = listPageKeywords(workspace.id)
-    .slice(0, 75)
-    .map(page => `${page.pagePath} ${page.pageTitle} ${page.primaryKeyword}`.toLowerCase())
-    .join(' ');
-  // Build geo regex from this workspace's configured markets and business profile —
-  // never from hardcoded city names that only apply to the original Texas dental workspace.
-  const workspaceGeoRegex = buildWorkspaceGeoRegex(workspace, listLocalSeoMarkets(workspace.id));
-  const geoPattern = workspaceGeoRegex ?? /\bnear me\b|\/location\//;
-  if (geoPattern.test(pageTerms)) reasons.push('Page map contains local/service-area terms');
-  if (reasons.length >= 2) return { suggestedPosture: LOCAL_SEO_POSTURE.LOCAL, suggestionReasons: reasons };
-  if (reasons.length === 1) return { suggestedPosture: LOCAL_SEO_POSTURE.HYBRID, suggestionReasons: reasons };
-  return { suggestedPosture: LOCAL_SEO_POSTURE.UNKNOWN, suggestionReasons: ['No explicit local market evidence found yet'] };
+  return deriveLocalSeoPosture(workspace, listLocalSeoMarkets(workspace.id), listPageKeywords(workspace.id));
 }
 
 function defaultSettings(workspace: Workspace): LocalSeoWorkspaceSettings {

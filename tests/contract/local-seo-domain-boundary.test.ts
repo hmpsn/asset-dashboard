@@ -42,6 +42,11 @@ import {
   normalizeText,
   titleLooksLikeServiceKeyword,
 } from '../../server/domains/local-seo/keyword-intent.js';
+import {
+  buildWorkspaceGeoRegex,
+  buildWorkspaceServiceTermRegex,
+  deriveLocalSeoPosture,
+} from '../../server/domains/local-seo/workspace-classifiers.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
@@ -112,5 +117,26 @@ describe('local SEO domain boundary', () => {
     expect(readRepoFile('server/llm-mentions.ts')).toContain("from './domains/local-seo/business-match.js'");
     expect(readRepoFile('server/national-serp.ts')).toContain("from './domains/local-seo/business-match.js'");
     expect(readRepoFile('server/scoring/keyword-value-score.ts')).toContain("from '../domains/local-seo/keyword-intent.js'");
+  });
+
+  it('keeps workspace classifier helpers in the domain module without widening the facade', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const workspaceClassifiers = readRepoFile('server/domains/local-seo/workspace-classifiers.ts');
+
+    for (const helper of [
+      'buildWorkspaceGeoRegex',
+      'buildWorkspaceServiceTermRegex',
+      'deriveLocalSeoPosture',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(workspaceClassifiers).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+    expect(facade).toContain("from './domains/local-seo/workspace-classifiers.js'");
+    expect(facade).not.toMatch(/export\s+\{[^}]*buildWorkspaceGeoRegex/s);
+    expect(facade).not.toMatch(/export\s+\{[^}]*buildWorkspaceServiceTermRegex/s);
+    expect(facade).not.toMatch(/export\s+\{[^}]*deriveLocalSeoPosture/s);
+    expect(typeof buildWorkspaceGeoRegex).toBe('function');
+    expect(typeof buildWorkspaceServiceTermRegex).toBe('function');
+    expect(typeof deriveLocalSeoPosture).toBe('function');
   });
 });
