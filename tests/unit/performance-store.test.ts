@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import db from '../../server/db/index.js';
 import {
   getCompetitorCompare,
@@ -21,6 +23,10 @@ const SITE_ID = 'perf-store-site';
 const OTHER_SITE_ID = 'perf-store-other';
 const MY_URL = 'https://perf-store.example.com/';
 const COMPETITOR_URL = 'https://competitor.example.com/';
+const performanceStoreSrc = readFileSync( // readFile-ok — intentional static analysis of performance-store competitor projection contract
+  resolve(import.meta.dirname, '../../server/performance-store.ts'),
+  'utf8',
+);
 
 function cleanup() {
   db.prepare("DELETE FROM performance_snapshots WHERE site_id LIKE 'perf-store-%' OR site_id LIKE 'perf_store_%'").run();
@@ -83,12 +89,45 @@ describe('performance-store', () => {
       competitor: { url: 'https://competitor.example.com' },
       winner: 'mine',
     });
+    db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots (sub, site_id, created_at, result)
+      VALUES ('competitor', 'perf_store_list_malformed', '2026-03-01T00:00:00.000Z', '{bad json')
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots (sub, site_id, created_at, result)
+      VALUES ('competitor', 'perf_store_partial_valid', '2026-03-02T00:00:00.000Z', ?)
+    `).run(JSON.stringify({ label: 'legacy-partial-valid-row' }));
 
     expect(getCompetitorCompare('http://perf-store.example.com', 'http://competitor.example.com')?.result).toMatchObject({ winner: 'mine' });
 
     const list = listCompetitorCompares().filter(item => item.myUrl?.includes('perf-store.example.com'));
     expect(list).toHaveLength(1);
     expect(list[0].competitorUrl).toBe('https://competitor.example.com');
+    const allList = listCompetitorCompares();
+    expect(allList.some(item => item.key === 'perf_store_list_malformed')).toBe(false);
+    const partial = allList.find(item => item.key === 'perf_store_partial_valid');
+    expect(partial).toEqual({
+      key: 'perf_store_partial_valid',
+      createdAt: '2026-03-02T00:00:00.000Z',
+      myUrl: undefined,
+      competitorUrl: undefined,
+    });
+  });
+
+  it('uses SQLite JSON projection for competitor list/latest selection instead of parsing every result blob', () => {
+    const projectionStart = performanceStoreSrc.indexOf('listCompetitorProjection: db.prepare');
+    const latestStart = performanceStoreSrc.indexOf('export function getLatestCompetitorCompareForSite');
+    const listStart = performanceStoreSrc.indexOf('export function listCompetitorCompares');
+    const end = performanceStoreSrc.indexOf('\n}', listStart) + 2;
+    const latestBody = performanceStoreSrc.slice(latestStart, listStart);
+    const listBody = performanceStoreSrc.slice(listStart, end);
+
+    expect(projectionStart).toBeGreaterThan(0);
+    expect(performanceStoreSrc.slice(projectionStart, latestStart)).toContain('json_extract');
+    expect(performanceStoreSrc.slice(projectionStart, latestStart)).toContain('json_valid(result)');
+    expect(latestBody).toContain('listCompetitorProjection.all()');
+    expect(listBody).toContain('listCompetitorProjection.all()');
+    expect(listBody).not.toContain('parseJsonFallback');
   });
 
   it('returns the latest competitor comparison for a site and skips malformed rows', () => {
@@ -110,7 +149,12 @@ describe('performance-store', () => {
       INSERT OR REPLACE INTO performance_snapshots (sub, site_id, created_at, result)
       VALUES ('competitor', 'perf_store_malformed', '2026-03-01T00:00:00.000Z', '{bad json')
     `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots (sub, site_id, created_at, result)
+      VALUES ('competitor', 'perf_store_partial_newer', '2026-04-01T00:00:00.000Z', ?)
+    `).run(JSON.stringify({ label: 'newer-but-no-my-url' }));
 
     expect(getLatestCompetitorCompareForSite('https://perf-store.example.com')?.result).toMatchObject({ label: 'new' });
+    expect(getLatestCompetitorCompareForSite('https://www.perf-store.example.com')?.result).toMatchObject({ label: 'new' });
   });
 });

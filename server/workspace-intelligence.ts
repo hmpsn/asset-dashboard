@@ -57,12 +57,17 @@ export async function buildWorkspaceIntelligence(
       assembledAt: new Date().toISOString(),
     };
 
-    for (const slice of requestedSlices) {
+    const assembledSlices = await Promise.all(requestedSlices.map(async (slice) => {
       try {
-        await assembleSlice(result, workspaceId, slice, opts);
+        return await assembleSlice(workspaceId, slice, opts);
       } catch (err) {
         log.warn({ workspaceId, slice, err }, 'Intelligence slice assembly failed — skipping');
+        return undefined;
       }
+    }));
+
+    for (const assembled of assembledSlices) {
+      if (assembled) Object.assign(result, assembled);
     }
 
     intelligenceCache.set(cacheKey, result, INTELLIGENCE_CACHE_TTL);
@@ -79,16 +84,14 @@ export async function buildWorkspaceIntelligence(
 }
 
 async function assembleSlice(
-  result: WorkspaceIntelligence,
   workspaceId: string,
   slice: IntelligenceSlice,
   opts?: IntelligenceOptions,
-): Promise<void> {
+): Promise<Partial<WorkspaceIntelligence> | undefined> {
   const entry: IntelligenceSliceMetadataEntry = INTELLIGENCE_SLICE_METADATA_REGISTRY[slice];
-  if (!canAssembleIntelligenceSlice(entry, opts)) return;
+  if (!canAssembleIntelligenceSlice(entry, opts)) return undefined;
 
-  const assembled = await entry.assemble(workspaceId, opts);
-  Object.assign(result, assembled);
+  return entry.assemble(workspaceId, opts);
 }
 
 export async function buildIntelPrompt(

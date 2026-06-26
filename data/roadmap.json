@@ -1352,9 +1352,20 @@
           "source": "Complexity audit 2026-06-24",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT low-med (bundle). (a) discovered_queries (largest table, 7,107 rows) has NO prune anywhere (unlike rank_snapshots/roi_snapshots which prune by date); getLostVisibilityKeys builds an unbounded in-memory Set — add a retention policy + LIMIT. (b) Default SQLite PRAGMAs leave headroom: add synchronous=NORMAL (safe under WAL) + larger cache (currently 2MB) in db/index.ts. (c) performance_snapshots.result GSC blobs (~160KB) parsed wholesale per read — same pattern as recommendation_sets, less acute (point reads). (d) Intelligence slices assembled sequentially (no Promise.all) — parallelize when slice count/cost grows. Progress 2026-06-26: added WAL-safe synchronous=NORMAL and cache_size=-20000 PRAGMAs; capped lost-visibility row/key read models to the top 200 rows while keeping count semantics uncapped; added discovered_queries pruning from both the rank scheduler and global data-retention cron with one-year retention while preserving the top 200 lost-visibility rows. Deferred recommendation: performance_snapshots projection and intelligence slice parallelism remain pending because they need more focused behavior/performance characterization than this hygiene batch."
+          "shippedAt": "2026-06-26",
+          "notes": "AUDIT low-med (bundle). (a) discovered_queries (largest table, 7,107 rows) has NO prune anywhere (unlike rank_snapshots/roi_snapshots which prune by date); getLostVisibilityKeys builds an unbounded in-memory Set — add a retention policy + LIMIT. (b) Default SQLite PRAGMAs leave headroom: add synchronous=NORMAL (safe under WAL) + larger cache (currently 2MB) in db/index.ts. (c) performance_snapshots.result GSC blobs (~160KB) parsed wholesale per read — same pattern as recommendation_sets, less acute (point reads). (d) Intelligence slices assembled sequentially (no Promise.all) — parallelize when slice count/cost grows. Progress 2026-06-26: added WAL-safe synchronous=NORMAL and cache_size=-20000 PRAGMAs; capped lost-visibility row/key read models to the top 200 rows while keeping count semantics uncapped; added discovered_queries pruning from both the rank scheduler and global data-retention cron with one-year retention while preserving the top 200 lost-visibility rows. DONE 2026-06-26: parallelized workspace intelligence slice assembly while preserving requested-order assignment and per-slice failure isolation; moved competitor performance snapshot list/latest selection onto SQLite JSON projection so list views and latest-candidate matching do not parse every stored result blob. Deferred recommendation captured as simp-delta-0626-pagespeed-snapshot-projection: PageSpeed/admin-chat/site-health/page-profile still need a dedicated summary/page-score projection rather than full result blob reads."
+        },
+        {
+          "id": "simp-delta-0626-pagespeed-snapshot-projection",
+          "title": "PageSpeed performance_snapshots projection (summary + page-score read models)",
+          "source": "Deferred from simp-audit-0624-sqlite-readpath-tuning",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-26",
+          "notes": "Deferred recommendation from the read-path tuning closeout. Competitor performance_snapshots now use SQLite JSON projection, but PageSpeed snapshots still return full result blobs for admin-chat performance detail, siteHealth CWV aggregation, and pageProfile page-score lookup. Build focused read models such as getPageSpeedSummary(siteId, strategy) and getPageSpeedPageScore(siteId, strategy, pagePath), backed by json_extract/json_each or normalized rows, then migrate those internal consumers while keeping /api/webflow/pagespeed-snapshot response shape unchanged."
         },
         {
           "id": "simp-audit-0624-multinode-readiness",
