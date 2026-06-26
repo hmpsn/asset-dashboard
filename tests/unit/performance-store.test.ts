@@ -8,6 +8,9 @@ import {
   getLatestCompetitorCompareForSite,
   getLinkCheck,
   getPageSpeed,
+  getPageSpeedPageMetrics,
+  getPageSpeedPageScore,
+  getPageSpeedSummary,
   getPageWeight,
   getSinglePageSpeed,
   listCompetitorCompares,
@@ -72,6 +75,134 @@ describe('performance-store', () => {
 
     expect(getPageSpeed(SITE_ID, 'mobile')?.result).toEqual({ score: 82 });
     expect(getPageSpeed(SITE_ID, 'desktop')).toBeNull();
+  });
+
+  it('projects PageSpeed summaries and CWV pass rates without loading the full snapshot result', () => {
+    savePageSpeed(SITE_ID, 'mobile', {
+      strategy: 'mobile',
+      averageScore: 85,
+      averageVitals: { LCP: 3150, INP: 235, FID: 80, CLS: 0.15, FCP: 1800, SI: 3200, TBT: 120, TTI: 4000 },
+      pages: [
+        { url: 'https://example.com/good', page: 'Good', score: 95, vitals: { LCP: 2100, INP: 120, CLS: 0.05 } },
+        { url: 'https://example.com/slow', page: 'Slow', score: 42, vitals: { LCP: 4200, INP: 350, CLS: 0.25 } },
+      ],
+      largePayload: 'x'.repeat(10_000),
+    });
+
+    const summary = getPageSpeedSummary(SITE_ID, 'mobile');
+
+    expect(summary).toMatchObject({
+      siteId: SITE_ID,
+      strategy: 'mobile',
+      averageScore: 85,
+      hasAverageVitals: true,
+      averageVitals: { LCP: 3150, INP: 235, FID: 80, CLS: 0.15 },
+      pageCount: 2,
+      cwvPassingPages: 1,
+      cwvPassRate: 0.5,
+      worstPages: [
+        { url: 'https://example.com/slow', page: 'Slow', score: 42 },
+        { url: 'https://example.com/good', page: 'Good', score: 95 },
+      ],
+    });
+  });
+
+  it('uses SQLite JSON projection for PageSpeed summary/page-score reads instead of parsing full blobs', () => {
+    const statementsStart = performanceStoreSrc.indexOf('getPageSpeedSummaryProjection: db.prepare');
+    const helpersStart = performanceStoreSrc.indexOf('export function getPageSpeedPageMetrics');
+    const singlePageStart = performanceStoreSrc.indexOf('// ── Single-page PageSpeed ──');
+    const statementBlock = performanceStoreSrc.slice(statementsStart, helpersStart);
+    const helperBlock = performanceStoreSrc.slice(helpersStart, singlePageStart);
+
+    expect(statementsStart).toBeGreaterThan(0);
+    expect(helpersStart).toBeGreaterThan(statementsStart);
+    expect(statementBlock).toContain('json_extract');
+    expect(statementBlock).toContain('json_each');
+    expect(statementBlock).toContain('json_valid(result)');
+    expect(helperBlock).not.toContain('parseJsonFallback');
+    expect(helperBlock).not.toContain("load('pagespeed");
+    expect(helperBlock).not.toContain('getPageSpeed(');
+  });
+
+  it('falls back to legacy mobile PageSpeed rows for projections only on mobile', () => {
+    db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots
+        (sub, site_id, created_at, result)
+      VALUES ('pagespeed', ?, ?, ?)
+    `).run(SITE_ID, new Date().toISOString(), JSON.stringify({
+      averageScore: 82,
+      averageVitals: { LCP: 2400, FID: 50, INP: null, CLS: 0.08 },
+      pages: [{ slug: '/legacy', score: 82, vitals: { LCP: 2400, FID: 50, CLS: 0.08 } }],
+    }));
+
+    expect(getPageSpeedSummary(SITE_ID, 'mobile')?.averageScore).toBe(82);
+    expect(getPageSpeedSummary(SITE_ID, 'desktop')).toBeNull();
+  });
+
+  it('projects PageSpeed page scores with URL identity matching', () => {
+    savePageSpeed(SITE_ID, 'mobile', {
+      averageScore: 80,
+      averageVitals: { LCP: 2500, FID: 50, INP: null, CLS: 0.05 },
+      pages: [
+        { slug: 'seo', url: 'https://example.com/services/seo#top', score: 94, vitals: { LCP: 2400, FID: 70, CLS: 0.06 } },
+        { slug: 'seo', url: 'https://example.com/seo', score: 45, vitals: { LCP: 4400, INP: 420, CLS: 0.22 } },
+      ],
+    });
+
+    expect(getPageSpeedPageScore(SITE_ID, 'mobile', '/services/seo')).toBe(94);
+    expect(getPageSpeedPageScore(SITE_ID, 'mobile', '/seo')).toBe(45);
+    expect(getPageSpeedPageScore(SITE_ID, 'desktop', '/seo')).toBeNull();
+  });
+
+  it('ignores non-object PageSpeed page entries during projection', () => {
+    savePageSpeed(SITE_ID, 'mobile', {
+      averageScore: 75,
+      averageVitals: { LCP: 3000, FID: 80, INP: null, CLS: 0.1 },
+      pages: [
+        'legacy bad entry',
+        null,
+        { url: 'https://example.com/good', score: 88, vitals: { LCP: 2200, FID: 40, CLS: 0.04 } },
+      ],
+    });
+
+    expect(getPageSpeedPageMetrics(SITE_ID, 'mobile')).toHaveLength(1);
+    expect(getPageSpeedSummary(SITE_ID, 'mobile')).toMatchObject({
+      pageCount: 1,
+      cwvPassingPages: 1,
+      cwvPassRate: 1,
+      worstPages: [{ url: 'https://example.com/good', score: 88 }],
+    });
+  });
+
+  it('selects worst PageSpeed pages after requiring URL-capable rows', () => {
+    savePageSpeed(SITE_ID, 'mobile', {
+      averageScore: 70,
+      averageVitals: { LCP: 3000, FID: 80, INP: null, CLS: 0.1 },
+      pages: [
+        { page: 'No URL 1', score: 1 },
+        { page: 'No URL 2', score: 2 },
+        { page: 'No URL 3', score: 3 },
+        { page: 'No URL 4', score: 4 },
+        { page: 'No URL 5', score: 5 },
+        { url: 'https://example.com/slow', page: 'Slow', score: 60 },
+      ],
+    });
+
+    expect(getPageSpeedSummary(SITE_ID, 'mobile')?.worstPages).toEqual([
+      { url: 'https://example.com/slow', page: 'Slow', score: 60 },
+    ]);
+  });
+
+  it('skips malformed PageSpeed projection rows without breaking full snapshot APIs', () => {
+    db.prepare(`
+      INSERT OR REPLACE INTO performance_snapshots
+        (sub, site_id, created_at, result)
+      VALUES ('pagespeed:mobile', ?, ?, ?)
+    `).run(SITE_ID, new Date().toISOString(), '{bad json');
+
+    expect(getPageSpeed(SITE_ID, 'mobile')).toBeNull();
+    expect(getPageSpeedSummary(SITE_ID, 'mobile')).toBeNull();
+    expect(getPageSpeedPageMetrics(SITE_ID, 'mobile')).toEqual([]);
   });
 
   it('stores single-page PageSpeed snapshots by page key', () => {

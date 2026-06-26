@@ -1404,9 +1404,10 @@
           "source": "Deferred from simp-audit-0624-sqlite-readpath-tuning",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Deferred recommendation from the read-path tuning closeout. Competitor performance_snapshots now use SQLite JSON projection, but PageSpeed snapshots still return full result blobs for admin-chat performance detail, siteHealth CWV aggregation, and pageProfile page-score lookup. Build focused read models such as getPageSpeedSummary(siteId, strategy) and getPageSpeedPageScore(siteId, strategy, pagePath), backed by json_extract/json_each or normalized rows, then migrate those internal consumers while keeping /api/webflow/pagespeed-snapshot response shape unchanged."
+          "shippedAt": "2026-06-26",
+          "notes": "DONE 2026-06-26: added SQLite JSON projection read models in performance-store for PageSpeed summaries, page metrics, and page-score lookup (`getPageSpeedSummary`, `getPageSpeedPageMetrics`, `getPageSpeedPageScore`). Migrated admin-chat performance detail, siteHealth CWV aggregation, and pageProfile CWV status off full PageSpeed result blob parsing while preserving `/api/webflow/pagespeed-snapshot/:siteId` full-snapshot response shape and legacy mobile fallback. Added focused performance-store, siteHealth, pageProfile, admin-chat, and route validation coverage. No deferred follow-up from this item."
         },
         {
           "id": "simp-audit-0624-multinode-readiness",
