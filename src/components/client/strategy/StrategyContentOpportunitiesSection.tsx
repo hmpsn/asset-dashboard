@@ -5,6 +5,7 @@ import { ContentGapRow } from '../../shared/ContentGapRow';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
 import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { compareOrganicContentGapDisplayOrder } from '../../../../shared/keyword-opportunity-projection';
 import { useCart } from '../useCart';
 import { contentProductType } from '../../../../shared/types/payments';
 import { useClientPricing } from '../ClientPricingContext';
@@ -322,9 +323,7 @@ export function StrategyContentOpportunitiesSection({
                       // SEO Generation Quality P2: organically-surfaced gaps sort by
                       // opportunity score; backfilled (deterministic-floor) gaps sort
                       // strictly after them so the strongest ideas stay on top.
-                      .sort((a, b) =>
-                        (a.backfilled ? 1 : 0) - (b.backfilled ? 1 : 0)
-                        || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+                      .sort(compareOrganicContentGapDisplayOrder)
                       .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 6)
                       .map((gap, i) => (
                         <ContentGapCard

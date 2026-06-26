@@ -22,6 +22,7 @@ import { matchesQuestionKeyword } from './strategy-filters.js';
 import { getWorkspace } from './workspaces.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { compareContentGapDemandDisplayOrder, compareKeywordOpportunityScoreDesc } from '../shared/keyword-opportunity-projection.js';
 
 const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
@@ -650,7 +651,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       }
     }
     // Sort descending so highest-value gaps surface first in the UI
-    strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
+    strategy.contentGaps.sort(compareKeywordOpportunityScoreDesc);
     log.info({ workspaceId, count: strategy.contentGaps.length, basis: relaxConservatism ? 'ov-emv' : 'legacy' }, 'Computed content gap opportunity scores');
   }
 
@@ -904,28 +905,7 @@ Rules:
   // opportunities after enrichment. Now we keep all and sort: positive-volume first,
   // then unenriched (no data yet), then confirmed-zero-volume at bottom.
   if (strategy.contentGaps?.length) {
-    const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-    strategy.contentGaps = [...strategy.contentGaps].sort(
-      (a: StrategyContentGap, b: StrategyContentGap) => {
-        // Bucket values (higher = sorted first, descending):
-        //   2 = Positive volume (>0) OR GSC-proven impressions — confirmed demand
-        //   1 = Unenriched (null/undefined) — not yet checked, potential
-        //   0 = Zero volume with no impressions — enriched but no proven demand
-        const getBundle = (gap: StrategyContentGap) => {
-          if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
-          if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive volume bucket 2
-          if ((gap.impressions ?? 0) > 0) return { bucket: 2, vol: gap.impressions! }; // GSC-proven demand even at volume=0
-          return { bucket: 0, vol: 0 };                                 // confirmed zero demand bucket 0
-        };
-        const aBundle = getBundle(a);
-        const bBundle = getBundle(b);
-
-        // Sort by bucket desc, then by volume desc within bucket, then by priority desc
-        return bBundle.bucket - aBundle.bucket ||
-               bBundle.vol - aBundle.vol ||
-               prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '');
-      }
-    );
+    strategy.contentGaps = [...strategy.contentGaps].sort(compareContentGapDemandDisplayOrder);
     log.info(`Content gaps: ${strategy.contentGaps.length} total (sorted, none dropped)`);
   }
 
