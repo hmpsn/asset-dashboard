@@ -68,6 +68,16 @@ vi.mock('../../src/lib/background-job-helpers', () => ({
 }));
 
 // Admin hooks
+vi.mock('../../src/hooks/admin/useAdminBriefs', () => ({
+  useAdminBriefsList: vi.fn(),
+  useAdminRequestsList: vi.fn(),
+  useAdminBriefTemplateCrossref: vi.fn(),
+}));
+
+vi.mock('../../src/hooks/admin/useAdminPosts', () => ({
+  useAdminPostsList: vi.fn(),
+}));
+
 vi.mock('../../src/hooks/admin', async () => {
   const actual = await vi.importActual<typeof import('../../src/hooks/admin')>('../../src/hooks/admin');
   return {
@@ -247,7 +257,8 @@ function makePost(overrides: Partial<PostSummary> = {}): PostSummary {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-import * as adminHooks from '../../src/hooks/admin';
+import * as adminBriefHooks from '../../src/hooks/admin/useAdminBriefs';
+import * as adminPostHooks from '../../src/hooks/admin/useAdminPosts';
 
 function setHooks({
   briefs = [makeBrief()],
@@ -257,22 +268,22 @@ function setHooks({
   requestsLoading = false,
   postsLoading = false,
 } = {}) {
-  vi.mocked(adminHooks.useAdminBriefsList).mockReturnValue({
+  vi.mocked(adminBriefHooks.useAdminBriefsList).mockReturnValue({
     data: briefs,
     isLoading: briefsLoading,
     error: null,
   } as any);
-  vi.mocked(adminHooks.useAdminRequestsList).mockReturnValue({
+  vi.mocked(adminBriefHooks.useAdminRequestsList).mockReturnValue({
     data: requests,
     isLoading: requestsLoading,
     error: null,
   } as any);
-  vi.mocked(adminHooks.useAdminPostsList).mockReturnValue({
+  vi.mocked(adminPostHooks.useAdminPostsList).mockReturnValue({
     data: posts,
     isLoading: postsLoading,
     error: null,
   } as any);
-  vi.mocked(adminHooks.useAdminBriefTemplateCrossref).mockReturnValue({
+  vi.mocked(adminBriefHooks.useAdminBriefTemplateCrossref).mockReturnValue({
     data: null,
     isLoading: false,
     error: null,
@@ -652,7 +663,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
     // Use a different describe file approach: exercise via the static source shape.
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
+    const src = readFileSync(join(__dirname, '../../src/hooks/admin/useAdminBriefWorkflow.ts'), 'utf8'); // readFile-ok
 
     // Handler must call the regen endpoint
     expect(src).toContain('/regenerate-outline');
@@ -663,7 +674,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
     // Verify the handler calls trackJob with CONTENT_BRIEF_REGENERATE when jobId is present.
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
+    const src = readFileSync(join(__dirname, '../../src/hooks/admin/useAdminBriefWorkflow.ts'), 'utf8'); // readFile-ok
 
     expect(src).toContain('CONTENT_BRIEF_REGENERATE');
     expect(src).toContain('setRegenBriefJobId');
@@ -678,7 +689,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
     // we verify the contract via source static check: the handler guards on res.jobId.
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
+    const src = readFileSync(join(__dirname, '../../src/hooks/admin/useAdminBriefWorkflow.ts'), 'utf8'); // readFile-ok
 
     // Handler consumes the unconditional 202 { jobId } contract (sync fallback removed post-review)
     expect(src).toContain('res.jobId');
@@ -692,7 +703,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
   it('handleRegenerateOutline POST endpoint receives { jobId } and enqueues job tracker', async () => {
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
+    const src = readFileSync(join(__dirname, '../../src/hooks/admin/useAdminBriefWorkflow.ts'), 'utf8'); // readFile-ok
 
     expect(src).toContain('Do NOT clear regeneratingOutline here');
     // Watcher effect must clear state on done/error
@@ -706,7 +717,7 @@ describe('W6.2 regen job wiring — handleRegenerateBrief', () => {
   it('handleRegenerateBrief error path shows toast and clears spinner on throw', async () => {
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
-    const src = readFileSync(join(__dirname, '../../src/components/ContentBriefs.tsx'), 'utf8'); // readFile-ok
+    const src = readFileSync(join(__dirname, '../../src/hooks/admin/useAdminBriefWorkflow.ts'), 'utf8'); // readFile-ok
 
     expect(src).toContain("toast(err instanceof Error ? err.message : 'Failed to regenerate brief', 'error')");
     // Must clear regeneratingBrief in catch

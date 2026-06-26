@@ -8,13 +8,13 @@
  *
  * The four receiver layers that must read these fields end-to-end are:
  *   Layer 1: App.tsx FixContext router-state receiver → stores in [fixContext, setFixContext]
- *   Layer 2: ContentBriefs.tsx → reads fixContextRef.current.{field} and passes to the job params
+ *   Layer 2: useAdminBriefWorkflow.ts → reads fixContextRef.current.{field} and passes to the job params
  *   Layer 3: content-brief-generation-job.ts → maps job params → pageAnalysisContext (standalone path)
  *   Layer 4: content-brief.ts generateBrief() → injects into the AI prompt (pageAnalysisContext block
  *             + separate serpFeatures directive block with matchedPage precedence)
  *
  * NOTE on implementation decision (Lane E):
- *   The standalone path (ContentBriefs.tsx → content-brief-generation-job.ts) forwards all 6 fields
+ *   The standalone path (useAdminBriefWorkflow.ts → content-brief-generation-job.ts) forwards all 6 fields
  *   into pageAnalysisContext, NOT into a dedicated strategyCardContext struct. This is because
  *   buildStrategyCardBlock is consumed by the request path (content_requests) where rationale/intent/
  *   priority/journeyStage are structured separately. In the standalone path:
@@ -146,13 +146,13 @@ describe('Layer 4 static — buildStrategyCardBlock (server/content-brief.ts)', 
   });
 });
 
-// ─── Layer 2: ContentBriefs.tsx — forwards FixContext fields to job params ────
+// ─── Layer 2: useAdminBriefWorkflow.ts — forwards FixContext fields to job params ────
 
-describe('Layer 2 static — ContentBriefs.tsx → job params forwarding', () => {
-  const contentBriefs = src('src/components/ContentBriefs.tsx');
+describe('Layer 2 static — useAdminBriefWorkflow.ts → job params forwarding', () => {
+  const contentBriefs = src('src/hooks/admin/useAdminBriefWorkflow.ts');
 
-  it('ContentBriefs.tsx reads fixContextRef', () => {
-    // Sanity: ContentBriefs uses fixContextRef.current to read FixContext fields.
+  it('useAdminBriefWorkflow.ts reads fixContextRef', () => {
+    // Sanity: the workflow hook uses fixContextRef.current to read FixContext fields.
     expect(contentBriefs).toMatch(/fixContextRef\.current/);
   });
 

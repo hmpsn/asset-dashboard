@@ -38,8 +38,8 @@ describe('background job task panel wiring', () => {
     expect(bulkWorkflow).toContain('filterWritableItems(bulkPreview, pages)');
   });
 
-  it('tracks direct content post generation jobs in ContentBriefs', () => {
-    const contentBriefs = read('src/components/ContentBriefs.tsx');
+  it('tracks direct content post generation jobs in the ContentBriefs workflow hook', () => {
+    const contentBriefs = read('src/hooks/admin/useAdminBriefWorkflow.ts');
 
     expect(contentBriefs).toContain('const { trackJob, jobs } = useBackgroundTasks()');
     expect(contentBriefs).toContain('attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId })');
