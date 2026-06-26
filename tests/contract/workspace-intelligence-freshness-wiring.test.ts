@@ -39,7 +39,7 @@ describe('workspace intelligence freshness wiring', () => {
 
   it('non-content intelligence mutation surfaces clear workspace intelligence before domain broadcasts', () => {
     for (const path of [
-      'server/local-seo.ts',
+      'server/domains/local-seo/events.ts',
       'server/routes/local-seo.ts',
       'server/recommendations.ts',
       'server/routes/recommendations.ts',
@@ -48,6 +48,8 @@ describe('workspace intelligence freshness wiring', () => {
     ]) {
       expect(source(path), path).toContain('invalidateIntelligenceCache');
     }
+    expect(source('server/local-seo.ts')).toContain("from './domains/local-seo/configuration-actions.js'");
+    expect(source('server/local-seo.ts')).toContain("from './domains/local-seo/refresh-runner.js'");
   });
 
   it('content decay invalidates when analysis and refresh recommendations mutate cached slice inputs', () => {
