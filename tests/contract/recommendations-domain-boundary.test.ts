@@ -134,4 +134,25 @@ describe('recommendations domain boundary', () => {
     expect(facade).toContain('const _exhaustive: never = type');
     expect(rules).not.toMatch(/function recommendationOutcomeActionType\b/);
   });
+
+  it('keeps read-only recommendation producer stages outside the facade', () => {
+    const facade = readRepoFile('server/recommendations.ts');
+    const producers = readRepoFile('server/domains/recommendations/generation-producers.ts');
+
+    for (const helper of [
+      'appendAuditRecommendations',
+      'appendContentDecayRecommendations',
+      'appendCtrOpportunityRecommendations',
+      'appendDiagnosticRecommendations',
+      'appendFreshnessRecommendations',
+    ]) {
+      expect(producers).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/recommendations/generation-producers.js'");
+    expect(producers).toContain('Content decay data unavailable for recommendations');
+    expect(facade).not.toContain('Content decay data unavailable for recommendations');
+    expect(producers).toContain("failedCategories.add('insight:freshness_alert')");
+  });
 });
