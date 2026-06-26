@@ -10772,6 +10772,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
 
 describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
   const RULE = 'new-rec-type-source-needs-category-and-action-type';
+  const TARGET = 'server/domains/recommendations/rules.ts';
 
   const UNION = (...members: string[]): string =>
     'export type RecSourceCategory =\n' + members.map(m => `  | '${m}'`).join('\n') + ';';
@@ -10782,7 +10783,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('does NOT flag when the union and array are in lockstep', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(UNION('audit', 'strategy', 'decay'), ARRAY('audit', 'strategy', 'decay')),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
@@ -10790,7 +10791,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('flags a union member missing from REC_SOURCE_CATEGORIES (G2 false auto-resolve)', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy', 'decay', 'keyword_gap'),
         ARRAY('audit', 'strategy', 'decay'), // keyword_gap NOT added — the bug
@@ -10804,7 +10805,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('flags an array member missing from the union', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy'),
         ARRAY('audit', 'strategy', 'topic_cluster'), // topic_cluster not in union
@@ -10818,7 +10819,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('respects the // rec-source-lockstep-ok hatch on the array opener line', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy', 'keyword_gap'),
         "const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [ // rec-source-lockstep-ok",
