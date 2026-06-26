@@ -283,7 +283,7 @@ first-class recs, a new `RecType`/`RecSource` value must NOT fall through the
 non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto-resolve):
 - `REC_SOURCE_CATEGORIES` + `getRecSourceCategory` (`server/domains/recommendations/rules.ts`) — a source
   with no category bypasses the auto-resolve safety check.
-- `recommendationOutcomeActionType` (`server/recommendations.ts`) — a real `ActionType` case
+- `recommendationOutcomeActionType` (`server/domains/recommendations/outcome-action-type.ts`) — a real `ActionType` case
   (define new `ActionType`s in `shared/types/outcome-tracking.ts`), **not** the
   `audit_fix_applied` fallback, which feeds `winRateByActionType` and distorts calibration.
   This function is an **exhaustive `switch` over `RecType` with a `never` default**, so adding

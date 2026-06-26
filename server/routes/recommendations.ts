@@ -15,9 +15,9 @@ import {
   computeRecommendationSummary,
   updateRecommendationStatus,
   dismissRecommendation,
-  recommendationOutcomeActionType,
   isCuratedForClient,
 } from '../recommendations.js';
+import { recommendationOutcomeActionType } from '../domains/recommendations/outcome-action-type.js';
 import {
   getOperatorOverrides,
   getSortOrderMap,

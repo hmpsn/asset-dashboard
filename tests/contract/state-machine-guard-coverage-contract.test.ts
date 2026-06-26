@@ -20,7 +20,7 @@ const GUARD_SIGNALS: GuardSignal[] = [
   { entity: 'client_action', file: 'server/client-actions.ts', transitionToken: 'CLIENT_ACTION_TRANSITIONS' },
   { entity: 'briefing_draft', file: 'server/briefing-store.ts', transitionToken: 'BRIEFING_DRAFT_TRANSITIONS' },
   { entity: 'background_job', file: 'server/jobs.ts', transitionToken: 'BACKGROUND_JOB_TRANSITIONS' },
-  { entity: 'recommendation', file: 'server/recommendations.ts', transitionToken: 'RECOMMENDATION_TRANSITIONS' },
+  { entity: 'recommendation', file: 'server/domains/recommendations/status-service.ts', transitionToken: 'RECOMMENDATION_TRANSITIONS' },
   { entity: 'keyword', file: 'server/domains/keyword-command-center/action-service.ts', transitionToken: 'TRACKED_KEYWORD_TRANSITIONS' },
   // G2: newly wired machines
   { entity: 'request', file: 'server/requests.ts', transitionToken: 'REQUEST_TRANSITIONS' },

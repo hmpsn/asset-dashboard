@@ -68,7 +68,8 @@ All five functions return `null` when the rec id is not found in the workspace b
 
 ## `isActiveRec` — the ONE active-set predicate
 
-`isActiveRec(rec, now?)` (exported from `server/recommendations.ts:638`) is the single predicate
+`isActiveRec(rec, now?)` (owned by `server/domains/recommendations/rules.ts` and re-exported from
+`server/recommendations.ts`) is the single predicate
 every reader uses to decide whether a rec is eligible to surface (Act queue, summary top-rec, AI
 context, briefings, intelligence slices). A rec is active iff ALL four conditions hold:
 
@@ -85,14 +86,14 @@ Absent v3 fields (`lifecycle === undefined`, `clientStatus === undefined`) → l
 
 | Reader | File | Decision |
 |---|---|---|
-| `computeRecommendationSummary` | `server/recommendations.ts:652` | routes through `isActiveRec` (Lane 1B) |
+| `computeRecommendationSummary` | `server/domains/recommendations/rules.ts` | routes through `isActiveRec` (Lane 1B) |
 | operational-slice rec counter | `server/intelligence/operational-slice.ts:217` | routes through `isActiveRec` |
 | seo-context-slice `topOpportunity` | `server/intelligence/seo-context-slice.ts:484` | routes through `isActiveRec` (was leaking throttled/sent into AI context) |
 | page-profile-slice | `server/intelligence/page-profile-slice.ts:70` | routes through `isActiveRec` |
 | public projection | `server/recommendation-public-projection.ts` (`stripEmvFromPublicRecs`) | allow-list; admin axis never serialized |
 | Act queue | `server/routes/recommendations.ts` (P2 cockpit) | reads via `isActiveRec` + lifecycle filters (Phase 2) |
 | `admin-chat-context` / `briefing-candidates` | (read summary indirectly) | EXEMPT — consume `computeRecommendationSummary` output, already filtered |
-| outcome-backfill | `server/recommendations.ts` ~line 2450 area | EXEMPT — operates on completed recs only (correct as-is) |
+| outcome-backfill | `server/outcome-backfill.ts` + `server/domains/recommendations/outcome-action-type.ts` | EXEMPT — operates on completed recs only (correct as-is) |
 
 > **As-built note:** The plan's per-reader table named the seo-context-slice reader as `topRec` and
 > the public projection function as `projectPublicRec`. As built: the seo-context-slice builds a
