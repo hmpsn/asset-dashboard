@@ -1,6 +1,7 @@
 import type {
   IntelligenceOptions,
   IntelligenceSlice,
+  SiteHealthSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
 import { createLogger } from '../logger.js';
@@ -15,12 +16,11 @@ export interface IntelligenceSliceMetadataEntry {
   requiredOptions?: Partial<Record<'pagePath' | 'siteId' | 'siteBaseUrl', true>>;
 }
 
-async function assembleWithTimeout<T>(
-  slice: IntelligenceSlice,
+async function assembleSiteHealthWithTimeout(
   workspaceId: string,
   timeoutMs: number,
-  factory: () => Promise<T>,
-): Promise<T | undefined> {
+  factory: () => Promise<SiteHealthSlice>,
+): Promise<SiteHealthSlice | undefined> {
   let timedOut = false;
   const pending = factory().catch((err) => {
     if (timedOut) return undefined;
@@ -28,7 +28,7 @@ async function assembleWithTimeout<T>(
   });
 
   try {
-    const result = await Promise.race<T | undefined>([
+    const result = await Promise.race<SiteHealthSlice | undefined>([
       pending,
       new Promise<undefined>((resolve) => {
         setTimeout(() => {
@@ -38,11 +38,11 @@ async function assembleWithTimeout<T>(
       }),
     ]);
     if (timedOut) {
-      log.warn({ workspaceId, slice, timeoutMs }, `${slice} slice assembly failed — skipping`);
+      log.warn({ workspaceId, slice: 'siteHealth', timeoutMs }, 'siteHealth slice assembly failed — skipping');
     }
     return result;
   } catch (err) {
-    log.warn({ workspaceId, slice, err }, `${slice} slice assembly failed — skipping`);
+    log.warn({ workspaceId, slice: 'siteHealth', err }, 'siteHealth slice assembly failed — skipping');
     return undefined;
   }
 }
@@ -82,8 +82,7 @@ export const INTELLIGENCE_SLICE_METADATA_REGISTRY = {
   siteHealth: {
     assemble: async (workspaceId, opts) => {
       const { assembleSiteHealth } = await import('./site-health-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
-      const siteHealth = await assembleWithTimeout(
-        'siteHealth',
+      const siteHealth = await assembleSiteHealthWithTimeout(
         workspaceId,
         5000,
         () => assembleSiteHealth(workspaceId, opts),
