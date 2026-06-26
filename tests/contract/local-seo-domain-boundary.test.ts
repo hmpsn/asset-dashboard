@@ -20,6 +20,7 @@ import {
   normalizeText as facadeNormalizeText,
   scrubOwnedLocalResults as facadeScrubOwnedLocalResults,
   titleLooksLikeServiceKeyword as facadeTitleLooksLikeServiceKeyword,
+  iterateLocalCandidateSignals as facadeIterateLocalCandidateSignals,
 } from '../../server/local-seo.js';
 import {
   cleanDomain,
@@ -47,6 +48,13 @@ import {
   buildWorkspaceServiceTermRegex,
   deriveLocalSeoPosture,
 } from '../../server/domains/local-seo/workspace-classifiers.js';
+import {
+  buildLocalSeoKeywordCandidatesEvaluatedFromContext,
+  buildLocalSeoKeywordCandidatesFromContext,
+  countLocalSeoKeywordCandidatesFromContext,
+  hasLocalIntentForWorkspace,
+  iterateLocalCandidateSignals,
+} from '../../server/domains/local-seo/candidate-pipeline.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
@@ -138,5 +146,33 @@ describe('local SEO domain boundary', () => {
     expect(typeof buildWorkspaceGeoRegex).toBe('function');
     expect(typeof buildWorkspaceServiceTermRegex).toBe('function');
     expect(typeof deriveLocalSeoPosture).toBe('function');
+  });
+
+  it('keeps candidate pipeline assembly in the domain module with compatibility facade exports', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const pipeline = readRepoFile('server/domains/local-seo/candidate-pipeline.ts');
+
+    for (const helper of [
+      'iterateLocalCandidateSignals',
+      'buildLocalSeoKeywordCandidatesFromContext',
+      'buildLocalSeoKeywordCandidatesEvaluatedFromContext',
+      'countLocalSeoKeywordCandidatesFromContext',
+      'hasLocalIntentForWorkspace',
+    ]) {
+      expect(pipeline).toMatch(new RegExp(`(function\\*?|function) ${helper}\\b`));
+    }
+    expect(facade).not.toMatch(/function\*?\s+iterateLocalCandidateSignals\b/);
+    expect(facade).not.toMatch(/function\s+upsertCandidate\b/);
+    expect(facade).not.toMatch(/function\s+hasLocalIntent\b/);
+    expect(facade).toContain("from './domains/local-seo/candidate-pipeline.js'");
+    expect(facade).not.toMatch(/export\s+\{[^}]*buildLocalSeoKeywordCandidatesFromContext/s);
+    expect(facade).not.toMatch(/export\s+\{[^}]*buildLocalSeoKeywordCandidatesEvaluatedFromContext/s);
+    expect(facade).not.toMatch(/export\s+\{[^}]*countLocalSeoKeywordCandidatesFromContext/s);
+    expect(facadeIterateLocalCandidateSignals).toBe(iterateLocalCandidateSignals);
+    expect(typeof iterateLocalCandidateSignals).toBe('function');
+    expect(typeof buildLocalSeoKeywordCandidatesFromContext).toBe('function');
+    expect(typeof buildLocalSeoKeywordCandidatesEvaluatedFromContext).toBe('function');
+    expect(typeof countLocalSeoKeywordCandidatesFromContext).toBe('function');
+    expect(typeof hasLocalIntentForWorkspace).toBe('function');
   });
 });
