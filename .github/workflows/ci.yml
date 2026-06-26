@@ -267,7 +267,7 @@ jobs:
         run: ${{ matrix.lane.command }}
 
   test:
-    if: always() && github.event_name == 'pull_request'
+    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     needs: [changes, test-lane]
     runs-on: ubuntu-latest
     steps:
@@ -285,7 +285,10 @@ jobs:
 
   coverage:
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.coverage == 'true'
+    # Full-suite coverage takes ~20 minutes and is intentionally not part of
+    # every staging merge. Keep it on the release path; staging remains covered
+    # by fast quality gates plus PR test lanes.
+    if: github.event_name == 'push' && github.ref_name == 'main' && needs.changes.outputs.coverage == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -335,13 +338,14 @@ jobs:
           retention-days: 14
 
   check:
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [changes, quality, test, coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Verify required CI jobs passed
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
           QUALITY_NEEDED: ${{ needs.changes.outputs.quality }}
           TEST_NEEDED: ${{ needs.changes.outputs.test }}
           COVERAGE_NEEDED: ${{ needs.changes.outputs.coverage }}
@@ -352,6 +356,7 @@ jobs:
           echo "quality needed:  $QUALITY_NEEDED"
           echo "test needed:     $TEST_NEEDED"
           echo "coverage needed: $COVERAGE_NEEDED"
+          echo "ref:      $REF_NAME"
           echo "quality:  $QUALITY_RESULT"
           echo "test:     $TEST_RESULT"
           echo "coverage: $COVERAGE_RESULT"
@@ -366,7 +371,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "push" && "$COVERAGE_NEEDED" == "true" && "$COVERAGE_RESULT" != "success" ]]; then
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" && "$COVERAGE_NEEDED" == "true" && "$COVERAGE_RESULT" != "success" ]]; then
             echo "::error::coverage job failed"
             exit 1
           fi

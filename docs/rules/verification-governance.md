@@ -15,7 +15,7 @@ npm run verify:governance
 | Bucket | CI posture | Use for |
 | --- | --- | --- |
 | `pr-ci-blocking` | Runs in the PR quality job | Cheap deterministic checks that protect every branch |
-| `push-ci-blocking` | Runs on push to `staging`/`main` | Checks that require heavier artifacts, such as coverage summaries |
+| `push-ci-blocking` | Runs on selected push paths | Checks that are heavier than PR gates but still appropriate for automated push/release CI |
 | `local-required` | Local platform verification | Developer-machine gates that are useful before PRs but too broad for PR CI |
 | `release-check` | Release readiness | Staging-to-main safety checks and cadence/freshness audits |
 | `secret-backed` | Manual only unless explicitly provisioned | Checks that require credentials or external account state |
@@ -33,10 +33,14 @@ PR quality CI blocks on:
 - `npm run verify:style-drift`
 - `npm run verify:staging-merge-integrity`
 
-Push coverage CI blocks on:
+Main/release coverage CI blocks on:
 
 - `npm run test:coverage`
 - `npm run verify:coverage-ratchet`
+
+Staging push CI does not run full-suite coverage on every merge. The coverage
+ratchet remains available locally and on the release path, where its slower
+single-summary artifact generation is appropriate.
 
 Do not wire every verifier into PR CI. Credentialed checks such as
 `verify:stripe-prices`, browser scenario probes, release-readiness audits, and
