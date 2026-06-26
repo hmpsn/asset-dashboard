@@ -164,4 +164,22 @@ describe('recommendations domain boundary', () => {
     expect(facade).not.toContain('Local service gaps unavailable for recommendations');
     expect(facade).not.toContain('GBP + reviews listings unavailable for recommendations');
   });
+
+  it('keeps recommendation finalization stages outside the facade', () => {
+    const facade = readRepoFile('server/recommendations.ts');
+    const finalization = readRepoFile('server/domains/recommendations/finalization.ts');
+
+    expect(finalization).toMatch(/function finalizeRecommendations\b/);
+    expect(finalization).toContain('function mintSignalRecs');
+    expect(finalization).toContain('signal-fold: minted intelligence signals as recommendations');
+    expect(finalization).toContain('applyLifecycleCarryOver(recs');
+    expect(finalization).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
+    expect(finalization).toContain('sortRecommendations(recs, effectiveBusinessPriorities');
+    expect(facade).toContain("from './domains/recommendations/finalization.js'");
+    expect(facade).toContain('finalizeRecommendations(recs');
+    expect(facade).not.toContain('function mintSignalRecs');
+    expect(facade).not.toContain('signal-fold: minted intelligence signals as recommendations');
+    expect(facade).not.toContain('applyLifecycleCarryOver(recs');
+    expect(facade).not.toContain('sortRecommendations(recs, effectiveBusinessPriorities');
+  });
 });

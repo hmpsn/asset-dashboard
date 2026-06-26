@@ -66,12 +66,13 @@ describe('workspace intelligence freshness wiring', () => {
   it('recommendation page-state writes broadcast page-state freshness', () => {
     const route = source('server/routes/recommendations.ts');
     const generator = source('server/recommendations.ts');
+    const finalization = source('server/domains/recommendations/finalization.ts');
     const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'admin');
     const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'client-dashboard');
 
     expect(route).toContain('updatedPageStateIds.push(resolvedPageId)');
     expect(route).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
-    expect(generator).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
+    expect(finalization).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(generator).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
     expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
     expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));
