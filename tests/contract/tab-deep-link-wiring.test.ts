@@ -403,13 +403,15 @@ describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
   // readFile-ok — intentional static analysis of sender and receiver
   const calendarFile = join(SRC_DIR, 'components/ContentCalendar.tsx');
   const managerFile = join(SRC_DIR, 'components/ContentManager.tsx');
+  const postWorkflowFile = join(SRC_DIR, 'hooks/admin/useAdminPostWorkflow.ts');
 
   it('ContentCalendar sender file exists', () => {
     expect(existsSync(calendarFile)).toBe(true);
   });
 
-  it('ContentManager receiver file exists', () => {
+  it('ContentManager receiver files exist', () => {
     expect(existsSync(managerFile)).toBe(true);
+    expect(existsSync(postWorkflowFile)).toBe(true);
   });
 
   it('ContentCalendar sends ?post=<id> via navigate()', () => {
@@ -420,10 +422,12 @@ describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
 
   it('ContentManager reads the "post" search param (receiver half)', () => {
     const managerSrc = readFileSync(managerFile, 'utf8'); // readFile-ok — intentional static analysis
+    const workflowSrc = readFileSync(postWorkflowFile, 'utf8'); // readFile-ok — intentional static analysis
+    expect(managerSrc).toContain('useAdminPostWorkflow(workspaceId)');
     // Receiver must call searchParams.get('post') to consume the deep-link
     expect(
-      managerSrc.includes("searchParams.get('post')") ||
-      managerSrc.includes('searchParams.get("post")')
+      workflowSrc.includes("searchParams.get('post')") ||
+      workflowSrc.includes('searchParams.get("post")')
     ).toBe(true);
   });
 
