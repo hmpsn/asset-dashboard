@@ -166,4 +166,39 @@ describe('keyword command center domain boundary', () => {
     expect(candidateBoundary).toContain('keywordSortComparator');
     expect(candidateBoundary).toContain('selectRankEvidence');
   });
+
+  it('keeps action mutation helpers in the domain service with compatibility re-exports from the facade', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const actionService = readRepoFile('server/domains/keyword-command-center/action-service.ts');
+
+    for (const helper of [
+      'canModifyProtected',
+      'trackedSourceForMerge',
+      'upsertTrackedKeywordByKey',
+      'retireTrackedKeyword',
+      'broadcastKeywordCommandCenterAction',
+      'applyKeywordCommandCenterActionInternal',
+      'bulkActionLabel',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(actionService).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const reExported of [
+      'applyKeywordCommandCenterAction',
+      'applyKeywordCommandCenterBulkAction',
+      'deleteKeywordHard',
+      'isHardDeleteEligible',
+    ]) {
+      expect(facade).toContain(`  ${reExported},`);
+      expect(actionService).toMatch(new RegExp(`export function ${reExported}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/action-service.js'");
+    expect(actionService).toContain('db.transaction');
+    expect(actionService).toContain('broadcastToWorkspace');
+    expect(actionService).toContain('addActivity');
+    expect(actionService).toContain('recordKeywordTrackingAction');
+    expect(actionService).toContain('validateTransition');
+  });
 });

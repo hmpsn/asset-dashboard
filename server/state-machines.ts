@@ -311,12 +311,12 @@ export type SchemaPlanStatus =
 // The four TRACKED_KEYWORD_STATUS values (shared/types/rank-tracking.ts). Until P3
 // (Keyword Hub Wave 4) the tracked-keyword lifecycle was the ONLY status entity whose
 // mutations were not state-machine-guarded: every other status column already routes
-// through validateTransition, but `applyKeywordCommandCenterActionInternal` flipped
-// active↔paused↔deprecated directly. This map closes that gap so the live KCC/Hub
+// through validateTransition, but the KCC action service flipped active↔paused↔deprecated
+// directly. This map closes that gap so the live KCC/Hub
 // action engine refuses illegal moves (defense-in-depth: an illegal transition is
 // "never allowed", orthogonal to protection which is "needs confirmation").
 //
-// The edge set is DERIVED from the real action switch (`applyKeywordCommandCenterActionInternal`)
+// The edge set is DERIVED from the real action switch in the KCC action service
 // — the minimal map that ADMITS every transition the switch performs and REJECTS the rest:
 //   active → paused      PAUSE_TRACKING
 //   active → deprecated  RETIRE, DECLINE-of-tracked

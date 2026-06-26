@@ -197,10 +197,10 @@ export function getTrackedKeywords(workspaceId: string, options: GetTrackedKeywo
  * a raw `db.prepare('BEGIN IMMEDIATE').run()` throws "cannot start a transaction
  * within a transaction".) So the db.inTransaction guard below is NOT a throw-avoider;
  * it is an optimisation that skips a needless inner SAVEPOINT and lets nested callers
- * inherit the outer txn's write lock directly. KCC wraps its outer action in
- * db.transaction() before calling updateTrackedKeywords → upsertTrackedKeywordByKey
- * → updateTrackedKeywords → withTrackedKeywordsTxn; the guard NO-OPs the inner BEGIN
- * so those nested callers run under the outer txn's serialisation.
+ * inherit the outer txn's write lock directly. The KCC action service wraps its
+ * outer action in db.transaction() before calling updateTrackedKeywords via its
+ * upsert/retire helpers; the guard NO-OPs the inner BEGIN so those nested callers
+ * run under the outer txn's serialisation.
  *
  * Returns the post-mutation TrackedKeyword[] so callers do NOT need a second
  * getTrackedKeywords() call (the "3×-parse fix").
