@@ -221,7 +221,7 @@ export function computeROI(workspaceId: string): ROIData | null {
     const clicks = page.clicks || 0;
     const impressions = page.impressions || 0;
     const cpc = page.cpc || 0;
-    const value = clicks * cpc;
+    const value = keywordDollarValue({ clicks, cpc }).currentMonthly;
 
     totalClicks += clicks;
     totalImpressions += impressions;
@@ -284,7 +284,7 @@ export function computeROI(workspaceId: string): ROIData | null {
     const clicks = traffic?.clicks || 0;
     const impressions = traffic?.impressions || 0;
     const cpc = traffic?.cpc || avgCPC;
-    const value = clicks * cpc;
+    const value = keywordDollarValue({ clicks, cpc }).currentMonthly;
     totalContentValue += value;
     if (req.targetKeyword) seenKeywords.add(req.targetKeyword.toLowerCase());
 
@@ -317,7 +317,7 @@ export function computeROI(workspaceId: string): ROIData | null {
         const clicks = traffic?.clicks || 0;
         const impressions = traffic?.impressions || 0;
         const cpc = traffic?.cpc || avgCPC;
-        const value = clicks * cpc;
+        const value = keywordDollarValue({ clicks, cpc }).currentMonthly;
         totalContentValue += value;
 
         contentItems.push({

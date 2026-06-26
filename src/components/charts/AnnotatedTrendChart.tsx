@@ -48,8 +48,6 @@ interface AnnotatedTrendChartProps {
   height?: number;
   onCreateAnnotation?: (date: string, label: string, category: string) => void;
   onToggleLine?: (key: string) => void;  // callback when a line chip is clicked
-  /** @deprecated Toggle limit is now enforced by the parent via useToggleSet. Accepted for backward compat but not used. */
-  maxActiveLines?: number;
   callouts?: ChartCallout[];              // optional chart callout bubbles
 }
 
@@ -278,7 +276,6 @@ export function AnnotatedTrendChart({
   height = 220,
   onCreateAnnotation,
   onToggleLine: _onToggleLine,
-  maxActiveLines: _maxActiveLines,
   callouts,
 }: AnnotatedTrendChartProps) {
   const [popover, setPopover] = useState<PopoverState | null>(null);

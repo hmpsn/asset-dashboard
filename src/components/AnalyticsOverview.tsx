@@ -191,7 +191,6 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
             annotations={overview.annotations}
             onCreateAnnotation={handleCreateAnnotation}
             onToggleLine={handleToggleLine}
-            maxActiveLines={3}
             height={260}
           />
         </SectionCard>

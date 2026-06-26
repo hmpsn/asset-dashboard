@@ -2,7 +2,7 @@
 // Pure unit tests for server/data-retention.ts
 //
 // The module only exposes two lifecycle functions: startDataRetentionCrons and
-// stopDataRetentionCrons.  All heavy lifting is delegated to three cleanup
+// stopDataRetentionCrons.  All heavy lifting is delegated to cleanup
 // helpers imported from other modules.  We verify:
 //   • crons can be started and stopped without throwing
 //   • starting a second time is a no-op (idempotent)
@@ -22,10 +22,16 @@ vi.mock('../../server/logger.js', () => ({
   }),
 }));
 
-const { mockCleanupChatSessions, mockCleanupSnapshots, mockCleanupLlmsTxt } = vi.hoisted(() => ({
+const {
+  mockCleanupChatSessions,
+  mockCleanupSnapshots,
+  mockCleanupLlmsTxt,
+  mockPruneDiscoveredQueries,
+} = vi.hoisted(() => ({
   mockCleanupChatSessions: vi.fn().mockReturnValue(0),
   mockCleanupSnapshots: vi.fn().mockReturnValue(0),
   mockCleanupLlmsTxt: vi.fn().mockReturnValue(0),
+  mockPruneDiscoveredQueries: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock('../../server/chat-memory.js', () => ({
@@ -38,6 +44,10 @@ vi.mock('../../server/reports.js', () => ({
 
 vi.mock('../../server/llms-txt-generator.js', () => ({
   cleanupOldLlmsTxt: mockCleanupLlmsTxt,
+}));
+
+vi.mock('../../server/client-discovered-queries.js', () => ({
+  pruneAllDiscoveredQueries: mockPruneDiscoveredQueries,
 }));
 
 import {
@@ -108,6 +118,7 @@ describe('retention cycle (triggered by startup timer)', () => {
     expect(mockCleanupChatSessions).toHaveBeenCalledWith(180);
     expect(mockCleanupSnapshots).toHaveBeenCalledWith(365);
     expect(mockCleanupLlmsTxt).toHaveBeenCalledWith(90);
+    expect(mockPruneDiscoveredQueries).toHaveBeenCalled();
   });
 
   it('passes the correct retention-day values to each helper', async () => {

@@ -195,10 +195,6 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({ tasks: [] }),
 }));
 
-vi.mock('../../src/components/TaskPanel', () => ({
-  TaskPanel: () => <div data-testid="task-panel" />,
-}));
-
 vi.mock('../../src/components/AdminChat', () => ({
   AdminChat: () => <div data-testid="admin-chat" />,
 }));
@@ -745,7 +741,6 @@ async function importAdminApp() {
   // We use a local re-implementation based on the real AdminApp logic but with mocked auth.
   const { useAuth } = await import('../../src/hooks/useAuth');
   const { LoginScreen } = await import('../../src/components/LoginScreen');
-  const { TaskPanel } = await import('../../src/components/TaskPanel');
   const React = await import('react');
 
   // Build a thin AdminApp that mirrors the real one but uses MemoryRouter-compatible rendering.
@@ -765,7 +760,6 @@ async function importAdminApp() {
         <div data-testid="sidebar" />
         <div data-testid="breadcrumbs" />
         <div data-testid="status-bar" />
-        <TaskPanel />
         <div data-testid="theme-class" data-theme={theme} />
       </>
     );

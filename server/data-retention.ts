@@ -4,6 +4,7 @@ import { cleanupOldChatSessions } from './chat-memory.js';
 import { cleanupOldSnapshots } from './reports.js';
 import { cleanupOldLlmsTxt } from './llms-txt-generator.js';
 import { pruneActivityLogRetention } from './activity-log.js';
+import { pruneAllDiscoveredQueries } from './client-discovered-queries.js';
 
 const log = createLogger('data-retention');
 const DAILY_MS = 24 * 60 * 60 * 1000;
@@ -16,7 +17,8 @@ async function runRetention(): Promise<void> {
     const snapshots = cleanupOldSnapshots(365);
     const llmsTxt = cleanupOldLlmsTxt(90);
     const activityLogRows = pruneActivityLogRetention();
-    log.info({ sessions, snapshots, llmsTxt, activityLogRows }, 'Data retention cycle complete');
+    const discoveredQueries = pruneAllDiscoveredQueries();
+    log.info({ sessions, snapshots, llmsTxt, activityLogRows, discoveredQueries }, 'Data retention cycle complete');
   } catch (err) {
     log.error({ err }, 'Data retention cycle failed');
   }

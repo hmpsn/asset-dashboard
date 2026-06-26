@@ -22,6 +22,12 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
+// Under WAL, NORMAL preserves durability for committed transactions while
+// avoiding the extra fsync cost of FULL on every write.
+db.pragma('synchronous = NORMAL');
+// SQLite cache_size is in KiB when negative. Keep this conservative because the
+// singleton is shared by app/tests, but larger than SQLite's small default.
+db.pragma('cache_size = -20000');
 // Wait up to 30 seconds when the database is locked. macOS APFS fsync() can
 // occasionally stall for 5-15 s under background I/O (Time Machine, Spotlight),
 // which was causing SQLITE_BUSY failures when parallel integration test servers

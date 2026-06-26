@@ -3,12 +3,10 @@ import {
 } from 'lucide-react';
 import { STUDIO_NAME } from '../../constants';
 import { Button, IconButton } from '../ui';
-import type { PricingModalData, StripePaymentData } from '../../hooks/usePayments';
-import type { WorkspaceInfo, ClientContentRequest } from './types';
+import type { PricingModalData } from '../../hooks/usePayments';
+import type { WorkspaceInfo } from './types';
 
 interface Props {
-  /** @deprecated Kept for call-site compat; no longer gates rendering. */
-  betaMode?: boolean;
   billingMode?: 'platform' | 'external';
   pricingModal: PricingModalData | null;
   setPricingModal: React.Dispatch<React.SetStateAction<PricingModalData | null>>;
@@ -18,18 +16,9 @@ interface Props {
   fullPostPrice: number | null;
   fmtPrice: (n: number) => string;
   contentPricing: WorkspaceInfo['contentPricing'] | undefined;
-  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
-  stripePayment: StripePaymentData | null;
-  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
-  setStripePayment: React.Dispatch<React.SetStateAction<StripePaymentData | null>>;
-  workspaceId: string;
-  setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
-  setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
 export function PricingConfirmationModal({
-  // betaMode kept in props for prop-spread call sites; no longer gates rendering since
-  // returning null here left the request stuck (setPricingModal was set, modal absent).
   billingMode,
   pricingModal,
   setPricingModal,

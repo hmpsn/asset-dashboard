@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   cleanupOldChatSessions: vi.fn(),
   cleanupOldSnapshots: vi.fn(),
   cleanupOldLlmsTxt: vi.fn(),
+  pruneAllDiscoveredQueries: vi.fn(),
 }));
 
 vi.mock('../../server/chat-memory.js', () => ({
@@ -14,6 +15,9 @@ vi.mock('../../server/reports.js', () => ({
 }));
 vi.mock('../../server/llms-txt-generator.js', () => ({
   cleanupOldLlmsTxt: mocks.cleanupOldLlmsTxt,
+}));
+vi.mock('../../server/client-discovered-queries.js', () => ({
+  pruneAllDiscoveredQueries: mocks.pruneAllDiscoveredQueries,
 }));
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -26,6 +30,7 @@ describe('data-retention', () => {
     mocks.cleanupOldChatSessions.mockReturnValue(1);
     mocks.cleanupOldSnapshots.mockReturnValue(2);
     mocks.cleanupOldLlmsTxt.mockReturnValue(3);
+    mocks.pruneAllDiscoveredQueries.mockReturnValue(4);
   });
 
   afterEach(async () => {
@@ -43,6 +48,7 @@ describe('data-retention', () => {
     expect(mocks.cleanupOldChatSessions).toHaveBeenCalledWith(180);
     expect(mocks.cleanupOldSnapshots).toHaveBeenCalledWith(365);
     expect(mocks.cleanupOldLlmsTxt).toHaveBeenCalledWith(90);
+    expect(mocks.pruneAllDiscoveredQueries).toHaveBeenCalled();
   });
 
   it('does not run startup retention after stop is called before timeout', async () => {
@@ -55,6 +61,7 @@ describe('data-retention', () => {
     expect(mocks.cleanupOldChatSessions).not.toHaveBeenCalled();
     expect(mocks.cleanupOldSnapshots).not.toHaveBeenCalled();
     expect(mocks.cleanupOldLlmsTxt).not.toHaveBeenCalled();
+    expect(mocks.pruneAllDiscoveredQueries).not.toHaveBeenCalled();
   });
 
   it('is idempotent across duplicate start calls', async () => {

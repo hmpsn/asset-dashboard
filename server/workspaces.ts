@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getUploadRoot as _getUploadRoot, getOptRoot as _getOptRoot } from './data-dir.js';
 import db from './db/index.js';
+import { slugify } from './utils/text.js';
 
 const UPLOAD_ROOT = _getUploadRoot();
 const OPT_ROOT = _getOptRoot();
@@ -485,7 +486,7 @@ export function listWorkspaces(): Workspace[] {
 }
 
 export function createWorkspace(name: string, webflowSiteId?: string, webflowSiteName?: string): Workspace {
-  const folder = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const folder = slugify(name);
   const id = `ws_${randomUUID()}`;
 
   // New workspaces start with a 14-day Growth trial

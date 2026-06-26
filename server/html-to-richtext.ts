@@ -8,6 +8,7 @@
  */
 
 import type { GeneratedPost } from '../shared/types/content.ts';
+import { slugify } from './utils/text.js';
 
 /**
  * Assemble a GeneratedPost into a single HTML string suitable for a
@@ -37,9 +38,5 @@ export function assemblePostHtml(post: GeneratedPost): string {
  * Generate a URL-safe slug from a title string.
  */
 export function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 100);
+  return slugify(title).slice(0, 100);
 }
