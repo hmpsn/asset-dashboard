@@ -1,13 +1,18 @@
-import { getOrComputeInsights } from './analytics-intelligence.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { isProgrammingError } from './errors.js';
 import { getJob, updateJob, createJob, hasActiveJob } from './jobs.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { createLogger } from './logger.js';
 import { WS_EVENTS } from './ws-events.js';
+import type { AnalyticsInsight, InsightType } from '../shared/types/analytics.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
 const log = createLogger('intelligence-recompute-job');
+type GetOrComputeInsights = (
+  workspaceId: string,
+  insightType?: InsightType,
+  opts?: { force?: boolean },
+) => Promise<AnalyticsInsight[]>;
 
 /**
  * Enqueue an automated intelligence recompute for a workspace — the single entry point for the daily
@@ -47,6 +52,10 @@ export async function runIntelligenceRecomputeJob(jobId: string, workspaceId: st
   try {
     updateJob(jobId, { status: 'running', progress: 0, total: 100, message: 'Refreshing signals...' });
 
+    const orchestratorPath = './domains/analytics-intelligence/orchestrator.js';
+    const { getOrComputeInsights } = (await import(orchestratorPath)) as { // dynamic-import-ok - avoid pulling analytics compute graph into keyword follow-on imports
+      getOrComputeInsights: GetOrComputeInsights;
+    };
     const insights = await getOrComputeInsights(workspaceId, undefined, { force: true });
     if (jobWasCancelled()) return;
 

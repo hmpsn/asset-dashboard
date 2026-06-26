@@ -58,8 +58,8 @@ vi.mock('../../server/search-console.js', async importOriginal => {
   };
 });
 
-vi.mock('../../server/analytics-intelligence.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../server/analytics-intelligence.js')>();
+vi.mock('../../server/domains/analytics-intelligence/content-decay-refresh.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../server/domains/analytics-intelligence/content-decay-refresh.js')>();
   return {
     ...actual,
     refreshContentDecayInsights: vi.fn().mockResolvedValue(undefined),

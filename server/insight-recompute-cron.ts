@@ -9,7 +9,7 @@ import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { hasRecentActivity } from './activity-log.js';
 import { getInsights } from './analytics-insights-store.js';
-import { isStale } from './analytics-intelligence.js';
+import { isStale } from './domains/analytics-intelligence/computations.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 
