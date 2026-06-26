@@ -201,4 +201,30 @@ describe('keyword command center domain boundary', () => {
     expect(actionService).toContain('recordKeywordTrackingAction');
     expect(actionService).toContain('validateTransition');
   });
+
+  it('keeps read-model row assembly helpers in the domain module', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const readModel = readRepoFile('server/domains/keyword-command-center/read-model.ts');
+
+    for (const helper of [
+      'buildValueScoringConfig',
+      'safeLostVisibilityKeys',
+      'safeLostVisibilityRows',
+      'populateDraftRows',
+      'finalizeDraftRow',
+      'finalizeDraftRows',
+      'ensureLocalVisibilityRows',
+      '__candidateRowMetricParityForTest',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(readModel).toMatch(new RegExp(`export (async )?function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/read-model.js'");
+    expect(facade).toContain('  __candidateRowMetricParityForTest,');
+    expect(readModel).toContain('buildKeywordStrategyUxPayload');
+    expect(readModel).toContain('getLatestSerpSnapshots');
+    expect(readModel).toContain('keywordDollarValue');
+    expect(readModel).toContain('addCandidateKeysFromBundle');
+  });
 });
