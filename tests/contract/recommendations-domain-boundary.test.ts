@@ -146,6 +146,7 @@ describe('recommendations domain boundary', () => {
       'appendCtrOpportunityRecommendations',
       'appendDiagnosticRecommendations',
       'appendFreshnessRecommendations',
+      'appendLocalVisibilityRecommendations',
     ]) {
       expect(producers).toMatch(new RegExp(`function ${helper}\\b`));
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
@@ -158,5 +159,9 @@ describe('recommendations domain boundary', () => {
     expect(producers).toContain('Content decay data unavailable for recommendations');
     expect(facade).not.toContain('Content decay data unavailable for recommendations');
     expect(producers).toContain("failedCategories.add('insight:freshness_alert')");
+    expect(producers).toContain('Local service gaps unavailable for recommendations');
+    expect(producers).toContain('GBP + reviews listings unavailable for recommendations');
+    expect(facade).not.toContain('Local service gaps unavailable for recommendations');
+    expect(facade).not.toContain('GBP + reviews listings unavailable for recommendations');
   });
 });

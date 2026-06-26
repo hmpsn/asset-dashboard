@@ -30,6 +30,7 @@ describe('competitor cron → opportunity event + regen', () => {
 
 describe('apply tail → opportunity regen', () => {
   const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
+  const producerSrc = readFileSync('server/domains/recommendations/generation-producers.ts', 'utf-8'); // readFile-ok - wiring contract
 
   it('triggers a debounced regen on resolveRecommendationsForChange', () => {
     const fnStart = src.indexOf('export function resolveRecommendationsForChange');
@@ -40,8 +41,9 @@ describe('apply tail → opportunity regen', () => {
 
   it('threads a decaying timingBoost into every computeOpportunityValue call', () => {
     // Each OV push site must carry a timingBoost computed from the rec's pages.
-    const ovCalls = (src.match(/computeOpportunityValue\(\{/g) ?? []).length;
-    const timingBoosts = (src.match(/timingBoost: maxBoostForPages\(timingBoosts,/g) ?? []).length;
+    const ovSource = `${src}\n${producerSrc}`;
+    const ovCalls = (ovSource.match(/computeOpportunityValue\(\{/g) ?? []).length;
+    const timingBoosts = (ovSource.match(/timingBoost: maxBoostForPages\((?:ctx\.)?timingBoosts,/g) ?? []).length;
     expect(ovCalls).toBeGreaterThan(0);
     expect(timingBoosts).toBe(ovCalls);
   });
