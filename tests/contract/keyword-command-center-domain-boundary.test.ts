@@ -107,4 +107,27 @@ describe('keyword command center domain boundary', () => {
     expect(bundleFilters).toContain('createVariantParentIndex');
     expect(bundleFilters).toContain('keywordComparisonKey');
   });
+
+  it('keeps tracked keyword provenance helpers in the domain module', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const provenance = readRepoFile('server/domains/keyword-command-center/tracked-keyword-provenance.ts');
+    const startup = readRepoFile('server/index.ts');
+
+    for (const helper of [
+      'withResolvedSiteKeywordMetrics',
+      'inferTrackedKeywordSources',
+      'mergeTrackedKeywordProvenance',
+      'inferTrackedKeywordSourcesForWorkspace',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(provenance).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).toContain(`  ${helper},`);
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/tracked-keyword-provenance.js'");
+    expect(startup).toContain("from './domains/keyword-command-center/tracked-keyword-provenance.js'");
+    expect(startup).not.toContain("from './keyword-command-center.js'");
+    expect(provenance).toContain('listTrackedKeywordRows');
+    expect(provenance).toContain('resolveSiteKeywordMetrics');
+  });
 });

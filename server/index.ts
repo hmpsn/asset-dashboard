@@ -77,14 +77,14 @@ migrateCannibalizationFromJsonBlob();
 import { migrateSiteKeywordMetricsFromBlob } from './site-keyword-metrics.js';
 migrateSiteKeywordMetricsFromBlob();
 
-// Backfill rank_tracking_config.tracked_keywords blobs into the tracked_keywords
-// row table (idempotent, CAS-guarded). Wave 3c-i ADDITIVE SHADOW: this only
-// POPULATES the table — it does NOT strip the blob and does NOT switch any read
-// (reads stay on the blob). The source stamper recovers provenance for legacy
-// UNKNOWN-source rows once via the canonical inference ladder (injected from KCC
-// to avoid a static import cycle). The read-switch + strip are later PRs (3c-ii).
+// Backfill legacy rank_tracking_config.tracked_keywords blobs into the
+// tracked_keywords row table (idempotent, CAS-guarded). The row table is now the
+// read authority; this protects old environments whose table was never populated.
+// The source stamper recovers provenance for legacy UNKNOWN-source rows once via
+// the canonical inference ladder. Import the leaf provenance helper directly so
+// startup does not load the full KCC facade.
 import { migrateTrackedKeywordsFromConfigBlob } from './tracked-keywords-store.js';
-import { inferTrackedKeywordSourcesForWorkspace } from './keyword-command-center.js';
+import { inferTrackedKeywordSourcesForWorkspace } from './domains/keyword-command-center/tracked-keyword-provenance.js';
 migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
 
 // One-time historical outcome-pollution remediation (A1 audit #1): relabel
