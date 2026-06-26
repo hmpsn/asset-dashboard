@@ -24,7 +24,7 @@ import { useRecBulkMutation } from '../../../hooks/admin/useRecBulkMutation';
 import { ARCHETYPE_ORDER, ARCHETYPE_LABELS, recArchetype } from '../../../../shared/types/strategy-archetype';
 import { ARCHETYPE_ACCENT } from '../../../lib/recArchetypeMap';
 import type { Archetype } from '../../../../shared/types/strategy-archetype';
-import type { CockpitActions } from '../StrategyCockpit';
+import type { CockpitActions } from '../cockpitTypes';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { RecWordingOverridePayload } from '../../../../shared/types/rec-operator-steering';
 

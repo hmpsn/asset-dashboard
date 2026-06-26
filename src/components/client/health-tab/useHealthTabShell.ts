@@ -9,9 +9,9 @@ import {
   countInfoIssues,
   filterAuditPages,
 } from './healthTabModel';
+import type { SeverityFilter, ViewMode } from './healthTabTypes';
 
-export type SeverityFilter = 'all' | 'error' | 'warning' | 'info';
-export type ViewMode = 'by-page' | 'by-fix-type';
+export type { SeverityFilter, ViewMode } from './healthTabTypes';
 
 export interface ShareableReport {
   id: string;

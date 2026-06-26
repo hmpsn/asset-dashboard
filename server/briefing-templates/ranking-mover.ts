@@ -19,7 +19,7 @@
 
 import type { AnalyticsInsight, RankingMoverData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
-import type { TemplateContext } from './index.js';
+import type { TemplateContext } from './context.js';
 import { fmtShortDateUTC, appendAnchor } from './_helpers.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;

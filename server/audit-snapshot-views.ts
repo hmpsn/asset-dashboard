@@ -1,5 +1,5 @@
-import type { SeoAuditResult } from './seo-audit.js';
-import { applySuppressionsToAudit, type AuditSuppression } from './seo-audit-suppressions.js';
+import type { AuditSuppression } from './seo-audit-suppressions.js';
+import { getEffectiveAudit, hasAuditSuppressions } from './audit-suppression-projection.js';
 import {
   getLatestSnapshot,
   getLatestSnapshotBefore,
@@ -9,34 +9,13 @@ import {
   type AuditSnapshot,
 } from './reports.js';
 
-function hasSuppressions(suppressions: AuditSuppression[] | undefined): suppressions is AuditSuppression[] {
-  return Array.isArray(suppressions) && suppressions.length > 0;
-}
-
-function normalizeAuditShape(audit: SeoAuditResult): SeoAuditResult {
-  return {
-    ...audit,
-    infos: audit.infos ?? 0,
-    pages: Array.isArray(audit.pages) ? audit.pages : [],
-    siteWideIssues: Array.isArray(audit.siteWideIssues) ? audit.siteWideIssues : [],
-  };
-}
-
-export function getEffectiveAudit(
-  audit: SeoAuditResult,
-  suppressions: AuditSuppression[] | undefined,
-): SeoAuditResult {
-  const normalized = normalizeAuditShape(audit);
-  return hasSuppressions(suppressions)
-    ? applySuppressionsToAudit(normalized, suppressions)
-    : normalized;
-}
+export { getEffectiveAudit } from './audit-suppression-projection.js';
 
 export function getEffectivePreviousScore(
   snapshot: AuditSnapshot,
   suppressions: AuditSuppression[] | undefined,
 ): number | undefined {
-  if (!hasSuppressions(suppressions)) return snapshot.previousScore;
+  if (!hasAuditSuppressions(suppressions)) return snapshot.previousScore;
   const previous = getLatestSnapshotBefore(snapshot.siteId, snapshot.id);
   return previous
     ? getEffectiveAudit(previous.audit, suppressions).siteScore
@@ -47,7 +26,7 @@ export function toEffectiveAuditSnapshot(
   snapshot: AuditSnapshot,
   suppressions: AuditSuppression[] | undefined,
 ): AuditSnapshot {
-  if (!hasSuppressions(suppressions)) return snapshot;
+  if (!hasAuditSuppressions(suppressions)) return snapshot;
   return {
     ...snapshot,
     audit: getEffectiveAudit(snapshot.audit, suppressions),
@@ -67,7 +46,7 @@ export function listEffectiveSnapshotSummaries(
   siteId: string,
   suppressions: AuditSuppression[] | undefined,
 ): SnapshotSummary[] {
-  if (!hasSuppressions(suppressions)) return listSnapshots(siteId);
+  if (!hasAuditSuppressions(suppressions)) return listSnapshots(siteId);
   const snapshots = listSnapshotsDetailed(siteId);
   return snapshots.map((snapshot, idx) => {
     const audit = getEffectiveAudit(snapshot.audit, suppressions);

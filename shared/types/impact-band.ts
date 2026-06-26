@@ -9,12 +9,15 @@
 // CROSS-LANE CONTRACT (the HealthTab UI lane codes against this exact shape):
 //   impactBand?: { band: 'low' | 'medium' | 'high'; monthlyRangeUsd?: [number, number] }
 //
-// The `ImpactBand` interface is the single source of truth and lives in
-// `./fix-catalog.ts` (the UI lane imports it from the catalog). This module owns
-// only the projection logic; it re-exports the type for ergonomic server imports.
+// The `ImpactBand` interface is the single source of truth and lives in this
+// leaf module so recommendation payload types and fix-catalog metadata do not
+// form an import cycle.
 
-import type { ImpactBand } from './fix-catalog.js';
-export type { ImpactBand } from './fix-catalog.js';
+export interface ImpactBand {
+  band: 'low' | 'medium' | 'high';
+  /** Conservative monthly USD range [lower, upper] — absent when below floor */
+  monthlyRangeUsd?: [number, number];
+}
 
 /** Band magnitude label for the impact line + (i) methodology popover. */
 export type ImpactBandLevel = ImpactBand['band'];

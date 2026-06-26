@@ -1,6 +1,6 @@
 import { CAT_LABELS } from '../types';
 import type { AuditDetail, PageAuditResult, SeoIssue } from '../types';
-import type { SeverityFilter } from './useHealthTabShell';
+import type { SeverityFilter } from './healthTabTypes';
 
 interface CategoryStats {
   errors: number;

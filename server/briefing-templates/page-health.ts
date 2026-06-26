@@ -25,7 +25,7 @@
 
 import type { AnalyticsInsight, PageHealthData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
-import type { TemplateContext } from './index.js';
+import type { TemplateContext } from './context.js';
 
 /* TemplateContext imported from ./index.js — see Phase 2.5a review */
 

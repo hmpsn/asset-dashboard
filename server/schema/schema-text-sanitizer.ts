@@ -25,3 +25,15 @@ export function cleanSchemaPublicText(value: unknown): string | undefined {
   if (!cleaned || isOpaqueSchemaIdentifier(cleaned)) return undefined;
   return cleaned;
 }
+
+/**
+ * Removes a trailing " | Brand", " - Brand", " — Brand", or " · Brand"
+ * suffix from a title. Schema.org `name` and breadcrumb labels should not
+ * duplicate the site name.
+ */
+export function scrubBrandSuffix(name: string, brand: string): string {
+  if (!brand) return name;
+  const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\s+[|\\-—·]\\s+${escaped}\\s*$`, 'i');
+  return name.replace(re, '').trim() || name;
+}

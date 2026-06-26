@@ -5,6 +5,7 @@
 
 import type { BreadcrumbItem, PageData } from '../data-sources.js';
 import type { ResolvedEntity } from '../../../shared/types/entity-resolution.js';
+export { scrubBrandSuffix } from '../schema-text-sanitizer.js';
 
 /**
  * Removes keys whose value is undefined. Schema.org templates only emit fields
@@ -150,25 +151,6 @@ function shouldEmitBreadcrumb(items: BreadcrumbItem[], canonicalUrl: string): bo
   if (segments.length >= 2) return true;
   if (segments.length === 1) return !STANDALONE_BREADCRUMB_OMIT_SEGMENTS.has(segments[0].toLowerCase());
   return false;
-}
-
-/**
- * Removes a trailing " | Brand", " - Brand", " — Brand", or " · Brand" suffix from a title.
- * Schema.org `name` and breadcrumb labels should not duplicate the site name —
- * Yoast/RankMath strip this; we match the brand against workspace.name (case-insensitive)
- * to avoid stripping legitimate trailing words that look like brand pipes.
- *
- * Examples:
- *   scrubBrandSuffix("Privacy Policy | Acme Studio", "Acme Studio") → "Privacy Policy"
- *   scrubBrandSuffix("Privacy Policy", "Acme Studio") → "Privacy Policy"
- *   scrubBrandSuffix("Acme | Other Co", "Acme Studio") → "Acme | Other Co" (suffix doesn't match brand)
- */
-export function scrubBrandSuffix(name: string, brand: string): string {
-  if (!brand) return name;
-  // Match " | Brand", " - Brand", " — Brand", " · Brand" at the end, case-insensitive on the brand.
-  const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`\\s+[|\\-—·]\\s+${escaped}\\s*$`, 'i');
-  return name.replace(re, '').trim() || name;
 }
 
 export function resolvedEntityToThingNode(entity: ResolvedEntity): Record<string, unknown> {

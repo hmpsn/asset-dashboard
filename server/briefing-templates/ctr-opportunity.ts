@@ -26,7 +26,7 @@
 
 import type { AnalyticsInsight, CtrOpportunityData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
-import type { TemplateContext } from './index.js';
+import type { TemplateContext } from './context.js';
 
 const MIN_IMPRESSIONS = 100;
 
