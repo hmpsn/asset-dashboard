@@ -3,7 +3,7 @@ import { deleteStaleInsightsByType, upsertInsight } from '../../analytics-insigh
 import { loadDecayAnalysis } from '../../content-decay.js';
 import { buildEnrichmentContext, enrichInsight } from '../../insight-enrichment.js';
 import { createLogger } from '../../logger.js';
-import { toInsightPageId } from '../../helpers.js';
+import { toInsightPageId } from '../../utils/page-address.js';
 import { MIN_DECAY_ABSOLUTE_LOSS, MIN_DECAY_BASELINE_CLICKS } from './constants.js';
 import { validateInsightBatch } from './validation.js';
 

@@ -5,7 +5,7 @@ import {
   updateActionContext,
   updateAttribution,
 } from '../../outcome-tracking.js';
-import { toInsightPageId } from '../../helpers.js';
+import { toInsightPageId } from '../../utils/page-address.js';
 import { createLogger } from '../../logger.js';
 import db from '../../db/index.js';
 import type { AnalyticsInsight } from '../../../shared/types/analytics.js';

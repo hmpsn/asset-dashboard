@@ -65,7 +65,7 @@ vi.mock('../../server/local-seo.js', () => ({
   getPrimaryMarketLocationCode: mocks.getPrimaryMarketLocationCode,
 }));
 
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/utils/page-address.js', () => ({
   findPageMapEntry: mocks.findPageMapEntry,
 }));
 

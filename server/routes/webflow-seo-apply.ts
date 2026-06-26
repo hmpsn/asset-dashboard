@@ -9,7 +9,7 @@ import { Router } from 'express';
 import { requireWorkspaceSiteAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
+import { tryResolvePagePath, normalizePageUrl } from '../utils/page-address.js';
 import { createLogger } from '../logger.js';
 import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { recordSeoChange } from '../seo-change-tracker.js';

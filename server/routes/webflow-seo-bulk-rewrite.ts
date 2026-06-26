@@ -19,7 +19,8 @@ import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
 import { parseJsonFallback } from '../db/json-validation.js';
-import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage } from '../helpers.js';
+import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripHtmlToText, stripCodeFences } from '../utils/text.js';
+import { tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage } from '../utils/page-address.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
   ctrUnderperformanceFlag,

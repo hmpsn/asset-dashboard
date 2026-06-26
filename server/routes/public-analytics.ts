@@ -35,7 +35,11 @@ import {
   getGA4PeriodComparison,
   getGA4NewVsReturning,
 } from '../google-analytics.js';
-import { parseDateRangeStrict, applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from '../helpers.js';
+import { parseDateRangeStrict } from '../utils/request-validation.js';
+import { applySuppressionsToAudit } from '../seo-audit-suppressions.js';
+import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
+import { normalizePageUrl } from '../utils/page-address.js';
+import { stripCodeFences } from '../utils/text.js';
 import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {

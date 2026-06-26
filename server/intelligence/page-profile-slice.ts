@@ -12,7 +12,7 @@ import type { ContentBrief, GeneratedPost } from '../../shared/types/content.js'
 import type { DecayAnalysis } from '../content-decay.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { createLogger } from '../logger.js';
-import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../helpers.js';
+import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../utils/page-address.js';
 
 const log = createLogger('workspace-intelligence/page-profile');
 

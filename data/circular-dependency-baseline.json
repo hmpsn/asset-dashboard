@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-06-26",
   "cycles": {
-    "server": 89,
+    "server": 43,
     "src": 10
   },
   "allowedDirectRouteDbIndexImports": [

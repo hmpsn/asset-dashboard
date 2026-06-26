@@ -1,7 +1,7 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { isProgrammingError } from './errors.js';
-import { buildSchemaContext } from './helpers.js';
+import { buildSchemaContext } from './schema/context-builder.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
 import { getSchemaSnapshot } from './schema-store.js';
 import { generateSchemaPlan } from './schema-plan.js';

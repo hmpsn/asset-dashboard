@@ -4,7 +4,7 @@
  */
 
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';

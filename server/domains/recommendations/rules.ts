@@ -1,4 +1,4 @@
-import { normalizePageUrl } from '../../helpers.js';
+import { normalizePageUrl } from '../../utils/page-address.js';
 import { toPageSlug as toPageSlugShared, cannibalizationUrlSetKey as cannibalizationUrlSetKeyShared } from '../../../shared/page-address-utils.js';
 import { isActiveRec, isCuratedForClient } from '../../../shared/recommendation-predicates.js';
 import type { ContentGap, QuickWin } from '../../workspaces.js';

@@ -30,7 +30,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { buildClientInboxReviewsUrl, getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
-import { normalizePageUrl, resolvePagePath } from '../helpers.js';
+import { normalizePageUrl, resolvePagePath } from '../utils/page-address.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { createLogger } from '../logger.js';

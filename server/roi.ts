@@ -12,7 +12,7 @@ import { listMatrices } from './content-matrices.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { keywordDollarValue } from './scoring/keyword-value-money.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { loadGa4SnapshotHistory } from './ga4-snapshots.js';

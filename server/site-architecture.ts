@@ -14,7 +14,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { listMatrices } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('site-architecture');

@@ -24,7 +24,7 @@ import { getPresence } from './websocket.js';
 import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
-import { sanitizeErrorMessage } from './helpers.js';
+import { sanitizeErrorMessage } from './utils/text.js';
 
 const log = createLogger('app');
 

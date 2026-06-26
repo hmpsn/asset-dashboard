@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
 import { getWorkspaceBySiteId } from './workspaces.js';

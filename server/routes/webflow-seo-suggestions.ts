@@ -25,7 +25,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const router = Router();

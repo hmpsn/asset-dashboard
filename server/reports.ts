@@ -9,7 +9,7 @@ import { getWorkspaceBySiteId } from './workspaces.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { isProgrammingError } from './errors.js';
-import { toAuditFindingPageId } from './helpers.js';
+import { toAuditFindingPageId } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 
 

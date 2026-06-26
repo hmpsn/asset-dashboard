@@ -9,7 +9,7 @@ import {
   type EeatRecommendationSurface,
   type MissingTrustSignal,
 } from '../shared/types/eeat-assets.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 
 interface TrustSignalRule {
   signal: string;

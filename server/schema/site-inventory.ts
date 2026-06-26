@@ -16,7 +16,7 @@ import { discoverCmsItemsBySlug, toCmsPageId } from '../webflow-pages.js';
 import { getCollectionSchema, listCollections } from '../webflow-cms.js';
 import { getSchemaCmsFieldMappings } from '../schema-store.js';
 import { createLogger } from '../logger.js';
-import { resolvePagePath } from '../helpers.js';
+import { resolvePagePath } from '../utils/page-address.js';
 
 const log = createLogger('schema/site-inventory');
 

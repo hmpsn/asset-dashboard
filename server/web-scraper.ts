@@ -6,7 +6,7 @@
 import { STUDIO_BOT_UA } from './constants.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
-import { decodeEntities } from './helpers.js';
+import { decodeEntities } from './utils/text.js';
 import { fetchPublicWebText } from './external-fetch.js';
 
 

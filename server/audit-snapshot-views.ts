@@ -1,5 +1,5 @@
 import type { SeoAuditResult } from './seo-audit.js';
-import { applySuppressionsToAudit, type AuditSuppression } from './helpers.js';
+import { applySuppressionsToAudit, type AuditSuppression } from './seo-audit-suppressions.js';
 import {
   getLatestSnapshot,
   getLatestSnapshotBefore,

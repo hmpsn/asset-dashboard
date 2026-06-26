@@ -4746,7 +4746,7 @@ export const CHECKS: Check[] = [
     // Webflow nested pages have a `publishedPath` like `/services/seo` and a
     // `slug` like `seo` (only the final segment). Using `/${page.slug}` directly
     // as a page path produces wrong URLs for nested pages. The correct helper is
-    // `resolvePagePath(page)` from `server/helpers.ts` (backend) or
+    // `resolvePagePath(page)` from `server/utils/page-address.ts` (backend) or
     // `src/lib/pathUtils.ts` (frontend), which prefers `publishedPath` and
     // falls back to `/${slug}` only when publishedPath is absent.
     //
@@ -4755,7 +4755,7 @@ export const CHECKS: Check[] = [
     //   2. `/${page.slug || ''}` (empty-fallback variant from pagePath assignments)
     //
     // Excluded:
-    //   - server/helpers.ts and src/lib/pathUtils.ts — the canonical implementations
+    //   - server/utils/page-address.ts and src/lib/pathUtils.ts — the canonical implementations
     //     that define the correct fallback logic
     //   - Lines containing `.startsWith('/')` — ternary slug-normalization patterns
     //     (`p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``) that are a safe
@@ -4767,7 +4767,7 @@ export const CHECKS: Check[] = [
     name: 'Bare slug used in pagePath construction — use resolvePagePath(page)',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['.startsWith(\'/\')', '.startsWith("/")', 'publishedPath', '// slug-path-ok'],
     message:
       'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
@@ -4787,7 +4787,7 @@ export const CHECKS: Check[] = [
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
         // Skip canonical implementation files
-        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        if (file.endsWith('server/utils/page-address.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -4818,7 +4818,7 @@ export const CHECKS: Check[] = [
     name: 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['// slug-path-ok'],
     message:
       'resolvePagePath(page) is always truthy (returns "/" as last resort), so ' +
@@ -4834,7 +4834,7 @@ export const CHECKS: Check[] = [
       const deadCodeRe = /resolvePagePath\([^)]*\)\s*\|\|\s*undefined\b/;
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        if (file.endsWith('server/utils/page-address.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -4859,7 +4859,7 @@ export const CHECKS: Check[] = [
     name: 'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['tests/**', 'server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['tests/**', 'shared/page-address-utils.ts', 'server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['normalizePageUrl', 'resolvePagePath', 'resolvePageAddress', '// page-slug-url-ok'],
     message:
       'Avoid `/${pageSlug}` URL construction. pageSlug may already be a canonical path or may be only a leaf slug. ' +
@@ -7278,7 +7278,7 @@ export const CHECKS: Check[] = [
   {
     // ── No new direct workspace reads in buildSchemaContext outside identity allow-list ──
     //
-    // `buildSchemaContext` in server/helpers.ts is the Trajectory 3 → 1 migration target
+    // `buildSchemaContext` in server/schema/context-builder.ts is the Trajectory 3 → 1 migration target
     // (data/roadmap.json:schema-context-builder-pattern-b-migration). The plan is to move
     // all direct ws.* reads to slice consumption via buildWorkspaceIntelligence({ slices }).
     //
@@ -7296,7 +7296,7 @@ export const CHECKS: Check[] = [
     name: 'schema-context-direct-read-not-on-allowlist',
     pattern: '',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/helpers.ts',
+    pathFilter: 'server/schema/context-builder.ts',
     message:
       'Net-new direct reads in buildSchemaContext must use buildWorkspaceIntelligence({ slices: [...] }) per docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6. ' +
       'Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) allowed. ' +
@@ -7323,7 +7323,7 @@ export const CHECKS: Check[] = [
       ]);
       const hits: CustomCheckMatch[] = [];
       for (const file of files) {
-        if (!file.endsWith('server/helpers.ts')) continue;
+        if (!file.endsWith('server/schema/context-builder.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -7393,15 +7393,17 @@ export const CHECKS: Check[] = [
         // Scan each line inside the function body.
         for (let i = bodyStart + 1; i < funcEnd; i++) {
           const line = lines[i];
+          const codeLine = line.replace(/\/\*.*?\*\//g, '').split('//')[0];
 
-          // Pattern: assignment to ctx.X or local const that reads ws.Y or
-          // calls a helper that does direct DB/ws reads (getInsights,
-          // listSites, listSitesCached).
-          // ws.\w+ matches the first segment — ws.keywordStrategy?.businessContext
-          // is flagged via ws.keywordStrategy (which is not in the allow-list).
-          const m = line.match(
-            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/,
-          );
+          // Pattern: any direct ws.Y read or helper call inside the schema
+          // context builder. ws.\w+ matches the first segment —
+          // ws.keywordStrategy?.businessContext is flagged via
+          // ws.keywordStrategy (which is not in the allow-list).
+          //
+          // Helper calls (`getInsights`, `listSites`, `listSitesCached`) are
+          // included because they perform direct cross-context reads even when
+          // wrapped in `await` or used as function arguments.
+          const m = codeLine.match(/\b(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/);
           if (!m) continue;
 
           const rhs = m[1];

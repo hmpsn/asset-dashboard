@@ -8,7 +8,7 @@ import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } fro
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { sanitizeQueryForPrompt } from './helpers.js';
+import { sanitizeQueryForPrompt } from './utils/text.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';

@@ -3,7 +3,7 @@
  * Extracted from webflow.ts — pages, SEO, publishing, schema, sitemap discovery.
  */
 import { createLogger } from './logger.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { fetchPublicWebText } from './external-fetch.js';

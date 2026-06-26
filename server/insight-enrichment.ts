@@ -23,7 +23,7 @@ import type * as Reports from './reports.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
-import { toInsightPageId } from './helpers.js';
+import { toInsightPageId } from './utils/page-address.js';
 import { capitalizeWord } from './utils/strings.js';
 const log = createLogger('insight-enrichment');
 

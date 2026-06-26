@@ -3,7 +3,7 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { addKeywordToPageInTxn, deletePageKeyword } from '../../page-keywords.js';
-import { slugify } from '../../helpers.js';
+import { slugify } from '../../utils/text.js';
 import {
   getTrackedKeywords,
   deleteKeywordRankHistory,

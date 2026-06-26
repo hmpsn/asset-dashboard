@@ -17,7 +17,7 @@ import type {
 import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import { extractBrandTokens, isBrandedQuery } from '../../competitor-brand-filter.js';
 import { isFeatureEnabled } from '../../feature-flags.js';
-import { normalizePageUrl, toInsightPageId } from '../../helpers.js';
+import { normalizePageUrl, toInsightPageId } from '../../utils/page-address.js';
 import { getLatestSerpSnapshots } from '../../serp-snapshots-store.js';
 import { listTrackedKeywordRows } from '../../tracked-keywords-store.js';
 import { industryCtr } from '../../scoring/ctr-curve.js';

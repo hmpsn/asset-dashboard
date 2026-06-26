@@ -14,7 +14,7 @@ import {
   EEAT_RECOMMENDATION_SURFACE,
   TRUST_SIGNAL_SEVERITY,
 } from '../shared/types/eeat-assets.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';

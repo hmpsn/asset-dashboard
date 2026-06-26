@@ -10,7 +10,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyClientFixesApplied, notifyClientWorkOrderComment } from '../email.js';
-import { sanitizeString } from '../helpers.js';
+import { sanitizeString } from '../utils/text.js';
 import { listClientNotificationRecipients } from '../notification-recipients.js';
 import { listPayments } from '../payments.js';
 import { listWorkOrders, getWorkOrder, updateWorkOrder } from '../work-orders.js';

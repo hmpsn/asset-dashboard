@@ -1,5 +1,5 @@
 import type { SearchPage, QueryPageRow } from '../../search-console.js';
-import { normalizePageUrl } from '../../helpers.js';
+import { normalizePageUrl } from '../../utils/page-address.js';
 
 // ── URL normalization for page deduplication ─────────────────────
 // GSC can return multiple URL variants for the same logical page

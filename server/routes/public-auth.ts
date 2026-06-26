@@ -19,7 +19,7 @@ import {
   resetPasswordWithToken,
 } from '../client-users.js';
 import { sendEmail } from '../email.js';
-import { sanitizeString } from '../helpers.js';
+import { sanitizeString } from '../utils/text.js';
 import { addActivity } from '../activity-log.js';
 import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures, requireAuthenticatedClientPortalAuth } from '../middleware.js';
 import { verifyTurnstile } from '../middleware/turnstile.js';

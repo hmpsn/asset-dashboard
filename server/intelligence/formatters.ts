@@ -10,7 +10,7 @@ import type {
   LocalSeoSlice,
   EeatAssetsSlice,
 } from '../../shared/types/intelligence.js';
-import { matchPagePath } from '../helpers.js';
+import { matchPagePath } from '../utils/page-address.js';
 import { formatContentPipelineSection } from './formatter-content-pipeline.js';
 import { formatOperationalSection } from './formatter-operational.js';
 import { pct } from './formatter-shared.js';

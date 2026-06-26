@@ -6,7 +6,7 @@
  * GPT-4.1-mini for keyword clustering/assignment.
  */
 import { randomUUID } from 'node:crypto';
-import { stripCodeFences } from './helpers.js';
+import { stripCodeFences } from './utils/text.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { z } from 'zod';

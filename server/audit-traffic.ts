@@ -2,7 +2,7 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getAllGscPages } from './search-console.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 
 const log = createLogger('audit-traffic');
 

@@ -5,7 +5,7 @@ import { Router, type Request, type Response } from 'express';
 
 const router = Router();
 
-import { sanitizeString } from '../helpers.js';
+import { sanitizeString } from '../utils/text.js';
 import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccess, requireWorkspaceAccessFromBody } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
