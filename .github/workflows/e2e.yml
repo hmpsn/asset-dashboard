@@ -62,7 +62,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-dist
           path: dist/
@@ -92,7 +92,7 @@ jobs:
           cache: npm
 
       - name: Download build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: e2e-dist
           path: dist/
@@ -107,7 +107,7 @@ jobs:
           echo "version=$PLAYWRIGHT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: blob-report-shard-${{ matrix.shard }}
           path: blob-report/
@@ -152,7 +152,7 @@ jobs:
         run: npm ci
 
       - name: Download shard blob reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: blob-report-shard-*
           path: all-blob-reports/
@@ -167,7 +167,7 @@ jobs:
         run: npx playwright merge-reports --reporter=html ./merged-blob-reports
 
       - name: Upload merged Playwright report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-merged
           path: playwright-report/

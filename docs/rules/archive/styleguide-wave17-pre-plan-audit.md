@@ -1,3 +1,9 @@
+---
+status: archived
+archivedAt: 2026-06-26
+reason: Point-in-time styleguide audit artifact. Active design rules live in docs/rules/design-system-enforcement.md and docs/rules/styleguide-rule-registry.md.
+---
+
 # Styleguide Parity Wave 17 Pre-Plan Audit
 
 Date: 2026-05-17

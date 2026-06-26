@@ -38,6 +38,12 @@ Each checkpoint in `data/platform-health-cadence.json` must include:
 - metric payload for all six dimensions
 - `evidencePaths` to code/docs/tests proving the checkpoint work
 
+The same verifier also checks durable governance hygiene:
+
+- active `docs/rules/` files are stable rule contracts, not dated audits, migration maps, or pattern reviews;
+- historical rule artifacts live under `docs/rules/archive/` with `status: archived` frontmatter;
+- official GitHub Actions pins stay on Node 24-native major versions so CI logs remain actionable.
+
 ## Execution Flow
 
 1. Run `npm run verify:platform-health-cadence`.

@@ -4,6 +4,8 @@ import path from 'node:path';
 import {
   buildPlatformHealthCadenceReport,
   findCadencePolicyGaps,
+  findGithubActionRuntimeGaps,
+  findRuleDocLifecycleGaps,
   formatPlatformHealthCadenceMarkdown,
   parseCliArgs,
 } from '../../scripts/platform-health-cadence.js';
@@ -90,6 +92,52 @@ describe('platform health cadence audit', () => {
     };
     const gaps = findCadencePolicyGaps(broken, roadmap, '2026-05-15');
     expect(gaps.issues.some(issue => issue.includes('evidence path does not exist'))).toBe(true);
+  });
+
+  it('detects point-in-time artifacts left in active docs/rules', () => {
+    const gaps = findRuleDocLifecycleGaps({
+      'docs/rules/current-contract.md': '# Current Contract\n\nStable rule text.\n',
+      'docs/rules/feature-pre-plan-audit.md': '# Feature Pre-Plan Audit\n\nDate: 2026-06-24\n',
+      'docs/rules/archive/old-migration-map.md': '---\nstatus: archived\n---\n# Old Migration Map\n',
+    });
+
+    expect(gaps.some(issue => issue.includes('feature-pre-plan-audit.md'))).toBe(true);
+    expect(gaps.length).toBeGreaterThan(0);
+    expect(gaps.some(issue => issue.includes('old-migration-map.md'))).toBe(false);
+  });
+
+  it('requires archived docs/rules files to declare archived status frontmatter', () => {
+    const gaps = findRuleDocLifecycleGaps({
+      'docs/rules/current-contract.md': '# Current Contract\n',
+      'docs/rules/archive/old-audit.md': '# Old Audit\n',
+    });
+
+    expect(gaps.some(issue => issue.includes('old-audit.md'))).toBe(true);
+    expect(gaps.some(issue => issue.includes('status: archived'))).toBe(true);
+  });
+
+  it('detects official GitHub actions that still target the old Node runtime majors', () => {
+    const gaps = findGithubActionRuntimeGaps({
+      '.github/workflows/ci.yaml': [
+        'steps:',
+        '  - uses: actions/checkout@v5',
+        '  - uses: actions/setup-node@v5',
+        '  - uses: actions/cache@v4',
+        '  - uses: actions/upload-artifact@v5',
+        '  - uses: actions/download-artifact@v5',
+      ].join('\n'),
+    });
+
+    expect(gaps).toEqual([
+      '.github/workflows/ci.yaml: actions/cache@v4 must be >= v5 for Node 24 runtime support',
+      '.github/workflows/ci.yaml: actions/upload-artifact@v5 must be >= v7 for Node 24 runtime support',
+      '.github/workflows/ci.yaml: actions/download-artifact@v5 must be >= v8 for Node 24 runtime support',
+    ]);
+  });
+
+  it('accepts the current docs/rules lifecycle and GitHub action runtime baselines', () => {
+    expect(findRuleDocLifecycleGaps()).toEqual([]);
+    expect(findGithubActionRuntimeGaps()).toEqual([]);
   });
 
   it('renders markdown report sections', () => {
