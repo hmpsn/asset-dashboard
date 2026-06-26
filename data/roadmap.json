@@ -1311,9 +1311,9 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT med (bundle). (a) Two useToast implementations — context ToastProvider (Toast.tsx, 5 files) vs local-state hook (hooks/useToast.ts, 2 files); ClientDashboard.tsx:237 drills setToast through 17 client files. Standardize on the context provider, replace setToast props with useToast() at point of use, deprecate the local hook. (b) 12 GA4 fields unbundled from useClientGA4 then re-threaded as 12 individual props into OverviewTab/PerformanceTab — pass the object. (c) Pricing 4-tuple (briefPrice/fullPostPrice/fmtPrice/setPricingModal) drilled through ~9 client files — move to context. (d) Hand-rolled score-color thresholds bypass scoreColorClass in SiteArchitecture.tsx:344 (off-palette green-400, 50 cutoff) + TopicClusters.tsx:21 (70 cutoff)."
+          "notes": "DONE 2026-06-26: standardized client/admin toast usage on the shared ToastProvider/useToast context, wrapped client routes with the client toast profile, removed the duplicate local src/hooks/useToast.ts hook, and moved StripeSettings off the old hook. Bundled the client GA4 hook result through OverviewTab/PerformanceTab instead of threading individual analytics fields. Added ClientPricingContext so StrategyTab, Inbox/UnifiedInbox content-request surfaces, ContentTab, PlansTab, and PricingConfirmationModal read pricing/modal state from a shared provider instead of receiving the brief/full-post/fmt/setPricingModal tuple from ClientDashboard; strict consumers now fail loudly if the provider is missing. Routed schema/topic coverage score-like colors through shared score helpers. Added tests/contract/client-propdrill-sweep.test.ts and tests/component/client/ClientPricingContext.test.tsx to prevent reintroducing local dashboard toast state, unbundled GA4 props, top-level pricing tuple props, missing-provider no-ops, and hand-rolled score-color coverage thresholds. No deferred follow-up from this item; the duplicate toast hook was fully retired."
         },
         {
           "id": "simp-audit-0624-overengineering-sweep",

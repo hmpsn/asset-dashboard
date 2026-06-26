@@ -1,4 +1,5 @@
 import { Button, Icon } from '../ui';
+import { scoreBgBarClass, scoreBgClass, scoreColorClass } from '../ui/constants';
 import { Check, Layers, BarChart3, AlertTriangle } from 'lucide-react';
 import { useShowMore } from '../../hooks/useShowMore';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
@@ -24,13 +25,13 @@ export interface TopicClustersProps {
   maxVisible?: number;
 }
 
-const coverageColor = (pct: number) =>
-  pct >= 70 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-  : pct >= 40 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-  : 'text-red-400 bg-red-500/10 border-red-500/20';
+const coverageBorderClass = (pct: number) =>
+  pct >= 80 ? 'border-emerald-500/20'
+  : pct >= 60 ? 'border-amber-500/20'
+  : 'border-red-500/20';
 
-const coverageBarColor = (pct: number) =>
-  pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
+const coverageColor = (pct: number) =>
+  `${scoreColorClass(pct)} ${scoreBgClass(pct)} ${coverageBorderClass(pct)}`;
 
 export function TopicClusters({ clusters, workspaceId, maxVisible }: TopicClustersProps) {
   const keepEnabled = useFeatureFlag('strategy-keywords-managed-set');
@@ -79,7 +80,7 @@ export function TopicClusters({ clusters, workspaceId, maxVisible }: TopicCluste
               </div>
               {/* Coverage bar */}
               <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-                <div className={`h-full rounded-[var(--radius-pill)] transition-all ${coverageBarColor(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
+                <div className={`h-full rounded-[var(--radius-pill)] transition-all ${scoreBgBarClass(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
               </div>
               <div className="flex items-center justify-between mt-1.5">
                 <div className="flex items-center gap-2 flex-wrap">

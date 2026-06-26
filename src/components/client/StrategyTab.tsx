@@ -56,17 +56,11 @@ interface StrategyTabProps {
   requestedTopics: Set<string>;
   contentRequests?: ClientContentRequest[];
   effectiveTier: Tier;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
-  setPricingModal: (modal: PricingModalState | null) => void;
   contentPlanKeywords?: Map<string, string>;
   onTabChange?: (tab: string) => void;
   workspaceId?: string;
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
-  /** When true (external billing), hide price chips on request buttons. */
-  hidePrices?: boolean;
 }
 
 // Strategy v2 client interior tabs (command-center layout). Mirrors the admin IA. The literal ids
@@ -112,7 +106,7 @@ function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkT
   return value != null && Object.prototype.hasOwnProperty.call(STRATEGY_TAB_SECTION_MAP, value);
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: clientIntelligence } = useClientIntelligence(workspaceId ?? '');
@@ -802,11 +796,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       submitFeedback={submitFeedback}
       onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
       betaMode={betaMode}
-      setPricingModal={setPricingModal}
-      briefPrice={briefPrice}
-      fullPostPrice={fullPostPrice}
-      fmtPrice={fmtPrice}
-      hidePrices={hidePrices}
       onTabChange={onTabChange}
     />
   );

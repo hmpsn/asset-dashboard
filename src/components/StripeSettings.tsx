@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
 import { SectionCard, Badge, Button, FormInput, Icon, IconButton } from './ui';
-import { useToast } from '../hooks/useToast';
+import { useToast } from './Toast';
 import { stripe } from '../api';
 
 interface StripeProduct {
@@ -62,8 +62,8 @@ export function StripeSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProducts, setSavingProducts] = useState(false);
-  const { toast, setToast } = useToast();
-  const showToast = useCallback((message: string, type: 'success' | 'error') => setToast({ message, type }), [setToast]);
+  const { toast } = useToast();
+  const showToast = useCallback((message: string, type: 'success' | 'error') => toast(message, type), [toast]);
 
   // Key inputs
   const [secretKey, setSecretKey] = useState('');
@@ -170,18 +170,6 @@ export function StripeSettings() {
         )
       }
     >
-      {/* Toast */}
-      {toast && (
-        <div className={`mb-3 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium flex items-center gap-2 ${
-          toast.type === 'success' ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-red-500/8 text-red-400/80 border border-red-500/20'
-        }`}>
-          {toast.type === 'success'
-            ? <Icon as={CheckCircle2} size="sm" />
-            : <Icon as={AlertTriangle} size="sm" />}
-          {toast.message}
-        </div>
-      )}
-
       <div className="space-y-4">
         {/* Status summary */}
         <div className="flex items-center gap-3 t-caption">

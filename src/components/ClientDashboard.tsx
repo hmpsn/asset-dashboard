@@ -9,9 +9,7 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
 import { eventDisplayName as deriveEventDisplayName, isEventPinned as deriveIsEventPinned } from './client/the-issue/outcomeNoun';
 import {
-  AlertTriangle,
   X,
-  CheckCircle2,
   Clock, Sparkles,
 } from 'lucide-react';
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader, InlineBanner } from './ui';
@@ -49,13 +47,14 @@ import {
   useClientCopyEntries,
 } from '../hooks/client/useClientQueries';
 import { usePayments } from '../hooks/usePayments';
-import { useToast } from '../hooks/useToast';
+import { useToast } from './Toast';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
 import { ClientHeader } from './client/ClientHeader';
 import { UpgradeModal } from './client/UpgradeModal';
 import { PricingConfirmationModal } from './client/PricingConfirmationModal';
+import { ClientPricingProvider } from './client/ClientPricingContext';
 import { ClientDashboardTabContent } from './client/client-dashboard/ClientDashboardTabContent';
 import { buildClientDashboardNav, hasClientTabData } from './client/client-dashboard/clientDashboardNav';
 import { useClientWorkspaceBootstrap } from './client/client-dashboard/useClientWorkspaceBootstrap';
@@ -220,7 +219,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const auditDetail = auditDetailQ.data ?? null;
   const strategyData = strategyQ.data ?? null;
   const ga4Overview = ga4Data.ga4Overview;
-  const ga4Trend = ga4Data.ga4Trend;
   const ga4Pages = ga4Data.ga4Pages;
   const ga4Sources = ga4Data.ga4Sources;
   const ga4Devices = ga4Data.ga4Devices;
@@ -230,9 +228,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const ga4Comparison = ga4Data.ga4Comparison;
   const ga4NewVsReturning = ga4Data.ga4NewVsReturning;
   const ga4Organic = ga4Data.ga4Organic;
-  const ga4LandingPages = ga4Data.ga4LandingPages;
   const searchDataUpdatedAt = search.dataUpdatedAt;
-  const ga4DataUpdatedAt = ga4Data.dataUpdatedAt;
   const anomalies = anomaliesQ.data ?? [];
   const approvalBatches = approvalsQ.data ?? [];
   const activityLog = activityQ.data ?? [];
@@ -246,7 +242,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const hasCopyEntries = (copyEntriesQ.data ?? 0) > 0;
 
   // ── UI-only state (declared early — needed by hooks below) ──
-  const { toast, setToast, clearToast } = useToast();
+  const { toast } = useToast();
+  const setToast = useCallback((next: { message: string; type: 'success' | 'error' | 'info' } | null) => {
+    if (!next) return;
+    toast(next.message, next.type);
+  }, [toast]);
 
   // ── Payments hook ──
   const {
@@ -564,6 +564,15 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // Upgrade modal, SEO services cart). Per-request actions still work via the
   // bypass path in usePayments + PricingConfirmationModal.
   const isExternalBilling = ws?.billingMode === 'external';
+  const pricingContextValue = {
+    briefPrice,
+    fullPostPrice,
+    fmtPrice,
+    setPricingModal,
+    pricingConfirming,
+    pricingData,
+    hidePrices: isExternalBilling,
+  };
   const trialCountdownDays = ws.trialDaysRemaining ?? 0;
   const trialBannerDismissKey = `client-trial-banner-dismissed:${workspaceId}:${ws.trialEndsAt ?? 'unknown'}`;
   const isTrialBannerDismissed = dismissedTrialBannerKey === trialBannerDismissKey || (() => {
@@ -606,6 +615,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
+    <ClientPricingProvider value={pricingContextValue}>
     <div className={`client-typography min-h-screen overflow-x-hidden bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
@@ -706,12 +716,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           panels={{
             overview: (
               <LazyClientTabPanel>
-                <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} searchDataUpdatedAt={searchDataUpdatedAt} ga4DataUpdatedAt={ga4DataUpdatedAt} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
+                <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Data={ga4Data} searchDataUpdatedAt={searchDataUpdatedAt} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
               </LazyClientTabPanel>
             ),
             performance: (
               <LazyClientTabPanel>
-                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ga4DataUpdatedAt={ga4DataUpdatedAt} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Data={ga4Data} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
               </LazyClientTabPanel>
             ),
             health: (
@@ -730,12 +740,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             strategy: (
               <LazyClientTabPanel>
-                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
               </LazyClientTabPanel>
             ),
             inbox: (
               <LazyClientTabPanel>
-                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} hidePrices={isExternalBilling} />
+                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} setToast={setToast} />
               </LazyClientTabPanel>
             ),
             'content-plan': (
@@ -747,7 +757,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             plans: (
               <LazyClientTabPanel>
-                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} hidePrices={isExternalBilling} />
+                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} setToast={setToast} onOpenChat={() => chatApi?.openChat()} />
               </LazyClientTabPanel>
             ),
             roi: (
@@ -782,7 +792,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 <DeepDiveTab
                   analyticsSlot={(
                     <LazyClientTabPanel>
-                      <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ga4DataUpdatedAt={ga4DataUpdatedAt} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                      <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Data={ga4Data} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
                     </LazyClientTabPanel>
                   )}
                   healthSlot={(
@@ -801,7 +811,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   )}
                   rankingsSlot={(
                     <LazyClientTabPanel>
-                      <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+                      <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
                     </LazyClientTabPanel>
                   )}
                   contentPlanSlot={(clientIaV2 && effectiveTier !== 'free' && contentPlanSummary && contentPlanSummary.totalCells > 0) ? (
@@ -831,7 +841,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     </ErrorBoundary>
                   )}
                   plansSlot={(!betaMode && !isExternalBilling) ? (
-                    <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} hidePrices={isExternalBilling} />
+                    <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} setToast={setToast} onOpenChat={() => chatApi?.openChat()} />
                   ) : undefined}
                 />
               </LazyClientTabPanel>
@@ -859,9 +869,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         setPricingModal={setPricingModal}
         pricingConfirming={pricingConfirming}
         confirmPricingAndSubmit={confirmPricingAndSubmit}
-        briefPrice={briefPrice}
-        fullPostPrice={fullPostPrice}
-        fmtPrice={fmtPrice}
         contentPricing={ws?.contentPricing}
       />
 
@@ -915,16 +922,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         />
       )}
 
-      {/* Toast notification */}
-      {/* z-index-ok — client toast must float above modal-backdrop but below cart */}
-      {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-accent-success' : 'bg-red-500/15 border-red-500/30 text-accent-danger'}`}>
-          {toast.type === 'success' ? <Icon as={CheckCircle2} size="md" className="flex-shrink-0" /> : <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />}
-          <span className="t-caption font-medium">{toast.message}</span>
-          <IconButton icon={X} label="Dismiss notification" size="sm" onClick={clearToast} className="ml-1" />
-        </div>
-      )}
-
       {/* Powered by footer */}
       <footer className="border-t border-[var(--brand-border)] mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -933,6 +930,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         </div>
       </footer>
     </div>
+    </ClientPricingProvider>
     </CartProvider>
     </BetaProvider>
     </ErrorBoundary>

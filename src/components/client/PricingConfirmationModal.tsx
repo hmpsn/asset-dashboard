@@ -1,20 +1,19 @@
 import {
   Loader2, X, Target, Sparkles, FileText, Shield, Lock, Check,
 } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
 import { STUDIO_NAME } from '../../constants';
 import { Button, IconButton } from '../ui';
 import type { PricingModalData } from '../../hooks/usePayments';
 import type { WorkspaceInfo } from './types';
+import { useClientPricing } from './ClientPricingContext';
 
 interface Props {
   billingMode?: 'platform' | 'external';
   pricingModal: PricingModalData | null;
-  setPricingModal: React.Dispatch<React.SetStateAction<PricingModalData | null>>;
+  setPricingModal: Dispatch<SetStateAction<PricingModalData | null>>;
   pricingConfirming: boolean;
   confirmPricingAndSubmit: () => void;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
   contentPricing: WorkspaceInfo['contentPricing'] | undefined;
 }
 
@@ -24,11 +23,9 @@ export function PricingConfirmationModal({
   setPricingModal,
   pricingConfirming,
   confirmPricingAndSubmit,
-  briefPrice,
-  fullPostPrice,
-  fmtPrice,
   contentPricing,
 }: Props) {
+  const { briefPrice, fullPostPrice, fmtPrice } = useClientPricing();
   if (!pricingModal) return null;
   const isExternal = billingMode === 'external';
 

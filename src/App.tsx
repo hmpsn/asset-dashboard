@@ -141,13 +141,15 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
 function ClientRouteShell({ betaMode = false }: { betaMode?: boolean }) {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   return (
-    <BackgroundTaskProvider workspaceId={workspaceId} publicMode>
-      <MobileGuard>
-        <Suspense fallback={<ChunkFallback />}>
-          <ClientRoutes betaMode={betaMode} />
-        </Suspense>
-      </MobileGuard>
-    </BackgroundTaskProvider>
+    <ToastProvider durationMs={5000} placement="bottom-center" mode="single" variant="client">
+      <BackgroundTaskProvider workspaceId={workspaceId} publicMode>
+        <MobileGuard>
+          <Suspense fallback={<ChunkFallback />}>
+            <ClientRoutes betaMode={betaMode} />
+          </Suspense>
+        </MobileGuard>
+      </BackgroundTaskProvider>
+    </ToastProvider>
   );
 }
 

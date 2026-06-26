@@ -12,26 +12,32 @@ import { contentSubscriptions } from '../../api/misc';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../../shared/types/content';
 import type { PricingData } from '../../hooks/usePayments';
 import { queryKeys } from '../../lib/queryKeys';
+import { useOptionalClientPricing } from './ClientPricingContext';
 
 interface PlansTabProps {
   workspaceId: string;
   ws: WorkspaceInfo;
   effectiveTier: Tier;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
+  briefPrice?: number | null;
+  fullPostPrice?: number | null;
+  fmtPrice?: (n: number) => string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   onOpenChat: () => void;
   pricingData?: PricingData | null;
   hidePrices?: boolean;
 }
 
-export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData, hidePrices: hidePricesProp }: PlansTabProps) {
+export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice: briefPriceProp, fullPostPrice: fullPostPriceProp, fmtPrice: fmtPriceProp, setToast, onOpenChat, pricingData: pricingDataProp, hidePrices: hidePricesProp }: PlansTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const tier = effectiveTier;
   const isTrial = ws.isTrial && ws.trialDaysRemaining != null && ws.trialDaysRemaining > 0;
-  const hidePrices = hidePricesProp ?? ws.billingMode === 'external';
+  const pricing = useOptionalClientPricing();
+  const briefPrice = briefPriceProp ?? pricing?.briefPrice ?? null;
+  const fullPostPrice = fullPostPriceProp ?? pricing?.fullPostPrice ?? null;
+  const fmtPrice = fmtPriceProp ?? pricing?.fmtPrice ?? ((n: number) => `$${n}`);
+  const pricingData = pricingDataProp ?? pricing?.pricingData ?? null;
+  const hidePrices = hidePricesProp ?? pricing?.hidePrices ?? false;
   const growthMonthlyPrice = pricingData?.products?.plan_growth?.price ?? 249;
   const premiumMonthlyPrice = pricingData?.products?.plan_premium?.price ?? 999;
   const [billingLoading, setBillingLoading] = useState(false);

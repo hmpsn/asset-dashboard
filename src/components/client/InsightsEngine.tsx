@@ -29,10 +29,9 @@ interface InsightsEngineProps {
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
   onNavigate?: (tab: string, context?: { pageSlug?: string; recType?: string }) => void;
-  /** Optional notification callback for client-portal mounts where no ToastProvider is
-   *  present. When absent the component falls back to the context-based toast (admin
-   *  mounts have ToastProvider; client mounts thread this from ClientDashboard's
-   *  local setToast). Signature mirrors the context toast so both paths look the same. */
+  /** Optional notification callback for client-portal mounts. Client routes now have
+   *  ToastProvider, but this threaded callback keeps notification ownership explicit
+   *  and preserves the older mount/test contract. */
   onNotify?: (message: string, type: 'error' | 'success' | 'info') => void;
 }
 
@@ -137,8 +136,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
   // A sent competitor rec must not surface to the client before this renderer is ready.
   const competitorSendEnabled = useFeatureFlag('strategy-competitor-send');
   const { toast: ctxToast } = useToast();
-  // Prefer the threaded onNotify prop (client-portal mount has no ToastProvider);
-  // fall back to the context toast (admin mount has ToastProvider).
+  // Prefer the threaded onNotify prop (client-portal ownership); fall back to
+  // context toast for reusable/admin mounts.
   const toast = (msg: string, type: 'error' | 'success' | 'info' = 'success') =>
     onNotify ? onNotify(msg, type) : ctxToast(msg, type);
   const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
