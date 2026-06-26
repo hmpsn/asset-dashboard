@@ -4,7 +4,7 @@
  * Wave 13 coverage: audit-batch.ts, audit-suppression-client.ts, SeoAudit.tsx
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
@@ -17,15 +17,30 @@ import {
   type BatchTaskItem,
 } from '../../src/lib/audit-batch';
 import { applyClientSuppressions } from '../../src/lib/audit-suppression-client';
+import { queryKeys } from '../../src/lib/queryKeys';
 import type { SeoIssue, PageSeoResult, SeoAuditResult } from '../../src/components/audit/types';
 
 // ── Module mocks (must be hoisted before component import) ────────────────────
 
+const backgroundTasksMock = vi.hoisted(() => ({
+  jobs: [] as Array<Record<string, unknown>>,
+  activeJobs: [] as Array<Record<string, unknown>>,
+  startJob: vi.fn().mockResolvedValue('job-1'),
+  trackJob: vi.fn(),
+  getJobResult: vi.fn().mockReturnValue(undefined),
+  findActiveJob: vi.fn().mockReturnValue(undefined),
+  findLatestTerminalJob: vi.fn().mockReturnValue(undefined),
+  jobsForWorkspace: vi.fn().mockReturnValue([]),
+  cancelJob: vi.fn().mockResolvedValue(undefined),
+  dismissJob: vi.fn(),
+  clearDone: vi.fn(),
+}));
+
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({
-    jobs: [],
-    activeJobs: [],
-    startJob: vi.fn().mockResolvedValue('job-1'),
+    jobs: backgroundTasksMock.jobs,
+    activeJobs: backgroundTasksMock.activeJobs,
+    startJob: backgroundTasksMock.startJob,
     trackJob: vi.fn(),
     getJobResult: vi.fn().mockReturnValue(undefined),
     findActiveJob: vi.fn().mockReturnValue(undefined),
@@ -53,11 +68,15 @@ vi.mock('../../src/hooks/usePageEditStates', () => ({
   }),
 }));
 
-vi.mock('../../src/hooks/admin', () => ({
-  useAuditTrafficMap: () => ({ data: {} }),
-  useAuditSuppressions: () => ({ data: [] }),
-  useAuditSchedule: () => ({ data: null }),
-}));
+vi.mock('../../src/hooks/admin', async () => {
+  const workflowModule = await vi.importActual('../../src/hooks/admin/useSeoAuditWorkflow');
+  return {
+    useSeoAuditWorkflow: (workflowModule as { useSeoAuditWorkflow: unknown }).useSeoAuditWorkflow,
+    useAuditTrafficMap: () => ({ data: {} }),
+    useAuditSuppressions: () => ({ data: [] }),
+    useAuditSchedule: () => ({ data: null }),
+  };
+});
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -179,8 +198,8 @@ function makeAuditResult(overrides: Partial<SeoAuditResult> = {}): SeoAuditResul
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 
-function makeWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function makeWrapper(queryClient?: QueryClient) {
+  const qc = queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={qc}>
       <MemoryRouter>{children}</MemoryRouter>
@@ -502,6 +521,15 @@ describe('applyClientSuppressions', () => {
 
 describe('SeoAudit component', () => {
   beforeEach(() => {
+    backgroundTasksMock.jobs = [];
+    backgroundTasksMock.activeJobs = [];
+    backgroundTasksMock.startJob.mockReset();
+    backgroundTasksMock.startJob.mockResolvedValue('job-1');
+    getSafeMock.mockReset();
+    getOptionalMock.mockReset();
+    postMock.mockReset();
+    putMock.mockReset();
+    delMock.mockReset();
     getSafeMock.mockResolvedValue([]);
     getOptionalMock.mockResolvedValue(null);
     postMock.mockResolvedValue({});
@@ -521,6 +549,129 @@ describe('SeoAudit component', () => {
     render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
 
     expect(screen.getByText('Include dead link scan')).toBeInTheDocument();
+  });
+
+  it('loads latest snapshot and history through the SeoAudit workflow queries', async () => {
+    render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    await waitFor(() => {
+      expect(getOptionalMock).toHaveBeenCalledWith('/api/reports/site-1/latest?workspaceId=ws-1');
+      expect(getSafeMock).toHaveBeenCalledWith('/api/reports/site-1/history?workspaceId=ws-1', []);
+    });
+  });
+
+  it('starts seo-audit jobs with the current site, workspace, and dead-link setting', async () => {
+    render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    fireEvent.click(screen.getByText('Include dead link scan'));
+    fireEvent.click(screen.getByRole('button', { name: /Run SEO Audit/i }));
+
+    await waitFor(() => {
+      expect(backgroundTasksMock.startJob).toHaveBeenCalledWith('seo-audit', {
+        siteId: 'site-1',
+        workspaceId: 'ws-1',
+        skipLinkCheck: true,
+      });
+    });
+  });
+
+  it('uses recovered completed job data ahead of a divergent latest snapshot', async () => {
+    backgroundTasksMock.jobs = [{
+      id: 'job-done',
+      type: 'seo-audit',
+      status: 'done',
+      workspaceId: 'ws-1',
+      result: makeAuditResult({
+        pages: [makePage({ page: 'Recovered Job Page', slug: 'job-page' })],
+      }),
+    }];
+    getOptionalMock.mockResolvedValueOnce({
+      id: 'snap-old',
+      audit: makeAuditResult({
+        pages: [makePage({ page: 'Old Snapshot Page', slug: 'old-page' })],
+      }),
+    });
+
+    const { findByText, queryByText } = render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    expect(await findByText('Recovered Job Page')).toBeInTheDocument();
+    expect(queryByText('Old Snapshot Page')).not.toBeInTheDocument();
+  });
+
+  it('recovers an in-flight seo-audit job in the loading state', async () => {
+    backgroundTasksMock.jobs = [{
+      id: 'job-running',
+      type: 'seo-audit',
+      status: 'running',
+      workspaceId: 'ws-1',
+      progress: 1,
+      total: 4,
+      message: 'Scanning pages...',
+    }];
+
+    render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    expect(await screen.findByText('Scanning pages...')).toBeInTheDocument();
+    expect(screen.getByText('25%')).toBeInTheDocument();
+  });
+
+  it('renders tracked job completion, shows next steps, and invalidates audit reads', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    backgroundTasksMock.jobs = [{
+      id: 'job-running',
+      type: 'seo-audit',
+      status: 'running',
+      workspaceId: 'ws-1',
+      progress: 1,
+      total: 4,
+      message: 'Scanning pages...',
+    }];
+
+    const { rerender } = render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper(queryClient) });
+    expect(await screen.findByText('Scanning pages...')).toBeInTheDocument();
+
+    backgroundTasksMock.jobs = [{
+      id: 'job-running',
+      type: 'seo-audit',
+      status: 'done',
+      workspaceId: 'ws-1',
+      result: makeAuditResult({
+        pages: [makePage({ page: 'Fresh Job Page', slug: 'fresh-job-page' })],
+      }),
+    }];
+    rerender(<SeoAudit siteId="site-1" workspaceId="ws-1" />);
+
+    expect(await screen.findByText('Fresh Job Page')).toBeInTheDocument();
+    expect(screen.getByText(/Audit complete:/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.admin.auditAll() });
+    });
+  });
+
+  it('renders tracked job errors after loading clears', async () => {
+    backgroundTasksMock.jobs = [{
+      id: 'job-running',
+      type: 'seo-audit',
+      status: 'running',
+      workspaceId: 'ws-1',
+      message: 'Scanning pages...',
+    }];
+
+    const { rerender } = render(<SeoAudit siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+    expect(await screen.findByText('Scanning pages...')).toBeInTheDocument();
+
+    backgroundTasksMock.jobs = [{
+      id: 'job-running',
+      type: 'seo-audit',
+      status: 'error',
+      workspaceId: 'ws-1',
+      error: 'Audit service unavailable',
+    }];
+    rerender(<SeoAudit siteId="site-1" workspaceId="ws-1" />);
+
+    expect(await screen.findByText('SEO Audit Failed')).toBeInTheDocument();
+    expect(screen.getByText('Audit service unavailable')).toBeInTheDocument();
   });
 
   it('renders the sub-tab navigation bar', () => {

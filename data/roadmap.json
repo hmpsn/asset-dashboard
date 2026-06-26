@@ -1422,9 +1422,10 @@
           "source": "Deferred from simp-audit-0624-overengineering-sweep",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Deferred recommendation from the overengineering sweep. SeoAudit still has many local loading/fetching state branches and hand-rolled API flows, but it also owns background-job recovery and persisted snapshot fallback behavior. Do this as a focused workflow extraction/React Query migration with parity tests for snapshot fallback, job recovery, broadcasts/cache invalidation, and existing route response handling."
+          "shippedAt": "2026-06-26",
+          "notes": "DONE 2026-06-26: extracted SeoAudit's background-job recovery, latest persisted snapshot fallback, history reads, run-audit controls, and completion refresh behavior into useSeoAuditWorkflow. Added admin-audit latest/history query keys under the admin-audit prefix so AUDIT_COMPLETE invalidation covers the new readers, kept rendering/task/export/suppression behavior in the component, and added component/source-contract/query-key tests for snapshot fallback, job recovery, endpoint parity, and extraction boundaries."
         },
         {
           "id": "simp-delta-0626-brandhub-overview-dedup",
@@ -1445,6 +1446,16 @@
           "status": "pending",
           "createdAt": "2026-06-26",
           "notes": "Deferred recommendation from the overengineering sweep. Initial audit found defaultProvider/defaultModel/defaultMaxRetries/defaultTimeoutMs/defaultResponseFormat/defaultResearchMode are runtime-consumed by server/ai.ts, while descriptive fields such as providerIntent/outputMode/executionMode/researchMode are contract-tested and documented policy metadata. Any cleanup should first define the registry's authoritative runtime-vs-policy contract, then remove or relocate fields with tests and docs updated in the same PR."
+        },
+        {
+          "id": "simp-delta-0626-roadmap-noise-reduction",
+          "title": "Roadmap noise reduction batch (close, combine, or reclassify stale small items)",
+          "source": "Weekend cleanup flow addition 2026-06-26",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-26",
+          "notes": "Append-only cleanup item for the current Platform Simplification sprint. Goal: reduce roadmap mental load without hiding real work. Do NOT remove or rewrite items from this current sprint except to add verified completion notes as they ship. Outside this sprint, audit small/stale sprint buckets and either (a) mark items done only when code/docs prove they are already shipped, (b) combine duplicate or superseded items into a clearer parent with provenance preserved, (c) reclassify product-judgment work as OWNER CALL / BRAINSTORM FIRST / DEFERRED with explicit re-entry criteria, or (d) archive/park stale one-off sprints only after every item is moved or closed with notes. Initial audit targets: `sprint-core-features-audit-deferred-2026-06-10` (2 parked items), `sprint-admin-surfaces-polish-2026-06-11` (5 broad polish sweeps likely suitable for triage/closeout), `sprint-platform-simplification-explorers-2026-06-09` (single remaining P2 simplification item), client-dashboard owner-call items (`tier-model-rediscussion`, `public-strategy-raw-gap-fields`, `cda-sc6-changes-requested-visibility`), and stale deferred P3/P4 items that say 'do not act', 'down the road', or require external/provider budget. Verification: JSON parse, `npx tsx scripts/sort-roadmap.ts` if item ordering changes, and PR notes listing every item closed/moved/reclassified with before/after IDs."
         },
         {
           "id": "simp-audit-0624-deadcode-sweep",
