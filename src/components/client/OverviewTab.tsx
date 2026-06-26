@@ -24,11 +24,13 @@ import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { themeColor } from '../ui/constants';
+import type { ClientGA4Data } from '../../hooks/client/useClientGA4';
 import type { IssueOutcomeCount, OutcomeType, OutcomeTypeBreakdown } from '../../../shared/types/the-issue';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
-  GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
-  GA4OrganicOverview, GA4Comparison, SearchComparison,
+  GA4Overview, GA4ConversionSummary, GA4NewVsReturning,
+  GA4OrganicOverview, GA4Comparison,
+  SearchComparison,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   ClientTab,
 } from './types';
@@ -48,14 +50,14 @@ interface OverviewTabProps {
   overview: SearchOverview | null;
   searchComparison: SearchComparison | null;
   trend: PerformanceTrend[];
-  ga4Overview: GA4Overview | null;
-  ga4Trend: GA4DailyTrend[];
-  ga4Comparison: GA4Comparison | null;
-  ga4Organic: GA4OrganicOverview | null;
-  ga4Conversions: GA4ConversionSummary[];
-  ga4NewVsReturning: GA4NewVsReturning[];
-  searchDataUpdatedAt?: number | null;
+  ga4Data?: ClientGA4Data;
+  ga4Overview?: GA4Overview | null;
+  ga4Comparison?: GA4Comparison | null;
+  ga4Organic?: GA4OrganicOverview | null;
+  ga4Conversions?: GA4ConversionSummary[];
+  ga4NewVsReturning?: GA4NewVsReturning[];
   ga4DataUpdatedAt?: number | null;
+  searchDataUpdatedAt?: number | null;
   audit: AuditSummary | null;
   auditDetail: AuditDetail | null;
   strategyData: ClientKeywordStrategy | null;
@@ -87,8 +89,14 @@ interface OverviewTabProps {
 export function OverviewTab({
   ws,
   overview, searchComparison,
-  ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
-  searchDataUpdatedAt, ga4DataUpdatedAt,
+  ga4Data,
+  ga4Overview: legacyGa4Overview = null,
+  ga4Comparison: legacyGa4Comparison = null,
+  ga4Organic: legacyGa4Organic = null,
+  ga4Conversions: legacyGa4Conversions = [],
+  ga4NewVsReturning: legacyGa4NewVsReturning = [],
+  ga4DataUpdatedAt: legacyGa4DataUpdatedAt = null,
+  searchDataUpdatedAt,
   audit, auditDetail, strategyData, insights,
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
@@ -96,6 +104,14 @@ export function OverviewTab({
   workspaceId, onAskAi, onOpenChat,
   clientUser, contentPlanSummary, setToast,
 }: OverviewTabProps) {
+  const {
+    ga4Overview = legacyGa4Overview,
+    ga4Comparison = legacyGa4Comparison,
+    ga4Organic = legacyGa4Organic,
+    ga4Conversions = legacyGa4Conversions,
+    ga4NewVsReturning = legacyGa4NewVsReturning,
+    dataUpdatedAt: ga4DataUpdatedAt = legacyGa4DataUpdatedAt,
+  } = ga4Data ?? {};
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const { data: clientIntel } = useClientIntelligence(workspaceId);

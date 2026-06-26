@@ -5,6 +5,7 @@ import {
   Zap, Link2,
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
+import { scoreColor } from './ui/constants';
 import { siteArchitecture } from '../api/content';
 import { formatDateTime } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
@@ -341,7 +342,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
             label="Schema Coverage"
             value={`${coverage.coveragePct}%`}
             icon={Code2}
-            iconColor={coverage.coveragePct >= 80 ? '#4ade80' : coverage.coveragePct >= 50 ? '#fbbf24' : '#ef4444'}
+            iconColor={scoreColor(coverage.coveragePct)}
             sub={`${coverage.withSchema}/${coverage.totalExisting} pages`}
             size="hero"
             staggerIndex={5}

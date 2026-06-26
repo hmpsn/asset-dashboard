@@ -3,11 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InsightsEngine } from '../../../src/components/client/InsightsEngine';
 import type { RecommendationSet } from '../../../shared/types/recommendations';
 
-// NOTE: ToastProvider is NOT imported here. The client-portal mounts InsightsEngine
-// WITHOUT a ToastProvider — the three error-toast tests below assert the threaded
-// onNotify prop is called, which is the real production path for client mounts.
-// Wrapping in ToastProvider (the previous approach) masked the bug where toast()
-// silently no-oped in the client portal because ToastProvider is only on the admin route.
+// NOTE: ToastProvider is intentionally NOT imported here. Client routes now have a
+// provider, but the client-portal production path still threads onNotify from
+// ClientDashboard so notification ownership stays explicit.
 
 const useQueryMock = vi.fn();
 const setQueryDataMock = vi.fn();
@@ -174,10 +172,9 @@ describe('InsightsEngine', () => {
     });
   });
 
-  // ── Error toast tests — client-portal mount (no ToastProvider) ───────────
+  // ── Error toast tests — client-portal notification ownership ─────────────
   // These tests use the onNotify prop directly (the client-portal path) rather than
-  // wrapping in ToastProvider (which would mask the dead-code bug: without onNotify
-  // or ToastProvider, toast() silently no-ops in the client portal).
+  // wrapping in ToastProvider, so a fallback context toast cannot mask this contract.
 
   it('calls onNotify with error when handleRegenerate post() rejects', async () => {
     const set = makeSet();

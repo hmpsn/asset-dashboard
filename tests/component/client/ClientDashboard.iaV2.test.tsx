@@ -79,10 +79,6 @@ vi.mock('react-router-dom', async () => {
 // ── Mock hooks ────────────────────────────────────────────────────────────────
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({ useWorkspaceEvents: vi.fn() }));
 
-vi.mock('../../../src/hooks/useToast', () => ({
-  useToast: vi.fn(() => ({ toast: null, setToast: vi.fn(), clearToast: vi.fn() })),
-}));
-
 // CRITICAL DIFFERENCE #1: flag-aware mock — 'client-ia-v2' is ON so the dashboard builds the
 // 4-tab IA-v2 nav and the OverviewTab IA-v2 branch. Every other flag returns false (its OFF base).
 vi.mock('../../../src/hooks/useFeatureFlag', () => ({

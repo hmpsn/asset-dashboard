@@ -6,7 +6,6 @@
  *
  * Hooks covered:
  *   - useToggleSet         (pure state — no QueryClient needed)
- *   - useToast             (pure state — no QueryClient needed)
  *   - useFeatureFlag       (useQuery + FEATURE_FLAGS fallback)
  *   - usePayments          (pure state + callbacks — no QueryClient needed)
  *   - useContentRequests   (pure state + callbacks — no QueryClient needed)
@@ -47,7 +46,6 @@ const mockPost = vi.mocked(post);
 // ── Imports ─────────────────────────────────────────────────────────────────
 
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../../src/hooks/useToggleSet';
-import { useToast } from '../../../src/hooks/useToast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
@@ -193,126 +191,6 @@ describe('useToggleSet — toggle behaviour', () => {
     const { result } = renderHook(() => useToggleSet(['a'], UNBOUNDED_TOGGLE_SET_OPTIONS));
     act(() => { result.current[2](new Set(['server-selected'])); });
     expect(result.current[0]).toEqual(new Set(['server-selected']));
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// useToast
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe('useToast — initial state', () => {
-  it('starts with no toast (null)', () => {
-    const { result } = renderHook(() => useToast());
-    expect(result.current.toast).toBeNull();
-  });
-
-  it('exposes setToast function', () => {
-    const { result } = renderHook(() => useToast());
-    expect(typeof result.current.setToast).toBe('function');
-  });
-
-  it('exposes clearToast function', () => {
-    const { result } = renderHook(() => useToast());
-    expect(typeof result.current.clearToast).toBe('function');
-  });
-});
-
-describe('useToast — setToast', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it('sets a success toast', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'Saved!', type: 'success' });
-    });
-    expect(result.current.toast).toEqual({ message: 'Saved!', type: 'success' });
-  });
-
-  it('sets an error toast', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'Something went wrong', type: 'error' });
-    });
-    expect(result.current.toast).toEqual({ message: 'Something went wrong', type: 'error' });
-  });
-
-  it('replaces the existing toast when called again', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'First', type: 'success' });
-    });
-    act(() => {
-      result.current.setToast({ message: 'Second', type: 'error' });
-    });
-    expect(result.current.toast?.message).toBe('Second');
-    expect(result.current.toast?.type).toBe('error');
-  });
-
-  it('auto-dismisses after default duration (5000ms)', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'Auto dismiss', type: 'success' });
-    });
-    expect(result.current.toast).not.toBeNull();
-    act(() => { vi.advanceTimersByTime(5000); });
-    expect(result.current.toast).toBeNull();
-  });
-
-  it('auto-dismisses after custom duration', () => {
-    const { result } = renderHook(() => useToast(2000));
-    act(() => {
-      result.current.setToast({ message: 'Short', type: 'success' });
-    });
-    act(() => { vi.advanceTimersByTime(1999); });
-    expect(result.current.toast).not.toBeNull();
-    act(() => { vi.advanceTimersByTime(1); });
-    expect(result.current.toast).toBeNull();
-  });
-
-  it('clears the toast immediately when setToast(null) is called', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'Visible', type: 'success' });
-    });
-    act(() => {
-      result.current.setToast(null);
-    });
-    expect(result.current.toast).toBeNull();
-  });
-});
-
-describe('useToast — clearToast', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it('clears the current toast', () => {
-    const { result } = renderHook(() => useToast());
-    act(() => {
-      result.current.setToast({ message: 'Toast', type: 'success' });
-    });
-    act(() => {
-      result.current.clearToast();
-    });
-    expect(result.current.toast).toBeNull();
-  });
-
-  it('is safe to call when no toast is active', () => {
-    const { result } = renderHook(() => useToast());
-    expect(() => {
-      act(() => { result.current.clearToast(); });
-    }).not.toThrow();
-  });
-
-  it('cancels the auto-dismiss timer so it does not fire after clear', () => {
-    const { result } = renderHook(() => useToast(3000));
-    act(() => {
-      result.current.setToast({ message: 'T', type: 'success' });
-    });
-    act(() => { result.current.clearToast(); });
-    // Advance past original timer — should not cause any state change
-    act(() => { vi.advanceTimersByTime(3000); });
-    expect(result.current.toast).toBeNull();
   });
 });
 

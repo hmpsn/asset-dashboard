@@ -16,19 +16,19 @@ import { useEffect, useState } from 'react';
 import { X, MessageSquare, Sparkles, FileText } from 'lucide-react';
 import { Button, IconButton, Icon, FormInput, FormTextarea } from '../../ui';
 import { SubmitRequestForm } from '../SubmitRequestForm';
-import type { PricingModalState } from '../StrategyTab';
+import { useOptionalClientPricing } from '../ClientPricingContext';
+import type { PricingModalData } from '../../../hooks/usePayments';
 
 interface SubmitRequestChooserModalProps {
   workspaceId: string;
   clientUser?: { id: string; name: string; email: string; role: string } | null;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   onDismiss: () => void;
-  /** Reuse the existing content-topic pricing flow (same handler ContentTab calls). */
-  setPricingModal: (modal: PricingModalState | null) => void;
-  pricingConfirming: boolean;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
+  setPricingModal?: (modal: PricingModalData | null) => void;
+  pricingConfirming?: boolean;
+  briefPrice?: number | null;
+  fullPostPrice?: number | null;
+  fmtPrice?: (n: number) => string;
   hidePrices?: boolean;
 }
 
@@ -39,13 +39,20 @@ export function SubmitRequestChooserModal({
   clientUser,
   setToast,
   onDismiss,
-  setPricingModal,
-  pricingConfirming,
-  briefPrice,
-  fullPostPrice,
-  fmtPrice,
-  hidePrices = false,
+  setPricingModal: setPricingModalProp,
+  pricingConfirming: pricingConfirmingProp,
+  briefPrice: briefPriceProp,
+  fullPostPrice: fullPostPriceProp,
+  fmtPrice: fmtPriceProp,
+  hidePrices: hidePricesProp,
 }: SubmitRequestChooserModalProps) {
+  const pricing = useOptionalClientPricing();
+  const setPricingModal = setPricingModalProp ?? pricing?.setPricingModal ?? (() => undefined);
+  const pricingConfirming = pricingConfirmingProp ?? pricing?.pricingConfirming ?? false;
+  const briefPrice = briefPriceProp ?? pricing?.briefPrice ?? null;
+  const fullPostPrice = fullPostPriceProp ?? pricing?.fullPostPrice ?? null;
+  const fmtPrice = fmtPriceProp ?? pricing?.fmtPrice ?? ((n: number) => `$${n}`);
+  const hidePrices = hidePricesProp ?? pricing?.hidePrices ?? false;
   const [step, setStep] = useState<ChooserStep>('choose');
 
   // "Ask for content" topic form state (mirrors ContentTab's topic form).

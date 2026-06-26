@@ -6,11 +6,9 @@ import { SearchTab } from './SearchTab';
 import { AnalyticsTab } from './AnalyticsTab';
 import { useBetaMode } from './BetaContext';
 import { clientPath } from '../../routes';
+import type { ClientGA4Data } from '../../hooks/client/useClientGA4';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
-  GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
-  GA4DeviceBreakdown, GA4Event, GA4ConversionSummary,
-  GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
   WorkspaceInfo,
 } from './types';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
@@ -35,18 +33,7 @@ interface PerformanceTabProps {
   insights: SearchInsights | null;
   searchDataUpdatedAt?: number | null;
   // Analytics props
-  ga4Overview: GA4Overview | null;
-  ga4Comparison: GA4Comparison | null;
-  ga4Trend: GA4DailyTrend[];
-  ga4Devices: GA4DeviceBreakdown[];
-  ga4Pages: GA4TopPage[];
-  ga4Sources: GA4TopSource[];
-  ga4Organic: GA4OrganicOverview | null;
-  ga4LandingPages: GA4LandingPage[];
-  ga4NewVsReturning: GA4NewVsReturning[] | null;
-  ga4Conversions: GA4ConversionSummary[];
-  ga4Events: GA4Event[];
-  ga4DataUpdatedAt?: number | null;
+  ga4Data: ClientGA4Data;
   ws: WorkspaceInfo;
   tier: 'free' | 'growth' | 'premium';
   days: number;
@@ -59,7 +46,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const hasSearch = !!props.overview;
-  const hasAnalytics = !!props.ga4Overview;
+  const hasAnalytics = !!props.ga4Data.ga4Overview;
   const searchExpected = !!props.ws.gscPropertyUrl;
   const [subTab, setSubTab] = useState<'search' | 'analytics'>(
     props.initialSubTab || (hasSearch ? 'search' : (hasAnalytics && !searchExpected ? 'analytics' : 'search'))
@@ -143,18 +130,18 @@ export function PerformanceTab(props: PerformanceTabProps) {
 
       {subTab === 'analytics' && (
         <AnalyticsTab
-          ga4Overview={props.ga4Overview}
-          ga4Comparison={props.ga4Comparison}
-          ga4Trend={props.ga4Trend}
-          ga4Devices={props.ga4Devices}
-          ga4Pages={props.ga4Pages}
-          ga4Sources={props.ga4Sources}
-          ga4Organic={props.ga4Organic}
-          ga4LandingPages={props.ga4LandingPages}
-          ga4NewVsReturning={props.ga4NewVsReturning}
-          ga4Conversions={props.ga4Conversions}
-          ga4Events={props.ga4Events}
-          dataUpdatedAt={props.ga4DataUpdatedAt}
+          ga4Overview={props.ga4Data.ga4Overview}
+          ga4Comparison={props.ga4Data.ga4Comparison}
+          ga4Trend={props.ga4Data.ga4Trend}
+          ga4Devices={props.ga4Data.ga4Devices}
+          ga4Pages={props.ga4Data.ga4Pages}
+          ga4Sources={props.ga4Data.ga4Sources}
+          ga4Organic={props.ga4Data.ga4Organic}
+          ga4LandingPages={props.ga4Data.ga4LandingPages}
+          ga4NewVsReturning={props.ga4Data.ga4NewVsReturning}
+          ga4Conversions={props.ga4Data.ga4Conversions}
+          ga4Events={props.ga4Data.ga4Events}
+          dataUpdatedAt={props.ga4Data.dataUpdatedAt}
           ws={props.ws}
           days={props.days}
           dateRange={props.dateRange}

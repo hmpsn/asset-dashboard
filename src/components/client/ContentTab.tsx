@@ -10,7 +10,6 @@ import type { ClientContentRequest } from './types';
 import { getDisplayStatus } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
-import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
@@ -18,6 +17,8 @@ import { publicContent } from '../../api/content';
 import { PostReviewCard } from './PostReviewCard';
 import { formatDate } from '../../utils/formatDates';
 import { positionColor } from '../ui/constants';
+import { useOptionalClientPricing } from './ClientPricingContext';
+import type { PricingModalData } from '../../hooks/usePayments';
 
 const POST_REVIEW_SEEN_STORAGE_KEY_PREFIX = 'client-post-review-seen';
 
@@ -36,11 +37,11 @@ export interface ContentTabProps {
   contentRequests: ClientContentRequest[];
   setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
   effectiveTier: Tier;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
-  setPricingModal: (modal: PricingModalState | null) => void;
-  pricingConfirming: boolean;
+  briefPrice?: number | null;
+  fullPostPrice?: number | null;
+  fmtPrice?: (n: number) => string;
+  setPricingModal?: (modal: PricingModalData | null) => void;
+  pricingConfirming?: boolean;
   workspaceId: string;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
   /** When true (external billing), hide price chips on upgrade button. */
@@ -63,11 +64,22 @@ export interface ContentTabProps {
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
-  briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setToast, hidePrices = false, initialExpandedRequestId, soloRequestId,
+  briefPrice: briefPriceProp,
+  fullPostPrice: fullPostPriceProp,
+  fmtPrice: fmtPriceProp,
+  setPricingModal: setPricingModalProp,
+  pricingConfirming: pricingConfirmingProp,
+  workspaceId, setToast, hidePrices: hidePricesProp, initialExpandedRequestId, soloRequestId,
 }: ContentTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
+  const pricing = useOptionalClientPricing();
+  const briefPrice = briefPriceProp ?? pricing?.briefPrice ?? null;
+  const fullPostPrice = fullPostPriceProp ?? pricing?.fullPostPrice ?? null;
+  const fmtPrice = fmtPriceProp ?? pricing?.fmtPrice ?? ((n: number) => `$${n}`);
+  const setPricingModal = setPricingModalProp ?? pricing?.setPricingModal ?? (() => undefined);
+  const pricingConfirming = pricingConfirmingProp ?? pricing?.pricingConfirming ?? false;
+  const hidePrices = hidePricesProp ?? pricing?.hidePrices ?? false;
   // ISSUE 2a — solo mode: show ONLY the opened request, hide all pipeline chrome. Default false in
   // legacy mounts (no prop) → full pipeline renders unchanged.
   const isSolo = soloRequestId != null;

@@ -52,14 +52,6 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: vi.fn(),
 }));
 
-vi.mock('../../src/hooks/useToast', () => ({
-  useToast: vi.fn(() => ({
-    toast: null,
-    setToast: vi.fn(),
-    clearToast: vi.fn(),
-  })),
-}));
-
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: vi.fn(() => false),
 }));

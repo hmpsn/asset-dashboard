@@ -6,6 +6,7 @@ import type {
 } from './types';
 import { UnifiedInbox } from './inbox/UnifiedInbox';
 import { resolveInboxFilter } from './inbox/inbox-filter';
+import type { PricingModalData } from '../../hooks/usePayments';
 
 export {
   INBOX_FILTER_VALUES,
@@ -23,22 +24,11 @@ interface InboxTabProps {
   loadRequests: (wsId: string) => void;
   contentRequests: ClientContentRequest[];
   setContentRequests: (val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => void;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
-  setPricingModal: (modal: {
-    serviceType: 'brief_only' | 'full_post';
-    topic: string;
-    targetKeyword: string;
-    intent?: string;
-    priority?: string;
-    rationale?: string;
-    notes?: string;
-    source: 'strategy' | 'client' | 'upgrade';
-    upgradeReqId?: string;
-    pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
-  } | null) => void;
-  pricingConfirming: boolean;
+  briefPrice?: number | null;
+  fullPostPrice?: number | null;
+  fmtPrice?: (n: number) => string;
+  setPricingModal?: (modal: PricingModalData | null) => void;
+  pricingConfirming?: boolean;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   initialFilter?: import('./inbox/inbox-filter').InboxFilter;
   hidePrices?: boolean;
@@ -60,7 +50,7 @@ export function InboxTab({
   pricingConfirming,
   setToast,
   initialFilter: seededFilter,
-  hidePrices = false,
+  hidePrices,
 }: InboxTabProps) {
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
