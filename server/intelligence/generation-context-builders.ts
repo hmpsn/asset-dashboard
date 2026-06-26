@@ -11,7 +11,7 @@ import { formatPersonasForPrompt } from './persona-format.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
 
-interface GenerationContextBuilderOptions {
+export interface GenerationContextBuilderOptions {
   pagePath?: string;
   verbosity?: PromptVerbosity;
   tokenBudget?: number;
@@ -31,9 +31,9 @@ export interface GenerationContextResult {
   learningsAvailability: LearningsSlice['availability'] | 'not_requested';
 }
 
-export interface ContentGenerationContextOptions extends GenerationContextBuilderOptions {}
+export type ContentGenerationContextOptions = GenerationContextBuilderOptions;
 
-export interface RecommendationGenerationContextOptions extends GenerationContextBuilderOptions {}
+export type RecommendationGenerationContextOptions = GenerationContextBuilderOptions;
 
 export interface SeoPromptContextOptions extends GenerationContextBuilderOptions {
   includePageMap?: boolean;

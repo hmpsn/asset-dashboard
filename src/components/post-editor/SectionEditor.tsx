@@ -34,6 +34,7 @@ export interface SectionEditorProps {
   editing: boolean;
   regenerating: boolean;
   isGenerating: boolean;
+  canStartSectionEdit: boolean;
   saveStatus: 'idle' | 'saving' | 'saved';
   onToggleExpand: (index: number) => void;
   onStartEdit: (index: number) => void;
@@ -44,7 +45,7 @@ export interface SectionEditorProps {
 }
 
 export function SectionEditor({
-  section, expanded, editing, regenerating, isGenerating, saveStatus,
+  section, expanded, editing, regenerating, isGenerating, canStartSectionEdit, saveStatus,
   onToggleExpand, onStartEdit, onChange, onDone, onRegenerate, onGenerateWithFeedback,
 }: SectionEditorProps) {
   return (
@@ -120,15 +121,17 @@ export function SectionEditor({
             <div>
               <div className={adminRichTextClass} dangerouslySetInnerHTML={{ __html: section.content }} />
               <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--brand-border)]/50">
-                <Button
-                  onClick={() => onStartEdit(section.index)}
-                  icon={Pencil}
-                  size="sm"
-                  variant="ghost"
-                  className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
-                >
-                  Edit
-                </Button>
+                {canStartSectionEdit && (
+                  <Button
+                    onClick={() => onStartEdit(section.index)}
+                    icon={Pencil}
+                    size="sm"
+                    variant="ghost"
+                    className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
+                  >
+                    Edit
+                  </Button>
+                )}
                 <Button
                   onClick={() => onRegenerate(section.index)}
                   disabled={regenerating}
