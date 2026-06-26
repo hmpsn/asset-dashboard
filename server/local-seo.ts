@@ -22,6 +22,7 @@ import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
+import { waitForHeapHeadroom } from './seo-refresh-runner-runtime.js';
 import { normalizeDomainValue } from './domain-normalization.js';
 import { sleep } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
@@ -192,15 +193,13 @@ export function __resetRefreshTimingsForTesting(): void {
  * for memory that may never drain (e.g. a long-running KCC build).
  */
 async function waitForMemoryHeadroom(): Promise<void> {
-  for (let attempt = 0; attempt < refreshTimings.heapHeadroomMaxWaits; attempt++) {
-    const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
-    if (heapMb < refreshTimings.heapHeadroomThresholdMb) return;
-    log.warn(
-      { heapMb: Math.round(heapMb), thresholdMb: refreshTimings.heapHeadroomThresholdMb, attempt: attempt + 1 },
-      'local-seo refresh: heap above threshold — pausing for GC headroom',
-    );
-    await sleep(refreshTimings.heapHeadroomWaitMs);
-  }
+  await waitForHeapHeadroom({
+    thresholdMb: refreshTimings.heapHeadroomThresholdMb,
+    waitMs: refreshTimings.heapHeadroomWaitMs,
+    maxWaits: refreshTimings.heapHeadroomMaxWaits,
+    logger: log,
+    logMessage: 'local-seo refresh: heap above threshold — pausing for GC headroom',
+  });
 }
 // Snapshot retention policy constants (Bug 3 / owner decision D4).
 //   - Raw retention window: keep all rows captured within RETENTION_RAW_DAYS.

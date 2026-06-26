@@ -17,7 +17,6 @@ import {
   updateClientLocation,
 } from '../client-locations.js';
 import db from '../db/index.js';
-import { createJob, hasActiveJob, registerAbort, updateJob } from '../jobs.js';
 import { createLogger } from '../logger.js';
 import {
   countLocalVisibilitySnapshots,
@@ -33,12 +32,12 @@ import { runLocalGbpRefreshJob } from '../local-gbp.js';
 import { getLatestBusinessListings, getLatestOwnedListing } from '../business-listings-store.js';
 import { deriveGbpCompletenessScore } from '../listing-rating.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { assertCreditBudget, CreditBudgetError } from '../credit-budget-gate.js';
 import { validate, z } from '../middleware/validate.js';
-import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
+import { getWorkspace } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
+import { startTrackedRefresh } from '../seo-refresh-runtime.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   LOCAL_SEO_DEVICE,
@@ -224,42 +223,28 @@ router.get('/api/local-seo/:workspaceId/location-lookup', requireWorkspaceAccess
 
 router.post('/api/local-seo/:workspaceId/refresh', requireWorkspaceAccess('workspaceId'), validate(refreshSchema), (req, res) => {
   const workspaceId = req.params.workspaceId;
-  const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, workspaceId);
-  if (active) return res.status(409).json({ error: 'Local SEO refresh is already running for this workspace', jobId: active.id });
-  // Global cross-workspace coalescing — each refresh holds DataForSEO SERP responses
-  // in memory; on memory-constrained hosts (Render starter ~512 MB) concurrent
-  // refreshes from different workspaces stack and OOM-kill the Node process with no
-  // error log. Serialize globally: only one local SEO refresh runs at a time across
-  // the whole platform. Wall-clock cost is acceptable per product call ("OK if it
-  // takes a while"). Returns 409 with the other workspace's jobId so the UI can
-  // surface a "waiting for another refresh" state if desired.
-  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH);
-  if (globalActive) {
-    return res.status(409).json({
-      error: 'Another workspace is currently running a local SEO refresh — please wait for it to complete',
-      jobId: globalActive.id,
-      blockingWorkspaceId: globalActive.workspaceId,
-    });
-  }
-  const plan = createLocalSeoRefreshPlan(workspaceId, req.body);
-  if (!plan) return res.status(404).json({ error: 'Workspace not found' });
-  const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
+  startTrackedRefresh({
     workspaceId,
-    total: Math.max(1, plan.markets.length * plan.keywords.length),
-    message: 'Preparing local SEO visibility refresh...',
-  });
-  registerAbort(job.id);
-  res.json({ jobId: job.id, selectedKeywordCount: plan.keywords.length, selectedMarketCount: plan.markets.length });
-  // Use .catch() instead of void so any unexpected throw (e.g. from addActivity/broadcastToWorkspace
-  // after the main loop) becomes a logged error + failed job rather than an unhandled rejection
-  // that kills the Node.js process.
-  runLocalSeoRefreshJob(job.id, workspaceId, req.body).catch(err => {
-    log.error({ err, jobId: job.id, workspaceId }, 'local-seo refresh: unhandled error escaped job runner — marking failed');
-    updateJob(job.id, {
-      status: 'error',
-      error: err instanceof Error ? err.message : String(err),
-      message: 'Local SEO refresh failed unexpectedly',
-    });
+    res,
+    logger: log,
+    jobType: BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH,
+    preparingMessage: 'Preparing local SEO visibility refresh...',
+    workspaceConflictError: 'Local SEO refresh is already running for this workspace',
+    globalConflictError: 'Another workspace is currently running a local SEO refresh — please wait for it to complete',
+    unexpectedFailureLogMessage: 'local-seo refresh: unhandled error escaped job runner — marking failed',
+    unexpectedFailureMessage: 'Local SEO refresh failed unexpectedly',
+    prepare: () => {
+      const plan = createLocalSeoRefreshPlan(workspaceId, req.body);
+      if (!plan) return null;
+      return {
+        total: Math.max(1, plan.markets.length * plan.keywords.length),
+        response: {
+          selectedKeywordCount: plan.keywords.length,
+          selectedMarketCount: plan.markets.length,
+        },
+      };
+    },
+    run: jobId => runLocalSeoRefreshJob(jobId, workspaceId, req.body),
   });
 });
 
@@ -300,65 +285,28 @@ router.get('/api/local-seo/:workspaceId/gbp-reviews', requireWorkspaceAccess('wo
 // auth is covered by the global app gate — never add requireAuth here).
 router.post('/api/local-seo/:workspaceId/refresh-gbp', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
-
-  // Flag gate — when off, the route does no work and returns a clean "not enabled" 404.
-  if (!isFeatureEnabled('local-gbp', workspaceId)) {
-    return res.status(404).json({ error: 'GBP + reviews tracking is not enabled' });
-  }
-
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-
-  // Tier gate — Growth + Premium only (owner decision); Free is excluded.
-  const tier = computeEffectiveTier(ws);
-  if (tier !== 'growth' && tier !== 'premium') {
-    return res.status(403).json({ error: 'GBP + reviews tracking requires a Growth or Premium plan' });
-  }
-
-  // P5 budget gate at route entry — observe-only at launch (logs the would-block, returns).
-  // Wrapped so that if enforcement is later enabled, an over-budget workspace is logged and
-  // the refresh still proceeds (enforcement posture for this route is observe-only by decision).
-  try {
-    assertCreditBudget(workspaceId, 'business_listings', tier);
-  } catch (err) {
-    if (err instanceof CreditBudgetError) {
-      log.warn({ workspaceId, tier }, 'local-gbp refresh: credit budget would-block at route entry (proceeding — observe-only)');
-    } else {
-      throw err;
-    }
-  }
-
-  // Per-workspace serialization.
-  const active = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, workspaceId);
-  if (active) return res.status(409).json({ error: 'A GBP + reviews refresh is already running for this workspace', jobId: active.id });
-
-  // Global cross-workspace coalescing — each refresh holds business-listings responses in
-  // memory; on memory-constrained hosts concurrent refreshes from different workspaces stack
-  // and OOM the process. Serialize globally: only one GBP refresh runs at a time platform-wide.
-  const globalActive = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH);
-  if (globalActive) {
-    return res.status(409).json({
-      error: 'Another workspace is currently running a GBP + reviews refresh — please wait for it to complete',
-      jobId: globalActive.id,
-      blockingWorkspaceId: globalActive.workspaceId,
-    });
-  }
-
-  const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, {
+  startTrackedRefresh({
     workspaceId,
-    message: 'Preparing GBP + reviews refresh...',
-  });
-  registerAbort(job.id);
-  res.json({ jobId: job.id });
-  // .catch() (not void) so any unexpected throw becomes a logged error + failed job rather than
-  // an unhandled rejection that crashes the process.
-  runLocalGbpRefreshJob(workspaceId, job.id).catch(err => {
-    log.error({ err, jobId: job.id, workspaceId }, 'local-gbp refresh: unhandled error escaped job runner — marking failed');
-    updateJob(job.id, {
-      status: 'error',
-      error: err instanceof Error ? err.message : String(err),
-      message: 'GBP + reviews refresh failed unexpectedly',
-    });
+    res,
+    logger: log,
+    jobType: BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH,
+    preparingMessage: 'Preparing GBP + reviews refresh...',
+    workspaceConflictError: 'A GBP + reviews refresh is already running for this workspace',
+    globalConflictError: 'Another workspace is currently running a GBP + reviews refresh — please wait for it to complete',
+    unexpectedFailureLogMessage: 'local-gbp refresh: unhandled error escaped job runner — marking failed',
+    unexpectedFailureMessage: 'GBP + reviews refresh failed unexpectedly',
+    featureGate: {
+      flag: 'local-gbp',
+      disabledError: 'GBP + reviews tracking is not enabled',
+    },
+    tierGate: {
+      forbiddenError: 'GBP + reviews tracking requires a Growth or Premium plan',
+    },
+    budgetGate: {
+      endpoint: 'business_listings',
+      wouldBlockLogMessage: 'local-gbp refresh: credit budget would-block at route entry (proceeding — observe-only)',
+    },
+    run: jobId => runLocalGbpRefreshJob(workspaceId, jobId),
   });
 });
 

@@ -1341,9 +1341,10 @@
           "source": "Delta audit 2026-06-24",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT F3 (med). The flag-gate→404→tier 403→observe-only assertCreditBudget→per-ws hasActiveJob 409→global hasActiveJob 409→createJob/registerAbort→.catch(markFailed) block is near-verbatim in rank-tracking.ts:155-197/202-256 and local-seo.ts (x2); waitForMemoryHeadroom()+its 3 constants (HEAP_HEADROOM_THRESHOLD_MB=320 etc.), isCancelled, the budget wrapper, and broadcast/activity scaffold are verbatim in national-serp.ts, local-gbp.ts, local-seo.ts. The observe-only→enforced budget flip and the 320MB tuning become 3-4-file edits with no compiler help. Fix: extract startTrackedRefresh(req,res,{jobType,flag,budgetOp,run,...}) + a server/seo-refresh-runtime.ts for the runner primitives."
+          "notes": "DONE 2026-06-25: added server/seo-refresh-runtime.ts as the shared owner for serialized refresh route startup (feature/tier/observe-only budget gates, per-workspace/global active-job conflicts, create/register/respond, and detached runner failure marking) plus runner safety primitives for heap-headroom waiting and cancellation checks. Rewired local SEO, local GBP, national SERP, and AI visibility refresh routes without changing status codes, response shapes, job types, preparing/failure messages, or runner ownership. Rewired national-serp/local-gbp/local-seo heap checks through the shared helper while preserving each runner's thresholds/timing hooks. Added focused runtime unit coverage and kept route/plumbing regression coverage green.",
+          "shippedAt": "2026-06-25"
         },
         {
           "id": "simp-delta-0624-weekly-cron-factory",
