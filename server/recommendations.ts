@@ -20,11 +20,6 @@ import type { AuditSnapshot } from './reports.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { listPageKeywords } from './page-keywords.js';
-import { listContentGaps } from './content-gaps.js';
-import { listQuickWins } from './quick-wins.js';
-import { listKeywordGaps } from './keyword-gaps.js';
-import { listTopicClusters } from './topic-clusters.js';
-import { listCannibalizationIssues } from './cannibalization-issues.js';
 import { getLatestBusinessListings } from './business-listings-store.js';
 import { deriveGbpCompletenessScore } from './listing-rating.js';
 import {
@@ -44,15 +39,9 @@ import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
-import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
-import {
-  assessAuthorityFromBacklinks,
-  kdClassificationNote,
-} from './authority-context.js';
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
-import { deriveValueIntent } from './scoring/keyword-value-score.js';
 import { computeTimingBoosts, maxBoostForPages } from './scoring/opportunity-timing.js';
 import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
@@ -64,20 +53,14 @@ import {
   RecSource,
   applyLifecycleCarryOver,
   buildMergeKey,
-  cannibalizationUrlSetKey,
   computeRecommendationSummary,
   deriveCanonicalRecommendationFields,
   getRecSourceCategory,
-  getTrafficForSlug,
   getTrafficScore,
-  inferPageType,
   isExemptFromAutoResolve,
-  isIntentMismatch,
   isOperatorMintedRec,
-  mapToProduct,
   resolveEstimatedGain,
   sortRecommendations,
-  strategyInsight,
   toPageSlug,
   type RecSourceCategory,
 } from './domains/recommendations/rules.js';
@@ -87,6 +70,7 @@ import {
   appendCtrOpportunityRecommendations,
   appendDiagnosticRecommendations,
   appendFreshnessRecommendations,
+  appendStrategyRecommendations,
 } from './domains/recommendations/generation-producers.js';
 import {
   loadRecommendationSet,
@@ -691,437 +675,23 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   }
 
   // ── 2. Strategy-based recommendations ──
-  // Load declined keywords so we can skip suggestions the client has rejected (2C)
+  // Load declined keywords so we can skip suggestions the client has rejected (2C).
+  // The set is also reused by the signal-fold tail below.
   const declinedKeywords = new Set(
     getDeclinedKeywords(workspaceId).map(k => keywordComparisonKey(k)).filter(Boolean)
   );
 
   if (strategy) {
-    // Quick wins → fix_now or fix_soon (table-only; blob field stripped on every write + boot-migrated out)
-    const quickWins = listQuickWins(workspaceId);
-    if (quickWins.length > 0) {
-      for (const qw of quickWins) {
-        // 2C: skip if the current keyword was declined
-        if (qw.currentKeyword && declinedKeywords.has(keywordComparisonKey(qw.currentKeyword))) continue;
-
-        const t = getTrafficForSlug(traffic, qw.pagePath.replace(/^\//, ''));
-        // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
-        const hasTraffic = t.clicks > 0 || t.impressions > 0;
-        const priority: RecPriority = !hasTraffic
-          ? 'fix_later'
-          : qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon';
-        const source = RecSource.strategyQuickWin();
-        const opportunity = computeOpportunityValue({
-          branch: 'quick_win',
-          effortDays: effortDaysFor('strategy', source),
-          roiScore: qw.roiScore ?? null,
-          llmLabel: qw.estimatedImpact,
-          authorityStrength: ovAuthority ?? null,
-          timingBoost: maxBoostForPages(timingBoosts, [qw.pagePath.replace(/^\//, '')]),
-        }, { calibration: ovCalibration, weights: ovWeights });
-        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-        recs.push({
-          id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-          workspaceId,
-          priority: hasTraffic ? scoring.priority : priority,
-          type: 'strategy',
-          title: `Quick Win: ${qw.action}`,
-          description: qw.rationale,
-          insight: strategyInsight('quick_win', qw),
-          impact: qw.estimatedImpact as 'high' | 'medium' | 'low',
-          effort: 'low',
-          impactScore: scoring.impactScore,
-          opportunity,
-          source,
-          affectedPages: [qw.pagePath.replace(/^\//, '')],
-          trafficAtRisk: t.clicks,
-          impressionsAtRisk: t.impressions,
-          estimatedGain: `${qw.estimatedImpact} impact potential based on current traffic and keyword position`,
-          actionType: 'manual',
-          status: 'pending',
-          assignedTo,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
-
-    // Content gaps → ongoing
-    // Sourced from the content_gaps table (post-#365 normalization), not the
-    // strategy blob — the blob no longer carries contentGaps after generation.
-    const strategyContentGaps = listContentGaps(workspaceId);
-    if (strategyContentGaps.length > 0) {
-      for (const cg of strategyContentGaps) {
-        // 2C: skip if the target keyword was declined by the client
-        if (cg.targetKeyword && declinedKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
-
-        // D2 (audit #11): skip gaps the content pipeline is already producing (an
-        // in-flight brief/post targets this keyword). A previously-minted pending rec
-        // for this gap auto-resolves in the merge tail below — intended: the pipeline
-        // is handling it, and `completed → pending` revives it on a later regen if the
-        // brief is deleted without ever publishing.
-        if (cg.targetKeyword && inFlightContentKeywords.has(keywordComparisonKey(cg.targetKeyword))) continue;
-
-        // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
-        // "within-reach" by kdClassificationNote.
-        const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
-        const authorityAssessment = assessAuthorityFromBacklinks(cg.difficulty ?? null, backlinkProfile);
-        const story = buildRecommendationStory('content_gap', {
-          topic: cg.topic,
-          targetKeyword: cg.targetKeyword,
-          rationale: cg.rationale,
-          suggestedPageType: cg.suggestedPageType,
-          intent: cg.intent,
-          kdNote,
-          authorityContext: authorityAssessment.note,
-        });
-        const source = RecSource.strategyContentGap();
-        const opportunity = computeOpportunityValue({
-          branch: 'content_gap',
-          effortDays: effortDaysFor('content', source),
-          opportunityScore: cg.opportunityScore ?? null,
-          volume: cg.volume ?? null,
-          difficulty: cg.difficulty ?? null,
-          trendDirection: cg.trendDirection ?? null,
-          llmLabel: cg.priority,
-          intent: deriveValueIntent(cg.targetKeyword, cg.intent),
-          authorityStrength: ovAuthority ?? null,
-          ctrCurve: ovCtrCurve,
-          timingBoost: maxBoostForPages(timingBoosts, []),
-        }, { calibration: ovCalibration, weights: ovWeights });
-        const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-        // D2 (audit #11): content recs route into the existing brief-purchase flow.
-        const product = mapToProduct('content', 1, cg.suggestedPageType);
-        recs.push({
-          id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-          workspaceId,
-          priority: scoring.priority,
-          type: 'content',
-          title: story.title,
-          description: story.description,
-          insight: story.insight,
-          impact: cg.priority as 'high' | 'medium' | 'low',
-          effort: 'high',
-          impactScore: scoring.impactScore,
-          opportunity,
-          source,
-          affectedPages: [],
-          trafficAtRisk: 0,
-          impressionsAtRisk: 0,
-          estimatedGain: story.estimatedGain,
-          actionType: 'content_creation',
-          ...product,
-          // D2: persisted so the publish-time resolver can match this rec against the
-          // published post's targetKeyword (content-gap recs have no affectedPages).
-          targetKeyword: cg.targetKeyword,
-          status: 'pending',
-          assignedTo,
-          // Carry the gap's deterministic-backfill provenance onto the rec (only when
-          // true, so flag-OFF recs are byte-identical) — lets the headline count / email
-          // exclude marginal backfill without a fragile rec→gap key remap.
-          ...(cg.backfilled ? { backfilled: true as const } : {}),
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
-
-    // Pages with ranking opportunities (from page_keywords table — pageMap is stripped
-    // from the strategy blob before saving, so always read from the dedicated table).
-    const pageKeywords = listPageKeywords(workspaceId);
-    if (pageKeywords.length > 0) {
-      for (const pm of pageKeywords) {
-        // 2C: skip if the primary keyword was declined
-        if (pm.primaryKeyword && declinedKeywords.has(keywordComparisonKey(pm.primaryKeyword))) continue;
-
-        if (pm.currentPosition && pm.currentPosition > 3 && pm.currentPosition <= 20 && pm.impressions && pm.impressions > 100) {
-          // Page ranking 4-20 with decent impressions — opportunity to push up
-          const authorityAssessment = assessAuthorityFromBacklinks(pm.difficulty ?? null, backlinkProfile);
-          const story = buildRecommendationStory('ranking_opportunity', {
-            keyword: pm.primaryKeyword,
-            pagePath: pm.pagePath,
-            currentPosition: pm.currentPosition,
-            impressions: pm.impressions,
-            authorityContext: authorityAssessment.note,
-          });
-          const source = RecSource.strategyRankingOpp();
-          const opportunity = computeOpportunityValue({
-            branch: 'ranking_opp',
-            effortDays: effortDaysFor('strategy', source),
-            volume: pm.volume ?? null,
-            currentPosition: pm.currentPosition ?? null,
-            difficulty: pm.difficulty ?? null,
-            impressions: pm.impressions ?? null,
-            cpc: pm.cpc ?? null,
-            intent: deriveValueIntent(pm.primaryKeyword, pm.searchIntent),
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, [pm.pagePath.replace(/^\//, '')]),
-          }, { calibration: ovCalibration, weights: ovWeights });
-          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-          recs.push({
-            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-            workspaceId,
-            priority: scoring.priority,
-            type: 'strategy',
-            title: story.title,
-            description: story.description,
-            insight: story.insight,
-            impact: pm.currentPosition <= 10 ? 'high' : 'medium',
-            effort: 'medium',
-            impactScore: scoring.impactScore,
-            opportunity,
-            source,
-            affectedPages: [pm.pagePath.replace(/^\//, '')],
-            trafficAtRisk: pm.clicks || 0,
-            impressionsAtRisk: pm.impressions || 0,
-            estimatedGain: story.estimatedGain,
-            actionType: 'manual',
-            status: 'pending',
-            assignedTo,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-      }
-    }
-
-    // ── Intent mismatch detection ──────────────────────────────────────────────
-    // Intentionally nested inside `if (strategy)`: intent mismatches are only
-    // meaningful when the workspace has a keyword strategy that has populated
-    // `page_keywords` with `searchIntent`. Without a strategy, `pageKeywords`
-    // is empty and the loop is a no-op — but keeping this inside the strategy
-    // guard documents the dependency and avoids recurring reviewer flags.
-    const intentPageKws = pageKeywords;
-    let intentMismatchCount = 0;
-    for (const pk of intentPageKws) {
-      if (intentMismatchCount >= 10) break;
-      if (!pk.searchIntent) continue;
-      const pageType = inferPageType(pk.pagePath);
-      const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
-      if (!mismatch) continue;
-      intentMismatchCount++;
-      const pageSlug = toPageSlug(pk.pagePath);
-      const source = RecSource.strategyIntentMismatch(pageSlug);
-      const opportunity = computeOpportunityValue({
-        branch: 'ranking_opp',
-        effortDays: effortDaysFor('strategy', source),
-        volume: pk.volume ?? null,
-        currentPosition: pk.currentPosition ?? null,
-        difficulty: pk.difficulty ?? null,
-        impressions: pk.impressions ?? null,
-        cpc: pk.cpc ?? null,
-        intent: deriveValueIntent(pk.primaryKeyword, pk.searchIntent),
-        authorityStrength: ovAuthority ?? null,
-        ctrCurve: ovCtrCurve,
-        timingBoost: maxBoostForPages(timingBoosts, [pageSlug]),
-      }, { calibration: ovCalibration, weights: ovWeights });
-      const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-      recs.push({
-        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-        workspaceId,
-        priority: scoring.priority,
-        type: 'strategy',
-        title: `Intent Mismatch: /${pageSlug} (${pageType} page targeting ${pk.searchIntent} keyword)`,
-        description: reason,
-        insight: `Pages rank better when page type matches search intent. ${reason}`,
-        impact: 'medium',
-        effort: 'medium',
-        impactScore: scoring.impactScore,
-        opportunity,
-        source,
-        affectedPages: [pageSlug],
-        trafficAtRisk: 0,
-        impressionsAtRisk: 0,
-        estimatedGain: 'Aligning page type with intent typically improves CTR and conversion rate',
-        actionType: 'manual',
-        status: 'pending',
-        assignedTo,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // ── 2b. First-class orphan-subsystem recs. ──
-    // keyword_gaps / topic_clusters / cannibalization_issues are normalized tables that
-    // until recently only surfaced in the intelligence slice + strategy UI, never as recs.
-    // They are now canonical recommendation producers. Each orphan read is in its OWN try/catch
-    // calling failedCategories.add(<category>) on catch — a transient empty read must NOT
-    // drop the source from newSources and falsely bulk-auto-resolve prior recs (FM-2/G2).
-      // keyword_gap → ranking_opp branch (competitor outranks us; close the gap).
-      try {
-        const keywordGaps = listKeywordGaps(workspaceId).slice(0, 10);
-        for (const kg of keywordGaps) {
-          if (declinedKeywords.has(keywordComparisonKey(kg.keyword))) continue;
-          const source = RecSource.keywordGap(kg.keyword);
-          const opportunity = computeOpportunityValue({
-            branch: 'ranking_opp',
-            effortDays: effortDaysFor('keyword_gap', source),
-            volume: kg.volume,
-            difficulty: kg.difficulty,
-            currentPosition: kg.competitorPosition,
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, []),
-          }, { calibration: ovCalibration, weights: ovWeights });
-          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-          recs.push({
-            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-            workspaceId,
-            priority: scoring.priority,
-            type: 'keyword_gap',
-            title: `Keyword Gap: "${kg.keyword}"`,
-            description: `${kg.competitorDomain} ranks #${kg.competitorPosition} for "${kg.keyword}" (volume ${kg.volume.toLocaleString()}, difficulty ${kg.difficulty}) — you don't. Targeting this term captures demand a competitor already owns.`,
-            insight: `Competitors ranking for high-demand keywords you ignore is lost organic traffic. Building content or optimizing a page for "${kg.keyword}" lets you compete for a term with proven search demand.`,
-            impact: kg.volume > 1000 ? 'high' : kg.volume > 200 ? 'medium' : 'low',
-            effort: 'high',
-            impactScore: scoring.impactScore,
-            opportunity,
-            source,
-            affectedPages: [],
-            // Match key for the admin Strategy KeywordOpportunities card — without this the
-            // keyword_gap rec has NO matchable field (affectedPages is empty) and the
-            // "Interested?" send affordance can never render. Normalized-compared client-side.
-            targetKeyword: kg.keyword,
-            trafficAtRisk: 0,
-            impressionsAtRisk: 0,
-            estimatedGain: `Capturing "${kg.keyword}" targets a term with ${kg.volume.toLocaleString()} monthly searches a competitor already ranks for`,
-            actionType: 'content_creation',
-            status: 'pending',
-            assignedTo,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-      } catch (err) {
-        failedCategories.add('keyword_gap');
-        log.warn({ err, workspaceId }, 'Keyword gaps unavailable for recommendations');
-      }
-
-      // topic_cluster → content_gap branch. listTopicClusters is coverage-ASC sorted, so
-      // clusters[0] is the WEAKEST cluster. Mint exactly ONE cluster-head rec (the weakest
-      // gap), NOT one per cluster — a single high-leverage "fill this cluster" directive.
-      try {
-        const clusters = listTopicClusters(workspaceId);
-        const cluster = clusters[0];
-        if (cluster) {
-          const opportunityScore = Math.max(0, Math.min(100, 100 - cluster.coveragePercent));
-          const source = RecSource.topicCluster(cluster.topic);
-          const opportunity = computeOpportunityValue({
-            branch: 'content_gap',
-            effortDays: effortDaysFor('topic_cluster', source),
-            opportunityScore,
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, []),
-          }, { calibration: ovCalibration, weights: ovWeights });
-          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-          const gapPreview = cluster.gap.slice(0, 5).join(', ');
-          recs.push({
-            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-            workspaceId,
-            priority: scoring.priority,
-            type: 'topic_cluster',
-            title: `Build Topical Authority: "${cluster.topic}"`,
-            description: `You cover ${Math.round(cluster.coveragePercent)}% of the "${cluster.topic}" cluster (${cluster.ownedCount}/${cluster.totalCount} keywords). Filling the gaps${gapPreview ? ` (${gapPreview})` : ''} builds the topical depth search engines reward.`,
-            insight: `Topical authority compounds — covering a cluster comprehensively signals expertise and lifts every page in it. "${cluster.topic}" is your weakest cluster, so it has the most room to grow.`,
-            impact: opportunityScore > 60 ? 'high' : opportunityScore > 30 ? 'medium' : 'low',
-            effort: 'high',
-            impactScore: scoring.impactScore,
-            opportunity,
-            source,
-            affectedPages: [],
-            trafficAtRisk: 0,
-            impressionsAtRisk: 0,
-            estimatedGain: `Filling the "${cluster.topic}" cluster (currently ${Math.round(cluster.coveragePercent)}% covered) builds topical authority across related pages`,
-            actionType: 'content_creation',
-            status: 'pending',
-            assignedTo,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-      } catch (err) {
-        failedCategories.add('topic_cluster');
-        log.warn({ err, workspaceId }, 'Topic clusters unavailable for recommendations');
-      }
-
-      // cannibalization → technical branch. Cannibalization is ALSO an InsightType, so we
-      // dedupe-vs-insight: an ACTIVE (unresolved) cannibalization insight covering the same
-      // URL set already surfaces the issue — we cross-link rather than mint a duplicate rec.
-      try {
-        const issues = listCannibalizationIssues(workspaceId);
-        // Build the set of URL-set keys already covered by an active cannibalization insight.
-        const insightUrlSets = new Set<string>();
-        try {
-          for (const ins of getInsights(workspaceId, 'cannibalization')) {
-            if (ins.resolutionStatus === 'resolved') continue;
-            const data = ins.data as import('../shared/types/analytics.js').CannibalizationData;
-            const pages = Array.isArray(data?.pages) ? data.pages : [];
-            if (pages.length > 0) insightUrlSets.add(cannibalizationUrlSetKey(pages));
-          }
-        } catch (err) {
-          // Insight read failure → degrade to "no insight coverage" (mint recs). This is the
-          // safe direction: a missed dedupe shows a (linkable) duplicate; a false dedupe would
-          // hide a real issue.
-          log.debug({ err, workspaceId }, 'Cannibalization insight dedupe unavailable — minting recs without cross-link');
-        }
-        for (const item of issues) {
-          const urlSetKey = cannibalizationUrlSetKey(item.pages.map(p => p.path));
-          // Skip minting if an active insight already covers the same URL set (cross-link instead).
-          // C1: the issue STILL EXISTS (it's in cannibalization_issues) — it merely migrated to the
-          // insight surface. Adding 'cannibalization' to failedCategories protects the category from
-          // the auto-resolve loop this run (same transient-read semantics as the FM-2 catch paths), so
-          // a prior cannibalization:<key> rec for this URL set is carried forward (stays pending) and
-          // its pages are NOT falsely flipped to `live`. Only runs where a dedupe-skip actually
-          // occurs are protected; runs with no insight-covered issue auto-resolve genuinely-fixed
-          // recs normally (a fixed issue lingers at most one extra cycle — errs safe).
-          if (insightUrlSets.has(urlSetKey)) {
-            failedCategories.add('cannibalization');
-            continue;
-          }
-          const severity: 'error' | 'warning' | 'info' =
-            item.severity === 'high' ? 'error' : item.severity === 'medium' ? 'warning' : 'info';
-          const currentClicks = item.pages.reduce((sum, p) => sum + (p.clicks ?? 0), 0);
-          const source = RecSource.cannibalization(urlSetKey);
-          const opportunity = computeOpportunityValue({
-            branch: 'technical',
-            effortDays: effortDaysFor('cannibalization', source),
-            severity,
-            currentClicks,
-            authorityStrength: ovAuthority ?? null,
-            ctrCurve: ovCtrCurve,
-            timingBoost: maxBoostForPages(timingBoosts, item.pages.map(p => toPageSlug(p.path))),
-          }, { calibration: ovCalibration, weights: ovWeights });
-          const scoring = deriveCanonicalRecommendationFields(source, opportunity);
-          recs.push({
-            id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-            workspaceId,
-            priority: scoring.priority,
-            type: 'cannibalization',
-            title: `Keyword Cannibalization: "${item.keyword}"`,
-            description: `${item.pages.length} pages compete for "${item.keyword}", splitting ranking signals. ${item.recommendation}`,
-            insight: `When multiple pages target the same keyword, search engines struggle to pick a winner — diluting authority and capping rankings. Consolidating to one canonical page recovers the combined strength.`,
-            impact: item.severity === 'high' ? 'high' : item.severity === 'medium' ? 'medium' : 'low',
-            effort: 'medium',
-            impactScore: scoring.impactScore,
-            opportunity,
-            source,
-            affectedPages: item.pages.map(p => p.path),
-            trafficAtRisk: currentClicks,
-            impressionsAtRisk: item.pages.reduce((sum, p) => sum + (p.impressions ?? 0), 0),
-            estimatedGain: `Consolidating ${item.pages.length} competing pages for "${item.keyword}" recovers split ranking signals`,
-            actionType: 'manual',
-            status: 'pending',
-            assignedTo,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-      } catch (err) {
-        failedCategories.add('cannibalization');
-        log.warn({ err, workspaceId }, 'Cannibalization issues unavailable for recommendations');
-      }
+    appendStrategyRecommendations(recs, {
+      ...producerContext,
+      failedCategories,
+      traffic,
+      declinedKeywords,
+      inFlightContentKeywords,
+      domainStrength,
+      backlinkProfile,
+      ctrCurve: ovCtrCurve,
+    });
   }
 
   // ── 2c. First-class local-visibility recs (posture-gated). ──

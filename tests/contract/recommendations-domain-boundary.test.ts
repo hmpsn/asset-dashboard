@@ -141,6 +141,7 @@ describe('recommendations domain boundary', () => {
 
     for (const helper of [
       'appendAuditRecommendations',
+      'appendStrategyRecommendations',
       'appendContentDecayRecommendations',
       'appendCtrOpportunityRecommendations',
       'appendDiagnosticRecommendations',
@@ -151,6 +152,9 @@ describe('recommendations domain boundary', () => {
     }
 
     expect(facade).toContain("from './domains/recommendations/generation-producers.js'");
+    expect(producers).toContain('Keyword gaps unavailable for recommendations');
+    expect(facade).not.toContain('Keyword gaps unavailable for recommendations');
+    expect(producers).toContain("failedCategories.add('cannibalization')");
     expect(producers).toContain('Content decay data unavailable for recommendations');
     expect(facade).not.toContain('Content decay data unavailable for recommendations');
     expect(producers).toContain("failedCategories.add('insight:freshness_alert')");
