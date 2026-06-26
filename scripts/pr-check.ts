@@ -8529,7 +8529,7 @@ export const CHECKS: Check[] = [
     // SEO Generation Quality (forward-looking guardrail). This rule enforces the
     // SOURCE-CATEGORY half of the "new rec types / sources" contract: a recommendation
     // source category must stay in lockstep across the RecSourceCategory union AND the
-    // REC_SOURCE_CATEGORIES array in server/recommendations.ts. A union member missing
+    // REC_SOURCE_CATEGORIES array in server/domains/recommendations/rules.ts. A union member missing
     // from the array makes getRecSourceCategory return null, bypassing the per-category
     // auto-resolve guard (an empty orphan-read would bulk auto-resolve previously-surfaced
     // recs — G2). Today the union and array are identical (6 each), so this returns ZERO
@@ -8543,7 +8543,7 @@ export const CHECKS: Check[] = [
     // See docs/rules/seo-generation-quality.md → "New rec types / sources".
     name: 'new-rec-type-source-needs-category-and-action-type',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/recommendations.ts',
+    pathFilter: 'server/domains/recommendations/rules.ts',
     message:
       'RecSourceCategory union and REC_SOURCE_CATEGORIES array are out of lockstep. A new rec ' +
       'source category must be in BOTH, or an empty orphan-read bulk auto-resolves live recs (G2). ' +
@@ -8557,8 +8557,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
-      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
+      const targetPath = 'server/domains/recommendations/rules.ts';
+      const provided = files.find(f => f.endsWith(targetPath));
+      const content = readFileOrEmpty(provided ?? path.join(ROOT, targetPath));
       if (!content) return hits;
 
       const literalsOf = (block: string | undefined): string[] =>
@@ -8579,7 +8580,7 @@ export const CHECKS: Check[] = [
       for (const member of unionMembers) {
         if (!arrayMembers.has(member)) {
           hits.push({
-            file: path.join(ROOT, 'server/recommendations.ts'),
+            file: path.join(ROOT, targetPath),
             line,
             text: `RecSourceCategory '${member}' is in the union but missing from REC_SOURCE_CATEGORIES`,
           });
@@ -8588,7 +8589,7 @@ export const CHECKS: Check[] = [
       for (const member of arrayMembers) {
         if (!unionMembers.has(member)) {
           hits.push({
-            file: path.join(ROOT, 'server/recommendations.ts'),
+            file: path.join(ROOT, targetPath),
             line,
             text: `REC_SOURCE_CATEGORIES '${member}' is not in the RecSourceCategory union`,
           });

@@ -281,7 +281,7 @@ apply. P6 swaps the calibration basis to `median(attributedValue / predictedEmv)
 When P5 surfaces `keyword_gaps` / `topic_clusters` / `cannibalization_issues` as
 first-class recs, a new `RecType`/`RecSource` value must NOT fall through the
 non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto-resolve):
-- `REC_SOURCE_CATEGORIES` + `getRecSourceCategory` (`server/recommendations.ts`) — a source
+- `REC_SOURCE_CATEGORIES` + `getRecSourceCategory` (`server/domains/recommendations/rules.ts`) — a source
   with no category bypasses the auto-resolve safety check.
 - `recommendationOutcomeActionType` (`server/recommendations.ts`) — a real `ActionType` case
   (define new `ActionType`s in `shared/types/outcome-tracking.ts`), **not** the
