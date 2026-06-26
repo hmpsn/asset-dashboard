@@ -11,7 +11,7 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
 import { createLogger } from '../logger.js';
-import { resolveRecommendationsForChange } from '../recommendations.js';
+import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import {

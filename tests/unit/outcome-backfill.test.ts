@@ -40,7 +40,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getActionBySource: mocks.getActionBySource,
   fillPredictedEmvIfNull: mocks.fillPredictedEmvIfNull,
 }));
-vi.mock('../../server/recommendation-storage.js', () => ({
+vi.mock('../../server/domains/recommendations/storage.js', () => ({
   loadRecommendationSet: mocks.loadRecommendationSet,
 }));
 

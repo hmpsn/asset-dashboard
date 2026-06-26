@@ -8,7 +8,7 @@ import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
-import { resolveRecommendationsForChange } from './recommendations.js';
+import { resolveRecommendationsForChange } from './domains/recommendations/resolution-service.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');

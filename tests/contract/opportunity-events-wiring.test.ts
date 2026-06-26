@@ -30,13 +30,15 @@ describe('competitor cron → opportunity event + regen', () => {
 
 describe('apply tail → opportunity regen', () => {
   const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
+  const resolutionSrc = readFileSync('server/domains/recommendations/resolution-service.ts', 'utf-8'); // readFile-ok - wiring contract
   const producerSrc = readFileSync('server/domains/recommendations/generation-producers.ts', 'utf-8'); // readFile-ok - wiring contract
 
   it('triggers a debounced regen on resolveRecommendationsForChange', () => {
-    const fnStart = src.indexOf('export function resolveRecommendationsForChange');
+    const fnStart = resolutionSrc.indexOf('export function resolveRecommendationsForChange');
     expect(fnStart).toBeGreaterThan(0);
-    const fnSrc = src.slice(fnStart, src.indexOf('export function resolveRecommendationsForPageIds'));
+    const fnSrc = resolutionSrc.slice(fnStart, resolutionSrc.indexOf('export function resolveRecommendationsForPageIds'));
     expect(fnSrc).toContain('triggerOpportunityRegen(workspaceId)');
+    expect(src).toContain("from './domains/recommendations/resolution-service.js'");
   });
 
   it('threads a decaying timingBoost into every computeOpportunityValue call', () => {

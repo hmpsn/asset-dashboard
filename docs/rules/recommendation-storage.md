@@ -4,6 +4,14 @@
 and a legacy `recommendations` JSON fallback. `recommendation_items` owns the
 authoritative per-recommendation rows once rows exist for a workspace.
 
+Domain owners:
+
+- `server/domains/recommendations/storage.ts` owns normalized set/item persistence.
+- `server/domains/recommendations/resolution-service.ts` owns in-place recommendation
+  completion after SEO/content/work-order writes.
+- `server/recommendations.ts` remains the compatibility facade plus generation
+  orchestrator; new storage or resolution consumers should import the leaf modules.
+
 Rules:
 
 - Read recommendations through `loadRecommendations(workspaceId)`, not direct SQL.

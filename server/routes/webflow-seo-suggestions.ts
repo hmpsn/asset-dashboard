@@ -20,7 +20,7 @@ import {
   markApplied,
   selectVariation,
 } from '../seo-suggestions.js';
-import { resolveRecommendationsForChange } from '../recommendations.js';
+import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';

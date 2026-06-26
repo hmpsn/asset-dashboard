@@ -12,7 +12,6 @@
  */
 
 import { getWorkspace } from './workspaces.js';
-import { getPageState } from './page-edit-states.js';
 import type { Workspace } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
@@ -29,14 +28,12 @@ import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.j
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
 import { computeTimingBoosts } from './scoring/opportunity-timing.js';
-import { triggerOpportunityRegen } from './scoring/opportunity-regen.js';
 import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.js';
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
 import {
   computeRecommendationSummary,
-  getRecSourceCategory,
   getTrafficScore,
   toPageSlug,
   type RecSourceCategory,
@@ -53,10 +50,9 @@ import {
 } from './domains/recommendations/generation-producers.js';
 import {
   loadRecommendationSet,
-  replaceRecommendationItems,
   saveRecommendationSet,
   setRecommendationItemStatus,
-} from './recommendation-storage.js';
+} from './domains/recommendations/storage.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -104,6 +100,12 @@ export {
   type RecSourceCategory,
   type RecoveryRate,
 } from './domains/recommendations/rules.js';
+
+export {
+  resolveContentRecommendationsForPublishedPost,
+  resolveRecommendationsForChange,
+  resolveRecommendationsForPageIds,
+} from './domains/recommendations/resolution-service.js';
 
 export {
   adjustKdImpactScore,
@@ -183,10 +185,6 @@ export function saveRecommendations(set: RecommendationSet): void {
   saveRecommendationSet(set);
 }
 
-function saveRecommendationMutation(set: RecommendationSet): void {
-  replaceRecommendationItems(set, set.recommendations, set.summary);
-}
-
 export function updateRecommendationStatus(
   workspaceId: string,
   recId: string,
@@ -207,157 +205,6 @@ export function updateRecommendationStatus(
 
 export function dismissRecommendation(workspaceId: string, recId: string): boolean {
   return updateRecommendationStatus(workspaceId, recId, 'dismissed') !== null;
-}
-
-/**
- * Resolve (complete) recommendations in-place when a workspace change touches
- * the pages they cover. Called from write sites that fix SEO issues directly
- * (approval apply, per-item approve/reject, work-order completion) so the
- * priority list reflects the change immediately — without waiting for the next
- * full audit-driven `generateRecommendations` regen (which is GSC-lag-gated).
- *
- * Behaviour:
- *  - Loads the existing rec set (no-op if none exists).
- *  - Marks every non-completed, non-dismissed rec whose `affectedPages`
- *    intersect `affectedPages` (slug-normalised via toPageSlug, matching the
- *    auto-resolve branch in generateRecommendations) as `completed`, guarded by
- *    validateTransition() (CLAUDE.md: status changes go through state machines).
- *  - When `source` is provided, only recs in that source category are touched
- *    (uses getRecSourceCategory so a `source` of `'audit'` matches `audit:title`
- *    etc. — the same category prefixes the auto-resolve safety check uses).
- *  - Saves, invalidates the intelligence cache, and broadcasts
- *    RECOMMENDATIONS_UPDATED — only when at least one rec actually changed.
- *
- * @returns the number of recommendations transitioned to `completed`.
- */
-export function resolveRecommendationsForChange(
-  workspaceId: string,
-  opts: { affectedPages: string[]; source?: string },
-): number {
-  const changedPages = new Set(
-    (opts.affectedPages ?? [])
-      .filter((p): p is string => typeof p === 'string' && p.length > 0)
-      .map(toPageSlug),
-  );
-  if (changedPages.size === 0) return 0;
-
-  const set = loadRecommendations(workspaceId);
-  if (!set) return 0;
-
-  // When a source filter is supplied, resolve it to its category so callers can
-  // pass either a full source string ('audit:title') or a bare category ('audit').
-  const sourceCategory = opts.source ? getRecSourceCategory(opts.source) : null;
-
-  let resolved = 0;
-  const now = new Date().toISOString();
-  for (const rec of set.recommendations) {
-    if (rec.status === 'completed' || rec.status === 'dismissed') continue;
-    if (sourceCategory && getRecSourceCategory(rec.source) !== sourceCategory) continue;
-    const intersects = rec.affectedPages.some(p => changedPages.has(toPageSlug(p)));
-    if (!intersects) continue;
-    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
-    rec.status = 'completed';
-    rec.updatedAt = now;
-    resolved++;
-  }
-
-  if (resolved === 0) return 0;
-
-  // Recompute the summary so client-facing headline counts and Opportunity
-  // Value totals reflect the resolved recs — otherwise the rendered list drops
-  // the item but the numbers stay inflated until the next full regen.
-  set.summary = computeRecommendationSummary(set.recommendations);
-  saveRecommendationMutation(set);
-  invalidateIntelligenceCache(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
-  log.info(`Resolved ${resolved} recommendation(s) in-place for ${workspaceId} (${changedPages.size} changed page(s))`);
-
-  // ── PR7 · Spine B — reprioritize-on-apply tail (try/catch). ──
-  // Completing a rec (e.g. the #1) frees its page; a debounced regen re-ranks the
-  // queue so the next-best opportunity is promoted with fresh timing boosts.
-  // Never let the regen trigger break the apply.
-  try {
-    triggerOpportunityRegen(workspaceId);
-  } catch (err) {
-    log.warn({ workspaceId, err: err instanceof Error ? err.message : String(err) }, 'opportunity regen trigger failed on apply (non-fatal)');
-  }
-
-  return resolved;
-}
-
-/**
- * Resolve recommendations covering a set of Webflow/CMS PAGE IDs (the
- * page_edit_states key). recommendation.affectedPages are SLUGS, so each id is
- * mapped to its slug via getPageState() before matching — the recurring pattern
- * shared by SEO-write apply paths (work orders, bulk SEO fix). Returns the number
- * of recommendations resolved (0 when no id maps to a slug, or no rec matches).
- *
- * `opts.source` is forwarded to resolveRecommendationsForChange so callers can
- * scope resolution to a single rec category (e.g. 'audit').
- */
-export function resolveRecommendationsForPageIds(
-  workspaceId: string,
-  pageIds: string[],
-  opts: { source?: string } = {},
-): number {
-  const affectedSlugs = (pageIds ?? [])
-    .map(id => getPageState(workspaceId, id)?.slug)
-    .filter((s): s is string => typeof s === 'string' && s.length > 0);
-  if (affectedSlugs.length === 0) return 0;
-  return resolveRecommendationsForChange(workspaceId, { affectedPages: affectedSlugs, source: opts.source });
-}
-
-/**
- * D2 (audit #11) — resolve (complete) active content recommendations whose target keyword
- * matches a just-published post. Called best-effort from the C3 publish domain service
- * (`server/domains/content/publish-post-to-webflow.ts`) AFTER a successful publish, so the
- * "create content for X" rec disappears the moment the content for X goes live — without
- * waiting for the next full regen (which is GSC-lag-gated).
- *
- * Content-gap recs have `affectedPages: []` (the page doesn't exist until publish), so the
- * page-intersection resolver (`resolveRecommendationsForChange`) can never match them —
- * matching is by `rec.targetKeyword` via `keywordComparisonKey` (the same normalization the
- * generation-time suppression and the contentPipeline slice use).
- *
- * Mirrors `resolveRecommendationsForChange`: validateTransition per rec, summary recompute,
- * save, intelligence-cache invalidation, and a RECOMMENDATIONS_UPDATED broadcast — only when
- * at least one rec changed. Deliberately does NOT call `triggerOpportunityRegen`: the publish
- * service already enqueues `queueKeywordStrategyPostUpdateFollowOns`, which re-ranks the queue.
- *
- * @returns the number of recommendations transitioned to `completed`.
- */
-export function resolveContentRecommendationsForPublishedPost(
-  workspaceId: string,
-  targetKeyword: string | null | undefined,
-): number {
-  const key = targetKeyword ? keywordComparisonKey(targetKeyword) : '';
-  if (!key) return 0;
-
-  const set = loadRecommendations(workspaceId);
-  if (!set) return 0;
-
-  let resolved = 0;
-  const now = new Date().toISOString();
-  for (const rec of set.recommendations) {
-    if (rec.status === 'completed' || rec.status === 'dismissed') continue;
-    if (rec.type !== 'content') continue;
-    if (!rec.targetKeyword || keywordComparisonKey(rec.targetKeyword) !== key) continue;
-    validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
-    rec.status = 'completed';
-    rec.updatedAt = now;
-    resolved++;
-  }
-
-  if (resolved === 0) return 0;
-
-  // Recompute the summary so headline counts / OV totals drop the resolved recs
-  // immediately (same contract as resolveRecommendationsForChange).
-  set.summary = computeRecommendationSummary(set.recommendations);
-  saveRecommendationMutation(set);
-  invalidateIntelligenceCache(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { resolved });
-  log.info(`Resolved ${resolved} content recommendation(s) for ${workspaceId} after publishing "${targetKeyword}"`);
-  return resolved;
 }
 
 

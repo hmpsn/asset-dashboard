@@ -46,7 +46,7 @@ import { WS_EVENTS } from '../../ws-events.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../../keyword-strategy-follow-ons.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../../outcome-tracking.js';
-import { resolveContentRecommendationsForPublishedPost } from '../../recommendations.js';
+import { resolveContentRecommendationsForPublishedPost } from '../recommendations/resolution-service.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
 import { normalizePageUrl } from '../../helpers.js';
 import { createLogger } from '../../logger.js';

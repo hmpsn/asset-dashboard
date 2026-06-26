@@ -18,7 +18,7 @@ import {
   toCmsPageId,
 } from '../webflow.js';
 import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } from '../workspaces.js';
-import { resolveRecommendationsForChange } from '../recommendations.js';
+import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { normalizePageUrl } from '../helpers.js';

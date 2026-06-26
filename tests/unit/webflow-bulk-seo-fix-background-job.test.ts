@@ -115,8 +115,8 @@ vi.mock('../../server/activity-log.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../server/recommendations.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/recommendations.js')>();
+vi.mock('../../server/domains/recommendations/resolution-service.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/domains/recommendations/resolution-service.js')>();
   return {
     ...actual,
     resolveRecommendationsForPageIds: vi.fn((workspaceId: string, pageIds: string[]) => {
