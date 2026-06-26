@@ -10,7 +10,7 @@ import {
   REC_WORDING_INSIGHT_MAX,
   type RecWordingOverridePayload,
 } from '../../../shared/types/rec-operator-steering';
-import type { CockpitActions } from './StrategyCockpit';
+import type { CockpitActions } from './cockpitTypes';
 import type { Recommendation } from '../../../shared/types/recommendations';
 
 interface CockpitRowProps {

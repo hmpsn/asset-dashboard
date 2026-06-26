@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
-import { getEffectiveAudit, getEffectivePreviousScore } from './audit-snapshot-views.js';
+import { getEffectiveAudit } from './audit-suppression-projection.js';
 import db from './db/index.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { seoAuditResultSchema, actionItemSchema } from './schemas/workspace-schemas.js';
@@ -210,7 +210,9 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
   const ws = getWorkspaceBySiteId(siteId);
   if (ws) {
     const effectiveAudit = getEffectiveAudit(audit, ws.auditSuppressions || []);
-    const effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
+    const effectivePreviousScore = prev
+      ? getEffectiveAudit(prev.audit, ws.auditSuppressions || []).siteScore
+      : undefined;
 
     // Bridge #12 — per-page audit findings.
     // 2026-06-09 audit (confirmed #5): this previously wrote insightType 'page_health'

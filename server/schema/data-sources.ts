@@ -4,7 +4,7 @@
  * No AI calls.
  */
 import * as cheerio from 'cheerio';
-import { scrubBrandSuffix } from './templates/helpers.js';
+import { scrubBrandSuffix } from './schema-text-sanitizer.js';
 import { contentScope } from './extractors/page-elements/content-scope.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import type { SchemaEvidenceSource, SchemaFieldEvidence, SchemaFieldTarget, SchemaServiceOffer, SchemaServiceProfile } from '../../shared/types/site-inventory.js';

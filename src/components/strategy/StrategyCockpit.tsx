@@ -15,15 +15,9 @@ import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../../hooks/useToggl
 import { useCurationSelection } from './hooks/useCurationSelection';
 import { useRecBulkMutation } from '../../hooks/admin/useRecBulkMutation';
 import type { Recommendation } from '../../../shared/types/recommendations';
+import type { CockpitActions } from './cockpitTypes';
 
-export interface CockpitActions {
-  send: (recId: string, note?: string) => void;
-  strike: (recId: string) => void;
-  unstrike: (recId: string) => void;
-  throttle: (recId: string, days: 7 | 30 | 90) => void;
-  fix: (recId: string) => void;
-  isPending: boolean;
-}
+export type { CockpitActions } from './cockpitTypes';
 
 interface StrategyCockpitProps {
   workspaceId: string;

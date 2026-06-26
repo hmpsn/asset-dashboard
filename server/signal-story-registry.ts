@@ -38,21 +38,10 @@ import { buildStoryFromInsight as lostVisibility } from './briefing-templates/lo
 import { buildStoryFromInsight as pageHealth } from './briefing-templates/page-health.js';
 import { buildStoryFromInsight as rankingMover } from './briefing-templates/ranking-mover.js';
 import { buildStoryFromInsight as rankingOpportunity } from './briefing-templates/ranking-opportunity.js';
+import type { TemplateContext as BriefingTemplateContext } from './briefing-templates/context.js';
 
 type ClientStoryContent = Pick<ClientInsight, 'headline' | 'narrative' | 'impact'>;
 type ClientInsightProjector = (insight: AnalyticsInsight) => ClientStoryContent;
-type BriefingTemplateContext = {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-  avgCPC?: number;
-  pulseMetrics?: {
-    totalClicks?: number;
-    totalImpressions?: number;
-    avgPosition?: number;
-    auditScore?: number;
-    organicTrafficValue?: number;
-  };
-};
 type BriefingInsightProjector = (
   insight: AnalyticsInsight,
   context: BriefingTemplateContext,

@@ -23,6 +23,7 @@
 
 import type { ProductType } from './payments.js';
 import type { RecType } from './recommendations.js';
+export type { ImpactBand } from './impact-band.js';
 
 /** Client-facing fixable-issue families surfaced with a purchase path. */
 export type FixType = 'metadata' | 'schema' | 'redirect' | 'alt-text';
@@ -169,12 +170,5 @@ export function fixTypeForRecType(recType: string): FixType | undefined {
 // `monthlyRangeUsd` is absent when the projected value is below the display floor
 // (~$25/mo). The impact line must only render when `monthlyRangeUsd` is present.
 //
-// Pre-declared shape (R1-A server lane commits the projection; R1-B UI lane codes
-// against this):
-//   impactBand?: { band: 'low'|'medium'|'high'; monthlyRangeUsd?: [number, number] }
-
-export interface ImpactBand {
-  band: 'low' | 'medium' | 'high';
-  /** Conservative monthly USD range [lower, upper] — absent when below floor */
-  monthlyRangeUsd?: [number, number];
-}
+// The ImpactBand shape lives in `impact-band.ts`; this module re-exports it for
+// compatibility with the original UI import path.
