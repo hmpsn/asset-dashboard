@@ -316,4 +316,4 @@ The `localSeo` slice (added 2026-05-21) is the canonical source of local SEO con
 
 **Empty-but-valid baseline:** when the `local-seo-visibility` feature flag is off OR no markets are configured, the slice returns a typed object with empty arrays and a short explanatory `effectiveLocalSeoBlock`. Consumers never see `undefined`. Token cost on non-local workspaces is ~80 characters when the slice is requested.
 
-**Known limitation:** `LocalSeoKeywordCandidate` in `server/local-seo.ts` does not currently expose a `marketId` field. Until it does, the stratified sampler in `assembleLocalSeo` falls back to flat score-sorted top-N, and the relevance helper's market-bonus heuristic is a no-op. The follow-up is tracked in the slice file with a `TODO(local-seo-marketId-passthrough)` comment.
+**Market-scoped candidates:** `LocalSeoKeywordCandidate` is owned by `server/domains/local-seo/types.ts` and includes `marketId`, so the stratified sampler in `assembleLocalSeo` can group candidates by active market and the relevance helper can apply market-bonus scoring.

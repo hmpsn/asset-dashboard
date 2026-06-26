@@ -1,4 +1,4 @@
-import type { LocalSeoKeywordCandidate } from '../../local-seo.js';
+import type { LocalSeoKeywordCandidate } from '../local-seo/types.js';
 import type { ScoringContext } from '../../scoring/keyword-value-score.js';
 import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap } from '../../../shared/types/workspace.js';
 import type {

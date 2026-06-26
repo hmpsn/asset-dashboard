@@ -12,7 +12,7 @@ import type { OpportunityInput } from '../../shared/types/recommendations.js';
 import type { LocalSeoPosture } from '../../shared/types/local-seo.js';
 import type { LocalSeoMarket } from '../../shared/types/local-seo.js';
 import { INTENT_WEIGHT, DEFAULT_INTENT_WEIGHT } from './opportunity-value.js';
-import { hasMarketModifier, classifyLocalKeywordIntent } from '../local-seo.js';
+import { classifyLocalKeywordIntent, hasMarketModifier } from '../domains/local-seo/keyword-intent.js';
 
 // ── Public type re-exports ───────────────────────────────────────────────────
 
