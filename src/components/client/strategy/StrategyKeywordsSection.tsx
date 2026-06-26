@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Target, Trash2, X } from 'lucide-react';
 import { Button, EmptyState, FormInput, Icon, IconButton, SectionCard, Skeleton } from '../../ui';
+import { compareKeywordOpportunityScoreDesc } from '../../../../shared/keyword-opportunity-projection';
 import {
   ROLE_DISPLAY_LABELS,
   type PriorityKeywordItem,
@@ -64,9 +65,7 @@ export function StrategyKeywordsSection({
     setKwListOverflows(el.scrollHeight > el.clientHeight);
   });
 
-  const sortedConfirmed = [...strategyKeywordRows].sort(
-    (a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0),
-  );
+  const sortedConfirmed = [...strategyKeywordRows].sort(compareKeywordOpportunityScoreDesc);
 
   return (
     <SectionCard

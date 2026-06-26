@@ -6,6 +6,7 @@ import { adminPath } from '../../routes';
 import { useShowMore } from '../../hooks/useShowMore';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useOutcomeActions, useRecordOutcomeAction } from '../../hooks/admin/useOutcomes';
+import { compareContentGapDisplayOrder } from '../../../shared/keyword-opportunity-projection';
 
 interface ContentGap {
   topic: string;
@@ -61,15 +62,8 @@ export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGap
       .filter((id): id is string => id != null),
   );
 
-  // Sort by opportunity score (server-computed), falling back to volume then priority
-  const sorted = [...contentGaps].sort((a, b) => {
-    const scoreDiff = (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
-    if (scoreDiff !== 0) return scoreDiff;
-    const volDiff = (b.volume || 0) - (a.volume || 0);
-    if (volDiff !== 0) return volDiff;
-    const prioW = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-    return prioW(b.priority) - prioW(a.priority);
-  });
+  // Sort by opportunity score (server-computed), falling back to volume then priority.
+  const sorted = [...contentGaps].sort(compareContentGapDisplayOrder);
 
   const { visible, hiddenCount, expanded, toggle, canExpand } = useShowMore(sorted, maxVisible);
 

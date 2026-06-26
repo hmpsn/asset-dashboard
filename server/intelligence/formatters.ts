@@ -16,6 +16,7 @@ import { formatOperationalSection } from './formatter-operational.js';
 import { pct } from './formatter-shared.js';
 import { formatSiteHealthSection } from './formatter-site-health.js';
 import { formatPageElementsSection } from './page-elements-slice.js';
+import { compareKeywordOpportunityScoreDesc } from '../../shared/keyword-opportunity-projection.js';
 export { formatPersonasForPrompt } from './persona-format.js';
 
 export function formatForPrompt(
@@ -473,7 +474,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.strategy?.contentGaps && ctx.strategy.contentGaps.length > 0 && verbosity !== 'compact') {
     const limit = verbosity === 'detailed' ? 8 : 4;
     const gaps = [...ctx.strategy.contentGaps]
-      .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+      .sort(compareKeywordOpportunityScoreDesc)
       .slice(0, limit);
     lines.push('Content gaps (opportunity-ranked):');
     for (const g of gaps) {
