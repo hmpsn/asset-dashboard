@@ -36,8 +36,7 @@ import { getWorkspace } from './workspaces.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { buildKeywordStrategyUxPayload } from './keyword-strategy-ux.js';
 import { WS_EVENTS } from './ws-events.js';
-import { findBestParent, isJunkKeywordString, keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { isStrategyPoolEligibleKeyword } from './keyword-intelligence/rules.js';
+import { findBestParent, keywordComparisonKey } from '../shared/keyword-normalization.js';
 import {
   getLostVisibilityKeys,
   getLostVisibilityQueries,
@@ -48,8 +47,6 @@ import {
   upsertFeedback,
 } from './domains/keyword-command-center/feedback-store.js';
 import {
-  addPageKeys,
-  addStrategyKeys,
   filterMapByKeys,
   filterStrategyForKeys,
   filterStrategyForSingleKeyword,
@@ -59,12 +56,28 @@ import {
   restrictPageToKeys,
 } from './domains/keyword-command-center/bundle-filters.js';
 import {
+  KEYWORD_UNIVERSE_FULL_FLAG,
+  LOCAL_CANDIDATE_ROW_LIMIT,
+  RAW_EVIDENCE_ROW_LIMIT,
+  UNIVERSE_SAFETY_CEILING,
+  addCandidateKeysFromBundle,
+  filterBundleToKeys,
+  gateDiscoveryGaps,
+  isTier1JunkKeyword,
+  mergeMetricsInto,
+  rowCandidateKeysForQuery,
+  selectRankEvidence,
+  sourceKeysForRows,
+  trackedKeywordMatchesFilter,
+  type CandidateRowMetricParity,
+  type CandidateRowMetricProjection,
+  type RowCandidateKey,
+} from './domains/keyword-command-center/candidate-boundary.js';
+import {
   mergeTrackedKeywordProvenance,
   withResolvedSiteKeywordMetrics,
 } from './domains/keyword-command-center/tracked-keyword-provenance.js';
 import {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
   buildCounts,
   buildFilterFacetsFromCounts,
   buildFilters,
@@ -91,7 +104,6 @@ import {
   statusLabel,
   trackingSourceDetail,
 } from './domains/keyword-command-center/row-lifecycle.js';
-import { keywordSortComparator, type SortFieldAccessors } from './domains/keyword-command-center/sort.js';
 import type {
   CommandCenterSourceBundle,
   DraftRow,
@@ -101,7 +113,7 @@ import type {
   RowFinalizeContext,
   ValueScoringConfig,
 } from './domains/keyword-command-center/types.js';
-import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap, Workspace } from '../shared/types/workspace.js';
+import type { PageKeywordMap, Workspace } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
@@ -118,7 +130,6 @@ import {
   type KeywordCommandCenterRowsResponse,
   type KeywordCommandCenterResponse,
   type KeywordCommandCenterRow,
-  type KeywordCommandCenterSort,
   type KeywordCommandCenterSourceLabel,
   type KeywordCommandCenterSummaryResponse,
 } from '../shared/types/keyword-command-center.js';
@@ -126,7 +137,6 @@ import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKey
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
-  type LatestRank,
   type TrackedKeyword,
 } from '../shared/types/rank-tracking.js';
 import type { OutcomeReadback } from '../shared/types/outcome-tracking.js';
@@ -164,75 +174,21 @@ export {
   withResolvedSiteKeywordMetrics,
 } from './domains/keyword-command-center/tracked-keyword-provenance.js';
 
+export {
+  __candidateKeysForTest,
+  candidateSortForQuery,
+  gateDiscoveryGaps,
+  trackedKeywordMatchesFilter,
+} from './domains/keyword-command-center/candidate-boundary.js';
+
+export type {
+  CandidateRowMetricParity,
+  RowCandidateKey,
+} from './domains/keyword-command-center/candidate-boundary.js';
+
 export type { CommandCenterSourceBundle } from './domains/keyword-command-center/types.js';
 
-const RAW_EVIDENCE_ROW_LIMIT = 75;
-const RANK_EVIDENCE_ROW_LIMIT = 50;
-const LOCAL_CANDIDATE_ROW_LIMIT = 75;
-
-/**
- * Universe-full safety ceiling (Task 3). When the `keyword-universe-full` flag is
- * ON the per-bucket caps (rank-evidence 50, raw-evidence 75, local 75) are lifted;
- * this is the single global backstop that protects the candidate Map from a
- * pathological GSC snapshot. It is a BACKSTOP, not the product cap — when it bites,
- * we keep the top-N BY VALUE (high-value head retained, low-value tail dropped) and
- * disclose the truncation honestly (rawEvidenceTotal > rawEvidenceReturned). Logged
- * at Pino debug when it truncates.
- */
-const UNIVERSE_SAFETY_CEILING = 2000;
-
 const log = createLogger('keyword-command-center');
-
-const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
-
-/**
- * The SINGLE "select ranked-untracked GSC queries" function. Given the ranks that
- * have already passed each site's own exclusion predicate (not-already-a-row,
- * not-a-variant, etc.), apply the flag-derived selection so all five rank-evidence
- * sites stay in lockstep:
- *
- *  - Flag OFF: keep the top-50 BY IMPRESSIONS (byte-identical to the pre-Task-3
- *    `.sort((a,b)=>impressions desc).slice(0, RANK_EVIDENCE_ROW_LIMIT)`).
- *  - Flag ON: keep EVERY query with clicks>0 OR impressions>0 (impression-only
- *    ranking IS retained — owner decision), ordered BY VALUE
- *    (demand=impressions, then clicks, desc), capped at UNIVERSE_SAFETY_CEILING.
- *    When the cap bites, the low-value tail is dropped (value-ordered truncation).
- *
- * `total` is the TRUE pre-ceiling count of selected ranks (post value-filter), so
- * callers can disclose ceiling truncation honestly. `workspaceId` may be undefined
- * (defensive — resolves to flag-OFF/global behavior).
- */
-function selectRankEvidence(
-  filteredRanks: LatestRank[],
-  workspaceId: string | undefined,
-): { selected: LatestRank[]; total: number } {
-  if (!isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspaceId)) {
-    const selected = [...filteredRanks]
-      .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-      .slice(0, RANK_EVIDENCE_ROW_LIMIT);
-    return { selected, total: Math.min(filteredRanks.length, RANK_EVIDENCE_ROW_LIMIT) };
-  }
-  // Flag ON: empirical-ranking universe — every query the site ranks for.
-  const valued = filteredRanks
-    .filter(rank => (rank.clicks ?? 0) > 0 || (rank.impressions ?? 0) > 0)
-    .sort((a, b) => {
-      // Value order: demand (impressions, the empirical-ranking demand proxy) then
-      // clicks, descending. Mirrors the candidate-stage value sort so the page-1
-      // selection equals the global value-ordered head.
-      const demandDelta = (b.impressions ?? 0) - (a.impressions ?? 0);
-      if (demandDelta !== 0) return demandDelta;
-      return (b.clicks ?? 0) - (a.clicks ?? 0);
-    });
-  const total = valued.length;
-  const selected = valued.slice(0, UNIVERSE_SAFETY_CEILING);
-  if (total > UNIVERSE_SAFETY_CEILING) {
-    log.debug(
-      { workspaceId, total, kept: UNIVERSE_SAFETY_CEILING, dropped: total - UNIVERSE_SAFETY_CEILING },
-      'keyword-command-center universe safety ceiling truncated rank evidence (value-ordered)',
-    );
-  }
-  return { selected, total };
-}
 
 /**
  * Per-request value-scoring config. Built ONCE per request in the rows-build entry
@@ -264,33 +220,6 @@ function buildValueScoringConfig(workspace: Workspace): ValueScoringConfig {
 function addSource(row: DraftRow, source: KeywordCommandCenterSourceLabel): void {
   if (row.sourceLabels.some(existing => existing.kind === source.kind && existing.label === source.label && existing.detail === source.detail)) return;
   row.sourceLabels.push(source);
-}
-
-/**
- * Last-writer-wins metric merge over a bare metrics object, with the planner
- * sentinel guard. Shared by the row stage (`mergeMetrics`) and the candidate
- * stage's metric resolver (`resolveBundleMetrics`) so the two stages compute
- * IDENTICAL clicks/rank/difficulty/demand per key — the invariant that keeps
- * page-1 == global-top-N. `keyword` is the RAW display keyword (the sentinel
- * guard is keyword-aware).
- */
-function mergeMetricsInto(keyword: string, target: KeywordCommandCenterMetrics, metrics: KeywordCommandCenterMetrics): KeywordCommandCenterMetrics {
-  // Filter DataForSEO planner-grouped bucket sentinels before merging.
-  // The Google Ads planner returns 1,000,000 as a grouped-forecast bucket value
-  // paired with difficulty=21 when it can't pin granular data. Letting this through
-  // overstates volume by orders of magnitude on branded long-tail keywords and
-  // overwrites real provider data from other sources (the merge spreads later
-  // sources over earlier ones, so a sentinel write after a real value wins).
-  // See server/keyword-strategy-helpers.ts:isSuspiciousPlannerGroupedVolume.
-  const filtered: KeywordCommandCenterMetrics = { ...metrics };
-  if (isSuspiciousPlannerGroupedVolume(keyword, filtered.volume)) {
-    filtered.volume = undefined;
-    filtered.difficulty = undefined; // 21 is the paired sentinel difficulty — drop both
-  }
-  return {
-    ...target,
-    ...Object.fromEntries(Object.entries(filtered).filter(([, value]) => value != null)),
-  };
 }
 
 function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void {
@@ -1131,20 +1060,6 @@ export async function buildKeywordCommandCenterSummary(
   };
 }
 
-export function trackedKeywordMatchesFilter(keyword: TrackedKeyword, filter: KeywordCommandCenterFilter): boolean {
-  const status = keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return status === TRACKED_KEYWORD_STATUS.ACTIVE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.RETIRED) return status !== TRACKED_KEYWORD_STATUS.ACTIVE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY) {
-    // Wave 3d-ii: In Strategy = active + reconcile-owned (strategyOwned===true),
-    // decoupled from the source enum. The caller must pass the table-bearing shape
-    // (mergeTrackedKeywordProvenance) — the stripped getTrackedKeywords output would
-    // see strategyOwned===undefined and count zero.
-    return status === TRACKED_KEYWORD_STATUS.ACTIVE && keyword.strategyOwned === true;
-  }
-  return true;
-}
-
 function localVisibilityByFilter(
   workspaceId: string,
   filter: KeywordCommandCenterFilter,
@@ -1178,488 +1093,6 @@ function filterUsesLocalVisibilityRows(filter: KeywordCommandCenterFilter): bool
     || filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH
     || filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE
     || filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED;
-}
-
-export interface RowCandidateKey {
-  key: string;
-  keyword: string;
-  sourcePriority: number;
-  demand: number;
-  rank?: number;
-  searchText?: string;
-  /** GSC clicks (28-day) — populated for ranking candidates; enables the clicks sort + filter. */
-  clicks?: number;
-  /** Keyword difficulty (0–100) — populated where the source has it; enables the difficulty sort. */
-  difficulty?: number;
-  /** Cost-per-click resolved from trackedKeyword enrichment (Phase 1: precomputed for value scoring). */
-  cpc?: number;
-  /** Raw keyword intent string resolved from the bundle (Phase 1: precomputed for value scoring). */
-  intent?: string;
-  /** Precomputed value-first score (flag ON only); undefined when the signal gate returns no score. */
-  valueScore?: number;
-}
-
-function addCandidateKey(
-  candidates: Map<string, RowCandidateKey>,
-  keyword: string | undefined | null,
-  sourcePriority: number,
-  demand = 0,
-  rank?: number,
-  searchText?: string,
-  clicks?: number,
-  difficulty?: number,
-): void {
-  const key = keywordComparisonKey(keyword ?? '');
-  if (!key) return;
-  const displayKeyword = keyword?.trim() || key;
-  const existing = candidates.get(key);
-  const mergeSearchText = (a: string | undefined, b: string | undefined): string | undefined => {
-    const merged = [...new Set([...(a?.split(' ') ?? []), ...(b?.split(' ') ?? [])].filter(Boolean))].join(' ');
-    return merged || undefined;
-  };
-  if (
-    !existing
-    || sourcePriority < existing.sourcePriority
-    || (sourcePriority === existing.sourcePriority && demand > existing.demand)
-  ) {
-    // New entry wins the priority/demand contest and becomes the surviving
-    // candidate identity. Metrics are SOURCE-AGNOSTIC: keep any clicks/difficulty/
-    // rank the displaced candidate carried that the winner lacks, so a tracked
-    // keyword (priority 1) that is ALSO a GSC ranking query (priority 2) still
-    // surfaces its empirical clicks. This mirrors the row stage's mergeMetrics
-    // and is what keeps the candidate sort from drifting from the row sort.
-    candidates.set(key, {
-      key,
-      keyword: displayKeyword,
-      sourcePriority,
-      demand,
-      rank: rank ?? existing?.rank,
-      searchText: mergeSearchText(existing?.searchText, searchText),
-      clicks: clicks ?? existing?.clicks,
-      difficulty: difficulty ?? existing?.difficulty,
-    });
-  } else {
-    // Existing entry keeps its identity; enrich it with any metric this lower-
-    // priority source supplies that the winner is still missing.
-    if (existing.rank === undefined && rank !== undefined) existing.rank = rank;
-    if (existing.clicks === undefined && clicks !== undefined) existing.clicks = clicks;
-    if (existing.difficulty === undefined && difficulty !== undefined) existing.difficulty = difficulty;
-    if (searchText) existing.searchText = mergeSearchText(existing.searchText, searchText);
-  }
-}
-
-/**
- * Tier-2 (relevance) evaluation context for the KCC discovery gate.
- *
- * DELIBERATELY EMPTY ({}). The strategy-synthesis path builds a rich ctx with
- * `strictBusinessFit: true` (server/keyword-strategy-ai-synthesis.ts) to
- * AGGRESSIVELY prune business-mismatched provider suggestions during strategy
- * GENERATION. The Keyword Command Center has a different goal: surface the
- * COMPLETE not-yet-ranking opportunity universe. Here we only want to strip the
- * low-actionability NOISE that `isStrategyPoolEligibleKeyword` suppresses
- * unconditionally — the `LOW_ACTIONABILITY_PHRASES` blocklist and blank keywords
- * (server/keyword-intelligence/rules.ts) — WITHOUT dropping a real competitor-gap
- * keyword just because the workspace has no business-context terms yet.
- *
- * With `{}`, `strictBusinessFit` defaults to false, so the `business_mismatch`
- * hard-suppress escalation never fires; only the source-agnostic noise/blank
- * suppression remains. This keeps the headline invariant ("invisalign cost",
- * 1900 vol, 0 clicks → RETAINED) true while still dropping "paper tiger"-class
- * noise. When unsure, we KEEP the keyword (a false-negative on junk is far
- * cheaper than dropping a real opportunity).
- */
-const KCC_DISCOVERY_TIER2_CTX: Parameters<typeof isStrategyPoolEligibleKeyword>[1] = {};
-
-/** Tier-1 malformed-string gate (ALL populations). True ⇒ drop the candidate. */
-function isTier1JunkKeyword(keyword: string | null | undefined): boolean {
-  return isJunkKeywordString(keyword).isJunk;
-}
-
-/**
- * Tier-2 relevance/low-actionability gate (DISCOVERY populations ONLY:
- * `contentGaps` + `keywordGaps`). True ⇒ drop the candidate. Never call this for
- * ranking/curated/strategy/tracked/feedback/GSC/local/lost sources — a
- * clicked/tracked/client-chosen keyword is never relevance-dropped.
- */
-function isTier2SuppressedDiscovery(keyword: string, volume: number, difficulty: number): boolean {
-  return isStrategyPoolEligibleKeyword(
-    { keyword, volume, difficulty, sourceKind: 'keyword_gap' },
-    KCC_DISCOVERY_TIER2_CTX,
-  ).suppressed;
-}
-
-/**
- * SINGLE source-of-truth junk gate for the DISCOVERY populations (contentGaps +
- * keywordGaps). Applied ONCE, immediately after `assembleStoredKeywordStrategy`,
- * by every KCC consumer (rows-skinny bundle, read-model, summary, detail) so all
- * four paths read the SAME gated gaps by construction — the rows table, the
- * summary badges, the `local_candidates` filter, and `/detail` can no longer
- * diverge on the discovery universe.
- *
- * Both tiers from the candidate boundary apply: Tier-1 (`isTier1JunkKeyword` —
- * malformed strings) drops every population; Tier-2 (`isTier2SuppressedDiscovery`
- * — low-actionability noise) is DISCOVERY-only and never touches ranking/curated
- * sources, so the headline invariant holds (a real not-yet-ranking competitor
- * gap with volume + 0 clicks survives; a clicked GSC ranking query is never
- * relevance-gated because ranks are not gaps).
- *
- * The candidate loops in `addCandidateKeysFromBundle` keep their own Tier-1/Tier-2
- * gap checks; with pre-gated bundles those checks are redundant-but-harmless
- * (they still gate the OTHER populations — strategy/page/rank/tracked/local/lost —
- * for the rare garbage string, and they keep `__candidateKeysForTest` honest when
- * fed a raw bundle directly).
- */
-function gateDiscoveryGaps<T extends { contentGaps: ContentGap[]; keywordGaps: KeywordGapItem[] }>(
-  source: T,
-): { contentGaps: ContentGap[]; keywordGaps: KeywordGapItem[] } {
-  return {
-    contentGaps: source.contentGaps.filter(gap =>
-      !isTier1JunkKeyword(gap.targetKeyword)
-      && !isTier2SuppressedDiscovery(gap.targetKeyword, gap.volume ?? 0, gap.difficulty ?? 0)),
-    keywordGaps: source.keywordGaps.filter(gap =>
-      !isTier1JunkKeyword(gap.keyword)
-      && !isTier2SuppressedDiscovery(gap.keyword, gap.volume ?? 0, gap.difficulty ?? 0)),
-  };
-}
-
-function addCandidateKeysFromBundle(
-  candidates: Map<string, RowCandidateKey>,
-  bundle: CommandCenterSourceBundle,
-  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
-  valueScoring: ValueScoringConfig = { on: false },
-): void {
-  const variantParentKeys = parentableVariantKeys({
-    strategy: bundle.strategy,
-    pageMap: bundle.pageMap,
-    contentGaps: bundle.contentGaps,
-    trackedKeywords: bundle.trackedKeywords,
-    feedback: bundle.feedback,
-  });
-  // Per-tier dropped COUNTS for observability (no keyword PII beyond counts).
-  let tier1Dropped = 0;
-  let tier2Dropped = 0;
-  for (const metric of bundle.strategy?.siteKeywordMetrics ?? []) {
-    if (isTier1JunkKeyword(metric.keyword)) { tier1Dropped++; continue; }
-    // siteKeywordMetrics carry provider difficulty (SiteKeywordMetric.difficulty).
-    addCandidateKey(candidates, metric.keyword, 0, metric.volume ?? 0, undefined, undefined, undefined, metric.difficulty);
-  }
-  for (const keyword of bundle.strategy?.siteKeywords ?? []) {
-    if (isTier1JunkKeyword(keyword)) { tier1Dropped++; continue; }
-    addCandidateKey(candidates, keyword, 0);
-  }
-  for (const page of bundle.pageMap) {
-    const pageSearchText = `${page.pageTitle ?? ''} ${page.pagePath ?? ''}`.toLowerCase();
-    if (isTier1JunkKeyword(page.primaryKeyword)) tier1Dropped++;
-    else addCandidateKey(candidates, page.primaryKeyword, 0, page.volume ?? 0, undefined, pageSearchText);
-    for (const secondary of page.secondaryKeywords ?? []) {
-      if (isTier1JunkKeyword(secondary)) { tier1Dropped++; continue; }
-      addCandidateKey(candidates, secondary, 1, page.volume ?? 0, undefined, pageSearchText);
-    }
-  }
-  for (const gap of bundle.contentGaps) {
-    // DISCOVERY (Population C): Tier-1 AND Tier-2.
-    if (isTier1JunkKeyword(gap.targetKeyword)) { tier1Dropped++; continue; }
-    if (isTier2SuppressedDiscovery(gap.targetKeyword, gap.volume ?? 0, gap.difficulty ?? 0)) { tier2Dropped++; continue; }
-    // ContentGap.difficulty (0–100) is optional provider enrichment.
-    addCandidateKey(candidates, gap.targetKeyword, 1, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
-  }
-  for (const keyword of bundle.trackedKeywords) {
-    if (isTier1JunkKeyword(keyword.query)) { tier1Dropped++; continue; }
-    // TrackedKeyword.difficulty is optional provider enrichment.
-    addCandidateKey(candidates, keyword.query, keyword.status === TRACKED_KEYWORD_STATUS.ACTIVE ? 1 : 5, keyword.volume ?? keyword.baselineImpressions ?? 0, undefined, undefined, undefined, keyword.difficulty);
-  }
-  for (const row of bundle.feedback.values()) {
-    if (isTier1JunkKeyword(row.keyword)) { tier1Dropped++; continue; }
-    addCandidateKey(candidates, row.keyword, row.status === 'requested' ? 2 : row.status === 'declined' ? 6 : 1);
-  }
-  for (const rank of bundle.latestRanks) {
-    if (findVariantParentKey(keywordComparisonKey(rank.query), variantParentKeys)) continue;
-    // RANKING (Population A): Tier-1 only — empirical ranking data is never
-    // relevance-gated (a clicked/impression-only query must still appear).
-    if (isTier1JunkKeyword(rank.query)) { tier1Dropped++; continue; }
-    // LatestRank carries empirical GSC clicks (28-day) — feeds the clicks sort.
-    addCandidateKey(candidates, rank.query, 2, rank.impressions ?? 0, rank.position, undefined, rank.clicks);
-  }
-  for (const gap of bundle.keywordGaps) {
-    // DISCOVERY (Population C): Tier-1 AND Tier-2.
-    if (isTier1JunkKeyword(gap.keyword)) { tier1Dropped++; continue; }
-    if (isTier2SuppressedDiscovery(gap.keyword, gap.volume ?? 0, gap.difficulty ?? 0)) { tier2Dropped++; continue; }
-    // KeywordGapItem.difficulty (competitor-gap KD) is required on the type.
-    addCandidateKey(candidates, gap.keyword, 4, gap.volume ?? 0, undefined, undefined, undefined, gap.difficulty);
-  }
-  for (const visibility of localVisibility.values()) {
-    if (isTier1JunkKeyword(visibility.keyword)) { tier1Dropped++; continue; }
-    addCandidateKey(candidates, visibility.keyword, 2);
-  }
-  for (const lost of bundle.lostVisibilityRows ?? []) {
-    if (isTier1JunkKeyword(lost.query)) { tier1Dropped++; continue; }
-    addCandidateKey(candidates, lost.query, 2, lost.totalImpressions, lost.lastPosition ?? undefined);
-  }
-
-  if (tier1Dropped > 0 || tier2Dropped > 0) {
-    log.debug(
-      { workspaceId: bundle.workspaceId, tier1Dropped, tier2Dropped },
-      'keyword-command-center junk gate dropped candidates',
-    );
-  }
-
-  // DRIFT FIX (Task 1): the loops above seed candidate IDENTITY (sourcePriority /
-  // demand contest) and search text, but their per-source metric carryover is
-  // FIRST-writer-wins and skips self-ranks + variant aggregation — so it diverges
-  // from the row stage's LAST-writer-wins `mergeMetrics` + variant rollup. Replay
-  // the EXACT row-stage metric assembly (`resolveBundleMetrics`) and overwrite each
-  // surviving candidate's SORT metrics with the row-accurate values, so
-  // candidate {demand,clicks,rank,difficulty} == row {volume??impressions,clicks,
-  // currentPosition,difficulty} for every key. Identity/replacement is untouched.
-  const resolved = resolveBundleMetrics(bundle, localVisibility);
-  for (const candidate of candidates.values()) {
-    const metrics = resolved.get(candidate.key);
-    if (!metrics) continue;
-    candidate.demand = metrics.volume ?? metrics.impressions ?? 0;
-    candidate.clicks = metrics.clicks;
-    candidate.rank = metrics.currentPosition;
-    candidate.difficulty = metrics.difficulty;
-    // Phase 1: cpc + intent are resolver-parity-guaranteed (resolveBundleMetrics
-    // merges them in the SAME source order as populateDraftRows), so copying them
-    // here keeps the candidate value-score inputs identical to the row stage.
-    candidate.cpc = metrics.cpc;
-    candidate.intent = metrics.intent;
-    // Precompute the value score ONCE per key (flag ON only), with the SAME
-    // function + SAME per-request ScoringContext as the row finalize — so
-    // candidate.valueScore === row valueScore for every key by construction.
-    if (valueScoring.on && valueScoring.ctx) {
-      candidate.valueScore = computeKeywordValueScore(
-        {
-          keyword: candidate.keyword,
-          volume: metrics.volume,
-          impressions: metrics.impressions,
-          difficulty: metrics.difficulty,
-          cpc: metrics.cpc,
-          intent: metrics.intent,
-        },
-        valueScoring.ctx,
-      );
-    }
-  }
-}
-
-/**
- * Compute the SORT-relevant metrics each evaluated row will carry, per
- * normalized key, WITHOUT building full rows. This is a numbers-only mirror of
- * `populateDraftRows`: it replays the same `mergeMetricsInto` passes in the same
- * source order (last-writer-wins), the same `rows.has(...)`-guarded self-rank
- * application, and the same variant aggregation (sum clicks/impressions, MIN
- * position) — guaranteeing the candidate stage and the row stage agree.
- *
- * It intentionally omits the strategyUx explanation pass: the candidate stage
- * always runs with `includeStrategyUx: false`, so that pass contributes no
- * row-stage metrics either. Difficulty added by the explanation loop only
- * re-applies content-gap difficulty already merged here.
- */
-function resolveBundleMetrics(
-  bundle: CommandCenterSourceBundle,
-  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
-): Map<string, KeywordCommandCenterMetrics> {
-  const strategy = bundle.strategy;
-  // key -> { keyword (raw display, for the sentinel guard), metrics, rawEvidenceOnly }
-  const rows = new Map<string, { keyword: string; metrics: KeywordCommandCenterMetrics; rawEvidenceOnly: boolean }>();
-  const ensure = (keyword: string | null | undefined): { keyword: string; metrics: KeywordCommandCenterMetrics; rawEvidenceOnly: boolean } | null => {
-    const key = keywordComparisonKey(keyword ?? '');
-    if (!key) return null;
-    const existing = rows.get(key);
-    if (existing) return existing;
-    const created = { keyword: (keyword ?? '').trim() || key, metrics: {} as KeywordCommandCenterMetrics, rawEvidenceOnly: false };
-    rows.set(key, created);
-    return created;
-  };
-  const merge = (target: { keyword: string; metrics: KeywordCommandCenterMetrics }, metrics: KeywordCommandCenterMetrics): void => {
-    target.metrics = mergeMetricsInto(target.keyword, target.metrics, metrics);
-  };
-
-  for (const metric of strategy?.siteKeywordMetrics ?? []) {
-    const row = ensure(metric.keyword);
-    if (!row) continue;
-    merge(row, { volume: metric.volume, difficulty: metric.difficulty });
-  }
-  for (const keyword of strategy?.siteKeywords ?? []) {
-    ensure(keyword); // identity-only in the row stage; carries no numeric metrics
-  }
-  for (const page of bundle.pageMap) {
-    for (const keyword of [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].filter(Boolean)) {
-      const row = ensure(keyword);
-      if (!row) continue;
-      // Task 3.2: cpc joined here too so the candidate-stage metrics stay in
-      // lockstep with populateDraftRows (the documented row==candidate invariant).
-      merge(row, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent });
-    }
-  }
-  for (const gap of bundle.contentGaps) {
-    const row = ensure(gap.targetKeyword);
-    if (!row) continue;
-    // cpc threaded here too so the candidate-stage metrics stay in lockstep with
-    // populateDraftRows (the row==candidate invariant) and the value score is cpc-aware.
-    merge(row, { volume: gap.volume, difficulty: gap.difficulty, cpc: gap.cpc, intent: gap.intent });
-  }
-  for (const gap of bundle.keywordGaps) {
-    const row = ensure(gap.keyword);
-    if (!row) continue;
-    row.rawEvidenceOnly = true; // matches populateDraftRows: keywordGaps are raw evidence
-    merge(row, { volume: gap.volume, difficulty: gap.difficulty });
-  }
-  for (const keyword of bundle.trackedKeywords) {
-    const row = ensure(keyword.query);
-    if (!row) continue;
-    merge(row, {
-      volume: keyword.volume,
-      difficulty: keyword.difficulty,
-      cpc: keyword.cpc,
-      intent: keyword.intent,
-      currentPosition: keyword.baselinePosition,
-      clicks: keyword.baselineClicks,
-      impressions: keyword.baselineImpressions,
-    });
-  }
-  for (const row of bundle.feedback.values()) {
-    ensure(row.keyword); // identity-only in the row stage; carries no numeric metrics
-  }
-  for (const lost of bundle.lostVisibilityRows ?? []) {
-    const row = ensure(lost.query);
-    if (!row) continue;
-    row.rawEvidenceOnly = true;
-    merge(row, { currentPosition: lost.lastPosition ?? undefined, impressions: lost.totalImpressions });
-  }
-
-  // Variant parenting — identical to populateDraftRows: only ranks that are NOT
-  // already a row and CAN be parented by a non-raw-evidence strategy key become
-  // variants; the rest are eligible GSC-only filler rows (capped at
-  // RANK_EVIDENCE_ROW_LIMIT by impressions, matching the row stage).
-  const strategyKeys = [...rows.entries()]
-    .filter(([, row]) => row.rawEvidenceOnly !== true)
-    .map(([key]) => key);
-  const metricsMap = new Map(strategyKeys.map(key => [key, rows.get(key)?.metrics.impressions ?? 0]));
-  const variantParentMap = new Map<string, string>();
-  for (const rank of bundle.latestRanks) {
-    const normalizedQuery = keywordComparisonKey(rank.query);
-    if (!normalizedQuery || rows.has(normalizedQuery)) continue;
-    const parent = findBestParent(normalizedQuery, strategyKeys, metricsMap);
-    if (parent) variantParentMap.set(normalizedQuery, parent);
-  }
-
-  const rankedUntrackedFiltered = bundle.latestRanks
-    .filter(rank => !rows.has(keywordComparisonKey(rank.query)))
-    .filter(rank => !variantParentMap.has(keywordComparisonKey(rank.query)));
-  const { selected: rankedUntracked } = selectRankEvidence(rankedUntrackedFiltered, bundle.workspaceId);
-  for (const rank of rankedUntracked) {
-    const row = ensure(rank.query);
-    if (!row) continue;
-    merge(row, { currentPosition: rank.position, clicks: rank.clicks, impressions: rank.impressions, ctr: rank.ctr });
-  }
-
-  // Self-rank: a GSC rank whose own key IS a row applies its metrics to ITS OWN
-  // row (the defect was the candidate loop `continue`-ing these as false variants).
-  for (const rank of bundle.latestRanks) {
-    const row = rows.get(keywordComparisonKey(rank.query));
-    if (!row) continue;
-    merge(row, { currentPosition: rank.position, clicks: rank.clicks, impressions: rank.impressions, ctr: rank.ctr });
-  }
-
-  // True-variant aggregation: SUM clicks/impressions, take MIN position onto parent.
-  for (const rank of bundle.latestRanks) {
-    const normalizedQuery = keywordComparisonKey(rank.query);
-    const parentKey = variantParentMap.get(normalizedQuery);
-    if (!parentKey) continue;
-    const parentRow = rows.get(parentKey);
-    if (!parentRow) continue;
-    parentRow.metrics.impressions = (parentRow.metrics.impressions ?? 0) + rank.impressions;
-    parentRow.metrics.clicks = (parentRow.metrics.clicks ?? 0) + rank.clicks;
-    if (parentRow.metrics.currentPosition == null || rank.position < parentRow.metrics.currentPosition) {
-      parentRow.metrics.currentPosition = rank.position;
-    }
-  }
-
-  for (const candidate of localVisibility.values()) {
-    ensure(candidate.keyword); // visibility rows carry no sort metrics in the candidate path
-  }
-  for (const candidate of bundle.localCandidates ?? []) {
-    const row = ensure(candidate.keyword);
-    if (!row) continue;
-    merge(row, { volume: candidate.volume, difficulty: candidate.difficulty });
-  }
-
-  const result = new Map<string, KeywordCommandCenterMetrics>();
-  for (const [key, row] of rows) result.set(key, row.metrics);
-  return result;
-}
-
-const CANDIDATE_SORT_ACCESSORS: SortFieldAccessors<RowCandidateKey> = {
-  keyword: (c) => c.keyword,
-  demand: (c) => c.demand,
-  rank: (c) => c.rank,
-  clicks: (c) => c.clicks,
-  difficulty: (c) => c.difficulty,
-  // Value-first opportunity: a FIELD READ of candidate.valueScore (precomputed once
-  // per key at merge-back with the SAME fn + SAME ctx as the row finalize). Mirrors
-  // ROW_SORT_ACCESSORS.opportunity (row WeakMap) — same value per key → no drift.
-  opportunity: (c) => c.valueScore,
-};
-
-/**
- * Candidate-stage sorter. The `priority`/default branch keeps its original,
- * candidate-specific behavior (sourcePriority then demand then keyword). The
- * explicit, directioned sorts delegate to the SAME `keywordSortComparator` the row
- * stage uses (via `CANDIDATE_SORT_ACCESSORS`, whose `opportunity` reads the same
- * value score) so the two stages cannot drift.
- */
-export function candidateSortForQuery(
-  sort: KeywordCommandCenterSort | undefined,
-  direction?: 'asc' | 'desc',
-): (a: RowCandidateKey, b: RowCandidateKey) => number {
-  if (sort === undefined || sort === 'priority') {
-    return (a, b) => {
-      if (a.sourcePriority !== b.sourcePriority) return a.sourcePriority - b.sourcePriority;
-      if (a.demand !== b.demand) return b.demand - a.demand;
-      return a.keyword.localeCompare(b.keyword);
-    };
-  }
-  return keywordSortComparator(sort, direction, CANDIDATE_SORT_ACCESSORS);
-}
-
-/**
- * Test-only DATA-parity probe. Builds, for the SAME bundle, both the candidate
- * sort-metric map (post `addCandidateKeysFromBundle`) and the evaluated-row
- * sort-metric map (post `populateDraftRows` + finalize), keyed by normalized
- * keyword. The drift guard in the unit test asserts these agree per key for
- * clicks/rank/difficulty/demand — catching DATA divergence the comparator-only
- * guard cannot. Exported for tests; not used by the request path.
- */
-interface CandidateRowMetricProjection {
-  demand: number;
-  clicks?: number;
-  rank?: number;
-  difficulty?: number;
-  cpc?: number;
-  intent?: string;
-  valueScore?: number;
-}
-
-export interface CandidateRowMetricParity {
-  candidate: Map<string, CandidateRowMetricProjection>;
-  row: Map<string, CandidateRowMetricProjection>;
-}
-
-/**
- * Test-only: return the set of normalized candidate keys that SURVIVE the
- * two-tier junk gate in `addCandidateKeysFromBundle`. Exactly the keys that can
- * become rows on the skinny path. Pure (no DB, no HTTP) — used by the per-source
- * gating unit spec. Not used by the request path.
- */
-export function __candidateKeysForTest(
-  bundle: CommandCenterSourceBundle,
-  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary> = new Map(),
-): Set<string> {
-  const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, { ...bundle, includeStrategyUx: false }, localVisibility);
-  return new Set(candidates.keys());
 }
 
 export async function __candidateRowMetricParityForTest(
@@ -1716,183 +1149,6 @@ export async function __candidateRowMetricParityForTest(
     });
   }
   return { candidate, row };
-}
-
-function rowCandidateKeysForQuery(
-  bundle: CommandCenterSourceBundle,
-  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
-  query: KeywordCommandCenterRowsQuery,
-  valueScoring: ValueScoringConfig = { on: false },
-): { keys: Set<string>; page: number; pageSize: number; totalRows: number; totalPages: number } {
-  const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, bundle, localVisibility, valueScoring);
-  const rawSearch = query.search?.trim().toLowerCase();
-  const normalizedSearch = keywordComparisonKey(query.search ?? '');
-  const filtered = [...candidates.values()]
-    .filter(candidate =>
-      !rawSearch
-      || candidate.keyword.toLowerCase().includes(rawSearch)
-      || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
-      || candidate.searchText?.includes(rawSearch)
-    )
-    .sort(candidateSortForQuery(query.sort, query.direction));
-  const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
-  const requestedPage = Math.max(query.page ?? 1, 1);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = Math.min(requestedPage, totalPages);
-  const start = (page - 1) * pageSize;
-  return {
-    keys: new Set(filtered.slice(start, start + pageSize).map(candidate => candidate.key)),
-    page,
-    pageSize,
-    totalRows: filtered.length,
-    totalPages,
-  };
-}
-
-function sourceKeysForRows(input: {
-  workspaceId: string;
-  filter: KeywordCommandCenterFilter;
-  strategy: KeywordStrategy | null | undefined;
-  pageMap: PageKeywordMap[];
-  contentGaps: ContentGap[];
-  keywordGaps: KeywordGapItem[];
-  trackedKeywords: TrackedKeyword[];
-  latestRanks: LatestRank[];
-  feedback: Map<string, FeedbackRow>;
-  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
-  lostVisibilityRows: LostVisibilityQuery[];
-}): Set<string> | null {
-  const keys = new Set<string>();
-  const add = (keyword: string | undefined | null) => {
-    const key = keywordComparisonKey(keyword ?? '');
-    if (key) keys.add(key);
-  };
-  const pageKeys = new Set<string>();
-  addPageKeys(pageKeys, input.pageMap);
-  const selectedOrTrackedOrFeedbackKeys = new Set<string>();
-  addStrategyKeys(selectedOrTrackedOrFeedbackKeys, input.strategy);
-  addPageKeys(selectedOrTrackedOrFeedbackKeys, input.pageMap);
-  for (const gap of input.contentGaps) {
-    const key = keywordComparisonKey(gap.targetKeyword);
-    if (key) selectedOrTrackedOrFeedbackKeys.add(key);
-  }
-  for (const keyword of input.trackedKeywords) {
-    const key = keywordComparisonKey(keyword.query);
-    if (key) selectedOrTrackedOrFeedbackKeys.add(key);
-  }
-  for (const key of input.feedback.keys()) selectedOrTrackedOrFeedbackKeys.add(key);
-  const rawEvidenceKeys = new Set(input.keywordGaps.map(gap => keywordComparisonKey(gap.keyword)).filter(Boolean));
-  const lostVisibilityKeys = new Set(input.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
-  const declinedKeys = new Set(
-    [...input.feedback.values()]
-      .filter(row => row.status === 'declined')
-      .map(row => keywordComparisonKey(row.keyword))
-      .filter(Boolean),
-  );
-  const nonStrategyFeedbackKeys = new Set(
-    [...input.feedback.values()]
-      .filter(row => row.status === 'declined' || row.status === 'requested')
-      .map(row => keywordComparisonKey(row.keyword))
-      .filter(Boolean),
-  );
-  const variantParentKeys = parentableVariantKeys(input);
-
-  switch (input.filter) {
-    case KEYWORD_COMMAND_CENTER_FILTERS.ALL:
-      addStrategyKeys(keys, input.strategy);
-      addPageKeys(keys, input.pageMap);
-      for (const gap of input.contentGaps) add(gap.targetKeyword);
-      for (const gap of input.keywordGaps) add(gap.keyword);
-      for (const keyword of input.trackedKeywords) add(keyword.query);
-      for (const row of input.feedback.values()) add(row.keyword);
-      for (const key of input.localVisibility.keys()) keys.add(key);
-      for (const key of lostVisibilityKeys) keys.add(key);
-      {
-        const filtered = input.latestRanks.filter(rank => {
-          const key = keywordComparisonKey(rank.query);
-          if (findVariantParentKey(key, variantParentKeys)) return false;
-          return key && !keys.has(key) && !rawEvidenceKeys.has(key);
-        });
-        for (const rank of selectRankEvidence(filtered, input.workspaceId).selected) add(rank.query);
-      }
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY:
-      addStrategyKeys(keys, input.strategy);
-      addPageKeys(keys, input.pageMap);
-      for (const gap of input.contentGaps) add(gap.targetKeyword);
-      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
-      for (const row of input.feedback.values()) if (row.status === 'approved') add(row.keyword);
-      for (const key of nonStrategyFeedbackKeys) keys.delete(key);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.TRACKED:
-      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.RETIRED:
-      for (const keyword of input.trackedKeywords.filter(entry => trackedKeywordMatchesFilter(entry, input.filter))) add(keyword.query);
-      for (const key of declinedKeys) keys.delete(key);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW:
-      for (const row of input.feedback.values()) if (row.status === 'requested') add(row.keyword);
-      {
-        const filtered = input.latestRanks.filter(rank => {
-          const key = keywordComparisonKey(rank.query);
-          if (findVariantParentKey(key, variantParentKeys)) return false;
-          return key && !selectedOrTrackedOrFeedbackKeys.has(key) && !rawEvidenceKeys.has(key);
-        });
-        for (const rank of selectRankEvidence(filtered, input.workspaceId).selected) add(rank.query);
-      }
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.CONTENT:
-      for (const gap of input.contentGaps) {
-        const key = keywordComparisonKey(gap.targetKeyword);
-        if (key && !pageKeys.has(key)) keys.add(key);
-      }
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED:
-      addPageKeys(keys, input.pageMap);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE:
-      for (const gap of input.keywordGaps) {
-        const key = keywordComparisonKey(gap.keyword);
-        if (key && !selectedOrTrackedOrFeedbackKeys.has(key)) keys.add(key);
-      }
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED:
-      for (const row of input.feedback.values()) if (row.status === 'requested') add(row.keyword);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.DECLINED:
-      for (const row of input.feedback.values()) if (row.status === 'declined') add(row.keyword);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY:
-      for (const key of lostVisibilityKeys) keys.add(key);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL:
-    case KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY:
-    case KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH:
-    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE:
-    case KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED:
-      for (const key of input.localVisibility.keys()) keys.add(key);
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED:
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE:
-      for (const rank of input.latestRanks) {
-        if (rank.position >= 11 && rank.position <= 20) {
-          const key = keywordComparisonKey(rank.query);
-          if (key) keys.add(key);
-        }
-      }
-      for (const keyword of input.trackedKeywords) {
-        const pos = keyword.baselinePosition;
-        if (pos != null && pos >= 11 && pos <= 20) {
-          add(keyword.query);
-        }
-      }
-      return keys;
-    case KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES:
-      return null;
-  }
 }
 
 function buildFilteredBundle(input: {
@@ -1967,31 +1223,6 @@ function buildFilteredBundle(input: {
       ? lostVisibilityRows.filter(row => keys.has(keywordComparisonKey(row.query)))
       : lostVisibilityRows,
     includeStrategyUx: false,
-  };
-}
-
-function filterBundleToKeys(
-  bundle: CommandCenterSourceBundle & { keys: Set<string> | null },
-  keys: Set<string>,
-): CommandCenterSourceBundle & { keys: Set<string> } {
-  const variantParentKeys = parentableVariantKeys(bundle);
-  return {
-    ...bundle,
-    keys,
-    strategy: filterStrategyForKeys(bundle.strategy, keys),
-    pageMap: bundle.pageMap
-      .map(page => restrictPageToKeys(page, keys))
-      .filter((page): page is PageKeywordMap => page !== null),
-    contentGaps: bundle.contentGaps.filter(gap => keys.has(keywordComparisonKey(gap.targetKeyword))),
-    keywordGaps: bundle.keywordGaps.filter(gap => keys.has(keywordComparisonKey(gap.keyword))),
-    trackedKeywords: bundle.trackedKeywords.filter(keyword => keys.has(keywordComparisonKey(keyword.query))),
-    latestRanks: bundle.latestRanks.filter(rank => {
-      const key = keywordComparisonKey(rank.query);
-      const parent = findVariantParentKey(key, variantParentKeys);
-      return keys.has(key) || Boolean(parent && keys.has(parent));
-    }),
-    feedback: filterMapByKeys(bundle.feedback, keys),
-    lostVisibilityRows: (bundle.lostVisibilityRows ?? []).filter(row => keys.has(keywordComparisonKey(row.query))),
   };
 }
 
