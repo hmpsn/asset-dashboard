@@ -1347,15 +1347,21 @@ export const CHECKS: Check[] = [
     name: 'Keyword Command Center summary/detail must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/keyword-command-center.ts',
+    displayScope: 'server/domains/keyword-command-center/{summary-service,detail-service}.ts',
     message: 'Summary/detail endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary() or buildKeywordCommandCenterDetail().',
     severity: 'error',
     rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
+      const watchedSuffixes = [
+        'server/keyword-command-center.ts',
+        'server/domains/keyword-command-center/summary-service.ts',
+        'server/domains/keyword-command-center/detail-service.ts',
+      ];
       for (const file of files) {
-        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const normalizedPath = file.split(path.sep).join('/');
+        if (!watchedSuffixes.some(suffix => normalizedPath.endsWith(suffix))) continue;
         const lines = readFileOrEmpty(file).split('\n');
         let current: string | null = null;
         let depth = 0;
@@ -1382,7 +1388,7 @@ export const CHECKS: Check[] = [
     name: 'Local SEO Evaluated candidates must be explicitly gated',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/keyword-command-center.ts',
+    displayScope: 'server/domains/keyword-command-center/*.ts',
     message: 'buildLocalSeoKeywordCandidatesEvaluated() is the expensive variant (scans pageMap × secondaries, runs evaluator+suppression). Call the cheap buildLocalSeoKeywordCandidates() default or add a documented hatch.',
     severity: 'error',
     rationale: 'After the Tier 2 cheap/Evaluated split, the Evaluated variant is the OOM-prone hot path. The cheap default is correct for KCC row enrichment, intelligence slice, and refresh path.',
@@ -1390,7 +1396,11 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
       for (const file of files) {
-        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const normalizedPath = file.split(path.sep).join('/');
+        const isKccFacade = normalizedPath.endsWith('server/keyword-command-center.ts');
+        const isKccDomainService = normalizedPath.includes('/server/domains/keyword-command-center/')
+          && normalizedPath.endsWith('.ts');
+        if (!isKccFacade && !isKccDomainService) continue;
         const lines = readFileOrEmpty(file).split('\n');
         let currentFunction = '';
         let functionDepth = 0;
