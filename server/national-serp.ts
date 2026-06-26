@@ -18,7 +18,7 @@
  * logged-and-skipped rather than fatal to the whole refresh.
  */
 import { createLogger } from './logger.js';
-import { getJob, updateJob, unregisterAbort } from './jobs.js';
+import { updateJob, unregisterAbort } from './jobs.js';
 import { getWorkspace, computeEffectiveTier } from './workspaces.js';
 import { cleanDomain } from './local-seo.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';
@@ -29,6 +29,7 @@ import { assertCreditBudget, CreditBudgetError } from './credit-budget-gate.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { addActivity } from './activity-log.js';
 import { WS_EVENTS } from './ws-events.js';
+import { isRefreshJobCancelled, waitForHeapHeadroom } from './seo-refresh-runner-runtime.js';
 
 const log = createLogger('national-serp');
 
@@ -41,23 +42,19 @@ const NATIONAL_SERP_HEAP_HEADROOM_THRESHOLD_MB = 320;
 const NATIONAL_SERP_HEAP_HEADROOM_WAIT_MS = 250;
 const NATIONAL_SERP_HEAP_HEADROOM_MAX_WAITS = 8;
 
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
 /**
  * Heap-aware backpressure before allocating another advanced-SERP response. Mirrors
  * `waitForMemoryHeadroom` in local-seo.ts: if heap is above the threshold, sleep and
  * retry up to `maxWaits` times, then proceed anyway rather than stall indefinitely.
  */
 async function waitForMemoryHeadroom(): Promise<void> {
-  for (let attempt = 0; attempt < NATIONAL_SERP_HEAP_HEADROOM_MAX_WAITS; attempt++) {
-    const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
-    if (heapMb < NATIONAL_SERP_HEAP_HEADROOM_THRESHOLD_MB) return;
-    log.warn(
-      { heapMb: Math.round(heapMb), thresholdMb: NATIONAL_SERP_HEAP_HEADROOM_THRESHOLD_MB, attempt: attempt + 1 },
-      'national-serp refresh: heap above threshold — pausing for GC headroom',
-    );
-    await sleep(NATIONAL_SERP_HEAP_HEADROOM_WAIT_MS);
-  }
+  await waitForHeapHeadroom({
+    thresholdMb: NATIONAL_SERP_HEAP_HEADROOM_THRESHOLD_MB,
+    waitMs: NATIONAL_SERP_HEAP_HEADROOM_WAIT_MS,
+    maxWaits: NATIONAL_SERP_HEAP_HEADROOM_MAX_WAITS,
+    logger: log,
+    logMessage: 'national-serp refresh: heap above threshold — pausing for GC headroom',
+  });
 }
 
 export interface NationalSerpRefreshSummary {
@@ -67,7 +64,7 @@ export interface NationalSerpRefreshSummary {
 
 /** True while the job has been cancelled (route registers an AbortController). */
 function isCancelled(jobId: string): boolean {
-  return getJob(jobId)?.status === 'cancelled';
+  return isRefreshJobCancelled(jobId);
 }
 
 export async function runNationalSerpRefreshJob(workspaceId: string, jobId: string): Promise<void> {

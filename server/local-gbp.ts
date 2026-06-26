@@ -25,7 +25,7 @@
  * heuristic.
  */
 import { createLogger } from './logger.js';
-import { getJob, updateJob, unregisterAbort } from './jobs.js';
+import { updateJob, unregisterAbort } from './jobs.js';
 import { getWorkspace, computeEffectiveTier } from './workspaces.js';
 import { cleanDomain, listLocalSeoMarkets, LOCAL_SEO_MAX_MARKETS } from './local-seo.js';
 import { getClientLocations } from './client-locations.js';
@@ -39,6 +39,7 @@ import { assertCreditBudget, CreditBudgetError } from './credit-budget-gate.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { addActivity } from './activity-log.js';
 import { WS_EVENTS } from './ws-events.js';
+import { isRefreshJobCancelled, waitForHeapHeadroom } from './seo-refresh-runner-runtime.js';
 import { LOCAL_SEO_MARKET_STATUS } from '../shared/types/local-seo.js';
 import type { LocalSeoMarket, ClientLocation } from '../shared/types/local-seo.js';
 
@@ -55,8 +56,6 @@ const LOCAL_GBP_HEAP_HEADROOM_THRESHOLD_MB = 320;
 const LOCAL_GBP_HEAP_HEADROOM_WAIT_MS = 250;
 const LOCAL_GBP_HEAP_HEADROOM_MAX_WAITS = 8;
 
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
 /**
  * Heap-aware backpressure before allocating another business-listings response. Mirrors
  * `waitForMemoryHeadroom` in national-serp.ts / local-seo.ts: if heap is above the
@@ -64,15 +63,13 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
  * stall indefinitely.
  */
 async function waitForMemoryHeadroom(): Promise<void> {
-  for (let attempt = 0; attempt < LOCAL_GBP_HEAP_HEADROOM_MAX_WAITS; attempt++) {
-    const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
-    if (heapMb < LOCAL_GBP_HEAP_HEADROOM_THRESHOLD_MB) return;
-    log.warn(
-      { heapMb: Math.round(heapMb), thresholdMb: LOCAL_GBP_HEAP_HEADROOM_THRESHOLD_MB, attempt: attempt + 1 },
-      'local-gbp refresh: heap above threshold — pausing for GC headroom',
-    );
-    await sleep(LOCAL_GBP_HEAP_HEADROOM_WAIT_MS);
-  }
+  await waitForHeapHeadroom({
+    thresholdMb: LOCAL_GBP_HEAP_HEADROOM_THRESHOLD_MB,
+    waitMs: LOCAL_GBP_HEAP_HEADROOM_WAIT_MS,
+    maxWaits: LOCAL_GBP_HEAP_HEADROOM_MAX_WAITS,
+    logger: log,
+    logMessage: 'local-gbp refresh: heap above threshold — pausing for GC headroom',
+  });
 }
 
 export interface LocalGbpRefreshSummary {
@@ -82,7 +79,7 @@ export interface LocalGbpRefreshSummary {
 
 /** True while the job has been cancelled (route registers an AbortController). */
 function isCancelled(jobId: string): boolean {
-  return getJob(jobId)?.status === 'cancelled';
+  return isRefreshJobCancelled(jobId);
 }
 
 /** Active markets with a usable coordinate, capped like the local-seo refresh (top 3). */
