@@ -1,9 +1,3 @@
-import { randomUUID } from 'crypto';
-import { z } from 'zod';
-
-import db from './db/index.js';
-import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import { fireBridge } from './bridge-infrastructure.js';
@@ -16,7 +10,6 @@ import { listPageKeywords } from './page-keywords.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { runRecommendationRegen } from './recommendation-regen-scheduler.js';
 import { DEFAULT_SEO_DATA_PROVIDER, getProvider, isCapabilityDisabled, normalizeRuntimeSeoDataProvider, type SeoDataProvider } from './seo-data-provider.js';
-import { getTaxonomyForIndustry } from './service-taxonomy.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
@@ -53,6 +46,25 @@ import {
   setPrimaryLocalSeoMarket,
 } from './domains/local-seo/configuration-service.js';
 import {
+  buildLocalSeoCaps,
+  buildLocalSeoReportSummary,
+  getLocalSeoCompetitorBrands,
+  getLocalSeoServiceGaps,
+} from './domains/local-seo/visibility-read-model.js';
+import {
+  countLocalVisibilitySnapshots,
+  getLocalSeoVisibilityTrend,
+  isUsableLocalVisibilitySnapshot,
+  listLatestLocalVisibilitySnapshots,
+  listLocalVisibilitySnapshotBackfillPage,
+  runSnapshotRetentionPrune,
+  snapshotFromProviderResult,
+  storeLocalVisibilitySnapshot,
+  updateLocalVisibilitySnapshotMatches,
+  type LocalVisibilitySnapshotBackfillCursor,
+  type LocalVisibilitySnapshotMatchUpdate,
+} from './domains/local-seo/snapshot-store.js';
+import {
   buildWorkspaceGeoRegex,
   buildWorkspaceServiceTermRegex,
 } from './domains/local-seo/workspace-classifiers.js';
@@ -61,38 +73,16 @@ import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
   LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_DEVICE,
-  LOCAL_SEO_MARKET_STATUS,
-  LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
-  LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_POSTURE,
-  LOCAL_SEO_VISIBILITY_POSTURE,
-  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
   LOCAL_VISIBILITY_STATUS,
-  localSeoKeywordVisibilityFromSnapshot,
-  localSeoKeywordVisibilitySummaryFromSnapshots,
-  summarizeLocalSeoKeywordVisibility,
-  type ClientLocation,
-  type LocalBusinessMatchConfidence,
-  type LocalSeoKeywordVisibility,
-  type LocalSeoKeywordVisibilitySummary,
   type LocalSeoDevice,
   type LocalSeoLocationLookupRequest,
   type LocalSeoLocationLookupResponse,
   type LocalSeoMarket,
   type LocalSeoMarketUpdateRequest,
-  type LocalSeoReportSummary,
   type LocalSeoReadResponse,
-  type LocalSeoVisibilityTrendPoint,
-  type LocalSeoVisibilityTrendSeries,
-  type LocalSeoRepeatCompetitor,
-  type LocalSeoServiceGap,
   type LocalSeoRefreshRequest,
   type LocalSeoRefreshResult,
-  type LocalSeoWorkspaceSettings,
-  type LocalVisibilitySourceEndpoint,
-  type LocalVisibilityBusinessResult,
-  type LocalVisibilityProviderResult,
-  type LocalVisibilitySnapshot,
 } from '../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../shared/types/rank-tracking.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
@@ -111,6 +101,24 @@ export {
   resolveWorkspaceTargetGeo,
   type ResolvedWorkspaceTargetGeo,
 } from './domains/local-seo/configuration-service.js';
+
+export {
+  RETENTION_PRUNE_BATCH_SIZE,
+  RETENTION_RAW_DAYS,
+  RETENTION_WEEKLY_MAX_DAYS,
+  buildLocalSeoKeywordVisibilityByKey,
+  buildLocalSeoKeywordVisibilityForKeyword,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
+  countLocalVisibilitySnapshots,
+  getLocalSeoVisibilityTrend,
+  latestLocalSnapshotAt,
+  listLatestLocalVisibilitySnapshots,
+  runSnapshotRetentionPrune,
+} from './domains/local-seo/snapshot-store.js';
+export {
+  getLocalSeoCompetitorBrands,
+  getLocalSeoServiceGaps,
+} from './domains/local-seo/visibility-read-model.js';
 
 export {
   cleanDomain,
@@ -223,420 +231,9 @@ async function waitForMemoryHeadroom(): Promise<void> {
     logMessage: 'local-seo refresh: heap above threshold — pausing for GC headroom',
   });
 }
-// Snapshot retention policy constants (Bug 3 / owner decision D4).
-//   - Raw retention window: keep all rows captured within RETENTION_RAW_DAYS.
-//   - Weekly thinning: for rows older than RETENTION_RAW_DAYS, keep one row per
-//     (market_id, normalized_keyword, device, language_code) per week up to
-//     RETENTION_WEEKLY_MAX_DAYS. Weeks are bucketed by start DATE (no year-boundary
-//     artifact), and per-device/per-language history is thinned independently.
-//   - Hard cutoff: delete all rows beyond RETENTION_WEEKLY_MAX_DAYS.
-//   - Exception: ALWAYS keep the latest row per
-//     (market_id, normalized_keyword, device, language_code) regardless of age so a
-//     market-keyword-device-language series is never invisible (matches the
-//     latestSnapshots read granularity).
-// Batch size: 200 rows per DELETE to stay within SQLite's safe per-statement
-// range on memory-constrained hosts.
-export const RETENTION_RAW_DAYS = 180;
-export const RETENTION_WEEKLY_MAX_DAYS = 548; // 18 months ≈ 18 × 30.44 days
-export const RETENTION_PRUNE_BATCH_SIZE = 200;
 
-/**
- * Fire a `LOCAL_SEO_UPDATED` broadcast every N completed snapshots during a
- * refresh so the UI invalidates its KCC + local-seo caches incrementally
- * instead of waiting for the whole job. Without this, a 200-call refresh
- * looks frozen until completion — the snapshots are landing in the DB but
- * the React Query cache stays stale.
- *
- * 20 is a balance: enough cadence that a 4–5 minute concurrent refresh
- * triggers ~10 mid-job invalidations (one every ~25s of wall-clock), few
- * enough to avoid hammering subscribed clients with redundant refetches.
- */
 const LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL = 20;
-/**
- * Backfills update existing snapshots in local DB batches rather than calling
- * the provider. Broadcast at batch boundaries so Local SEO + KCC views refresh
- * during large historical recalculations without producing noisy refetches.
- */
 const LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL = 100;
-
-const localResultSchema = z.object({
-  title: z.string(),
-  rank: z.number().optional(),
-  domain: z.string().optional(),
-  url: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  cid: z.string().optional(),
-}).strip();
-
-interface SnapshotRow {
-  id: string;
-  workspace_id: string;
-  keyword: string;
-  normalized_keyword: string;
-  market_id: string;
-  market_label: string;
-  captured_at: string;
-  local_pack_present: number;
-  business_found: number;
-  business_match_confidence: string;
-  business_match_reason: string | null;
-  local_rank: number | null;
-  top_competitors: string;
-  source_endpoint: string;
-  provider: string;
-  device: string;
-  language_code: string;
-  status: string;
-  degraded_reason: string | null;
-  matched_location_id: string | null;
-  matched_location_name: string | null;
-  raw_results: string | null;
-}
-
-interface SnapshotSummaryRow {
-  keyword: string;
-  normalized_keyword: string;
-  market_id: string;
-  market_label: string;
-  captured_at: string;
-  local_pack_present: number;
-  business_found: number;
-  business_match_confidence: string;
-  business_match_reason: string | null;
-  local_rank: number | null;
-  source_endpoint: string;
-  provider: string;
-  status: string;
-  degraded_reason: string | null;
-}
-
-const stmts = createStmtCache(() => ({
-  insertSnapshot: db.prepare(`
-    INSERT INTO local_visibility_snapshots (
-      id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
-      local_pack_present, business_found, business_match_confidence, business_match_reason,
-      local_rank, top_competitors, source_endpoint, provider, device, language_code, status,
-      degraded_reason, matched_location_id, matched_location_name, raw_results
-    ) VALUES (
-      @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
-      @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
-      @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status,
-      @degraded_reason, @matched_location_id, @matched_location_name, @raw_results
-    )
-  `),
-  updateSnapshotMatch: db.prepare(`
-    UPDATE local_visibility_snapshots
-    SET business_found = @business_found,
-      business_match_confidence = @business_match_confidence,
-      business_match_reason = @business_match_reason,
-      local_rank = @local_rank,
-      matched_location_id = @matched_location_id,
-      matched_location_name = @matched_location_name,
-      top_competitors = @top_competitors,
-      raw_results = COALESCE(raw_results, @raw_results)
-    WHERE id = @id AND workspace_id = @workspace_id
-  `),
-  listAllSnapshotsForWorkspace: db.prepare(`
-    SELECT * FROM local_visibility_snapshots
-    WHERE workspace_id = ?
-    ORDER BY captured_at DESC
-  `),
-  countSnapshotsForWorkspace: db.prepare(`
-    SELECT COUNT(*) AS count FROM local_visibility_snapshots
-    WHERE workspace_id = ?
-  `),
-  maxUsableCapturedAtForWorkspace: db.prepare(`
-    SELECT MAX(captured_at) AS max_captured_at FROM local_visibility_snapshots
-    WHERE workspace_id = ? AND status != ?
-  `),
-  // Bug 1 fix: replaced LIMIT-500 + JS-dedupe with GROUP BY MAX(captured_at) to avoid
-  // truncating large workspaces (300 keywords × 3 markets = 900 rows > 500).
-  // Migration 097's composite index on (workspace_id, market_id, normalized_keyword,
-  // device, language_code) already supports this query.
-  // Tiebreaker fix: when two rows in the same (market, keyword, device, language)
-  // group share the MAX(captured_at) timestamp, joining on captured_at alone returns
-  // BOTH rows (duplicate "latest" entries). The id IN (SELECT MIN(id) ... GROUP BY ...)
-  // guard collapses each group to a single deterministic row (MIN(id) among the rows
-  // tied at the group's MAX(captured_at)).
-  latestSnapshots: db.prepare(`
-    SELECT s.*
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.id IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
-            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-  `),
-  latestSnapshotsByKeyword: db.prepare(`
-    SELECT s.*
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ? AND s.normalized_keyword = ?
-      AND s.id IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ? AND normalized_keyword = ?
-          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
-            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ? AND normalized_keyword = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-  `),
-  // Bug 2 fix: keyset-paginated read for the backfill job so it never materialises
-  // all rows into memory at once. Cursor is (captured_at DESC, id ASC) for stable pagination.
-  listSnapshotsPageForBackfill: db.prepare(`
-    SELECT * FROM local_visibility_snapshots
-    WHERE workspace_id = ?
-      AND (captured_at < ? OR (captured_at = ? AND id > ?))
-    ORDER BY captured_at DESC, id ASC
-    LIMIT ?
-  `),
-  listSnapshotsFirstPageForBackfill: db.prepare(`
-    SELECT * FROM local_visibility_snapshots
-    WHERE workspace_id = ?
-    ORDER BY captured_at DESC, id ASC
-    LIMIT ?
-  `),
-  // Bug 3 fix: retention prune (owner decision D4).
-  //
-  // Grouping fix: every grouping here is on the FULL 4-column identity
-  // (market_id, normalized_keyword, device, language_code) — the SAME granularity as
-  // the latestSnapshots read query. Grouping on (market, keyword) alone would let the
-  // immortal guard protect only ONE device/language variant and would thin per-device
-  // history into a single shared row, destroying the other device's series.
-  //
-  // The "immortal" guard selects EXACTLY ONE row per 4-col identity using
-  // (MAX(captured_at), MIN(id)) — same tie-breaking as the read query — so it never
-  // protects ALL rows that share a captured_at timestamp.
-  //
-  // Week key fix: the weekly bucket is keyed on the week's START DATE
-  // (date(captured_at, '-' || strftime('%w', captured_at) || ' days') → the Sunday of
-  // that week) instead of strftime('%Y-%W'). The %Y-%W form concatenates the CALENDAR
-  // year with the week number, which mis-buckets the days around a year boundary (e.g.
-  // 2024-W52 vs 2025-W00 for the same Sun–Sat week). The start-date key has no such
-  // artifact.
-  //
-  // Step 1 — IDs to thin from the weekly window (RETENTION_RAW_DAYS → RETENTION_WEEKLY_MAX_DAYS):
-  //   rows that are NOT the canonical row per (market, keyword, device, language, week) —
-  //   i.e. not the latest-per-bucket keeper (MAX(captured_at), tie-broken by MIN(id)) —
-  //   AND are not the single immortal row per 4-col identity.
-  //
-  //   The keeper uses MAX(captured_at) per week bucket (not MIN(id) per group) so that the
-  //   weekly survivor is always the most-recent snapshot in that bucket. This makes the
-  //   keeper coincide with the immortal row whenever the bucket holds the pair's overall
-  //   latest, eliminating a nondeterministic interaction: when the bucket's latest row is
-  //   also the immortal (e.g. Dec 31 vs Jan 1 straddling a year boundary), a random-UUID
-  //   MIN(id) coin flip could keep the older row while the immortal guard protects the
-  //   newer one — leaving both alive and returning pruned=0 instead of 1.
-  //
-  //   Two-level keepers subquery:
-  //     Inner: MAX(captured_at) per (market, keyword, device, language, week_start)
-  //     Outer: JOIN on that max, MIN(id) to break ties among rows sharing the max timestamp
-  //   Parameters (12 total):
-  //     1-3: inner subquery WHERE (workspace_id, raw_days, weekly_max)
-  //     4-6: outer keepers WHERE (workspace_id, raw_days, weekly_max)
-  //     7-9: main outer WHERE (workspace_id, raw_days, weekly_max)
-  //     10-11: immortal NOT IN guard (workspace_id inner, workspace_id outer)
-  //     12: LIMIT
-  pruneWeeklyThinIds: db.prepare(`
-    SELECT s.id
-    FROM local_visibility_snapshots s
-    JOIN (
-      SELECT outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
-             outer_k.language_code, top.week_start,
-             MIN(outer_k.id) AS keep_id
-      FROM local_visibility_snapshots outer_k
-      JOIN (
-        SELECT market_id, normalized_keyword, device, language_code,
-               date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
-               MAX(captured_at) AS max_captured_at
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND captured_at < datetime('now', '-' || ? || ' days')
-          AND captured_at >= datetime('now', '-' || ? || ' days')
-        GROUP BY market_id, normalized_keyword, device, language_code, week_start
-      ) top ON outer_k.market_id = top.market_id
-           AND outer_k.normalized_keyword = top.normalized_keyword
-           AND outer_k.device = top.device
-           AND outer_k.language_code = top.language_code
-           AND date(outer_k.captured_at, '-' || strftime('%w', outer_k.captured_at) || ' days') = top.week_start
-           AND outer_k.captured_at = top.max_captured_at
-      WHERE outer_k.workspace_id = ?
-        AND outer_k.captured_at < datetime('now', '-' || ? || ' days')
-        AND outer_k.captured_at >= datetime('now', '-' || ? || ' days')
-      GROUP BY outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
-               outer_k.language_code, top.week_start
-    ) keepers ON keepers.market_id = s.market_id
-             AND keepers.normalized_keyword = s.normalized_keyword
-             AND keepers.device = s.device
-             AND keepers.language_code = s.language_code
-             AND date(s.captured_at, '-' || strftime('%w', s.captured_at) || ' days') = keepers.week_start
-    WHERE s.workspace_id = ?
-      AND s.captured_at < datetime('now', '-' || ? || ' days')
-      AND s.captured_at >= datetime('now', '-' || ? || ' days')
-      AND s.id != keepers.keep_id
-      AND s.id NOT IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-    LIMIT ?
-  `),
-  // Step 2 — IDs beyond the hard cutoff (> RETENTION_WEEKLY_MAX_DAYS) that are not the
-  // immortal row (latest per 4-col identity).
-  pruneHardCutoffIds: db.prepare(`
-    SELECT s.id
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.captured_at < datetime('now', '-' || ? || ' days')
-      AND s.id NOT IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-    LIMIT ?
-  `),
-  // Step 3 — single-row delete used inside the prune batch loop.
-  deleteSnapshotById: db.prepare(`
-    DELETE FROM local_visibility_snapshots WHERE id = ? AND workspace_id = ?
-  `),
-  competitorSnapshots: db.prepare(`
-    SELECT workspace_id, business_found, local_pack_present, market_label, top_competitors
-    FROM local_visibility_snapshots
-    WHERE workspace_id = @workspaceId
-      AND captured_at >= datetime('now', '-' || @days || ' days')
-      AND status = 'success'
-    ORDER BY captured_at DESC
-  `),
-  // W5.3: per-market visible-count trend. One row per (market, capture-day) with the
-  // count of verified-match identities and the total checked identities that day.
-  // Bucketed on date(captured_at) so multiple intra-day refreshes collapse to one point.
-  // Bounded to RETENTION_RAW_DAYS (180d) so the series is uniformly daily — older rows
-  // have been weekly-thinned and would introduce uneven spacing in the sparkline.
-  // Excludes both provider_failed and degraded rows so neither inflates checked_count
-  // (degraded snapshots carry businessFound=false regardless of actual visibility, matching
-  // the postureFromSummaryRow convention that treats both status values as untrustworthy).
-  visibilityTrend: db.prepare(`
-    SELECT
-      s.market_id AS market_id,
-      s.market_label AS market_label,
-      date(s.captured_at) AS day,
-      COUNT(DISTINCT CASE
-        WHEN s.business_found = 1 AND s.business_match_confidence = ?
-        THEN s.normalized_keyword || '::' || s.device || '::' || s.language_code
-      END) AS visible_count,
-      COUNT(DISTINCT s.normalized_keyword || '::' || s.device || '::' || s.language_code) AS checked_count
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.status NOT IN (?, ?)
-      AND s.captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
-    GROUP BY s.market_id, s.market_label, day
-    ORDER BY s.market_id ASC, day ASC
-  `),
-  latestSnapshotSummary: db.prepare(`
-    SELECT
-      s.keyword,
-      s.normalized_keyword,
-      s.market_id,
-      s.market_label,
-      s.captured_at,
-      s.local_pack_present,
-      s.business_found,
-      s.business_match_confidence,
-      s.business_match_reason,
-      s.local_rank,
-      s.source_endpoint,
-      s.provider,
-      s.status,
-      s.degraded_reason
-    FROM local_visibility_snapshots s
-    JOIN (
-      SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at) AS captured_at
-      FROM local_visibility_snapshots
-      WHERE workspace_id = ? AND status != ?
-      GROUP BY market_id, normalized_keyword, device, language_code
-    ) latest
-      ON latest.market_id = s.market_id
-      AND latest.normalized_keyword = s.normalized_keyword
-      AND latest.device = s.device
-      AND latest.language_code = s.language_code
-      AND latest.captured_at = s.captured_at
-    WHERE s.workspace_id = ? AND s.status != ?
-  `),
-}));
-
-function isBusinessMatchConfidence(value: string): value is LocalBusinessMatchConfidence {
-  return Object.values(LOCAL_BUSINESS_MATCH_CONFIDENCE).includes(value as LocalBusinessMatchConfidence);
-}
-
-function isLocalVisibilitySourceEndpoint(value: string): value is LocalVisibilitySourceEndpoint {
-  return Object.values(LOCAL_VISIBILITY_SOURCE_ENDPOINT).includes(value as LocalVisibilitySourceEndpoint);
-}
-
-function rowToSnapshot(row: SnapshotRow): LocalVisibilitySnapshot {
-  return {
-    id: row.id,
-    workspaceId: row.workspace_id,
-    keyword: row.keyword,
-    normalizedKeyword: row.normalized_keyword,
-    marketId: row.market_id,
-    marketLabel: row.market_label,
-    capturedAt: row.captured_at,
-    localPackPresent: row.local_pack_present === 1,
-    businessFound: row.business_found === 1,
-    businessMatchConfidence: Object.values(LOCAL_BUSINESS_MATCH_CONFIDENCE).includes(row.business_match_confidence as LocalBusinessMatchConfidence)
-      ? row.business_match_confidence as LocalBusinessMatchConfidence
-      : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
-    businessMatchReason: row.business_match_reason ?? undefined,
-    localRank: row.local_rank ?? undefined,
-    topCompetitors: parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId: row.workspace_id, table: 'local_visibility_snapshots', field: 'top_competitors' }),
-    sourceEndpoint: row.source_endpoint as LocalVisibilitySnapshot['sourceEndpoint'],
-    provider: row.provider,
-    device: row.device === LOCAL_SEO_DEVICE.MOBILE ? LOCAL_SEO_DEVICE.MOBILE : LOCAL_SEO_DEVICE.DESKTOP,
-    languageCode: row.language_code,
-    status: Object.values(LOCAL_VISIBILITY_STATUS).includes(row.status as LocalVisibilitySnapshot['status']) ? row.status as LocalVisibilitySnapshot['status'] : LOCAL_VISIBILITY_STATUS.DEGRADED,
-    degradedReason: row.degraded_reason ?? undefined,
-    matchedLocationId: row.matched_location_id ?? undefined,
-    matchedLocationName: row.matched_location_name ?? undefined,
-  };
-}
-
-function rowToRawLocalResults(row: SnapshotRow): LocalVisibilityBusinessResult[] {
-  return parseJsonSafeArray(row.raw_results ?? row.top_competitors, localResultSchema, {
-    workspaceId: row.workspace_id,
-    table: 'local_visibility_snapshots',
-    field: row.raw_results ? 'raw_results' : 'top_competitors',
-  });
-}
-
-function isUsableLocalVisibilitySnapshot(snapshot: Pick<LocalVisibilitySnapshot, 'status'>): boolean {
-  return snapshot.status !== LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED;
-}
 
 export function setPrimaryMarket(workspaceId: string, marketId: string): void {
   setPrimaryLocalSeoMarket(workspaceId, marketId);
@@ -678,13 +275,7 @@ export function getLocalSeoReadModel(
       competitorBrands: [],
       serviceGaps: [],
       visibilityTrend: [],
-      caps: {
-        maxMarkets: LOCAL_SEO_MAX_MARKETS,
-        maxKeywordsPerRefresh: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
-        keywordsPerRefreshMin: LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
-        keywordsPerRefreshMax: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
-        keywordsPerRefreshDefault: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
-      },
+      caps: buildLocalSeoCaps(settings),
     };
   }
   const settings = readLocalSeoSettings(workspace);
@@ -709,13 +300,7 @@ export function getLocalSeoReadModel(
     competitorBrands: getLocalSeoCompetitorBrands(workspaceId),
     serviceGaps: featureEnabled ? getLocalSeoServiceGaps(workspaceId) : [],
     visibilityTrend: getLocalSeoVisibilityTrend(workspace.id),
-    caps: {
-      maxMarkets: LOCAL_SEO_MAX_MARKETS,
-      maxKeywordsPerRefresh: settings.keywordsPerRefresh ?? LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
-      keywordsPerRefreshMin: LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
-      keywordsPerRefreshMax: LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
-      keywordsPerRefreshDefault: LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
-    },
+    caps: buildLocalSeoCaps(settings),
   };
 }
 
@@ -729,451 +314,6 @@ export function updateLocalSeoConfiguration(workspaceId: string, request: LocalS
   addActivity(workspace.id, 'local_seo_updated', 'Local SEO configuration updated', activityDetail, { source: 'local_seo', ...(promotedPrimaryLabel ? { promotedPrimaryLabel } : {}) });
   notifyLocalSeoUpdated(workspace.id, { action: 'configuration_updated', updatedAt });
   return getLocalSeoReadModel(workspace.id, featureEnabled);
-}
-
-interface VisibilityTrendRow {
-  market_id: string;
-  market_label: string;
-  day: string;
-  visible_count: number;
-  checked_count: number;
-}
-
-/**
- * W5.3 — per-market visible-count trend over the retained snapshot window.
- *
- * Cheap aggregate read (single GROUP BY over local_visibility_snapshots) — does NOT
- * invoke any provider or full-model builder. Returns one series per market that has any
- * usable snapshot, each a chronological list of (date, visibleCount, checkedCount) points
- * over the D4-thinned window. Markets are ordered by most-recent activity (last point
- * date DESC) so the busiest market renders first.
- */
-export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibilityTrendSeries[] {
-  const rows = stmts().visibilityTrend.all(
-    LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
-    workspaceId,
-    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
-    LOCAL_VISIBILITY_STATUS.DEGRADED,
-  ) as VisibilityTrendRow[];
-
-  const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();
-  for (const row of rows) {
-    let series = byMarket.get(row.market_id);
-    if (!series) {
-      series = { marketId: row.market_id, marketLabel: row.market_label, points: [] };
-      byMarket.set(row.market_id, series);
-    }
-    const point: LocalSeoVisibilityTrendPoint = {
-      date: row.day,
-      visibleCount: row.visible_count,
-      checkedCount: row.checked_count,
-    };
-    series.points.push(point);
-  }
-
-  return [...byMarket.values()].sort((a, b) => {
-    const aLast = a.points[a.points.length - 1]?.date ?? '';
-    const bLast = b.points[b.points.length - 1]?.date ?? '';
-    return bLast.localeCompare(aLast);
-  });
-}
-
-export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
-  // Bug 1 + tiebreaker fix: query takes (workspaceId × 3) — outer WHERE, the
-  // MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
-  const rows = stmts().latestSnapshots.all(workspaceId, workspaceId, workspaceId) as SnapshotRow[];
-  return rows.map(rowToSnapshot);
-}
-
-function listLatestLocalVisibilitySnapshotsForKeyword(workspaceId: string, normalizedKeyword: string): LocalVisibilitySnapshot[] {
-  // Bug 1 + tiebreaker fix: query takes (workspaceId, normalizedKeyword) × 3 — outer
-  // WHERE, the MIN(id) subquery WHERE, and the innermost MAX(captured_at) subquery WHERE.
-  const rows = stmts().latestSnapshotsByKeyword.all(
-    workspaceId, normalizedKeyword,
-    workspaceId, normalizedKeyword,
-    workspaceId, normalizedKeyword,
-  ) as SnapshotRow[];
-  return rows.map(rowToSnapshot);
-}
-
-function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
-  return stmts().latestSnapshotSummary.all(
-    workspaceId,
-    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
-    workspaceId,
-    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
-  ) as SnapshotSummaryRow[];
-}
-
-interface CompetitorSnapshotRow {
-  workspace_id: string;
-  business_found: number;
-  local_pack_present: number;
-  market_label: string;
-  top_competitors: string;
-}
-
-export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 30): LocalSeoRepeatCompetitor[] {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return [];
-  const rows = stmts().competitorSnapshots.all({ workspaceId, days: lookbackDays }) as CompetitorSnapshotRow[];
-
-  const TOP_LIMIT = 10;
-  const MIN_APPEARANCES = 2;
-
-  interface Accumulator {
-    domain: string | undefined;
-    totalAppearances: number;
-    winsAgainstClient: number;
-    markets: Set<string>;
-  }
-  const map = new Map<string, Accumulator>();
-  // Collect the original (un-lowercased) title for display — use first seen title
-  const titleMap = new Map<string, string>();
-
-  for (const row of rows) {
-    const clientLost = row.business_found === 0 && row.local_pack_present === 1;
-    const competitors = parseJsonSafeArray(row.top_competitors, localResultSchema, { workspaceId, table: 'local_visibility_snapshots', field: 'top_competitors' });
-    for (const competitor of competitors) {
-      const key = competitor.title.toLowerCase().trim();
-      if (!key) continue;
-      const existing = map.get(key);
-      if (existing) {
-        existing.totalAppearances += 1;
-        if (clientLost) existing.winsAgainstClient += 1;
-        existing.markets.add(row.market_label);
-        if (!existing.domain && competitor.domain) existing.domain = competitor.domain;
-      } else {
-        map.set(key, {
-          domain: competitor.domain,
-          totalAppearances: 1,
-          winsAgainstClient: clientLost ? 1 : 0,
-          markets: new Set([row.market_label]),
-        });
-        titleMap.set(key, competitor.title);
-      }
-    }
-  }
-
-  const activeMarketCity = listLocalSeoMarkets(workspaceId)
-    .find(m => m.status === LOCAL_SEO_MARKET_STATUS.ACTIVE)?.city;
-
-  const results: LocalSeoRepeatCompetitor[] = [];
-  for (const [key, acc] of map.entries()) {
-    if (acc.totalAppearances < MIN_APPEARANCES) continue;
-    const title = titleMap.get(key) ?? key;
-    const suggestedTrackingKeywords: string[] = [
-      `${title} reviews`,
-    ];
-    if (workspace.name.trim()) {
-      suggestedTrackingKeywords.push(`${title} vs ${workspace.name.trim()}`);
-    }
-    if (activeMarketCity) suggestedTrackingKeywords.push(`${title} ${activeMarketCity}`);
-    results.push({
-      title,
-      domain: acc.domain,
-      totalAppearances: acc.totalAppearances,
-      winsAgainstClient: acc.winsAgainstClient,
-      markets: Array.from(acc.markets),
-      suggestedTrackingKeywords,
-    });
-  }
-
-  results.sort((a, b) =>
-    b.winsAgainstClient - a.winsAgainstClient
-    || b.totalAppearances - a.totalAppearances,
-  );
-
-  return results.slice(0, TOP_LIMIT);
-}
-
-/**
- * Returns services from the workspace's industry taxonomy that have no active
- * tracking keyword mentioning them. Used to nudge admins in the setup drawer.
- */
-export function getLocalSeoServiceGaps(workspaceId: string): LocalSeoServiceGap[] {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return [];
-  const taxonomy = getTaxonomyForIndustry(workspace.intelligenceProfile?.industry);
-  if (!taxonomy) return [];
-  const tracked = getTrackedKeywords(workspaceId); // active only (default)
-  const activeQueries = tracked.map(k => k.query.toLowerCase());
-  return taxonomy
-    .filter(service =>
-      !service.matchTerms.some(term => activeQueries.some(q => q.includes(term)))
-    )
-    .map(service => ({
-      serviceId: service.id,
-      serviceLabel: service.label,
-      starterKeywords: service.starterKeywords,
-    }));
-}
-
-function postureFromSummaryRow(row: SnapshotSummaryRow) {
-  if (row.status === LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED || row.status === LOCAL_VISIBILITY_STATUS.DEGRADED) {
-    return LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
-  }
-  if (row.business_found === 1 && row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED) {
-    return LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
-  }
-  if (
-    row.business_found === 1
-    && (
-      row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH
-      || row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH
-    )
-  ) {
-    return LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
-  }
-  if (row.local_pack_present === 1) return LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
-  return LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE;
-}
-
-function visibilityFromSummaryRow(row: SnapshotSummaryRow): LocalSeoKeywordVisibility {
-  const posture = postureFromSummaryRow(row);
-  const businessMatchConfidence = isBusinessMatchConfidence(row.business_match_confidence)
-    ? row.business_match_confidence
-    : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN;
-  const sourceEndpoint = isLocalVisibilitySourceEndpoint(row.source_endpoint)
-    ? row.source_endpoint
-    : LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP;
-  const base = {
-    keyword: row.keyword,
-    normalizedKeyword: row.normalized_keyword,
-    marketId: row.market_id,
-    marketLabel: row.market_label,
-    capturedAt: row.captured_at,
-    localPackPresent: row.local_pack_present === 1,
-    businessFound: row.business_found === 1,
-    businessMatchConfidence,
-    localRank: row.local_rank ?? undefined,
-    sourceEndpoint,
-    provider: row.provider,
-    degradedReason: row.degraded_reason ?? undefined,
-  };
-
-  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE) {
-    return {
-      ...base,
-      posture,
-      label: row.local_rank ? `Visible #${row.local_rank}` : 'Visible locally',
-      detail: row.business_match_reason ?? 'Business appears in local results with verified match evidence.',
-    };
-  }
-  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH) {
-    return {
-      ...base,
-      posture,
-      label: row.local_rank ? `Possible match #${row.local_rank}` : 'Possible match',
-      detail: row.business_match_reason ?? 'Possible business match; review before treating this as verified local visibility.',
-    };
-  }
-  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED) {
-    return {
-      ...base,
-      posture,
-      label: 'Provider degraded',
-      detail: row.degraded_reason ?? 'Local visibility data could not be refreshed cleanly.',
-    };
-  }
-  if (posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT) {
-    return {
-      ...base,
-      posture,
-      label: 'Local pack present',
-      detail: row.business_match_reason ?? 'A local pack appeared, but this business was not confidently matched.',
-    };
-  }
-  return {
-    ...base,
-    posture,
-    label: 'Not found locally',
-    detail: row.business_match_reason ?? 'No likely business match found in local results for this market.',
-  };
-}
-
-export function buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
-  const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
-  for (const row of listLatestLocalVisibilitySnapshotSummaryRows(workspaceId)) {
-    if (!row.normalized_keyword) continue;
-    const current = grouped.get(row.normalized_keyword) ?? [];
-    current.push(visibilityFromSummaryRow(row));
-    grouped.set(row.normalized_keyword, current);
-  }
-  const summaries = new Map<string, LocalSeoKeywordVisibilitySummary>();
-  for (const [key, visibility] of grouped) {
-    const summary = summarizeLocalSeoKeywordVisibility(visibility);
-    if (summary) summaries.set(key, summary);
-  }
-  return summaries;
-}
-
-export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
-  const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
-  for (const snapshot of listLatestLocalVisibilitySnapshots(workspaceId)) {
-    if (!isUsableLocalVisibilitySnapshot(snapshot)) continue;
-    if (!snapshot.normalizedKeyword) continue;
-    const current = grouped.get(snapshot.normalizedKeyword) ?? [];
-    current.push(localSeoKeywordVisibilityFromSnapshot(snapshot));
-    grouped.set(snapshot.normalizedKeyword, current);
-  }
-  const summaries = new Map<string, LocalSeoKeywordVisibilitySummary>();
-  for (const [key, visibility] of grouped) {
-    const summary = summarizeLocalSeoKeywordVisibility(visibility);
-    if (summary) summaries.set(key, summary);
-  }
-  return summaries;
-}
-
-export function buildLocalSeoKeywordVisibilityForKeyword(
-  workspaceId: string,
-  normalizedKeyword: string,
-): LocalSeoKeywordVisibilitySummary | undefined {
-  return localSeoKeywordVisibilitySummaryFromSnapshots(
-    listLatestLocalVisibilitySnapshotsForKeyword(workspaceId, normalizedKeyword),
-  );
-}
-
-function buildLocalSeoReportSummary(input: {
-  featureEnabled: boolean;
-  settings: LocalSeoWorkspaceSettings;
-  markets: LocalSeoMarket[];
-  suggestedMarkets: LocalSeoMarket[];
-  latestSnapshots: LocalVisibilitySnapshot[];
-}): LocalSeoReportSummary {
-  const activeMarketCount = input.markets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length;
-  const latestByMarketKeyword = buildMarketKeywordVisibilityFromSnapshots(input.latestSnapshots);
-  const visibility = [...latestByMarketKeyword.values()];
-  const visibleCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length;
-  const possibleMatchCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length;
-  const notVisibleCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE || item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT).length;
-  const degradedCount = visibility.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length;
-  const lastCapturedAt = input.latestSnapshots
-    .map(snapshot => snapshot.capturedAt)
-    .sort()
-    .at(-1);
-
-  let setupState: LocalSeoReportSummary['setupState'] = 'has_data';
-  let setupLabel = 'Local visibility reporting is active';
-  let setupDetail = 'Market-specific local-pack visibility is available for reviewed local-intent keywords.';
-  if (!input.featureEnabled) {
-    setupState = 'feature_disabled';
-    setupLabel = 'Local SEO visibility is not enabled';
-    setupDetail = 'The reporting layer is dark-launched behind the local SEO visibility feature flag.';
-  } else if (input.settings.posture === LOCAL_SEO_POSTURE.NON_LOCAL) {
-    setupState = 'non_local';
-    setupLabel = 'Workspace marked non-local';
-    setupDetail = 'Local-pack visibility is hidden because this workspace is not currently managed as a local SEO account.';
-  } else if (activeMarketCount === 0) {
-    setupState = 'needs_market';
-    setupLabel = 'Market setup needed';
-    setupDetail = 'Configure at least one reviewed local market before refreshing local visibility.';
-  } else if (input.latestSnapshots.length === 0) {
-    setupState = 'ready_no_data';
-    setupLabel = 'Ready for first refresh';
-    setupDetail = 'Markets are configured. Run a local visibility refresh to collect local-pack evidence.';
-  }
-
-  return {
-    workspacePosture: input.settings.posture,
-    suggestedPosture: input.settings.suggestedPosture,
-    activeMarketCount,
-    configuredMarketCount: input.markets.length,
-    suggestedMarketCount: input.suggestedMarkets.length,
-    latestSnapshotCount: input.latestSnapshots.length,
-    checkedKeywordCount: latestByMarketKeyword.size,
-    visibleCount,
-    possibleMatchCount,
-    notVisibleCount,
-    localPackPresentCount: visibility.filter(item => item.localPackPresent).length,
-    degradedCount,
-    lastCapturedAt,
-    setupState,
-    setupLabel,
-    setupDetail,
-  };
-}
-
-function buildMarketKeywordVisibilityFromSnapshots(snapshots: LocalVisibilitySnapshot[]): Map<string, LocalSeoKeywordVisibility> {
-  return buildLocalSeoVisibilityMap(
-    snapshots,
-    snapshot => `${snapshot.marketId}:${snapshot.normalizedKeyword}`,
-  );
-}
-
-function buildLocalSeoVisibilityMap(
-  snapshots: LocalVisibilitySnapshot[],
-  keyForSnapshot: (snapshot: LocalVisibilitySnapshot) => string,
-): Map<string, LocalSeoKeywordVisibility> {
-  const map = new Map<string, LocalSeoKeywordVisibility>();
-  for (const snapshot of snapshots) {
-    const key = keyForSnapshot(snapshot);
-    if (!snapshot.normalizedKeyword || map.has(key)) continue;
-    map.set(key, localSeoKeywordVisibilityFromSnapshot(snapshot));
-  }
-  return map;
-}
-
-function snapshotFromProviderResult(
-  workspaceId: string,
-  locations: ClientLocation[],
-  market: LocalSeoMarket,
-  providerResult: LocalVisibilityProviderResult,
-  device: LocalSeoDevice,
-  languageCode: string,
-): LocalVisibilitySnapshot {
-  const match = evaluateLocalBusinessMatch(locations, providerResult.results);
-  const isSuccess = providerResult.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
-  return {
-    id: randomUUID(),
-    workspaceId,
-    keyword: providerResult.keyword,
-    normalizedKeyword: keywordComparisonKey(providerResult.keyword),
-    marketId: market.id,
-    marketLabel: market.label,
-    capturedAt: providerResult.capturedAt,
-    localPackPresent: providerResult.localPackPresent,
-    businessFound: isSuccess && match.found,
-    businessMatchConfidence: isSuccess ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
-    businessMatchReason: isSuccess ? match.reason : providerResult.degradedReason,
-    localRank: isSuccess ? match.rank : undefined,
-    topCompetitors: scrubOwnedLocalResults(providerResult.results, locations),
-    sourceEndpoint: providerResult.sourceEndpoint,
-    provider: providerResult.provider,
-    device,
-    languageCode,
-    status: providerResult.status,
-    degradedReason: providerResult.degradedReason,
-    matchedLocationId: isSuccess ? match.matchedLocationId : undefined,
-    matchedLocationName: isSuccess ? match.matchedLocationName : undefined,
-  };
-}
-
-function storeSnapshot(snapshot: LocalVisibilitySnapshot, rawResults: LocalVisibilityBusinessResult[] = snapshot.topCompetitors): void {
-  stmts().insertSnapshot.run({
-    id: snapshot.id,
-    workspace_id: snapshot.workspaceId,
-    keyword: snapshot.keyword,
-    normalized_keyword: snapshot.normalizedKeyword,
-    market_id: snapshot.marketId,
-    market_label: snapshot.marketLabel,
-    captured_at: snapshot.capturedAt,
-    local_pack_present: snapshot.localPackPresent ? 1 : 0,
-    business_found: snapshot.businessFound ? 1 : 0,
-    business_match_confidence: snapshot.businessMatchConfidence,
-    business_match_reason: snapshot.businessMatchReason ?? null,
-    local_rank: snapshot.localRank ?? null,
-    top_competitors: JSON.stringify(snapshot.topCompetitors),
-    source_endpoint: snapshot.sourceEndpoint,
-    provider: snapshot.provider,
-    device: snapshot.device,
-    language_code: snapshot.languageCode,
-    status: snapshot.status,
-    degraded_reason: snapshot.degradedReason ?? null,
-    matched_location_id: snapshot.matchedLocationId ?? null,
-    matched_location_name: snapshot.matchedLocationName ?? null,
-    raw_results: JSON.stringify(rawResults.slice(0, LOCAL_SEO_MAX_RESULTS)),
-  });
 }
 
 function buildCandidateContext(workspace: Workspace) {
@@ -1429,7 +569,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
 
     // W5.3: snapshot the PREVIOUS latest-per-(market, keyword, device, language) state
     // BEFORE the crawl writes new rows, so the shift bridge can diff transitions after
-    // the refresh. Captured here (not after) because storeSnapshot mutates the series.
+    // the refresh. Captured here (not after) because storing a snapshot mutates the series.
     const previousLatestSnapshots = listLatestLocalVisibilitySnapshots(workspaceId);
 
     const total = plan.markets.length * plan.keywords.length;
@@ -1465,7 +605,7 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
         }, workspaceId);
         if (getJob(jobId)?.status === 'cancelled') return;
         const snapshot = snapshotFromProviderResult(workspaceId, locations, market, providerResult, plan.device, plan.languageCode);
-        storeSnapshot(snapshot, providerResult.results);
+        storeLocalVisibilitySnapshot(snapshot, providerResult.results);
         if (providerResult.status === LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED) failed++;
         else refreshed++;
       } catch (err) {
@@ -1656,101 +796,6 @@ export async function runLocalSeoRefreshJob(jobId: string, workspaceId: string, 
   }
 }
 
-export function countLocalVisibilitySnapshots(workspaceId: string): number {
-  const row = stmts().countSnapshotsForWorkspace.get(workspaceId) as { count: number };
-  return row.count;
-}
-
-/**
- * Returns the ISO timestamp of the most recent usable local_visibility_snapshots
- * row for the given workspace, or null when none exist. Provider-failed rows are
- * stored for diagnostics but must not satisfy freshness checks.
- * Cheap aggregate read — does NOT invoke any full-model or Evaluated builders.
- */
-export function latestLocalSnapshotAt(workspaceId: string): string | null {
-  const row = stmts().maxUsableCapturedAtForWorkspace.get(workspaceId, LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED) as { max_captured_at: string | null };
-  return row.max_captured_at ?? null;
-}
-
-/**
- * Bug 3 / owner decision D4 — Idempotent snapshot retention pruner.
- *
- * Policy:
- *   - Rows within RETENTION_RAW_DAYS (180 d): always kept.
- *   - Rows between RETENTION_RAW_DAYS and RETENTION_WEEKLY_MAX_DAYS (18 months):
- *     weekly thinning — keep exactly one row per
- *     (market_id, normalized_keyword, device, language_code, week-start-date).
- *   - Rows beyond RETENTION_WEEKLY_MAX_DAYS: hard delete.
- *   - ALWAYS keep the latest row per
- *     (market_id, normalized_keyword, device, language_code) regardless of age.
- *
- * Runs inside a db.transaction() per batch (RETENTION_PRUNE_BATCH_SIZE rows). Returns
- * the total pruned count for logging. Safe to call multiple times — no-op when the
- * table is already within policy.
- *
- * @internal Exported only for testing. Call from job hooks, not route handlers.
- */
-export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number } {
-  let totalPruned = 0;
-
-  // Collect and delete weekly-thinning candidates in batches.
-  let batch: Array<{ id: string }>;
-  do {
-    batch = stmts().pruneWeeklyThinIds.all(
-      // inner subquery (max captured_at per week bucket): workspace_id, raw_days, weekly_max
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      // outer keepers WHERE (rows at max captured_at): workspace_id, raw_days, weekly_max
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      // main outer WHERE: workspace_id, raw_days, weekly_max
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      // NOT IN immortal guard: workspace_id (inner), workspace_id (outer)
-      workspaceId,
-      workspaceId,
-      RETENTION_PRUNE_BATCH_SIZE,
-    ) as Array<{ id: string }>;
-    if (batch.length > 0) {
-      db.transaction(() => {
-        for (const row of batch) {
-          stmts().deleteSnapshotById.run(row.id, workspaceId);
-        }
-      })();
-      totalPruned += batch.length;
-    }
-  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
-
-  // Collect and delete hard-cutoff candidates in batches.
-  do {
-    batch = stmts().pruneHardCutoffIds.all(
-      // outer WHERE: workspace_id, weekly_max
-      workspaceId,
-      RETENTION_WEEKLY_MAX_DAYS,
-      // NOT IN immortal guard: workspace_id (inner), workspace_id (outer)
-      workspaceId,
-      workspaceId,
-      RETENTION_PRUNE_BATCH_SIZE,
-    ) as Array<{ id: string }>;
-    if (batch.length > 0) {
-      db.transaction(() => {
-        for (const row of batch) {
-          stmts().deleteSnapshotById.run(row.id, workspaceId);
-        }
-      })();
-      totalPruned += batch.length;
-    }
-  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
-
-  if (totalPruned > 0) {
-    log.info({ workspaceId, pruned: totalPruned }, 'local visibility snapshot retention prune complete');
-  }
-  return { pruned: totalPruned };
-}
-
 export async function runLocationBackfillJob(jobId: string, workspaceId: string): Promise<void> {
   if (getJob(jobId)?.status === 'cancelled') return;
 
@@ -1787,50 +832,34 @@ export async function runLocationBackfillJob(jobId: string, workspaceId: string)
   const pageSize = 100;
   let processed = 0;
   let lastProgressBroadcastAt = 0;
-  let cursorCapturedAt: string | null = null;
-  let cursorId: string | null = null;
+  let cursor: LocalVisibilitySnapshotBackfillCursor | null = null;
 
   while (true) {
     if (getJob(jobId)?.status === 'cancelled') return;
 
-    const batch: SnapshotRow[] = cursorCapturedAt === null
-      ? stmts().listSnapshotsFirstPageForBackfill.all(workspaceId, pageSize) as SnapshotRow[]
-      : stmts().listSnapshotsPageForBackfill.all(
-          workspaceId,
-          cursorCapturedAt,
-          cursorCapturedAt,
-          cursorId!,
-          pageSize,
-        ) as SnapshotRow[];
+    const batch = listLocalVisibilitySnapshotBackfillPage(workspaceId, pageSize, cursor);
 
     if (batch.length === 0) break;
 
-    // Advance cursor to the last row in this page
-    const lastRow = batch[batch.length - 1];
-    cursorCapturedAt = lastRow.captured_at;
-    cursorId = lastRow.id;
+    cursor = batch[batch.length - 1].cursor;
 
-    db.transaction(() => {
-      for (const row of batch) {
-        const snapshot = rowToSnapshot(row);
-        const rawResults = rowToRawLocalResults(row);
-        const match = evaluateLocalBusinessMatch(locations, rawResults);
-        const isSuccess = snapshot.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
-
-        stmts().updateSnapshotMatch.run({
-          id: snapshot.id,
-          workspace_id: workspaceId,
-          business_found: isSuccess && match.found ? 1 : 0,
-          business_match_confidence: isSuccess ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
-          business_match_reason: isSuccess ? (match.reason ?? null) : (snapshot.degradedReason ?? null),
-          local_rank: isSuccess ? (match.rank ?? null) : null,
-          matched_location_id: isSuccess ? (match.matchedLocationId ?? null) : null,
-          matched_location_name: isSuccess ? (match.matchedLocationName ?? null) : null,
-          top_competitors: JSON.stringify(scrubOwnedLocalResults(rawResults, locations)),
-          raw_results: JSON.stringify(rawResults.slice(0, LOCAL_SEO_MAX_RESULTS)),
-        });
-      }
-    })();
+    const updates: LocalVisibilitySnapshotMatchUpdate[] = batch.map(({ snapshot, rawResults }) => {
+      const match = evaluateLocalBusinessMatch(locations, rawResults);
+      const isSuccess = snapshot.status === LOCAL_VISIBILITY_STATUS.SUCCESS;
+      return {
+        workspaceId,
+        snapshotId: snapshot.id,
+        businessFound: isSuccess && match.found,
+        businessMatchConfidence: isSuccess ? match.confidence : LOCAL_BUSINESS_MATCH_CONFIDENCE.UNKNOWN,
+        businessMatchReason: isSuccess ? (match.reason ?? null) : (snapshot.degradedReason ?? null),
+        localRank: isSuccess ? (match.rank ?? null) : null,
+        matchedLocationId: isSuccess ? (match.matchedLocationId ?? null) : null,
+        matchedLocationName: isSuccess ? (match.matchedLocationName ?? null) : null,
+        topCompetitors: scrubOwnedLocalResults(rawResults, locations),
+        rawResults,
+      };
+    });
+    updateLocalVisibilitySnapshotMatches(updates);
 
     processed += batch.length;
     updateJob(jobId, {
