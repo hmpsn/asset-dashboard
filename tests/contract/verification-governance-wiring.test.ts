@@ -70,4 +70,16 @@ describe('verification governance wiring', () => {
     expect(viteConfig).not.toContain('Baseline 2026-05-05');
     expect(viteConfig).not.toContain('thresholds: {');
   });
+
+  it('keeps full coverage off staging push CI and on the main release path', () => {
+    const ci = readText('.github/workflows/ci.yml');
+    const coverageDoc = readText('docs/testing/coverage-ratchet-ci.md');
+
+    expect(ci).toContain("github.ref_name == 'main'");
+    expect(ci).toContain('REF_NAME: ${{ github.ref_name }}');
+    expect(ci).toContain('"$REF_NAME" == "main"');
+    expect(VERIFICATION_GOVERNANCE_REGISTRY['verify:coverage-ratchet'].classification).toBe('push-ci-blocking');
+    expect(coverageDoc).toMatch(/Staging\s+push CI also stays fast/);
+    expect(coverageDoc).toContain('The `main` push coverage job');
+  });
 });

@@ -84,7 +84,7 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
   'verify:coverage-ratchet': {
     classification: 'push-ci-blocking',
     owner: 'platform-foundation',
-    rationale: 'Enforces the authoritative coverage floor after npm run test:coverage generates a fresh summary.',
+    rationale: 'Enforces the authoritative coverage floor after npm run test:coverage generates a fresh summary on selected push/release paths.',
   },
   'verify:domain-events': {
     classification: 'manual-advisory',
