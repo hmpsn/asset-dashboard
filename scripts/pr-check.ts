@@ -8614,7 +8614,8 @@ export const CHECKS: Check[] = [
     name: 'recommendation impactScore must flow from canonical OV scorer',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/recommendations.ts; server/domains/recommendations/generation-producers.ts',
+    displayScope:
+      'server/recommendations.ts; server/domains/recommendations/generation-producers.ts; server/domains/recommendations/generation-service.ts',
     message:
       'Do not hand-roll recommendation impactScore math in recommendation runtime scoring modules. ' +
       'Route scoring through computeOpportunityValue() and write `impactScore` from the ' +
@@ -8633,6 +8634,7 @@ export const CHECKS: Check[] = [
       const targetPaths = [
         'server/recommendations.ts',
         'server/domains/recommendations/generation-producers.ts',
+        'server/domains/recommendations/generation-service.ts',
       ];
 
       for (const targetPath of targetPaths) {

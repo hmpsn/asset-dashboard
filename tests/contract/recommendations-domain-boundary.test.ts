@@ -25,6 +25,7 @@ import {
   mapToProduct as facadeMapToProduct,
   migrateSourceKey as facadeMigrateSourceKey,
   pageImportanceMultiplier as facadePageImportanceMultiplier,
+  recommendationOutcomeActionType as facadeRecommendationOutcomeActionType,
   resolveEstimatedGain as facadeResolveEstimatedGain,
   sortRecommendations as facadeSortRecommendations,
   toPageSlug as facadeToPageSlug,
@@ -56,6 +57,7 @@ import {
   sortRecommendations,
   toPageSlug,
 } from '../../server/domains/recommendations/rules.js';
+import { recommendationOutcomeActionType } from '../../server/domains/recommendations/outcome-action-type.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
@@ -152,18 +154,23 @@ describe('recommendations domain boundary', () => {
     expect(facadeResolveEstimatedGain).toBe(resolveEstimatedGain);
   });
 
-  it('keeps the RecType to outcome mapping exhaustive in the facade', () => {
+  it('keeps the RecType to outcome mapping exhaustive in the domain module with a compatibility export', () => {
     const facade = readRepoFile('server/recommendations.ts');
+    const outcomeActionType = readRepoFile('server/domains/recommendations/outcome-action-type.ts');
     const rules = readRepoFile('server/domains/recommendations/rules.ts');
 
-    expect(facade).toMatch(/function recommendationOutcomeActionType\b/);
-    expect(facade).toContain('const _exhaustive: never = type');
+    expect(outcomeActionType).toMatch(/function recommendationOutcomeActionType\b/);
+    expect(outcomeActionType).toContain('const _exhaustive: never = type');
+    expect(facade).not.toMatch(/function recommendationOutcomeActionType\b/);
+    expect(facade).toContain("from './domains/recommendations/outcome-action-type.js'");
+    expect(facadeRecommendationOutcomeActionType).toBe(recommendationOutcomeActionType);
     expect(rules).not.toMatch(/function recommendationOutcomeActionType\b/);
   });
 
   it('keeps read-only recommendation producer stages outside the facade', () => {
     const facade = readRepoFile('server/recommendations.ts');
     const producers = readRepoFile('server/domains/recommendations/generation-producers.ts');
+    const generation = readRepoFile('server/domains/recommendations/generation-service.ts');
 
     for (const helper of [
       'appendAuditRecommendations',
@@ -175,10 +182,11 @@ describe('recommendations domain boundary', () => {
       'appendLocalVisibilityRecommendations',
     ]) {
       expect(producers).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(generation).toContain(helper);
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
     }
 
-    expect(facade).toContain("from './domains/recommendations/generation-producers.js'");
+    expect(generation).toContain("from './generation-producers.js'");
     expect(producers).toContain('Keyword gaps unavailable for recommendations');
     expect(facade).not.toContain('Keyword gaps unavailable for recommendations');
     expect(producers).toContain("failedCategories.add('cannibalization')");
@@ -191,9 +199,25 @@ describe('recommendations domain boundary', () => {
     expect(facade).not.toContain('GBP + reviews listings unavailable for recommendations');
   });
 
+  it('keeps recommendation generation orchestration outside the facade', () => {
+    const facade = readRepoFile('server/recommendations.ts');
+    const generation = readRepoFile('server/domains/recommendations/generation-service.ts');
+
+    expect(generation).toMatch(/function generateRecommendations\b/);
+    expect(generation).toContain('buildRecommendationGenerationContext');
+    expect(generation).toContain('appendAuditRecommendations');
+    expect(generation).toContain('finalizeRecommendations(recs');
+    expect(generation).toContain('broadcastToWorkspace');
+    expect(facade).toContain("const generationServicePath = './domains/recommendations/generation-service.js'");
+    expect(facade).toContain('await import(generationServicePath)');
+    expect(facade).not.toContain('buildRecommendationGenerationContext');
+    expect(facade).not.toContain('broadcastToWorkspace');
+  });
+
   it('keeps recommendation finalization stages outside the facade', () => {
     const facade = readRepoFile('server/recommendations.ts');
     const finalization = readRepoFile('server/domains/recommendations/finalization.ts');
+    const generation = readRepoFile('server/domains/recommendations/generation-service.ts');
 
     expect(finalization).toMatch(/function finalizeRecommendations\b/);
     expect(finalization).toContain('function mintSignalRecs');
@@ -201,8 +225,8 @@ describe('recommendations domain boundary', () => {
     expect(finalization).toContain('applyLifecycleCarryOver(recs');
     expect(finalization).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(finalization).toContain('sortRecommendations(recs, effectiveBusinessPriorities');
-    expect(facade).toContain("from './domains/recommendations/finalization.js'");
-    expect(facade).toContain('finalizeRecommendations(recs');
+    expect(generation).toContain("from './finalization.js'");
+    expect(generation).toContain('finalizeRecommendations(recs');
     expect(facade).not.toContain('function mintSignalRecs');
     expect(facade).not.toContain('signal-fold: minted intelligence signals as recommendations');
     expect(facade).not.toContain('applyLifecycleCarryOver(recs');
@@ -212,6 +236,7 @@ describe('recommendations domain boundary', () => {
   it('keeps recommendation storage and resolution mutations in domain-owned modules', () => {
     const facade = readRepoFile('server/recommendations.ts');
     const storage = readRepoFile('server/domains/recommendations/storage.ts');
+    const statusService = readRepoFile('server/domains/recommendations/status-service.ts');
     const resolution = readRepoFile('server/domains/recommendations/resolution-service.ts');
 
     expect(storage).toContain('recommendation_items');
@@ -219,7 +244,10 @@ describe('recommendations domain boundary', () => {
     expect(storage).toMatch(/function saveRecommendationSet\b/);
     expect(storage).toMatch(/function setRecommendationItemStatus\b/);
     expect(storage).toMatch(/function mutateRecommendationItem\b/);
-    expect(facade).toContain("from './domains/recommendations/storage.js'");
+    expect(statusService).toContain("from './storage.js'");
+    expect(statusService).toContain('validateTransition(');
+    expect(statusService).toContain('RECOMMENDATION_TRANSITIONS');
+    expect(facade).toContain("from './domains/recommendations/status-service.js'");
     expect(facade).not.toContain("from './recommendation-storage.js'");
 
     for (const helper of [

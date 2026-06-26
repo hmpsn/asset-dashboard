@@ -41,7 +41,7 @@ describe('workspace intelligence freshness wiring', () => {
     for (const path of [
       'server/domains/local-seo/events.ts',
       'server/routes/local-seo.ts',
-      'server/recommendations.ts',
+      'server/domains/recommendations/generation-service.ts',
       'server/routes/recommendations.ts',
       'server/routes/briefing.ts',
       'server/briefing-cron.ts',
@@ -67,7 +67,7 @@ describe('workspace intelligence freshness wiring', () => {
 
   it('recommendation page-state writes broadcast page-state freshness', () => {
     const route = source('server/routes/recommendations.ts');
-    const generator = source('server/recommendations.ts');
+    const generator = source('server/domains/recommendations/generation-service.ts');
     const finalization = source('server/domains/recommendations/finalization.ts');
     const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'admin');
     const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'client-dashboard');

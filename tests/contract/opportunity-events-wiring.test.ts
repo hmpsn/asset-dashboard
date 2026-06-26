@@ -30,6 +30,7 @@ describe('competitor cron → opportunity event + regen', () => {
 
 describe('apply tail → opportunity regen', () => {
   const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
+  const generationSrc = readFileSync('server/domains/recommendations/generation-service.ts', 'utf-8'); // readFile-ok - wiring contract
   const resolutionSrc = readFileSync('server/domains/recommendations/resolution-service.ts', 'utf-8'); // readFile-ok - wiring contract
   const producerSrc = readFileSync('server/domains/recommendations/generation-producers.ts', 'utf-8'); // readFile-ok - wiring contract
 
@@ -51,9 +52,9 @@ describe('apply tail → opportunity regen', () => {
   });
 
   it('generateRecommendations does NOT call triggerOpportunityRegen (no recursion)', () => {
-    const genStart = src.indexOf('export async function generateRecommendations');
+    const genStart = generationSrc.indexOf('export async function generateRecommendations');
     expect(genStart).toBeGreaterThan(0);
-    const genSrc = src.slice(genStart);
+    const genSrc = generationSrc.slice(genStart);
     expect(genSrc).not.toContain('triggerOpportunityRegen');
   });
 });
@@ -61,10 +62,16 @@ describe('apply tail → opportunity regen', () => {
 describe('opportunity-regen breaks the recommendations cycle', () => {
   const regenSrc = readFileSync('server/scoring/opportunity-regen.ts', 'utf-8'); // readFile-ok - cycle contract
   const schedulerSrc = readFileSync('server/recommendation-regen-scheduler.ts', 'utf-8'); // readFile-ok - cycle contract
+  const recommendationFacade = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - cycle contract
 
   it('keeps the dynamic-import cycle break in the shared scheduler', () => {
     expect(schedulerSrc).toContain("await import('./recommendations.js')");
     expect(schedulerSrc).not.toContain("from './recommendations.js'");
+  });
+  it('keeps recommendation generation lazy behind the public facade', () => {
+    expect(recommendationFacade).toContain("const generationServicePath = './domains/recommendations/generation-service.js'");
+    expect(recommendationFacade).toContain('await import(generationServicePath)');
+    expect(recommendationFacade).not.toContain("from './domains/recommendations/generation-service.js'");
   });
   it('is built on debounceBridge with the opportunity event source id', () => {
     expect(regenSrc).toContain("debounceBridge('opportunity-value-events'");

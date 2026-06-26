@@ -6,7 +6,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource, fillPredictedEmvIfNull } from './outcome-tracking.js';
-import { recommendationOutcomeActionType } from './recommendations.js';
+import { recommendationOutcomeActionType } from './domains/recommendations/outcome-action-type.js';
 import { loadRecommendationSet } from './domains/recommendations/storage.js';
 import type { RecType } from '../shared/types/recommendations.js';
 
