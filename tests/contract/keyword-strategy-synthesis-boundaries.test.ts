@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 const facade = readFileSync('server/keyword-strategy-ai-synthesis.ts', 'utf8'); // readFile-ok: source-boundary contract for decomposition guard
 const prompts = readFileSync('server/keyword-strategy-synthesis/prompts.ts', 'utf8'); // readFile-ok: source-boundary contract for prompt ownership
 const types = readFileSync('server/keyword-strategy-synthesis/types.ts', 'utf8'); // readFile-ok: source-boundary contract for stage type ownership
+const pageAssignment = readFileSync('server/keyword-strategy-synthesis/page-assignment.ts', 'utf8'); // readFile-ok: source-boundary contract for OP1 stage ownership
+const siteSynthesis = readFileSync('server/keyword-strategy-synthesis/site-synthesis.ts', 'utf8'); // readFile-ok: source-boundary contract for OP2 stage ownership
 
 describe('keyword strategy synthesis decomposition boundaries', () => {
   it('keeps synthesis-only stage types out of the public facade', () => {
@@ -22,5 +24,27 @@ describe('keyword strategy synthesis decomposition boundaries', () => {
     expect(prompts).toContain('Return JSON with this EXACT structure');
     expect(prompts).toContain('Return a JSON OBJECT (not a bare array)');
     expect(prompts).toContain('Return a JSON array with one entry per page');
+  });
+
+  it('keeps OP1 page-assignment batching outside the public facade', () => {
+    expect(facade).toContain('runPageAssignmentBatches');
+    expect(facade).not.toContain('const runBatch = async');
+    expect(facade).not.toContain('postProcessBatch');
+    expect(facade).not.toContain('perPageFallbackBatch');
+    expect(pageAssignment).toContain('export async function runPageAssignmentBatches');
+    expect(pageAssignment).toContain('CONCURRENCY = 3');
+    expect(pageAssignment).toContain('pageAssignmentResponseSchema.safeParse');
+    expect(pageAssignment).toContain('keyword-page-assignment');
+  });
+
+  it('keeps OP2 site-synthesis AI parsing outside the public facade', () => {
+    expect(facade).toContain('runSiteSynthesis');
+    expect(facade).not.toContain('siteSynthesisResponseSchema.safeParse');
+    expect(facade).not.toContain('Master closed-set OP2 failed validation');
+    expect(facade).not.toContain('AI returned invalid JSON in master synthesis');
+    expect(siteSynthesis).toContain('export async function runSiteSynthesis');
+    expect(siteSynthesis).toContain('siteSynthesisResponseSchema.safeParse');
+    expect(siteSynthesis).toContain('keyword-site-synthesis');
+    expect(siteSynthesis).toContain('AI returned invalid JSON in master synthesis');
   });
 });

@@ -34,6 +34,10 @@ const keywordStrategySynthesisSrc = fs.readFileSync(
   path.join(serverDir, 'keyword-strategy-ai-synthesis.ts'),
   'utf-8',
 );
+const keywordStrategySiteSynthesisSrc = fs.readFileSync( // readFile-ok — intentional static analysis of OP2 site-synthesis stage ownership
+  path.join(serverDir, 'keyword-strategy-synthesis/site-synthesis.ts'),
+  'utf-8',
+);
 const keywordStrategyPoolSrc = fs.readFileSync( // readFile-ok — intentional static analysis of keyword-pool brand-filter ownership
   path.join(serverDir, 'keyword-strategy-synthesis/pool.ts'),
   'utf-8',
@@ -180,14 +184,15 @@ describe('content gap analysis sub-pipeline — static wiring', () => {
     expect(keywordStrategySynthesisSrc).toContain(
       'Post-generation hard filter: remove any content gaps containing competitor brand names',
     );
-    // The filter call must be present after the master AI call (callStrategyAI for 'master').
-    // We use the specific variable assignment "masterRaw = await callStrategyAI" to locate
-    // the master call — not lastIndexOf('callStrategyAI') which would match a later cluster
-    // AI call that appears after the filter in the file.
-    const afterMasterIdx = keywordStrategySynthesisSrc.indexOf('masterRaw = await callStrategyAI');
+    // The OP2 master AI call now lives in the site-synthesis stage owner. The
+    // facade must call that stage, then apply the hard content-gap filter before
+    // final strategy assembly.
+    const masterCallIdx = keywordStrategySiteSynthesisSrc.indexOf("], 3000, 'master'");
+    const afterMasterIdx = keywordStrategySynthesisSrc.indexOf('const masterData: MasterStrategyData = await runSiteSynthesis');
     const filterDelegateIdx = keywordStrategySynthesisSrc.indexOf('filterMasterContentGaps(');
     const filterCallIdx = keywordStrategyFinalizeSrc.indexOf('filterBrandedContentGaps(rawContentGaps');
-    expect(afterMasterIdx).toBeGreaterThan(0); // guard: master call must exist
+    expect(masterCallIdx).toBeGreaterThan(0); // guard: legacy master call must exist in the OP2 stage owner
+    expect(afterMasterIdx).toBeGreaterThan(0); // guard: OP2 stage invocation must exist in the facade
     expect(filterDelegateIdx).toBeGreaterThan(afterMasterIdx);
     expect(filterCallIdx).toBeGreaterThan(0);
   });
