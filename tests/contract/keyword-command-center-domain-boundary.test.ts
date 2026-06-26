@@ -36,4 +36,32 @@ describe('keyword command center domain boundary', () => {
     expect(rowQuery).toContain('setKeywordCommandCenterRowValueScore');
     expect(sort).toContain('export function keywordSortComparator');
   });
+
+  it('keeps row lifecycle helpers in the domain module with compatibility re-exports from the facade', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const lifecycle = readRepoFile('server/domains/keyword-command-center/row-lifecycle.ts');
+    const types = readRepoFile('server/domains/keyword-command-center/types.ts');
+
+    for (const helper of [
+      'feedbackState',
+      'ensureRow',
+      'assignmentPriority',
+      'sourceFromExplanation',
+      'sourceFromKeywordGap',
+      'isInactiveTracking',
+      'protectedReason',
+      'lifecycleStatus',
+      'statusLabel',
+      'localPriority',
+    ]) {
+      expect(facade).toContain(`  ${helper},`);
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(lifecycle).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/row-lifecycle.js'");
+    expect(facade).toContain("from './domains/keyword-command-center/types.js'");
+    expect(types).toContain('export interface CommandCenterSourceBundle');
+    expect(types).toContain('export interface DraftRow');
+  });
 });
