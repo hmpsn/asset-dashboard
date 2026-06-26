@@ -102,13 +102,15 @@ Absent v3 fields (`lifecycle === undefined`, `clientStatus === undefined`) → l
 
 ## Carry-over through regen
 
-`applyLifecycleCarryOver(newRecs, oldRecs)` (exported from `server/recommendations.ts:598`)
+`applyLifecycleCarryOver(newRecs, oldRecs)` (owned by
+`server/domains/recommendations/rules.ts` and compatibility-exported from `server/recommendations.ts`)
 re-applies the client-facing lifecycle axis onto freshly-minted recs during a regen merge, keyed by
 `buildMergeKey(rec)` (`source + affectedPages[0] + title`), for EVERY matched old rec regardless of
 `RecStatus`. Without it a sent rec resets to `system` on the next regen.
 
-Called at `generateRecommendations` after the RecStatus merge branch (~line 2441) so the two merge
-passes are additive and idempotent. The carry-over copies the lifecycle axis (`clientStatus`,
+Called by `server/domains/recommendations/finalization.ts:finalizeRecommendations` after the
+RecStatus merge branch so the two merge passes are additive and idempotent. The carry-over copies
+the lifecycle axis (`clientStatus`,
 `lifecycle`, `throttledUntil`, `sentAt`, `struckAt`, `cascade`, `sendChannel` — only when present on
 the old rec) AND re-applies `id` + `createdAt` continuity (so a re-minted rec keeps its identity and
 sentAt lineage; idempotent with the RecStatus branch above).
@@ -117,14 +119,15 @@ Exit-gate test: `tests/integration/recommendation-regen-preserves-lifecycle.test
 
 ## Auto-resolve exemption
 
-`isExemptFromAutoResolve(rec)` (exported from `server/recommendations.ts:624`) exempts recs with
+`isExemptFromAutoResolve(rec)` (owned by `server/domains/recommendations/rules.ts` and
+compatibility-exported from `server/recommendations.ts`) exempts recs with
 `clientStatus` in `{sent, discussing, approved}` from the destructive auto-resolve → `completed`
 sweep inside `generateRecommendations`. `declined` is NOT exempt (the client said no; it can
 auto-resolve when the issue is genuinely fixed).
 
-Called inside the auto-resolve loop at ~line 2454, AFTER `applyLifecycleCarryOver` has already
-re-stamped the lifecycle axis on surviving recs. The ordering is critical: carry-over runs first so
-the exemption check sees the correct `clientStatus`.
+Called inside `finalizeRecommendations` in `server/domains/recommendations/finalization.ts`, AFTER
+`applyLifecycleCarryOver` has already re-stamped the lifecycle axis on surviving recs. The ordering
+is critical: carry-over runs first so the exemption check sees the correct `clientStatus`.
 
 Exit-gate test: `tests/integration/recommendation-lifecycle.test.ts`
 (the `strike-never-completed — auto-resolve exemption survives a real regen` describe block).
@@ -134,7 +137,7 @@ Exit-gate test: `tests/integration/recommendation-lifecycle.test.ts`
 In addition to the `clientStatus` exemption above, recs whose source category is `'signal'`
 (merge key prefixed `signal:`, minted by `mintSignalRecs` under the `strategy-signal-fold` flag)
 are exempt from the auto-resolve sweep via a **separate guard immediately before the auto-resolve
-loop** in `generateRecommendations`. The reason is structural, not status-based: `mintSignalRecs`
+loop** in `finalizeRecommendations`. The reason is structural, not status-based: `mintSignalRecs`
 runs once per generation *after* the merge/auto-resolve block, so a `signal:<insightId>` key is
 **never** added to `newSources`. For a signal rec, "absent from `newSources`" is therefore always a
 false positive — without the guard every un-actioned folded signal would be rewritten to

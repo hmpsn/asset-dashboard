@@ -11,19 +11,16 @@
  *   ongoing   — Content gaps, keyword opportunities, continuous optimization
  */
 
-import crypto from 'crypto';
-import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
+import { getWorkspace } from './workspaces.js';
 import { getPageState } from './page-edit-states.js';
 import type { Workspace } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
-import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
-import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getLocalSeoPosture } from './local-seo.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';
 import { getInsights } from './analytics-insights-store.js';
-import { buildStrategySignals } from './insight-feedback.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -37,22 +34,14 @@ import { buildCtrCurve, type GscKeywordObservation } from './scoring/ctr-curve.j
 import { resolveOvAuthorityStrength } from './workspace-authority.js';
 import { getOrCreateWorkspaceWeights } from './opportunity-weights.js';
 import { computeOvCalibration } from './scoring/ov-calibration.js';
-import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 import {
-  RecSource,
-  applyLifecycleCarryOver,
-  buildMergeKey,
   computeRecommendationSummary,
-  deriveCanonicalRecommendationFields,
   getRecSourceCategory,
   getTrafficScore,
-  isExemptFromAutoResolve,
-  isOperatorMintedRec,
-  resolveEstimatedGain,
-  sortRecommendations,
   toPageSlug,
   type RecSourceCategory,
 } from './domains/recommendations/rules.js';
+import { finalizeRecommendations } from './domains/recommendations/finalization.js';
 import {
   appendAuditRecommendations,
   appendContentDecayRecommendations,
@@ -72,9 +61,8 @@ import {
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
-import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData } from '../shared/types/analytics.js';
-import type { StrategySignal } from '../shared/types/insights.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 import { getEffortPriorDays } from './outcome-emv-calibration.js';
 import { LOCAL_SEO_POSTURE } from '../shared/types/local-seo.js';
@@ -404,111 +392,6 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
   }
 }
 
-// ─── Strategy redesign P4 · signal-fold ───────────────────────────
-//
-// Maps the standalone IntelligenceSignals feed (the `buildStrategySignals` read the
-// dedicated `…/signals` card consumed) into first-class Recommendation rows minted at
-// generation time. The card is being deleted; signals-as-recs ride the existing
-// RECOMMENDATIONS_UPDATED broadcast (signals ARE recs — no new WS event). Gated behind
-// `strategy-signal-fold`, checked server-side per-workspace; flag-OFF mints nothing so the
-// rec set stays byte-identical.
-
-/** Map a StrategySignal's `type` to a RecType. `momentum` (a keyword that gained positions —
- *  "consider adding to strategy") maps to `keyword_gap`; `content_gap` (competitor coverage we
- *  lack) maps to `topic_cluster`; everything else (`misalignment`) maps to the generic
- *  `strategy`. NEVER `competitor` — that RecType is Lane C's and signals don't map to it. */
-function signalToRecType(signalType: StrategySignal['type']): RecType {
-  switch (signalType) {
-    case 'momentum':    return 'keyword_gap';
-    case 'content_gap': return 'topic_cluster';
-    case 'misalignment':
-    default:            return 'strategy';
-  }
-}
-
-/** Band a signal's score into a RecPriority (the minted signal rec carries no OV
- *  `opportunity` — it is a pure map of the feed, so the canonical OV post-pass skips it and
- *  the score flows straight from the signal). Thresholds mirror the impact bands used
- *  by the keyword_gap / topic_cluster producers above. */
-function signalPriority(score: number): RecPriority {
-  if (score >= 70) return 'fix_now';
-  if (score >= 40) return 'fix_soon';
-  return 'fix_later';
-}
-
-/**
- * Mint StrategySignals as Recommendation rows, appending to `recs` in place.
- *
- * Dedup contract: a signal is skipped when its `signal:<insightId>` merge key already exists
- * in `recs` (covers BOTH a different producer that already minted the same source AND a
- * carried-over signal rec re-pushed by the merge phase). buildMergeKey is the single keying
- * authority — `signal:` sources are not `strategy:`-prefixed, so the key is the source string,
- * exactly the per-`insightId` dedup the spec requires. Carry-over semantics are respected:
- * mintSignalRecs runs AFTER applyLifecycleCarryOver, so a previously-minted signal rec that
- * survived regen is already in `recs` with its preserved id/status/lifecycle, and this dedup
- * prevents a second copy — no re-mint, no duplication.
- *
- * Pure map (no AI, no DB write): the caller persists the assembled set.
- */
-function mintSignalRecs(
-  signals: StrategySignal[],
-  recs: Recommendation[],
-  ctx: { workspaceId: string; now: string; assignedTo: 'team' | 'client' },
-): number {
-  // O(n) dedup: one Set of existing merge keys, then a single pass over signals. No nested
-  // scan over `recs` per signal (the carry-over O(n²) hazard the plan flags) — the lookup is
-  // Set-backed.
-  const existingKeys = new Set<string>();
-  for (const rec of recs) existingKeys.add(buildMergeKey(rec));
-
-  let minted = 0;
-  for (const signal of signals) {
-    const source = RecSource.signal(signal.insightId);
-    // buildMergeKey on a `signal:`-prefixed source returns the source unchanged (not
-    // strategy-prefixed) → per-insightId dedup.
-    const key = buildMergeKey({ source, affectedPages: [], title: '' });
-    if (existingKeys.has(key)) continue; // already minted (this run or carried over) — don't double-mint
-    existingKeys.add(key);
-
-    const type = signalToRecType(signal.type);
-    // Signal recs are a pure map of the IntelligenceSignals feed — the feed already carries the
-    // insight's score and there are no OV inputs (volume/KD/position) to ground a
-    // computeOpportunityValue() call. This mirrors the standalone card, which rendered the
-    // signal score verbatim. No `opportunity` attached → the canonical OV post-pass leaves this
-    // rec alone (it guards on `if (r.opportunity)`).
-    const impactScore = signal.impactScore; // rec-impactscore-ok: pure feed map, no OV inputs to ground a scorer call (see comment above)
-    const pageSlug = signal.pageUrl ? toPageSlug(signal.pageUrl) : undefined;
-    recs.push({
-      id: `rec_${crypto.randomBytes(6).toString('hex')}`,
-      workspaceId: ctx.workspaceId,
-      priority: signalPriority(impactScore),
-      type,
-      title: `${signal.keyword ? `"${signal.keyword}"` : 'Intelligence signal'}: ${signal.detail}`,
-      description: signal.detail,
-      insight: signal.detail,
-      impact: impactScore >= 70 ? 'high' : impactScore >= 40 ? 'medium' : 'low',
-      effort: 'medium',
-      impactScore,
-      // No `opportunity` — the mint is a pure map of the feed (no OV inputs to ground it),
-      // so the canonical OV post-pass (which guards on `if (r.opportunity)`) leaves it alone
-      // and impactScore flows straight from the signal.
-      source,
-      affectedPages: pageSlug ? [pageSlug] : [],
-      targetKeyword: signal.keyword || undefined,
-      trafficAtRisk: 0,
-      impressionsAtRisk: 0,
-      estimatedGain: signal.detail,
-      actionType: 'manual',
-      status: 'pending',
-      assignedTo: ctx.assignedTo,
-      createdAt: ctx.now,
-      updatedAt: ctx.now,
-    });
-    minted++;
-  }
-  return minted;
-}
-
 // ─── Main Engine ──────────────────────────────────────────────────
 
 export async function generateRecommendations(workspaceId: string): Promise<RecommendationSet> {
@@ -731,230 +614,25 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
-  // ── Merge with existing recommendations ──
-  // Preserve statuses from previous run and auto-resolve issues no longer detected
-  const existing = loadRecommendations(workspaceId);
-  let autoResolved = 0;
-  const autoResolvedPageStateIds: string[] = [];
-
-  if (existing) {
-    // Build lookup: source → existing rec (for audit-based and site-wide recs)
-    // For strategy recs, use source + first affected page as key
-    const existingByKey = new Map<string, Recommendation>();
-    for (const oldRec of existing.recommendations) {
-      // buildMergeKey migrates old recs whose source embeds a full URL slug
-      // (pre-toPageSlug) so they match newly-generated normalised keys and
-      // in_progress/dismissed statuses are preserved.
-      existingByKey.set(buildMergeKey(oldRec), oldRec);
-    }
-
-    const newSources = new Set<string>();
-    for (const newRec of recs) {
-      const key = buildMergeKey(newRec);
-      newSources.add(key);
-
-      // Preserve status from existing rec if it was in_progress or completed
-      const oldRec = existingByKey.get(key);
-      if (oldRec) {
-        if (oldRec.status === 'in_progress') {
-          newRec.status = oldRec.status;
-          newRec.id = oldRec.id; // keep same ID for frontend continuity
-          newRec.createdAt = oldRec.createdAt;
-        } else if (oldRec.status === 'completed') {
-          validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, oldRec.status, 'pending');
-          newRec.status = 'pending';
-          newRec.id = oldRec.id; // keep same ID for frontend continuity
-          newRec.createdAt = oldRec.createdAt;
-        } else if (oldRec.status === 'dismissed') {
-          newRec.status = 'dismissed';
-          newRec.id = oldRec.id;
-          newRec.createdAt = oldRec.createdAt;
-        }
-      }
-    }
-
-    // Strategy v3 — carry the client-facing lifecycle axis across regen for EVERY matched rec
-    // (the RecStatus branch above only ran on in_progress/completed/dismissed). buildMergeKey
-    // re-matches old↔new; applyLifecycleCarryOver also re-applies id+createdAt continuity (idempotent
-    // with the branch above). This is the trust-critical graft: a sent rec stays sent through regen.
-    applyLifecycleCarryOver(recs, Array.from(existingByKey.values()));
-
-    // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
-    // Safety: if the data source for a category failed this run (e.g. provider
-    // outage, diagnostic store unavailable), skip auto-resolving recs in that
-    // category — their absence from `newSources` is a fetch artifact, not a
-    // genuine fix. This prevents silent bulk-completion of real issues during
-    // transient failures.
-    const autoResolvedRecs: typeof existing.recommendations = [];
-    for (const oldRec of existing.recommendations) {
-      if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
-      // Strategy v3 (§6.5): a rec the client has already seen (sent/discussing/approved) must
-      // never be auto-swept to 'completed' (it would read as "✓ done" — the trust-critical graft).
-      // It must ALSO not silently vanish when its source is no longer detected: a sent rec the
-      // client is mid-decision on has to survive regen. If its source is still detected, the matching
-      // new rec already carries its lifecycle (applyLifecycleCarryOver above) — skip to avoid a dup.
-      // If the source is gone, RETAIN the old rec as-is (preserve its sent/discussing/approved state);
-      // the positive "we handled this" terminal is a later phase (P2/P3) — here we only preserve.
-      if (isExemptFromAutoResolve(oldRec)) {
-        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
-        continue;
-      }
-      // The Issue (operator-steering) — operator-minted recs (manual:/competitor:) have NO producer
-      // in the merge phase, so their merge key is NEVER in newSources. Without this they auto-resolve
-      // to 'completed' on the next regen. RETAIN as-is when the source is absent — the operator owns
-      // their lifecycle; only an explicit strike removes them. (Also fixes the live competitor-rec
-      // auto-resolve bug: an un-sent competitor mint silently flipped to "✓ done" on the next regen.)
-      if (isOperatorMintedRec(oldRec)) {
-        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
-        continue;
-      }
-      const category = getRecSourceCategory(oldRec.source);
-      // Strategy redesign P4 · signal-fold — signal recs have NO producer in the merge phase:
-      // mintSignalRecs runs AFTER this loop, so a `signal:<insightId>` key is never added to
-      // `newSources`. Its absence is therefore ALWAYS a false positive, not a genuine "no longer
-      // detected" fix. Without this exemption every un-actioned folded signal flips to a false
-      // "✓ Auto-resolved — completed" on the next regen, and the post-loop mintSignalRecs then
-      // dedups against that now-completed rec and never re-mints it. RETAIN the old signal rec
-      // as-is (preserve status/lifecycle) when its mint key is absent so the subsequent
-      // mintSignalRecs dedup sees it and skips the re-mint (no duplicate). Struck/sent signal
-      // recs are already handled by the isExemptFromAutoResolve branch above.
-      if (category === 'signal') {
-        if (!newSources.has(buildMergeKey(oldRec))) recs.push({ ...oldRec });
-        continue;
-      }
-      if (category && failedCategories.has(category)) continue;
-      if (!newSources.has(buildMergeKey(oldRec))) {
-        // D2: a content-gap rec suppressed because the pipeline already has an in-flight
-        // brief/post for its keyword is NOT "no longer detected" — the gap still exists,
-        // we're just already working on it. Use truthful copy so the client doesn't read
-        // "done" as "my content is live". (Pre-D2 recs without targetKeyword fall through
-        // to the generic copy — forward-looking only.)
-        const suppressedByPipeline = Boolean(
-          oldRec.targetKeyword
-          && inFlightContentKeywords.has(keywordComparisonKey(oldRec.targetKeyword)),
-        );
-        recs.push({
-          ...oldRec,
-          status: 'completed',
-          updatedAt: now,
-          insight: suppressedByPipeline
-            ? `✓ Content for this is already in progress — it will be marked done when it publishes. ${oldRec.insight}`
-            : `✓ Auto-resolved — this issue is no longer detected in the latest audit. ${oldRec.insight}`,
-        });
-        autoResolved++;
-        autoResolvedRecs.push(oldRec);
-      }
-    }
-
-    // Build set of pages that still have active (non-completed, non-dismissed) recs
-    const pagesWithActiveRecs = new Set<string>();
-    for (const r of recs) {
-      if (r.status !== 'completed' && r.status !== 'dismissed') {
-        for (const p of r.affectedPages) pagesWithActiveRecs.add(toPageSlug(p));
-      }
-    }
-
-    // Only mark pages as live if they have no other active recommendations
-    for (const oldRec of autoResolvedRecs) {
-      if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
-        for (const pageSlug of oldRec.affectedPages) {
-          if (pagesWithActiveRecs.has(toPageSlug(pageSlug))) continue;
-          const resolvedPageId = slugToPageId.get(pageSlug)
-            ?? getPageIdBySlug(workspaceId, pageSlug)
-            ?? pageSlug;
-          updatePageState(workspaceId, resolvedPageId, {
-            status: 'live',
-            source: 'recommendation',
-            recommendationId: oldRec.id,
-          });
-          autoResolvedPageStateIds.push(resolvedPageId);
-        }
-      }
-    }
-  }
-
-  // ── Strategy redesign P4 · signal-fold (flag-gated, runs AFTER carry-over) ──
-  // Mint the IntelligenceSignals feed as real recs. Placed here, after the entire merge/
-  // carry-over block, so dedup sees BOTH this run's producer recs AND any carried-over
-  // signal rec that survived regen (applyLifecycleCarryOver re-applied its id/lifecycle into
-  // `recs` already) — buildMergeKey on `signal:<insightId>` keeps the dedup per-insight, so a
-  // sent/struck signal rec is respected and never re-minted. Flag-OFF: mints nothing → the
-  // rec set is byte-identical. Reuses the exact read path the standalone card used
-  // (getInsights → buildStrategySignals).
-  if (isFeatureEnabled('strategy-signal-fold', workspaceId)) {
-    try {
-      // Parity with the standalone IntelligenceSignals card (server/routes/keyword-strategy.ts):
-      // it threaded a keywordEvaluationContext into buildStrategySignals to suppress
-      // declined/business-misfit keywords. Reuse the SAME read path here so the mint never emits
-      // recs for keywords the card would have suppressed. The seoContext + clientSignals slices
-      // were already assembled into `recommendationContext` above (slices: [...'seoContext',
-      // 'clientSignals'...]) — no extra intelligence build. If that context was unavailable
-      // (build failed → null), fall back to the unfiltered feed (same fail-open direction the
-      // route uses in its catch).
-      const intel = recommendationContext?.intelligence;
-      const keywordEvaluationContext = intel
-        ? buildStrategyKeywordEvaluationContext({
-            workspaceId,
-            workspaceName: ws.name,
-            businessContext: ws.keywordStrategy?.businessContext,
-            seoContext: intel.seoContext,
-            clientSignals: intel.clientSignals,
-            declinedKeywords: [...new Set([
-              ...(intel.clientSignals?.keywordFeedback.rejected ?? []),
-              ...getDeclinedKeywords(workspaceId),
-            ])],
-            requestedKeywords: getRequestedKeywords(workspaceId),
-            approvedKeywords: intel.clientSignals?.keywordFeedback.approved ?? [],
-            strictBusinessFit: true,
-          })
-        : undefined;
-      const signals = buildStrategySignals(getInsights(workspaceId), { keywordEvaluationContext });
-      const mintedSignalRecs = mintSignalRecs(signals, recs, { workspaceId, now, assignedTo });
-      if (mintedSignalRecs > 0) {
-        log.info({ workspaceId, mintedSignalRecs }, 'signal-fold: minted intelligence signals as recommendations');
-      }
-    } catch (err) { // non-fatal — a signal-fold failure must never block the rest of the rec set
-      log.warn({ err, workspaceId }, 'signal-fold: failed to mint signal recs — continuing without them');
-    }
-  }
-
-  // ── Canonical OV scoring + one gain basis chokepoint. ──
-  // Keep one post-pass so every producer converges on the same final authority even if a
-  // future branch accidentally provides a placeholder priority/score during construction.
-  const outcomeRankScores = new Map<string, number>();
-  for (const r of recs) {
-    if (r.opportunity) {
-      const scoring = deriveCanonicalRecommendationFields(r.source, r.opportunity);
-      r.impactScore = scoring.impactScore;
-      r.priority = scoring.priority;
-    }
-    const outcomeAdjustment = buildOutcomeAdjustment({
-      actionType: recommendationOutcomeActionType(r.type, r.source),
-      learnings: outcomeLearnings,
-    });
-    if (outcomeAdjustment.multiplier !== 1) {
-      outcomeRankScores.set(r.id, applyOutcomeAdjustmentScore(r.impactScore, outcomeAdjustment));
-    }
-    r.estimatedGain = resolveEstimatedGain(r.estimatedGain, r.opportunity, true);
-  }
-
-  // ── Sort: tier PRIMARY, learned rank score / impactScore SECONDARY, business-intent
-  // alignment as the final within-tier tiebreaker. Learning scores are rank-only so
-  // the public `impactScore === opportunity.value` contract stays intact.
-  sortRecommendations(recs, effectiveBusinessPriorities, { rankScores: outcomeRankScores });
-
-  // ── Build summary (exclude auto-resolved from active counts) ──
-  const summary = computeRecommendationSummary(recs);
-
-  const set: RecommendationSet = {
+  const { set, autoResolved, autoResolvedPageStateIds } = finalizeRecommendations(recs, {
     workspaceId,
-    generatedAt: now,
-    recommendations: recs,
-    summary,
-  };
+    workspaceName: ws.name,
+    workspaceBusinessContext: ws.keywordStrategy?.businessContext,
+    now,
+    assignedTo,
+    existing: loadRecommendations(workspaceId),
+    failedCategories,
+    inFlightContentKeywords,
+    slugToPageId,
+    effectiveBusinessPriorities,
+    outcomeLearnings,
+    intelligence: recommendationContext?.intelligence ?? null,
+    actionTypeForRecommendation: recommendationOutcomeActionType,
+  });
 
   saveRecommendations(set);
   invalidateIntelligenceCache(workspaceId);
+  const summary = set.summary;
   log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
   if (autoResolvedPageStateIds.length > 0) {
