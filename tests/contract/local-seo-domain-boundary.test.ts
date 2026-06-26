@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +8,8 @@ import {
   RETENTION_RAW_DAYS as facadeRetentionRawDays,
   RETENTION_WEEKLY_MAX_DAYS as facadeRetentionWeeklyMaxDays,
   applySourcePageCap as facadeApplySourcePageCap,
+  buildLocalSeoKeywordCandidates as facadeBuildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordCandidatesEvaluated as facadeBuildLocalSeoKeywordCandidatesEvaluated,
   buildLocalSeoKeywordVisibilityByKey as facadeBuildLocalSeoKeywordVisibilityByKey,
   buildLocalSeoKeywordVisibilityForKeyword as facadeBuildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey as facadeBuildLocalSeoKeywordVisibilitySummaryByKey,
@@ -16,10 +18,13 @@ import {
   cleanDomain as facadeCleanDomain,
   cleanKeywordDisplay as facadeCleanKeywordDisplay,
   confidencePriority as facadeConfidencePriority,
+  countLocalSeoKeywordCandidates as facadeCountLocalSeoKeywordCandidates,
   countLocalVisibilitySnapshots as facadeCountLocalVisibilitySnapshots,
+  createLocalSeoRefreshPlan as facadeCreateLocalSeoRefreshPlan,
   evaluateLocalBusinessMatch as facadeEvaluateLocalBusinessMatch,
   getEffectiveLocations as facadeGetEffectiveLocations,
   getEffectiveKeywordsPerRefresh as facadeGetEffectiveKeywordsPerRefresh,
+  getLocalSeoReadModel as facadeGetLocalSeoReadModel,
   getLocalSeoPosture as facadeGetLocalSeoPosture,
   getLocalSeoCompetitorBrands as facadeGetLocalSeoCompetitorBrands,
   getLocalSeoServiceGaps as facadeGetLocalSeoServiceGaps,
@@ -30,18 +35,25 @@ import {
   latestLocalSnapshotAt as facadeLatestLocalSnapshotAt,
   listLocalSeoMarkets as facadeListLocalSeoMarkets,
   listLatestLocalVisibilitySnapshots as facadeListLatestLocalVisibilitySnapshots,
+  loadCandidateIterationContext as facadeLoadCandidateIterationContext,
   localVariantKeywords as facadeLocalVariantKeywords,
   localVariantKeywordsByMarket as facadeLocalVariantKeywordsByMarket,
   normalizePhone as facadeNormalizePhone,
   normalizeProviderIdentity as facadeNormalizeProviderIdentity,
   normalizeText as facadeNormalizeText,
+  resolveLocalSeoProviderLocation as facadeResolveLocalSeoProviderLocation,
   resolveWorkspaceLanguageCode as facadeResolveWorkspaceLanguageCode,
   resolveWorkspaceLocationCode as facadeResolveWorkspaceLocationCode,
   resolveWorkspaceTargetGeo as facadeResolveWorkspaceTargetGeo,
+  runLocalSeoRefreshJob as facadeRunLocalSeoRefreshJob,
+  runLocationBackfillJob as facadeRunLocationBackfillJob,
   runSnapshotRetentionPrune as facadeRunSnapshotRetentionPrune,
   scrubOwnedLocalResults as facadeScrubOwnedLocalResults,
+  selectLocalIntentKeywords as facadeSelectLocalIntentKeywords,
+  setPrimaryMarket as facadeSetPrimaryMarket,
   titleLooksLikeServiceKeyword as facadeTitleLooksLikeServiceKeyword,
   iterateLocalCandidateSignals as facadeIterateLocalCandidateSignals,
+  updateLocalSeoConfiguration as facadeUpdateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
 import {
   cleanDomain,
@@ -77,6 +89,18 @@ import {
   iterateLocalCandidateSignals,
 } from '../../server/domains/local-seo/candidate-pipeline.js';
 import {
+  buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordCandidatesEvaluated,
+  countLocalSeoKeywordCandidates,
+  createLocalSeoRefreshPlan,
+  loadCandidateIterationContext,
+  selectLocalIntentKeywords,
+} from '../../server/domains/local-seo/candidate-service.js';
+import {
+  setPrimaryMarket,
+  updateLocalSeoConfiguration,
+} from '../../server/domains/local-seo/configuration-actions.js';
+import {
   LOCAL_SEO_MAX_MARKETS,
   getEffectiveKeywordsPerRefresh,
   getLocalSeoPosture,
@@ -103,11 +127,48 @@ import {
   getLocalSeoCompetitorBrands,
   getLocalSeoServiceGaps,
 } from '../../server/domains/local-seo/visibility-read-model.js';
+import {
+  getLocalSeoReadModel,
+} from '../../server/domains/local-seo/read-service.js';
+import {
+  resolveLocalSeoProviderLocation,
+  runLocalSeoRefreshJob,
+  runLocationBackfillJob,
+} from '../../server/domains/local-seo/refresh-runner.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(new URL(relativePath, repoRoot), 'utf8'); // readFile-ok - source contract checks local SEO facade/domain ownership.
+}
+
+function isServerLocalSeoFacadeImport(file: string, importPath: string): boolean {
+  if (!importPath.startsWith('.')) return false;
+  try {
+    const fileUrl = new URL(file, repoRoot);
+    const resolved = realpathSync(new URL(`${importPath.replace(/\.js$/, '.ts')}`, fileUrl));
+    return resolved === realpathSync(new URL('server/local-seo.ts', repoRoot));
+  } catch {
+    return false;
+  }
+}
+
+function listServerProductionFiles(dir = 'server'): string[] {
+  const entries = readdirSync(new URL(`${dir}/`, repoRoot), { withFileTypes: true }); // readdir-ok - source contract checks local SEO facade/domain ownership.
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const relativePath = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__') continue;
+      files.push(...listServerProductionFiles(relativePath));
+      continue;
+    }
+    if (!entry.isFile() || !relativePath.endsWith('.ts')) continue;
+    files.push(relativePath);
+  }
+
+  return files;
 }
 
 describe('local SEO domain boundary', () => {
@@ -173,6 +234,44 @@ describe('local SEO domain boundary', () => {
     expect(readRepoFile('server/llm-mentions.ts')).toContain("from './domains/local-seo/business-match.js'");
     expect(readRepoFile('server/national-serp.ts')).toContain("from './domains/local-seo/business-match.js'");
     expect(readRepoFile('server/scoring/keyword-value-score.ts')).toContain("from '../domains/local-seo/keyword-intent.js'");
+
+    const domainOnlyHelpers = [
+      'applySourcePageCap',
+      'candidateSourceScore',
+      'classifyLocalKeywordIntent',
+      'cleanDomain',
+      'cleanKeywordDisplay',
+      'confidencePriority',
+      'evaluateLocalBusinessMatch',
+      'getEffectiveLocations',
+      'hasMarketModifier',
+      'isOwnedLocalResult',
+      'localVariantKeywords',
+      'localVariantKeywordsByMarket',
+      'normalizePhone',
+      'normalizeProviderIdentity',
+      'normalizeText',
+      'scrubOwnedLocalResults',
+      'titleLooksLikeServiceKeyword',
+      'iterateLocalCandidateSignals',
+    ];
+    const facadeImportOffenders = listServerProductionFiles()
+      .filter((file) => file !== 'server/local-seo.ts')
+      .flatMap((file) => {
+        const source = readRepoFile(file);
+        const matches = [...source.matchAll(/import\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]*local-seo\.js)['"]/g)]
+          .filter((match) => isServerLocalSeoFacadeImport(file, match[2]));
+        return matches.flatMap((match) => {
+          const importedNames = match[1]
+            .split(',')
+            .map((name) => name.trim().split(/\s+as\s+/)[0]?.trim())
+            .filter(Boolean);
+          const domainOnlyImports = importedNames.filter((name) => domainOnlyHelpers.includes(name));
+          return domainOnlyImports.map((name) => `${file}: ${name} from ${match[2]}`);
+        });
+      });
+
+    expect(facadeImportOffenders).toEqual([]);
   });
 
   it('keeps workspace classifier helpers in the domain module without widening the facade', () => {
@@ -187,7 +286,7 @@ describe('local SEO domain boundary', () => {
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
       expect(workspaceClassifiers).toMatch(new RegExp(`function ${helper}\\b`));
     }
-    expect(facade).toContain("from './domains/local-seo/workspace-classifiers.js'");
+    expect(facade).not.toContain("from './domains/local-seo/workspace-classifiers.js'");
     expect(facade).not.toMatch(/export\s+\{[^}]*buildWorkspaceGeoRegex/s);
     expect(facade).not.toMatch(/export\s+\{[^}]*buildWorkspaceServiceTermRegex/s);
     expect(facade).not.toMatch(/export\s+\{[^}]*deriveLocalSeoPosture/s);
@@ -222,6 +321,45 @@ describe('local SEO domain boundary', () => {
     expect(typeof buildLocalSeoKeywordCandidatesEvaluatedFromContext).toBe('function');
     expect(typeof countLocalSeoKeywordCandidatesFromContext).toBe('function');
     expect(typeof hasLocalIntentForWorkspace).toBe('function');
+  });
+
+  it('keeps candidate context, selection, and refresh planning in the domain candidate service', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const candidateService = readRepoFile('server/domains/local-seo/candidate-service.ts');
+
+    for (const helper of [
+      'loadCandidateIterationContext',
+      'buildLocalSeoKeywordCandidates',
+      'buildLocalSeoKeywordCandidatesEvaluated',
+      'countLocalSeoKeywordCandidates',
+      'selectLocalIntentKeywords',
+      'createLocalSeoRefreshPlan',
+    ]) {
+      expect(candidateService).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const movedDetail of [
+      'LOCAL_CANDIDATE_HARD_CAP',
+      'selectExplicitLocalSeoKeywords',
+      'buildCandidateContext',
+      'warnLocalSeoCandidateHardCap',
+      'getTrackedKeywords',
+      'listContentGaps',
+      'getDeclinedKeywords',
+      'getRequestedKeywords',
+    ]) {
+      expect(candidateService).toContain(movedDetail);
+      expect(facade).not.toContain(movedDetail);
+    }
+
+    expect(facade).toContain("from './domains/local-seo/candidate-service.js'");
+    expect(facadeLoadCandidateIterationContext).toBe(loadCandidateIterationContext);
+    expect(facadeBuildLocalSeoKeywordCandidates).toBe(buildLocalSeoKeywordCandidates);
+    expect(facadeBuildLocalSeoKeywordCandidatesEvaluated).toBe(buildLocalSeoKeywordCandidatesEvaluated);
+    expect(facadeCountLocalSeoKeywordCandidates).toBe(countLocalSeoKeywordCandidates);
+    expect(facadeSelectLocalIntentKeywords).toBe(selectLocalIntentKeywords);
+    expect(facadeCreateLocalSeoRefreshPlan).toBe(createLocalSeoRefreshPlan);
   });
 
   it('keeps settings, markets, and target geo ownership in the domain configuration service', () => {
@@ -327,5 +465,71 @@ describe('local SEO domain boundary', () => {
     expect(facadeRunSnapshotRetentionPrune).toBe(runSnapshotRetentionPrune);
     expect(facadeGetLocalSeoCompetitorBrands).toBe(getLocalSeoCompetitorBrands);
     expect(facadeGetLocalSeoServiceGaps).toBe(getLocalSeoServiceGaps);
+  });
+
+  it('keeps read model and configuration write actions in domain services', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const readService = readRepoFile('server/domains/local-seo/read-service.ts');
+    const configurationActions = readRepoFile('server/domains/local-seo/configuration-actions.ts');
+    const events = readRepoFile('server/domains/local-seo/events.ts');
+
+    expect(readService).toMatch(/function getLocalSeoReadModel\b/);
+    expect(readService).toContain('buildLocalSeoReportSummary');
+    expect(readService).toContain('listLatestLocalVisibilitySnapshots');
+    expect(readService).toContain('getLocalSeoVisibilityTrend');
+    expect(facade).not.toMatch(/function getLocalSeoReadModel\b/);
+
+    for (const helper of ['setPrimaryMarket', 'updateLocalSeoConfiguration']) {
+      expect(configurationActions).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+    expect(configurationActions).toContain('addActivity');
+    expect(configurationActions).toContain('notifyLocalSeoUpdated');
+    expect(events).toMatch(/function notifyLocalSeoUpdated\b/);
+    expect(events).toContain('invalidateIntelligenceCache');
+    expect(events).toContain('WS_EVENTS.LOCAL_SEO_UPDATED');
+    expect(facade).not.toContain('notifyLocalSeoUpdated');
+
+    expect(facade).toContain("from './domains/local-seo/read-service.js'");
+    expect(facade).toContain("from './domains/local-seo/configuration-actions.js'");
+    expect(facadeGetLocalSeoReadModel).toBe(getLocalSeoReadModel);
+    expect(facadeSetPrimaryMarket).toBe(setPrimaryMarket);
+    expect(facadeUpdateLocalSeoConfiguration).toBe(updateLocalSeoConfiguration);
+  });
+
+  it('keeps provider refresh and location backfill runners out of the facade', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const refreshRunner = readRepoFile('server/domains/local-seo/refresh-runner.ts');
+
+    for (const helper of [
+      'resolveLocalSeoProviderLocation',
+      'runLocalSeoRefreshJob',
+      'runLocationBackfillJob',
+    ]) {
+      expect(refreshRunner).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const movedDetail of [
+      'resolveLocalVisibilityProvider',
+      'resolveLocalLocationProvider',
+      'waitForMemoryHeadroom',
+      'LOCAL_SEO_REFRESH_CONCURRENCY',
+      'LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL',
+      'LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL',
+      'runLocalVisibilityShiftBridge',
+      'runRecommendationRegen',
+      'generateKeywordStrategy',
+      'listLocalVisibilitySnapshotBackfillPage',
+      'updateLocalVisibilitySnapshotMatches',
+    ]) {
+      expect(refreshRunner).toContain(movedDetail);
+      expect(facade).not.toContain(movedDetail);
+    }
+
+    expect(facade).toContain("from './domains/local-seo/refresh-runner.js'");
+    expect(facadeResolveLocalSeoProviderLocation).toBe(resolveLocalSeoProviderLocation);
+    expect(facadeRunLocalSeoRefreshJob).toBe(runLocalSeoRefreshJob);
+    expect(facadeRunLocationBackfillJob).toBe(runLocationBackfillJob);
   });
 });

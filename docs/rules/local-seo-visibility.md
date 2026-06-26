@@ -57,6 +57,19 @@ Never say "verified local rank" unless the source and match confidence support i
 - Provider telemetry and credit labels must identify local endpoints separately from keyword discovery/rank tracking.
 - v1 caps should be explicit before launch, e.g. max markets and max keywords per refresh.
 
+## Domain Ownership
+
+- `server/local-seo.ts` is a compatibility facade. Keep public exports there, but do not add new storage, provider, job, or read-model logic to it.
+- `server/domains/local-seo/configuration-service.ts` owns settings, markets, target geo resolution, and transactional market updates.
+- `server/domains/local-seo/configuration-actions.ts` owns activity/broadcast wrappers around admin configuration mutations.
+- `server/domains/local-seo/candidate-pipeline.ts` owns deterministic candidate enumeration and scoring from an already-loaded context.
+- `server/domains/local-seo/candidate-service.ts` owns candidate context loading, cheap/evaluated candidate entry points, local-intent selection, and refresh-plan construction.
+- `server/domains/local-seo/snapshot-store.ts` owns `local_visibility_snapshots` persistence, snapshot mapping, latest reads, trend reads, and retention pruning.
+- `server/domains/local-seo/visibility-read-model.ts` owns competitor/service-gap projections and report caps/summary assembly.
+- `server/domains/local-seo/read-service.ts` owns the public/admin local SEO read model assembled from settings, markets, snapshots, and projections.
+- `server/domains/local-seo/refresh-runner.ts` owns provider selection, local visibility refresh jobs, chained non-fatal recommendation/strategy regeneration, and location-match backfill jobs.
+- `server/domains/local-seo/events.ts` owns `LOCAL_SEO_UPDATED` broadcasts plus intelligence-cache invalidation.
+
 ## Intelligence Boundary
 
 If local visibility feeds prompts, recommendations, or strategy scoring, add a `localSeo` intelligence slice rather than direct reads from callers. Missing local visibility should degrade to `local posture unknown`, not fabricated confidence.
