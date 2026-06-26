@@ -4,20 +4,32 @@ import { describe, expect, it } from 'vitest';
 
 import {
   LOCAL_SEO_MAX_MARKETS as facadeLocalSeoMaxMarkets,
+  RETENTION_PRUNE_BATCH_SIZE as facadeRetentionPruneBatchSize,
+  RETENTION_RAW_DAYS as facadeRetentionRawDays,
+  RETENTION_WEEKLY_MAX_DAYS as facadeRetentionWeeklyMaxDays,
   applySourcePageCap as facadeApplySourcePageCap,
+  buildLocalSeoKeywordVisibilityByKey as facadeBuildLocalSeoKeywordVisibilityByKey,
+  buildLocalSeoKeywordVisibilityForKeyword as facadeBuildLocalSeoKeywordVisibilityForKeyword,
+  buildLocalSeoKeywordVisibilitySummaryByKey as facadeBuildLocalSeoKeywordVisibilitySummaryByKey,
   candidateSourceScore as facadeCandidateSourceScore,
   classifyLocalKeywordIntent as facadeClassifyLocalKeywordIntent,
   cleanDomain as facadeCleanDomain,
   cleanKeywordDisplay as facadeCleanKeywordDisplay,
   confidencePriority as facadeConfidencePriority,
+  countLocalVisibilitySnapshots as facadeCountLocalVisibilitySnapshots,
   evaluateLocalBusinessMatch as facadeEvaluateLocalBusinessMatch,
   getEffectiveLocations as facadeGetEffectiveLocations,
   getEffectiveKeywordsPerRefresh as facadeGetEffectiveKeywordsPerRefresh,
   getLocalSeoPosture as facadeGetLocalSeoPosture,
+  getLocalSeoCompetitorBrands as facadeGetLocalSeoCompetitorBrands,
+  getLocalSeoServiceGaps as facadeGetLocalSeoServiceGaps,
+  getLocalSeoVisibilityTrend as facadeGetLocalSeoVisibilityTrend,
   getPrimaryMarketLocationCode as facadeGetPrimaryMarketLocationCode,
   hasMarketModifier as facadeHasMarketModifier,
   isOwnedLocalResult as facadeIsOwnedLocalResult,
+  latestLocalSnapshotAt as facadeLatestLocalSnapshotAt,
   listLocalSeoMarkets as facadeListLocalSeoMarkets,
+  listLatestLocalVisibilitySnapshots as facadeListLatestLocalVisibilitySnapshots,
   localVariantKeywords as facadeLocalVariantKeywords,
   localVariantKeywordsByMarket as facadeLocalVariantKeywordsByMarket,
   normalizePhone as facadeNormalizePhone,
@@ -26,6 +38,7 @@ import {
   resolveWorkspaceLanguageCode as facadeResolveWorkspaceLanguageCode,
   resolveWorkspaceLocationCode as facadeResolveWorkspaceLocationCode,
   resolveWorkspaceTargetGeo as facadeResolveWorkspaceTargetGeo,
+  runSnapshotRetentionPrune as facadeRunSnapshotRetentionPrune,
   scrubOwnedLocalResults as facadeScrubOwnedLocalResults,
   titleLooksLikeServiceKeyword as facadeTitleLooksLikeServiceKeyword,
   iterateLocalCandidateSignals as facadeIterateLocalCandidateSignals,
@@ -73,6 +86,23 @@ import {
   resolveWorkspaceLocationCode,
   resolveWorkspaceTargetGeo,
 } from '../../server/domains/local-seo/configuration-service.js';
+import {
+  RETENTION_PRUNE_BATCH_SIZE,
+  RETENTION_RAW_DAYS,
+  RETENTION_WEEKLY_MAX_DAYS,
+  buildLocalSeoKeywordVisibilityByKey,
+  buildLocalSeoKeywordVisibilityForKeyword,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
+  countLocalVisibilitySnapshots,
+  getLocalSeoVisibilityTrend,
+  latestLocalSnapshotAt,
+  listLatestLocalVisibilitySnapshots,
+  runSnapshotRetentionPrune,
+} from '../../server/domains/local-seo/snapshot-store.js';
+import {
+  getLocalSeoCompetitorBrands,
+  getLocalSeoServiceGaps,
+} from '../../server/domains/local-seo/visibility-read-model.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
@@ -237,5 +267,65 @@ describe('local SEO domain boundary', () => {
     expect(facadeResolveWorkspaceLocationCode).toBe(resolveWorkspaceLocationCode);
     expect(facadeResolveWorkspaceLanguageCode).toBe(resolveWorkspaceLanguageCode);
     expect(facadeResolveWorkspaceTargetGeo).toBe(resolveWorkspaceTargetGeo);
+  });
+
+  it('keeps local visibility snapshot storage and read projections out of the facade', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const snapshotStore = readRepoFile('server/domains/local-seo/snapshot-store.ts');
+    const readModel = readRepoFile('server/domains/local-seo/visibility-read-model.ts');
+
+    for (const storeDetail of [
+      'createStmtCache',
+      'local_visibility_snapshots',
+      'rowToSnapshot',
+      'rowToRawLocalResults',
+      'listSnapshotsPageForBackfill',
+      'pruneWeeklyThinIds',
+      'pruneHardCutoffIds',
+      'latestSnapshotSummary',
+    ]) {
+      expect(snapshotStore).toContain(storeDetail);
+      expect(facade).not.toContain(storeDetail);
+    }
+
+    for (const helper of [
+      'listLatestLocalVisibilitySnapshots',
+      'buildLocalSeoKeywordVisibilitySummaryByKey',
+      'buildLocalSeoKeywordVisibilityByKey',
+      'buildLocalSeoKeywordVisibilityForKeyword',
+      'getLocalSeoVisibilityTrend',
+      'countLocalVisibilitySnapshots',
+      'latestLocalSnapshotAt',
+      'runSnapshotRetentionPrune',
+    ]) {
+      expect(snapshotStore).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const helper of [
+      'getLocalSeoCompetitorBrands',
+      'getLocalSeoServiceGaps',
+      'buildLocalSeoReportSummary',
+      'buildLocalSeoCaps',
+    ]) {
+      expect(readModel).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/local-seo/snapshot-store.js'");
+    expect(facade).toContain("from './domains/local-seo/visibility-read-model.js'");
+    expect(facadeRetentionRawDays).toBe(RETENTION_RAW_DAYS);
+    expect(facadeRetentionWeeklyMaxDays).toBe(RETENTION_WEEKLY_MAX_DAYS);
+    expect(facadeRetentionPruneBatchSize).toBe(RETENTION_PRUNE_BATCH_SIZE);
+    expect(facadeListLatestLocalVisibilitySnapshots).toBe(listLatestLocalVisibilitySnapshots);
+    expect(facadeBuildLocalSeoKeywordVisibilitySummaryByKey).toBe(buildLocalSeoKeywordVisibilitySummaryByKey);
+    expect(facadeBuildLocalSeoKeywordVisibilityByKey).toBe(buildLocalSeoKeywordVisibilityByKey);
+    expect(facadeBuildLocalSeoKeywordVisibilityForKeyword).toBe(buildLocalSeoKeywordVisibilityForKeyword);
+    expect(facadeGetLocalSeoVisibilityTrend).toBe(getLocalSeoVisibilityTrend);
+    expect(facadeCountLocalVisibilitySnapshots).toBe(countLocalVisibilitySnapshots);
+    expect(facadeLatestLocalSnapshotAt).toBe(latestLocalSnapshotAt);
+    expect(facadeRunSnapshotRetentionPrune).toBe(runSnapshotRetentionPrune);
+    expect(facadeGetLocalSeoCompetitorBrands).toBe(getLocalSeoCompetitorBrands);
+    expect(facadeGetLocalSeoServiceGaps).toBe(getLocalSeoServiceGaps);
   });
 });
