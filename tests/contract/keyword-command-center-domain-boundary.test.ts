@@ -32,7 +32,7 @@ describe('keyword command center domain boundary', () => {
     }
 
     expect(facade).toContain("from './domains/keyword-command-center/row-query.js'");
-    expect(facade).toContain("from './domains/keyword-command-center/sort.js'");
+    expect(rowQuery).toContain("from './sort.js'");
     expect(rowQuery).toContain('setKeywordCommandCenterRowValueScore');
     expect(sort).toContain('export function keywordSortComparator');
   });
@@ -129,5 +129,41 @@ describe('keyword command center domain boundary', () => {
     expect(startup).not.toContain("from './keyword-command-center.js'");
     expect(provenance).toContain('listTrackedKeywordRows');
     expect(provenance).toContain('resolveSiteKeywordMetrics');
+  });
+
+  it('keeps candidate boundary helpers in the domain module', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const candidateBoundary = readRepoFile('server/domains/keyword-command-center/candidate-boundary.ts');
+
+    for (const helper of [
+      'selectRankEvidence',
+      'mergeMetricsInto',
+      'gateDiscoveryGaps',
+      'addCandidateKeysFromBundle',
+      'resolveBundleMetrics',
+      'candidateSortForQuery',
+      'trackedKeywordMatchesFilter',
+      '__candidateKeysForTest',
+      'rowCandidateKeysForQuery',
+      'sourceKeysForRows',
+      'filterBundleToKeys',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(candidateBoundary).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const reExported of [
+      '__candidateKeysForTest',
+      'candidateSortForQuery',
+      'gateDiscoveryGaps',
+      'trackedKeywordMatchesFilter',
+    ]) {
+      expect(facade).toContain(`  ${reExported},`);
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/candidate-boundary.js'");
+    expect(candidateBoundary).toContain('isStrategyPoolEligibleKeyword');
+    expect(candidateBoundary).toContain('keywordSortComparator');
+    expect(candidateBoundary).toContain('selectRankEvidence');
   });
 });
