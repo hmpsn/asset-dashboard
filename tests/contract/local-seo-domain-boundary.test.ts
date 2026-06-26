@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  LOCAL_SEO_MAX_MARKETS as facadeLocalSeoMaxMarkets,
   applySourcePageCap as facadeApplySourcePageCap,
   candidateSourceScore as facadeCandidateSourceScore,
   classifyLocalKeywordIntent as facadeClassifyLocalKeywordIntent,
@@ -11,13 +12,20 @@ import {
   confidencePriority as facadeConfidencePriority,
   evaluateLocalBusinessMatch as facadeEvaluateLocalBusinessMatch,
   getEffectiveLocations as facadeGetEffectiveLocations,
+  getEffectiveKeywordsPerRefresh as facadeGetEffectiveKeywordsPerRefresh,
+  getLocalSeoPosture as facadeGetLocalSeoPosture,
+  getPrimaryMarketLocationCode as facadeGetPrimaryMarketLocationCode,
   hasMarketModifier as facadeHasMarketModifier,
   isOwnedLocalResult as facadeIsOwnedLocalResult,
+  listLocalSeoMarkets as facadeListLocalSeoMarkets,
   localVariantKeywords as facadeLocalVariantKeywords,
   localVariantKeywordsByMarket as facadeLocalVariantKeywordsByMarket,
   normalizePhone as facadeNormalizePhone,
   normalizeProviderIdentity as facadeNormalizeProviderIdentity,
   normalizeText as facadeNormalizeText,
+  resolveWorkspaceLanguageCode as facadeResolveWorkspaceLanguageCode,
+  resolveWorkspaceLocationCode as facadeResolveWorkspaceLocationCode,
+  resolveWorkspaceTargetGeo as facadeResolveWorkspaceTargetGeo,
   scrubOwnedLocalResults as facadeScrubOwnedLocalResults,
   titleLooksLikeServiceKeyword as facadeTitleLooksLikeServiceKeyword,
   iterateLocalCandidateSignals as facadeIterateLocalCandidateSignals,
@@ -55,6 +63,16 @@ import {
   hasLocalIntentForWorkspace,
   iterateLocalCandidateSignals,
 } from '../../server/domains/local-seo/candidate-pipeline.js';
+import {
+  LOCAL_SEO_MAX_MARKETS,
+  getEffectiveKeywordsPerRefresh,
+  getLocalSeoPosture,
+  getPrimaryMarketLocationCode,
+  listLocalSeoMarkets,
+  resolveWorkspaceLanguageCode,
+  resolveWorkspaceLocationCode,
+  resolveWorkspaceTargetGeo,
+} from '../../server/domains/local-seo/configuration-service.js';
 
 const repoRoot = new URL('../../', import.meta.url);
 
@@ -174,5 +192,50 @@ describe('local SEO domain boundary', () => {
     expect(typeof buildLocalSeoKeywordCandidatesEvaluatedFromContext).toBe('function');
     expect(typeof countLocalSeoKeywordCandidatesFromContext).toBe('function');
     expect(typeof hasLocalIntentForWorkspace).toBe('function');
+  });
+
+  it('keeps settings, markets, and target geo ownership in the domain configuration service', () => {
+    const facade = readRepoFile('server/local-seo.ts');
+    const configuration = readRepoFile('server/domains/local-seo/configuration-service.ts');
+
+    for (const helper of [
+      'getEffectiveKeywordsPerRefresh',
+      'getLocalSeoPosture',
+      'listLocalSeoMarkets',
+      'getPrimaryMarketLocationCode',
+      'resolveWorkspaceLocationCode',
+      'resolveWorkspaceLanguageCode',
+      'resolveWorkspaceTargetGeo',
+      'readLocalSeoSettings',
+      'applyLocalSeoConfigurationUpdate',
+      'activeLocalSeoMarkets',
+      'buildSuggestedLocalSeoMarkets',
+      'disabledLocalSeoSettings',
+    ]) {
+      expect(configuration).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    for (const movedStoreDetail of [
+      'upsertSettings',
+      'upsertMarket',
+      'getPrimaryMarketLanguage',
+      'rowToMarket',
+      'rowToSettings',
+      'TARGET_GEO_LOCATION_NAMES_BY_CODE',
+    ]) {
+      expect(configuration).toContain(movedStoreDetail);
+      expect(facade).not.toContain(movedStoreDetail);
+    }
+
+    expect(facade).toContain("from './domains/local-seo/configuration-service.js'");
+    expect(facadeLocalSeoMaxMarkets).toBe(LOCAL_SEO_MAX_MARKETS);
+    expect(facadeGetEffectiveKeywordsPerRefresh).toBe(getEffectiveKeywordsPerRefresh);
+    expect(facadeGetLocalSeoPosture).toBe(getLocalSeoPosture);
+    expect(facadeListLocalSeoMarkets).toBe(listLocalSeoMarkets);
+    expect(facadeGetPrimaryMarketLocationCode).toBe(getPrimaryMarketLocationCode);
+    expect(facadeResolveWorkspaceLocationCode).toBe(resolveWorkspaceLocationCode);
+    expect(facadeResolveWorkspaceLanguageCode).toBe(resolveWorkspaceLanguageCode);
+    expect(facadeResolveWorkspaceTargetGeo).toBe(resolveWorkspaceTargetGeo);
   });
 });
