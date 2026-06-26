@@ -64,4 +64,23 @@ describe('keyword command center domain boundary', () => {
     expect(types).toContain('export interface CommandCenterSourceBundle');
     expect(types).toContain('export interface DraftRow');
   });
+
+  it('keeps keyword feedback persistence in the domain store module', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const feedbackStore = readRepoFile('server/domains/keyword-command-center/feedback-store.ts');
+
+    for (const helper of [
+      'readFeedbackRows',
+      'readFeedback',
+      'deleteFeedbackByKeywordKey',
+      'upsertFeedback',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(feedbackStore).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/feedback-store.js'");
+    expect(feedbackStore).toContain('keyword_feedback');
+    expect(feedbackStore).toContain('createStmtCache');
+  });
 });

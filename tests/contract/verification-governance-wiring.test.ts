@@ -71,15 +71,15 @@ describe('verification governance wiring', () => {
     expect(viteConfig).not.toContain('thresholds: {');
   });
 
-  it('keeps full coverage off staging push CI and on the main release path', () => {
+  it('keeps full coverage off automatic push CI and on manual release verification', () => {
     const ci = readText('.github/workflows/ci.yml');
     const coverageDoc = readText('docs/testing/coverage-ratchet-ci.md');
 
-    expect(ci).toContain("github.ref_name == 'main'");
-    expect(ci).toContain('REF_NAME: ${{ github.ref_name }}');
-    expect(ci).toContain('"$REF_NAME" == "main"');
-    expect(VERIFICATION_GOVERNANCE_REGISTRY['verify:coverage-ratchet'].classification).toBe('push-ci-blocking');
-    expect(coverageDoc).toMatch(/Staging\s+push CI also stays fast/);
-    expect(coverageDoc).toContain('The `main` push coverage job');
+    expect(ci).toContain('workflow_dispatch:');
+    expect(ci).toContain("if: github.event_name == 'workflow_dispatch'");
+    expect(ci).not.toContain('"$EVENT_NAME" == "push" && "$REF_NAME" == "main"');
+    expect(VERIFICATION_GOVERNANCE_REGISTRY['verify:coverage-ratchet'].classification).toBe('release-check');
+    expect(coverageDoc).toMatch(/Staging\s+and main push CI also stay fast/);
+    expect(coverageDoc).toContain('The manually dispatched coverage job');
   });
 });

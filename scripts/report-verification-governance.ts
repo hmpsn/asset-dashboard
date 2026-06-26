@@ -82,9 +82,9 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     rationale: 'Pipeline wiring inventory informs audits; it is not yet a zero-hit CI contract.',
   },
   'verify:coverage-ratchet': {
-    classification: 'push-ci-blocking',
+    classification: 'release-check',
     owner: 'platform-foundation',
-    rationale: 'Enforces the authoritative coverage floor after npm run test:coverage generates a fresh summary on selected push/release paths.',
+    rationale: 'Enforces the authoritative coverage floor after npm run test:coverage generates a fresh summary during deliberate release verification.',
   },
   'verify:domain-events': {
     classification: 'manual-advisory',

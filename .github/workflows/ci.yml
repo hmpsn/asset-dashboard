@@ -5,6 +5,7 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -286,9 +287,10 @@ jobs:
   coverage:
     needs: changes
     # Full-suite coverage takes ~20 minutes and is intentionally not part of
-    # every staging merge. Keep it on the release path; staging remains covered
-    # by fast quality gates plus PR test lanes.
-    if: github.event_name == 'push' && github.ref_name == 'main' && needs.changes.outputs.coverage == 'true'
+    # automatic PR, staging, or main push CI. Run this workflow manually before
+    # a release when a fresh ratchet summary is needed; normal merges stay
+    # covered by fast quality gates plus PR test lanes.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -371,7 +373,4 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" && "$COVERAGE_NEEDED" == "true" && "$COVERAGE_RESULT" != "success" ]]; then
-            echo "::error::coverage job failed"
-            exit 1
-          fi
+          echo "coverage is manual-only; failed manual coverage runs fail via the coverage job itself"

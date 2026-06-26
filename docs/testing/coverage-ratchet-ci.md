@@ -48,17 +48,18 @@ Domain guardrail gaps are reported as advisory output so planning can continue w
 ## CI Integration
 
 PR CI intentionally uses fast project-aware Vitest lanes for feedback. Staging
-push CI also stays fast; it does not run full-suite coverage on every merge.
-Coverage remains a release-path job because artifact merging and ratchet
-enforcement are still single-summary operations in this phase.
+and main push CI also stay fast; they do not run full-suite coverage on every
+merge or promotion. Coverage remains a deliberate release check because artifact
+generation and ratchet enforcement are still single-summary operations in this
+phase.
 
-The `main` push coverage job in `.github/workflows/ci.yml` runs:
+The manually dispatched coverage job in `.github/workflows/ci.yml` runs:
 
 1. `npm run test:coverage`
 2. `npm run verify:coverage-ratchet`
 3. uploads `coverage/coverage-summary.json` + `coverage/lcov.info` as artifacts
 
-Any floor regression fails the coverage job.
+Any floor regression fails the manually dispatched coverage job.
 
 ## Ratchet Maintenance
 

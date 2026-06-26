@@ -33,14 +33,15 @@ PR quality CI blocks on:
 - `npm run verify:style-drift`
 - `npm run verify:staging-merge-integrity`
 
-Main/release coverage CI blocks on:
+Manual release coverage verification blocks on:
 
 - `npm run test:coverage`
 - `npm run verify:coverage-ratchet`
 
-Staging push CI does not run full-suite coverage on every merge. The coverage
-ratchet remains available locally and on the release path, where its slower
-single-summary artifact generation is appropriate.
+PR, staging push, and main push CI do not run full-suite coverage on every
+merge or promotion. The coverage ratchet remains available locally and as a
+manual release check, where its slower single-summary artifact generation is
+appropriate.
 
 Do not wire every verifier into PR CI. Credentialed checks such as
 `verify:stripe-prices`, browser scenario probes, release-readiness audits, and
