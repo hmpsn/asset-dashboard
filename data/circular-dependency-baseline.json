@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-25",
+  "updatedAt": "2026-06-26",
   "cycles": {
-    "server": 92,
+    "server": 89,
     "src": 10
   },
   "allowedDirectRouteDbIndexImports": [

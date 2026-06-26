@@ -1,0 +1,2 @@
+export const MIN_DECAY_BASELINE_CLICKS = 20;
+export const MIN_DECAY_ABSOLUTE_LOSS = 5;

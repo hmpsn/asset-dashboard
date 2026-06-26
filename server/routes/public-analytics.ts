@@ -51,7 +51,7 @@ import { buildSeoPromptContext } from '../intelligence/generation-context-builde
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { computeEffectiveTier, getWorkspace, getBrandName } from '../workspaces.js';
-import { getOrComputeInsights } from '../analytics-intelligence.js';
+import { getOrComputeInsights } from '../domains/analytics-intelligence/orchestrator.js';
 import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
 import type { InsightType } from '../../shared/types/analytics.js';

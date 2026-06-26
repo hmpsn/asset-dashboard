@@ -25,7 +25,7 @@ vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: () => state.flagEnabled,
 }));
 
-vi.mock('../../server/analytics-intelligence.js', () => ({
+vi.mock('../../server/domains/analytics-intelligence/orchestrator.js', () => ({
   getOrComputeInsights: state.getOrComputeInsights,
 }));
 

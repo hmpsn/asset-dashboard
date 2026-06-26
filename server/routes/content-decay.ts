@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
-import { refreshContentDecayInsights } from '../analytics-intelligence.js';
+import { refreshContentDecayInsights } from '../domains/analytics-intelligence/content-decay-refresh.js';
 import { getWorkspace } from '../workspaces.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';

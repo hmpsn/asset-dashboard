@@ -14,7 +14,7 @@ vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: () => state.
 vi.mock('../../server/workspaces.js', () => ({ listWorkspaces: () => state.workspaces }));
 vi.mock('../../server/activity-log.js', () => ({ hasRecentActivity: (ws: string) => state.recentActivity.get(ws) ?? false }));
 vi.mock('../../server/analytics-insights-store.js', () => ({ getInsights: (ws: string) => state.insights.get(ws) ?? [] }));
-vi.mock('../../server/analytics-intelligence.js', () => ({ isStale: () => state.stale }));
+vi.mock('../../server/domains/analytics-intelligence/computations.js', () => ({ isStale: () => state.stale }));
 vi.mock('../../server/intelligence-recompute-job.js', () => ({ enqueueIntelligenceRecompute: state.enqueue }));
 
 import { runDailyInsightRecompute } from '../../server/insight-recompute-cron.js';
