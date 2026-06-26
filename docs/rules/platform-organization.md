@@ -147,7 +147,7 @@ Owns content planning, briefs, matrices, post generation/review/publish, copy pi
 Owns schema generation, validation, plan/review/publish flows, CMS field mapping for schema delivery, and schema-related AI/data extraction.
 
 - Owned routes/modules:
-  `server/routes/webflow-schema.ts`, `server/routes/competitor-schema.ts`, `server/schema-store.ts`, `server/schema-plan.ts`, `server/schema-validator.ts`, `server/schema-suggester.ts`, `server/schema-generation-job.ts`, `server/schema-queue.ts`, `server/helpers.ts:buildSchemaContext`, `server/schema/`
+  `server/routes/webflow-schema.ts`, `server/routes/competitor-schema.ts`, `server/schema-store.ts`, `server/schema-plan.ts`, `server/schema-validator.ts`, `server/schema-suggester.ts`, `server/schema-generation-job.ts`, `server/schema-queue.ts`, `server/schema/context-builder.ts:buildSchemaContext`, `server/schema/`
 - Owned components/hooks/API wrappers/shared types:
   `src/components/SchemaSuggester.tsx`, `src/components/schema/`, `src/hooks/admin/useSchemaValidation.ts`, `src/components/client/SchemaReviewTab.tsx`, `src/components/client/SchemaReviewModal.tsx`, `src/api/seo.ts` for current schema-facing wrappers, `shared/types/schema-generation.ts`, `shared/types/schema-plan.ts`, `shared/types/schema-validation.ts`, `shared/types/site-inventory.ts`, `shared/types/page-elements.ts`
 - WebSocket/events:

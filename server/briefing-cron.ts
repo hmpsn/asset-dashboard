@@ -46,7 +46,7 @@ import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.j
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { listContentGaps } from './content-gaps.js';
 import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
 import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';

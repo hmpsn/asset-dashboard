@@ -15,7 +15,7 @@ import {
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
-import { sanitizeErrorMessage } from '../helpers.js';
+import { sanitizeErrorMessage } from '../utils/text.js';
 import { getWorkspace } from '../workspaces.js';
 import {
   createVoiceProfileSchema,

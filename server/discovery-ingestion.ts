@@ -5,7 +5,7 @@ import { buildIntelPrompt } from './workspace-intelligence.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
-import { sanitizeForPromptInjection } from './helpers.js';
+import { sanitizeForPromptInjection } from './utils/text.js';
 import type {
   DiscoverySource, DiscoveryExtraction, SourceType,
   ExtractionType, ExtractionCategory, Confidence, ExtractionStatus, ExtractionDestination,

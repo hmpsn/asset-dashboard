@@ -1,6 +1,7 @@
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { fireBridge } from './bridge-infrastructure.js';
-import { applySuppressionsToAudit, toAuditFindingPageId } from './helpers.js';
+import { applySuppressionsToAudit } from './seo-audit-suppressions.js';
+import { toAuditFindingPageId } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import type { SeoAuditResult } from './seo-audit.js';
 import { updatePageState, type Workspace } from './workspaces.js';

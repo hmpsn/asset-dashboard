@@ -9,7 +9,7 @@
 // in server/prompt-assembly.ts — do NOT duplicate that content here.
 import { callAI } from './ai.js';
 import { createLogger } from './logger.js';
-import { sanitizeInlinePromptText } from './helpers.js';
+import { sanitizeInlinePromptText } from './utils/text.js';
 import type { BriefingStory } from '../shared/types/briefing.js';
 
 const log = createLogger('briefing-prompt');

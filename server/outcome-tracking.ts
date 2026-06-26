@@ -29,7 +29,7 @@ import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridg
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
-import { toInsightPageId, normalizePageUrl } from './helpers.js';
+import { toInsightPageId, normalizePageUrl } from './utils/page-address.js';
 
 const log = createLogger('outcome-tracking');
 

@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword } from './keyword-intelligence/index.js';
 import { isTopicKeywordCoveredByPageMap, type KeywordStrategyCannibalizationIssue, type KeywordStrategyTopicCluster } from './keyword-strategy-enrichment.js';

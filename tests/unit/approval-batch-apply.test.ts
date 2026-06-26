@@ -49,7 +49,7 @@ vi.mock('../../server/domains/inbox/send-to-client.js', () => ({
   markDeliverableApplied: mockMarkDeliverableApplied,
 }));
 
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/utils/page-address.js', () => ({
   normalizePageUrl: mockNormalizePageUrl,
 }));
 

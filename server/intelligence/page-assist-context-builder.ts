@@ -11,7 +11,7 @@ import {
   buildWorkspaceIntelligence,
   formatForPrompt,
 } from '../workspace-intelligence.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 
 const PAGE_PROFILE_SECTIONS = ['pageProfile'] as const;
 

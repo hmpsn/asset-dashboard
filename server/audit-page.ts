@@ -4,7 +4,7 @@ import {
   stripHiddenElements,
 } from './seo-audit-html.js';
 import { computePageScore } from '../shared/scoring.js';
-import { decodeEntities } from './helpers.js';
+import { decodeEntities } from './utils/text.js';
 import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
 export type Severity = 'error' | 'warning' | 'info';
 

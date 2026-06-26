@@ -43,7 +43,7 @@ import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace, buildClientPortalUrl, computeEffectiveTier } from '../workspaces.js';
 import type { EffectiveTier } from '../workspaces.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';

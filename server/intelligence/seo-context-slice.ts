@@ -7,7 +7,7 @@ import type { StoredKeywordStrategy } from '../../shared/types/keyword-strategy.
 import type { RankEntry } from '../rank-tracking.js';
 import { getPrimaryMarketLocationCode } from '../local-seo.js';
 import { createLogger } from '../logger.js';
-import { findPageMapEntry } from '../helpers.js';
+import { findPageMapEntry } from '../utils/page-address.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import db from '../db/index.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';

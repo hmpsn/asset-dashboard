@@ -7,7 +7,8 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import { getBrandName, getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafe } from './db/json-validation.js';
-import { findPageMapEntryByIdentity, sanitizeForPromptInjection, stripCodeFences } from './helpers.js';
+import { findPageMapEntryByIdentity } from './utils/page-address.js';
+import { sanitizeForPromptInjection, stripCodeFences } from './utils/text.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { z } from './middleware/validate.js';
 import type { PageSeoResult } from './audit-page.js';

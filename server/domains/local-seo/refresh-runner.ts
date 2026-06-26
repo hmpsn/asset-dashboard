@@ -1,7 +1,7 @@
 import { addActivity } from '../../activity-log.js';
 import { fireBridge } from '../../bridge-infrastructure.js';
 import { runLocalVisibilityShiftBridge } from '../../bridge-local-visibility-shift.js';
-import { sleep } from '../../helpers.js';
+import { sleep } from '../../utils/async.js';
 import { createJob, getJob, hasActiveJob, unregisterAbort, updateJob } from '../../jobs.js';
 import { createLogger } from '../../logger.js';
 import { runRecommendationRegen } from '../../recommendation-regen-scheduler.js';

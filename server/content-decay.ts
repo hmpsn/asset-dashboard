@@ -16,7 +16,8 @@ import type { DecayingPage, DecayAnalysis } from '../shared/types/content-decay.
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { normalizePageUrl, sanitizeQueryForPrompt } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
+import { sanitizeQueryForPrompt } from './utils/text.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');

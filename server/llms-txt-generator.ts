@@ -18,7 +18,7 @@ import { listPageKeywords } from './page-keywords.js';
 import { listMatrices } from './content-matrices.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { callAI } from './ai.js';
 import { STUDIO_BOT_UA } from './constants.js';

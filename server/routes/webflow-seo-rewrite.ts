@@ -12,14 +12,8 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import { getLatestSnapshot } from '../reports.js';
 import { getQueryPageData } from '../search-console.js';
 import { isProgrammingError } from '../errors.js';
-import {
-  matchGscUrlToPath,
-  normalizePageUrl,
-  sanitizeForPromptInjection,
-  sanitizeQueryForPrompt,
-  stripCodeFences,
-  stripHtmlToText,
-} from '../helpers.js';
+import { matchGscUrlToPath, normalizePageUrl } from '../utils/page-address.js';
+import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripCodeFences, stripHtmlToText } from '../utils/text.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { resolveBaseUrl } from '../url-helpers.js';

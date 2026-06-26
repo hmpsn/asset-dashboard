@@ -24,7 +24,7 @@ import type {
 } from '../shared/types/content.ts';
 import type { ClientSignalsSlice, LearningsSlice, SeoContextSlice } from '../shared/types/intelligence.ts';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
-import { sanitizeQueryForPrompt, stripCodeFences } from './helpers.js';
+import { sanitizeQueryForPrompt, stripCodeFences } from './utils/text.js';
 import {
   evaluateKeywordCandidate,
   normalizeKeyword,

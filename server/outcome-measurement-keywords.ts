@@ -25,7 +25,7 @@ import {
   STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,
   strategyPageKeywordSourceId,
 } from './outcome-tracking.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { BaselineSnapshot, TrackedAction } from '../shared/types/outcome-tracking.js';
 
 const log = createLogger('outcome-measurement-keywords');

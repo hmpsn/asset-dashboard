@@ -48,7 +48,7 @@ import { queueKeywordStrategyPostUpdateFollowOns } from '../../keyword-strategy-
 import { recordAction, getActionByWorkspaceAndSource } from '../../outcome-tracking.js';
 import { resolveContentRecommendationsForPublishedPost } from '../recommendations/resolution-service.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
-import { normalizePageUrl } from '../../helpers.js';
+import { normalizePageUrl } from '../../utils/page-address.js';
 import { createLogger } from '../../logger.js';
 import type { GeneratedPost } from '../../../shared/types/content.js';
 import type { Workspace } from '../../../shared/types/workspace.js';

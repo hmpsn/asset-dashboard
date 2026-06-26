@@ -45,7 +45,7 @@ vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: vi.fn().mockReturnValue([]),
 }));
 
-import { buildSchemaContext } from '../../server/helpers.js';
+import { buildSchemaContext } from '../../server/schema/context-builder.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { getDeclinedKeywords } from '../../server/keyword-feedback.js';
 import { listWorkspaces } from '../../server/workspaces.js';

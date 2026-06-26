@@ -19,7 +19,7 @@ import {
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
 import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin, SeoDataStatus } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';

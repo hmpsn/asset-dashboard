@@ -1,6 +1,6 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { z } from 'zod';
 import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';

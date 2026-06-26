@@ -30,7 +30,7 @@ import type {
 } from '../shared/types/outcome-tracking.js';
 import { isProgrammingError } from './errors.js';
 import { getPageKeyword } from './page-keywords.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 
 const log = createLogger('outcome-measurement');
 

@@ -1,4 +1,5 @@
-import { resolvePagePath, stripHtmlToText, decodeEntities } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
+import { stripHtmlToText, decodeEntities } from './utils/text.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { discoverSitemapUrls } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';

@@ -16,7 +16,7 @@ import { listPageKeywords } from '../../page-keywords.js';
 import { getAllGscPages, getQueryPageData } from '../../search-console.js';
 import { workspaceProviderGeo } from '../../seo-target-geo.js';
 import { createLogger } from '../../logger.js';
-import { toInsightPageId } from '../../helpers.js';
+import { toInsightPageId } from '../../utils/page-address.js';
 import { getWorkspace } from '../../workspaces.js';
 import { MIN_DECAY_ABSOLUTE_LOSS, MIN_DECAY_BASELINE_CLICKS } from './constants.js';
 import {

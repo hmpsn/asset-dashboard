@@ -1,4 +1,6 @@
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl } from './helpers.js';
+import { applySuppressionsToAudit } from './seo-audit-suppressions.js';
+import { getAuditTrafficForWorkspace } from './audit-traffic.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { getLatestSnapshot } from './reports.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { listPageKeywords } from './page-keywords.js';

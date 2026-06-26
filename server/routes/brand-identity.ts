@@ -14,7 +14,7 @@ import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.
 import { getWorkspace } from '../workspaces.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { aiLimiter } from '../middleware.js';
-import { sanitizeErrorMessage } from '../helpers.js';
+import { sanitizeErrorMessage } from '../utils/text.js';
 
 const router = Router();
 

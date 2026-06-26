@@ -5018,9 +5018,9 @@ describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag server/helpers.ts (canonical implementation)', () => {
+  it('does NOT flag server/utils/page-address.ts (canonical implementation)', () => {
     const file = write(
-      uniqPath('rule-bare-slug', 'server/helpers.ts'),
+      uniqPath('rule-bare-slug', 'server/utils/page-address.ts'),
       lines(
         'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
         '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
@@ -5109,9 +5109,9 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag server/helpers.ts (excluded — canonical implementation)', () => {
+  it('does NOT flag server/utils/page-address.ts (excluded — canonical implementation)', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/helpers.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/utils/page-address.ts'),
       lines(
         'const basePath = resolvePagePath(page) || undefined;',
       )
@@ -8886,25 +8886,25 @@ describe('Rule: stat-primitive-bypass-signal', () => {
 // Rule: schema-context-direct-read-not-on-allowlist
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
+// Brace-walks buildSchemaContext in server/schema/context-builder.ts, skipping identity
 // fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch,
 // siteId), and supporting legacy hatches for non-identity reads except migrated
 // forbidden fields (`ws.brandVoice`, `ws.keywordStrategy`, `ws.businessProfile`).
 //
-// The fixture files are placed at a path ending in `server/helpers.ts` so
-// the rule's `file.endsWith('server/helpers.ts')` guard accepts them.
+// The fixture files are placed at a path ending in `server/schema/context-builder.ts` so
+// the rule's `file.endsWith('server/schema/context-builder.ts')` guard accepts them.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   const RULE = 'schema-context-direct-read-not-on-allowlist';
 
-  // Write a minimal helpers.ts fixture at a path ending in server/helpers.ts.
+  // Write a minimal schema context fixture at a path ending in server/schema/context-builder.ts.
   // The function signature spans 3 lines (matching the real file's multi-line
   // return type) so the paren+angle body-opener logic is exercised.
-  function writeHelpers(subdir: string, bodyLines: string): string {
+  function writeSchemaContext(subdir: string, bodyLines: string): string {
     return write(
-      `${subdir}/server/helpers.ts`,
+      `${subdir}/server/schema/context-builder.ts`,
       lines(
         'export async function buildSchemaContext(',
         '  siteId: string,',
@@ -8918,7 +8918,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   }
 
   it('flags a non-allowlist ws.* read with no hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'trigger'),
       '  ctx.foo = ws.gscPropertyUrl;',
     );
@@ -8928,7 +8928,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('does NOT flag allowlisted identity reads (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId)', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'allowlist-neg'),
       lines(
         '  ctx.companyName = ws.name;',
@@ -8944,7 +8944,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('respects inline // schema-context-direct-read-ok hatch on the same line', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'hatch-inline'),
       '  ctx.foo = ws.gscPropertyUrl; // schema-context-direct-read-ok: legacy',
     );
@@ -8953,7 +8953,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('respects // schema-context-direct-read-ok hatch on the line immediately above', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'hatch-above'),
       lines(
         '  // schema-context-direct-read-ok: legacy; tracked in roadmap',
@@ -8964,7 +8964,29 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     expect(hits).toHaveLength(0);
   });
 
-  it('does NOT scan files that do not end in server/helpers.ts', () => {
+  it('flags awaited listSitesCached and ws.* argument reads without hatch', () => {
+    const file = writeSchemaContext(
+      uniqPath('rule-schema-ctx', 'await-helper-trigger'),
+      '  const sites = await listSitesCached(ws.webflowToken || undefined);',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('listSitesCached');
+  });
+
+  it('allows documented Webflow locale token reads with schema-context hatch', () => {
+    const file = writeSchemaContext(
+      uniqPath('rule-schema-ctx', 'await-helper-hatch'),
+      lines(
+        '  // schema-context-direct-read-ok: Webflow token selects workspace-scoped locale source',
+        '  const sites = await listSitesCached(ws.webflowToken || undefined);',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does NOT scan files that do not end in server/schema/context-builder.ts', () => {
     const file = write(
       uniqPath('rule-schema-ctx', 'wrong-file.ts'),
       lines(
@@ -8978,7 +9000,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.brandVoice even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-brandvoice'),
       '  ctx.brandVoice = ws.brandVoice; // schema-context-direct-read-ok: legacy',
     );
@@ -8988,7 +9010,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.keywordStrategy path even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-keywordstrategy'),
       '  ctx.businessContext = ws.keywordStrategy?.businessContext; // schema-context-direct-read-ok: legacy',
     );
@@ -8998,7 +9020,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.businessProfile even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-businessprofile'),
       '  ctx._businessProfile = ws.businessProfile; // schema-context-direct-read-ok: legacy',
     );

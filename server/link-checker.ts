@@ -1,10 +1,10 @@
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { webflowFetch } from './webflow-client.js';
-import { fetchPublishedHtml } from './helpers.js';
+import { fetchPublishedHtml } from './published-html.js';
 import { extractLinks as extractHtmlLinks } from './html-analysis-utils.js';
 
 const log = createLogger('link-checker');

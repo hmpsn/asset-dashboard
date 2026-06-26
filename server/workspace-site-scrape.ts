@@ -2,7 +2,7 @@ import type { Workspace } from './workspaces.js';
 import type { ScrapedPage } from './web-scraper.js';
 import type * as WebScraper from './web-scraper.js';
 import { isProgrammingError } from './errors.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { discoverSitemapUrls } from './webflow.js';

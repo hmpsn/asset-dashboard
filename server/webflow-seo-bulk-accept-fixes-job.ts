@@ -6,7 +6,7 @@ import { recordSeoChange } from './seo-change-tracker.js';
 import { updatePageSeo } from './webflow.js';
 import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { resolveRecommendationsForChange } from './domains/recommendations/resolution-service.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';

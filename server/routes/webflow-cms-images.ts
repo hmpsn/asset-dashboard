@@ -10,7 +10,7 @@ import { createLogger } from '../logger.js';
 import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '../../shared/types/cms-images.ts';
 import { isProgrammingError } from '../errors.js';
 import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
-import { toInsightPageId } from '../helpers.js';
+import { toInsightPageId } from '../utils/page-address.js';
 
 const router = Router();
 const log = createLogger('webflow-cms-images');

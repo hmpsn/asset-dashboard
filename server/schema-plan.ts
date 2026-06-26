@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { SCHEMA_ROLE_PRIMARY_TYPE, type SchemaSitePlan, type CanonicalEntity, type PageRoleAssignment, type SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callAI } from './ai.js';
-import { normalizePageUrl, resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
+import { normalizePageUrl, resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';

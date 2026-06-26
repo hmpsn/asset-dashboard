@@ -1,4 +1,4 @@
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 
 /**
  * Deterministic URL → schema.org @type classifier.

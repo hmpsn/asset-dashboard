@@ -6,7 +6,7 @@ import { classifyPage } from './classifier.js';
 import type { PageKind } from './classifier.js';
 import type { WebflowPage } from '../webflow-pages.js';
 import type { CanonicalEntity } from '../../shared/types/schema-plan.js';
-import { resolvePagePath } from '../helpers.js';
+import { resolvePagePath } from '../utils/page-address.js';
 
 export interface SiteContextPage {
   /** URL path segment, e.g. '/services/design' */

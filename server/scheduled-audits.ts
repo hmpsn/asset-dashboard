@@ -6,7 +6,7 @@ import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from './audit-snapshot-views.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
-import { toAuditFindingPageId } from './helpers.js';
+import { toAuditFindingPageId } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';

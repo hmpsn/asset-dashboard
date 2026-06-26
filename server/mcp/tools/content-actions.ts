@@ -42,7 +42,7 @@ import {
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
-import { sanitizeInlinePromptText } from '../../helpers.js';
+import { sanitizeInlinePromptText } from '../../utils/text.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
 import { createLogger } from '../../logger.js';

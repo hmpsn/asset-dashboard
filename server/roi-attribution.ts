@@ -22,7 +22,7 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 const log = createLogger('roi-attribution');
 

@@ -21,7 +21,7 @@ import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } 
 import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';

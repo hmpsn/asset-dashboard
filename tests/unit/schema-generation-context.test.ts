@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   logWarn: vi.fn(),
 }));
 
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/schema/context-builder.js', () => ({
   buildSchemaContext: mocks.buildSchemaContext,
 }));
 

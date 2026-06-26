@@ -23,8 +23,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../server/bridge-infrastructure.js', () => ({ fireBridge: mocks.fireBridge }));
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/seo-audit-suppressions.js', () => ({
   applySuppressionsToAudit: mocks.applySuppressionsToAudit,
+}));
+vi.mock('../../server/utils/page-address.js', () => ({
   toAuditFindingPageId: mocks.toAuditFindingPageId,
 }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.logger) }));

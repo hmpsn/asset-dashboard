@@ -6,7 +6,7 @@ import type {
   WholeSiteSchemaGraphNode,
   WholeSiteSchemaGraphValidationResult,
 } from '../../shared/types/schema-validation.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 
 export interface WholeSiteSchemaGraphInput {
   pages: SchemaPageSuggestion[];
