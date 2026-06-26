@@ -6237,7 +6237,7 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
 describe('Rule: Keyword Command Center summary/detail must not use full model', () => {
   it('flags summary/detail calling the full model builder', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/summary-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
         '  return buildKeywordCommandCenterModel(workspaceId);',
@@ -6254,7 +6254,7 @@ describe('Rule: Keyword Command Center summary/detail must not use full model', 
 
   it('accepts skinny summary/detail implementations', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/detail-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
         '  return buildSummaryCounts(workspaceId);',
@@ -6274,7 +6274,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('flags ungated Evaluated candidate generation in command center read paths', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6288,7 +6288,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('does NOT flag the cheap default buildLocalSeoKeywordCandidates', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidates(workspaceId);',
@@ -6300,9 +6300,9 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('accepts Evaluated generation in the explicit local-candidate path', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/model-service.ts'),
       lines(
-        'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
+        'export async function buildKeywordCommandCenterModel(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
@@ -6312,7 +6312,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('accepts an explicit temporary hatch for selected-keyword detail fallback', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/detail-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
         '  // local-candidates-evaluated-ok: explicit selected keyword fallback',
@@ -6325,7 +6325,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('does not let an allowlisted function name leak into later helpers', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6342,7 +6342,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('flags ungated arrow-function Evaluated generation', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'const buildKeywordCommandCenterRowsSkinny = async (workspaceId: string) => {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6356,7 +6356,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('does not let a one-line allowlisted arrow declaration leak scope', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'const buildKeywordCommandCenterRowsViaModel = () => 1;',
         'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',

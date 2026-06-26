@@ -2,6 +2,15 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import {
+  buildKeywordCommandCenterDetail as facadeBuildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterRows as facadeBuildKeywordCommandCenterRows,
+  buildKeywordCommandCenterSummary as facadeBuildKeywordCommandCenterSummary,
+} from '../../server/keyword-command-center.js';
+import { buildKeywordCommandCenterDetail } from '../../server/domains/keyword-command-center/detail-service.js';
+import { buildKeywordCommandCenterRows } from '../../server/domains/keyword-command-center/rows-service.js';
+import { buildKeywordCommandCenterSummary } from '../../server/domains/keyword-command-center/summary-service.js';
+
 const repoRoot = new URL('../../', import.meta.url);
 
 function readRepoFile(relativePath: string): string {
@@ -68,6 +77,8 @@ describe('keyword command center domain boundary', () => {
   it('keeps keyword feedback persistence in the domain store module', () => {
     const facade = readRepoFile('server/keyword-command-center.ts');
     const feedbackStore = readRepoFile('server/domains/keyword-command-center/feedback-store.ts');
+    const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
+    const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
 
     for (const helper of [
       'readFeedbackRows',
@@ -79,7 +90,8 @@ describe('keyword command center domain boundary', () => {
       expect(feedbackStore).toMatch(new RegExp(`function ${helper}\\b`));
     }
 
-    expect(facade).toContain("from './domains/keyword-command-center/feedback-store.js'");
+    expect(rowsService).toContain("from './feedback-store.js'");
+    expect(detailService).toContain("from './feedback-store.js'");
     expect(feedbackStore).toContain('keyword_feedback');
     expect(feedbackStore).toContain('createStmtCache');
   });
@@ -87,6 +99,8 @@ describe('keyword command center domain boundary', () => {
   it('keeps bundle filtering helpers in the domain module', () => {
     const facade = readRepoFile('server/keyword-command-center.ts');
     const bundleFilters = readRepoFile('server/domains/keyword-command-center/bundle-filters.ts');
+    const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
+    const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
 
     for (const helper of [
       'addStrategyKeys',
@@ -103,7 +117,8 @@ describe('keyword command center domain boundary', () => {
       expect(bundleFilters).toMatch(new RegExp(`function ${helper}\\b`));
     }
 
-    expect(facade).toContain("from './domains/keyword-command-center/bundle-filters.js'");
+    expect(rowsService).toContain("from './bundle-filters.js'");
+    expect(detailService).toContain("from './bundle-filters.js'");
     expect(bundleFilters).toContain('createVariantParentIndex');
     expect(bundleFilters).toContain('keywordComparisonKey');
   });
@@ -254,5 +269,38 @@ describe('keyword command center domain boundary', () => {
     expect(detailService).toContain('getScoredOutcomeReadbacks');
     expect(detailService).toContain('filterStrategyForSingleKeyword');
     expect(detailService).toContain('finalizeDraftRow');
+  });
+
+  it('keeps rows and full-model read assembly in domain services with facade re-export only', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
+    const modelService = readRepoFile('server/domains/keyword-command-center/model-service.ts');
+
+    for (const helper of [
+      'buildKeywordCommandCenterRows',
+      'buildKeywordCommandCenterRowsSkinny',
+      'buildKeywordCommandCenterRowsViaModel',
+      'buildFilteredBundle',
+      'localVisibilityByFilter',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+    }
+    expect(facade).not.toMatch(/createLogger\('keyword-command-center'\)/);
+    expect(facade).toContain('  buildKeywordCommandCenterRows,');
+    expect(facade).toContain("from './domains/keyword-command-center/rows-service.js'");
+    expect(rowsService).toMatch(/export async function buildKeywordCommandCenterRows\b/);
+    expect(rowsService).toContain('buildKeywordCommandCenterModel');
+    expect(rowsService).toContain('rowCandidateKeysForQuery');
+    expect(rowsService).toContain('filterBundleToKeys');
+    expect(modelService).toMatch(/export async function buildKeywordCommandCenterModel\b/);
+    expect(modelService).toContain('buildLocalSeoKeywordCandidates');
+    expect(modelService).toContain('LOCAL_CANDIDATE_ROW_LIMIT');
+    expect(modelService).toContain('finalizeDraftRows');
+  });
+
+  it('keeps facade read exports as direct domain service re-exports', () => {
+    expect(facadeBuildKeywordCommandCenterRows).toBe(buildKeywordCommandCenterRows);
+    expect(facadeBuildKeywordCommandCenterSummary).toBe(buildKeywordCommandCenterSummary);
+    expect(facadeBuildKeywordCommandCenterDetail).toBe(buildKeywordCommandCenterDetail);
   });
 });
