@@ -43,11 +43,11 @@ Each checkpoint in `data/platform-health-cadence.json` must include:
 1. Run `npm run verify:platform-health-cadence`.
 2. If due window is open (or overdue), scope the checkpoint with 1-3 high-impact platform-health items.
 3. Ship the items as normal PRs to `staging`.
-4. Add/update checkpoint metrics and evidence in `data/platform-health-cadence.json`.
-5. Re-run `npm run verify:platform-health-cadence` and include the output summary in PR notes.
+4. After each PR merges green, fetch fresh `origin/staging` and reread `data/roadmap.json` before selecting the next item. Newly added pending checkpoints, especially side-audit items such as import-cycle SCC review, must be carried into the next batch or explicitly deferred in PR notes.
+5. Add/update checkpoint metrics and evidence in `data/platform-health-cadence.json`.
+6. Re-run `npm run verify:platform-health-cadence` and include the output summary in PR notes.
 
 ## Escalation Rules
 
 - If `overdue: yes`, open/priority-tag a platform-health roadmap item in the current sprint.
 - If `oversizedModulesAfter > oversizedModulesBefore` or `ownershipGapsAfter > ownershipGapsBefore`, do not close the checkpoint without explicit owner sign-off and corrective follow-up items.
-
