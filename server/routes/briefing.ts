@@ -31,7 +31,7 @@ import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
-import { buildBriefingClientView } from '../briefing-client-projection.js';
+import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { mirrorBriefingToDeliverable } from '../domains/inbox/briefing-dual-write.js';
 
 const log = createLogger('routes:briefing');
@@ -261,7 +261,7 @@ router.get(
   (req, res) => {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'workspace not found' });
-    const briefing = buildBriefingClientView(ws.id);
+    const briefing = buildClientBriefingView(ws.id);
     res.json({ briefing });
   },
 );
