@@ -1,537 +1,85 @@
-import { useState, useEffect, useRef, useDeferredValue } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ApiError, get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
 import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState, StatusBadge } from './ui';
 import { formatDate } from '../utils/formatDates';
 import type { FixContext } from '../App';
-import type { ContentBrief, ContentGenerationStyle, ContentTopicRequest, PostSummary } from '../../shared/types/content';
-import { DEFAULT_CONTENT_GENERATION_STYLE } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
-import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList, useAdminBriefTemplateCrossref } from '../hooks/admin';
-import { queryKeys } from '../lib/queryKeys';
-import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-import { attachTrackedJob } from '../lib/background-job-helpers';
-import { useToast } from './Toast';
-
-/** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
- *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
-const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
-type BriefRoute = typeof BRIEF_ROUTES[number];
+import { useAdminBriefWorkflow, type BriefSortField } from '../hooks/admin/useAdminBriefWorkflow';
 
 export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { workspaceId: string; fixContext?: FixContext | null; clearFixContext?: () => void }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { trackJob, jobs } = useBackgroundTasks();
-  const [keyword, setKeyword] = useState('');
-  const deferredKeyword = useDeferredValue(keyword);
-  const briefsQ = useAdminBriefsList(workspaceId);
-  const requestsQ = useAdminRequestsList(workspaceId);
-  const postsQ = useAdminPostsList(workspaceId);
-  const templateCrossrefQ = useAdminBriefTemplateCrossref(workspaceId, deferredKeyword);
-  const briefs = (briefsQ.data ?? []) as ContentBrief[];
-  const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
-  const posts = (postsQ.data ?? []) as PostSummary[];
-  const templateCrossref = templateCrossrefQ.data ?? null;
-  // Include postsQ — RequestList uses posts to decide between "Generate Post" and
-  // "Open Post" buttons. If posts hasn't loaded yet we'd mistakenly show "Generate
-  // Post" for briefs that already have one, causing duplicate post creation on click.
-  const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
-  const hasBlockingQueryError =
-    (briefsQ.isError || requestsQ.isError || postsQ.isError) &&
-    briefs.length === 0 &&
-    clientRequests.length === 0 &&
-    posts.length === 0;
-
-  const [generating, setGenerating] = useState(false);
-  const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
-  const [pendingStandaloneBriefJobId, setPendingStandaloneBriefJobId] = useState<string | null>(null);
-  const [pendingRequestBriefJob, setPendingRequestBriefJob] = useState<{ jobId: string; requestId: string } | null>(null);
-  const [businessCtx, setBusinessCtx] = useState('');
-  const [generationStyle, setGenerationStyle] = useState<ContentGenerationStyle>(DEFAULT_CONTENT_GENERATION_STYLE);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
-  const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
-  const [briefError, setBriefError] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  const [briefSearch, setBriefSearch] = useState('');
-
-  // ── fixContext lifecycle (3 refs, 3 effects) ──
-  //
-  // When the user navigates here from Page Intelligence or Content Gaps, fixContext
-  // carries the page/keyword context. Three refs coordinate consumption:
-  //
-  //   fixContextRef   — snapshot of fixContext for handleGenerate to read after
-  //                     clearFixContext() nulls the prop. Cleared after first generation
-  //                     so subsequent manual briefs don't inherit stale page data.
-  //
-  //   fixConsumed     — ensures the keyword/pageType pre-fill runs exactly once per
-  //                     navigation, even if fixContext re-renders before being cleared.
-  //
-  //   autoGenTriggered — gates the auto-generate effect so it fires once after keyword
-  //                     is set, only when fixContext.autoGenerate was true.
-  //
-  // All three are guarded on BRIEF_ROUTES to ignore stale fixContext from other tabs.
-
-  const fixContextRef = useRef<FixContext | null | undefined>(null);
-  useEffect(() => {
-    if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
-      fixContextRef.current = fixContext;
-    }
-  }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fixConsumed = useRef(false);
-  useEffect(() => {
-    if (fixContext && !fixConsumed.current && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
-      fixConsumed.current = true;
-      const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
-      if (prefill) setKeyword(prefill.replace(/-/g, ' '));
-      if (fixContext.pageType) setPageType(fixContext.pageType);
-      clearFixContext?.();
-    }
-  }, [fixContext]);
-
-  const autoGenTriggered = useRef(false);
-  useEffect(() => {
-    if (fixContextRef.current?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
-      autoGenTriggered.current = true;
-      handleGenerate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword]);
-
-  function extractGeneratedBriefResult(result: unknown): { brief?: ContentBrief; briefId?: string; requestId?: string } | null {
-    if (!result || typeof result !== 'object') return null;
-    const candidate = result as { brief?: unknown; briefId?: unknown; requestId?: unknown };
-    return {
-      brief: candidate.brief && typeof candidate.brief === 'object' ? candidate.brief as ContentBrief : undefined,
-      briefId: typeof candidate.briefId === 'string' ? candidate.briefId : undefined,
-      requestId: typeof candidate.requestId === 'string' ? candidate.requestId : undefined,
-    };
-  }
-
-  async function startBriefGenerationJob(params: Record<string, unknown>): Promise<string | null> {
-    try {
-      const data = await post<{ jobId?: string }>('/api/jobs', {
-        type: BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION,
-        params,
-      });
-      if (!data.jobId) return null;
-      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, data.jobId, params);
-      return data.jobId;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        toast('A content brief is already being generated for this workspace.', 'error');
-        return null;
-      }
-      throw err;
-    }
-  }
-
-  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
-  useEffect(() => {
-    if (!pendingStandaloneBriefJobId) return;
-    const job = jobs.find(j => j.id === pendingStandaloneBriefJobId);
-    if (!job) return;
-    if (job.status === 'done') {
-      const result = extractGeneratedBriefResult(job.result);
-      if (result?.brief) {
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
-        setKeyword('');
-        setExpanded(result.brief.id);
-        fixContextRef.current = null;
-      }
-      setPendingStandaloneBriefJobId(null);
-      setGenerating(false);
-    } else if (job.status === 'error' || job.status === 'cancelled') {
-      setError(job.error || 'Failed to generate brief');
-      setPendingStandaloneBriefJobId(null);
-      setGenerating(false);
-    }
-  }, [jobs, pendingStandaloneBriefJobId, queryClient, workspaceId]);
-
-  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
-  useEffect(() => {
-    if (!pendingRequestBriefJob) return;
-    const job = jobs.find(j => j.id === pendingRequestBriefJob.jobId);
-    if (!job) return;
-    if (job.status === 'done') {
-      const result = extractGeneratedBriefResult(job.result);
-      if (result?.brief) {
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
-        queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === pendingRequestBriefJob.requestId ? { ...r, status: 'brief_generated' as const, briefId: result.brief!.id } : r));
-        setExpandedRequest(pendingRequestBriefJob.requestId);
-      }
-      setGeneratingBriefFor(null);
-      setPendingRequestBriefJob(null);
-    } else if (job.status === 'error' || job.status === 'cancelled') {
-      toast(job.error || 'Failed to generate brief', 'error');
-      setGeneratingBriefFor(null);
-      setPendingRequestBriefJob(null);
-    }
-  }, [jobs, pendingRequestBriefJob, queryClient, toast, workspaceId]);
-
-  // Job IDs for regen operations that switched to the async background-job contract (W6.2).
-  // When set, we watch jobs[] for completion and clear the corresponding regenerating* state.
-  const [regenBriefJobId, setRegenBriefJobId] = useState<{ jobId: string; briefId: string; requestId?: string } | null>(null);
-  const [regenOutlineJobId, setRegenOutlineJobId] = useState<{ jobId: string; briefId: string } | null>(null);
-
-  // Watch for brief-regen job completion (W6.2 async contract).
-  // The BRIEF_UPDATED broadcast from the server invalidates the briefs query automatically
-  // via wsInvalidation; here we just clear local spinner state and expand the new brief.
-  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
-  useEffect(() => {
-    if (!regenBriefJobId) return;
-    const job = jobs.find(j => j.id === regenBriefJobId.jobId);
-    if (!job) return;
-    if (job.status === 'done') {
-      const result = extractGeneratedBriefResult(job.result);
-      if (result?.brief) {
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [result.brief!, ...(old ?? [])]);
-        setExpanded(result.brief.id);
-        if (regenBriefJobId.requestId) {
-          void handleUpdateRequestStatus(regenBriefJobId.requestId, undefined, { briefId: result.brief.id });
-        }
-      }
-      setRegenBriefJobId(null);
-      setRegeneratingBrief(null);
-    } else if (job.status === 'error' || job.status === 'cancelled') {
-      toast(job.error || 'Failed to regenerate brief', 'error');
-      setRegenBriefJobId(null);
-      setRegeneratingBrief(null);
-    }
-  }, [jobs, regenBriefJobId, queryClient, toast, workspaceId]); // eslint-disable-line react-hooks/exhaustive-deps -- handleUpdateRequestStatus is stable; including it would require memo
-
-  // Watch for outline-regen job completion (W6.2 async contract).
-  // effect-layout-ok — reacts to async background job completion, not first-paint layout derivation.
-  useEffect(() => {
-    if (!regenOutlineJobId) return;
-    const job = jobs.find(j => j.id === regenOutlineJobId.jobId);
-    if (!job) return;
-    if (job.status === 'done') {
-      const result = extractGeneratedBriefResult(job.result);
-      if (result?.brief) {
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === regenOutlineJobId!.briefId ? result.brief! : b));
-      }
-      setRegenOutlineJobId(null);
-      setRegeneratingOutline(null);
-    } else if (job.status === 'error' || job.status === 'cancelled') {
-      toast(job.error || 'Failed to regenerate outline', 'error');
-      setRegenOutlineJobId(null);
-      setRegeneratingOutline(null);
-    }
-  }, [jobs, regenOutlineJobId, queryClient, toast, workspaceId]);
-
-  const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
-  const [editingBrief, setEditingBrief] = useState<string | null>(null);
-  const [activePostId, setActivePostId] = useState<string | null>(null);
-  const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
-  const [regeneratingBrief, setRegeneratingBrief] = useState<string | null>(null);
-  const [regeneratingOutline, setRegeneratingOutline] = useState<string | null>(null);
-  const [sendingToClient, setSendingToClient] = useState<string | null>(null);
-  const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
-  const [deliveryUrl, setDeliveryUrl] = useState('');
-  const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [pageType, setPageType] = useState('');
-  const [refUrls, setRefUrls] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    if (!templateCrossref?.pageType) return;
-    if (!pageType) {
-      setPageType(templateCrossref.pageType);
-    }
-  }, [templateCrossref?.pageType, pageType]);
-
-  // W6.2: POST .../regenerate-outline always returns 202 { jobId } — sync fallback removed.
-  const handleRegenerateOutline = async (briefId: string, feedback?: string) => {
-    setRegeneratingOutline(briefId);
-    try {
-      const res = await post<{ jobId: string }>(
-        `/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback }
-      );
-      // Job was enqueued; watcher effect will clear state on completion.
-      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
-      setRegenOutlineJobId({ jobId: res.jobId, briefId });
-      // Do NOT clear regeneratingOutline here — the watcher clears it.
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to regenerate outline', 'error');
-      setRegeneratingOutline(null);
-    }
-  };
-
-  // W6.2: POST .../regenerate always returns 202 { jobId } — sync fallback removed.
-  const handleRegenerateBrief = async (briefId: string, feedback: string, requestId?: string) => {
-    setRegeneratingBrief(briefId);
-    try {
-      const res = await post<{ jobId: string }>(
-        `/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback }
-      );
-      // Job was enqueued; watcher effect handles result + state clear.
-      trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
-      setRegenBriefJobId({ jobId: res.jobId, briefId, requestId });
-      // Do NOT clear regeneratingBrief here — the watcher clears it.
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to regenerate brief', 'error');
-      setRegeneratingBrief(null);
-    }
-  };
-
-  const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
-    try {
-      const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      // auto-save degradation — field reverts to server value on next refetch; no toast (background, user-unaware)
-    }
-  };
-
-  const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
-
-  const toggleRequestBrief = async (reqId: string, briefId: string) => {
-    if (expandedRequest === reqId) { setExpandedRequest(null); setBriefError(null); return; }
-    setBriefError(null);
-    // If brief already in local state, just expand
-    if (getBriefById(briefId)) { setExpandedRequest(reqId); return; }
-    // Not in local state — try fetching individually
-    setLoadingBrief(reqId);
-    try {
-      const url = `/api/content-briefs/${workspaceId}/${briefId}`;
-      try {
-        const brief = await get<ContentBrief>(url);
-        queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [brief, ...(old ?? []).filter(b => b.id !== brief.id)]);
-        setLoadingBrief(null);
-        setExpandedRequest(reqId);
-        return;
-      } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-        // Individual fetch failed — try refetching the full list as fallback
-        try {
-          const allBriefs = await getSafe<ContentBrief[]>(`/api/content-briefs/${workspaceId}`, []);
-          if (Array.isArray(allBriefs)) {
-            queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), allBriefs);
-            const found = allBriefs.find((b: ContentBrief) => b.id === briefId);
-            if (found) {
-              setLoadingBrief(null);
-              setExpandedRequest(reqId);
-              return;
-            }
-          }
-        } catch (err) { console.error('ContentBriefs operation failed:', err); }
-      }
-      setBriefError(`Brief "${briefId}" not found. The brief may have been lost after a server restart. Try regenerating.`);
-      setExpandedRequest(reqId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setBriefError(`Network error loading brief: ${msg}`);
-      setExpandedRequest(reqId);
-    }
-    setLoadingBrief(null);
-  };
-
-  const handleDeleteRequest = async (reqId: string) => {
-    try {
-      await del(`/api/content-requests/${workspaceId}/${reqId}`);
-      queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).filter(r => r.id !== reqId));
-      if (expandedRequest === reqId) setExpandedRequest(null);
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to delete request', 'error');
-    }
-  };
-
-  const copyAsMarkdown = (b: ContentBrief) => {
-    const lines: string[] = [
-      `# Content Brief: ${b.targetKeyword}`,
-      '',
-      `**Write a ${b.wordCountTarget}-word ${b.contentFormat || 'article'} targeting "${b.targetKeyword}".**`,
-      '',
-    ];
-    if (b.executiveSummary) lines.push(`## Strategic Context`, b.executiveSummary, '');
-    lines.push(`## Title`, b.suggestedTitle, '', `## Meta Description`, b.suggestedMetaDesc, '');
-    if (b.toneAndStyle) lines.push(`## Tone & Style`, b.toneAndStyle, '');
-    lines.push(`## Target Audience`, b.audience, '');
-    lines.push(`## Search Intent`, b.intent, '');
-    if (b.secondaryKeywords.length) lines.push(`## Keywords to Include`, b.secondaryKeywords.map(k => `- ${k}`).join('\n'), '');
-    if (b.topicalEntities?.length) lines.push(`## Topical Entities to Cover`, b.topicalEntities.map(e => `- ${e}`).join('\n'), '');
-    if (b.peopleAlsoAsk?.length) lines.push(`## Questions to Answer`, b.peopleAlsoAsk.map((q, i) => `${i + 1}. ${q}`).join('\n'), '');
-    if (b.outline.length) {
-      lines.push(`## Content Outline`);
-      b.outline.forEach(s => {
-        lines.push(`### ${s.heading}${s.wordCount ? ` (~${s.wordCount} words)` : ''}`);
-        lines.push(s.notes);
-        if (s.keywords?.length) lines.push(`*Keywords: ${s.keywords.join(', ')}*`);
-        lines.push('');
-      });
-    }
-    if (b.ctaRecommendations?.length) lines.push(`## CTAs`, b.ctaRecommendations.map((c, i) => `- **${i === 0 ? 'Primary' : 'Secondary'}:** ${c}`).join('\n'), '');
-    if (b.competitorInsights) lines.push(`## Competitor Insights`, b.competitorInsights, '');
-    if (b.internalLinkSuggestions.length) lines.push(`## Internal Links to Include`, b.internalLinkSuggestions.map(l => `- /${l}`).join('\n'), '');
-    if (b.serpAnalysis) {
-      lines.push(`## SERP Analysis`);
-      lines.push(`- Content type: ${b.serpAnalysis.contentType}`);
-      lines.push(`- Avg word count: ${b.serpAnalysis.avgWordCount}`);
-      if (b.serpAnalysis.gaps.length) lines.push(`- Gaps to exploit: ${b.serpAnalysis.gaps.join('; ')}`);
-      lines.push('');
-    }
-    navigator.clipboard.writeText(lines.join('\n'));
-  };
-
-  const exportClientHTML = (b: ContentBrief) => {
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write('<p style="font-family:sans-serif;padding:40px">Loading PDF preview…</p>');
-    getText(`/api/content-briefs/${workspaceId}/${b.id}/export`)
-      .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
-      .catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${b.id}/export`; });
-  };
-
-  const handleSendToClient = async (b: ContentBrief, note?: string) => {
-    setSendingToClient(b.id);
-    try {
-      const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`, note ? { note } : {});
-      if (result.ok) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
-        toast('Brief sent to client');
-      }
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast('Failed to send brief to client', 'error');
-    }
-    setSendingToClient(null);
-  };
-
-
-  const handleGenerateBriefForRequest = async (req: ContentTopicRequest, selectedGenerationStyle?: ContentGenerationStyle) => {
-    setGeneratingBriefFor(req.id);
-    try {
-      const jobId = await startBriefGenerationJob({
-        workspaceId,
-        requestId: req.id,
-        generationStyle: selectedGenerationStyle ?? generationStyle,
-      });
-      if (jobId) {
-        setPendingRequestBriefJob({ jobId, requestId: req.id });
-      } else {
-        setGeneratingBriefFor(null);
-      }
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to start brief generation', 'error');
-      setGeneratingBriefFor(null);
-    }
-  };
-
-  const handleGeneratePost = async (briefId: string, selectedGenerationStyle?: ContentGenerationStyle): Promise<boolean> => {
-    setGeneratingPostFor(briefId);
-    try {
-      const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, {
-        briefId,
-        generationStyle: selectedGenerationStyle,
-      });
-      if (skeleton.jobId) {
-        attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
-      }
-      queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
-      setActivePostId(skeleton.id);
-      return true;
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to generate post', 'error');
-      return false;
-    } finally {
-      setGeneratingPostFor(null);
-    }
-  };
-
-  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string; internalNote?: string }) => {
-    try {
-      const body: Record<string, unknown> = { ...extra };
-      if (status !== undefined) body.status = status;
-      const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, body);
-      queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === reqId ? updated : r));
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to update request status', 'error');
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!keyword.trim()) return;
-    setGenerating(true);
-    setError('');
-    try {
-      const jobId = await startBriefGenerationJob({
-        workspaceId,
-        targetKeyword: keyword.trim(),
-        businessContext: businessCtx.trim() || undefined,
-        targetPageId: fixContextRef.current?.pageId,
-        targetPageSlug: fixContextRef.current?.pageSlug,
-        pageType: pageType || undefined,
-        generationStyle,
-        referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
-        pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps || fixContextRef.current?.rationale
-          ? {
-              optimizationScore: fixContextRef.current.optimizationScore,
-              optimizationIssues: fixContextRef.current.optimizationIssues,
-              recommendations: fixContextRef.current.recommendations,
-              contentGaps: fixContextRef.current.contentGaps,
-              searchIntent: fixContextRef.current.searchIntent,
-              // Brief pre-seed: 6 new fields from Content Gaps / strategy layer (Lane E)
-              rationale: fixContextRef.current.rationale,
-              competitorProof: fixContextRef.current.competitorProof,
-              volume: fixContextRef.current.volume,
-              intent: fixContextRef.current.intent,
-              questionKeywords: fixContextRef.current.questionKeywords,
-              serpFeatures: fixContextRef.current.serpFeatures,
-            }
-          : undefined,
-      });
-      if (jobId) {
-        setPendingStandaloneBriefJobId(jobId);
-      } else {
-        setGenerating(false);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate brief');
-      setGenerating(false);
-    }
-  };
-
-  const handleDelete = async (briefId: string) => {
-    await del(`/api/content-briefs/${workspaceId}/${briefId}`);
-    queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).filter(b => b.id !== briefId));
-    if (expanded === briefId) setExpanded(null);
-    setDeleteConfirm(null);
-  };
-
-  const confirmDeleteBrief = (brief: ContentBrief) => {
-    setDeleteConfirm({ type: 'brief', id: brief.id, label: brief.targetKeyword });
-  };
-
-  const confirmDeleteRequest = (req: ContentTopicRequest) => {
-    setDeleteConfirm({ type: 'request', id: req.id, label: req.topic });
-  };
-
-  const executeDelete = async () => {
-    if (!deleteConfirm) return;
-    if (deleteConfirm.type === 'brief') {
-      await handleDelete(deleteConfirm.id);
-    } else {
-      await handleDeleteRequest(deleteConfirm.id);
-    }
-    setDeleteConfirm(null);
-  };
+  const {
+    activePostId,
+    briefError,
+    briefSearch,
+    briefSort,
+    briefs,
+    briefsQ,
+    businessCtx,
+    clientRequests,
+    deleteConfirm,
+    deliveringReqId,
+    deliveryNotes,
+    deliveryUrl,
+    editingBrief,
+    error,
+    expanded,
+    expandedRequest,
+    generationStyle,
+    generating,
+    generatingBriefFor,
+    generatingPostFor,
+    hasBlockingQueryError,
+    keyword,
+    loading,
+    loadingBrief,
+    pageType,
+    posts,
+    postsQ,
+    refUrls,
+    regeneratingBrief,
+    regeneratingOutline,
+    requestsQ,
+    sendingToClient,
+    showAdvanced,
+    templateCrossref,
+    closePostEditor,
+    confirmDeleteBrief,
+    confirmDeleteRequest,
+    copyAsMarkdown,
+    executeDelete,
+    exportClientHTML,
+    generateBrief,
+    generateBriefForRequest,
+    generatePost,
+    getBriefById,
+    regenerateBrief,
+    regenerateOutline,
+    saveBriefField,
+    sendToClient,
+    setActivePostId,
+    setBriefError,
+    setBriefSearch,
+    setBriefSort,
+    setBusinessCtx,
+    setDeleteConfirm,
+    setDeliveringReqId,
+    setDeliveryNotes,
+    setDeliveryUrl,
+    setEditingBrief,
+    setExpanded,
+    setExpandedRequest,
+    setGenerationStyle,
+    setKeyword,
+    setPageType,
+    setRefUrls,
+    setShowAdvanced,
+    toggleRequestBrief,
+    updateRequestStatus,
+  } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext });
 
   if (loading) {
     return (
@@ -604,7 +152,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
             workspaceId={workspaceId}
             postId={activePostId}
             onClose={() => setActivePostId(null)}
-            onDelete={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) }); setActivePostId(null); }}
+            onDelete={closePostEditor}
           />
         </div>
       )}
@@ -637,7 +185,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
             </div>
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
               <Icon as={ArrowUpDown} size="sm" />
-              <FormSelect value={briefSort} onChange={value => setBriefSort(value as 'date' | 'keyword' | 'difficulty')} options={[
+              <FormSelect value={briefSort} onChange={value => setBriefSort(value as BriefSortField)} options={[
                 { value: 'date', label: 'Newest' },
                 { value: 'keyword', label: 'Keyword A-Z' },
                 { value: 'difficulty', label: 'Difficulty' },
@@ -665,7 +213,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         onGenerationStyleChange={setGenerationStyle}
         onRefUrlsChange={setRefUrls}
         onToggleAdvanced={() => setShowAdvanced(v => !v)}
-        onGenerate={handleGenerate}
+        onGenerate={generateBrief}
       />
 
       {/* Client Requests */}
@@ -680,10 +228,10 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         deliveryNotes={deliveryNotes}
         getBriefById={getBriefById}
         onToggleRequestBrief={toggleRequestBrief}
-        onGenerateBriefForRequest={handleGenerateBriefForRequest}
+        onGenerateBriefForRequest={generateBriefForRequest}
         generationStyle={generationStyle}
         onGenerationStyleChange={setGenerationStyle}
-        onUpdateRequestStatus={handleUpdateRequestStatus}
+        onUpdateRequestStatus={updateRequestStatus}
         onConfirmDeleteRequest={confirmDeleteRequest}
         onSetDeliveringReqId={setDeliveringReqId}
         onSetDeliveryUrl={setDeliveryUrl}
@@ -696,13 +244,13 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         onSetEditingBrief={setEditingBrief}
         onSaveBriefField={saveBriefField}
         regeneratingBrief={regeneratingBrief}
-        onRegenerateBrief={handleRegenerateBrief}
+        onRegenerateBrief={regenerateBrief}
         regeneratingOutline={regeneratingOutline}
-        onRegenerateOutline={handleRegenerateOutline}
+        onRegenerateOutline={regenerateOutline}
         sendingToClient={sendingToClient}
         posts={posts}
         generatingPostFor={generatingPostFor}
-        onGeneratePost={handleGeneratePost}
+        onGeneratePost={generatePost}
         onOpenPost={setActivePostId}
       />
 
@@ -756,13 +304,13 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         onSetBriefSort={setBriefSort}
         onSetEditingBrief={setEditingBrief}
         onSaveBriefField={saveBriefField}
-        onGeneratePost={handleGeneratePost}
-        onRegenerateBrief={handleRegenerateBrief}
+        onGeneratePost={generatePost}
+        onRegenerateBrief={regenerateBrief}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
-        onSendToClient={handleSendToClient}
+        onSendToClient={sendToClient}
         onConfirmDeleteBrief={confirmDeleteBrief}
-        onRegenerateOutline={handleRegenerateOutline}
+        onRegenerateOutline={regenerateOutline}
         regeneratingOutline={regeneratingOutline}
       />
     </div>
