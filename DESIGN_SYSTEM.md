@@ -51,7 +51,7 @@ Inter loaded from Google Fonts: 300–700.
 
 ### Migration note (Phase A, 2026-04-27)
 
-Phase A boosted `.t-caption-sm`, `.t-caption`, and `.t-body` to match pre-existing `!important` CSS overrides that were bumping `text-[11px]`→13.5px, `text-xs`→13.5px, and `text-sm`→15.5px. This ensures `text-sm` → `.t-body` and `text-[11px]` → `.t-caption-sm` migrations are size-preserving. See `docs/rules/phase-b-migration-map.md` for the full mapping table.
+Phase A boosted `.t-caption-sm`, `.t-caption`, and `.t-body` to match pre-existing `!important` CSS overrides that were bumping `text-[11px]`→13.5px, `text-xs`→13.5px, and `text-sm`→15.5px. This ensures `text-sm` → `.t-body` and `text-[11px]` → `.t-caption-sm` migrations are size-preserving. See `docs/rules/archive/phase-b-migration-map.md` for the historical mapping table.
 
 ### Rules
 - **Minimum font size**: 10px (`.t-micro` for monospace timestamps/IDs only — body text minimum is 11.5px via `.t-label`)

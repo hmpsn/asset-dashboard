@@ -1,3 +1,9 @@
+---
+status: archived
+archivedAt: 2026-06-26
+reason: Point-in-time mapper review. Current DB mapper conventions live in CLAUDE.md quick reference and docs/rules/automated-rules.md guardrails.
+---
+
 # Table Mapper Pattern Review (2026-05-28)
 
 ## Scope

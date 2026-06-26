@@ -1,8 +1,16 @@
+---
+status: archived
+archivedAt: 2026-06-26
+reason: Point-in-time typography migration lookup from Phase B. Current typography rules live in DESIGN_SYSTEM.md, src/index.css, and docs/rules/design-system-enforcement.md.
+---
+
 # Phase B Migration Map
 
-> **Single source of truth for `text-*` → `.t-*` class migrations.**
-> Consult this table before migrating ANY `text-[Npx]` or Tailwind text utility.
-> Last updated: Phase A (PR #329).
+> **Archived historical artifact.** This lookup table records the Phase B
+> typography migration context from PR #329. It is no longer active guidance for
+> new migrations; current typography and design-system rules live in
+> `DESIGN_SYSTEM.md`, `src/index.css`, and
+> `docs/rules/design-system-enforcement.md`.
 
 ---
 

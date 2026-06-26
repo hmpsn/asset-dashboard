@@ -47,17 +47,18 @@ Applied in this order:
 4. **`requireRole(...roles)`** — Rejects 403 if `req.user.role` not in allowed roles. Use after `requireAuth`.
 5. **`requireWorkspaceAccess(paramName)`** — Checks `req.user.workspaceIds` includes the route param. Owners bypass. Passes through if no `req.user` (legacy compat). Use on workspace-specific routes.
 
-### How to protect a new admin route
+### How to protect a new route
+
+Admin dashboard API routes are already covered by the global HMAC/`APP_PASSWORD`
+gate in `server/app.ts`. Do not add `requireAuth` to admin routes; it only
+recognizes JWT user sessions and will reject legacy HMAC-admin requests.
 
 ```typescript
-// Requires any logged-in internal user
-app.get('/api/my-route', requireAuth, (req, res) => { ... });
-
-// Requires admin or owner role
-app.post('/api/my-route', requireAuth, requireRole('admin', 'owner'), (req, res) => { ... });
-
-// Requires workspace access
+// Admin workspace route: HMAC admin sessions pass through; JWT users are scoped.
 app.get('/api/workspaces/:id/my-data', requireWorkspaceAccess(), (req, res) => { ... });
+
+// JWT account-management route only.
+app.get('/api/users', requireAuth, requireRole('admin', 'owner'), (req, res) => { ... });
 ```
 
 ### How client session enforcement works

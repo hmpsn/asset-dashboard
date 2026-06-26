@@ -1261,9 +1261,9 @@
           "source": "Deferred CI hygiene observed during Platform Simplification 2026-06-26",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Observed during PR/staging watches: E2E annotations report actions/cache@v4, actions/download-artifact@v5, and actions/upload-artifact@v5 targeting Node.js 20 while GitHub forces them onto Node 24. Non-blocking today, but keep this in the sprint backlog so CI logs stay actionable; update/pin actions once upstream Node 24-native releases are available or document why the warning is unavoidable."
+          "notes": "Observed during PR/staging watches: E2E annotations report actions/cache@v4, actions/download-artifact@v5, and actions/upload-artifact@v5 targeting Node.js 20 while GitHub forces them onto Node 24. Non-blocking today, but keep this in the sprint backlog so CI logs stay actionable; update/pin actions once upstream Node 24-native releases are available or document why the warning is unavoidable. DONE 2026-06-26: updated cache to actions/cache@v6, upload-artifact to actions/upload-artifact@v7, and download-artifact to actions/download-artifact@v8; added platform-health cadence guard coverage so old Node-runtime official actions cannot re-enter workflows silently."
         },
         {
           "id": "simp-audit-0624-prcheck-diff-perf",
@@ -1291,9 +1291,9 @@
           "source": "Complexity audit 2026-06-24",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/med. 46 docs/rules/*.md created, ZERO ever deleted; point-in-time artifacts (styleguide-wave17-pre-plan-audit.md dated 2026-05-17, phase-b-migration-map.md) sit in the contracts dir as if durable, so agents weight finished-migration lookup tables as live rules. Fix: add status: active|archived frontmatter or docs/rules/archive/; move audit/migration docs out now; add a prune check to the platform-health cadence. Also collapse the ~13 CLAUDE.md Code-Convention bullets that restate pr-check rules in full prose to pointer lines (3-way drift surface), and designate single canonical homes for the Four-Laws-of-Color (re-specified in 4+ docs) + requireAuth HMAC-vs-JWT (6 places)."
+          "notes": "AUDIT high/med. 46 docs/rules/*.md created, ZERO ever deleted; point-in-time artifacts (styleguide-wave17-pre-plan-audit.md dated 2026-05-17, phase-b-migration-map.md) sit in the contracts dir as if durable, so agents weight finished-migration lookup tables as live rules. Fix: add status: active|archived frontmatter or docs/rules/archive/; move audit/migration docs out now; add a prune check to the platform-health cadence. Also collapse the ~13 CLAUDE.md Code-Convention bullets that restate pr-check rules in full prose to pointer lines (3-way drift surface), and designate single canonical homes for the Four-Laws-of-Color (re-specified in 4+ docs) + requireAuth HMAC-vs-JWT (6 places). DONE 2026-06-26: added docs/rules/rules-lifecycle.md, archived styleguide-wave17-pre-plan-audit.md, phase-b-migration-map.md, and table-mapper-pattern-review.md under docs/rules/archive/ with archived frontmatter; extended verify:platform-health-cadence with docs/rules lifecycle checks and tests; made BRAND_DESIGN_LANGUAGE.md the canonical Four-Laws home, docs/workflows/auth-system.md the canonical auth home, fixed the stale requireAuth example there, and shortened CLAUDE.md duplicated mechanized-rule prose to pointers."
         },
         {
           "id": "simp-audit-0624-backend-dup-sweep",
