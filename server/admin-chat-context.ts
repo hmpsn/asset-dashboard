@@ -22,7 +22,7 @@ import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listAnomalies } from './anomaly-detection.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { getLinkCheck, getPageSpeed, getPageWeight } from './performance-store.js';
+import { getLinkCheck, getPageSpeedSummary, getPageWeight } from './performance-store.js';
 import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
@@ -932,17 +932,13 @@ export async function assembleAdminContext(
 
         try {
           for (const strategy of ['mobile', 'desktop'] as const) {
-            const speedSnap = getPageSpeed(ws.webflowSiteId, strategy);
-            if (speedSnap?.result) {
-              const siteSpeed = speedSnap.result as { averageScore?: number; pages?: Array<{ url?: string; score?: number }> };
+            const siteSpeed = getPageSpeedSummary(ws.webflowSiteId, strategy);
+            if (siteSpeed) {
               if (siteSpeed.averageScore != null) perfParts.push(`Saved ${strategy} PageSpeed average: ${siteSpeed.averageScore}/100`);
-              const pages = siteSpeed.pages ?? [];
-              const worst = pages
-                .filter(p => p.url && p.score != null)
-                .sort((a, b) => (a.score ?? 100) - (b.score ?? 100))
-                .slice(0, 5);
-              if (worst.length > 0) {
-                const worstDetail = worst.map(p => `    ${p.url} — score ${p.score}/100`);
+              const worstDetail = siteSpeed.worstPages
+                .filter(page => page.url)
+                .map(page => `    ${page.url} — score ${page.score}/100`);
+              if (worstDetail.length > 0) {
                 perfParts.push(`Worst-performing ${strategy} pages (PageSpeed):\n${worstDetail.join('\n')}`);
               }
             }

@@ -164,7 +164,7 @@ export async function assembleSiteHealth(
     );
   }
 
-  // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  // ── PageSpeed / CWV (performance-store.ts / getPageSpeedSummary) ────
   if (siteId) {
     const pageSpeedData = await readOptionalSlicePart<{
       cwvDesktop: number | null;
@@ -179,47 +179,17 @@ export async function assembleSiteHealth(
         performanceSummary: performanceSummary,
       },
       async () => {
-        const { getPageSpeed } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-        const readSiteSpeed = (strategy: 'mobile' | 'desktop') => {
-          const speedSnap = getPageSpeed(siteId, strategy);
-          return speedSnap?.result as
-            | {
-                pages?: Array<{
-                  score?: number;
-                  vitals?: {
-                    LCP?: number | null;
-                    FID?: number | null;
-                    INP?: number | null;
-                    CLS?: number | null;
-                  };
-                }>;
-                averageScore?: number;
-                averageVitals?: {
-                  LCP?: number | null;
-                  FID?: number | null;
-                  INP?: number | null;
-                  CLS?: number | null;
-                };
-              }
-            | undefined;
-        };
-        const passRate = (siteSpeed: ReturnType<typeof readSiteSpeed>) => {
-          const pages = siteSpeed?.pages ?? [];
-          if (pages.length === 0) return null;
-          const passing = pages.filter(pagePassesCoreWebVitals).length;
-          return passing / pages.length;
-        };
-
-        const mobileSpeed = readSiteSpeed('mobile');
-        const desktopSpeed = readSiteSpeed('desktop');
-        const nextMobile = passRate(mobileSpeed);
-        const nextDesktop = passRate(desktopSpeed);
+        const { getPageSpeedSummary } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+        const mobileSpeed = getPageSpeedSummary(siteId, 'mobile');
+        const desktopSpeed = getPageSpeedSummary(siteId, 'desktop');
+        const nextMobile = mobileSpeed?.cwvPassRate ?? null;
+        const nextDesktop = desktopSpeed?.cwvPassRate ?? null;
 
         const summarySource = mobileSpeed ?? desktopSpeed;
         return {
           cwvMobile: nextMobile,
           cwvDesktop: nextDesktop,
-          performanceSummary: summarySource?.averageVitals
+          performanceSummary: summarySource?.hasAverageVitals
             ? {
                 avgLcp: summarySource.averageVitals.LCP ?? null,
                 avgInp: summarySource.averageVitals.INP ?? null,
@@ -529,27 +499,6 @@ export async function assembleSiteHealth(
     recentDiagnostics,
     weeklyMetricsTrend,
   };
-}
-
-function pagePassesCoreWebVitals(page: {
-  vitals?: {
-    LCP?: number | null;
-    FID?: number | null;
-    INP?: number | null;
-    CLS?: number | null;
-  };
-}): boolean {
-  const vitals = page.vitals;
-  if (!vitals) return false;
-  const interaction = vitals.INP ?? vitals.FID;
-  return (
-    typeof vitals.LCP === 'number' &&
-    vitals.LCP <= 2500 &&
-    typeof interaction === 'number' &&
-    interaction <= (vitals.INP == null ? 100 : 200) &&
-    typeof vitals.CLS === 'number' &&
-    vitals.CLS <= 0.1
-  );
 }
 
 function deadLinkCount(result: unknown): number | null {

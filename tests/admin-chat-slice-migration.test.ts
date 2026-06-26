@@ -12,12 +12,12 @@ describe('admin-chat-context Task 8 migration — structural checks', () => {
     expect(src).not.toMatch(/import.*listChurnSignals.*from/);
   });
 
-  it('imports getLinkCheck, getPageSpeed, and getPageWeight for supplemental performance detail', () => {
-    // All three re-imported as supplemental direct calls — siteHealth slice stores aggregate
-    // counts/averages only; raw snapshots hold per-URL dead links, worst-page scores, and
-    // per-page asset weight data. Same pattern as listBatches() supplement for approvals.
+  it('imports getLinkCheck, getPageSpeedSummary, and getPageWeight for supplemental performance detail', () => {
+    // Supplemental direct calls are preserved for detail outside the siteHealth slice:
+    // per-URL dead links, PageSpeed summary projections, and per-page asset weight data.
+    // Same pattern as listBatches() supplement for approvals.
     expect(src).toMatch(/import.*getLinkCheck.*from/);
-    expect(src).toMatch(/import.*getPageSpeed.*from/);
+    expect(src).toMatch(/import.*getPageSpeedSummary.*from/);
     expect(src).toMatch(/import.*getPageWeight.*from/);
   });
 
@@ -45,7 +45,7 @@ describe('admin-chat-context Task 8 migration — structural checks', () => {
     expect(savedSnapshotIndex).toBeGreaterThan(healthIndex);
     expect(pushSectionIndex).toBeGreaterThan(savedSnapshotIndex);
     expect(src).toMatch(/for \(const strategy of \['mobile', 'desktop'\] as const\)/);
-    expect(src).toMatch(/getPageSpeed\(ws\.webflowSiteId, strategy\)/);
+    expect(src).toMatch(/getPageSpeedSummary\(ws\.webflowSiteId, strategy\)/);
   });
 
   it('uses intel.clientSignals for client health', () => {

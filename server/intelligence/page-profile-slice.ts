@@ -291,17 +291,10 @@ export async function assemblePageProfile(
     const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const ws = getWorkspace(workspaceId);
     if (ws?.webflowSiteId) {
-      const { getPageSpeed } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const speedSnap = getPageSpeed(ws.webflowSiteId, 'mobile');
-      if (speedSnap?.result) {
-        const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
-        const pages = result.pages ?? [];
-        const pageData = pages.find(p =>
-          p.url ? matchPageIdentity(p.url, pagePath) : !!p.slug && matchPageIdentity(p.slug, pagePath)
-        );
-        if (pageData?.score != null) {
-          cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';
-        }
+      const { getPageSpeedPageScore } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const score = getPageSpeedPageScore(ws.webflowSiteId, 'mobile', pagePath);
+      if (score != null) {
+        cwvStatus = score >= 90 ? 'good' : score >= 50 ? 'needs_improvement' : 'poor';
       }
     }
   } catch (err) {

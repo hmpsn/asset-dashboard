@@ -20,7 +20,7 @@ vi.mock('../server/reports.js', () => ({
 }));
 
 vi.mock('../server/performance-store.js', () => ({
-  getPageSpeed: vi.fn(),
+  getPageSpeedSummary: vi.fn(),
   getLinkCheck: vi.fn(),
 }));
 
@@ -118,20 +118,22 @@ function makeMockSnapshot(scoreOverride = 85, prevScore: number | undefined = 80
 
 function makeMockPageSpeedResult(strategy: 'mobile' | 'desktop' = 'mobile', scores = [80, 60]) {
   const [firstScore = 80, secondScore = 60] = scores;
+  const pageCount = 2;
+  const cwvPassingPages = 1;
   return {
     siteId: 'site-abc',
     createdAt: new Date().toISOString(),
-    result: {
-      siteId: 'site-abc',
-      strategy,
-      pages: [
-        { score: firstScore, vitals: { LCP: 2500, FID: 10, CLS: 0.05, FCP: 1500, INP: 150, SI: 3000, TBT: 100, TTI: 4000 }, url: '/page-1', page: '/page-1', strategy, opportunities: [], diagnostics: [], fetchedAt: new Date().toISOString(), fieldDataAvailable: false },
-        { score: secondScore, vitals: { LCP: 4000, FID: 200, CLS: 0.2, FCP: 2500, INP: 350, SI: 5000, TBT: 500, TTI: 8000 }, url: '/page-2', page: '/page-2', strategy, opportunities: [], diagnostics: [], fetchedAt: new Date().toISOString(), fieldDataAvailable: false },
-      ],
-      averageScore: 70,
-      averageVitals: { LCP: 3250, FID: 105, CLS: 0.125, FCP: 2000, INP: 250, SI: 4000, TBT: 300, TTI: 6000 },
-      testedAt: new Date().toISOString(),
-    },
+    strategy,
+    averageScore: 70,
+    hasAverageVitals: true,
+    averageVitals: { LCP: 3250, FID: 105, CLS: 0.125, FCP: 2000, INP: 250, SI: 4000, TBT: 300, TTI: 6000 },
+    pageCount,
+    cwvPassingPages,
+    cwvPassRate: cwvPassingPages / pageCount,
+    worstPages: [
+      { url: '/page-2', page: '/page-2', score: secondScore },
+      { url: '/page-1', page: '/page-1', score: firstScore },
+    ],
   };
 }
 
@@ -182,7 +184,7 @@ describe('assembleSiteHealth', () => {
   let getSnapshot: ReturnType<typeof vi.fn>;
   let listSnapshots: ReturnType<typeof vi.fn>;
   let listSnapshotsDetailed: ReturnType<typeof vi.fn>;
-  let getPageSpeed: ReturnType<typeof vi.fn>;
+  let getPageSpeedSummary: ReturnType<typeof vi.fn>;
   let getLinkCheck: ReturnType<typeof vi.fn>;
   let getRedirectSnapshot: ReturnType<typeof vi.fn>;
   let listAnomalies: ReturnType<typeof vi.fn>;
@@ -205,7 +207,7 @@ describe('assembleSiteHealth', () => {
     listSnapshotsDetailed = reportsMod.listSnapshotsDetailed as ReturnType<typeof vi.fn>;
 
     const perfMod = await import('../server/performance-store.js');
-    getPageSpeed = perfMod.getPageSpeed as ReturnType<typeof vi.fn>;
+    getPageSpeedSummary = perfMod.getPageSpeedSummary as ReturnType<typeof vi.fn>;
     getLinkCheck = perfMod.getLinkCheck as ReturnType<typeof vi.fn>;
 
     const redirectMod = await import('../server/redirect-store.js');
@@ -281,7 +283,7 @@ describe('assembleSiteHealth', () => {
       { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 70, totalPages: 1, errors: 1, warnings: 1, infos: 0 },
     ]);
     listSnapshotsDetailed.mockReturnValue([currentSnapshot, previousSnapshot]);
-    getPageSpeed.mockReturnValue(null);
+    getPageSpeedSummary.mockReturnValue(null);
     getLinkCheck.mockReturnValue(null);
     getRedirectSnapshot.mockReturnValue(null);
     listAnomalies.mockReturnValue([]);
@@ -306,7 +308,7 @@ describe('assembleSiteHealth', () => {
       { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 85, totalPages: 10, errors: 2, warnings: 5, infos: 3 },
       { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 80, totalPages: 10, errors: 3, warnings: 6, infos: 2 },
     ]);
-    getPageSpeed.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
+    getPageSpeedSummary.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
       strategy === 'desktop' ? null : makeMockPageSpeedResult('mobile')
     );
     getLinkCheck.mockReturnValue({
@@ -389,7 +391,7 @@ describe('assembleSiteHealth', () => {
       { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 90, totalPages: 10, errors: 0, warnings: 1, infos: 3 },
       { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 80, totalPages: 10, errors: 2, warnings: 3, infos: 2 },
     ]);
-    getPageSpeed.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
+    getPageSpeedSummary.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
       strategy === 'desktop' ? null : makeMockPageSpeedResult()
     );
     getLinkCheck.mockReturnValue(null);
@@ -418,7 +420,7 @@ describe('assembleSiteHealth', () => {
     });
     listSnapshots.mockReturnValue([]);
     getLinkCheck.mockReturnValue(null);
-    getPageSpeed.mockReturnValue(null);
+    getPageSpeedSummary.mockReturnValue(null);
     getRedirectSnapshot.mockReturnValue(null);
     listAnomalies.mockReturnValue([]);
     getSeoChanges.mockReturnValue([]);
@@ -436,17 +438,17 @@ describe('assembleSiteHealth', () => {
     getLatestSnapshot.mockReturnValue(makeMockSnapshot(88, 80));
     listSnapshots.mockReturnValue([]);
     getLinkCheck.mockReturnValue(null);
-    getPageSpeed.mockReturnValue({
+    getPageSpeedSummary.mockReturnValue({
       siteId: 'site-abc',
       createdAt: new Date().toISOString(),
-      result: {
-        pages: [
-          { score: 100, vitals: { LCP: 4200, INP: 350, CLS: 0.25 } },
-          { score: 70, vitals: { LCP: 2100, INP: 120, CLS: 0.05 } },
-        ],
-        averageScore: 85,
-        averageVitals: { LCP: 3150, INP: 235, FID: 80, CLS: 0.15 },
-      },
+      strategy: 'mobile',
+      averageScore: 85,
+      hasAverageVitals: true,
+      averageVitals: { LCP: 3150, INP: 235, FID: 80, CLS: 0.15 },
+      pageCount: 2,
+      cwvPassingPages: 1,
+      cwvPassRate: 0.5,
+      worstPages: [],
     });
     getRedirectSnapshot.mockReturnValue(null);
     listAnomalies.mockReturnValue([]);
@@ -465,7 +467,7 @@ describe('assembleSiteHealth', () => {
     getWorkspace.mockReturnValue(makeMockWorkspace());
     getLatestSnapshot.mockReturnValue(makeMockSnapshot(90, 80));
     listSnapshots.mockReturnValue([]);
-    getPageSpeed.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
+    getPageSpeedSummary.mockImplementation((_siteId: string, strategy: 'mobile' | 'desktop') =>
       strategy === 'desktop'
         ? makeMockPageSpeedResult('desktop', [95, 98])
         : makeMockPageSpeedResult('mobile', [92, 60])
@@ -481,8 +483,8 @@ describe('assembleSiteHealth', () => {
     const intel = await buildWorkspaceIntelligence('ws-1', { slices: ['siteHealth'] });
     const health = intel.siteHealth as SiteHealthSlice;
 
-    expect(getPageSpeed).toHaveBeenCalledWith('site-abc', 'mobile');
-    expect(getPageSpeed).toHaveBeenCalledWith('site-abc', 'desktop');
+    expect(getPageSpeedSummary).toHaveBeenCalledWith('site-abc', 'mobile');
+    expect(getPageSpeedSummary).toHaveBeenCalledWith('site-abc', 'desktop');
     expect(health.cwvPassRate.mobile).toBe(0.5);
     expect(health.cwvPassRate.desktop).toBe(0.5);
   });
@@ -493,7 +495,7 @@ describe('assembleSiteHealth', () => {
     getWorkspace.mockReturnValue(makeMockWorkspace());
     getLatestSnapshot.mockReturnValue(null);
     listSnapshots.mockReturnValue([]);
-    getPageSpeed.mockReturnValue(null);
+    getPageSpeedSummary.mockReturnValue(null);
     getLinkCheck.mockReturnValue(null);
     getRedirectSnapshot.mockReturnValue(null);
     listAnomalies.mockReturnValue([]);
@@ -525,7 +527,7 @@ describe('assembleSiteHealth', () => {
     getWorkspace.mockReturnValue(makeMockWorkspace());
     getLatestSnapshot.mockReturnValue(null);
     listSnapshots.mockReturnValue([]);
-    getPageSpeed.mockReturnValue(null);
+    getPageSpeedSummary.mockReturnValue(null);
     getLinkCheck.mockReturnValue(null);
     getRedirectSnapshot.mockReturnValue(null);
     listAnomalies.mockReturnValue([]);
@@ -569,7 +571,7 @@ describe('assembleSiteHealth', () => {
     ]);
 
     // Pagespeed throws
-    getPageSpeed.mockImplementation(() => { throw new Error('pagespeed DB locked'); });
+    getPageSpeedSummary.mockImplementation(() => { throw new Error('pagespeed DB locked'); });
 
     // Link check throws
     getLinkCheck.mockImplementation(() => { throw new Error('link-check DB error'); });

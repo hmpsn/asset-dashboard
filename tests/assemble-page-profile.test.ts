@@ -71,7 +71,7 @@ vi.mock('../server/reports.js', () => ({
 }));
 vi.mock('../server/performance-store.js', () => ({
   getInternalLinks: vi.fn(() => null),
-  getPageSpeed: vi.fn(() => null),
+  getPageSpeedPageScore: vi.fn(() => null),
 }));
 vi.mock('../server/site-architecture.js', () => ({
   getCachedArchitecture: vi.fn(() => null),
@@ -195,13 +195,7 @@ describe('assemblePageProfile', () => {
         ],
       },
     } as ReturnType<typeof reports.getLatestSnapshot>);
-    vi.mocked(performanceStore.getPageSpeed).mockReturnValueOnce({
-      result: {
-        pages: [
-          { slug: 'seo', url: 'https://example.com/services/seo#top', score: 94 },
-        ],
-      },
-    } as ReturnType<typeof performanceStore.getPageSpeed>);
+    vi.mocked(performanceStore.getPageSpeedPageScore).mockReturnValueOnce(94);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', {
@@ -289,14 +283,7 @@ describe('assemblePageProfile', () => {
         ],
       },
     } as ReturnType<typeof reports.getLatestSnapshot>);
-    vi.mocked(performanceStore.getPageSpeed).mockReturnValueOnce({
-      result: {
-        pages: [
-          { slug: 'seo', url: 'https://example.com/services/seo', score: 94 },
-          { slug: 'seo', url: 'https://example.com/seo#top', score: 45 },
-        ],
-      },
-    } as ReturnType<typeof performanceStore.getPageSpeed>);
+    vi.mocked(performanceStore.getPageSpeedPageScore).mockReturnValueOnce(45);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', {
