@@ -1,8 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { Badge, EmptyState, ErrorState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput, OutcomeReadbackChip } from './ui';
-import type { OutcomeReadback } from '../../shared/types/outcome-tracking';
 import { formatDate } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
 import {
@@ -11,34 +7,7 @@ import {
   Sparkles, X, Globe, Check, AlertTriangle, UserCheck,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
-import { contentPosts } from '../api/content';
-import { useAdminPostsList, usePublishTarget, useSendPostToClient } from '../hooks/admin';
-import { queryKeys } from '../lib/queryKeys';
-import { useToast } from './Toast';
-import { useBackgroundTasks, isTerminalJobStatus, type BackgroundJob } from '../hooks/useBackgroundTasks';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-
-interface PostSummary {
-  id: string;
-  briefId: string;
-  targetKeyword: string;
-  title: string;
-  metaDescription: string;
-  totalWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
-  publishedAt?: string;
-  webflowItemId?: string;
-  createdAt: string;
-  updatedAt: string;
-  sections: { heading: string; wordCount: number; status: string }[];
-  voiceScore?: number;
-  voiceFeedback?: string;
-  /** W5.1: read-back outcome verdict for published posts (90-day clicks/position delta). */
-  outcome?: OutcomeReadback;
-}
-
-type SortField = 'date' | 'title' | 'status' | 'words';
-type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved' | 'error';
+import { useAdminPostWorkflow } from '../hooks/admin/useAdminPostWorkflow';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string; tone: 'amber' | 'red' | 'blue' | 'teal' | 'emerald' }> = {
   generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20', tone: 'amber' },
@@ -49,157 +18,43 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
 };
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
-  const queryClient = useQueryClient();
-  // W6.2: score-voice now runs on the background job platform (returns { jobId }).
-  const tasks = useBackgroundTasks();
-  const tasksJobsRef = useRef<BackgroundJob[]>(tasks.jobs);
-  useEffect(() => { tasksJobsRef.current = tasks.jobs; }, [tasks.jobs]);
-  const awaitVoiceJob = (jobId: string, timeoutMs = 150_000): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const deadline = Date.now() + timeoutMs;
-      const tick = () => {
-        const job = tasksJobsRef.current.find(j => j.id === jobId);
-        if (job && isTerminalJobStatus(job.status)) {
-          if (job.status === 'done') return resolve();
-          return reject(new Error(job.error || 'Voice scoring failed'));
-        }
-        if (Date.now() > deadline) return reject(new Error('Timed out waiting for voice scoring'));
-        window.setTimeout(tick, 400);
-      };
-      tick();
-    });
-  };
-  const postsQ = useAdminPostsList(workspaceId);
-  const posts = (postsQ.data ?? []) as PostSummary[];
-  const loading = postsQ.isLoading;
-  const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
-  const { toast } = useToast();
-
-  // W6.6: deep-link receiver — `?post=<id>` (e.g. from the Content Calendar) opens
-  // that post in the editor on mount. The param is consumed once into local state;
-  // the close handler clears it so a manual close doesn't reopen on re-render.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activePostId, setActivePostId] = useState<string | null>(() => searchParams.get('post'));
-
-  const closePostEditor = () => {
-    setActivePostId(null);
-    invalidatePosts();
-    if (searchParams.get('post')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('post');
-      setSearchParams(next, { replace: true });
-    }
-  };
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('date');
-  const [sortAsc, setSortAsc] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [sendToClientPost, setSendToClientPost] = useState<string | null>(null);
-  const [sendNote, setSendNote] = useState('');
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [publishingPost, setPublishingPost] = useState<string | null>(null);
-  const [scoringVoice, setScoringVoice] = useState<string | null>(null);
-  const [expandedVoice, setExpandedVoice] = useState<string | null>(null);
-
-  const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
-
-  const publishPost = async (postId: string) => {
-    setPublishingPost(postId);
-    try {
-      const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
-      if (result.success) {
-        invalidatePosts();
-      } else {
-        toast(result.error || 'Publish failed', 'error');
-      }
-    } catch (err) {
-      console.error('ContentManager publish failed:', err);
-      toast(err instanceof Error ? err.message : 'Publish failed', 'error');
-    }
-    setPublishingPost(null);
-  };
-
-  const updateStatus = async (postId: string, status: string) => {
-    setUpdatingStatus(postId);
-    try {
-      await contentPosts.update(workspaceId, postId, { status });
-      invalidatePosts();
-    } catch (err) {
-      console.error('ContentManager status update failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to update status', 'error');
-    }
-    setUpdatingStatus(null);
-  };
-
-  // Send to client (POST-C1) — the SEPARATE client-facing action (distinct from the internal
-  // "Review" status bump). Single "Send to client" button + optional inline note per the Admin
-  // Send Convention. On success the post becomes a post_review content_request in the client inbox.
-  const sendPostToClient = useSendPostToClient(workspaceId);
-  const confirmSendToClient = (postId: string) => {
-    const note = sendNote.trim();
-    sendPostToClient.mutate(
-      { postId, note: note || undefined },
-      { onSuccess: () => { setSendToClientPost(null); setSendNote(''); } },
-    );
-  };
-
-  const deletePost = async (postId: string) => {
-    try {
-      await contentPosts.remove(workspaceId, postId);
-      invalidatePosts();
-      setDeleteConfirm(null);
-    } catch (err) {
-      console.error('ContentManager delete failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
-    }
-  };
-
-  const scoreVoice = async (postId: string) => {
-    setScoringVoice(postId);
-    try {
-      const { jobId } = await contentPosts.scoreVoice(workspaceId, postId);
-      tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, jobId, { workspaceId });
-      await awaitVoiceJob(jobId);
-      invalidatePosts();
-    } catch (err) {
-      console.error('ContentManager voice score failed:', err);
-      toast(err instanceof Error ? err.message : 'Voice scoring failed', 'error');
-    }
-    setScoringVoice(null);
-  };
-
-  // Filter & sort
-  const filtered = posts
-    .filter(p => statusFilter === 'all' || p.status === statusFilter)
-    .filter(p => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return p.title.toLowerCase().includes(q) || p.targetKeyword.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'date': cmp = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
-        case 'title': cmp = a.title.localeCompare(b.title); break;
-        case 'status': {
-          const order = { generating: 0, error: 1, draft: 2, review: 3, approved: 4 };
-          cmp = (order[a.status] || 0) - (order[b.status] || 0);
-          break;
-        }
-        case 'words': cmp = a.totalWordCount - b.totalWordCount; break;
-      }
-      return sortAsc ? cmp : -cmp;
-    });
-
-  const statusCounts = {
-    all: posts.length,
-    generating: posts.filter(p => p.status === 'generating').length,
-    error: posts.filter(p => p.status === 'error').length,
-    draft: posts.filter(p => p.status === 'draft').length,
-    review: posts.filter(p => p.status === 'review').length,
-    approved: posts.filter(p => p.status === 'approved').length,
-  };
+  const {
+    postsQ,
+    posts,
+    loading,
+    hasPublishTarget,
+    activePostId,
+    setActivePostId,
+    closePostEditor,
+    search,
+    setSearch,
+    sortField,
+    setSortField,
+    sortAsc,
+    setSortAsc,
+    statusFilter,
+    setStatusFilter,
+    deleteConfirm,
+    setDeleteConfirm,
+    sendToClientPost,
+    sendNote,
+    setSendNote,
+    sendPostToClient,
+    beginSendToClient,
+    cancelSendToClient,
+    confirmSendToClient,
+    updatingStatus,
+    publishingPost,
+    scoringVoice,
+    expandedVoice,
+    setExpandedVoice,
+    filtered,
+    statusCounts,
+    publishPost,
+    updateStatus,
+    deletePost,
+    scoreVoice,
+  } = useAdminPostWorkflow(workspaceId);
 
   // If viewing a post, render the PostEditor
   if (activePostId) {
@@ -469,7 +324,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                         inline note (Admin Send Convention). Distinct from the internal Review button. */}
                     {!isGenerating && sendToClientPost !== post.id && (
                       <Button
-                        onClick={() => { setSendToClientPost(post.id); setSendNote(''); }}
+                        onClick={() => beginSendToClient(post.id)}
                         disabled={sendPostToClient.isPending}
                         icon={UserCheck}
                         variant="primary"
@@ -575,7 +430,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       Send to client
                     </Button>
                     <Button
-                      onClick={() => { setSendToClientPost(null); setSendNote(''); }}
+                      onClick={cancelSendToClient}
                       disabled={sendPostToClient.isPending}
                       variant="ghost"
                       size="sm"

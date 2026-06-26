@@ -2,6 +2,8 @@ export { useAdminGA4 } from './useAdminGA4';
 export { useAdminSearch } from './useAdminSearch';
 export { useAdminBriefsList, useAdminRequestsList, useAdminBriefTemplateCrossref } from './useAdminBriefs';
 export { useAdminPostsList, useAdminPost, useAdminPostVersions, usePublishTarget, useSendPostToClient } from './useAdminPosts';
+export { useAdminPostWorkflow } from './useAdminPostWorkflow';
+export type { ContentPostSortField, ContentPostStatusFilter, ContentPostStatusCounts } from './useAdminPostWorkflow';
 export { useWorkspaceHomeData } from './useWorkspaceHome';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';
 export { useWorkspaceBadges } from './useWorkspaceBadges';
