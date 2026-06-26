@@ -23,7 +23,7 @@ import {
   computeRecommendationSummary,
   updateRecommendationStatus,
 } from './recommendations.js';
-import { mutateRecommendationItem } from './recommendation-storage.js';
+import { mutateRecommendationItem } from './domains/recommendations/storage.js';
 import { validateTransition, RECOMMENDATION_TRANSITIONS, CLIENT_REC_TRANSITIONS } from './state-machines.js';
 import { creditArchetypeCycleOnSend } from './strategy-autosend-store.js';
 import { createLogger } from './logger.js';

@@ -68,7 +68,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   recordAction: mockRecordAction,
 }));
 
-vi.mock('../../server/recommendations.js', () => ({
+vi.mock('../../server/domains/recommendations/resolution-service.js', () => ({
   resolveRecommendationsForChange: mockResolveRecommendationsForChange,
 }));
 

@@ -28,7 +28,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { recommendationOutcomeActionType } from './recommendations.js';
-import { loadRecommendationSet } from './recommendation-storage.js';
+import { loadRecommendationSet } from './domains/recommendations/storage.js';
 import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-remediation');

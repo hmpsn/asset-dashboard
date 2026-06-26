@@ -1,14 +1,14 @@
 /**
- * recommendation-storage
+ * Recommendation storage
  *
  * Normalized persistence for RecommendationSet. The set row owns generated_at
  * and summary; recommendation_items owns addressable per-rec payloads.
  */
-import db from './db/index.js';
-import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { createStmtCache } from './db/stmt-cache.js';
-import { recommendationSchema, recommendationSummarySchema } from './schemas/workspace-schemas.js';
-import type { Recommendation, RecommendationSet, RecStatus } from '../shared/types/recommendations.js';
+import db from '../../db/index.js';
+import { parseJsonSafe, parseJsonSafeArray } from '../../db/json-validation.js';
+import { createStmtCache } from '../../db/stmt-cache.js';
+import { recommendationSchema, recommendationSummarySchema } from '../../schemas/workspace-schemas.js';
+import type { Recommendation, RecommendationSet, RecStatus } from '../../../shared/types/recommendations.js';
 
 interface RecSetRow {
   workspace_id: string;

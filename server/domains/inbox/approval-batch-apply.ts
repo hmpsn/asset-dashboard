@@ -8,7 +8,7 @@ import { normalizePageUrl } from '../../helpers.js';
 import { createLogger } from '../../logger.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
 import { getActionBySource, recordAction } from '../../outcome-tracking.js';
-import { resolveRecommendationsForChange } from '../../recommendations.js';
+import { resolveRecommendationsForChange } from '../recommendations/resolution-service.js';
 import { recordSeoChange } from '../../seo-change-tracker.js';
 import {
   publishCollectionItems,

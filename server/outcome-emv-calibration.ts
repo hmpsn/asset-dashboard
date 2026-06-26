@@ -48,7 +48,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { loadRecommendationSet } from './recommendation-storage.js';
+import { loadRecommendationSet } from './domains/recommendations/storage.js';
 import type { ActionType } from '../shared/types/outcome-tracking.js';
 
 const log = createLogger('outcome-emv-calibration');

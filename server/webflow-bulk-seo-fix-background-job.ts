@@ -9,7 +9,7 @@ import {
   createJob, updateJob, } from './jobs.js';
 import { createLogger } from './logger.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { resolveRecommendationsForPageIds } from './recommendations.js';
+import { resolveRecommendationsForPageIds } from './domains/recommendations/resolution-service.js';
 import { recordSeoChange } from './seo-change-tracker.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import {

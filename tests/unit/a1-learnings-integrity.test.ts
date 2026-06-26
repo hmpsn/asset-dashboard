@@ -37,7 +37,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getActionsByWorkspace: vi.fn(() => []),
   getOutcomesForAction: vi.fn(() => []),
 }));
-vi.mock('../../server/recommendation-storage.js', () => ({
+vi.mock('../../server/domains/recommendations/storage.js', () => ({
   loadRecommendationSet: backfillMocks.loadRecommendationSet,
 }));
 
