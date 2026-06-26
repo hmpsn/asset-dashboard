@@ -39,3 +39,9 @@ Closed-set IDs are the normalized keyword strings from the candidate set. A mode
 `server/keyword-strategy-ai-synthesis.ts` is the public facade and orchestration shell. Stage contracts, prompt builders, pool builders, parse/repair helpers, and finalization helpers belong under `server/keyword-strategy-synthesis/`.
 
 Do not reintroduce local synthesis-only type aliases such as `PageMapping` into the facade. Shared stage payloads belong in `server/keyword-strategy-synthesis/types.ts`.
+
+Current stage owners:
+
+- `page-assignment.ts` owns OP1 page batching, retry/repair validation, post-processing, deterministic page fallback, parse-error filtering, and incremental preserved-page merge.
+- `site-synthesis.ts` owns OP2 site-level prompt selection, retry/repair validation, legacy invalid-JSON throw behavior, closed-set content-gap validation, conflict detection, and conflict-fix application.
+- `provider-validation.ts` stays after OP1 and before OP2 so provider metrics are validated before conflict detection and site synthesis.

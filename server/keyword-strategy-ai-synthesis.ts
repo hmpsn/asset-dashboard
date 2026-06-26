@@ -5,7 +5,6 @@ import { getLatestSnapshot } from './reports.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
-import { parseJsonFallback } from './db/json-validation.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
@@ -14,16 +13,13 @@ import type { KeywordStrategySearchData } from './keyword-strategy-search-data.j
 import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
 import { buildStrategySignals } from './insight-feedback.js';
-import { extractBrandTokens } from './competitor-brand-filter.js';
 import { isProgrammingError } from './errors.js';
 import { resolveWorkspaceLanguageCode, resolveWorkspaceLocationCode } from './local-seo.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
-import { pageAssignmentResponseSchema, siteSynthesisResponseSchema } from './schemas/keyword-strategy-schemas.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 import type { KeywordCandidate } from '../shared/types/keyword-universe.js';
 import { callKeywordStrategyAI, callNamedStrategyAI } from './keyword-strategy-synthesis/ai-callers.js';
-import { KeywordStrategySynthesisError } from './keyword-strategy-synthesis/errors.js';
 import { assembleSynthesisContext } from './keyword-strategy-synthesis/context.js';
 import { validatePageMappingsWithProvider } from './keyword-strategy-synthesis/provider-validation.js';
 import {
@@ -31,18 +27,13 @@ import {
   buildLegacyKeywordPool,
 } from './keyword-strategy-synthesis/pool.js';
 import {
-  buildBatchPagesBlock,
   buildCandidateIds,
   buildClosedSetBlock,
-  buildClosedSetPageAssignmentPrompt,
-  buildClosedSetSiteSynthesisPrompt,
-  buildLegacyPageAssignmentPrompt,
-  buildLegacySiteSynthesisPrompt,
-  resolveClosedSetKeyword,
 } from './keyword-strategy-synthesis/prompts.js';
+import { runPageAssignmentBatches } from './keyword-strategy-synthesis/page-assignment.js';
+import { runSiteSynthesis, type SiteSynthesisContext } from './keyword-strategy-synthesis/site-synthesis.js';
 import {
   applyDeclinedPageMapFilter,
-  applyKeywordConflictFixes,
   applyRequestedGapsAndBackfill,
   filterMasterContentGaps,
   filterMasterSiteKeywords,
@@ -51,11 +42,8 @@ import type {
   KeywordStrategyKeywordPool,
   MasterStrategyData,
   PageMapping,
-  StrategyContentGap,
-  StrategyKeywordFix,
   StrategyOutput,
   StrategyPageMapEntry,
-  StrategyQuickWin,
 } from './keyword-strategy-synthesis/types.js';
 
 export { callKeywordStrategyAI, callNamedStrategyAI } from './keyword-strategy-synthesis/ai-callers.js';
@@ -210,15 +198,6 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     }
     // For AI batching we only process stale pages; preserved pages are merged back after.
     const pagesForBatching = strategyMode === 'incremental' ? pagesToAnalyze : pageInfo;
-
-    // --- STEP 1: Parallel page analysis batches ---
-    const BATCH_SIZE = 20;
-    const batches: typeof pageInfo[] = [];
-    for (let i = 0; i < pagesForBatching.length; i += BATCH_SIZE) {
-      batches.push(pagesForBatching.slice(i, i + BATCH_SIZE));
-    }
-    log.info(`Splitting ${pagesForBatching.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
-    sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
 
     // Build per-page GSC context lookup
     const gscByPath = new Map<string, Array<{ query: string; position: number; clicks: number; impressions: number }>>();
@@ -431,249 +410,26 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // Empty on the flag-OFF path (universeCandidates undefined) — never consulted.
     const candidateIds = buildCandidateIds(universeCandidates);
 
-    const existingKeywordByPath = new Map(existingPageKeywords.map(pk => [pk.pagePath, pk]));
-    const pageInfoByPath = new Map(pageInfo.map(page => [page.path, page]));
-    const fallbackKeywordFromPageIdentity = (pagePath: string): string | null => {
-      const page = pageInfoByPath.get(pagePath);
-      const titleFallback = page?.seoTitle || page?.title;
-      const slugFallback = pagePath.split('/').filter(Boolean).join(' ');
-      const fallback = normalizeKeyword(titleFallback || slugFallback);
-      return fallback || null;
-    };
-    const findFallbackKeywordForPage = (pagePath: string): string | null => {
-      const existingKeyword = existingKeywordByPath.get(pagePath)?.primaryKeyword;
-      if (existingKeyword && isEligibleGeneratedKeyword(existingKeyword)) {
-        return existingKeyword;
-      }
-
-      const providerKeyword = [...(semrushByPath.get(pagePath) ?? [])]
-        .sort((a, b) => b.volume - a.volume)
-        .find(keyword => isEligibleGeneratedKeyword(keyword.keyword));
-      if (providerKeyword) return providerKeyword.keyword;
-
-      const gscKeyword = [...(gscByPath.get(pagePath) ?? [])]
-        .sort((a, b) => b.impressions - a.impressions)
-        .find(keyword => isEligibleGeneratedKeyword(keyword.query));
-      return gscKeyword?.query ?? fallbackKeywordFromPageIdentity(pagePath);
-    };
-
-    const runBatch = async (batch: typeof pageInfo, batchIdx: number): Promise<PageMapping[]> => {
-      const batchPages = buildBatchPagesBlock(batch, gscByPath, semrushByPath);
-
-      // EXISTING post-processing applied to a parsed PageMapping[] — factored out so
-      // BOTH the legacy parse path AND the P3 flag-ON closed-set path run it VERBATIM
-      // (the `primaryKeywordSourceId` that IS in the pool short-circuits the
-      // eligibility check, exactly as a pool keyword does today).
-      const postProcessBatch = (parsed: PageMapping[]): PageMapping[] => {
-        // Strip AI-hallucinated volume/difficulty — those must come from keyword-provider enrichment only
-        // Also strip "(invented)" suffix and pre-enrich keywords that are already in the pool
-        let fromPool = 0;
-        let invented = 0;
-        for (const pm of parsed) {
-          delete pm.volume; delete pm.difficulty; delete pm.cpc;
-          // Strip "(invented)" marker the AI may add
-          if (pm.primaryKeyword) {
-            pm.primaryKeyword = pm.primaryKeyword.replace(/\s*\(invented\)\s*$/i, '').trim();
-          }
-          if (!Array.isArray(pm.secondaryKeywords)) {
-            pm.secondaryKeywords = [];
-          }
-          if (pm.secondaryKeywords?.length) {
-            pm.secondaryKeywords = pm.secondaryKeywords
-              .map(keyword => keyword.replace(/\s*\(invented\)\s*$/i, '').trim())
-              .filter(Boolean)
-              .filter(keyword => isEligibleGeneratedKeyword(keyword));
-          }
-          if (pm.primaryKeyword) {
-            const primaryEvaluation = isEligibleGeneratedKeyword(pm.primaryKeyword);
-            if (!primaryEvaluation) {
-              const promotedSecondary = pm.secondaryKeywords.shift();
-              if (promotedSecondary) {
-                pm.primaryKeyword = promotedSecondary;
-              } else {
-                const fallbackKeyword = findFallbackKeywordForPage(pm.pagePath);
-                if (fallbackKeyword) {
-                  pm.primaryKeyword = fallbackKeyword;
-                  pm.validated = false;
-                } else {
-                  pm.primaryKeyword = '';
-                  pm._parseError = true;
-                  continue;
-                }
-              }
-            }
-          }
-          // Pre-enrich from pool — if the keyword is in our pool, apply the data now
-          const poolMatch = keywordPool.get(normalizeKeyword(pm.primaryKeyword ?? ''));
-          if (poolMatch && poolMatch.source !== 'gsc') {
-            pm.volume = poolMatch.volume;
-            pm.difficulty = poolMatch.difficulty;
-            fromPool++;
-          } else {
-            invented++;
-          }
-        }
-        log.info(`Batch ${batchIdx + 1}: ${fromPool} keywords from pool, ${invented} invented`);
-        return parsed;
-      };
-
-      // Legacy flag-OFF "invalid JSON" return. NOTE: these rows are tagged
-      // `_parseError:true` and `primaryKeyword:''`, so they are FILTERED OUT of the
-      // final mappings downstream (~:902-908) — i.e. on the legacy path a parse-fail
-      // drops the batch's pages entirely. Flag-OFF preserves this verbatim.
-      const syntheticBatchFallback = (): PageMapping[] => batch.map(p => ({
-        pagePath: p.path,
-        pageTitle: p.title,
-        primaryKeyword: '',
-        secondaryKeywords: [],
-        searchIntent: 'informational',
-        _parseError: true,
-      }));
-
-      // SEO Generation Quality P3 (M1, flag-ON): real per-page fallback that keeps
-      // pages instead of dropping them after a parse-fail. Synthesize each page's
-      // primaryKeyword from its own identity/provider/GSC signal via the existing
-      // findFallbackKeywordForPage — when that yields a keyword the page survives
-      // (validated:false); only when no signal exists at all does the page degrade
-      // to the legacy `_parseError` drop (rare). This is the genuine quality
-      // improvement: the previous flag-ON fallback re-used syntheticBatchFallback,
-      // whose empty/_parseError rows were filtered out → zero surviving pages.
-      const perPageFallbackBatch = (): PageMapping[] => batch.map(p => {
-        const fallbackKeyword = findFallbackKeywordForPage(p.path);
-        if (!fallbackKeyword) {
-          return {
-            pagePath: p.path,
-            pageTitle: p.title,
-            primaryKeyword: '',
-            secondaryKeywords: [],
-            searchIntent: 'informational',
-            _parseError: true,
-          };
-        }
-        return {
-          pagePath: p.path,
-          pageTitle: p.title,
-          primaryKeyword: fallbackKeyword,
-          secondaryKeywords: [],
-          searchIntent: 'informational',
-          validated: false,
-        };
-      });
-
-      // ── SEO Generation Quality P3 (flag-ON): closed-set, Zod-validated OP1 ──
-      if (seoGenQualityEnabled && closedSetBlock) {
-        const groundedPrompt = buildClosedSetPageAssignmentPrompt({
-          businessSection,
-          closedSetBlock,
-          batchPages,
-          batchLength: batch.length,
-        });
-
-        log.info(`Batch ${batchIdx + 1}/${batches.length} (closed-set): ${batch.length} pages, ${groundedPrompt.length} chars`);
-        const messages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
-          { role: 'user', content: groundedPrompt },
-        ];
-        let raw = await callNamedStrategyAI(ws.id, 'keyword-page-assignment', messages, 3000);
-        let parsedResult = pageAssignmentResponseSchema.safeParse(parseJsonFallback<unknown>(raw, null));
-        if (!parsedResult.success) {
-          // Retry ONCE: append the raw assistant turn + a user turn quoting the issues.
-          const issues = parsedResult.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
-          log.warn({ workspaceId: ws.id, issues }, `Batch ${batchIdx + 1} closed-set OP1 failed validation — retrying once`);
-          messages.push({ role: 'assistant', content: raw });
-          messages.push({ role: 'user', content: `Your previous response failed schema validation: ${issues}. Return ONLY the corrected JSON object matching the exact { "assignments": [...] } shape. No markdown.` });
-          raw = await callNamedStrategyAI(ws.id, 'keyword-page-assignment', messages, 3000);
-          parsedResult = pageAssignmentResponseSchema.safeParse(parseJsonFallback<unknown>(raw, null));
-        }
-        if (parsedResult.success) {
-          sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${parsedResult.data.assignments.length} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
-          const mapped: PageMapping[] = parsedResult.data.assignments.map(a => {
-            // (I1) Verify closed-set membership: accept the AI's sourceId only if it
-            // is a real candidate id; else fall back to the keyword only if THAT is
-            // in the set. An in-set pick (normalized == candidate id) short-circuits
-            // the eligibility check in post-processing. If neither is in the set, pass
-            // the raw keyword through so postProcessBatch's eligibility + per-page
-            // fallback path rejects the hallucination (never admits it, and never
-            // lets a hallucinated id override a valid in-set keyword).
-            const resolved = resolveClosedSetKeyword(candidateIds, a.primaryKeywordSourceId, a.primaryKeyword);
-            return {
-              pagePath: a.pagePath,
-              pageTitle: a.pageTitle,
-              primaryKeyword: resolved ?? a.primaryKeyword,
-              secondaryKeywords: a.secondaryKeywords,
-              searchIntent: a.searchIntent ?? 'informational',
-            };
-          });
-          return postProcessBatch(mapped);
-        }
-        // Still failing after the retry: synthesize a REAL per-page keyword via
-        // findFallbackKeywordForPage so pages are NOT dropped (M1). Unlike the legacy
-        // syntheticBatchFallback (empty/_parseError → filtered out), this keeps pages
-        // with a page-identity/provider/GSC-derived keyword.
-        log.error({ workspaceId: ws.id, detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} closed-set OP1 failed after retry — real per-page fallback`);
-        return perPageFallbackBatch();
-      }
-
-      // ── Legacy flag-OFF path — VERBATIM ──
-      const hasPool = keywordPool.size > 0;
-      const batchPrompt = buildLegacyPageAssignmentPrompt({
-        businessSection,
-        keywordPoolReference: semrushBatchRef,
-        batchPages,
-        batchLength: batch.length,
-        hasPool,
-      });
-
-      log.info(`Batch ${batchIdx + 1}/${batches.length}: ${batch.length} pages, ${batchPrompt.length} chars`);
-      const raw = await callStrategyAI([
-        { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
-        { role: 'user', content: batchPrompt },
-      ], 3000, `batch-${batchIdx + 1}`);
-
-      const parsed = parseJsonFallback<PageMapping[] | null>(raw, null);
-      if (Array.isArray(parsed)) {
-        log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
-        sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
-        return postProcessBatch(parsed);
-      }
-      log.error({ detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} returned invalid JSON:`);
-      return syntheticBatchFallback();
-    };
-
-    // Run batches with limited concurrency (3 at a time)
-    const CONCURRENCY = 3;
-    const allPageMappings: PageMapping[] = [];
-    for (let i = 0; i < batches.length; i += CONCURRENCY) {
-      const chunk = batches.slice(i, i + CONCURRENCY);
-      const results = await Promise.all(chunk.map((batch, ci) => runBatch(batch, i + ci)));
-      allPageMappings.push(...results.flat());
-    }
-    // Filter out pages with parse errors and log warning
-    const parseErrors = allPageMappings.filter((pm: { _parseError?: boolean }) => pm._parseError);
-    if (parseErrors.length > 0) {
-      log.warn(`${parseErrors.length} pages had JSON parse or keyword validation errors and were assigned empty keywords`);
-      // Remove invalid pages from the mappings so empty primary keywords are not persisted.
-      const validMappings = allPageMappings.filter((pm: { _parseError?: boolean }) => !pm._parseError);
-      allPageMappings.length = 0;
-      allPageMappings.push(...validMappings);
-    }
-    log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
-
-    // --- Incremental mode: merge preserved (fresh) pages back into the page mappings ---
-    // These pages had analysis_generated_at < 7 days old so we keep their existing keywords.
-    if (strategyMode === 'incremental' && pagesToPreserve.length > 0) {
-      const preservedPaths = new Set(pagesToPreserve.map(p => p.path));
-      for (const pk of existingPageKeywords) {
-        if (preservedPaths.has(pk.pagePath)) {
-          allPageMappings.push({
-            ...pk,
-            searchIntent: pk.searchIntent || 'informational',
-            secondaryKeywords: pk.secondaryKeywords || [],
-          });
-        }
-      }
-      log.info(`Incremental mode: merged ${pagesToPreserve.length} preserved pages into final mappings`);
-    }
+    const allPageMappings = await runPageAssignmentBatches({
+      workspaceId: ws.id,
+      businessSection,
+      pagesForBatching,
+      allPageInfo: pageInfo,
+      strategyMode,
+      pagesToPreserve,
+      existingPageKeywords,
+      gscByPath,
+      providerKeywordsByPath: semrushByPath,
+      keywordPool,
+      keywordPoolReference: semrushBatchRef,
+      seoGenQualityEnabled,
+      closedSetBlock,
+      candidateIds,
+      isEligibleGeneratedKeyword,
+      callStrategyAI,
+      callNamedStrategyAI,
+      sendProgress,
+    });
 
     await validatePageMappingsWithProvider({
       workspaceId: ws.id,
@@ -691,22 +447,6 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // The batch results ARE the pageMap. Master only generates siteKeywords, contentGaps, quickWins, opportunities.
     // This keeps output small (~2K tokens) and fast.
     sendProgress('ai', 'Synthesizing site-level strategy...', 0.78);
-
-    // Detect keyword conflicts from batch results (batches don't know about each other)
-    const kwCount = new Map<string, string[]>();
-    for (const pm of allPageMappings) {
-      const kw = normalizeKeyword(pm.primaryKeyword);
-      if (!kw) continue;
-      if (!kwCount.has(kw)) kwCount.set(kw, []);
-      kwCount.get(kw)!.push(pm.pagePath);
-    }
-    const conflicts = [...kwCount.entries()].filter(([, pages]) => pages.length > 1);
-    if (conflicts.length > 0) {
-      log.info(`Found ${conflicts.length} keyword conflicts to resolve`);
-    }
-
-    // Compact summary: just keywords per page (no secondary details — keep prompt small)
-    const kwSummary = allPageMappings.map(pm => `${pm.pagePath}: "${pm.primaryKeyword}"`).join('\n');
 
     // GSC: top queries + enriched signals
     let gscSummary = '';
@@ -824,9 +564,6 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
 
     const hasProviderContext = sanitizedProviderKeywordLines > 0;
     const hasKeywordGaps = eligibleKeywordGapCount > 0;
-    const conflictNote = conflicts.length > 0
-      ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
-      : '';
 
     // Fetch analytics intelligence from computed insights layer
     let intelligenceBlock = '';
@@ -902,133 +639,30 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
 
-    let masterData: MasterStrategyData;
-    const masterClosedSetBlock = closedSetBlock;
-    const competitorBrandTokens = [...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))];
-    if (seoGenQualityEnabled && masterClosedSetBlock) {
-      // ── SEO Generation Quality P3 (flag-ON): closed-set, Zod-validated OP2 ──
-      const groundedMasterPrompt = buildClosedSetSiteSynthesisPrompt({
-        businessSection,
-        pageMappingCount: allPageMappings.length,
-        keywordSummary: kwSummary,
-        conflictNote,
-        gscSummary,
-        ga4Context,
-        auditContext,
-        providerContext: sanitizedProviderContext,
-        intelligenceBlock,
-        closedSetBlock: masterClosedSetBlock,
-        effectiveBusinessPriorities: businessPrioritiesContext,
-        hasProviderContext,
-        hasKeywordGaps,
-        competitorDomains,
-        competitorBrandTokens,
-        conflictsCount: conflicts.length,
-      });
-
-      log.info(`Master prompt (closed-set): ${groundedMasterPrompt.length} chars (~${Math.ceil(groundedMasterPrompt.length / 4)} tokens)`);
-      const masterMessages: Array<{ role: string; content: string }> = [
-        { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
-        { role: 'user', content: groundedMasterPrompt },
-      ];
-      let masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 4500);
-      let masterResult = siteSynthesisResponseSchema.safeParse(parseJsonFallback<unknown>(masterRaw, null));
-      if (!masterResult.success) {
-        const issues = masterResult.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
-        log.warn({ workspaceId: ws.id, issues }, 'Master closed-set OP2 failed validation — retrying once');
-        masterMessages.push({ role: 'assistant', content: masterRaw });
-        masterMessages.push({ role: 'user', content: `Your previous response failed schema validation: ${issues}. Return ONLY the corrected JSON object with the exact keys siteKeywords, opportunities, contentGaps, quickWins. No markdown.` });
-        masterRaw = await callNamedStrategyAI(ws.id, 'keyword-site-synthesis', masterMessages, 4500);
-        masterResult = siteSynthesisResponseSchema.safeParse(parseJsonFallback<unknown>(masterRaw, null));
-      }
-      if (masterResult.success) {
-        const d = masterResult.data;
-        // (I1) Verify closed-set membership for every content-gap target. Accept the
-        // AI's targetKeywordSourceId only if it is a real candidate id; else fall back
-        // to targetKeyword only if THAT is in the set; else DROP the gap (do not admit
-        // an out-of-set/hallucinated keyword). The never-emit-empty backfill below
-        // re-fills contentGaps from the universe candidates if dropping leaves us
-        // below the floor, so this never silently empties the strategy.
-        let droppedOutOfSetGaps = 0;
-        const validatedGaps = d.contentGaps.flatMap(cg => {
-          const resolved = resolveClosedSetKeyword(candidateIds, cg.targetKeywordSourceId, cg.targetKeyword);
-          if (!resolved) {
-            droppedOutOfSetGaps++;
-            return [];
-          }
-          const { targetKeywordSourceId: _ignored, ...rest } = cg;
-          void _ignored;
-          return [{
-            ...rest,
-            targetKeyword: resolved,
-            topic: cg.topic,
-          } as StrategyContentGap & { targetKeyword: string; topic: string }];
-        });
-        if (droppedOutOfSetGaps > 0) {
-          log.info({ workspaceId: ws.id, droppedOutOfSetGaps }, 'Dropped OP2 content gaps whose targetKeyword/sourceId was not in the closed candidate set');
-        }
-        masterData = {
-          siteKeywords: d.siteKeywords,
-          opportunities: d.opportunities,
-          contentGaps: validatedGaps,
-          quickWins: d.quickWins as StrategyQuickWin[],
-          keywordFixes: d.keywordFixes as StrategyKeywordFix[],
-        };
-      } else {
-        // Still failing after the retry: use a TYPED-EMPTY object (NOT a throw). The
-        // never-emit-empty content-gap backfill below fills contentGaps to the floor
-        // from the universe candidates so the flag-ON path is never silently empty.
-        log.error({ workspaceId: ws.id, detail: masterRaw.slice(0, 300) }, 'Master closed-set OP2 failed after retry — typed-empty + deterministic backfill');
-        masterData = { siteKeywords: [], opportunities: [], contentGaps: [], quickWins: [], keywordFixes: [] };
-      }
-    } else {
-      // ── Legacy flag-OFF path — VERBATIM (including the throw) ──
-      const masterPrompt = buildLegacySiteSynthesisPrompt({
-        businessSection,
-        pageMappingCount: allPageMappings.length,
-        keywordSummary: kwSummary,
-        conflictNote,
-        gscSummary,
-        ga4Context,
-        auditContext,
-        providerContext: sanitizedProviderContext,
-        intelligenceBlock,
-        hasProviderContext,
-        hasKeywordGaps,
-        competitorDomains,
-        competitorBrandTokens,
-        conflictsCount: conflicts.length,
-        clientKeywordsAdded,
-      });
-
-      log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
-
-      const masterRaw = await callStrategyAI([
-        { role: 'system', content: 'You are an expert SEO strategist. Return valid JSON only.' },
-        { role: 'user', content: masterPrompt },
-      ], 3000, 'master');
-
-      const parsedMasterData = parseJsonFallback<MasterStrategyData | null>(masterRaw, null);
-      if (!parsedMasterData) {
-        log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
-        const errMsg = 'AI returned invalid JSON in master synthesis';
-        throw new KeywordStrategySynthesisError(500, { error: errMsg, raw: masterRaw.slice(0, 500) });
-      }
-      masterData = parsedMasterData;
-    }
-
-    // Apply keyword conflict fixes from master
-    if (masterData.keywordFixes?.length) {
-      const { appliedFixes, suppressedFixes } = applyKeywordConflictFixes(
-        allPageMappings,
-        masterData.keywordFixes,
-        isEligibleGeneratedKeyword,
-      );
-      log.info(`Applied ${appliedFixes} keyword conflict fixes`);
-      if (suppressedFixes > 0) {
-        log.info(`Suppressed ${suppressedFixes} keyword conflict fixes via shared keyword intelligence`);
-      }
-    }
+    const siteSynthesisContext: SiteSynthesisContext = {
+      gscSummary,
+      ga4Context,
+      auditContext,
+      providerContext: sanitizedProviderContext,
+      intelligenceBlock,
+    };
+    const masterData: MasterStrategyData = await runSiteSynthesis({
+      workspaceId: ws.id,
+      businessSection,
+      allPageMappings,
+      closedSetBlock,
+      candidateIds,
+      effectiveBusinessPriorities: businessPrioritiesContext,
+      context: siteSynthesisContext,
+      hasProviderContext,
+      hasKeywordGaps,
+      competitorDomains,
+      clientKeywordsAdded,
+      seoGenQualityEnabled,
+      isEligibleGeneratedKeyword,
+      callStrategyAI,
+      callNamedStrategyAI,
+    });
 
     // Post-generation hard filter: remove declined keywords from siteKeywords.
     // The AI prompt instructs this, but LLMs don't always comply — hard filter is the real defense.
