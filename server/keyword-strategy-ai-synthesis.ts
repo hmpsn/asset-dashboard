@@ -16,21 +16,16 @@ import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } 
 import { buildStrategySignals } from './insight-feedback.js';
 import { extractBrandTokens } from './competitor-brand-filter.js';
 import { isProgrammingError } from './errors.js';
-import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
-import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, getLocalSeoPosture } from './local-seo.js';
-import { LOCAL_SEO_POSTURE } from '../shared/types/local-seo.js';
-import { buildWorkspaceIntelligence, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
-import { formatPersonasForPrompt } from './intelligence/persona-format.js';
-import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
+import { resolveWorkspaceLanguageCode, resolveWorkspaceLocationCode } from './local-seo.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import { pageAssignmentResponseSchema, siteSynthesisResponseSchema } from './schemas/keyword-strategy-schemas.js';
-import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
-import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 import type { KeywordCandidate } from '../shared/types/keyword-universe.js';
 import { callKeywordStrategyAI, callNamedStrategyAI } from './keyword-strategy-synthesis/ai-callers.js';
 import { KeywordStrategySynthesisError } from './keyword-strategy-synthesis/errors.js';
+import { assembleSynthesisContext } from './keyword-strategy-synthesis/context.js';
+import { validatePageMappingsWithProvider } from './keyword-strategy-synthesis/provider-validation.js';
 import {
   buildKeywordPoolSection,
   buildLegacyKeywordPool,
@@ -170,109 +165,19 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
   // Keyword pool — declared outside try so enrichment code can access it after batching
   const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
 
-  // Business context section — declared outside try so topic clustering can access it
-  let businessSection = '';
-  if (businessContext) {
-    businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
-  }
-  const strategySlices = await withActiveLocalSeoSlice(ws.id, ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
-  const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: strategySlices,
-    learningsDomain: 'strategy',
-  });
-    const strategySeo = strategyIntel.seoContext;
-    const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
-    const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
-    const localSeoBlock = formatForPrompt(strategyIntel, {
-      verbosity: 'standard',
-      sections: ['localSeo'],
-      tokenBudget: 1600,
-      learningsDomain: 'strategy',
-    });
-    if (kbBlock) {
-      businessSection += kbBlock + '\n';
-    }
-    if (persBlock) {
-      businessSection += persBlock + '\n';
-    }
-    if (/##\s/.test(localSeoBlock)) {
-      businessSection += `${localSeoBlock}\nUse Local SEO evidence conservatively. It can shape local content/page posture, but do not treat local visibility as GSC rank tracking and do not imply provider checks ran during this strategy generation.\n`;
-    }
+  const {
+    businessSection,
+    strategyIntel,
+    declinedKeywords,
+    requestedKeywords,
+    includeLocalUniverse,
+    keywordEvaluationContext: strategyKeywordEvaluationContext,
+  } = await assembleSynthesisContext({ ws, businessContext });
+  const clientSignals = strategyIntel.clientSignals;
 
-    const clientSignals = strategyIntel.clientSignals;
-
-    // Inject client-declined keywords so AI avoids them. Use the intelligence slice
-    // plus the direct helper as a fallback/compat guard.
-    const declinedKeywords = [...new Set([
-      ...(clientSignals?.keywordFeedback.rejected ?? []),
-      ...getDeclinedKeywords(ws.id),
-    ])];
-    if (declinedKeywords.length > 0) {
-      businessSection += `\nDECLINED KEYWORDS (the client has explicitly rejected these — do NOT suggest them or close variants as primaryKeyword, secondaryKeywords, or content gap targets):\n${declinedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
-      const rejectionReasons = clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [];
-      if (rejectionReasons.length > 0) {
-        businessSection += `Top rejection reasons: ${rejectionReasons.join(', ')} — avoid keywords matching these patterns.\n`;
-      }
-      log.info(`Injecting ${declinedKeywords.length} declined keywords into AI prompt`);
-    }
-
-    // Inject client-requested keywords so AI prioritizes them. These are not the
-    // same as clientSignals.keywordFeedback.approved; requested is its own status.
-    const requestedKeywords = getRequestedKeywords(ws.id);
-    if (requestedKeywords.length > 0) {
-      businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
-      log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
-    }
-
-    const approvedKeywords = clientSignals?.keywordFeedback.approved ?? [];
-    if (approvedKeywords.length > 0) {
-      businessSection += `\nAPPROVED KEYWORDS (client has positively reviewed these — treat as safe strategic direction):\n${approvedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
-    }
-    if (clientSignals?.contentGapVotes?.length) {
-      businessSection += `\nCLIENT-PRIORITIZED TOPICS (upvoted by client — give high priority):\n${clientSignals.contentGapVotes.map(v => `- "${v.topic}" (${v.votes} votes)`).join('\n')}\n`;
-    }
-    if (clientSignals?.effectiveBusinessPriorities?.length) {
-      businessSection += `\nBUSINESS PRIORITIES: ${clientSignals.effectiveBusinessPriorities.join('; ')}\n`;
-    }
-    const coverageGaps = strategyIntel.contentPipeline?.coverageGaps ?? [];
-    if (coverageGaps.length > 0) {
-      businessSection += `\nSTRATEGY COVERAGE GAPS (strategy keywords without content briefs — prioritize in contentGaps):\n${coverageGaps.map(k => `- "${k}"`).join('\n')}\n`;
-    }
-
-    const learningsBlock = formatForPrompt(strategyIntel, {
-      sections: ['learnings'],
-      learningsDomain: 'strategy',
-      verbosity: 'standard',
-      tokenBudget: 1500,
-    });
-    if (learningsBlock) {
-      businessSection += `\n\n${learningsBlock}\n`;
-      log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
-    } else {
-      const learningsStatusNote = buildOutcomeLearningStatusNote(strategyIntel.learnings?.availability, 'strategy');
-      if (learningsStatusNote) {
-        businessSection += `\nOUTCOME LEARNING STATUS: ${learningsStatusNote}\n`;
-      }
-    }
-
-    // The generation-quality path is now canonical. Local-intent candidates still stay
-    // posture-gated so non-local workspaces do not accumulate irrelevant local terms.
-    const seoGenQualityEnabled = true;
-    const localPosture = getLocalSeoPosture(ws.id);
-    const includeLocalUniverse = localPosture === LOCAL_SEO_POSTURE.LOCAL || localPosture === LOCAL_SEO_POSTURE.HYBRID;
-    const strategyKeywordEvaluationContext = buildStrategyKeywordEvaluationContext({
-      workspaceId: ws.id,
-      workspaceName: ws.name,
-      businessContext,
-      seoContext: strategySeo,
-      clientSignals,
-      declinedKeywords,
-      requestedKeywords,
-      approvedKeywords,
-      strictBusinessFit: true,
-      // Drop the business_mismatch hard-suppress escalation so narrow-but-real
-      // keywords survive into ranking (penalty stays).
-      relaxConservatism: seoGenQualityEnabled,
-    });
+  // The generation-quality path is now canonical. Local-intent candidates still stay
+  // posture-gated so non-local workspaces do not accumulate irrelevant local terms.
+  const seoGenQualityEnabled = true;
 
     let strategy: StrategyOutput = {};
     // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
@@ -770,83 +675,17 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       log.info(`Incremental mode: merged ${pagesToPreserve.length} preserved pages into final mappings`);
     }
 
-    // --- Post-AI keyword validation via SEO provider bulk lookup ---
-    // Optimization: check domain organic data + existing page_keywords before calling API
-    if (provider && seoDataMode !== 'none') {
-      const domainKwLookup = new Map(semrushDomainData.map(k => [normalizeKeyword(k.keyword), k])); // map-dup-ok
-      const existingPkLookup = new Map(
-        listPageKeywords(ws.id)
-          .filter(pk => pk.volume && pk.volume > 0 && !isSuspiciousPlannerGroupedVolume(pk.primaryKeyword, pk.volume))
-          .map(pk => [normalizeKeyword(pk.primaryKeyword), pk])
-      );
-
-      // First pass: enrich from already-fetched data (no API calls)
-      const needsApiLookup: string[] = [];
-      let preEnriched = 0;
-      for (const pm of allPageMappings) {
-        const kwLower = normalizeKeyword(pm.primaryKeyword ?? '');
-        if (!kwLower) continue;
-        // Check domain organic data (already fetched this run)
-        const domainHit = domainKwLookup.get(kwLower);
-        if (domainHit && domainHit.volume > 0) {
-          pm.validated = true;
-          pm.volume = domainHit.volume;
-          pm.difficulty = domainHit.difficulty;
-          preEnriched++;
-          continue;
-        }
-        // Check existing page_keywords from previous strategy runs
-        const pkHit = existingPkLookup.get(kwLower);
-        if (pkHit && pkHit.volume && pkHit.volume > 0) {
-          pm.validated = true;
-          pm.volume = pkHit.volume;
-          pm.difficulty = pkHit.difficulty ?? 0;
-          preEnriched++;
-          continue;
-        }
-        needsApiLookup.push(pm.primaryKeyword);
-      }
-      log.info(`Keyword validation: ${preEnriched} pre-enriched from existing data, ${needsApiLookup.length} need API lookup`);
-
-      // Second pass: fetch remaining from provider API
-      if (needsApiLookup.length > 0) {
-        try {
-          const uniqueNeedsByKey = new Map<string, string>();
-          for (const keyword of needsApiLookup) {
-            const key = normalizeKeyword(keyword);
-            if (key && !uniqueNeedsByKey.has(key)) {
-              uniqueNeedsByKey.set(key, keyword);
-            }
-          }
-          const uniqueNeeds = [...uniqueNeedsByKey.values()];
-          const locationCode = resolveWorkspaceLocationCode(ws.id) ?? undefined;
-          // (I4) On the flag-ON path validate page keywords in the resolved
-          // workspace language (matching the universe's resolved-language pool);
-          // flag-OFF passes no languageCode → the provider's 'en' default, so the
-          // flag-OFF request is byte-identical to before.
-          const languageCode = usedKeywordUniverse ? resolveWorkspaceLanguageCode(ws.id) : undefined;
-          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id, undefined, locationCode, languageCode);
-          const metricMap = new Map(metrics.map(m => [normalizeKeyword(m.keyword), m])); // map-dup-ok
-
-          let unvalidated = 0;
-          for (const pm of allPageMappings) {
-            if (pm.validated != null) continue; // already handled
-            const m = metricMap.get(normalizeKeyword(pm.primaryKeyword));
-            if (m && m.volume > 0 && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
-              pm.validated = true;
-              pm.volume = m.volume;
-              pm.difficulty = m.difficulty;
-            } else {
-              pm.validated = false;
-              unvalidated++;
-            }
-          }
-          log.info(`API validation: ${needsApiLookup.length - unvalidated} validated, ${unvalidated} unvalidated`);
-        } catch (err) {
-          log.error({ err }, 'Post-AI keyword validation error');
-        }
-      }
-    }
+    await validatePageMappingsWithProvider({
+      workspaceId: ws.id,
+      pageMappings: allPageMappings,
+      provider,
+      seoDataMode,
+      domainKeywords: semrushDomainData,
+      usedKeywordUniverse,
+      isSuspiciousGroupedVolume: isSuspiciousPlannerGroupedVolume,
+      resolveLocationCode: resolveWorkspaceLocationCode,
+      resolveLanguageCode: resolveWorkspaceLanguageCode,
+    });
 
     // --- STEP 2: Master synthesis — site-level strategy only ---
     // The batch results ARE the pageMap. Master only generates siteKeywords, contentGaps, quickWins, opportunities.
