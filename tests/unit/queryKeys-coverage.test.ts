@@ -91,6 +91,13 @@ describe('queryKeys.admin SEO keys', () => {
     expect(queryKeys.admin.auditAll()).toEqual(['admin-audit']);
   });
 
+  it('auditLatest and auditHistory nest under the admin audit prefix', () => {
+    expect(queryKeys.admin.auditLatest(SITE, WS)).toEqual(['admin-audit', 'latest', SITE, WS]);
+    expect(queryKeys.admin.auditHistory(SITE, WS)).toEqual(['admin-audit', 'history', SITE, WS]);
+    expect(queryKeys.admin.auditLatest(SITE)).toEqual(['admin-audit', 'latest', SITE]);
+    expect(queryKeys.admin.auditHistory(SITE)).toEqual(['admin-audit', 'history', SITE]);
+  });
+
   it('auditTraffic includes siteId', () => {
     expect(queryKeys.admin.auditTraffic(SITE)).toEqual(['admin-audit-traffic', SITE]);
   });

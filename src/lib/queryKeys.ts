@@ -65,6 +65,10 @@ export const queryKeys = {
 
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
+    auditLatest: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-audit', 'latest', siteId, wsId] as const : ['admin-audit', 'latest', siteId] as const,
+    auditHistory: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-audit', 'history', siteId, wsId] as const : ['admin-audit', 'history', siteId] as const,
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
     auditTrafficAll: () => ['admin-audit-traffic'] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,

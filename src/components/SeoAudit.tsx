@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
+import { useState, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminPath } from '../routes';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
-import { post, put, del, getSafe, getOptional } from '../api/client';
-import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { useAuditTrafficMap, useAuditSuppressions } from '../hooks/admin';
+import { post, put, del } from '../api/client';
+import { useAuditTrafficMap, useAuditSuppressions, useSeoAuditWorkflow } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import {
@@ -24,7 +23,7 @@ import { AuditHistory } from './audit/AuditHistory';
 import { SeoAuditGuide } from './audit/SeoAuditGuide';
 import {
   type Severity, type CheckCategory, type SeoIssue, type PageSeoResult,
-  type SeoAuditResult, type SnapshotSummary,
+  type SeoAuditResult,
   SEVERITY_CONFIG,
 } from './audit/types';
 import { applyClientSuppressions } from '../lib/audit-suppression-client';
@@ -56,12 +55,20 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startJob, jobs } = useBackgroundTasks();
-  const auditJobId = useRef<string | null>(null);
-  const reportWorkspaceQuery = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
-  const [data, setData] = useState<SeoAuditResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [hasRun, setHasRun] = useState(false);
+  const {
+    data,
+    loading,
+    hasRun,
+    history,
+    auditError,
+    showNextSteps,
+    setShowNextSteps,
+    skipLinkCheck,
+    setSkipLinkCheck,
+    runAudit,
+    refreshAuditHistory,
+    runningAuditJob,
+  } = useSeoAuditWorkflow({ siteId, workspaceId });
   const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>(() => {
     const sub = searchParams.get('sub');
     const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay', 'guide'];
@@ -73,14 +80,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [categoryFilter, setCategoryFilter] = useState<CheckCategory | 'all'>('all');
   const [reportModal, setReportModal] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
-  const [history, setHistory] = useState<SnapshotSummary[]>([]);
   const [saving, setSaving] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const [skipLinkCheck, setSkipLinkCheck] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  const [showNextSteps, setShowNextSteps] = useState(false);
 
   const [applyingFix, setApplyingFix] = useState<string | null>(null);
   const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
@@ -243,81 +245,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     bulkHandlersRef.current?.cancel();
   };
 
-  const runAudit = async () => {
-    setLoading(true);
-    setHasRun(true);
-    setAuditError(null);
-    setShowNextSteps(false);
-    const jobId = await startJob('seo-audit', { siteId, workspaceId, skipLinkCheck });
-    if (jobId) {
-      auditJobId.current = jobId;
-    } else {
-      setAuditError('Failed to start audit job');
-      setLoading(false);
-    }
-  };
-
-  const loadHistory = useCallback(() => {
-    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history${reportWorkspaceQuery}`, [])
-      .then(h => setHistory(Array.isArray(h) ? h : []))
-      .catch(() => {});
-  }, [siteId, reportWorkspaceQuery]);
-
-  // Watch for audit job completion via WebSocket-driven jobs array // effect-layout-ok — jobs is driven by WS events, state update is genuinely post-paint
-  useEffect(() => {
-    if (!auditJobId.current) return;
-    const job = jobs.find(j => j.id === auditJobId.current);
-    if (!job) return;
-    if (job.status === 'done' && job.result) {
-      const d = job.result as SeoAuditResult & { snapshotId?: string };
-      if (d && Array.isArray(d.pages)) {
-        setData(d);
-        setShowNextSteps(true);
-        loadHistory(); // Refresh history — snapshot was auto-saved server-side
-      } else {
-        setAuditError('Invalid audit response');
-      }
-      setLoading(false);
-      auditJobId.current = null;
-    } else if (job.status === 'error') {
-      setAuditError(job.error || 'Audit failed');
-      setLoading(false);
-      auditJobId.current = null;
-    }
-  }, [jobs, loadHistory]);
-
-  useEffect(() => {
-    // Check for existing completed or running seo-audit job for this site
-    const existingJob = jobs
-      .filter(j => j.type === 'seo-audit' && j.status === 'done' && j.result && j.workspaceId === workspaceId)
-      .find(j => {
-        const r = j.result as SeoAuditResult;
-        return r && Array.isArray(r.pages);
-      });
-    const runningJob = jobs.find(j => j.type === 'seo-audit' && (j.status === 'running' || j.status === 'pending') && j.workspaceId === workspaceId);
-
-    if (existingJob && !data) {
-      setData(existingJob.result as SeoAuditResult);
-      setHasRun(true);
-    } else if (runningJob && !auditJobId.current) {
-      auditJobId.current = runningJob.id;
-      setLoading(true);
-      setHasRun(true);
-    } else if (!existingJob && !runningJob && !data) {
-      // No in-memory job — try loading latest persisted snapshot from disk
-      getOptional<{ id: string; audit: SeoAuditResult }>(`/api/reports/${siteId}/latest${reportWorkspaceQuery}`)
-        .then(snapshot => {
-          if (snapshot && snapshot.audit && Array.isArray(snapshot.audit.pages)) {
-            setData({ ...snapshot.audit, snapshotId: snapshot.id } as SeoAuditResult & { snapshotId: string });
-            setHasRun(true);
-          }
-        })
-        .catch(() => {});
-    }
-    setAuditError(null);
-    loadHistory();
-  }, [siteId, loadHistory, data, jobs, workspaceId]);
-
   const handleSaveAndShare = async () => {
     if (!data) return;
     setSaving(true);
@@ -335,7 +262,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       const result = await post<{ id: string }>(`/api/reports/${siteId}/snapshot`, { workspaceId, siteName: siteName || siteId, audit: data });
       const url = `${window.location.origin}/report/${result.id}`;
       setShareUrl(url);
-      loadHistory();
+      refreshAuditHistory();
     } catch (err) {
       console.error('Save and share failed:', err);
       alert('Failed to save report. Check your connection.');
@@ -446,7 +373,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     );
   }
   if (auditSubTab === 'history') {
-    return <div>{auditTabBar}{pageHeader}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
+    return <div>{auditTabBar}{pageHeader}<AuditHistory siteId={siteId} history={history} onRefresh={refreshAuditHistory} /></div>;
   }
 
   if (!hasRun) {
@@ -481,7 +408,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   }
 
   if (loading) {
-    const runningAuditJob = auditJobId.current ? jobs.find(j => j.id === auditJobId.current) : undefined;
     const auditProgress = runningAuditJob && runningAuditJob.total && runningAuditJob.progress != null
       ? Math.round((runningAuditJob.progress / runningAuditJob.total) * 100)
       : null;
