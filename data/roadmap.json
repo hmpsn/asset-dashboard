@@ -1223,7 +1223,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high/large. keyword-command-center.ts (3,698) / local-seo.ts (3,238) / recommendations.ts (2,493) / keyword-strategy-ai-synthesis.ts (2,013) / analytics-intelligence.ts (1,499) mix pure logic with DB/job orchestration. Carve into server/domains/. Start with keyword-command-center.ts (only 3 importers = lowest-risk). Behavior-preserving extraction per platform-organization.md."
+          "notes": "AUDIT high/large. keyword-command-center.ts (3,698) / local-seo.ts (3,238) / recommendations.ts (2,493) / keyword-strategy-ai-synthesis.ts (2,013) / analytics-intelligence.ts (1,499) mix pure logic with DB/job orchestration. Carve into server/domains/. Start with keyword-command-center.ts (only 3 importers = lowest-risk). Behavior-preserving extraction per platform-organization.md. Progress 2026-06-26: extracted the KCC row-query/sort helper slice into server/domains/keyword-command-center/ with compatibility re-exports from server/keyword-command-center.ts and a source-boundary contract. Remaining scope: continue carving KCC persistence/action/model assembly slices, then local-seo/recommendations/keyword-strategy-ai-synthesis/analytics-intelligence."
         },
         {
           "id": "simp-audit-0624-helpers-split",

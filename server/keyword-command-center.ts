@@ -45,6 +45,23 @@ import {
   getLostVisibilityKeys,
   getLostVisibilityQueries,
 } from './client-discovered-queries.js';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  buildCounts,
+  buildFilterFacetsFromCounts,
+  buildFilters,
+  filterNeedsLocalCandidates,
+  matchesFilter,
+  matchesSearch,
+  paginateRows,
+  setKeywordCommandCenterRowValueScore,
+  sortRows,
+  sortRowsForQuery,
+  stripRowForList,
+  type SkinnyFilterCounts,
+} from './domains/keyword-command-center/row-query.js';
+import { keywordSortComparator, type SortFieldAccessors } from './domains/keyword-command-center/sort.js';
 import type { ContentGap, KeywordGapItem, KeywordStrategy, PageKeywordMap, Workspace } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -62,7 +79,6 @@ import {
   type KeywordCommandCenterDetailResponse,
   type KeywordCommandCenterFeedbackState,
   type KeywordCommandCenterFilter,
-  type KeywordCommandCenterFilterMeta,
   type KeywordCommandCenterLocalSeoState,
   type KeywordCommandCenterMetrics,
   type KeywordCommandCenterNextAction,
@@ -85,11 +101,22 @@ import {
 import type { KeywordStrategyExplanation } from '../shared/types/keyword-strategy-ux.js';
 import type { OutcomeReadback } from '../shared/types/outcome-tracking.js';
 
+export {
+  buildCounts,
+  buildFilterFacetsFromCounts,
+  filterCount,
+  filterNeedsLocalCandidates,
+  matchesFilter,
+  matchesSearch,
+  paginateRows,
+  sortRows,
+  sortRowsForQuery,
+  stripLocalSeoVisibility,
+} from './domains/keyword-command-center/row-query.js';
+
 const RAW_EVIDENCE_ROW_LIMIT = 75;
 const RANK_EVIDENCE_ROW_LIMIT = 50;
 const LOCAL_CANDIDATE_ROW_LIMIT = 75;
-const DEFAULT_PAGE_SIZE = 50;
-const MAX_PAGE_SIZE = 100;
 
 /**
  * Universe-full safety ceiling (Task 3). When the `keyword-universe-full` flag is
@@ -105,16 +132,6 @@ const UNIVERSE_SAFETY_CEILING = 2000;
 const log = createLogger('keyword-command-center');
 
 const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
-
-/**
- * Per-request transient carrier for a finalized row's precomputed value-first
- * score. Kept OFF the public `KeywordCommandCenterRow` type (it must never
- * serialize to the client) — the `opportunity` accessor reads it as a trivial
- * field read. A WeakMap so finalized rows that fall
- * out of scope are collected without leaking. `undefined` (key absent) flows
- * through `compareMetric` as missing-last, exactly like a no-signal score.
- */
-const rowValueScore = new WeakMap<KeywordCommandCenterRow, number>();
 
 /**
  * The SINGLE "select ranked-untracked GSC queries" function. Given the ranks that
@@ -791,339 +808,6 @@ function buildNextActions(
   return actions;
 }
 
-export function sortRows(a: KeywordCommandCenterRow, b: KeywordCommandCenterRow): number {
-  const statusOrder: Record<KeywordCommandCenterStatus, number> = {
-    [KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY]: 0,
-    [KEYWORD_COMMAND_CENTER_STATUS.TRACKED]: 1,
-    [KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW]: 2,
-    [KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE]: 3,
-    [KEYWORD_COMMAND_CENTER_STATUS.DECLINED]: 4,
-    [KEYWORD_COMMAND_CENTER_STATUS.RETIRED]: 5,
-  };
-  const byStatus = statusOrder[a.lifecycleStatus] - statusOrder[b.lifecycleStatus];
-  if (byStatus !== 0) return byStatus;
-  const aVolume = a.metrics.volume ?? a.metrics.impressions ?? 0;
-  const bVolume = b.metrics.volume ?? b.metrics.impressions ?? 0;
-  if (aVolume !== bVolume) return bVolume - aVolume;
-  return a.keyword.localeCompare(b.keyword);
-}
-
-// ---------------------------------------------------------------------------
-// Unified sort comparator (single source of truth for BOTH stages)
-//
-// The page-bounded pipeline sorts cheap candidate keys pre-pagination
-// (`candidateSortForQuery`) and full rows post-evaluation (`sortRowsForQuery`).
-// If the two comparators disagree, page-1 ≠ global-top-N. To make drift
-// impossible, both consume the SAME `keywordSortComparator` via type-specific
-// field accessors. Only the accessors differ between the two stages.
-// ---------------------------------------------------------------------------
-
-/** The explicit, directioned sorts handled by the shared comparator core. */
-type ExplicitSort = 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty' | 'opportunity';
-
-/** Per-type field readers. `null`/`undefined` numeric values mean "missing". */
-interface SortFieldAccessors<T> {
-  keyword: (item: T) => string;
-  demand: (item: T) => number | null | undefined;
-  rank: (item: T) => number | null | undefined;
-  clicks: (item: T) => number | null | undefined;
-  difficulty: (item: T) => number | null | undefined;
-  /** Opportunity score (0–100): volume-weighted × ease. The DEFAULT Hub sort. */
-  opportunity: (item: T) => number | null | undefined;
-}
-
-/**
- * Natural sort directions when `direction` is absent. `keyword`/`rank` ascend
- * (A→Z, position 1 first); `demand`/`clicks`/`difficulty` descend (biggest
- * first). An explicit `direction` always overrides these.
- */
-const NATURAL_SORT_DIRECTION: Record<ExplicitSort, 'asc' | 'desc'> = {
-  keyword: 'asc',
-  rank: 'asc',
-  demand: 'desc',
-  clicks: 'desc',
-  difficulty: 'desc',
-  opportunity: 'desc',
-};
-
-/**
- * Compare two possibly-missing numeric metric values such that missing values
- * ALWAYS sort last regardless of direction. Returns a directioned comparison
- * for two present values, and a sign that pushes the missing one last.
- */
-function compareMetric(
-  a: number | null | undefined,
-  b: number | null | undefined,
-  direction: 'asc' | 'desc',
-): number {
-  const aMissing = a == null || Number.isNaN(a);
-  const bMissing = b == null || Number.isNaN(b);
-  if (aMissing && bMissing) return 0;
-  if (aMissing) return 1; // a goes after b
-  if (bMissing) return -1; // b goes after a
-  return direction === 'asc' ? a - b : b - a;
-}
-
-/**
- * The shared comparator for the explicit, directioned sorts. Tiebreak is ALWAYS
- * `keyword.localeCompare` (ascending) in both stages — identical tiebreak →
- * identical order → page-1 == global-top-N.
- */
-function keywordSortComparator<T>(
-  sort: ExplicitSort,
-  direction: 'asc' | 'desc' | undefined,
-  accessors: SortFieldAccessors<T>,
-): (a: T, b: T) => number {
-  const dir = direction ?? NATURAL_SORT_DIRECTION[sort];
-  const tiebreak = (a: T, b: T) => accessors.keyword(a).localeCompare(accessors.keyword(b));
-  if (sort === 'keyword') {
-    return (a, b) => {
-      const cmp = accessors.keyword(a).localeCompare(accessors.keyword(b));
-      return dir === 'asc' ? cmp : -cmp;
-    };
-  }
-  const read: (item: T) => number | null | undefined =
-    sort === 'demand' ? accessors.demand
-      : sort === 'rank' ? accessors.rank
-        : sort === 'clicks' ? accessors.clicks
-          : sort === 'opportunity' ? accessors.opportunity
-            : accessors.difficulty;
-  return (a, b) => {
-    const cmp = compareMetric(read(a), read(b), dir);
-    if (cmp !== 0) return cmp;
-    return tiebreak(a, b);
-  };
-}
-
-const ROW_SORT_ACCESSORS: SortFieldAccessors<KeywordCommandCenterRow> = {
-  keyword: (row) => row.keyword,
-  demand: (row) => row.metrics.volume ?? row.metrics.impressions,
-  rank: (row) => row.metrics.currentPosition,
-  clicks: (row) => row.metrics.clicks,
-  difficulty: (row) => row.metrics.difficulty,
-  // Value-first opportunity: a FIELD READ of the value score precomputed once per
-  // key in finalizeDraftRow (rowValueScore WeakMap) — never recomputed inside the
-  // comparator. `undefined` (no signal / key absent) flows through compareMetric as
-  // missing-last. Mirrors candidate.valueScore so the two sort stages cannot drift.
-  opportunity: (row) => rowValueScore.get(row),
-};
-
-export function sortRowsForQuery(
-  sort: KeywordCommandCenterSort | undefined,
-  direction?: 'asc' | 'desc',
-): (a: KeywordCommandCenterRow, b: KeywordCommandCenterRow) => number {
-  if (sort === undefined || sort === 'priority') return sortRows;
-  return keywordSortComparator(sort, direction, ROW_SORT_ACCESSORS);
-}
-
-/**
- * True when a row is in the "striking distance" position window (11–20 inclusive).
- * Positions are 1-based (lower = better); pos 11 is the first result on page 2.
- * A position of exactly 10 is NOT included (that is still page 1).
- */
-function isStrikingDistanceRow(row: KeywordCommandCenterRow): boolean {
-  const pos = row.metrics.currentPosition;
-  return pos != null && pos >= 11 && pos <= 20;
-}
-
-export function matchesFilter(row: KeywordCommandCenterRow, filter: KeywordCommandCenterFilter): boolean {
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return true;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE) return isStrikingDistanceRow(row);
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return row.assignment?.role === 'content_gap';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return row.assignment?.role === 'page_keyword';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return Boolean(row.localSeoState);
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
-    return row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
-    return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
-      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return Boolean(row.localSeoState && !row.localSeoState.checked);
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) return row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return row.feedback?.status === 'requested';
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) return row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY) return row.isLostVisibility === true;
-  return row.lifecycleStatus === filter;
-}
-
-export function matchesSearch(row: KeywordCommandCenterRow, search: string | undefined): boolean {
-  const query = keywordComparisonKey(search ?? '');
-  if (!query) return true;
-  return row.normalizedKeyword.includes(query)
-    || row.assignment?.pagePath?.toLowerCase().includes(query) === true
-    || row.assignment?.pageTitle?.toLowerCase().includes(query) === true;
-}
-
-export function stripLocalSeoVisibility<T extends LocalSeoKeywordVisibilitySummary | undefined>(visibility: T): T {
-  if (!visibility) return visibility;
-  return {
-    ...visibility,
-    topCompetitors: undefined,
-    markets: visibility.markets.map(market => ({ ...market, topCompetitors: undefined })),
-  } as T;
-}
-
-function stripRowForList(row: KeywordCommandCenterRow): KeywordCommandCenterRow {
-  const localSeo = stripLocalSeoVisibility(row.localSeo);
-  return {
-    ...row,
-    explanation: undefined,
-    localSeo,
-    localSeoState: row.localSeoState ? {
-      ...row.localSeoState,
-      visibility: stripLocalSeoVisibility(row.localSeoState.visibility),
-    } : undefined,
-  };
-}
-
-export function paginateRows(rows: KeywordCommandCenterRow[], query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse['pageInfo'] & { rows: KeywordCommandCenterRow[] } {
-  const pageSize = Math.min(Math.max(Number(query.pageSize) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
-  const totalRows = rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-  const page = Math.min(Math.max(Number(query.page) || 1, 1), totalPages);
-  const start = (page - 1) * pageSize;
-  return {
-    rows: rows.slice(start, start + pageSize),
-    page,
-    pageSize,
-    totalRows,
-    totalPages,
-    hasNextPage: page < totalPages,
-    hasPreviousPage: page > 1,
-  };
-}
-
-export function filterCount(rows: KeywordCommandCenterRow[], filter: KeywordCommandCenterFilter): number {
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return rows.length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE) return rows.filter(isStrikingDistanceRow).length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.CONTENT) return rows.filter(row => row.assignment?.role === 'content_gap').length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED) return rows.filter(row => row.assignment?.role === 'page_keyword').length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL) return rows.filter(row => row.localSeoState).length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES) {
-    return rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) {
-    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH) {
-    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE) {
-    return rows.filter(row =>
-      row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
-      || row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
-    ).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED) return rows.filter(row => row.localSeoState && !row.localSeoState.checked).length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED) {
-    return rows.filter(row => row.localSeo?.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED) return rows.filter(row => row.feedback?.status === 'requested').length;
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.TRACKED) {
-    return rows.filter(row => row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE).length;
-  }
-  if (filter === KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY) {
-    return rows.filter(row => row.isLostVisibility === true).length;
-  }
-  return rows.filter(row => row.lifecycleStatus === filter).length;
-}
-
-export function filterNeedsLocalCandidates(filter: KeywordCommandCenterFilter | undefined): boolean {
-  return filter === KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
-}
-
-export function buildCounts(rows: KeywordCommandCenterRow[]): KeywordCommandCenterCounts {
-  return {
-    total: rows.length,
-    inStrategy: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY).length,
-    tracked: rows.filter(row => row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE).length,
-    needsReview: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW).length,
-    evidence: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE).length,
-    local: rows.filter(row => row.localSeoState).length,
-    localCandidates: rows.filter(row => row.localSeoState?.lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE).length,
-    retired: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.RETIRED).length,
-    declined: rows.filter(row => row.lifecycleStatus === KEYWORD_COMMAND_CENTER_STATUS.DECLINED).length,
-    strikingDistance: rows.filter(isStrikingDistanceRow).length,
-    lostVisibility: rows.filter(row => row.isLostVisibility === true).length,
-    // Sentinel-masked volumes have already been dropped to undefined by mergeMetrics,
-    // so any null/undefined here is genuinely missing (not a planner-bucket masquerade).
-    missingVolume: rows.filter(row => row.metrics.volume == null || row.metrics.volume <= 0).length,
-  };
-}
-
-function buildFilters(rows: KeywordCommandCenterRow[]): KeywordCommandCenterFilterMeta[] {
-  const filters: Array<{ id: KeywordCommandCenterFilter; label: string }> = [
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED, label: 'Tracked' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, label: 'Local Candidates' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY, label: 'Visible Locally' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH, label: 'Possible Match' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE, label: 'Not Visible' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED, label: 'Not Checked' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED, label: 'Provider Degraded' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired' },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY, label: 'Lost Visibility' },
-  ];
-  return filters.map(filter => ({ ...filter, count: filterCount(rows, filter.id) }));
-}
-
-interface SkinnyFilterCounts {
-  all: number;
-  inStrategy: number;
-  tracked: number;
-  needsReview: number;
-  content: number;
-  pageAssigned: number;
-  rawEvidence: number;
-  local: number;
-  localCandidates: number;
-  visibleLocally: number;
-  possibleMatch: number;
-  notVisible: number;
-  notChecked: number;
-  providerDegraded: number;
-  requested: number;
-  declined: number;
-  retired: number;
-  lostVisibility: number;
-  strikingDistance: number;
-}
-
-export function buildFilterFacetsFromCounts(counts: SkinnyFilterCounts): KeywordCommandCenterFilterMeta[] {
-  return [
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All', count: counts.all },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE, label: 'Striking Distance', count: counts.strikingDistance },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY, label: 'In Strategy', count: counts.inStrategy },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED, label: 'Tracked', count: counts.tracked },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review', count: counts.needsReview },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content', count: counts.content },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned', count: counts.pageAssigned },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence', count: counts.rawEvidence },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local', count: counts.local },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, label: 'Local Candidates', count: counts.localCandidates },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY, label: 'Visible Locally', count: counts.visibleLocally },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.POSSIBLE_MATCH, label: 'Possible Match', count: counts.possibleMatch },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_VISIBLE, label: 'Not Visible', count: counts.notVisible },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED, label: 'Not Checked', count: counts.notChecked },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED, label: 'Provider Degraded', count: counts.providerDegraded },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.REQUESTED, label: 'Requested', count: counts.requested },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.DECLINED, label: 'Declined', count: counts.declined },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired', count: counts.retired },
-    { id: KEYWORD_COMMAND_CENTER_FILTERS.LOST_VISIBILITY, label: 'Lost Visibility', count: counts.lostVisibility },
-  ];
-}
-
 async function populateDraftRows(rows: Map<string, DraftRow>, bundle: CommandCenterSourceBundle): Promise<void> {
   const strategy = bundle.strategy;
 
@@ -1452,7 +1136,7 @@ function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): KeywordCo
       intent: finalized.metrics.intent,
     };
     const { score, components } = computeKeywordValueComponents(input, context.valueScoring.ctx);
-    if (score !== undefined) rowValueScore.set(finalized, score);
+    if (score !== undefined) setKeywordCommandCenterRowValueScore(finalized, score);
     // Task 2.2: populate valueReasons from components (admin-only, flag-gated).
     if (components !== undefined) {
       finalized.valueReasons = keywordValueReasons(components, {
