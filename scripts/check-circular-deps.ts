@@ -4,7 +4,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface CircularDependencyBaseline {
+  version?: number;
+  updatedAt?: string;
   cycles: Record<string, number>;
+  maxCircularComponentFiles?: Record<string, number>;
   allowedDirectRouteDbIndexImports: string[];
 }
 
@@ -17,7 +20,7 @@ const routeDbTarget = path.join(repoRoot, 'server/db/index.js');
 
 let failed = false;
 
-function runMadge(target: string): unknown[] {
+function runMadge(target: string): string[][] {
   const result = spawnSync(
     madgeBin,
     ['madge', '--circular', '--extensions', 'ts,tsx', '--json', target],
@@ -29,13 +32,71 @@ function runMadge(target: string): unknown[] {
   }
 
   try {
-    return JSON.parse(result.stdout || '[]') as unknown[];
+    return JSON.parse(result.stdout || '[]') as string[][];
   } catch (err) {
     console.error(`[circular-deps] Failed to parse madge output for ${target}`);
     if (result.stdout) console.error(result.stdout);
     if (result.stderr) console.error(result.stderr);
     throw err;
   }
+}
+
+export interface CircularComponent {
+  files: string[];
+  cycleCount: number;
+}
+
+export function collectCircularComponents(cycles: readonly (readonly string[])[]): CircularComponent[] {
+  const parent = new Map<string, string>();
+  const cycleCountByRoot = new Map<string, number>();
+
+  const find = (file: string): string => {
+    const current = parent.get(file);
+    if (!current) {
+      parent.set(file, file);
+      return file;
+    }
+    if (current === file) return file;
+    const root = find(current);
+    parent.set(file, root);
+    return root;
+  };
+
+  const union = (a: string, b: string): void => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent.set(rootB, rootA);
+  };
+
+  for (const cycle of cycles) {
+    if (cycle.length === 0) continue;
+    const [first, ...rest] = cycle;
+    find(first);
+    for (const file of rest) {
+      union(first, file);
+    }
+  }
+
+  for (const cycle of cycles) {
+    if (cycle.length === 0) continue;
+    const root = find(cycle[0]);
+    cycleCountByRoot.set(root, (cycleCountByRoot.get(root) ?? 0) + 1);
+  }
+
+  const filesByRoot = new Map<string, string[]>();
+  for (const file of parent.keys()) {
+    const root = find(file);
+    const files = filesByRoot.get(root) ?? [];
+    files.push(file);
+    filesByRoot.set(root, files);
+  }
+
+  return [...filesByRoot.entries()]
+    .map(([root, files]) => ({
+      files: files.sort(),
+      cycleCount: cycleCountByRoot.get(root) ?? 0,
+    }))
+    .sort((a, b) => b.files.length - a.files.length || b.cycleCount - a.cycleCount || a.files[0].localeCompare(b.files[0]));
 }
 
 function checkCircularDependencyRatchet(): void {
@@ -49,6 +110,26 @@ function checkCircularDependencyRatchet(): void {
       const delta = allowedCount - count;
       const suffix = delta > 0 ? ` (${delta} below baseline)` : '';
       console.log(`[circular-deps] ${target}: ${count}/${allowedCount} cycles${suffix}`);
+    }
+
+    const components = collectCircularComponents(cycles);
+    const largest = components[0];
+    if (!largest) {
+      console.log(`[circular-deps] ${target}: no circular components`);
+      continue;
+    }
+
+    const allowedComponentSize = baseline.maxCircularComponentFiles?.[target];
+    const topFiles = largest.files.slice(0, 6).join(', ');
+    if (allowedComponentSize == null) {
+      console.log(`[circular-deps] ${target}: largest circular component has ${largest.files.length} files across ${largest.cycleCount} cycles (${topFiles})`);
+    } else if (largest.files.length > allowedComponentSize) {
+      failed = true;
+      console.error(`[circular-deps] ${target}: largest circular component has ${largest.files.length} files, exceeds baseline ${allowedComponentSize} (${topFiles})`);
+    } else {
+      const componentDelta = allowedComponentSize - largest.files.length;
+      const componentSuffix = componentDelta > 0 ? ` (${componentDelta} below baseline)` : '';
+      console.log(`[circular-deps] ${target}: largest circular component ${largest.files.length}/${allowedComponentSize} files across ${largest.cycleCount} cycles${componentSuffix} (${topFiles})`);
     }
   }
 }
@@ -104,9 +185,15 @@ function checkRouteDbImportGuard(): void {
   }
 }
 
-checkCircularDependencyRatchet();
-checkRouteDbImportGuard();
+function main(): void {
+  checkCircularDependencyRatchet();
+  checkRouteDbImportGuard();
 
-if (failed) {
-  process.exit(1);
+  if (failed) {
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
 }
