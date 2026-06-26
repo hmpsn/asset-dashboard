@@ -1,17 +1,13 @@
-import { isFeatureEnabled } from './feature-flags.js';
 import { assembleStoredKeywordStrategy } from './keyword-strategy-assembler.js';
 import {
   buildLocalSeoKeywordCandidates,
-  countLocalSeoKeywordCandidates,
   buildLocalSeoKeywordVisibilityForKeyword,
   buildLocalSeoKeywordVisibilitySummaryByKey,
   buildLocalSeoKeywordVisibilityByKey,
-  getPrimaryMarketLocationCode,
   listLocalSeoMarkets,
 } from './local-seo.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords, listPageKeywordsLite } from './page-keywords.js';
-import { isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import {
   getLatestSnapshotRanks,
   getTrackedKeywords,
@@ -30,16 +26,11 @@ import {
   restrictPageToKeys,
 } from './domains/keyword-command-center/bundle-filters.js';
 import {
-  KEYWORD_UNIVERSE_FULL_FLAG,
   LOCAL_CANDIDATE_ROW_LIMIT,
-  RAW_EVIDENCE_ROW_LIMIT,
-  UNIVERSE_SAFETY_CEILING,
   filterBundleToKeys,
   gateDiscoveryGaps,
   rowCandidateKeysForQuery,
-  selectRankEvidence,
   sourceKeysForRows,
-  trackedKeywordMatchesFilter,
 } from './domains/keyword-command-center/candidate-boundary.js';
 import {
   mergeTrackedKeywordProvenance,
@@ -47,7 +38,6 @@ import {
 } from './domains/keyword-command-center/tracked-keyword-provenance.js';
 import {
   buildCounts,
-  buildFilterFacetsFromCounts,
   buildFilters,
   filterNeedsLocalCandidates,
   matchesFilter,
@@ -55,7 +45,6 @@ import {
   paginateRows,
   sortRowsForQuery,
   stripRowForList,
-  type SkinnyFilterCounts,
 } from './domains/keyword-command-center/row-query.js';
 import {
   buildValueScoringConfig,
@@ -74,18 +63,13 @@ import type {
 import type { PageKeywordMap, Workspace } from '../shared/types/workspace.js';
 import {
   KEYWORD_COMMAND_CENTER_FILTERS,
-  type KeywordCommandCenterCounts,
   type KeywordCommandCenterDetailResponse,
   type KeywordCommandCenterFilter,
   type KeywordCommandCenterRowsQuery,
   type KeywordCommandCenterRowsResponse,
   type KeywordCommandCenterResponse,
-  type KeywordCommandCenterSummaryResponse,
 } from '../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../shared/types/local-seo.js';
-import {
-  TRACKED_KEYWORD_STATUS,
-} from '../shared/types/rank-tracking.js';
 import type { OutcomeReadback } from '../shared/types/outcome-tracking.js';
 
 export {
@@ -131,6 +115,10 @@ export {
 export {
   __candidateRowMetricParityForTest,
 } from './domains/keyword-command-center/read-model.js';
+
+export {
+  buildKeywordCommandCenterSummary,
+} from './domains/keyword-command-center/summary-service.js';
 
 export {
   applyKeywordCommandCenterAction,
@@ -293,277 +281,6 @@ async function buildKeywordCommandCenterModel(
     rawEvidenceTotal: finalized.rawEvidenceTotal,
     rawEvidenceReturned: finalized.rawEvidenceReturned,
     generatedAt: strategy?.generatedAt ?? null,
-  };
-}
-
-export async function buildKeywordCommandCenterSummary(
-  workspaceId: string,
-  options: { includeLocalSeo?: boolean } = {},
-): Promise<KeywordCommandCenterSummaryResponse | null> {
-  const startedAt = Date.now();
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return null;
-
-  const allKeys = new Set<string>();
-  const inStrategyKeys = new Set<string>();
-  const pageAssignedKeys = new Set<string>();
-  const contentKeys = new Set<string>();
-  const rawEvidenceKeys = new Set<string>();
-  // Track which keys have at least one source contributing a positive volume
-  // value. Used to surface "{X} keywords missing demand data" diagnostic.
-  const keysWithVolume = new Set<string>();
-  const addKey = (target: Set<string>, keyword: string | undefined) => {
-    const key = keywordComparisonKey(keyword ?? '');
-    if (!key) return;
-    target.add(key);
-    allKeys.add(key);
-  };
-  const markVolume = (keyword: string | undefined, volume: number | undefined | null) => {
-    if (volume == null || volume <= 0) return;
-    // Mirror the planner-bucket mask from mergeMetrics — a 1M+ planner sentinel
-    // is NOT real demand data, so it must not count toward the volume diagnostic.
-    if (isSuspiciousPlannerGroupedVolume(keyword, volume)) return;
-    const key = keywordComparisonKey(keyword ?? '');
-    if (!key) return;
-    keysWithVolume.add(key);
-  };
-
-  // #19b: siteKeywordMetrics resolved table-first (blob fallback).
-  const summaryStrategy = withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy);
-  for (const metric of summaryStrategy?.siteKeywordMetrics ?? []) {
-    addKey(inStrategyKeys, metric.keyword);
-    markVolume(metric.keyword, metric.volume);
-  }
-  for (const keyword of summaryStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
-
-  for (const page of listPageKeywordsLite(workspace.id)) {
-    addKey(pageAssignedKeys, page.primaryKeyword);
-    addKey(inStrategyKeys, page.primaryKeyword);
-    markVolume(page.primaryKeyword, page.volume);
-    for (const secondary of page.secondaryKeywords ?? []) {
-      addKey(pageAssignedKeys, secondary);
-      addKey(inStrategyKeys, secondary);
-      // Page secondaries don't carry their own volume — the page's volume is
-      // associated with the primary keyword only.
-    }
-  }
-
-  // contentGaps + keywordGaps via the single assembler (#2); siteKeywords/
-  // siteKeywordMetrics above stay blob-sourced (workspace.keywordStrategy).
-  // F1 fix: gate the discovery gaps through the SAME Tier-1 + Tier-2 junk gate the
-  // rows path uses, so the summary `counts`/`filterCounts` and `/rows?filter=all`
-  // `totalRows` agree on the gated universe (numerator/denominator share a source).
-  const summaryAssembled = assembleStoredKeywordStrategy(workspace.id);
-  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
-    contentGaps: summaryAssembled?.contentGaps ?? [],
-    keywordGaps: summaryAssembled?.keywordGaps ?? [],
-  });
-  for (const gap of contentGaps) {
-    addKey(contentKeys, gap.targetKeyword);
-    addKey(inStrategyKeys, gap.targetKeyword);
-    markVolume(gap.targetKeyword, gap.volume);
-  }
-
-  for (const gap of keywordGaps) {
-    addKey(rawEvidenceKeys, gap.keyword);
-    markVolume(gap.keyword, gap.volume);
-  }
-
-  const feedback = readFeedback(workspace.id);
-  // Wave 3d-ii: merge the table-bearing shape so trackedKeywordMatchesFilter (used
-  // below) sees strategyOwned — getTrackedKeywords STRIPS it, so without this merge
-  // the IN_STRATEGY summary count would read undefined → false → zero. Read-time
-  // inferTrackedKeywordSources was retired here too.
-  const trackedKeywords = mergeTrackedKeywordProvenance(
-    workspace.id,
-    getTrackedKeywords(workspace.id, { includeInactive: true }),
-  );
-  for (const tracked of trackedKeywords) {
-    addKey(allKeys, tracked.query);
-    markVolume(tracked.query, tracked.volume);
-  }
-  const trackedKeys = new Set(trackedKeywords.map(keyword => keywordComparisonKey(keyword.query)).filter(Boolean));
-
-  // Align with sourceKeysForRows(IN_STRATEGY): tracked keywords promoted from the
-  // strategy (active + STRATEGY_PRIMARY/STRATEGY_SITE_KEYWORD source) count toward
-  // In Strategy. Without this, the summary badge under-counts vs the rows table.
-  for (const tracked of trackedKeywords) {
-    if (trackedKeywordMatchesFilter(tracked, KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY)) {
-      addKey(inStrategyKeys, tracked.query);
-    }
-  }
-
-  for (const row of feedback.values()) addKey(allKeys, row.keyword);
-  const feedbackKeys = new Set([...feedback.keys()]);
-
-  // Align with sourceKeysForRows(IN_STRATEGY): approved feedback keywords count toward
-  // In Strategy; declined/requested feedback keys must NOT (they live under other tabs).
-  for (const row of feedback.values()) {
-    if (row.status === 'approved') addKey(inStrategyKeys, row.keyword);
-  }
-  for (const row of feedback.values()) {
-    if (row.status === 'declined' || row.status === 'requested') {
-      const key = keywordComparisonKey(row.keyword);
-      if (key) inStrategyKeys.delete(key);
-    }
-  }
-
-  const latestRanks = getLatestSnapshotRanks(workspace.id);
-  const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
-  const lostVisibilityCount = lostVisibilityRows.length;
-  const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
-  for (const key of lostVisibilityKeys) allKeys.add(key);
-  const rankEvidenceKeys = new Set<string>();
-  // The pre-ceiling count of selected rank-evidence queries — drives honest
-  // truncation disclosure (rawEvidenceTotal) when the safety ceiling bites.
-  const rankEvidenceFiltered = latestRanks.filter(
-    rank => !allKeys.has(keywordComparisonKey(rank.query)),
-  );
-  const rankEvidence = selectRankEvidence(rankEvidenceFiltered, workspace.id);
-  for (const rank of rankEvidence.selected) {
-    addKey(rankEvidenceKeys, rank.query);
-  }
-  const rankEvidenceTotal = rankEvidence.total;
-
-  // Striking-distance count: distinct keyword keys with position 11–20 inclusive
-  // (page 2). Uses a Set to deduplicate variants. The source set MUST mirror
-  // sourceKeysForRows(STRIKING_DISTANCE) and the isStrikingDistanceRow row filter,
-  // which read the MERGED currentPosition (rank snapshot OR tracked baselinePosition).
-  // Excluding baselinePosition here under-counted the pill vs the rendered rows: a
-  // tracked keyword with baselinePosition 11–20 and NO rank snapshot would appear in
-  // the rows but be invisible to the facet count (rate-display rule — the pill count
-  // must equal the rendered rows).
-  const strikingDistanceKeys = new Set<string>();
-  for (const rank of latestRanks) {
-    if (rank.position >= 11 && rank.position <= 20) {
-      const key = keywordComparisonKey(rank.query);
-      if (key) strikingDistanceKeys.add(key);
-    }
-  }
-  for (const tracked of trackedKeywords) {
-    const pos = tracked.baselinePosition;
-    if (pos != null && pos >= 11 && pos <= 20) {
-      const key = keywordComparisonKey(tracked.query);
-      if (key) strikingDistanceKeys.add(key);
-    }
-  }
-  const strikingDistanceCount = strikingDistanceKeys.size;
-
-  const activeTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
-  const inactiveTracked = trackedKeywords.filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE);
-  const requested = [...feedback.values()].filter(row => row.status === 'requested');
-  const declined = [...feedback.values()].filter(row => row.status === 'declined');
-  const rawEvidenceOnlyKeys = new Set(
-    [...rawEvidenceKeys].filter(key =>
-      !inStrategyKeys.has(key)
-      && !trackedKeys.has(key)
-      && !feedbackKeys.has(key)
-    ),
-  );
-  const localVisibility = options.includeLocalSeo ? buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id) : new Map();
-  for (const key of localVisibility.keys()) allKeys.add(key);
-  const localVisibilityValues = [...localVisibility.values()];
-
-  // Local Candidates badge: cheap count-only path that skips evaluateKeywordCandidate
-  // (the per-candidate scan that caused the 35-second regression in PR #876).
-  // `countLocalSeoKeywordCandidates` mirrors the candidate generator's outer iteration
-  // and source filters (declined/inactive/intent/market) but never builds row objects
-  // or runs eligibility evaluation. Sub-100ms even on Swish-scale workspaces.
-  // Slight overcount possible — the displayable list still comes from the full
-  // generator when the user clicks into the Local Candidates filter.
-  let localCandidatesCount = 0;
-  if (options.includeLocalSeo) {
-    try {
-      // local-candidates-unconditional-ok: countLocalSeoKeywordCandidates is the cheap-count helper, not the full generator; capped at LOCAL_CANDIDATE_HARD_CAP
-      localCandidatesCount = countLocalSeoKeywordCandidates(workspace.id);
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
-    }
-  }
-
-  // Keywords across the universe with no real provider volume attached.
-  // Planner-bucket sentinels (1M+) are intentionally excluded from "has volume"
-  // so they count as missing — consistent with the mergeMetrics mask in rows.
-  const missingVolume = Math.max(0, allKeys.size - keysWithVolume.size);
-
-  const counts: KeywordCommandCenterCounts = {
-    total: allKeys.size,
-    inStrategy: inStrategyKeys.size,
-    tracked: activeTracked.length,
-    needsReview: requested.length + rankEvidenceKeys.size,
-    evidence: rawEvidenceOnlyKeys.size,
-    local: localVisibility.size,
-    localCandidates: localCandidatesCount,
-    retired: inactiveTracked.length,
-    declined: declined.length,
-    strikingDistance: strikingDistanceCount,
-    missingVolume,
-    lostVisibility: lostVisibilityCount,
-  };
-  const filterCounts: SkinnyFilterCounts = {
-    all: counts.total,
-    inStrategy: counts.inStrategy,
-    tracked: counts.tracked,
-    needsReview: counts.needsReview,
-    content: contentKeys.size,
-    pageAssigned: pageAssignedKeys.size,
-    rawEvidence: counts.evidence,
-    local: counts.local,
-    localCandidates: localCandidatesCount,
-    strikingDistance: strikingDistanceCount,
-    visibleLocally: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE).length,
-    possibleMatch: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.POSSIBLE_MATCH).length,
-    notVisible: localVisibilityValues.filter(item =>
-      item.posture === LOCAL_SEO_VISIBILITY_POSTURE.NOT_VISIBLE
-      || item.posture === LOCAL_SEO_VISIBILITY_POSTURE.LOCAL_PACK_PRESENT,
-    ).length,
-    notChecked: 0,
-    providerDegraded: localVisibilityValues.filter(item => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.PROVIDER_DEGRADED).length,
-    requested: requested.length,
-    declined: declined.length,
-    retired: inactiveTracked.length,
-    lostVisibility: lostVisibilityCount,
-  };
-
-  log.info({
-    workspaceId,
-    mode: 'summary-skinny',
-    totalKeys: counts.total,
-    trackedCount: trackedKeywords.length,
-    contentGapCount: contentGaps.length,
-    keywordGapCount: keywordGaps.length,
-    localVisibilityCount: localVisibility.size,
-    totalMs: Date.now() - startedAt,
-    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-  }, 'keyword command center summary built');
-
-  let geoLabel: string | undefined;
-  try {
-    geoLabel = getPrimaryMarketLocationCode(workspace.id)?.label;
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
-  }
-
-  // Honest truncation disclosure (Task 3). The rank-evidence selection above is
-  // already ceiling-capped (post-ceiling) and feeds rawEvidenceOnlyKeys, so
-  // rawEvidenceOnlyKeys.size is the RETURNED universe. The TRUE pre-ceiling size
-  // adds back the value-ordered tail the ceiling dropped, so when the ceiling bites
-  // rawEvidenceTotal > rawEvidenceReturned and the Task-4 banner fires. Flag OFF:
-  // droppedRankEvidenceTail is 0 (the 50-cap leaves no tail) and the raw cap stays
-  // RAW_EVIDENCE_ROW_LIMIT (75) — byte-identical to today.
-  const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
-  const rawEvidenceReturnedCap = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspace.id)
-    ? UNIVERSE_SAFETY_CEILING
-    : RAW_EVIDENCE_ROW_LIMIT;
-
-  return {
-    counts,
-    filters: buildFilterFacetsFromCounts(filterCounts),
-    rawEvidenceTotal: rawEvidenceOnlyKeys.size + droppedRankEvidenceTail,
-    rawEvidenceReturned: Math.min(counts.evidence, rawEvidenceReturnedCap),
-    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
-    summarizedAt: new Date().toISOString(),
-    geoLabel,
   };
 }
 
