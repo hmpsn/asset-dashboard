@@ -20,7 +20,6 @@ import {
 import { recommendationOutcomeActionType } from '../domains/recommendations/outcome-action-type.js';
 import {
   getOperatorOverrides,
-  getSortOrderMap,
   setWordingOverride,
   setSortOrders,
   applyWordingOverrides,
@@ -42,25 +41,28 @@ import { runRecommendationGenerationJob } from '../recommendation-generation-job
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace, buildClientPortalUrl, computeEffectiveTier } from '../workspaces.js';
-import type { EffectiveTier } from '../workspaces.js';
 import { normalizePageUrl } from '../utils/page-address.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { addActivity } from '../activity-log.js';
-import { stripEmvFromPublicRecs, toPublicRecommendationSet } from '../recommendation-public-projection.js';
 import {
   applyBulkRecommendationAction,
   mintCompetitorRecommendation,
   mintManualRecommendation,
 } from '../recommendation-route-mutations.js';
 import {
+  buildClientRecommendationResponsesView,
+  buildClientRecommendationSetView,
+  buildClientRecommendationView,
+} from '../client-insight-recommendation-view-model.js';
+import {
   RECOMMENDATION_TRANSITIONS,
   validateTransition,
   InvalidTransitionError,
 } from '../state-machines.js';
-import type { Recommendation, ClientFacingClientStatus, ClientRecResponseSummary } from '../../shared/types/recommendations.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 import {
   MANUAL_REC_ALLOWED_TYPES,
   REC_WORDING_TITLE_MAX,
@@ -119,67 +121,16 @@ router.post('/api/public/recommendations/:workspaceId/generate', requireAuthenti
 router.get('/api/public/recommendations/:workspaceId', requireClientPortalAuth(), (req, res) => {
   try {
     const { workspaceId } = req.params;
-    let set = loadRecommendations(workspaceId);
-    if (!set) {
-      // No cached set. Distinguish unknown workspace (honest 404) from a known
-      // workspace that simply hasn't generated yet (return an empty set — do NOT
-      // generate inline).
-      if (!getWorkspace(workspaceId)) {
-        return res.status(404).json({ error: 'Workspace not found' });
-      }
-      set = {
-        workspaceId,
-        generatedAt: new Date().toISOString(),
-        recommendations: [],
-        summary: computeRecommendationSummary([]),
-      };
-    }
-    // Filter by status if requested
-    const status = req.query.status as string | undefined;
-    const priority = req.query.priority as string | undefined;
-    // Strategy "The Issue" §7 (P2-5) — the curated client feed reads ?clientStatus=sent to fetch
-    // ONLY the recs the operator has put in front of the client. Filters on the RAW rec.clientStatus
-    // (pre-projection); only the post-send client-facing values are meaningful here (a request for
-    // 'system'/'curated' returns nothing, since those are operator-axis states the client never sees).
-    const clientStatus = req.query.clientStatus as string | undefined;
-    // The Issue §7 — the restricted clientStatus projection + the ?clientStatus filter are gated on
-    // the per-workspace flag, so a non-Issue workspace's public read stays byte-identical to legacy.
-    const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
-    // Effective tier feeds the audit-blocker #1 `actOn` descriptor. Resolved ONLY on the flag-ON
-    // path (inside the exposeClientStatus block below) so the flag-OFF read does zero extra DB work
-    // and stays byte-identical; the default 'free' is never used when the flag is off (actOn is
-    // gated on exposeClientStatus, so it is absent then regardless of this value).
-    let effectiveTier: EffectiveTier = 'free';
-    let recs = set.recommendations;
-    if (status) recs = recs.filter(r => r.status === status);
-    if (priority) recs = recs.filter(r => r.priority === priority);
-    if (exposeClientStatus && clientStatus) recs = recs.filter(r => r.clientStatus === clientStatus);
-    // The Issue (operator-steering) — flag-gated, so a non-Issue workspace's public read stays
-    // byte-identical to legacy. Apply the operator's wording corrections (title/insight, DISPLAY
-    // only — never baked) THEN order by the operator's client-facing running order (recs with a
-    // sort_order first, ascending; the rest after in their existing order via a stable sort).
-    if (exposeClientStatus) {
-      const ws = getWorkspace(workspaceId);
-      if (ws) effectiveTier = computeEffectiveTier(ws);
-      recs = applyWordingOverrides(workspaceId, recs);
-      const sortOrderMap = getSortOrderMap(workspaceId);
-      if (sortOrderMap.size > 0) {
-        recs = recs
-          .map((r, i) => ({ r, i }))
-          .sort((a, b) => {
-            const aOrder = sortOrderMap.get(a.r.id);
-            const bOrder = sortOrderMap.get(b.r.id);
-            // Operator-ordered recs first (ascending); un-ordered recs keep their natural order
-            // after them. The index tiebreaker (a.i - b.i) makes the sort stable.
-            if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder || a.i - b.i;
-            if (aOrder !== undefined) return -1;
-            if (bOrder !== undefined) return 1;
-            return a.i - b.i;
-          })
-          .map(({ r }) => r);
-      }
-    }
-    res.json(toPublicRecommendationSet(set, recs, exposeClientStatus, effectiveTier));
+    const response = buildClientRecommendationSetView(workspaceId, {
+      status: req.query.status as string | undefined,
+      priority: req.query.priority as string | undefined,
+      // Strategy "The Issue" §7 — the curated client feed reads ?clientStatus=sent to fetch
+      // ONLY recs the operator put in front of the client. The view model gates this filter on
+      // strategy-the-issue so flag-OFF reads stay byte-identical.
+      clientStatus: req.query.clientStatus as string | undefined,
+    });
+    if (!response) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -294,15 +245,8 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
       `Status changed to "${status}"`,
     );
   }
-  // Client-facing single-rec response — strip the admin/AI-only dollar figures
-  // (emvPerWeek / roiPerEffortDay) just like the GET route does (owner constraint).
-  // Resolve the effective tier ONLY on the flag-ON path so the flag-OFF response stays
-  // byte-identical (no actOn, no extra DB read); the tier feeds the audit-blocker #1 descriptor.
-  const exposeClientStatus = isFeatureEnabled('strategy-the-issue', workspaceId);
-  const effectiveTier: EffectiveTier = exposeClientStatus
-    ? (() => { const ws = getWorkspace(workspaceId); return ws ? computeEffectiveTier(ws) : 'free'; })()
-    : 'free';
-  res.json(stripEmvFromPublicRecs([rec], exposeClientStatus, effectiveTier)[0]);
+  // Client-facing single-rec response mirrors the GET route projection.
+  res.json(buildClientRecommendationView(workspaceId, rec));
 });
 
 // Dismiss a recommendation
@@ -476,7 +420,7 @@ router.post(
     // greenlight took effect) + the actOn descriptor, gated on the per-workspace flag (exposeClientStatus
     // + effectiveTier resolved once at the top of the handler for the pricing gate).
     res.json({
-      recommendation: stripEmvFromPublicRecs([rec], exposeClientStatus, effectiveTier)[0],
+      recommendation: buildClientRecommendationView(workspaceId, rec),
       requestId: request.id,
     });
   },
@@ -502,27 +446,7 @@ router.get(
     if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
     const set = loadRecommendations(workspaceId);
     const recs: Recommendation[] = set?.recommendations ?? [];
-    const responded = recs.filter(
-      (r) =>
-        r.clientStatus === 'approved' ||
-        r.clientStatus === 'declined' ||
-        r.clientStatus === 'discussing',
-    );
-    const recent = [...responded]
-      .sort((a, b) => Date.parse(b.updatedAt ?? b.createdAt) - Date.parse(a.updatedAt ?? a.createdAt))
-      .slice(0, 5)
-      .map((r) => ({
-        title: r.title,
-        clientStatus: (r.clientStatus ?? 'sent') as ClientFacingClientStatus,
-        respondedAt: r.updatedAt ?? r.createdAt,
-      }));
-    const summary: ClientRecResponseSummary = {
-      approved: responded.filter((r) => r.clientStatus === 'approved').length,
-      declined: responded.filter((r) => r.clientStatus === 'declined').length,
-      discussing: responded.filter((r) => r.clientStatus === 'discussing').length,
-      recent,
-    };
-    res.json(summary);
+    res.json(buildClientRecommendationResponsesView(recs));
   },
 );
 
