@@ -19,7 +19,7 @@ import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSum
 import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { buildBriefingClientView } from '../briefing-client-projection.js';
+import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
@@ -803,7 +803,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireC
 //
 // admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
 // only weekOf, publishedAt, and the BriefingStory[] array reach the client.
-// Enrichment logic lives in server/briefing-client-projection.ts.
+// Enrichment logic lives behind server/client-insight-view-model.ts.
 router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -816,7 +816,7 @@ router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req,
     return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
   }
 
-  const briefing = buildBriefingClientView(ws.id);
+  const briefing = buildClientBriefingView(ws.id);
   res.json({ briefing });
 });
 

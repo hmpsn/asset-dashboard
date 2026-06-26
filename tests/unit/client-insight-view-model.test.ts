@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildClientIntelligenceView,
   clientIntelligenceSlicesForTier,
 } from '../../server/client-insight-view-model.js';
+import { buildClientNarrativeInsightsView } from '../../server/client-insight-narrative-view-model.js';
+import {
+  deleteInsightsForWorkspace,
+  upsertInsight,
+} from '../../server/analytics-insights-store.js';
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type {
   ClientSignalsSlice,
@@ -14,6 +19,12 @@ import type {
   WeCalledItEntry,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
+
+const NARRATIVE_WS = 'ws-client-narrative-view';
+
+afterEach(() => {
+  deleteInsightsForWorkspace(NARRATIVE_WS);
+});
 
 function insight(overrides: Partial<AnalyticsInsight> = {}): AnalyticsInsight {
   return {
@@ -204,6 +215,95 @@ describe('clientIntelligenceSlicesForTier', () => {
       'clientSignals',
       'siteHealth',
     ]);
+  });
+});
+
+describe('buildClientNarrativeInsightsView', () => {
+  it('filters client-excluded and low-impact insights, then sorts by impact score', () => {
+    deleteInsightsForWorkspace(NARRATIVE_WS);
+
+    upsertInsight({
+      workspaceId: NARRATIVE_WS,
+      pageId: 'page-high',
+      insightType: 'page_health',
+      data: {
+        score: 42,
+        trend: 'declining',
+        clicks: 100,
+        impressions: 1000,
+        position: 8,
+        ctr: 10,
+        pageviews: 80,
+        bounceRate: 0.4,
+        avgEngagementTime: 75,
+      },
+      severity: 'warning',
+      pageTitle: 'Services Page',
+      impactScore: 72,
+      domain: 'technical',
+    });
+    upsertInsight({
+      workspaceId: NARRATIVE_WS,
+      pageId: 'page-low',
+      insightType: 'page_health',
+      data: {
+        score: 92,
+        trend: 'stable',
+        clicks: 10,
+        impressions: 100,
+        position: 2,
+        ctr: 10,
+        pageviews: 15,
+        bounceRate: 0.2,
+        avgEngagementTime: 120,
+      },
+      severity: 'positive',
+      pageTitle: 'Low Impact Page',
+      impactScore: 19,
+      domain: 'technical',
+    });
+    upsertInsight({
+      workspaceId: NARRATIVE_WS,
+      pageId: null,
+      insightType: 'strategy_alignment',
+      data: {
+        alignedCount: 1,
+        misalignedCount: 9,
+        untrackedCount: 2,
+        summary: 'Admin-only alignment note',
+      },
+      severity: 'warning',
+      pageTitle: 'Strategy Alignment',
+      impactScore: 99,
+      domain: 'cross',
+    });
+    upsertInsight({
+      workspaceId: NARRATIVE_WS,
+      pageId: 'page-decay',
+      insightType: 'content_decay',
+      data: {
+        baselineClicks: 200,
+        currentClicks: 120,
+        deltaPercent: -40,
+        baselinePeriod: 'previous',
+        currentPeriod: 'current',
+      },
+      severity: 'critical',
+      pageTitle: 'Evergreen Guide',
+      impactScore: 88,
+      domain: 'content',
+    });
+
+    const view = buildClientNarrativeInsightsView(NARRATIVE_WS);
+
+    expect(view.map(i => i.type)).toEqual(['content_decay', 'page_health']);
+    expect(view.map(i => i.impactScore)).toEqual([88, 72]);
+    expect(view[0]).toMatchObject({
+      headline: 'We noticed a traffic change on Evergreen Guide',
+      domain: 'content',
+    });
+    expect(JSON.stringify(view)).not.toContain('Admin-only alignment note');
+    expect(JSON.stringify(view)).not.toContain('Low Impact Page');
   });
 });
 

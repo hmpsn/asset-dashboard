@@ -56,8 +56,10 @@ import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { computeEffectiveTier, getWorkspace, getBrandName } from '../workspaces.js';
 import { getOrComputeInsights } from '../domains/analytics-intelligence/orchestrator.js';
-import { buildClientInsights } from '../insight-narrative.js';
-import { generateMonthlyDigest } from '../monthly-digest.js';
+import {
+  buildClientNarrativeInsightsView,
+} from '../client-insight-narrative-view-model.js';
+import { buildClientMonthlyDigestView } from '../client-insight-digest-view-model.js';
 import type { InsightType } from '../../shared/types/analytics.js';
 import { STUDIO_NAME } from '../constants.js';
 import { createClientSignal, hasRecentSignal } from '../client-signals-store.js';
@@ -178,7 +180,7 @@ router.get('/api/public/insights/:workspaceId/narrative', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
-    const insights = buildClientInsights(ws.id);
+    const insights = buildClientNarrativeInsightsView(ws.id);
     res.json({ insights });
   } catch (err) {
     log.error({ err }, 'Failed to build client insights');
@@ -191,7 +193,7 @@ router.get('/api/public/insights/:workspaceId/digest', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
-    const digest = await generateMonthlyDigest(ws);
+    const digest = await buildClientMonthlyDigestView(ws);
     res.json(digest);
   } catch (err) {
     log.error({ err }, 'Failed to generate monthly digest');
