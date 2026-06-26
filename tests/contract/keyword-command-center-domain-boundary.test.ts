@@ -241,4 +241,18 @@ describe('keyword command center domain boundary', () => {
     expect(summaryService).toContain('trackedKeywordMatchesFilter');
     expect(summaryService).toContain('buildFilterFacetsFromCounts');
   });
+
+  it('keeps detail assembly in the domain service with compatibility re-export from the facade', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
+
+    expect(facade).not.toMatch(/function buildKeywordCommandCenterDetail\b/);
+    expect(detailService).toMatch(/export async function buildKeywordCommandCenterDetail\b/);
+    expect(facade).toContain('  buildKeywordCommandCenterDetail,');
+    expect(facade).toContain("from './domains/keyword-command-center/detail-service.js'");
+    expect(detailService).toContain('buildLocalSeoKeywordVisibilityForKeyword');
+    expect(detailService).toContain('getScoredOutcomeReadbacks');
+    expect(detailService).toContain('filterStrategyForSingleKeyword');
+    expect(detailService).toContain('finalizeDraftRow');
+  });
 });
