@@ -83,4 +83,28 @@ describe('keyword command center domain boundary', () => {
     expect(feedbackStore).toContain('keyword_feedback');
     expect(feedbackStore).toContain('createStmtCache');
   });
+
+  it('keeps bundle filtering helpers in the domain module', () => {
+    const facade = readRepoFile('server/keyword-command-center.ts');
+    const bundleFilters = readRepoFile('server/domains/keyword-command-center/bundle-filters.ts');
+
+    for (const helper of [
+      'addStrategyKeys',
+      'addPageKeys',
+      'parentableVariantKeys',
+      'findVariantParentKey',
+      'filterStrategyForKeys',
+      'restrictPageToKeys',
+      'filterMapByKeys',
+      'filterStrategyForSingleKeyword',
+      'pageMatchesKeyword',
+    ]) {
+      expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
+      expect(bundleFilters).toMatch(new RegExp(`function ${helper}\\b`));
+    }
+
+    expect(facade).toContain("from './domains/keyword-command-center/bundle-filters.js'");
+    expect(bundleFilters).toContain('createVariantParentIndex');
+    expect(bundleFilters).toContain('keywordComparisonKey');
+  });
 });
