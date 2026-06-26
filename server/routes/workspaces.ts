@@ -29,6 +29,7 @@ import { parseAIJson } from '../openai-helpers.js';
 import { listRequests } from '../requests.js';
 import { invalidatePageCache } from '../workspace-data.js';
 import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { getPrimaryCustomDomainUrl } from '../webflow-domains.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
@@ -358,17 +359,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     try {
       const token = updates.webflowToken || getTokenForSite(updates.webflowSiteId) || process.env.WEBFLOW_API_TOKEN || '';
       if (token) {
-        const domRes = await fetch(`https://api.webflow.com/v2/sites/${updates.webflowSiteId}/custom_domains`, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        });
-        if (domRes.ok) {
-          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
-          const domains = domData.customDomains || [];
-          if (domains.length > 0 && domains[0].url) {
-            const d = domains[0].url;
-            updates.liveDomain = d.startsWith('http') ? d : `https://${d}`;
-          }
-        }
+        updates.liveDomain = await getPrimaryCustomDomainUrl(updates.webflowSiteId, token) ?? updates.liveDomain;
       }
     } catch (err) {
       // url-fetch-ok: best-effort live domain resolution

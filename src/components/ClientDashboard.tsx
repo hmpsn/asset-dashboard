@@ -252,7 +252,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const {
     pricingModal, setPricingModal,
     pricingConfirming, pricingData, setPricingData,
-    stripePayment, setStripePayment,
     confirmPricingAndSubmit,
   } = usePayments(workspaceId, ws, setToast, setContentRequests, setRequestedTopics, setRequestingTopic);
 
@@ -855,7 +854,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
       {/* Pricing confirmation modal */}
       <PricingConfirmationModal
-        betaMode={betaMode}
         billingMode={ws?.billingMode}
         pricingModal={pricingModal}
         setPricingModal={setPricingModal}
@@ -865,11 +863,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         fullPostPrice={fullPostPrice}
         fmtPrice={fmtPrice}
         contentPricing={ws?.contentPricing}
-        stripePayment={stripePayment}
-        setStripePayment={setStripePayment}
-        workspaceId={workspaceId}
-        setContentRequests={setContentRequests}
-        setToast={setToast}
       />
 
       {/* Client onboarding questionnaire */}

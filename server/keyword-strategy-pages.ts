@@ -2,6 +2,7 @@ import { resolvePagePath } from './utils/page-address.js';
 import { stripHtmlToText, decodeEntities } from './utils/text.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { discoverSitemapUrls } from './webflow.js';
+import { getPrimaryCustomDomainUrl } from './webflow-domains.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { updateWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -58,19 +59,12 @@ async function resolveLiveBaseUrl(
   let liveDomain = ws.liveDomain || '';
   if (!liveDomain && token) {
     try {
-      const domRes = await fetch(`https://api.webflow.com/v2/sites/${ws.webflowSiteId}/custom_domains`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (domRes.ok) {
-        const domData = await domRes.json() as { customDomains?: { url?: string }[] };
-        const domains = domData.customDomains || [];
-        if (domains.length > 0 && domains[0].url) {
-          const d = domains[0].url;
-          liveDomain = d.startsWith('http') ? d : `https://${d}`;
-          // Persist so we don't re-resolve every time.
-          updateWorkspace(ws.id, { liveDomain });
-          log.info(`Auto-resolved liveDomain: ${liveDomain}`);
-        }
+      const primaryDomain = await getPrimaryCustomDomainUrl(ws.webflowSiteId, token);
+      if (primaryDomain) {
+        liveDomain = primaryDomain;
+        // Persist so we don't re-resolve every time.
+        updateWorkspace(ws.id, { liveDomain });
+        log.info(`Auto-resolved liveDomain: ${liveDomain}`);
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* best-effort */ } // url-fetch-ok
   }

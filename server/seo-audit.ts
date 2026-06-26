@@ -11,6 +11,7 @@ export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-p
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
 import { getToken, webflowFetch } from './webflow-client.js';
+import { getWebflowSiteDomainInfo } from './webflow-domains.js';
 import { runSiteWideChecks } from './seo-audit-site-checks.js';
 import { generateAiRecommendations } from './seo-audit-ai-recs.js';
 import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
@@ -97,30 +98,9 @@ interface SiteInfo {
 async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<SiteInfo> {
   if (!tokenOverride && !getToken()) return { subdomain: null, customDomain: null };
   try {
-    // Fetch site info for subdomain
-    const siteRes = await webflowFetch(`/sites/${siteId}`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
-    let subdomain: string | null = null;
-    if (siteRes.ok) {
-      const siteData = await siteRes.json() as { shortName?: string };
-      subdomain = siteData.shortName || null;
-    }
-
-    // Fetch custom domains from dedicated endpoint
-    let customDomain: string | null = null;
-    try {
-      const domainRes = await webflowFetch(`/sites/${siteId}/custom_domains`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
-      if (domainRes.ok) {
-        const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
-        const domains = domainData.customDomains || [];
-        if (domains.length > 0 && domains[0].url) {
-          customDomain = domains[0].url;
-        }
-      }
-    } catch (err) {
-      log.debug({ err }, 'seo-audit/getSiteInfo: custom domains fetch failed — degrading gracefully');
-    }
-
-    return { subdomain, customDomain };
+    const domainInfo = await getWebflowSiteDomainInfo(siteId, tokenOverride);
+    const subdomain = domainInfo?.staging.match(/^https:\/\/([^.]+)\.webflow\.io$/i)?.[1] ?? null;
+    return { subdomain, customDomain: domainInfo?.customDomains[0] ?? null };
   } catch (err) {
     log.debug({ err }, 'seo-audit/getSiteInfo: network failure — degrading gracefully');
     return { subdomain: null, customDomain: null };

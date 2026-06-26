@@ -24,7 +24,7 @@ import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
 import { toInsightPageId } from './utils/page-address.js';
-import { capitalizeWord } from './utils/strings.js';
+import { pathToTitle, titleCaseWord } from '../shared/slug-title.js';
 const log = createLogger('insight-enrichment');
 
 // ── Pure utility functions ────────────────────────────────────────────────────
@@ -42,30 +42,11 @@ const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
  *   /  → "Home"
  */
 export function cleanSlugToTitle(urlOrPath: string): string {
-  let pathname = urlOrPath;
-
-  // Extract pathname if it looks like a full URL
-  if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
-    pathname = toInsightPageId(urlOrPath);
-  }
-
-  // Strip trailing slash
-  pathname = pathname.replace(/\/$/, '');
-
-  if (!pathname || pathname === '/') return 'Home';
-
-  // Take the last segment
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 0) return 'Home';
-
-  const slug = segments[segments.length - 1];
-
-  // Convert hyphens/underscores to spaces and title-case each word.
-  return slug
-    .replace(/[-_]/g, ' ')
-    .split(' ')
-    .map(word => capitalizeWord(word))
-    .join(' ');
+  return pathToTitle(
+    urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')
+      ? toInsightPageId(urlOrPath)
+      : urlOrPath,
+  );
 }
 
 /**
@@ -174,7 +155,7 @@ export function resolvePageTitle(
     }
     // For non-URL prefixes (cannibalization::, cluster::), use the right part as a readable label
     if (right) {
-      return right.split(/\s+/).map(word => capitalizeWord(word)).join(' ');
+      return right.split(/\s+/).map(word => titleCaseWord(word)).join(' ');
     }
   }
 

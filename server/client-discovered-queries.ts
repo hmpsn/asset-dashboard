@@ -21,6 +21,9 @@ export type DiscoveredQueryObservation = LatestRank & {
   seenDate?: string;
 };
 
+export const LOST_VISIBILITY_READ_LIMIT = 200;
+export const DISCOVERED_QUERY_RETENTION_DAYS = 365;
+
 const stmts = createStmtCache(() => ({
   upsert: db.prepare(`
     INSERT INTO discovered_queries
@@ -67,6 +70,8 @@ const stmts = createStmtCache(() => ({
     SELECT query
     FROM discovered_queries
     WHERE workspace_id = ? AND status = '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
+    ORDER BY total_impressions DESC, last_seen DESC, query ASC
+    LIMIT ${LOST_VISIBILITY_READ_LIMIT}
   `),
   lostCount: db.prepare(`
     SELECT COUNT(*) AS count
@@ -89,7 +94,39 @@ const stmts = createStmtCache(() => ({
     SELECT query, best_position, last_seen, total_impressions
     FROM discovered_queries
     WHERE workspace_id = ? AND status = '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
-    ORDER BY total_impressions DESC
+    ORDER BY total_impressions DESC, last_seen DESC, query ASC
+    LIMIT ${LOST_VISIBILITY_READ_LIMIT}
+  `),
+  prune: db.prepare(`
+    DELETE FROM discovered_queries
+    WHERE workspace_id = ?
+      AND julianday(?) - julianday(last_seen) > ?
+      AND (
+        status != '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
+        OR query NOT IN (
+          SELECT query
+          FROM discovered_queries
+          WHERE workspace_id = ?
+            AND status = '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
+          ORDER BY total_impressions DESC, last_seen DESC, query ASC
+          LIMIT ${LOST_VISIBILITY_READ_LIMIT}
+        )
+      )
+  `),
+  pruneAll: db.prepare(`
+    DELETE FROM discovered_queries
+    WHERE julianday(?) - julianday(last_seen) > ?
+      AND (
+        status != '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
+        OR query NOT IN (
+          SELECT query
+          FROM discovered_queries AS retained
+          WHERE retained.workspace_id = discovered_queries.workspace_id
+            AND retained.status = '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
+          ORDER BY retained.total_impressions DESC, retained.last_seen DESC, retained.query ASC
+          LIMIT ${LOST_VISIBILITY_READ_LIMIT}
+        )
+      )
   `),
 }));
 
@@ -120,6 +157,23 @@ export function upsertDiscoveredQueries(
 
 export function detectLostVisibility(workspaceId: string, today: string): void {
   stmts().markLost.run(workspaceId, today);
+}
+
+export function pruneDiscoveredQueries(
+  workspaceId: string,
+  today: string,
+  retentionDays = DISCOVERED_QUERY_RETENTION_DAYS,
+): number {
+  const result = stmts().prune.run(workspaceId, today, retentionDays, workspaceId);
+  return result.changes;
+}
+
+export function pruneAllDiscoveredQueries(
+  today = new Date().toISOString().split('T')[0],
+  retentionDays = DISCOVERED_QUERY_RETENTION_DAYS,
+): number {
+  const result = stmts().pruneAll.run(today, retentionDays);
+  return result.changes;
 }
 
 export function getLostVisibilityKeys(workspaceId: string): Set<string> {

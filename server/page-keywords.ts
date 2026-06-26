@@ -19,6 +19,7 @@ import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { pathToTitle } from '../shared/slug-title.js';
 
 const log = createLogger('page-keywords');
 const SCORE_HISTORY_PER_PAGE_LIMIT = 25;
@@ -660,24 +661,7 @@ export const MAX_SECONDARY_KEYWORDS = 20;
  * Never returns a raw URL — falls back to a cleaned slug-based title.
  */
 export function pageTitleFromPath(pathOrUrl: string): string {
-  try {
-    let pathname = pathOrUrl;
-    if (pathname.startsWith('http://') || pathname.startsWith('https://')) {
-      pathname = new URL(pathname).pathname;
-    }
-    pathname = pathname.replace(/\/$/, '');
-    if (!pathname || pathname === '/') return 'Home';
-    const segments = pathname.split('/').filter(Boolean);
-    if (segments.length === 0) return 'Home';
-    const slug = segments[segments.length - 1] ?? '';
-    return slug
-      .replace(/[-_]/g, ' ')
-      .split(' ')
-      .map(w => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
-      .join(' ');
-  } catch (_err) { // catch-ok: URL parsing failure — fall back to raw path
-    return pathOrUrl;
-  }
+  return pathToTitle(pathOrUrl, pathOrUrl);
 }
 
 /**

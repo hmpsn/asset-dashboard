@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  LOST_VISIBILITY_READ_LIMIT,
   detectLostVisibility,
   getDiscoveredQuerySummary,
   getLostVisibilityCount,
   getLostVisibilityKeys,
+  pruneDiscoveredQueries,
+  pruneAllDiscoveredQueries,
   upsertDiscoveredQueries,
 } from '../../server/client-discovered-queries.js';
 import db from '../../server/db/index.js';
@@ -193,6 +196,86 @@ describe('lost visibility reads', () => {
   it('returns an empty set when no lost_visibility rows exist', () => {
     expect(getLostVisibilityKeys(workspaceId).size).toBe(0);
     expect(getLostVisibilityCount(workspaceId)).toBe(0);
+  });
+
+  it('caps normalized lost visibility keys to bounded highest-impression rows', () => {
+    for (let i = 0; i < LOST_VISIBILITY_READ_LIMIT + 3; i += 1) {
+      db.prepare(`
+        INSERT INTO discovered_queries
+          (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+        VALUES (?, ?, '2026-01-01', '2026-01-01', 5, ?, 'lost_visibility')
+      `).run(workspaceId, `Query ${i}`, i);
+    }
+
+    const keys = getLostVisibilityKeys(workspaceId);
+    expect(keys.size).toBe(LOST_VISIBILITY_READ_LIMIT);
+    expect(keys.has(`query ${LOST_VISIBILITY_READ_LIMIT + 2}`)).toBe(true);
+    expect(keys.has('query 0')).toBe(false);
+  });
+});
+
+describe('pruneDiscoveredQueries', () => {
+  it('deletes stale rows while retaining recent rows and top lost-visibility history', () => {
+    db.prepare(`
+      INSERT INTO discovered_queries
+        (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+      VALUES
+        (?, 'old active', '2024-01-01', '2024-01-01', 1, 1, 'active'),
+        (?, 'recent active', '2026-05-01', '2026-05-01', 1, 1, 'active'),
+        (?, 'old top lost', '2024-01-01', '2024-01-01', 5, 999, 'lost_visibility')
+    `).run(workspaceId, workspaceId, workspaceId);
+
+    const deleted = pruneDiscoveredQueries(workspaceId, '2026-06-26');
+    expect(deleted).toBe(1);
+
+    const rows = db.prepare(`
+      SELECT query FROM discovered_queries WHERE workspace_id = ? ORDER BY query
+    `).all(workspaceId) as Array<{ query: string }>;
+    expect(rows.map(row => row.query)).toEqual(['old top lost', 'recent active']);
+  });
+
+  it('prunes stale lost rows outside the retained top lost set', () => {
+    for (let i = 0; i < LOST_VISIBILITY_READ_LIMIT + 2; i += 1) {
+      db.prepare(`
+        INSERT INTO discovered_queries
+          (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+        VALUES (?, ?, '2024-01-01', '2024-01-01', 5, ?, 'lost_visibility')
+      `).run(workspaceId, `old lost ${i}`, i);
+    }
+
+    const deleted = pruneDiscoveredQueries(workspaceId, '2026-06-26');
+    expect(deleted).toBe(2);
+
+    const remaining = db.prepare(`
+      SELECT COUNT(*) AS count FROM discovered_queries WHERE workspace_id = ?
+    `).get(workspaceId) as { count: number };
+    expect(remaining.count).toBe(LOST_VISIBILITY_READ_LIMIT);
+  });
+
+  it('can prune stale rows globally outside the rank-tracking success path', () => {
+    const otherWorkspaceId = createWorkspace(`Other Global Prune ${Date.now()}`).id;
+    try {
+      db.prepare(`
+        INSERT INTO discovered_queries
+          (workspace_id, query, first_seen, last_seen, snapshot_count, total_impressions, status)
+        VALUES
+          (?, 'old active local', '2024-01-01', '2024-01-01', 1, 1, 'active'),
+          (?, 'old active other', '2024-01-01', '2024-01-01', 1, 1, 'active')
+      `).run(workspaceId, otherWorkspaceId);
+
+      const deleted = pruneAllDiscoveredQueries('2026-06-26');
+      expect(deleted).toBeGreaterThanOrEqual(2);
+
+      const remaining = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM discovered_queries
+        WHERE workspace_id IN (?, ?)
+      `).get(workspaceId, otherWorkspaceId) as { count: number };
+      expect(remaining.count).toBe(0);
+    } finally {
+      db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(otherWorkspaceId);
+      deleteWorkspace(otherWorkspaceId);
+    }
   });
 });
 

@@ -16,6 +16,7 @@ import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
+import { slugSegmentToTitle } from '../shared/slug-title.js';
 
 const log = createLogger('site-architecture');
 
@@ -62,7 +63,7 @@ function pathToSegments(path: string): string[] {
 }
 
 function segmentToName(segment: string): string {
-  return segment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return slugSegmentToTitle(segment);
 }
 
 /**

@@ -13,6 +13,7 @@ import { RemediationPlan } from './RemediationPlan.js';
 import { EvidenceAccordion } from './EvidenceAccordion.js';
 import { useDiagnosticReport, useDiagnosticsList } from '../../../hooks/admin/useDiagnostics.js';
 import type { DiagnosticReport } from '../../../../shared/types/diagnostics.js';
+import { pathToTitle } from '../../../../shared/slug-title';
 import { formatDate } from '../../../utils/formatDates.js';
 
 interface Props {
@@ -124,8 +125,7 @@ function DiagnosticReportDetail({ workspaceId, reportId }: { workspaceId: string
 const pageLabel = (pages: string[], fallback: string): string => {
   const p = pages[0];
   if (!p) return fallback;
-  // Strip leading slash, replace hyphens/underscores with spaces, title-case
-  return p.replace(/^\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || fallback;
+  return pathToTitle(p, fallback);
 };
 
 const ANOMALY_TYPE_LABELS: Record<string, string> = {

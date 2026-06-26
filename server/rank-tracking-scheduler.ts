@@ -14,6 +14,7 @@ import { storeRankSnapshot } from './rank-tracking.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 import {
   detectLostVisibility,
+  pruneDiscoveredQueries,
   upsertDiscoveredQueries,
   type DiscoveredQueryObservation,
 } from './client-discovered-queries.js';
@@ -80,6 +81,7 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
       }
       detectLostVisibility(ws.id, date);
+      pruneDiscoveredQueries(ws.id, date);
       fireBridge('bridge-lost-visibility', ws.id, async () => runLostVisibilityBridge(ws.id));
       // A4 review I2: new daily positions must reach open dashboards live — the
       // requested-keyword trend card (and any rank-history consumer) invalidates

@@ -11,6 +11,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  LOST_VISIBILITY_READ_LIMIT,
+  getLostVisibilityCount,
   getLostVisibilityQueries,
   upsertDiscoveredQueries,
 } from '../../server/client-discovered-queries.js';
@@ -111,6 +113,18 @@ describe('getLostVisibilityQueries', () => {
     expect(result[1].totalImpressions).toBe(200);
     expect(result[2].query).toBe('low traffic query');
     expect(result[2].totalImpressions).toBe(50);
+  });
+
+  it('caps lost visibility rows to the highest-impression queries', () => {
+    for (let i = 0; i < LOST_VISIBILITY_READ_LIMIT + 5; i += 1) {
+      insertLostQuery(`query ${i}`, 10 + i, '2026-04-01', i);
+    }
+
+    const result = getLostVisibilityQueries(workspaceId);
+    expect(result).toHaveLength(LOST_VISIBILITY_READ_LIMIT);
+    expect(result[0].query).toBe(`query ${LOST_VISIBILITY_READ_LIMIT + 4}`);
+    expect(result.some(row => row.query === 'query 0')).toBe(false);
+    expect(getLostVisibilityCount(workspaceId)).toBe(LOST_VISIBILITY_READ_LIMIT + 5);
   });
 
   it('does not return active queries', () => {

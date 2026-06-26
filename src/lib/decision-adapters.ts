@@ -1,6 +1,5 @@
-import type { ClientAction, ClientActionSourceType } from '../../shared/types/client-actions.js';
-import type { ApprovalBatch } from '../../shared/types/approvals.js';
-import type { DecisionKind, NormalizedDecision } from '../../shared/types/decision.js';
+import type { ClientActionSourceType } from '../../shared/types/client-actions.js';
+import type { NormalizedDecision } from '../../shared/types/decision.js';
 import type { ClientDeliverable, DeliverableType } from '../../shared/types/client-deliverable.js';
 
 // ── Badge labels ───────────────────────────────────────────────────────────
@@ -56,75 +55,6 @@ export function badgeForBatch(name: string): string {
   if (lower.startsWith('seo editor') || lower.startsWith('seo')) return 'SEO Editor';
   if (lower.startsWith('audit')) return 'Audit';
   return 'SEO';   // fallback
-}
-
-// ── Item count helpers ────────────────────────────────────────────────────
-
-/**
- * For client_actions, itemCount reflects the number of individual changes
- * inside the payload. Falls back to 1 (the action itself is the single item).
- */
-function itemCountForAction(action: ClientAction): number {
-  const p = action.payload as Record<string, unknown>;
-  if (Array.isArray(p?.diffs)) return (p.diffs as unknown[]).length;
-  if (Array.isArray(p?.suggestions)) return (p.suggestions as unknown[]).length;
-  if (Array.isArray(p?.redirects)) return (p.redirects as unknown[]).length;
-  return 1;  // content_decay and unknown types
-}
-
-// ── Legacy compatibility adapters ──────────────────────────────────────────
-
-/**
- * Normalize a `client_action` row into a `NormalizedDecision` for `<DecisionCard>`.
- *
- * `isSingleAction` is true only for `content_decay` — those render inline
- * with approve/flag buttons; all other types open `<DecisionDetailModal>`.
- *
- * @deprecated Production client inbox rendering normalizes `ClientDeliverable` rows.
- * Keep this only for archived compatibility tests until old source projections are fully retired.
- */
-export function normalizeClientAction(action: ClientAction): NormalizedDecision {
-  // content_decay + cannibalization → inline single-action ('decision'); all others open the modal.
-  const kind: DecisionKind = action.sourceType === 'content_decay' || action.sourceType === 'cannibalization' ? 'decision' : 'batch';
-  return {
-    id: `ca-${action.id}`,
-    source: 'client_action',
-    sourceId: action.id,
-    title: action.title,
-    summary: action.summary,
-    priority: action.priority,
-    itemCount: itemCountForAction(action),
-    kind,
-    isSingleAction: kind === 'decision',
-    badge: clientActionSourceLabel(action.sourceType),
-    createdAt: action.createdAt,
-  };
-}
-
-/**
- * Normalize an `approval_batch` row into a `NormalizedDecision` for `<DecisionCard>`.
- *
- * Approval batches never have isSingleAction=true — they always open the
- * full-screen `<DecisionDetailModal>` regardless of item count.
- *
- * @deprecated Production client inbox rendering normalizes `ClientDeliverable` rows.
- * Keep this only for archived compatibility tests until old source projections are fully retired.
- */
-export function normalizeApprovalBatch(batch: ApprovalBatch): NormalizedDecision {
-  return {
-    id: `ab-${batch.id}`,
-    source: 'approval_batch',
-    sourceId: batch.id,
-    title: batch.name,
-    summary: `${batch.items.length} change${batch.items.length !== 1 ? 's' : ''} ready for your approval`,
-    priority: undefined,
-    itemCount: batch.items.length,
-    // Approval batches always open the full-screen modal (never inline) regardless of item count.
-    kind: 'batch',
-    isSingleAction: false,
-    badge: badgeForBatch(batch.name),
-    createdAt: batch.createdAt,
-  };
 }
 
 // ── Canonical ClientDeliverable adapter ─────────────────────────────────────

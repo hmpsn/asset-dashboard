@@ -262,6 +262,23 @@ export const DEPRECATION_REGISTRY: DeprecationEntry[] = [
     ],
   },
   {
+    id: 'roi-attribution-module-deprecated',
+    capability: 'Legacy roi_attributions table and server/roi-attribution.ts module',
+    state: 'deprecated',
+    owner: 'outcomes-roi',
+    replacement: 'Use outcome tracking, workspace learnings, and outcome measurement stores for new attribution flows.',
+    requiresHumanVerification: true,
+    notes: 'Retained for historical data reconciliation; new outcome consumers should not add write paths through roi_attributions.',
+    contracts: [
+      {
+        kind: 'safe-failure',
+        description: 'The legacy module is marked deprecated and helper tests preserve read behavior until historical data is reconciled.',
+        evidence: 'server/roi-attribution.ts (module-level deprecated contract)',
+        testEvidence: 'tests/unit/roi-attribution.test.ts',
+      },
+    ],
+  },
+  {
     id: 'schema-review-standalone-tab-migration',
     capability: 'Schema Review standalone tab retired into Inbox Reviews workflow',
     state: 'migrated',

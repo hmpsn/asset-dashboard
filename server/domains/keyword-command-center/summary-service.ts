@@ -27,7 +27,7 @@ import {
   trackedKeywordMatchesFilter,
 } from './candidate-boundary.js';
 import { readFeedback } from './feedback-store.js';
-import { safeLostVisibilityRows } from './read-model.js';
+import { safeLostVisibilityCount, safeLostVisibilityRows } from './read-model.js';
 import {
   buildFilterFacetsFromCounts,
   type SkinnyFilterCounts,
@@ -129,7 +129,7 @@ export async function buildKeywordCommandCenterSummary(
 
   const latestRanks = getLatestSnapshotRanks(workspace.id);
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
-  const lostVisibilityCount = lostVisibilityRows.length;
+  const lostVisibilityCount = safeLostVisibilityCount(workspace.id);
   const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   for (const key of lostVisibilityKeys) allKeys.add(key);
   const rankEvidenceKeys = new Set<string>();

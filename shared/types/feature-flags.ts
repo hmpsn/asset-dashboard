@@ -193,9 +193,7 @@ export interface FeatureFlagCatalogEntry {
 }
 
 const LEGACY_ROADMAP = {
-  outcome: 'legacy-outcome-intelligence',
   briefing: 'legacy-client-briefing-v2',
-  schema: 'legacy-schema-ai',
   platformIntelligenceEnhancements: 'legacy-platform-intelligence-enhancements',
 } as const;
 

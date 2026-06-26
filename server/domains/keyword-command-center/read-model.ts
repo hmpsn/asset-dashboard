@@ -10,7 +10,7 @@ import {
   TRACKED_KEYWORD_STATUS,
 } from '../../../shared/types/rank-tracking.js';
 import type { Workspace } from '../../../shared/types/workspace.js';
-import { getLostVisibilityKeys, getLostVisibilityQueries } from '../../client-discovered-queries.js';
+import { getLostVisibilityCount, getLostVisibilityKeys, getLostVisibilityQueries } from '../../client-discovered-queries.js';
 import { isFeatureEnabled } from '../../feature-flags.js';
 import { buildKeywordStrategyUxPayload } from '../../keyword-strategy-ux.js';
 import { getLatestSerpSnapshots } from '../../serp-snapshots-store.js';
@@ -104,6 +104,15 @@ export function safeLostVisibilityRows(workspaceId: string): LostVisibilityQuery
   } catch (err) {
     log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility rows');
     return [];
+  }
+}
+
+export function safeLostVisibilityCount(workspaceId: string): number {
+  try {
+    return getLostVisibilityCount(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'discovered_queries unavailable while reading lost visibility count');
+    return safeLostVisibilityRows(workspaceId).length;
   }
 }
 

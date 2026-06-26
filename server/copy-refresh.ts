@@ -16,7 +16,7 @@ import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
 import { normalizePageUrl } from './utils/page-address.js';
-import { sanitizeQueryForPrompt } from './utils/text.js';
+import { sanitizeQueryForPrompt, slugify } from './utils/text.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
 const log = createLogger('copy-refresh');
@@ -63,13 +63,12 @@ export interface BatchRefreshResult {
  * "About Us" → "about-us", "Our Services — Web Design" → "our-services-web-design"
  */
 function nameToSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[—–]/g, '-')         // em/en dashes
-    .replace(/[^a-z0-9\s-]/g, '')  // strip non-alphanumeric
-    .replace(/\s+/g, '-')          // spaces to hyphens
-    .replace(/-+/g, '-')           // collapse multiple hyphens
-    .replace(/^-|-$/g, '');        // trim leading/trailing hyphens
+  return slugify(
+    name
+      .toLowerCase()
+      .replace(/[—–]/g, '-')
+      .replace(/[^a-z0-9\s-]/g, ''),
+  );
 }
 
 // ── Match function ──
