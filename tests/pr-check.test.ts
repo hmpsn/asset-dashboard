@@ -10871,6 +10871,21 @@ describe('Rule: recommendation impactScore must flow from canonical OV scorer', 
     expect(hits[0].line).toBe(2);
   });
 
+  it('flags local legacy impactScore math in extracted recommendation producers', () => {
+    const file = write(
+      uniqPath('rule-rec-impactscore', 'server/domains/recommendations/generation-producers.ts'),
+      lines(
+        'function bad() {',
+        '  const impactScore = 75;',
+        '  return { impactScore: 75 };',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].line).toBe(2);
+  });
+
   it('respects // rec-impactscore-ok hatch', () => {
     const file = write(
       uniqPath('rule-rec-impactscore', 'server/recommendations.ts'),
