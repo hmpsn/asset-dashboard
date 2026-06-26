@@ -31,7 +31,8 @@
  * three critical differences spelled out inline below.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import { render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
@@ -348,6 +349,13 @@ async function assertWrappedInSuspenseThenResolve(
   await afterResolve();
 }
 
+async function switchDeepDiveToRankings() {
+  const user = userEvent.setup();
+  const rankingsTab = screen.getByRole('tab', { name: /rankings/i });
+  await user.click(rankingsTab);
+  await waitFor(() => expect(rankingsTab).toHaveAttribute('aria-selected', 'true'));
+}
+
 describe('ClientDashboard — IA v2 flag-ON real lazy/Suspense render (rule-13 guard)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -386,7 +394,7 @@ describe('ClientDashboard — IA v2 flag-ON real lazy/Suspense render (rule-13 g
     });
 
     // DeepDiveTab renders its own real TabBar (role="tab") with Analytics / Rankings.
-    fireEvent.click(screen.getByRole('tab', { name: /rankings/i }));
+    await switchDeepDiveToRankings();
 
     await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
     // Analytics slot is unmounted once Rankings is active.
@@ -407,7 +415,7 @@ describe('ClientDashboard — IA v2 flag-ON real lazy/Suspense render (rule-13 g
     });
 
     // Switch to Rankings — the content roadmap lives under that sub-tab only.
-    fireEvent.click(screen.getByRole('tab', { name: /rankings/i }));
+    await switchDeepDiveToRankings();
 
     await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
     // The "Content roadmap" section renders and the (mocked) ContentPlanTab mounts inside it.
@@ -427,7 +435,7 @@ describe('ClientDashboard — IA v2 flag-ON real lazy/Suspense render (rule-13 g
       await waitFor(() => expect(screen.getByTestId('performance-tab')).toBeInTheDocument());
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /rankings/i }));
+    await switchDeepDiveToRankings();
 
     await waitFor(() => expect(screen.getByTestId('strategy-tab')).toBeInTheDocument());
     // No plan → no content roadmap section and no ContentPlanTab anywhere under Rankings.
