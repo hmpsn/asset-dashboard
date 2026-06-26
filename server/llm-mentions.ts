@@ -20,7 +20,7 @@
 import { createLogger } from './logger.js';
 import { getJob, updateJob, unregisterAbort } from './jobs.js';
 import { getWorkspace, computeEffectiveTier } from './workspaces.js';
-import { cleanDomain } from './local-seo.js';
+import { cleanDomain } from './domains/local-seo/business-match.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { storeLlmMentionSnapshot } from './llm-mentions-store.js';

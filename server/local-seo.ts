@@ -9,7 +9,6 @@ import { addActivity } from './activity-log.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { runLocalVisibilityShiftBridge } from './bridge-local-visibility-shift.js';
 import { broadcastToWorkspace } from './broadcast.js';
-import { getClientLocations } from './client-locations.js';
 import { listContentGaps } from './content-gaps.js';
 import { createJob, updateJob, getJob, hasActiveJob, unregisterAbort } from './jobs.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
@@ -23,10 +22,26 @@ import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { waitForHeapHeadroom } from './seo-refresh-runner-runtime.js';
-import { normalizeDomainValue } from './domain-normalization.js';
 import { sleep } from './helpers.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { buildDataForSeoLocationName } from '../shared/local-seo-location.js';
+import {
+  LOCAL_SEO_MAX_RESULTS,
+  evaluateLocalBusinessMatch,
+  getEffectiveLocations,
+  scrubOwnedLocalResults,
+} from './domains/local-seo/business-match.js';
+import {
+  applySourcePageCap,
+  candidateSourceScore,
+  classifyLocalKeywordIntent,
+  cleanKeywordDisplay,
+  hasMarketModifier,
+  localVariantKeywordsByMarket,
+  titleLooksLikeServiceKeyword,
+  normalizeText,
+} from './domains/local-seo/keyword-intent.js';
+import type { LocalSeoKeywordCandidate } from './domains/local-seo/types.js';
 import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
   LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
@@ -76,6 +91,30 @@ import type { Workspace } from '../shared/types/workspace.js';
 const log = createLogger('local-seo');
 
 export const LOCAL_SEO_MAX_MARKETS = 3;
+
+export {
+  cleanDomain,
+  confidencePriority,
+  evaluateLocalBusinessMatch,
+  getEffectiveLocations,
+  isOwnedLocalResult,
+  normalizePhone,
+  normalizeProviderIdentity,
+  scrubOwnedLocalResults,
+} from './domains/local-seo/business-match.js';
+export {
+  applySourcePageCap,
+  candidateSourceScore,
+  classifyLocalKeywordIntent,
+  cleanKeywordDisplay,
+  hasMarketModifier,
+  localVariantKeywords,
+  localVariantKeywordsByMarket,
+  normalizeText,
+  titleLooksLikeServiceKeyword,
+  type LocalVariantKeyword,
+} from './domains/local-seo/keyword-intent.js';
+export type { LocalSeoKeywordCandidate } from './domains/local-seo/types.js';
 
 const TARGET_GEO_LOCATION_NAMES_BY_CODE: Record<number, string> = {
   2036: 'Australia',
@@ -134,7 +173,6 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
   );
 }
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
-const LOCAL_SEO_MAX_RESULTS = 10;
 // Fully sequential SERP calls. Iteration history: 5 (initial) → 3 (PR #909) → 1 (PR #910).
 // Each concurrent slot holds a full DataForSEO serp/google/organic/live/advanced JSON
 // response in memory during parsing (~20–30 MB). On memory-constrained hosts (Render
@@ -237,33 +275,6 @@ const LOCAL_SEO_REFRESH_PROGRESS_BROADCAST_INTERVAL = 20;
  */
 const LOCAL_SEO_LOCATION_BACKFILL_PROGRESS_BROADCAST_INTERVAL = 100;
 const DEFAULT_LANGUAGE_CODE = 'en';
-
-export interface LocalSeoKeywordCandidate {
-  keyword: string;
-  normalizedKeyword: string;
-  source: 'explicit' | 'strategy' | 'tracking' | 'page_assignment' | 'content_gap' | 'local_variant';
-  sourceLabel: string;
-  detail?: string;
-  pagePath?: string;
-  pageTitle?: string;
-  /**
-   * The local market this candidate was generated for, when the source is
-   * market-scoped (i.e. local variants tied to a specific market's city/state,
-   * or intent-modifier variants tied to the primary market). Market-agnostic
-   * sources (explicit, strategy, tracking, page assignments, content gaps) leave
-   * this `null`/undefined — never fabricate a market for them. Threaded onto the
-   * `localSeo` intelligence slice so per-market relevance (stratified prompt
-   * sampling, market-scoped candidate selection) works instead of falling back
-   * to flat top-N. See docs/rules/local-seo-visibility.md (intelligence boundary).
-   */
-  marketId?: string | null;
-  volume?: number;
-  difficulty?: number;
-  selected: boolean;
-  score: number;
-  reasons: string[];
-  intent: LocalSeoKeywordIntent;
-}
 
 const localResultSchema = z.object({
   title: z.string(),
@@ -1746,203 +1757,6 @@ function buildLocalSeoVisibilityMap(
   return map;
 }
 
-export function cleanDomain(value: string | undefined): string | undefined {
-  const normalized = normalizeDomainValue(value, {
-    stripWww: true,
-    lowercase: true,
-    stripPort: true,
-    allowMalformedFallback: true,
-  });
-  if (!normalized && value) {
-    log.debug({ value }, 'local-seo cleanDomain: malformed domain value');
-  }
-  return normalized;
-}
-
-export function normalizePhone(value: string | undefined): string | undefined {
-  const digits = value?.replace(/\D/g, '') ?? '';
-  return digits.length >= 7 ? digits.slice(-10) : undefined;
-}
-
-export function normalizeText(value: string | undefined): string {
-  return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-export function normalizeProviderIdentity(value: string | undefined): string | undefined {
-  const normalized = value?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
-  return normalized || undefined;
-}
-
-type LocalBusinessMatchResult = {
-  confidence: LocalBusinessMatchConfidence;
-  found: boolean;
-  rank?: number;
-  reason?: string;
-  matchedLocationId?: string;
-  matchedLocationName?: string;
-};
-
-export function confidencePriority(confidence: LocalBusinessMatchConfidence): number {
-  switch (confidence) {
-    case LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED:
-      return 3;
-    case LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH:
-      return 2;
-    case LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH:
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-export function getEffectiveLocations(workspace: Workspace): ClientLocation[] {
-  const configured = getClientLocations(workspace.id).filter(location => location.status === 'confirmed');
-  if (configured.length > 0) return configured;
-  const address = workspace.businessProfile?.address;
-  // Use a fixed sentinel timestamp so two calls at different wall-clock times return
-  // structurally identical objects — avoids false cache misses from unstable timestamps.
-  const syntheticTimestamp = '1970-01-01T00:00:00.000Z';
-  return [{
-    id: `synthetic-${workspace.id}`,
-    workspaceId: workspace.id,
-    name: workspace.name,
-    domain: workspace.liveDomain ?? workspace.gscPropertyUrl ?? undefined,
-    phone: workspace.businessProfile?.phone,
-    streetAddress: address?.street,
-    city: address?.city,
-    stateOrRegion: address?.state,
-    country: address?.country,
-    isPrimary: true,
-    status: 'confirmed',
-    createdAt: syntheticTimestamp,
-    updatedAt: syntheticTimestamp,
-  }];
-}
-
-export function isOwnedLocalResult(result: LocalVisibilityBusinessResult, locations: ClientLocation[]): boolean {
-  const resultDomain = cleanDomain(result.domain ?? result.url);
-  const resultPhone = normalizePhone(result.phone);
-  const resultAddress = normalizeText(result.address);
-  const resultProviderIdentity = normalizeProviderIdentity(result.cid);
-
-  return locations.some(location => {
-    const locationDomain = cleanDomain(location.domain);
-    if (locationDomain && resultDomain && locationDomain === resultDomain) return true;
-    const locationProviderIdentity = normalizeProviderIdentity(location.gbpPlaceId);
-    if (locationProviderIdentity && resultProviderIdentity && locationProviderIdentity === resultProviderIdentity) return true;
-    const locationPhone = normalizePhone(location.phone);
-    if (locationPhone && resultPhone && locationPhone === resultPhone) return true;
-    const locationStreet = normalizeText(location.streetAddress);
-    if (locationStreet && resultAddress.includes(locationStreet)) return true;
-    // Name alone is NOT enough to claim ownership — domain, GBP identity, phone, or
-    // street address must corroborate. All four signals were already checked above
-    // via early-return; if we reach here, all four were false, so name-only can't
-    // produce a match. Returning false explicitly prevents a future reader from
-    // "simplifying" the early-returns and inadvertently enabling name-only scrubbing.
-    return false;
-  });
-}
-
-function scrubOwnedLocalResults(
-  results: LocalVisibilityBusinessResult[],
-  locations: ClientLocation[],
-): LocalVisibilityBusinessResult[] {
-  return results
-    .filter(result => !isOwnedLocalResult(result, locations))
-    .slice(0, LOCAL_SEO_MAX_RESULTS);
-}
-
-function isBetterLocalBusinessMatch(
-  candidate: LocalBusinessMatchResult,
-  current: LocalBusinessMatchResult | null,
-): boolean {
-  if (!current) return true;
-  const candidatePriority = confidencePriority(candidate.confidence);
-  const currentPriority = confidencePriority(current.confidence);
-  if (candidatePriority !== currentPriority) return candidatePriority > currentPriority;
-  const candidateRank = candidate.rank ?? Number.POSITIVE_INFINITY;
-  const currentRank = current.rank ?? Number.POSITIVE_INFINITY;
-  return candidateRank < currentRank;
-}
-
-export function evaluateLocalBusinessMatch(
-  locations: ClientLocation[],
-  results: LocalVisibilityBusinessResult[],
-): LocalBusinessMatchResult {
-  if (results.length === 0 || locations.length === 0) {
-    return {
-      confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
-      found: false,
-      reason: 'No local pack results returned',
-    };
-  }
-
-  let best: LocalBusinessMatchResult | null = null;
-
-  for (const location of locations) {
-    const locationDomain = cleanDomain(location.domain);
-    const locationName = normalizeText(location.name);
-    const locationPhone = normalizePhone(location.phone);
-    const locationStreet = normalizeText(location.streetAddress);
-
-    for (const result of results) {
-      const resultDomain = cleanDomain(result.domain ?? result.url);
-      const title = normalizeText(result.title);
-      const address = normalizeText(result.address);
-      const phone = normalizePhone(result.phone);
-      const providerIdentity = normalizeProviderIdentity(result.cid);
-      const domainMatch = Boolean(locationDomain && resultDomain && resultDomain === locationDomain);
-      const phoneMatch = Boolean(locationPhone && phone && locationPhone === phone);
-      const nameMatch = Boolean(locationName && title && (title.includes(locationName) || locationName.includes(title)));
-      const streetAddressMatch = Boolean(locationStreet && address.includes(locationStreet));
-      const locationProviderIdentity = normalizeProviderIdentity(location.gbpPlaceId);
-      const providerIdentityMatch = Boolean(
-        locationProviderIdentity && providerIdentity && locationProviderIdentity === providerIdentity,
-      );
-
-      let candidate: LocalBusinessMatchResult | null = null;
-      if (providerIdentityMatch || (domainMatch && (nameMatch || phoneMatch || streetAddressMatch))) {
-        candidate = {
-          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
-          found: true,
-          rank: result.rank,
-          reason: 'Domain plus name, phone, address, or provider identity matched',
-          matchedLocationId: location.id,
-          matchedLocationName: location.name,
-        };
-      } else if (domainMatch || (nameMatch && (phoneMatch || streetAddressMatch))) {
-        candidate = {
-          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.STRONG_MATCH,
-          found: true,
-          rank: result.rank,
-          reason: 'Strong business identity match in local result',
-          matchedLocationId: location.id,
-          matchedLocationName: location.name,
-        };
-      } else if (nameMatch || phoneMatch || streetAddressMatch) {
-        candidate = {
-          confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.POSSIBLE_MATCH,
-          found: true,
-          rank: result.rank,
-          reason: 'Possible business match; review before treating as verified',
-          matchedLocationId: location.id,
-          matchedLocationName: location.name,
-        };
-      }
-
-      if (candidate && isBetterLocalBusinessMatch(candidate, best)) {
-        best = candidate;
-      }
-    }
-  }
-
-  return best ?? {
-    confidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.NOT_FOUND,
-    found: false,
-    reason: 'No likely business match found in local results',
-  };
-}
-
 function snapshotFromProviderResult(
   workspaceId: string,
   locations: ClientLocation[],
@@ -2034,76 +1848,6 @@ function hasLocalIntent(
   return false;
 }
 
-export function cleanKeywordDisplay(keyword: string | undefined): string | undefined {
-  const cleaned = keyword?.replace(/\s+/g, ' ').trim();
-  if (!cleaned || cleaned.length < 3 || cleaned.length > 90) return undefined;
-  return cleaned;
-}
-
-/**
- * Returns true if `title` looks like a local service keyword (short enough and
- * matches service vocabulary).
- *
- * When called with a `serviceTermRegex` derived from the workspace via
- * `buildWorkspaceServiceTermRegex`, the match is per-workspace and accurate for
- * any industry. Without it, a broad cross-industry fallback regex is used — this
- * is only appropriate for tests and callers that deliberately have no workspace
- * context (the `iterateLocalCandidateSignals` hot path always passes a regex).
- */
-export function titleLooksLikeServiceKeyword(
-  title: string | undefined,
-  serviceTermRegex?: RegExp,
-): boolean {
-  const cleaned = cleanKeywordDisplay(title);
-  if (!cleaned) return false;
-  const tokens = cleaned.split(/\s+/);
-  if (tokens.length > 6) return false;
-  // Use the provided per-workspace regex, or fall back to the broad cross-industry
-  // list. The fallback retains dental/legal/contractor coverage for the test suite
-  // and for callers that have no workspace context.
-  const regex = serviceTermRegex ?? /dent|dental|implant|invisalign|veneer|whiten|emergency|orthodont|clinic|law|attorney|restaurant|contractor|plumb|roof|med spa|service/i;
-  return regex.test(cleaned);
-}
-
-export function hasMarketModifier(keyword: string, markets: LocalSeoMarket[]): boolean {
-  const normalized = normalizeText(keyword);
-  if (/\bnear me\b|\blocal\b/.test(normalized)) return true;
-  return markets.some(market => {
-    const city = normalizeText(market.city);
-    const state = normalizeText(market.stateOrRegion);
-    return Boolean((city && normalized.includes(city)) || (state && normalized.includes(state)));
-  });
-}
-
-/**
- * Classify the search intent of a local SEO keyword using regex patterns.
- * Runs in the hot path — no API calls.
- *
- * Priority order: comparison → informational → commercial → transactional (default)
- *
- * Note: 'navigational' is part of the LocalSeoKeywordIntent union but is never
- * returned by this classifier (it requires workspace brand context not available here).
- * It may be pre-assigned by signal iterators that have that context.
- */
-export function classifyLocalKeywordIntent(keyword: string): LocalSeoKeywordIntent {
-  const kw = keyword.toLowerCase();
-  // Comparison: X vs Y, versus, alternatives, compare
-  if (/\bvs\b|\bversus\b|\balternative[s]?\b|\bcompare\b|\bcomparison\b/.test(kw)) {
-    return 'comparison';
-  }
-  // Informational: question words, educational patterns, cost/price research
-  if (/^(how |what |why |when |where |which |who |can |does |do |is |are )|\bguide\b|\btutorial\b|\btips\b|\bexplained\b|\boverview\b|\bhistory\b|\bfacts\b|\bstatistics\b|\btypes of\b|\bdifference between\b|\bcost of\b|\bprice of\b|\bpros and cons\b|\bbenefits of\b|\bcauses of\b|\bwhat is\b|\bimpact of\b/.test(kw)) {
-    return 'informational';
-  }
-  // Commercial: pre-buying research with quality signals (still useful for local)
-  if (/\b(best|top|top-rated|top rated|affordable|cheap|cheapest|discount|deal|coupon|budget|premium|quality)\b/.test(kw)) {
-    return 'commercial';
-  }
-  // Navigational: brand/domain search (hard to detect without workspace context, skip)
-  // Default: transactional (local service + city/near-me patterns)
-  return 'transactional';
-}
-
 const LOCAL_INTENT_PREFIXES = [
   'emergency', 'open now', 'best',
   'same day', 'affordable', 'cheap',
@@ -2111,70 +1855,6 @@ const LOCAL_INTENT_PREFIXES = [
 ] as const;
 
 const LOCAL_INTENT_PREFIX_CAP_PER_BASE = 3;
-
-const LOCAL_SOURCE_PAGE_BUDGET_FRACTION = 0.20;
-
-/**
- * A locally-modified keyword variant tagged with the market that produced it.
- *
- * City/state variants carry the originating market's `marketId`. The
- * market-agnostic `"<base> near me"` variant carries `marketId: null` — it is
- * not tied to any single market, so do not fabricate one.
- */
-export interface LocalVariantKeyword {
-  keyword: string;
-  marketId: string | null;
-}
-
-/**
- * Market-tagged local variant generation. Yields one entry per generated
- * variant, attributing city/state variants to their originating market so the
- * candidate engine can thread `marketId` onto the resulting candidate. The
- * `near me` variant is market-agnostic and carries `marketId: null`.
- *
- * Dedupe is by keyword text: the first market to produce a given variant string
- * wins its attribution (mirrors the `Set`-based dedupe of the flat helper).
- */
-export function localVariantKeywordsByMarket(baseKeyword: string, markets: LocalSeoMarket[]): LocalVariantKeyword[] {
-  const base = cleanKeywordDisplay(baseKeyword);
-  if (!base) return [];
-  const variants: LocalVariantKeyword[] = [];
-  const seen = new Set<string>();
-  // Dedup is first-market-wins by keyword text: if two markets produce the same
-  // variant string (e.g. a city name shared by two markets), it is attributed to
-  // the first market only. Very low likelihood at LOCAL_SEO_MAX_MARKETS=3;
-  // acknowledged as a known, accepted edge case rather than merged across markets.
-  const add = (keyword: string, marketId: string | null) => {
-    if (seen.has(keyword)) return;
-    seen.add(keyword);
-    variants.push({ keyword, marketId });
-  };
-  for (const market of markets) {
-    const city = cleanKeywordDisplay(market.city);
-    const state = cleanKeywordDisplay(market.stateOrRegion);
-    if (city && !normalizeText(base).includes(normalizeText(city))) {
-      add(`${base} ${city}`, market.id);
-      if (state && state.length <= 3) add(`${base} ${city} ${state}`, market.id);
-    }
-  }
-  if (!/\bnear me\b/i.test(base)) add(`${base} near me`, null);
-  return variants;
-}
-
-export function localVariantKeywords(baseKeyword: string, markets: LocalSeoMarket[]): string[] {
-  return localVariantKeywordsByMarket(baseKeyword, markets).map(v => v.keyword);
-}
-
-export function candidateSourceScore(source: LocalSeoKeywordCandidate['source']): number {
-  switch (source) {
-    case 'explicit': return 120;
-    case 'strategy': return 95;
-    case 'tracking': return 90;
-    case 'page_assignment': return 85;
-    case 'content_gap': return 72;
-    case 'local_variant': return 62;
-  }
-}
 
 function buildCandidateContext(workspace: Workspace) {
   const contentGaps = listContentGaps(workspace.id);
@@ -2724,24 +2404,6 @@ function selectExplicitLocalSeoKeywords(workspaceId: string, explicitKeywords: s
     if (selected.length >= budget) break;
   }
   return selected;
-}
-
-/**
- * Apply a per-source-page budget cap to prevent a single page from dominating
- * the refresh budget. Explicit keywords are never capped — they are admin-chosen.
- * Non-explicit keywords without a pagePath share a bucket per source type.
- */
-export function applySourcePageCap(candidates: LocalSeoKeywordCandidate[], budget: number): LocalSeoKeywordCandidate[] {
-  const pageCap = Math.max(1, Math.ceil(budget * LOCAL_SOURCE_PAGE_BUDGET_FRACTION));
-  const pageCounts = new Map<string, number>();
-  return candidates.filter(c => {
-    if (c.source === 'explicit') return true;
-    const key = c.pagePath ?? `__no_page__${c.source}`;
-    const count = pageCounts.get(key) ?? 0;
-    if (count >= pageCap) return false;
-    pageCounts.set(key, count + 1);
-    return true;
-  });
 }
 
 export function selectLocalIntentKeywords(workspaceId: string, explicitKeywords: string[] = []): string[] {
