@@ -21,6 +21,17 @@ const stmts = createStmtCache(() => ({
   listBySub: db.prepare<[sub: string]>(
     `SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`,
   ),
+  listCompetitorProjection: db.prepare(`
+    SELECT
+      site_id,
+      created_at,
+      json_extract(result, '$.mySite.url') AS my_url,
+      json_extract(result, '$.competitor.url') AS competitor_url
+    FROM performance_snapshots
+    WHERE sub = 'competitor'
+      AND json_valid(result)
+    ORDER BY created_at DESC
+  `),
 }));
 
 interface PerfRow {
@@ -142,39 +153,50 @@ interface CompetitorCompareResult {
   [key: string]: unknown;
 }
 
+interface CompetitorCompareProjectionRow {
+  site_id: string;
+  created_at: string;
+  my_url: string | null;
+  competitor_url: string | null;
+}
+
+function normalizeCompareUrl(u: string): string {
+  return u.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+}
+
 // Get latest comparison for a given myUrl (any competitor)
 export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: string; result: unknown } | null {
-  const rows = stmts().listBySub.all('competitor') as PerfRow[];
+  const rows = stmts().listCompetitorProjection.all() as CompetitorCompareProjectionRow[];
   if (rows.length === 0) return null;
 
-  const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
-  const myNorm = normalize(myUrl);
-  let latest: { createdAt: string; result: unknown } | null = null;
+  const myNorm = normalizeCompareUrl(myUrl);
+  let latestKey: string | null = null;
+  let latestCreatedAt: string | null = null;
 
   for (const row of rows) {
-    const data = parseJsonFallback<CompetitorCompareResult | null>(row.result, null);
-    if (!data?.mySite?.url) continue; // skip corrupt/empty rows
-    const snapMyUrl = normalize(data.mySite.url);
+    if (!row.my_url) continue;
+    const snapMyUrl = normalizeCompareUrl(row.my_url);
     if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
-      if (!latest || row.created_at > latest.createdAt) {
-        latest = { createdAt: row.created_at, result: data };
+      if (!latestCreatedAt || row.created_at > latestCreatedAt) {
+        latestKey = row.site_id;
+        latestCreatedAt = row.created_at;
       }
     }
   }
-  return latest;
+  if (!latestKey || !latestCreatedAt) return null;
+
+  const snapshot = load<CompetitorCompareResult>('competitor', latestKey);
+  return snapshot ? { createdAt: latestCreatedAt, result: snapshot.result } : null;
 }
 
 // List all saved competitor comparisons
 export function listCompetitorCompares(): Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }> {
-  const rows = stmts().listBySub.all('competitor') as PerfRow[];
-  return rows.map(row => {
-    const data = parseJsonFallback<CompetitorCompareResult | null>(row.result, null);
-    if (!data) return null; // skip corrupt rows
-    return {
+  const rows = stmts().listCompetitorProjection.all() as CompetitorCompareProjectionRow[];
+  return rows
+    .map(row => ({
       key: row.site_id,
       createdAt: row.created_at,
-      myUrl: data.mySite?.url,
-      competitorUrl: data.competitor?.url,
-    };
-  }).filter(Boolean) as Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }>;
+      myUrl: row.my_url ?? undefined,
+      competitorUrl: row.competitor_url ?? undefined,
+    }));
 }

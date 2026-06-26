@@ -1,5 +1,6 @@
 // tests/unit/workspace-intelligence.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
 
 const hoisted = vi.hoisted(() => ({
   logDebug: vi.fn(),
@@ -89,6 +90,7 @@ import {
   formatForPrompt,
 } from '../../server/workspace-intelligence.js';
 import {
+  type IntelligenceSliceMetadataEntry,
   INTELLIGENCE_SLICE_METADATA_REGISTRY,
 } from '../../server/intelligence/slice-metadata-registry.js';
 import {
@@ -185,6 +187,43 @@ describe('buildWorkspaceIntelligence', () => {
 
     expect(missingSiteId.siteInventory).toBeUndefined();
     expect(missingBaseUrl.siteInventory).toBeUndefined();
+  });
+
+  it('starts requested slice assemblers in parallel and applies results in requested order', async () => {
+    const registry = INTELLIGENCE_SLICE_METADATA_REGISTRY as unknown as Record<string, IntelligenceSliceMetadataEntry>;
+    const originalSeoContext = registry.seoContext.assemble;
+    const resolvers: Array<(value: Partial<WorkspaceIntelligence>) => void> = [];
+    const makeSeoContext = (brandVoice: string) => ({
+      strategy: undefined,
+      brandVoice,
+      effectiveBrandVoiceBlock: '',
+      businessContext: '',
+      personas: [],
+      knowledgeBase: '',
+    });
+
+    try {
+      registry.seoContext.assemble = vi.fn(() => new Promise<Partial<WorkspaceIntelligence>>((resolve) => {
+        resolvers.push(resolve);
+      }));
+
+      const pending = buildWorkspaceIntelligence('ws-parallel-order', {
+        slices: ['seoContext', 'seoContext'],
+      });
+      await Promise.resolve();
+
+      expect(registry.seoContext.assemble).toHaveBeenCalledTimes(2);
+      expect(resolvers).toHaveLength(2);
+
+      resolvers[1]!({ seoContext: makeSeoContext('second-requested') });
+      await Promise.resolve();
+      resolvers[0]!({ seoContext: makeSeoContext('first-requested') });
+
+      const result = await pending;
+      expect(result.seoContext?.brandVoice).toBe('second-requested');
+    } finally {
+      registry.seoContext.assemble = originalSeoContext;
+    }
   });
 
   it('degrades siteHealth timeout once without duplicate warnings from late rejection', async () => {
