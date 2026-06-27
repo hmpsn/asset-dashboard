@@ -113,9 +113,10 @@ export function compareBriefingContentGapDisplayOrder(
 ): number {
   const projectedA = projectKeywordOpportunity(a);
   const projectedB = projectKeywordOpportunity(b);
-  return projectedB.demandBucket - projectedA.demandBucket
+  return projectedB.sortScore - projectedA.sortScore
+    || projectedB.demandBucket - projectedA.demandBucket
     || projectedB.demandSortValue - projectedA.demandSortValue
-    || projectedB.sortScore - projectedA.sortScore;
+    || projectedB.priorityWeight - projectedA.priorityWeight;
 }
 
 export function compareContentGapDemandDisplayOrder(

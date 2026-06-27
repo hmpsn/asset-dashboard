@@ -369,11 +369,60 @@ describe('GET /api/public/briefing/:workspaceId — Phase 2.5b serve-time fields
     ]);
   });
 
+  it('recommendations rank by keyword value score when content-gap signals are present', async () => {
+    replaceAllContentGaps(summaryWsId, [
+      {
+        topic: 'Broad high-volume topic',
+        targetKeyword: 'how to clean windows',
+        intent: 'informational',
+        priority: 'high',
+        rationale: 'r',
+        volume: 50000,
+        difficulty: 10,
+        cpc: 0,
+        opportunityScore: 95,
+      },
+      {
+        topic: 'Commercial low-volume topic',
+        targetKeyword: 'window repair quote',
+        intent: 'transactional',
+        priority: 'medium',
+        rationale: 'r',
+        volume: 40,
+        difficulty: 45,
+        cpc: 18,
+        opportunityScore: 25,
+      },
+    ]);
+
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      briefing: { recommendations?: Array<{ topic: string; opportunityScore?: number; sortScore?: number; valueScore?: number }> } | null;
+    };
+    const recs = body.briefing!.recommendations!;
+    expect(recs.map((r) => r.topic)).toEqual([
+      'Commercial low-volume topic',
+      'Broad high-volume topic',
+    ]);
+    expect(recs[0]).not.toHaveProperty('sortScore');
+    expect(recs[0]).not.toHaveProperty('valueScore');
+  });
+
   it('issueSummary reflects the FULL recommendation pool, not the post-cap render set', async () => {
-    // Previous test injected 7 gaps. The recommendations array is capped at 5
+    // Re-inject 7 gaps so this test is independent from the value-ranking case above.
+    replaceAllContentGaps(summaryWsId, [
+      { topic: 'Topic A', targetKeyword: 'kw a', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 10 },
+      { topic: 'Topic B', targetKeyword: 'kw b', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 90 },
+      { topic: 'Topic C', targetKeyword: 'kw c', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 50 },
+      { topic: 'Topic D', targetKeyword: 'kw d', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 70 },
+      { topic: 'Topic E', targetKeyword: 'kw e', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 30 },
+      { topic: 'Topic F', targetKeyword: 'kw f', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 80 },
+      { topic: 'Topic G', targetKeyword: 'kw g', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 20 },
+    ]);
+    // The recommendations array is capped at 5
     // for rendering, but the summary's "N opportunities" must still reflect
-    // the full pool (otherwise it understates what's available). 7 gaps were
-    // injected in the prior test case.
+    // the full pool (otherwise it understates what's available).
     const res = await api(`/api/public/briefing/${summaryWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as { briefing: { issueSummary?: string } | null };

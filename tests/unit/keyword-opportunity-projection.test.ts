@@ -60,16 +60,28 @@ describe('keyword opportunity projection', () => {
       .toEqual(['high', 'low', 'missing']);
   });
 
-  it('keeps briefing content-gap demand buckets before opportunity score', () => {
+  it('orders briefing content gaps by caller-provided value score before demand buckets', () => {
     const gaps = [
-      { targetKeyword: 'zero demand high score', volume: 0, opportunityScore: 99 },
-      { targetKeyword: 'unenriched', opportunityScore: 50 },
-      { targetKeyword: 'volume demand low score', volume: 10, opportunityScore: 1 },
-      { targetKeyword: 'gsc demand', volume: 0, impressions: 100, opportunityScore: 2 },
+      { targetKeyword: 'zero demand high value', volume: 0, sortScore: 99, opportunityScore: 20 },
+      { targetKeyword: 'unenriched', sortScore: 50, opportunityScore: 50 },
+      { targetKeyword: 'volume demand low value', volume: 10, sortScore: 1, opportunityScore: 90 },
+      { targetKeyword: 'gsc demand', volume: 0, impressions: 100, sortScore: 2, opportunityScore: 80 },
     ];
 
     expect([...gaps].sort(compareBriefingContentGapDisplayOrder).map(gap => gap.targetKeyword))
-      .toEqual(['gsc demand', 'volume demand low score', 'unenriched', 'zero demand high score']);
+      .toEqual(['zero demand high value', 'unenriched', 'gsc demand', 'volume demand low value']);
+  });
+
+  it('uses briefing demand buckets as a tie-breaker when value scores match', () => {
+    const gaps = [
+      { targetKeyword: 'zero demand', volume: 0, sortScore: 50 },
+      { targetKeyword: 'unknown demand', sortScore: 50 },
+      { targetKeyword: 'volume demand', volume: 10, sortScore: 50 },
+      { targetKeyword: 'gsc demand', volume: 0, impressions: 100, sortScore: 50 },
+    ];
+
+    expect([...gaps].sort(compareBriefingContentGapDisplayOrder).map(gap => gap.targetKeyword))
+      .toEqual(['gsc demand', 'volume demand', 'unknown demand', 'zero demand']);
   });
 
   it('keeps demand-bucket content gaps ordered by demand, then priority', () => {

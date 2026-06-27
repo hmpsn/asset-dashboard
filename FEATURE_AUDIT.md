@@ -729,6 +729,18 @@ A comprehensive value assessment of every feature in the platform — **533 feat
 
 ---
 
+### 527. Keyword value score wiring — content plans, briefs, and client briefing ranking
+
+**What it does:** Completes the `kwv-one-score-everywhere` wiring delta for the highest-impact keyword-ranking read paths. `buildKeywordValueScoringContext()` now owns the shared posture/market/business-address context outside the Keyword Command Center domain. Content-plan keyword recommendations use `computeKeywordValueScore` as the deterministic base score before the existing strategic-fit, outcome-learning, cannibalization, and authority adjustments. Client briefing content-gap recommendations rank by a private Layer-1 sort score when volume/impression/difficulty/CPC signals exist, while preserving the public `opportunityScore` display field and stripping the private sort key from the response.
+
+**Client value:** The weekly briefing and content planning paths now lead with commercial, winnable keywords instead of letting raw volume push broad informational ideas above low-volume revenue terms.
+
+**Mutual:** No new API fields, DB migrations, UI components, or public response-shape changes. Legacy content gaps with only a stored `opportunityScore` continue to fall back to that score.
+
+**Files:** `server/scoring/keyword-value-context.ts`, `server/briefing-client-projection.ts`, `server/keyword-recommendations.ts`, `shared/keyword-opportunity-projection.ts`, `docs/rules/keyword-hub.md`, `tests/unit/keyword-opportunity-projection.test.ts`, `tests/integration/briefing-public.test.ts`, `tests/integration/keyword-recommendations-gsc.test.ts`.
+
+---
+
 ### 479. Keyword value score consolidation — one intent classifier + Layer-1 component interface (PR 1 + PR 2)
 
 **What it does:** Establishes the keystone foundation for the `kwv-one-score-everywhere` sprint. PR 1 makes `deriveValueIntent` (`server/scoring/keyword-value-score.ts`) the single keyword intent classifier for both Layer 1 (Hub value score) and Layer 2 (recommendation OV scorer), retiring `toOpportunityIntent` and the inline copy in `keyword-strategy-enrichment.ts`. Closes the `comparison`-intent drift: a `comparison` keyword was weighted 0.7 in the Hub but 0.5 in recs — both now map to `commercial` (0.7) via the shared classifier. PR 2 (this entry) adds `computeKeywordValueComponents(input, ctx): { score, components }` — a sibling to `computeKeywordValueScore` that exposes the internal `KeywordValueComponents` interface (`commercialValue / demand / winnability / localMultiplier / intent`). `computeKeywordValueScore` becomes a thin wrapper (`.score`) so the 4 existing scalar callers are byte-identical. Signal-gate parity is hard: a gated-out input returns `{ score: undefined, components: undefined }` — locked by test.

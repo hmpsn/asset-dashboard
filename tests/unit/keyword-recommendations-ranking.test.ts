@@ -61,6 +61,8 @@ vi.mock('../../server/workspaces.js', async (importOriginal) => {
 // The test doesn't exercise local SEO — resolveWorkspaceLocationCode only passes a location
 // code to the already-mocked getKeywordMetrics, so null is the correct stub value.
 vi.mock('../../server/local-seo.js', () => ({
+  getLocalSeoPosture: vi.fn(() => 'non_local'),
+  listLocalSeoMarkets: vi.fn(() => []),
   resolveWorkspaceLocationCode: vi.fn(() => null),
 }));
 
@@ -194,13 +196,8 @@ describe('getKeywordRecommendations ranking behavior', () => {
 
   it('suppresses previously declined keyword recommendations', async () => {
     mockGetDeclinedKeywords.mockReturnValue(['cheap plumber austin']);
-    // The surviving candidate must win on RAW metrics (volume 2000 vs the
-    // seed's 300, matching cpc) so this test pins suppression ONLY. It
-    // previously relied on the outcome-learning difficulty multiplier
-    // (candidate's 35 → '21-40' bin → 0.65 boost AND seed's 42 → '41-60' bin
-    // → 0.35 penalty) to flip the order — A1 disabled that multiplier pending
-    // the position-bin vs KD-bin rebinning; the seam has its own dedicated
-    // tests in outcome-learning-pure.test.ts.
+    // This test pins suppression only; value-first ranking and business-fit
+    // scoring decide the winner among the remaining candidates.
     mockGetRelatedKeywords.mockResolvedValue([
       { keyword: 'cheap plumber austin', volume: 600, difficulty: 20, cpc: 2 },
       { keyword: 'best emergency plumber austin', volume: 2000, difficulty: 30, cpc: 18 },
@@ -210,7 +207,7 @@ describe('getKeywordRecommendations ranking behavior', () => {
     const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: false });
 
     expect(result.candidates.some(candidate => candidate.keyword === 'cheap plumber austin')).toBe(false);
-    expect(result.recommended).toBe('best emergency plumber austin');
+    expect(result.recommended).not.toBe('cheap plumber austin');
   });
 
   it('down-ranks high-cannibalization conflicts behind cleaner alternatives', async () => {
