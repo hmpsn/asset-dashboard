@@ -16,6 +16,8 @@ import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createJob, clearCompletedJobs } from '../../server/jobs.js';
 import { buildLocalSeoKeywordCandidates, updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
+import { LOCAL_CANDIDATE_ROW_LIMIT } from '../../server/domains/keyword-command-center/candidate-boundary.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
 import { keywordComparisonKey, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
@@ -1695,10 +1697,26 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
     );
     expect(payload).not.toBeNull();
     expect(payload!.rows.length).toBeGreaterThan(0);
+    expect(payload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
+    expect(payload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
 
     // Every row returned must be lifecycle=CANDIDATE (the filter contract).
     for (const row of payload!.rows) {
       expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
+    }
+
+    setWorkspaceFlagOverride('keyword-universe-full', workspaceId, true);
+    try {
+      const fullUniversePayload = await buildKeywordCommandCenterRows(
+        workspaceId,
+        { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
+        { includeLocalSeo: true },
+      );
+      expect(fullUniversePayload).not.toBeNull();
+      expect(fullUniversePayload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
+      expect(fullUniversePayload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
+    } finally {
+      setWorkspaceFlagOverride('keyword-universe-full', workspaceId, null);
     }
   });
 });

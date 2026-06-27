@@ -8,7 +8,13 @@ import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { updateTrackedKeywords } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
-import type { KeywordCommandCenterRow } from '../../shared/types/keyword-command-center.js';
+import type {
+  KeywordCommandCenterInitialViewResponse,
+  KeywordCommandCenterRow,
+  KeywordCommandCenterRowsResponse,
+  KeywordCommandCenterSummaryResponse,
+} from '../../shared/types/keyword-command-center.js';
+import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../shared/types/keyword-command-center.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
@@ -39,7 +45,7 @@ describe('Keyword Command Center routes', () => {
 
     const summary = await api(`/api/webflow/keyword-command-center/${workspaceId}/summary`);
     expect(summary.status).toBe(200);
-    const summaryBody = await summary.json();
+    const summaryBody = await summary.json() as KeywordCommandCenterSummaryResponse;
     expect(summaryBody).toEqual(expect.objectContaining({
       counts: expect.objectContaining({ total: expect.any(Number) }),
       filters: expect.any(Array),
@@ -49,7 +55,7 @@ describe('Keyword Command Center routes', () => {
 
     const rows = await api(`/api/webflow/keyword-command-center/${workspaceId}/rows?search=split&page=1&pageSize=2`);
     expect(rows.status).toBe(200);
-    const rowsBody = await rows.json();
+    const rowsBody = await rows.json() as KeywordCommandCenterRowsResponse;
     expect(rowsBody.pageInfo).toEqual(expect.objectContaining({
       page: 1,
       pageSize: 2,
@@ -65,6 +71,23 @@ describe('Keyword Command Center routes', () => {
     await expect(detail.json()).resolves.toEqual(expect.objectContaining({
       row: expect.objectContaining({ normalizedKeyword: 'split route keyword' }),
     }));
+
+    const initial = await api(`/api/webflow/keyword-command-center/${workspaceId}/initial?search=split&page=1&pageSize=2`);
+    expect(initial.status).toBe(200);
+    const initialBody = await initial.json() as KeywordCommandCenterInitialViewResponse;
+    const stripSummary = (body: KeywordCommandCenterSummaryResponse) => ({ ...body, summarizedAt: '' });
+    expect(stripSummary(initialBody.summary)).toEqual(stripSummary(summaryBody));
+    expect(initialBody.rows).toEqual(rowsBody);
+  });
+
+  it('GET initial rejects local_candidates so first paint stays on the skinny read path', async () => {
+    const res = await api(
+      `/api/webflow/keyword-command-center/${workspaceId}/initial?filter=${KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES}`,
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Initial Keyword Hub read does not support local_candidates',
+    });
   });
 
   it('POST track activates a keyword and protected lifecycle actions require explicit confirmation', async () => {

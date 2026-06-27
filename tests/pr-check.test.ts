@@ -5670,7 +5670,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
     // Keyword Command Center crash-hardening follow-up
-    'Keyword Command Center summary/detail must not use full model',
+    'Keyword Command Center summary/detail/initial must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
     'Retired normalizePath usage in production code',
     'Local page/path normalizer helper outside tests',
@@ -6234,8 +6234,10 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
   });
 });
 
-describe('Rule: Keyword Command Center summary/detail must not use full model', () => {
-  it('flags summary/detail calling the full model builder', () => {
+describe('Rule: Keyword Command Center summary/detail/initial must not use full model', () => {
+  const RULE = 'Keyword Command Center summary/detail/initial must not use full model';
+
+  it('flags summary/detail/initial calling the full model builder', () => {
     const file = write(
       uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/summary-service.ts'),
       lines(
@@ -6245,14 +6247,18 @@ describe('Rule: Keyword Command Center summary/detail must not use full model', 
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
         '  return { ok: true };',
         '}',
+        'export async function buildKeywordCommandCenterInitialView(workspaceId: string) {',
+        '  return buildKeywordCommandCenterModel(workspaceId);',
+        '}',
       ),
     );
-    const hits = runRule('Keyword Command Center summary/detail must not use full model', [file]);
-    expect(hits).toHaveLength(1);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
     expect(hits[0].text).toContain('buildKeywordCommandCenterSummary');
+    expect(hits[1].text).toContain('buildKeywordCommandCenterInitialView');
   });
 
-  it('accepts skinny summary/detail implementations', () => {
+  it('accepts skinny summary/detail/initial implementations', () => {
     const file = write(
       uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/detail-service.ts'),
       lines(
@@ -6262,9 +6268,12 @@ describe('Rule: Keyword Command Center summary/detail must not use full model', 
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
         '  return buildSingleKeyword(workspaceId);',
         '}',
+        'export async function buildKeywordCommandCenterInitialView(workspaceId: string) {',
+        '  return { summary: buildSummaryCounts(workspaceId), rows: buildRows(workspaceId) };',
+        '}',
       ),
     );
-    expect(runRule('Keyword Command Center summary/detail must not use full model', [file])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
 });

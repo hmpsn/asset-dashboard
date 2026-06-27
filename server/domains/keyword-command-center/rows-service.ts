@@ -5,17 +5,10 @@ import {
   type KeywordCommandCenterRowsQuery,
   type KeywordCommandCenterRowsResponse,
 } from '../../../shared/types/keyword-command-center.js';
-import { LOCAL_SEO_MARKET_STATUS, LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
-import type { PageKeywordMap, Workspace } from '../../../shared/types/workspace.js';
-import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
-import {
-  buildLocalSeoKeywordVisibilitySummaryByKey,
-  listLocalSeoMarkets,
-} from '../../local-seo.js';
+import { LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
+import type { PageKeywordMap } from '../../../shared/types/workspace.js';
+import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
-import { listPageKeywordsLite } from '../../page-keywords.js';
-import { getLatestSnapshotRanks, getTrackedKeywords } from '../../rank-tracking.js';
-import { getWorkspace } from '../../workspaces.js';
 import {
   filterMapByKeys,
   filterStrategyForKeys,
@@ -25,11 +18,9 @@ import {
 } from './bundle-filters.js';
 import {
   filterBundleToKeys,
-  gateDiscoveryGaps,
   rowCandidateKeysForQuery,
   sourceKeysForRows,
 } from './candidate-boundary.js';
-import { readFeedback } from './feedback-store.js';
 import { buildKeywordCommandCenterModel } from './model-service.js';
 import {
   buildValueScoringConfig,
@@ -37,7 +28,6 @@ import {
   finalizeDraftRows,
   populateDraftRows,
   safeLostVisibilityKeys,
-  safeLostVisibilityRows,
 } from './read-model.js';
 import {
   filterNeedsLocalCandidates,
@@ -52,7 +42,10 @@ import type {
   DraftRow,
   FeedbackRow,
 } from './types.js';
-import { mergeTrackedKeywordProvenance, withResolvedSiteKeywordMetrics } from './tracked-keyword-provenance.js';
+import {
+  buildKeywordCommandCenterSourceSnapshot,
+  type KeywordCommandCenterSourceSnapshot,
+} from './source-snapshot.js';
 
 const log = createLogger('keyword-command-center');
 
@@ -60,9 +53,10 @@ function localVisibilityByFilter(
   workspaceId: string,
   filter: KeywordCommandCenterFilter,
   includeLocalSeo: boolean | undefined,
+  sourceVisibility?: Map<string, LocalSeoKeywordVisibilitySummary>,
 ): Map<string, LocalSeoKeywordVisibilitySummary> {
   if (!includeLocalSeo) return new Map();
-  const visibility = buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId);
+  const visibility = sourceVisibility ?? buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId);
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL) return visibility;
   if (filter === KEYWORD_COMMAND_CENTER_FILTERS.VISIBLE_LOCALLY) {
     return new Map([...visibility.entries()].filter(([, item]) => item.posture === LOCAL_SEO_VISIBILITY_POSTURE.VISIBLE));
@@ -92,33 +86,11 @@ function filterUsesLocalVisibilityRows(filter: KeywordCommandCenterFilter): bool
 }
 
 function buildFilteredBundle(input: {
-  workspace: Workspace;
+  snapshot: KeywordCommandCenterSourceSnapshot;
   filter: KeywordCommandCenterFilter;
   localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>;
 }): CommandCenterSourceBundle & { keys: Set<string> | null } {
-  // #19b: siteKeywordMetrics resolved table-first (blob fallback).
-  const strategy = withResolvedSiteKeywordMetrics(input.workspace.id, input.workspace.keywordStrategy);
-  const pageMap = listPageKeywordsLite(input.workspace.id);
-  // contentGaps + keywordGaps via the single assembler (#2); strategy stays the
-  // raw blob (with siteKeywordMetrics table-resolved) and pageMap keeps the Lite
-  // page_keywords path.
-  const filteredAssembled = assembleStoredKeywordStrategy(input.workspace.id);
-  // Gate discovery gaps once at the source (Tier-1 + Tier-2) so the skinny rows
-  // path's candidate gathering, populateDraftRows, and key derivation all read the
-  // same gated gaps — identical to the read-model / summary / detail paths.
-  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
-    contentGaps: filteredAssembled?.contentGaps ?? [],
-    keywordGaps: filteredAssembled?.keywordGaps ?? [],
-  });
-  // Wave 3d-i: merge sourceGapKey back from the provenance-bearing table read
-  // (getTrackedKeywords strips it; KCC is admin-authed so it may surface it).
-  const trackedKeywords = mergeTrackedKeywordProvenance(
-    input.workspace.id,
-    getTrackedKeywords(input.workspace.id, { includeInactive: true }),
-  );
-  const latestRanks = getLatestSnapshotRanks(input.workspace.id);
-  const feedback = readFeedback(input.workspace.id);
-  const lostVisibilityRows = safeLostVisibilityRows(input.workspace.id);
+  const { workspace, strategy, pageMap, contentGaps, keywordGaps, trackedKeywords, latestRanks, feedback, lostVisibilityRows } = input.snapshot;
   const variantParentKeys = parentableVariantKeys({
     strategy,
     pageMap,
@@ -127,7 +99,7 @@ function buildFilteredBundle(input: {
     feedback,
   });
   const keys = sourceKeysForRows({
-    workspaceId: input.workspace.id,
+    workspaceId: workspace.id,
     filter: input.filter,
     strategy,
     pageMap,
@@ -142,8 +114,8 @@ function buildFilteredBundle(input: {
 
   return {
     keys,
-    workspaceId: input.workspace.id,
-    workspaceName: input.workspace.name,
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
     strategy: filterStrategyForKeys(strategy, keys),
     pageMap: pageMap
       .map(page => restrictPageToKeys(page, keys))
@@ -205,21 +177,27 @@ async function buildKeywordCommandCenterRowsViaModel(
 async function buildKeywordCommandCenterRowsSkinny(
   workspaceId: string,
   query: KeywordCommandCenterRowsQuery,
-  options: { includeLocalSeo?: boolean },
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot },
 ): Promise<KeywordCommandCenterRowsResponse | null> {
   const startedAt = Date.now();
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return null;
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+  });
+  if (!snapshot) return null;
+  const { workspace } = snapshot;
   // Build the ScoringContext ONCE per request. The SAME config is threaded into
   // the candidate merge-back and the row finalize so both stages score identically
   // per key.
   const valueScoring = buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
-  const localVisibilityByKeyword = localVisibilityByFilter(workspace.id, filter, options.includeLocalSeo);
-  const activeLocalMarketCount = options.includeLocalSeo
-    ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
-    : 0;
-  const bundle = buildFilteredBundle({ workspace, filter, localVisibility: localVisibilityByKeyword });
+  const localVisibilityByKeyword = localVisibilityByFilter(
+    workspace.id,
+    filter,
+    options.includeLocalSeo,
+    snapshot.localVisibilityByKeyword,
+  );
+  const activeLocalMarketCount = options.includeLocalSeo ? snapshot.activeLocalMarketCount ?? 0 : 0;
+  const bundle = buildFilteredBundle({ snapshot, filter, localVisibility: localVisibilityByKeyword });
   const candidateBundle = filterUsesLocalVisibilityRows(filter)
     ? {
       ...bundle,
@@ -282,7 +260,7 @@ async function buildKeywordCommandCenterRowsSkinny(
 export async function buildKeywordCommandCenterRows(
   workspaceId: string,
   query: KeywordCommandCenterRowsQuery = {},
-  options: { includeLocalSeo?: boolean } = {},
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot } = {},
 ): Promise<KeywordCommandCenterRowsResponse | null> {
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   if (filterNeedsLocalCandidates(filter)) {

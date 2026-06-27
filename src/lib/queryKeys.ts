@@ -105,6 +105,7 @@ export const queryKeys = {
     backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
+    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'initial', query] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,

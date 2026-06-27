@@ -24,11 +24,30 @@ export function useKeywordCommandCenterSummary(
   });
 }
 
-export function useKeywordCommandCenterRows(workspaceId: string, query: KeywordCommandCenterRowsQuery) {
+export function useKeywordCommandCenterInitialView(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery,
+  options: { enabled?: boolean } = {},
+) {
+  const enabled = options.enabled ?? true;
+  return useQuery({
+    queryKey: queryKeys.admin.keywordCommandCenterInitial(workspaceId, query),
+    queryFn: () => keywordCommandCenter.initial(workspaceId, query),
+    enabled: !!workspaceId && enabled,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useKeywordCommandCenterRows(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery,
+  options: { enabled?: boolean } = {},
+) {
+  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterRows(workspaceId, query),
     queryFn: () => keywordCommandCenter.rows(workspaceId, query),
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && enabled,
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,
   });

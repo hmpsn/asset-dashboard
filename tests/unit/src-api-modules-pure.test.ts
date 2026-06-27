@@ -1049,6 +1049,12 @@ describe('src/api/keywordCommandCenter', () => {
     expect(url).toBe('/api/webflow/keyword-command-center/ws-1/rows');
   });
 
+  it('initial with no filters has no query string', async () => {
+    await keywordCommandCenter.initial('ws-1', {});
+    const [url] = mockedGet.mock.calls[0];
+    expect(url).toBe('/api/webflow/keyword-command-center/ws-1/initial');
+  });
+
   it('rows with filter appends filter param', async () => {
     await keywordCommandCenter.rows('ws-1', { filter: 'no_keyword', page: 2 });
     const [url] = mockedGet.mock.calls[0];

@@ -1344,11 +1344,11 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Keyword Command Center summary/detail must not use full model',
+    name: 'Keyword Command Center summary/detail/initial must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/domains/keyword-command-center/{summary-service,detail-service}.ts',
-    message: 'Summary/detail endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary() or buildKeywordCommandCenterDetail().',
+    displayScope: 'server/domains/keyword-command-center/{summary-service,detail-service,initial-view-service}.ts',
+    message: 'Summary/detail/initial endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary(), buildKeywordCommandCenterDetail(), or buildKeywordCommandCenterInitialView().',
     severity: 'error',
     rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
     claudeMdRef: '#data-flow-rules-mandatory',
@@ -1358,6 +1358,7 @@ export const CHECKS: Check[] = [
         'server/keyword-command-center.ts',
         'server/domains/keyword-command-center/summary-service.ts',
         'server/domains/keyword-command-center/detail-service.ts',
+        'server/domains/keyword-command-center/initial-view-service.ts',
       ];
       for (const file of files) {
         const normalizedPath = file.split(path.sep).join('/');
@@ -1367,7 +1368,7 @@ export const CHECKS: Check[] = [
         let depth = 0;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail)\b/);
+          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail|buildKeywordCommandCenterInitialView)\b/);
           if (fnMatch) {
             current = fnMatch[1];
             depth = 0;

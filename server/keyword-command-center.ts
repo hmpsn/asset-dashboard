@@ -55,6 +55,10 @@ export {
 } from './domains/keyword-command-center/detail-service.js';
 
 export {
+  buildKeywordCommandCenterInitialView,
+} from './domains/keyword-command-center/initial-view-service.js';
+
+export {
   applyKeywordCommandCenterAction,
   applyKeywordCommandCenterBulkAction,
   deleteKeywordHard,

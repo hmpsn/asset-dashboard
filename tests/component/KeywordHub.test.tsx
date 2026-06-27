@@ -39,6 +39,7 @@ const hardDeleteMutateMock = vi.fn();
 const workspaceEventsMock = vi.fn();
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),

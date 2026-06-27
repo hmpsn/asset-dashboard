@@ -348,6 +348,11 @@ export interface KeywordCommandCenterRowsResponse {
   generatedAt?: string | null;
 }
 
+export interface KeywordCommandCenterInitialViewResponse {
+  summary: KeywordCommandCenterSummaryResponse;
+  rows: KeywordCommandCenterRowsResponse;
+}
+
 export interface KeywordCommandCenterDetailResponse {
   row: KeywordCommandCenterRow;
   generatedAt?: string | null;

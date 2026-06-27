@@ -43,6 +43,7 @@ const ROWS = [
 ];
 
 vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: () => ({ data: { counts: {}, filters: [] }, isLoading: false }),
   useKeywordCommandCenterRows: () => ({
     data: { rows: ROWS, pageInfo: undefined },

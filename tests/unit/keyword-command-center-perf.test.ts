@@ -28,6 +28,7 @@ import { setBroadcast } from '../../server/broadcast.js';
 import db from '../../server/db/index.js';
 import {
   buildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterInitialView,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
 } from '../../server/keyword-command-center.js';
@@ -139,6 +140,19 @@ describe('Task 7 — assemble-once-per-request guard', () => {
     expect(detail).not.toBeNull();
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it('GET /initial builds summary and first rows from one source snapshot', async () => {
+    const spy = vi.spyOn(assemblerModule, 'assembleStoredKeywordStrategy');
+    const payload = await buildKeywordCommandCenterInitialView(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 1,
+      pageSize: 50,
+    });
+    expect(payload).not.toBeNull();
+    expect(payload!.summary.counts.total).toBeGreaterThan(0);
+    expect(payload!.rows.rows.length).toBeGreaterThan(0);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Task 7 — determinism / self-parity (no output drift)', () => {
@@ -169,5 +183,27 @@ describe('Task 7 — determinism / self-parity (no output drift)', () => {
     const a = await buildKeywordCommandCenterDetail(workspaceId, 'teeth whitening austin');
     const b = await buildKeywordCommandCenterDetail(workspaceId, 'teeth whitening austin');
     expect(b).toEqual(a);
+  });
+
+  it('GET /initial summary and rows match the split endpoints', async () => {
+    const query = {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 1,
+      pageSize: 50,
+    };
+    const initial = await buildKeywordCommandCenterInitialView(workspaceId, query);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    const rows = await buildKeywordCommandCenterRows(workspaceId, query);
+    const strip = <T extends { summarizedAt?: string }>(value: T): T => ({ ...value, summarizedAt: '' });
+
+    expect(initial).not.toBeNull();
+    expect(strip(initial!.summary)).toEqual(strip(summary!));
+    expect(initial!.rows).toEqual(rows);
+  });
+
+  it('GET /initial rejects local_candidates so first paint cannot enter the full-model exception', async () => {
+    await expect(buildKeywordCommandCenterInitialView(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+    })).rejects.toThrow('initial view does not support local_candidates');
   });
 });
