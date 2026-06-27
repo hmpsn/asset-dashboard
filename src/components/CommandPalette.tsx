@@ -9,7 +9,7 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { adminPath, GLOBAL_TABS } from '../routes';
 import {
-  NAV_REGISTRY, type NavGroupKey,
+  NAV_REGISTRY, type NavEntry, type NavGroupKey,
   resolveNavLabel, isNavEntryHidden,
 } from '../lib/navRegistry';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
@@ -30,6 +30,10 @@ interface CommandPaletteProps {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
   onSelectWorkspace: (ws: Workspace) => void;
+}
+
+export function isPaletteNavEntryAvailable(entry: Pick<NavEntry, 'id'>, selectedWorkspace: Workspace | null): boolean {
+  return GLOBAL_TABS.has(entry.id) || selectedWorkspace !== null;
 }
 
 // Palette-local presentation: maps each registry group key to the sub-text
@@ -131,6 +135,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     const flagResolver = (_flag: FeatureFlagKey) => false;
     for (const entry of NAV_REGISTRY) {
       if (isNavEntryHidden(entry, flagResolver)) continue;
+      if (!isPaletteNavEntryAvailable(entry, selectedWorkspace)) continue;
       const label = resolveNavLabel(entry, flagResolver);
       const groupLabel = PALETTE_GROUP_LABELS[entry.group];
       result.push({
@@ -139,7 +144,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: groupLabel || undefined,
         icon: entry.icon,
         type: 'nav',
-        action: () => { if (GLOBAL_TABS.has(entry.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', entry.id)); } addRecent(`nav:${entry.id}`); },
+        action: () => { navigate(adminPath(selectedWorkspace?.id || '', entry.id)); addRecent(`nav:${entry.id}`); },
       });
     }
 
@@ -336,7 +341,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" // fixed-inset-ok — command palette overlay // z-index-ok — above modal scale
+    <div className="fixed inset-0 z-[var(--z-command-palette)] flex items-start justify-center pt-[15vh]" // fixed-inset-ok — command palette overlay
       onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       {/* pr-check-disable-next-line -- modal container */}

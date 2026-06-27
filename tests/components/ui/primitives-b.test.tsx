@@ -58,6 +58,11 @@ describe('StatCard', () => {
     expect(container.querySelector('.t-caption-sm.font-medium')).toBeNull();
   });
 
+  it('renders zero delta when explicitly requested', () => {
+    render(<StatCard label="Clicks" value={100} delta={0} deltaLabel=" pts" showZeroDelta />);
+    expect(screen.getByText('+0 pts')).toBeInTheDocument();
+  });
+
   it('renders deltaLabel appended to delta', () => {
     render(<StatCard label="Pos" value={3} delta={-2} deltaLabel=" pos" />);
     expect(screen.getByText('-2 pos')).toBeInTheDocument();
@@ -124,6 +129,11 @@ describe('StatCard', () => {
   it('renders ReactNode label', () => {
     render(<StatCard label={<span data-testid="fancy-label">Fancy</span>} value={1} />);
     expect(screen.getByTestId('fancy-label')).toBeInTheDocument();
+  });
+
+  it('renders trailing content beside the value block', () => {
+    render(<StatCard label="Health" value={92} trailing={<span data-testid="trailing-ring">ring</span>} />);
+    expect(screen.getByTestId('trailing-ring')).toBeInTheDocument();
   });
 });
 

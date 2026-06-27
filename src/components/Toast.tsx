@@ -45,8 +45,8 @@ export function ToastProvider({
   }, []);
 
   const containerClass = placement === 'bottom-center'
-    ? 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] flex flex-col gap-2 pointer-events-none' // z-index-ok — client toast matches the retired dashboard-local layer below cart overlays
-    : 'fixed bottom-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none'; // z-index-ok — default toast must float above all modals
+    ? 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[var(--z-client-toast)] flex flex-col gap-2 pointer-events-none'
+    : 'fixed bottom-4 right-4 z-[var(--z-system-toast)] flex flex-col gap-2 pointer-events-none';
 
   return (
     <ToastContext.Provider value={{ toast }}>
