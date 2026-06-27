@@ -1344,42 +1344,28 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Keyword Command Center summary/detail/initial must not use full model',
+    name: 'Keyword Command Center read paths must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/domains/keyword-command-center/{summary-service,detail-service,initial-view-service}.ts',
-    message: 'Summary/detail/initial endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary(), buildKeywordCommandCenterDetail(), or buildKeywordCommandCenterInitialView().',
+    displayScope: 'server/keyword-command-center.ts and server/domains/keyword-command-center/*.ts',
+    message: 'Keyword Command Center read paths must stay on skinny source snapshots/local-candidate projections. Do not reintroduce buildKeywordCommandCenterModel() or model-service.ts.',
     severity: 'error',
-    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
+    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into Command Center read paths, including the local_candidates advanced filter.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
-      const watchedSuffixes = [
-        'server/keyword-command-center.ts',
-        'server/domains/keyword-command-center/summary-service.ts',
-        'server/domains/keyword-command-center/detail-service.ts',
-        'server/domains/keyword-command-center/initial-view-service.ts',
-      ];
       for (const file of files) {
         const normalizedPath = file.split(path.sep).join('/');
-        if (!watchedSuffixes.some(suffix => normalizedPath.endsWith(suffix))) continue;
+        const isKccFacade = normalizedPath.endsWith('server/keyword-command-center.ts');
+        const isKccDomainService = normalizedPath.includes('/server/domains/keyword-command-center/')
+          && normalizedPath.endsWith('.ts');
+        if (!isKccFacade && !isKccDomainService) continue;
         const lines = readFileOrEmpty(file).split('\n');
-        let current: string | null = null;
-        let depth = 0;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail|buildKeywordCommandCenterInitialView)\b/);
-          if (fnMatch) {
-            current = fnMatch[1];
-            depth = 0;
+          if (line.includes('buildKeywordCommandCenterModel') || line.includes('model-service')) {
+            matches.push({ file, line: i + 1, text: line.trim() });
           }
-          if (!current) continue;
-          if (line.includes('buildKeywordCommandCenterModel(')) {
-            matches.push({ file, line: i + 1, text: `${current} calls buildKeywordCommandCenterModel()` });
-          }
-          depth += (line.match(/\{/g) ?? []).length;
-          depth -= (line.match(/\}/g) ?? []).length;
-          if (depth <= 0 && line.trim() === '}') current = null;
         }
       }
       return matches;
@@ -1416,8 +1402,6 @@ export const CHECKS: Check[] = [
           if (
             line.includes('buildLocalSeoKeywordCandidatesEvaluated(')
             && !line.includes('import ')
-            && currentFunction !== 'buildKeywordCommandCenterModel'
-            && currentFunction !== 'buildKeywordCommandCenterRowsViaModel'
             && !hasHatch(lines, i, 'local-candidates-evaluated-ok')
           ) {
             matches.push({ file, line: i + 1, text: `ungated Evaluated candidate generation in ${currentFunction || 'module scope'}` });

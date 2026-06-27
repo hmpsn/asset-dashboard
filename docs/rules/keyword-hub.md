@@ -20,12 +20,13 @@ The Keyword Hub is the admin operating layer for keyword lifecycle management. I
 - Raw provider evidence must be labeled as evidence, not a selected strategy action.
 - Inactive lifecycle rows are preserved for auditability; active rank views should continue hiding paused/deprecated/replaced rows by default.
 
-## Skinny vs full-model read path (the `local_candidates` exception)
+## Skinny read paths and local candidates
 
 - The Hub's rows/summary/detail/initial endpoints take the **skinny** path (`buildKeywordCommandCenterRowsSkinny` for rows and initial rows): a page-bounded source bundle, never the full keyword-universe model.
 - First paint uses `buildKeywordCommandCenterInitialView()` to return the existing summary shape plus the existing rows/pageInfo shape from one shared source snapshot. `/summary`, `/rows`, and `/detail` remain compatibility endpoints and must preserve their public response shapes.
-- **Exception — the `local_candidates` advanced filter.** When the Hub requests `/rows?filter=local_candidates`, `buildKeywordCommandCenterRows` dispatches to `buildKeywordCommandCenterRowsViaModel` → `buildKeywordCommandCenterModel({ includeLocalCandidates: true })`, because local candidates are produced by `buildLocalSeoKeywordCandidates()` and are NOT in the skinny universe. This is a **live** Hub path, not dead code. The candidate list is hard-capped at `LOCAL_CANDIDATE_ROW_LIMIT` (the universe-full flag does NOT lift this cap) to avoid the OOM regression that a page-unbounded full-row evaluation would cause. `/initial?filter=local_candidates` is rejected so first paint cannot enter this exception indirectly; the client falls back to the normal capped `/rows` read for that filter.
-- pr-check rule **`Keyword Command Center summary/detail/initial must not use full model`** keeps `buildKeywordCommandCenterSummary`/`buildKeywordCommandCenterDetail`/`buildKeywordCommandCenterInitialView` on the skinny path; the model builder is reachable only via the `local_candidates` rows dispatch.
+- The retired full-model builder (`buildKeywordCommandCenterModel` / `model-service.ts`) must not be reintroduced. pr-check rule **`Keyword Command Center read paths must not use full model`** keeps the facade and all KCC domain read services on source snapshots or skinny projections.
+- **`local_candidates` advanced filter.** `/rows?filter=local_candidates` now uses a skinny local-candidate projection: call the cheap `buildLocalSeoKeywordCandidates()` default, prioritize unselected candidates before selected candidates, apply `LOCAL_CANDIDATE_ROW_LIMIT`, then finalize only that capped candidate slice through the normal row finalizer. The `keyword-universe-full` flag does NOT lift this cap. `/initial?filter=local_candidates` is rejected so first paint cannot enter the advanced filter indirectly; the client falls back to the normal capped `/rows` read for that filter.
+- The `not_checked` filter literal remains in shared types and route validation for compatibility, but summary filter metadata does not expose a "Not Checked" advanced facet because the skinny source-key path intentionally returns no rows for it.
 
 ## Value Scoring (the `opportunity` sort)
 
