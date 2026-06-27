@@ -2,12 +2,12 @@
  * fix-context-both-halves.test.ts
  *
  * CONTRACT: the FixContext both-halves contract for the 6 content-gap pre-seed fields
- * introduced in Strategy P2 (src/App.tsx:FixContext lines 97–106).
+ * introduced in Strategy P2 (src/types/fix-context.ts:FixContext).
  *
  * The 6 fields are: rationale, competitorProof, volume, intent, questionKeywords, serpFeatures.
  *
  * The four receiver layers that must read these fields end-to-end are:
- *   Layer 1: App.tsx FixContext router-state receiver → stores in [fixContext, setFixContext]
+ *   Layer 1: FixContext leaf type + App.tsx router-state receiver → stores in [fixContext, setFixContext]
  *   Layer 2: useAdminBriefWorkflow.ts → reads fixContextRef.current.{field} and passes to the job params
  *   Layer 3: content-brief-generation-job.ts → maps job params → pageAnalysisContext (standalone path)
  *   Layer 4: content-brief.ts generateBrief() → injects into the AI prompt (pageAnalysisContext block
@@ -37,35 +37,35 @@ function src(rel: string): string {
   return readFileSync(join(ROOT, rel), 'utf8'); // readFile-ok: intentional static contract analysis
 }
 
-// ─── Layer 1: FixContext type — 6 fields must be present in src/App.tsx ──────
+// ─── Layer 1: FixContext type — 6 fields must be present in the leaf type ───
 
-describe('Layer 1 — FixContext type extension (src/App.tsx)', () => {
-  const appTsx = src('src/App.tsx');
+describe('Layer 1 — FixContext type extension (src/types/fix-context.ts)', () => {
+  const fixContextType = src('src/types/fix-context.ts');
 
   it('FixContext interface includes "rationale" field', () => {
-    expect(appTsx).toMatch(/rationale\?:\s*string/);
+    expect(fixContextType).toMatch(/rationale\?:\s*string/);
   });
 
   it('FixContext interface includes "competitorProof" field', () => {
-    expect(appTsx).toMatch(/competitorProof\?:\s*string/);
+    expect(fixContextType).toMatch(/competitorProof\?:\s*string/);
   });
 
   it('FixContext interface includes "volume" field', () => {
-    expect(appTsx).toMatch(/volume\?:\s*number/);
+    expect(fixContextType).toMatch(/volume\?:\s*number/);
   });
 
   it('FixContext interface includes "intent" field', () => {
     // "intent" appears in FixContext alongside the new content-gap fields.
     // We narrow the match to the FixContext block by checking for the comment that introduces them.
-    expect(appTsx).toMatch(/rationale\?:\s*string[\s\S]{0,300}intent\?:\s*string/);
+    expect(fixContextType).toMatch(/rationale\?:\s*string[\s\S]{0,300}intent\?:\s*string/);
   });
 
   it('FixContext interface includes "questionKeywords" field', () => {
-    expect(appTsx).toMatch(/questionKeywords\?:\s*string\[\]/);
+    expect(fixContextType).toMatch(/questionKeywords\?:\s*string\[\]/);
   });
 
   it('FixContext interface includes "serpFeatures" field', () => {
-    expect(appTsx).toMatch(/serpFeatures\?:\s*string\[\]/);
+    expect(fixContextType).toMatch(/serpFeatures\?:\s*string\[\]/);
   });
 });
 

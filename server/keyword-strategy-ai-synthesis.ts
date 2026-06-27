@@ -8,7 +8,7 @@ import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
-import { resolveWorkspaceLanguageCode, resolveWorkspaceLocationCode } from './local-seo.js';
+import { resolveWorkspaceLanguageCode, resolveWorkspaceLocationCode } from './domains/local-seo/configuration-service.js';
 import { getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildKeywordUniverse } from './keyword-strategy-universe.js';

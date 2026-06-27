@@ -7,7 +7,7 @@ import { useKeywordStrategy, usePageJoin } from '../hooks/admin';
 import { useLocalSeo } from '../hooks/admin/useLocalSeo';
 import type { UnifiedPage } from '../../shared/types/page-join';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { PageIntelligenceGuide } from './PageIntelligenceGuide';
 import { buildEffectiveAnalyses, buildFilteredPages, buildFixQueue } from './page-intelligence/pageIntelligenceData';
 import type { KeywordData, SortBy } from './page-intelligence/pageIntelligenceTypes';

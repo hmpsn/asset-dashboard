@@ -4,7 +4,7 @@
 import { runSinglePageSpeed } from './pagespeed.js';
 import { createLogger } from './logger.js';
 import type { SeoIssue } from './audit-page.js';
-import type { CwvSummary, CwvStrategyResult } from './seo-audit.js';
+import type { CwvSummary, CwvStrategyResult } from './seo-audit-cwv-types.js';
 
 const log = createLogger('seo-audit-cwv');
 

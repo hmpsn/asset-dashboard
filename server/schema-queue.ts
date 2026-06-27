@@ -8,7 +8,8 @@
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { getMatrix, getSchemaTypesForTemplate } from './content-matrices.js';
+import { getMatrix } from './content-matrices.js';
+import { getSchemaTypesForTemplate } from './schema/template-schema-types.js';
 import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type { MatrixCell, ContentTemplate } from '../shared/types/content.ts';

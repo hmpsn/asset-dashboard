@@ -7,10 +7,8 @@ import {
 } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
-import {
-  buildLocalSeoKeywordCandidates,
-  buildLocalSeoKeywordVisibilitySummaryByKey,
-} from '../../local-seo.js';
+import { buildLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
+import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
 import {
   filterMapByKeys,

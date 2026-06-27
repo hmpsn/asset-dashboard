@@ -9,7 +9,7 @@ import { runHomepageCwv } from './seo-audit-cwv.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './utils/page-address.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
-import type { CwvSummary } from './seo-audit.js';
+import type { CwvSummary } from './seo-audit-cwv-types.js';
 
 const log = createLogger('seo-audit-site-checks');
 

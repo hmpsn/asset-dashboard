@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-26",
+  "updatedAt": "2026-06-27",
   "cycles": {
-    "server": 28,
-    "src": 7
+    "server": 21,
+    "src": 0
   },
   "maxCircularComponentFiles": {
-    "server": 37,
-    "src": 8
+    "server": 29,
+    "src": 0
   },
   "allowedDirectRouteDbIndexImports": [
     "server/routes/content-briefs.ts",

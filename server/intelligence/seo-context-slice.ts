@@ -5,7 +5,7 @@ import type {
 } from '../../shared/types/intelligence.js';
 import type { StoredKeywordStrategy } from '../../shared/types/keyword-strategy.js';
 import type { RankEntry } from '../rank-tracking.js';
-import { getPrimaryMarketLocationCode } from '../local-seo.js';
+import { getPrimaryMarketLocationCode } from '../domains/local-seo/configuration-service.js';
 import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../utils/page-address.js';
 import { createStmtCache } from '../db/stmt-cache.js';

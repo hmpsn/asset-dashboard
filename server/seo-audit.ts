@@ -15,30 +15,10 @@ import { getWebflowSiteDomainInfo } from './webflow-domains.js';
 import { runSiteWideChecks } from './seo-audit-site-checks.js';
 import { generateAiRecommendations } from './seo-audit-ai-recs.js';
 import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
+import type { CwvSummary } from './seo-audit-cwv-types.js';
+export type { CwvMetricSummary, CwvStrategyResult, CwvSummary } from './seo-audit-cwv-types.js';
 
 const log = createLogger('seo-audit');
-
-
-export interface CwvMetricSummary {
-  value: number | null;
-  rating: 'good' | 'needs-improvement' | 'poor' | null;
-}
-
-export interface CwvStrategyResult {
-  assessment: 'good' | 'needs-improvement' | 'poor' | 'no-data';
-  fieldDataAvailable: boolean;
-  lighthouseScore: number;
-  metrics: {
-    LCP: CwvMetricSummary;
-    INP: CwvMetricSummary;
-    CLS: CwvMetricSummary;
-  };
-}
-
-export interface CwvSummary {
-  mobile?: CwvStrategyResult;
-  desktop?: CwvStrategyResult;
-}
 
 export interface SeoAuditResult {
   siteScore: number;

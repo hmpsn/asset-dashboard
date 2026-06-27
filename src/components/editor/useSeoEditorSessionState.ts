@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FixContext } from '../../App';
+import type { FixContext } from '../../types/fix-context';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { SeoEditState, SeoVariationSet, SeoEditorPage } from './seoEditorTypes';
 import { matchPageIdentity } from '../../lib/pathUtils';

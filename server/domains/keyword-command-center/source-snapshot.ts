@@ -1,5 +1,6 @@
 import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
-import { buildLocalSeoKeywordVisibilitySummaryByKey, listLocalSeoMarkets } from '../../local-seo.js';
+import { listLocalSeoMarkets } from '../local-seo/configuration-service.js';
+import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { listPageKeywordsLite } from '../../page-keywords.js';
 import { getLatestSnapshotRanks, getTrackedKeywords } from '../../rank-tracking.js';
 import { getWorkspace } from '../../workspaces.js';

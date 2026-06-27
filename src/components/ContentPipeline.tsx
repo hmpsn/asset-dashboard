@@ -12,7 +12,7 @@ import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
 
 /** Synthetic FixContext built from an AI-suggested signal to prefill ContentBriefs. */

@@ -3,7 +3,7 @@ import {
 } from 'lucide-react';
 import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader, LoadingState, ErrorState, StatusBadge } from './ui';
 import { formatDate } from '../utils/formatDates';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';

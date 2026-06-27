@@ -24,7 +24,8 @@ import { isProgrammingError } from './errors.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { filterBrandedKeywords } from './competitor-brand-filter.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
-import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, buildLocalSeoKeywordCandidates } from './local-seo.js';
+import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode } from './domains/local-seo/configuration-service.js';
+import { buildLocalSeoKeywordCandidates } from './domains/local-seo/candidate-service.js';
 import {
   upsertKeywordPoolCandidate,
   isStrategyQualityDiscoveryKeyword,

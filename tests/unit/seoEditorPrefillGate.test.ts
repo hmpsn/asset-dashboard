@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSeoEditorSessionState } from '../../src/components/editor/useSeoEditorSessionState';
 import type { SeoEditorPage } from '../../src/components/editor/seoEditorTypes';
-import type { FixContext } from '../../src/App';
+import type { FixContext } from '../../src/types/fix-context';
 
 // Isolate from sessionStorage-backed persistence so the test exercises only the prefill gate.
 vi.mock('../../src/components/editor/seoEditorPersistence', () => ({
