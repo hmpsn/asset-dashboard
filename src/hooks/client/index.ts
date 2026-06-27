@@ -1,6 +1,14 @@
 export { useClientSearch } from './useClientSearch';
 export { useClientGA4 } from './useClientGA4';
 export { useClientInsights } from './useClientInsights';
+export {
+  useClientInsightViewModel,
+  useClientIntelligenceView,
+  useClientMonthlyDigestView,
+  useClientNarrativeInsightsView,
+  useClientPublishedBriefingView,
+  useClientRecommendationSetView,
+} from './useClientInsightViewModel';
 export { useActOnRecommendation } from './useActOnRecommendation';
 export { useClientRecResponses } from './useClientRecResponses';
 export { useUnifiedInbox, useRespondToDeliverable } from './useUnifiedInbox';
