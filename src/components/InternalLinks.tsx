@@ -11,35 +11,7 @@ import { clientActions } from '../api/clientActions';
 import { toInternalLinkClientActionItem } from '../lib/internal-link-client-action';
 import { queryKeys } from '../lib/queryKeys';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
-
-interface LinkSuggestion {
-  fromPage: string;
-  fromTitle: string;
-  toPage: string;
-  toTitle: string;
-  anchorText: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-}
-
-interface PageLinkHealth {
-  path: string;
-  title: string;
-  outboundLinks: number;
-  inboundLinks: number;
-  score: number;
-  isOrphan: boolean;
-}
-
-interface InternalLinkResult {
-  suggestions: LinkSuggestion[];
-  pageCount: number;
-  attemptedPageCount?: number;
-  existingLinkCount: number;
-  analyzedAt: string;
-  pageHealth?: PageLinkHealth[];
-  orphanCount?: number;
-}
+import type { InternalLinkResult } from '../../shared/types/internal-links';
 
 interface Props {
   siteId: string;

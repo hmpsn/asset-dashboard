@@ -13,18 +13,27 @@ import { buildPageAssistContext } from '../../server/intelligence/page-assist-co
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
+} from '../../server/workspace-intelligence.js';
+import {
   formatKeywordsForPrompt,
   formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
-  formatPersonasForPrompt,
-} from '../../server/workspace-intelligence.js';
+} from '../../server/intelligence/formatters.js';
+import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
   formatForPrompt: vi.fn(),
+  formatPageMapForPrompt: vi.fn(() => '[Page Map]'),
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatKeywordsForPrompt: vi.fn(),
   formatKnowledgeBaseForPrompt: vi.fn(),
   formatPageMapForPrompt: vi.fn(),
+}));
+
+vi.mock('../../server/intelligence/persona-format.js', () => ({
   formatPersonasForPrompt: vi.fn(),
 }));
 

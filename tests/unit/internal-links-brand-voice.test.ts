@@ -63,6 +63,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
     },
     pageProfile: null,
   })),
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatKeywordsForPrompt: vi.fn(() => ''),
   formatKnowledgeBaseForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
@@ -98,7 +101,7 @@ vi.mock('../../server/logger.js', () => ({
 
 import {
   formatKnowledgeBaseForPrompt,
-} from '../../server/workspace-intelligence.js';
+} from '../../server/intelligence/formatters.js';
 import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 import { analyzeInternalLinks } from '../../server/internal-links.js';
 

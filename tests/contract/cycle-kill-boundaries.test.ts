@@ -133,4 +133,72 @@ describe('cycle-kill boundary contracts', () => {
     expect(siteChecks).not.toContain("from './seo-audit.js'");
     expect(audit).toContain("export type { CwvMetricSummary, CwvStrategyResult, CwvSummary } from './seo-audit-cwv-types.js'");
   });
+
+  it('keeps generation intelligence slices on read/type leaves for content status data', () => {
+    const contentPipeline = readSource('server/intelligence/content-pipeline-slice.ts');
+    const pageProfile = readSource('server/intelligence/page-profile-slice.ts');
+    const briefReadModel = readSource('server/content-brief-read-model.ts');
+    const decayReadModel = readSource('server/content-decay-read-model.ts');
+    const briefFacade = readSource('server/content-brief.ts');
+    const decayFacade = readSource('server/content-decay.ts');
+
+    expect(briefReadModel).toContain('export function listBriefs');
+    expect(briefReadModel).toContain('export function getBrief');
+    expect(decayReadModel).toContain('export function loadDecayAnalysis');
+    expect(briefFacade).toContain("from './content-brief-read-model.js'");
+    expect(decayFacade).toContain("export { loadDecayAnalysis } from './content-decay-read-model.js'");
+
+    for (const source of [contentPipeline, pageProfile]) {
+      expect(source).toContain('content-brief-read-model.js');
+      expect(source).toContain('content-decay-read-model.js');
+      expect(source).not.toContain("import('../content-brief.js')");
+      expect(source).not.toContain("import('../content-decay.js')");
+      expect(source).not.toContain("from '../content-decay.js'");
+    }
+  });
+
+  it('keeps internal-link result contracts in shared types', () => {
+    const sharedTypes = readSource('shared/types/internal-links.ts');
+    const internalLinks = readSource('server/internal-links.ts');
+    const internalLinksUi = readSource('src/components/InternalLinks.tsx');
+    const pageProfile = readSource('server/intelligence/page-profile-slice.ts');
+    const siteArchitecture = readSource('server/routes/site-architecture.ts');
+
+    expect(sharedTypes).toContain('export interface InternalLinkResult');
+    expect(internalLinks).toContain("from '../shared/types/internal-links.js'");
+    expect(internalLinks).toContain("export type {\n  InternalLinkResult");
+    expect(pageProfile).toContain("from '../../shared/types/internal-links.js'");
+    expect(siteArchitecture).toContain("from '../../shared/types/internal-links.js'");
+    expect(internalLinksUi).toContain("from '../../shared/types/internal-links'");
+    expect(internalLinksUi).not.toContain('interface InternalLinkResult');
+    expect(internalLinksUi).not.toContain('interface LinkSuggestion');
+    expect(internalLinksUi).not.toContain('interface PageLinkHealth');
+    expect(pageProfile).not.toContain("import('../internal-links.js').InternalLinkResult");
+    expect(siteArchitecture).not.toContain("from '../internal-links.js'");
+  });
+
+  it('keeps voice profile reads on a leaf read model for intelligence context', () => {
+    const voiceReadModel = readSource('server/voice-profile-read-model.ts');
+    const voiceCalibration = readSource('server/voice-calibration.ts');
+    const seoContextSource = readSource('server/intelligence/seo-context-source.ts');
+
+    expect(voiceReadModel).toContain('export function getVoiceProfile');
+    expect(voiceCalibration).toContain("export { getVoiceProfile } from './voice-profile-read-model.js'");
+    expect(seoContextSource).toContain("from '../voice-profile-read-model.js'");
+    expect(seoContextSource).not.toContain("from '../voice-calibration.js'");
+  });
+
+  it('keeps generation context prompt helpers off broad compatibility facades where possible', () => {
+    const generationContext = readSource('server/intelligence/generation-context-builders.ts');
+    const contentBrief = readSource('server/content-brief.ts');
+    const contentPostsAi = readSource('server/content-posts-ai.ts');
+
+    expect(generationContext).toContain("from './formatters.js'");
+    expect(generationContext).toContain("from '../domains/local-seo/configuration-service.js'");
+    expect(generationContext).not.toContain("from '../local-seo.js'");
+    expect(contentBrief).toContain("from './intelligence/formatters.js'");
+    expect(contentBrief).not.toContain("from './workspace-intelligence.js'");
+    expect(contentPostsAi).toContain("from '../shared/types/content.js'");
+    expect(contentPostsAi).not.toContain("from './content-brief.js'");
+  });
 });

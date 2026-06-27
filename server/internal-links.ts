@@ -20,6 +20,17 @@ import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { fetchPublicWebText } from './external-fetch.js';
+import type {
+  InternalLinkResult,
+  LinkSuggestion,
+  PageLinkHealth,
+} from '../shared/types/internal-links.js';
+
+export type {
+  InternalLinkResult,
+  LinkSuggestion,
+  PageLinkHealth,
+} from '../shared/types/internal-links.js';
 
 const log = createLogger('internal-links');
 
@@ -77,35 +88,6 @@ export interface PageContent {
   title: string;
   contentSnippet: string;
   existingInternalLinks: string[];
-}
-
-export interface LinkSuggestion {
-  fromPage: string;
-  fromTitle: string;
-  toPage: string;
-  toTitle: string;
-  anchorText: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-}
-
-export interface PageLinkHealth {
-  path: string;
-  title: string;
-  outboundLinks: number;
-  inboundLinks: number;
-  score: number; // 0-100
-  isOrphan: boolean; // no inbound links from other pages
-}
-
-export interface InternalLinkResult {
-  suggestions: LinkSuggestion[];
-  pageCount: number;
-  attemptedPageCount: number;
-  existingLinkCount: number;
-  analyzedAt: string;
-  pageHealth?: PageLinkHealth[];
-  orphanCount?: number;
 }
 
 async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[]; pageTitle?: string } | null> {

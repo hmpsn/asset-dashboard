@@ -9,7 +9,7 @@ import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structure
 import { isAnthropicConfigured } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { z } from 'zod';
-import type { ContentBrief } from './content-brief.js';
+import type { ContentBrief } from '../shared/types/content.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';

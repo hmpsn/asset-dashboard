@@ -82,7 +82,15 @@ vi.mock('../server/content-brief.js', () => ({
   listBriefs: vi.fn(() => []),
 }));
 
+vi.mock('../server/content-brief-read-model.js', () => ({
+  listBriefs: vi.fn(() => []),
+}));
+
 vi.mock('../server/content-decay.js', () => ({
+  loadDecayAnalysis: vi.fn(() => null),
+}));
+
+vi.mock('../server/content-decay-read-model.js', () => ({
   loadDecayAnalysis: vi.fn(() => null),
 }));
 
@@ -535,7 +543,7 @@ describe('assemblePageProfile', () => {
       currentPosition: 12,
       previousPosition: 15,
     } as ReturnType<typeof pageKeywords.getPageKeyword>);
-    const contentBriefs = await import('../server/content-brief.js');
+    const contentBriefs = await import('../server/content-brief-read-model.js');
     vi.mocked(contentBriefs.listBriefs).mockReturnValueOnce([
       { id: 'brief_1', workspaceId: 'ws-1', targetKeyword: 'emergency dentist near me', status: 'draft' },
     ] as ReturnType<typeof contentBriefs.listBriefs>);

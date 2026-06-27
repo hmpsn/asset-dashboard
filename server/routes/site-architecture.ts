@@ -9,7 +9,7 @@ import { buildSiteArchitecture, getCachedArchitecture, flattenTree } from '../si
 import { getSchemaSnapshot, getSchemaPlan } from '../schema-store.js';
 import { getWorkspace } from '../workspaces.js';
 import { getInternalLinks } from '../performance-store.js';
-import type { PageLinkHealth, InternalLinkResult } from '../internal-links.js';
+import type { PageLinkHealth, InternalLinkResult } from '../../shared/types/internal-links.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:site-architecture');

@@ -9,7 +9,8 @@ import type { SchemaValidation } from '../schema-validator.js';
 import type { SeoChangeEvent } from '../seo-change-tracker.js';
 import type { RankEntry } from '../rank-tracking.js';
 import type { ContentBrief, GeneratedPost } from '../../shared/types/content.js';
-import type { DecayAnalysis } from '../content-decay.js';
+import type { DecayAnalysis } from '../../shared/types/content-decay.js';
+import type { InternalLinkResult } from '../../shared/types/internal-links.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { createLogger } from '../logger.js';
 import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../utils/page-address.js';
@@ -162,7 +163,7 @@ export async function assemblePageProfile(
       try {
         const { getInternalLinks } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
         const linkSnapshot = getInternalLinks(wsForLinks.webflowSiteId);
-        const linkData = linkSnapshot?.result as import('../internal-links.js').InternalLinkResult | null;
+        const linkData = linkSnapshot?.result as InternalLinkResult | null;
         if (linkData?.pageHealth) {
           const entry = linkData.pageHealth.find(
             ph => matchPagePath(ph.path, pagePath),
@@ -226,7 +227,7 @@ export async function assemblePageProfile(
   // Content status
   let contentStatus: PageProfileSlice['contentStatus'] = null;
   try {
-    const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { listBriefs } = await import('../content-brief-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const briefs: ContentBrief[] = listBriefs(workspaceId);
     // ContentBrief matches pages via targetKeyword, not URL
     const primaryKw = keywordComparisonKey(pageKw?.primaryKeyword);
@@ -249,7 +250,7 @@ export async function assemblePageProfile(
 
     let isDecaying = false;
     try {
-      const { loadDecayAnalysis } = await import('../content-decay.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadDecayAnalysis } = await import('../content-decay-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const decayPP: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
       isDecaying = decayPP?.decayingPages?.some(d => matchPageIdentity(d.page, pagePath)) ?? false;
     } catch (err) {
