@@ -1,21 +1,15 @@
-import { applySuppressionsToAudit } from './seo-audit-suppressions.js';
-import { getAuditTrafficForWorkspace } from './audit-traffic.js';
 import { normalizePageUrl } from './utils/page-address.js';
-import { getLatestSnapshot } from './reports.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
-import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
-import { buildStrategySignals } from './insight-feedback.js';
-import { isProgrammingError } from './errors.js';
 import { resolveWorkspaceLanguageCode, resolveWorkspaceLocationCode } from './local-seo.js';
-import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
+import { getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 import type { KeywordCandidate } from '../shared/types/keyword-universe.js';
@@ -31,7 +25,8 @@ import {
   buildClosedSetBlock,
 } from './keyword-strategy-synthesis/prompts.js';
 import { runPageAssignmentBatches } from './keyword-strategy-synthesis/page-assignment.js';
-import { runSiteSynthesis, type SiteSynthesisContext } from './keyword-strategy-synthesis/site-synthesis.js';
+import { buildSiteSynthesisContext } from './keyword-strategy-synthesis/site-synthesis-context.js';
+import { runSiteSynthesis } from './keyword-strategy-synthesis/site-synthesis.js';
 import {
   applyDeclinedPageMapFilter,
   applyRequestedGapsAndBackfill,
@@ -136,16 +131,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     provider,
     sendProgress,
   } = options;
-  const {
-    gscData,
-    deviceBreakdown,
-    countryBreakdown,
-    periodComparison,
-    organicLandingPages,
-    organicOverview,
-    ga4Conversions,
-    ga4EventsByPage,
-  } = searchData;
+  const { gscData } = searchData;
 
   const callStrategyAI = (messages: Array<{ role: string; content: string }>, maxTokens: number, label?: string): Promise<string> =>
     callKeywordStrategyAI(ws.id, messages, maxTokens, label);
@@ -448,204 +434,18 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     // This keeps output small (~2K tokens) and fast.
     sendProgress('ai', 'Synthesizing site-level strategy...', 0.78);
 
-    // GSC: top queries + enriched signals
-    let gscSummary = '';
-    if (gscData.length > 0) {
-      const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
-      gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
-        topGsc.map(r => {
-          const pagePath = normalizePageUrl(r.page);
-          return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
-        }).join('\n');
-    }
-
-    // Device breakdown context
-    if (deviceBreakdown.length > 0) {
-      gscSummary += `\n\nDEVICE BREAKDOWN (last 28 days):\n` +
-        deviceBreakdown.map(d => `- ${d.device}: ${d.clicks} clicks, ${d.impressions} imp, CTR ${d.ctr}%, avg pos ${d.position}`).join('\n');
-      // Flag if mobile dominates but has worse position
-      const mobile = deviceBreakdown.find(d => d.device === 'MOBILE');
-      const desktop = deviceBreakdown.find(d => d.device === 'DESKTOP');
-      if (mobile && desktop && mobile.impressions > desktop.impressions && mobile.position > desktop.position + 2) {
-        gscSummary += `\n⚠️ MOBILE GAP: Mobile has ${mobile.impressions} imp vs desktop ${desktop.impressions} but avg position is ${mobile.position.toFixed(1)} vs ${desktop.position.toFixed(1)} — mobile optimization is critical.`;
-      }
-    }
-
-    // Period comparison context
-    if (periodComparison) {
-      const { change, changePercent } = periodComparison;
-      gscSummary += `\n\nPERIOD COMPARISON (last 28 days vs previous 28 days):\n` +
-        `- Clicks: ${change.clicks >= 0 ? '+' : ''}${change.clicks} (${changePercent.clicks >= 0 ? '+' : ''}${changePercent.clicks}%)\n` +
-        `- Impressions: ${change.impressions >= 0 ? '+' : ''}${change.impressions} (${changePercent.impressions >= 0 ? '+' : ''}${changePercent.impressions}%)\n` +
-        `- Avg Position: ${change.position >= 0 ? '+' : ''}${change.position} (${change.position > 0 ? 'declining ⚠️' : change.position < 0 ? 'improving ✓' : 'stable'})`;
-    }
-
-    // Country breakdown
-    if (countryBreakdown.length > 0) {
-      gscSummary += `\n\nTOP COUNTRIES by clicks:\n` +
-        countryBreakdown.slice(0, 5).map(c => `- ${c.country}: ${c.clicks} clicks, ${c.impressions} imp, pos ${c.position}`).join('\n');
-    }
-
-    // GA4 organic landing pages — find pages getting traffic that aren't in the keyword map
-    let ga4Context = '';
-    if (organicLandingPages.length > 0) {
-      const mappedPaths = new Set(allPageMappings.map(pm => pm.pagePath));
-      const unmappedLanding = organicLandingPages.filter(lp => !mappedPaths.has(lp.landingPage));
-      if (unmappedLanding.length > 0) {
-        ga4Context += `\n\nGA4 ORGANIC LANDING PAGES not in keyword map (getting traffic but no keyword strategy):\n` +
-          unmappedLanding.slice(0, 10).map(lp => `- ${lp.landingPage}: ${lp.sessions} organic sessions, ${lp.users} users, bounce ${lp.bounceRate}%`).join('\n');
-      }
-      // High-bounce organic landing pages = content quality signal
-      const highBounce = organicLandingPages.filter(lp => lp.bounceRate > 70 && lp.sessions > 5);
-      if (highBounce.length > 0) {
-        ga4Context += `\n\nHIGH-BOUNCE ORGANIC PAGES (>70% bounce, may need content improvement):\n` +
-          highBounce.slice(0, 5).map(lp => `- ${lp.landingPage}: bounce ${lp.bounceRate}%, ${lp.sessions} sessions`).join('\n');
-      }
-    }
-    if (organicOverview) {
-      ga4Context += `\n\nORGANIC SEARCH OVERVIEW (GA4, last 28 days):\n` +
-        `- ${organicOverview.organicUsers} organic users (${organicOverview.shareOfTotalUsers}% of all traffic)\n` +
-        `- Engagement rate: ${organicOverview.engagementRate}%\n` +
-        `- Avg engagement time: ${organicOverview.avgEngagementTime.toFixed(0)}s`;
-    }
-
-    // GA4 conversions — which events fire and on which pages
-    if (ga4Conversions.length > 0) {
-      ga4Context += `\n\nCONVERSION EVENTS (GA4, last 28 days — these are the site's money actions):\n` +
-        ga4Conversions.slice(0, 10).map(c => `- "${c.eventName}": ${c.conversions} events, ${c.users} users (${c.rate}% conversion rate)`).join('\n');
-    }
-    if (ga4EventsByPage.length > 0) {
-      // Group events by page to find "money pages"
-      const pageEvents = new Map<string, { events: number; topEvent: string }>();
-      for (const ep of ga4EventsByPage) {
-        const existing = pageEvents.get(ep.pagePath);
-        if (!existing || ep.eventCount > existing.events) {
-          pageEvents.set(ep.pagePath, { events: ep.eventCount, topEvent: ep.eventName });
-        }
-      }
-      const topConvertingPages = [...pageEvents.entries()]
-        .sort((a, b) => b[1].events - a[1].events)
-        .slice(0, 8);
-      if (topConvertingPages.length > 0) {
-        ga4Context += `\n\nTOP CONVERTING PAGES (pages that drive the most events — protect these keywords):\n` +
-          topConvertingPages.map(([p, d]) => `- ${p}: ${d.events} events (top: "${d.topEvent}")`).join('\n');
-      }
-    }
-
-    // Audit data — pages with SEO errors + traffic = high-priority quick wins
-    let auditContext = '';
-    if (ws.webflowSiteId) {
-      try {
-        const trafficMap = await getAuditTrafficForWorkspace(ws);
-        const latestAudit = getLatestSnapshot(ws.webflowSiteId);
-        if (latestAudit && Object.keys(trafficMap).length > 0) {
-          // Apply suppressions so strategy chat excludes suppressed issues
-          const filteredAudit = applySuppressionsToAudit(latestAudit.audit, ws.auditSuppressions || []);
-          const pagesWithIssues = filteredAudit.pages
-            .filter(p => p.issues.length > 0)
-            .map(p => {
-              const slug = normalizePageUrl(p.slug);
-              const traffic = trafficMap[slug] || trafficMap[p.slug];
-              return { slug, issues: p.issues.length, score: p.score, traffic };
-            })
-            .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
-            .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
-            .slice(0, 8);
-          if (pagesWithIssues.length > 0) {
-            auditContext = `\n\nSEO AUDIT: HIGH-TRAFFIC PAGES WITH ERRORS (fix these for immediate impact):\n` +
-              pagesWithIssues.map(p => `- ${p.slug}: ${p.issues} issues, score ${p.score}/100 | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
-            if (filteredAudit.siteScore != null) {
-              auditContext += `\nOverall site health score: ${filteredAudit.siteScore}/100`;
-            }
-          }
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical */ }
-    }
-
     const hasProviderContext = sanitizedProviderKeywordLines > 0;
     const hasKeywordGaps = eligibleKeywordGapCount > 0;
 
-    // Fetch analytics intelligence from computed insights layer
-    let intelligenceBlock = '';
-    try {
-      const insights = strategyIntel.insights?.all ?? [];
-      if (insights.length > 0) {
-        const strategyEligibleInsights = insights.filter(insight => {
-          if (insight.insightType !== 'competitor_gap') return true;
-          const gapInsight = insight as AnalyticsInsight<'competitor_gap'>;
-          return isEligibleStrategyPoolKeyword({
-            keyword: gapInsight.data.keyword,
-            volume: gapInsight.data.volume,
-            difficulty: gapInsight.data.difficulty,
-            source: `insight_gap:${gapInsight.data.competitorDomain}`,
-          });
-        });
-        const keywordClusters = insights
-          .filter((i): i is AnalyticsInsight<'keyword_cluster'> => i.insightType === 'keyword_cluster')
-          .map(i => i.data)
-          .sort((a, b) => b.totalImpressions - a.totalImpressions);
-        const competitorGaps = strategyEligibleInsights
-          .filter((i): i is AnalyticsInsight<'competitor_gap'> => i.insightType === 'competitor_gap')
-          .map(i => i.data)
-          .sort((a, b) => b.volume - a.volume);
-        const conversionPages = insights
-          .filter((i): i is AnalyticsInsight<'conversion_attribution'> => i.insightType === 'conversion_attribution')
-          .map(i => ({ pageUrl: i.pageId || '', ...i.data }))
-          .sort((a, b) => b.conversionRate - a.conversionRate);
-        const contentDecaySignals = insights
-          .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay' && i.pageId != null)
-          .map(i => ({
-            pageId: i.pageId!,
-            clicksDelta: i.data.currentClicks - i.data.baselineClicks,
-            deltaPercent: i.data.deltaPercent,
-          }));
-        const rankingMovers = insights
-          .filter((i): i is AnalyticsInsight<'ranking_mover'> => i.insightType === 'ranking_mover')
-          .map(i => ({
-            query: i.data.query,
-            // StrategyIntelligenceInput treats positive as a drop for legacy display.
-            // RankingMoverData treats positive as improvement, so invert here.
-            positionDelta: -i.data.positionChange,
-            clicksDelta: i.data.currentClicks - i.data.previousClicks,
-            currentPosition: i.data.currentPosition,
-          }))
-          .sort((a, b) => Math.abs(b.positionDelta) - Math.abs(a.positionDelta));
-        const cannibalization = insights
-          .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
-          .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
-        const ctrOpportunities = insights
-          .filter((i): i is AnalyticsInsight<'ctr_opportunity'> => i.insightType === 'ctr_opportunity')
-          .sort((a, b) => b.data.estimatedClickGap - a.data.estimatedClickGap);
-        const rankingOpportunities = insights
-          .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
-          .sort((a, b) => b.data.estimatedTrafficGain - a.data.estimatedTrafficGain);
-
-        intelligenceBlock = buildStrategyIntelligenceBlock({
-          keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
-          competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
-          conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          performanceDeltas: rankingMovers.length > 0 ? rankingMovers : undefined,
-          contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
-          cannibalization: cannibalization.length > 0 ? cannibalization : undefined,
-          ctrOpportunities: ctrOpportunities.length > 0 ? ctrOpportunities : undefined,
-          rankingOpportunities: rankingOpportunities.length > 0 ? rankingOpportunities : undefined,
-        });
-
-        // Append feedback-loop signals to give the AI real performance context
-        const stratSignals = buildStrategySignals(strategyEligibleInsights, { keywordEvaluationContext: strategyKeywordEvaluationContext });
-        if (stratSignals.length > 0) {
-          intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
-        }
-      }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
-
-    const siteSynthesisContext: SiteSynthesisContext = {
-      gscSummary,
-      ga4Context,
-      auditContext,
+    const siteSynthesisContext = await buildSiteSynthesisContext({
+      ws,
+      searchData,
+      pageMappings: allPageMappings,
       providerContext: sanitizedProviderContext,
-      intelligenceBlock,
-    };
+      strategyIntel,
+      keywordEvaluationContext: strategyKeywordEvaluationContext,
+      isEligibleStrategyPoolKeyword,
+    });
     const masterData: MasterStrategyData = await runSiteSynthesis({
       workspaceId: ws.id,
       businessSection,
