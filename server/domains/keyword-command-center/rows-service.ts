@@ -7,7 +7,10 @@ import {
 } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
-import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../../local-seo.js';
+import {
+  buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
+} from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
 import {
   filterMapByKeys,
@@ -18,10 +21,10 @@ import {
 } from './bundle-filters.js';
 import {
   filterBundleToKeys,
+  LOCAL_CANDIDATE_ROW_LIMIT,
   rowCandidateKeysForQuery,
   sourceKeysForRows,
 } from './candidate-boundary.js';
-import { buildKeywordCommandCenterModel } from './model-service.js';
 import {
   buildValueScoringConfig,
   ensureLocalVisibilityRows,
@@ -46,6 +49,7 @@ import {
   buildKeywordCommandCenterSourceSnapshot,
   type KeywordCommandCenterSourceSnapshot,
 } from './source-snapshot.js';
+import type { LocalSeoKeywordCandidate } from '../local-seo/types.js';
 
 const log = createLogger('keyword-command-center');
 
@@ -138,28 +142,79 @@ function buildFilteredBundle(input: {
   };
 }
 
-async function buildKeywordCommandCenterRowsViaModel(
+function localCandidatesForRows(workspaceId: string): LocalSeoKeywordCandidate[] {
+  const candidates = buildLocalSeoKeywordCandidates(workspaceId);
+  const prioritized = [
+    ...candidates.filter(candidate => !candidate.selected),
+    ...candidates.filter(candidate => candidate.selected),
+  ];
+  if (prioritized.length > LOCAL_CANDIDATE_ROW_LIMIT) {
+    log.warn(
+      {
+        workspaceId,
+        total: prioritized.length,
+        kept: LOCAL_CANDIDATE_ROW_LIMIT,
+        dropped: prioritized.length - LOCAL_CANDIDATE_ROW_LIMIT,
+      },
+      'keyword command center local candidate row cap reached; output truncated',
+    );
+  }
+  return prioritized.slice(0, LOCAL_CANDIDATE_ROW_LIMIT);
+}
+
+async function buildKeywordCommandCenterLocalCandidateRows(
   workspaceId: string,
   query: KeywordCommandCenterRowsQuery,
-  options: { includeLocalSeo?: boolean },
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot },
 ): Promise<KeywordCommandCenterRowsResponse | null> {
-  const payload = await buildKeywordCommandCenterModel(workspaceId, {
+  const startedAt = Date.now();
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
-    includeLocalSeoDetails: false,
-    includeLocalCandidates: true,
-    includeStrategyUx: false,
-    timingLabel: 'rows-local-candidate',
   });
-  if (!payload) return null;
-  // The model builder already precomputed each row's value score in finalize; the
-  // sort here is a cheap cached field read of that score (no extra DB work, no
-  // ScoringContext needed).
-  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
-  const filtered = payload.rows
-    .filter(row => matchesFilter(row, filter))
+  if (!snapshot) return null;
+  const { workspace } = snapshot;
+  const localCandidates = localCandidatesForRows(workspace.id);
+  const candidateKeys = new Set(localCandidates.map(candidate => candidate.normalizedKeyword));
+  const localVisibilityByKeyword = options.includeLocalSeo
+    ? snapshot.localVisibilityByKeyword ?? new Map<string, LocalSeoKeywordVisibilitySummary>()
+    : new Map<string, LocalSeoKeywordVisibilitySummary>();
+  const candidateVisibility = filterMapByKeys(localVisibilityByKeyword, candidateKeys);
+  const baseBundle = buildFilteredBundle({
+    snapshot,
+    filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+    localVisibility: localVisibilityByKeyword,
+  });
+  const cappedBundle = filterBundleToKeys({ ...baseBundle, localCandidates }, candidateKeys);
+  const valueScoring = buildValueScoringConfig(workspace);
+  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const rows = new Map<string, DraftRow>();
+  await populateDraftRows(rows, cappedBundle);
+  ensureLocalVisibilityRows(rows, candidateVisibility);
+  const finalized = finalizeDraftRows(rows, {
+    workspaceId: workspace.id,
+    localVisibilityByKeyword: candidateVisibility,
+    activeLocalMarketCount: options.includeLocalSeo ? snapshot.activeLocalMarketCount ?? 0 : 0,
+    lostVisibilityKeys,
+    valueScoring,
+  });
+  const filtered = finalized.rows
+    .filter(row => matchesFilter(row, KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES))
     .filter(row => matchesSearch(row, query.search))
     .sort(sortRowsForQuery(query.sort, query.direction));
   const page = paginateRows(filtered.map(stripRowForList), query);
+
+  log.info({
+    workspaceId,
+    mode: 'rows-local-candidate-skinny',
+    candidatePool: localCandidates.length,
+    rowCount: page.rows.length,
+    rowsBeforeFilter: finalized.rows.length,
+    rowsDropped: finalized.rows.length - filtered.length,
+    totalRows: page.totalRows,
+    totalMs: Date.now() - startedAt,
+    finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  }, 'keyword command center local candidate rows built');
+
   return {
     rows: page.rows,
     pageInfo: {
@@ -170,7 +225,7 @@ async function buildKeywordCommandCenterRowsViaModel(
       hasNextPage: page.hasNextPage,
       hasPreviousPage: page.hasPreviousPage,
     },
-    generatedAt: payload.generatedAt,
+    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
   };
 }
 
@@ -264,7 +319,7 @@ export async function buildKeywordCommandCenterRows(
 ): Promise<KeywordCommandCenterRowsResponse | null> {
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   if (filterNeedsLocalCandidates(filter)) {
-    return buildKeywordCommandCenterRowsViaModel(workspaceId, query, options);
+    return buildKeywordCommandCenterLocalCandidateRows(workspaceId, query, options);
   }
   return buildKeywordCommandCenterRowsSkinny(workspaceId, query, options);
 }

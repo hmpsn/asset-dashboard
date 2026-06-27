@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
@@ -277,16 +277,15 @@ describe('keyword command center domain boundary', () => {
     expect(detailService).toContain("from './source-snapshot.js'");
   });
 
-  it('keeps rows, initial view, and full-model read assembly in domain services with facade re-export only', () => {
+  it('keeps rows and initial view assembly in domain services with facade re-export only', () => {
     const facade = readRepoFile('server/keyword-command-center.ts');
     const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
     const initialViewService = readRepoFile('server/domains/keyword-command-center/initial-view-service.ts');
-    const modelService = readRepoFile('server/domains/keyword-command-center/model-service.ts');
 
     for (const helper of [
       'buildKeywordCommandCenterRows',
       'buildKeywordCommandCenterRowsSkinny',
-      'buildKeywordCommandCenterRowsViaModel',
+      'buildKeywordCommandCenterLocalCandidateRows',
       'buildFilteredBundle',
       'localVisibilityByFilter',
       'buildKeywordCommandCenterInitialView',
@@ -299,7 +298,10 @@ describe('keyword command center domain boundary', () => {
     expect(facade).toContain("from './domains/keyword-command-center/rows-service.js'");
     expect(facade).toContain("from './domains/keyword-command-center/initial-view-service.js'");
     expect(rowsService).toMatch(/export async function buildKeywordCommandCenterRows\b/);
-    expect(rowsService).toContain('buildKeywordCommandCenterModel');
+    expect(rowsService).not.toContain('buildKeywordCommandCenterModel');
+    expect(rowsService).toContain('buildLocalSeoKeywordCandidates');
+    expect(rowsService).toContain('LOCAL_CANDIDATE_ROW_LIMIT');
+    expect(rowsService).toContain('finalizeDraftRows');
     expect(rowsService).toContain("from './source-snapshot.js'");
     expect(rowsService).toContain('rowCandidateKeysForQuery');
     expect(rowsService).toContain('filterBundleToKeys');
@@ -308,10 +310,7 @@ describe('keyword command center domain boundary', () => {
     expect(initialViewService).toContain('buildKeywordCommandCenterSummary');
     expect(initialViewService).toContain('buildKeywordCommandCenterRows');
     expect(initialViewService).not.toContain('buildKeywordCommandCenterModel');
-    expect(modelService).toMatch(/export async function buildKeywordCommandCenterModel\b/);
-    expect(modelService).toContain('buildLocalSeoKeywordCandidates');
-    expect(modelService).toContain('LOCAL_CANDIDATE_ROW_LIMIT');
-    expect(modelService).toContain('finalizeDraftRows');
+    expect(existsSync(new URL('server/domains/keyword-command-center/model-service.ts', repoRoot))).toBe(false);
   });
 
   it('keeps shared source loading in the domain source snapshot', () => {

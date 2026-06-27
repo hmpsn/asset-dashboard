@@ -393,75 +393,6 @@
       ]
     },
     {
-      "id": "sprint-keyword-hub-health-2026-06-26",
-      "name": "🔑 Keyword Hub Health — First Paint, Memory, and Universe Read-Path Hardening",
-      "hours": "phased",
-      "rationale": "The Keyword Hub/Keyword Universe crash pattern was most likely not caused directly by circular imports; it was caused by heavy keyword/local/intelligence read paths sharing one hot graph under memory pressure. The current Hub is much safer than the original path: rows use a skinny page-bounded read path, local SEO refreshes run sequentially with heap headroom, rank evidence is capped, junk gates exist, and large local-candidate evaluation remains hard-capped. This sprint turns those patch-level protections into an explicit performance architecture: measure first, remove duplicated first-paint reads, move the remaining heavy local_candidates exception toward the skinny model, fix known facet drift, and add regression guardrails so a future universe expansion cannot quietly re-open the OOM/page-crash class.",
-      "notes": "Audit anchors (2026-06-26): `src/components/KeywordHub.tsx` fetches `/summary` and `/rows` separately on first paint; `server/domains/keyword-command-center/summary-service.ts` and `rows-service.ts` duplicate source loading across strategy, page keywords, tracked keywords, latest ranks, feedback, lost visibility, and local visibility; `rows-service.ts` now page-bounds final row assembly but still builds/sorts a full candidate key set before slicing; `filter=local_candidates` still dispatches through `buildKeywordCommandCenterRowsViaModel()` / `buildKeywordCommandCenterModel()` and is explicitly OOM-capped; `summary-service.ts` hardcodes `notChecked: 0`; `candidate-boundary.ts` has a tiny duplicated secondary-keyword junk check. Success metric: Keyword Hub first paint remains stable on large workspaces while `npm run check:circular-deps`, focused KCC tests, and an explicit perf/heap smoke keep the read path inside known limits. Phase-per-PR unless a task is demonstrably tiny. Do not change keyword scoring semantics or lifecycle behavior in this sprint.",
-      "items": [
-        {
-          "id": "kh-health-01-baseline-perf-and-heap-trace",
-          "title": "Baseline Keyword Hub first-paint, rows, summary, and local-candidates heap profile",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "S",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-26",
-          "notes": "DONE 2026-06-27: added the advisory `npm run report:keyword-hub-health` harness, which profiles a selected workspace through the real initial(summary+rows), split summary, split rows, and local_candidates service paths and prints timing/heap/row-count baselines for PR notes. Added/extended focused KCC tests so local_candidates remains capped even when `keyword-universe-full` is enabled, preserving the OOM boundary while the later skinny-path item remains pending."
-        },
-        {
-          "id": "kh-health-02-first-paint-combined-read",
-          "title": "Combine Keyword Hub first-paint summary + first rows without changing public row/detail contracts",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-26",
-          "notes": "DONE 2026-06-27: added `buildKeywordCommandCenterInitialView(workspaceId, rowsQuery)` plus `GET /api/webflow/keyword-command-center/:workspaceId/initial`, shared/API/client types, API wrapper, React Query key/hook, and KeywordHub first-paint usage. Existing `/summary`, `/rows`, and `/detail` contracts remain intact; the client uses split-read fallbacks after initial query errors or non-initial query changes. Focused unit/integration/API tests pin initial-view parity with split summary/rows responses."
-        },
-        {
-          "id": "kh-health-03-shared-source-snapshot",
-          "title": "Extract a reusable Keyword Hub source snapshot for summary, rows, detail, and future combined reads",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-06-26",
-          "notes": "DONE 2026-06-27: extracted `server/domains/keyword-command-center/source-snapshot.ts` as the focused KCC source loader for workspace, stored strategy, gated gaps, lite page keywords, tracked keyword provenance, latest ranks, feedback, and lost visibility rows/counts. Summary, rows, detail, and initial-view services can consume the shared snapshot while retaining their own projections. Source-contract tests now pin the snapshot boundary and extend the full-model guard so summary/detail/initial cannot re-enter `buildKeywordCommandCenterModel`."
-        },
-        {
-          "id": "kh-health-04-local-candidates-skinny-path",
-          "title": "Move `local_candidates` off the full model path or prove the capped model path is the final safe boundary",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-26",
-          "notes": "`filter=local_candidates` is the remaining live exception that dispatches to `buildKeywordCommandCenterRowsViaModel()` and `buildKeywordCommandCenterModel({ includeLocalCandidates: true })`. It is intentionally hard-capped at `LOCAL_CANDIDATE_ROW_LIMIT` because lifting it to the full universe ceiling would recreate the OOM risk. Preferred outcome: create a skinny/page-bounded local-candidate selection path that ranks candidate keys first, slices to the requested page, then finalizes only those rows. Acceptable outcome after audit: keep the capped model path but document it as the final safe boundary, add tests that the cap is never lifted by `keyword-universe-full`, and ensure logs expose when the cap truncates output. Tests: local candidates still return unselected candidates first, selected candidates still sort after, lifecycle labels/actions remain unchanged, pageInfo totals are honest, and large candidate fixtures do not materialize thousands of rows."
-        },
-        {
-          "id": "kh-health-05-filter-facet-correctness-and-scar-tissue",
-          "title": "Fix Keyword Hub filter facet drift (`notChecked`) and small duplicated candidate checks",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "S",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-26",
-          "notes": "Correctness cleanup that improves trust without changing the universe model. `summary-service.ts` currently hardcodes `notChecked: 0` while the full row matcher can identify `row.localSeoState && !row.localSeoState.checked`; decide and implement one owner-approved behavior: either compute `notChecked` cheaply in the skinny summary counts path, or remove the dead advanced filter from the exposed filter metadata while preserving the distinct local SEO lifecycle enum value. Also remove the duplicated `isTier1JunkKeyword(secondary)` branch in `candidate-boundary.ts`. Tests: summary facet count matches rows for local not-checked fixtures or the filter no longer renders; no regression to `visible_locally`, `possible_match`, `not_visible`, or `provider_degraded`; junk-gate dropped counts stay equivalent."
-        },
-        {
-          "id": "kh-health-06-regression-guardrails-and-docs",
-          "title": "Add Keyword Hub read-path guardrails for OOM, duplicate loading, and full-model regressions",
-          "source": "Keyword Hub health audit 2026-06-26",
-          "est": "S",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-26",
-          "notes": "Turn the crash learnings into durable rules. Update `docs/rules/keyword-hub.md` with first-paint contracts, skinny-vs-full model boundaries, memory/OOM constraints, and the allowed local_candidates exception or its replacement. Add or extend contract tests so summary/detail cannot import or call `buildKeywordCommandCenterModel`, local_candidates cannot exceed its cap without an explicit test/contract update, combined first-paint reads cannot drift from existing endpoints, and valueScore accessors stay precomputed field reads instead of comparator recomputation. Consider a pr-check/source-contract rule only if a regression is easy to mechanize without noisy false positives. Verification: focused KCC unit/integration tests, keyword-universe sort/junk tests, `npm run check:circular-deps`, `npm run pr-check`, `npm run typecheck`, and `npx vite build`."
-        }
-      ]
-    },
-    {
       "id": "sprint-keyword-value-amplification-2026-06-05",
       "name": "🎯 Keyword Value — propagation, money, GSC signals, client display",
       "hours": "phased",
@@ -1500,6 +1431,76 @@
           "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before."
         }
       ]
+    },
+    {
+      "id": "sprint-keyword-hub-health-2026-06-26",
+      "name": "✅ SHIPPED — 🔑 Keyword Hub Health — First Paint, Memory, and Universe Read-Path Hardening",
+      "hours": "phased",
+      "rationale": "The Keyword Hub/Keyword Universe crash pattern was most likely not caused directly by circular imports; it was caused by heavy keyword/local/intelligence read paths sharing one hot graph under memory pressure. The current Hub is much safer than the original path: rows use a skinny page-bounded read path, local SEO refreshes run sequentially with heap headroom, rank evidence is capped, junk gates exist, and large local-candidate evaluation remains hard-capped. This sprint turns those patch-level protections into an explicit performance architecture: measure first, remove duplicated first-paint reads, move the remaining heavy local_candidates exception toward the skinny model, fix known facet drift, and add regression guardrails so a future universe expansion cannot quietly re-open the OOM/page-crash class.",
+      "notes": "Audit anchors (2026-06-26): `src/components/KeywordHub.tsx` fetched `/summary` and `/rows` separately on first paint; `server/domains/keyword-command-center/summary-service.ts` and `rows-service.ts` duplicated source loading across strategy, page keywords, tracked keywords, latest ranks, feedback, lost visibility, and local visibility; `filter=local_candidates` dispatched through `buildKeywordCommandCenterRowsViaModel()` / `buildKeywordCommandCenterModel()` and required an explicit OOM cap; `summary-service.ts` hardcoded `notChecked: 0`; `candidate-boundary.ts` appeared to have a duplicated secondary-keyword junk check. DONE 2026-06-27: first paint uses the combined initial view, shared source snapshots back summary/rows/detail/initial, local_candidates uses a capped skinny projection instead of the full model, the dead Not Checked facet is no longer exposed, and the secondary junk check was re-audited as already gone. Success metric: Keyword Hub first paint remains stable on large workspaces while `npm run check:circular-deps`, focused KCC tests, and an explicit perf/heap smoke keep the read path inside known limits. Do not change keyword scoring semantics or lifecycle behavior in this sprint.",
+      "items": [
+        {
+          "id": "kh-health-01-baseline-perf-and-heap-trace",
+          "title": "Baseline Keyword Hub first-paint, rows, summary, and local-candidates heap profile",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: added the advisory `npm run report:keyword-hub-health` harness, which profiles a selected workspace through the real initial(summary+rows), split summary, split rows, and local_candidates service paths and prints timing/heap/row-count baselines for PR notes. Added/extended focused KCC tests so local_candidates remains capped even when `keyword-universe-full` is enabled, preserving the OOM boundary while the later skinny-path item remains pending."
+        },
+        {
+          "id": "kh-health-02-first-paint-combined-read",
+          "title": "Combine Keyword Hub first-paint summary + first rows without changing public row/detail contracts",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: added `buildKeywordCommandCenterInitialView(workspaceId, rowsQuery)` plus `GET /api/webflow/keyword-command-center/:workspaceId/initial`, shared/API/client types, API wrapper, React Query key/hook, and KeywordHub first-paint usage. Existing `/summary`, `/rows`, and `/detail` contracts remain intact; the client uses split-read fallbacks after initial query errors or non-initial query changes. Focused unit/integration/API tests pin initial-view parity with split summary/rows responses."
+        },
+        {
+          "id": "kh-health-03-shared-source-snapshot",
+          "title": "Extract a reusable Keyword Hub source snapshot for summary, rows, detail, and future combined reads",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: extracted `server/domains/keyword-command-center/source-snapshot.ts` as the focused KCC source loader for workspace, stored strategy, gated gaps, lite page keywords, tracked keyword provenance, latest ranks, feedback, and lost visibility rows/counts. Summary, rows, detail, and initial-view services can consume the shared snapshot while retaining their own projections. Source-contract tests now pin the snapshot boundary and extend the full-model guard so summary/detail/initial cannot re-enter `buildKeywordCommandCenterModel`."
+        },
+        {
+          "id": "kh-health-04-local-candidates-skinny-path",
+          "title": "Move `local_candidates` off the full model path or prove the capped model path is the final safe boundary",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: moved `/rows?filter=local_candidates` off `buildKeywordCommandCenterModel()` and deleted the retired `model-service.ts`. The new skinny projection uses cheap `buildLocalSeoKeywordCandidates()`, prioritizes unselected candidates before selected candidates, applies `LOCAL_CANDIDATE_ROW_LIMIT`, logs truncation, preserves the `keyword-universe-full` cap boundary, and finalizes only the capped candidate slice through normal KCC row finalization."
+        },
+        {
+          "id": "kh-health-05-filter-facet-correctness-and-scar-tissue",
+          "title": "Fix Keyword Hub filter facet drift (`notChecked`) and small duplicated candidate checks",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: removed the dead `Not Checked` advanced facet from skinny summary filter metadata while preserving the shared `not_checked` filter literal/matcher for compatibility. Re-audited `candidate-boundary.ts` and confirmed the duplicated secondary-keyword junk branch called out in the audit was already gone, so no behavior change was needed there."
+        },
+        {
+          "id": "kh-health-06-regression-guardrails-and-docs",
+          "title": "Add Keyword Hub read-path guardrails for OOM, duplicate loading, and full-model regressions",
+          "source": "Keyword Hub health audit 2026-06-26",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-26",
+          "notes": "DONE 2026-06-27: updated `docs/rules/keyword-hub.md` for the first-paint/source-snapshot/local-candidate skinny contracts, added source-contract coverage that the retired full model stays absent, widened pr-check to block any KCC read-path reintroduction of `buildKeywordCommandCenterModel()`/`model-service.ts`, and regenerated automated rule docs."
+        }
+      ],
+      "shippedAt": "2026-06-27"
     },
     {
       "id": "sprint-admin-surfaces-polish-2026-06-11",

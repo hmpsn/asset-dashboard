@@ -5670,7 +5670,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
     // Keyword Command Center crash-hardening follow-up
-    'Keyword Command Center summary/detail/initial must not use full model',
+    'Keyword Command Center read paths must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
     'Retired normalizePath usage in production code',
     'Local page/path normalizer helper outside tests',
@@ -6234,33 +6234,28 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
   });
 });
 
-describe('Rule: Keyword Command Center summary/detail/initial must not use full model', () => {
-  const RULE = 'Keyword Command Center summary/detail/initial must not use full model';
+describe('Rule: Keyword Command Center read paths must not use full model', () => {
+  const RULE = 'Keyword Command Center read paths must not use full model';
 
-  it('flags summary/detail/initial calling the full model builder', () => {
+  it('flags KCC read paths importing or calling the retired full model builder', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/summary-service.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
-        'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
-        '  return buildKeywordCommandCenterModel(workspaceId);',
-        '}',
-        'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
-        '  return { ok: true };',
-        '}',
-        'export async function buildKeywordCommandCenterInitialView(workspaceId: string) {',
+        "import { buildKeywordCommandCenterModel } from './model-service.js';",
+        'export async function buildKeywordCommandCenterRows(workspaceId: string) {',
         '  return buildKeywordCommandCenterModel(workspaceId);',
         '}',
       ),
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(2);
-    expect(hits[0].text).toContain('buildKeywordCommandCenterSummary');
-    expect(hits[1].text).toContain('buildKeywordCommandCenterInitialView');
+    expect(hits[0].text).toContain('model-service');
+    expect(hits[1].text).toContain('buildKeywordCommandCenterModel');
   });
 
-  it('accepts skinny summary/detail/initial implementations', () => {
+  it('accepts skinny read implementations and cheap local-candidate projection', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/detail-service.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
         '  return buildSummaryCounts(workspaceId);',
@@ -6270,6 +6265,9 @@ describe('Rule: Keyword Command Center summary/detail/initial must not use full 
         '}',
         'export async function buildKeywordCommandCenterInitialView(workspaceId: string) {',
         '  return { summary: buildSummaryCounts(workspaceId), rows: buildRows(workspaceId) };',
+        '}',
+        'export async function buildKeywordCommandCenterLocalCandidateRows(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidates(workspaceId);',
         '}',
       ),
     );
@@ -6307,7 +6305,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('accepts Evaluated generation in the explicit local-candidate path', () => {
+  it('flags Evaluated generation in the retired full-model local-candidate path', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/model-service.ts'),
       lines(
@@ -6316,7 +6314,9 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
         '}',
       ),
     );
-    expect(runRule(RULE, [file])).toHaveLength(0);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterModel');
   });
 
   it('accepts an explicit temporary hatch for selected-keyword detail fallback', () => {
@@ -6332,7 +6332,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not let an allowlisted function name leak into later helpers', () => {
+  it('does not let a deleted full-model helper name bypass the Evaluated guard', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
@@ -6345,8 +6345,9 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
       ),
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+    expect(hits).toHaveLength(2);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsViaModel');
+    expect(hits[1].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 
   it('flags ungated arrow-function Evaluated generation', () => {
@@ -6363,7 +6364,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 
-  it('does not let a one-line allowlisted arrow declaration leak scope', () => {
+  it('does not let a deleted one-line full-model helper name leak into later helpers', () => {
     const file = write(
       uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(

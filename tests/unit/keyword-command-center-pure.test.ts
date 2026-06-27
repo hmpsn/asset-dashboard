@@ -1265,9 +1265,9 @@ describe('buildFilterFacetsFromCounts', () => {
     strikingDistance: 7,
   };
 
-  it('returns 19 filter facets', () => {
+  it('returns 18 filter facets', () => {
     const result = buildFilterFacetsFromCounts(counts);
-    expect(result).toHaveLength(19);
+    expect(result).toHaveLength(18);
   });
 
   it('ALL facet has correct count', () => {
@@ -1305,6 +1305,7 @@ describe('buildFilterFacetsFromCounts', () => {
     expect(ids).toContain(KEYWORD_COMMAND_CENTER_FILTERS.DECLINED);
     expect(ids).toContain(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES);
     expect(ids).toContain(KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED);
+    expect(ids).not.toContain(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED);
   });
 });
 

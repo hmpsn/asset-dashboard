@@ -644,5 +644,6 @@ export function filterBundleToKeys(
     }),
     feedback: filterMapByKeys(bundle.feedback, keys),
     lostVisibilityRows: (bundle.lostVisibilityRows ?? []).filter(row => keys.has(keywordComparisonKey(row.query))),
+    localCandidates: (bundle.localCandidates ?? []).filter(candidate => keys.has(candidate.normalizedKeyword)),
   };
 }
