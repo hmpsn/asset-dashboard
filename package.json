@@ -61,6 +61,7 @@
     "scaffold:coverage-campaign": "tsx scripts/coverage-campaign.ts --top 200 --since-days 180 --scaffold-plans --plan-count 25",
     "verify:staging-merge-integrity": "tsx scripts/report-staging-merge-integrity.ts",
     "report:style-drift": "tsx scripts/report-style-drift.ts --json --output reports/style-drift-report.json",
+    "report:keyword-hub-health": "tsx scripts/report-keyword-hub-health.ts",
     "report:risky-modules": "tsx scripts/report-risky-modules.ts --json --top 40 --since-days 180",
     "verify:performance-budgets": "tsx scripts/performance-budgets.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",

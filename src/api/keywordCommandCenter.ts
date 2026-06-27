@@ -5,6 +5,7 @@ import type {
   KeywordCommandCenterBulkActionRequest,
   KeywordCommandCenterBulkActionResult,
   KeywordCommandCenterDetailResponse,
+  KeywordCommandCenterInitialViewResponse,
   KeywordCommandCenterRowsQuery,
   KeywordCommandCenterRowsResponse,
   KeywordCommandCenterSummaryResponse,
@@ -20,6 +21,20 @@ export interface KeywordHardDeleteResult {
 export const keywordCommandCenter = {
   summary: (wsId: string) =>
     get<KeywordCommandCenterSummaryResponse>(`/api/webflow/keyword-command-center/${wsId}/summary`),
+
+  initial: (wsId: string, query: KeywordCommandCenterRowsQuery) => {
+    const params = new URLSearchParams();
+    if (query.filter) params.set('filter', query.filter);
+    if (query.search) params.set('search', query.search);
+    if (query.sort) params.set('sort', query.sort);
+    if (query.direction) params.set('direction', query.direction);
+    if (query.page) params.set('page', String(query.page));
+    if (query.pageSize) params.set('pageSize', String(query.pageSize));
+    const suffix = params.toString();
+    return get<KeywordCommandCenterInitialViewResponse>(
+      `/api/webflow/keyword-command-center/${wsId}/initial${suffix ? `?${suffix}` : ''}`,
+    );
+  },
 
   rows: (wsId: string, query: KeywordCommandCenterRowsQuery) => {
     const params = new URLSearchParams();

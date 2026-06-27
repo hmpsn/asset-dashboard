@@ -12,6 +12,7 @@ import {
   applyKeywordCommandCenterAction,
   applyKeywordCommandCenterBulkAction,
   buildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterInitialView,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
   deleteKeywordHard,
@@ -78,6 +79,11 @@ const rowsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 }).strict();
 
+const initialRowsQuerySchema = rowsQuerySchema.refine(
+  query => query.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+  { path: ['filter'], message: 'Initial Keyword Hub read does not support local_candidates' },
+);
+
 const detailQuerySchema = z.object({
   keyword: z.string().min(1),
 }).strict();
@@ -85,6 +91,20 @@ const detailQuerySchema = z.object({
 router.get('/api/webflow/keyword-command-center/:workspaceId/summary', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
   try {
     const payload = await buildKeywordCommandCenterSummary(req.params.workspaceId, {
+      includeLocalSeo: true,
+    });
+    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/webflow/keyword-command-center/:workspaceId/initial', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const parsed = initialRowsQuerySchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
+    const payload = await buildKeywordCommandCenterInitialView(req.params.workspaceId, parsed.data, {
       includeLocalSeo: true,
     });
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });

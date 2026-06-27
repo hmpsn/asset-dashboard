@@ -38,4 +38,16 @@ describe('keywordCommandCenter.rows — request params', () => {
     keywordCommandCenter.rows('ws-1', { sort: 'clicks' });
     expect(getMock.mock.calls[0][0] as string).not.toContain('direction=');
   });
+
+  it('builds the combined initial-view URL with the same rows query params', () => {
+    keywordCommandCenter.initial('ws-1', { filter: 'tracked', search: 'seo guide', sort: 'clicks', direction: 'asc', page: 2, pageSize: 50 });
+    const url = getMock.mock.calls[0][0] as string;
+    expect(url).toContain('/api/webflow/keyword-command-center/ws-1/initial');
+    expect(url).toContain('filter=tracked');
+    expect(url).toContain('search=seo+guide');
+    expect(url).toContain('sort=clicks');
+    expect(url).toContain('direction=asc');
+    expect(url).toContain('page=2');
+    expect(url).toContain('pageSize=50');
+  });
 });

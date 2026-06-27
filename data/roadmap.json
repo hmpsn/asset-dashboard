@@ -405,9 +405,9 @@
           "source": "Keyword Hub health audit 2026-06-26",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Measure before optimizing. Add a deterministic local/dev fixture or harness that exercises a large keyword universe through the real endpoints: `GET /api/webflow/keyword-command-center/:workspaceId/summary`, `GET /rows?filter=all&sort=opportunity&pageSize=50`, representative search/sort changes, and `GET /rows?filter=local_candidates`. Record per-stage timings and heap from existing KCC logs (`summary-skinny`, `rows-skinny`, `rows-local-candidate`) and local SEO refresh headroom logs. If a synthetic large fixture is too expensive for CI, keep the perf harness manual/advisory but add a focused unit/integration smoke that asserts row counts, pageInfo, and capped local-candidate behavior. Output should become the baseline for later PR notes: first paint = summary + first rows, rows totalMs, finalHeapMb, candidate count, hidden-by-cap count, and local_candidates cap behavior."
+          "notes": "DONE 2026-06-27: added the advisory `npm run report:keyword-hub-health` harness, which profiles a selected workspace through the real initial(summary+rows), split summary, split rows, and local_candidates service paths and prints timing/heap/row-count baselines for PR notes. Added/extended focused KCC tests so local_candidates remains capped even when `keyword-universe-full` is enabled, preserving the OOM boundary while the later skinny-path item remains pending."
         },
         {
           "id": "kh-health-02-first-paint-combined-read",
@@ -415,9 +415,9 @@
           "source": "Keyword Hub health audit 2026-06-26",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Today `KeywordHub.tsx` issues separate summary and rows queries on mount, and both server paths reload overlapping source data. Add a server-owned first-paint read path, e.g. `buildKeywordCommandCenterInitialView(workspaceId, rowsQuery)` and optional route/API hook, that returns the existing summary shape plus the existing rows/pageInfo shape assembled from a shared source snapshot. Preserve `/summary`, `/rows`, and `/detail` routes for compatibility and existing cache invalidation. Frontend can either call the combined endpoint for initial render and seed React Query caches, or use it behind a new hook while leaving existing hooks as fallbacks. Tests: parity between combined.summary and `/summary`, combined.rows and `/rows` for default segment/search/sort; React Query cache/invalidation still refreshes summary and rows after rank/strategy/local mutations; first-paint error handling still allows row data if summary-like metadata fails."
+          "notes": "DONE 2026-06-27: added `buildKeywordCommandCenterInitialView(workspaceId, rowsQuery)` plus `GET /api/webflow/keyword-command-center/:workspaceId/initial`, shared/API/client types, API wrapper, React Query key/hook, and KeywordHub first-paint usage. Existing `/summary`, `/rows`, and `/detail` contracts remain intact; the client uses split-read fallbacks after initial query errors or non-initial query changes. Focused unit/integration/API tests pin initial-view parity with split summary/rows responses."
         },
         {
           "id": "kh-health-03-shared-source-snapshot",
@@ -425,9 +425,9 @@
           "source": "Keyword Hub health audit 2026-06-26",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Create a focused source loader adjacent to `server/domains/keyword-command-center/rows-service.ts`, not a new catch-all utility. It should load and normalize the read-only inputs once per request: workspace, table-resolved keyword strategy, lite page keywords, assembled content/keyword gaps after `gateDiscoveryGaps`, tracked keywords with provenance, latest ranks, feedback, lost visibility rows/count, local visibility summaries when requested, active local market count, value-scoring config, and variant parent keys where useful. Consumers should still choose their projection: summary counts, candidate key page selection, row finalization, detail drawer. Guardrails: no scoring semantic changes, no row response-shape changes, no local-candidate full generation by default, and no new circular imports from local-seo/intelligence back into the facade. Tests: source snapshot parity with existing summary/rows/detail fixtures, no full-model import in summary/detail, and candidate/row metric parity still holds."
+          "notes": "DONE 2026-06-27: extracted `server/domains/keyword-command-center/source-snapshot.ts` as the focused KCC source loader for workspace, stored strategy, gated gaps, lite page keywords, tracked keyword provenance, latest ranks, feedback, and lost visibility rows/counts. Summary, rows, detail, and initial-view services can consume the shared snapshot while retaining their own projections. Source-contract tests now pin the snapshot boundary and extend the full-model guard so summary/detail/initial cannot re-enter `buildKeywordCommandCenterModel`."
         },
         {
           "id": "kh-health-04-local-candidates-skinny-path",

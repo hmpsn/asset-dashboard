@@ -6,43 +6,41 @@ import {
 } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
-import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
 import {
   countLocalSeoKeywordCandidates,
-  buildLocalSeoKeywordVisibilitySummaryByKey,
   getPrimaryMarketLocationCode,
 } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
-import { listPageKeywordsLite } from '../../page-keywords.js';
-import { getLatestSnapshotRanks, getTrackedKeywords } from '../../rank-tracking.js';
-import { getWorkspace } from '../../workspaces.js';
 import { isFeatureEnabled } from '../../feature-flags.js';
 import {
   KEYWORD_UNIVERSE_FULL_FLAG,
   RAW_EVIDENCE_ROW_LIMIT,
   UNIVERSE_SAFETY_CEILING,
-  gateDiscoveryGaps,
   selectRankEvidence,
   trackedKeywordMatchesFilter,
 } from './candidate-boundary.js';
-import { readFeedback } from './feedback-store.js';
-import { safeLostVisibilityCount, safeLostVisibilityRows } from './read-model.js';
 import {
   buildFilterFacetsFromCounts,
   type SkinnyFilterCounts,
 } from './row-query.js';
-import { mergeTrackedKeywordProvenance, withResolvedSiteKeywordMetrics } from './tracked-keyword-provenance.js';
+import {
+  buildKeywordCommandCenterSourceSnapshot,
+  type KeywordCommandCenterSourceSnapshot,
+} from './source-snapshot.js';
 
 const log = createLogger('keyword-command-center');
 
 export async function buildKeywordCommandCenterSummary(
   workspaceId: string,
-  options: { includeLocalSeo?: boolean } = {},
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot } = {},
 ): Promise<KeywordCommandCenterSummaryResponse | null> {
   const startedAt = Date.now();
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return null;
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+  });
+  if (!snapshot) return null;
+  const { workspace } = snapshot;
 
   const allKeys = new Set<string>();
   const inStrategyKeys = new Set<string>();
@@ -64,14 +62,14 @@ export async function buildKeywordCommandCenterSummary(
     keysWithVolume.add(key);
   };
 
-  const summaryStrategy = withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy);
+  const summaryStrategy = snapshot.strategy;
   for (const metric of summaryStrategy?.siteKeywordMetrics ?? []) {
     addKey(inStrategyKeys, metric.keyword);
     markVolume(metric.keyword, metric.volume);
   }
   for (const keyword of summaryStrategy?.siteKeywords ?? []) addKey(inStrategyKeys, keyword);
 
-  for (const page of listPageKeywordsLite(workspace.id)) {
+  for (const page of snapshot.pageMap) {
     addKey(pageAssignedKeys, page.primaryKeyword);
     addKey(inStrategyKeys, page.primaryKeyword);
     markVolume(page.primaryKeyword, page.volume);
@@ -81,11 +79,7 @@ export async function buildKeywordCommandCenterSummary(
     }
   }
 
-  const summaryAssembled = assembleStoredKeywordStrategy(workspace.id);
-  const { contentGaps, keywordGaps } = gateDiscoveryGaps({
-    contentGaps: summaryAssembled?.contentGaps ?? [],
-    keywordGaps: summaryAssembled?.keywordGaps ?? [],
-  });
+  const { contentGaps, keywordGaps } = snapshot;
   for (const gap of contentGaps) {
     addKey(contentKeys, gap.targetKeyword);
     addKey(inStrategyKeys, gap.targetKeyword);
@@ -97,11 +91,8 @@ export async function buildKeywordCommandCenterSummary(
     markVolume(gap.keyword, gap.volume);
   }
 
-  const feedback = readFeedback(workspace.id);
-  const trackedKeywords = mergeTrackedKeywordProvenance(
-    workspace.id,
-    getTrackedKeywords(workspace.id, { includeInactive: true }),
-  );
+  const feedback = snapshot.feedback;
+  const trackedKeywords = snapshot.trackedKeywords;
   for (const tracked of trackedKeywords) {
     addKey(allKeys, tracked.query);
     markVolume(tracked.query, tracked.volume);
@@ -127,9 +118,9 @@ export async function buildKeywordCommandCenterSummary(
     }
   }
 
-  const latestRanks = getLatestSnapshotRanks(workspace.id);
-  const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
-  const lostVisibilityCount = safeLostVisibilityCount(workspace.id);
+  const latestRanks = snapshot.latestRanks;
+  const lostVisibilityRows = snapshot.lostVisibilityRows;
+  const lostVisibilityCount = snapshot.lostVisibilityCount;
   const lostVisibilityKeys = new Set(lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   for (const key of lostVisibilityKeys) allKeys.add(key);
   const rankEvidenceKeys = new Set<string>();
@@ -169,7 +160,7 @@ export async function buildKeywordCommandCenterSummary(
       && !feedbackKeys.has(key)
     ),
   );
-  const localVisibility = options.includeLocalSeo ? buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id) : new Map();
+  const localVisibility = options.includeLocalSeo ? snapshot.localVisibilityByKeyword ?? new Map() : new Map();
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 

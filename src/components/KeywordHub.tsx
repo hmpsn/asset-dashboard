@@ -45,6 +45,7 @@ import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterBulkAction,
   useKeywordCommandCenterDetail,
+  useKeywordCommandCenterInitialView,
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useKeywordHardDelete,
@@ -109,6 +110,24 @@ function hubSortToKccSort(key: HubSortKey): KeywordCommandCenterSort {
   }
 }
 
+function rowsQuerySignature(query: {
+  filter?: string;
+  search?: string;
+  sort?: string;
+  direction?: string;
+  page?: number;
+  pageSize?: number;
+}): string {
+  return [
+    query.filter ?? '',
+    query.search ?? '',
+    query.sort ?? '',
+    query.direction ?? '',
+    query.page ?? '',
+    query.pageSize ?? '',
+  ].join('|');
+}
+
 // ---------------------------------------------------------------------------
 // Segment counts from summary
 // ---------------------------------------------------------------------------
@@ -168,29 +187,6 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
 
-  // Data --------------------------------------------------------------------
-  const summary = useKeywordCommandCenterSummary(workspaceId);
-  const counts = summary.data?.counts;
-  const filterMetas = summary.data?.filters ?? [];
-
-  // Trust signals (Task 4) --------------------------------------------------
-  // The universe is truncated by the display cap whenever the true post-gate
-  // total exceeds the returned/displayed count. We disclose the hidden tail
-  // honestly rather than silently dropping it. (Under keyword-universe-full the
-  // total can include rank-evidence beyond the value-ceiling, so the copy is a
-  // generic "N more keywords below the cap" — accurate for both cases.)
-  const rawEvidenceTotal = summary.data?.rawEvidenceTotal ?? 0;
-  const rawEvidenceReturned = summary.data?.rawEvidenceReturned ?? 0;
-  const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
-  const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
-
-  // Summary error band (KCC :461-468 parity) — non-null when the summary fetch fails.
-  const summaryErrorMessage = summary.error instanceof Error
-    ? summary.error.message
-    : summary.error
-      ? 'Keyword summary metrics could not load. Row data remains available.'
-      : null;
-
   const rowsQuery = useMemo(
     () => ({
       filter: hub.activeKccFilter,
@@ -203,9 +199,44 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     [hub.activeKccFilter, hub.debouncedSearch, hub.sort.key, hub.sort.direction, hub.page],
   );
 
-  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
-  const rows = rowsResult.data?.rows ?? [];
-  const pageInfo = rowsResult.data?.pageInfo;
+  const initialRowsQueryRef = useRef(rowsQuery);
+  const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current);
+  const viewingInitialRows = rowsQuerySignature(rowsQuery) === rowsQuerySignature(initialRowsQueryRef.current);
+  const summary = useKeywordCommandCenterSummary(workspaceId, {
+    enabled: initialView.isError,
+  });
+  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
+    enabled: !viewingInitialRows || initialView.isError,
+  });
+  const summaryData = initialView.data?.summary ?? summary.data;
+  const rowsData = viewingInitialRows ? initialView.data?.rows ?? rowsResult.data : rowsResult.data;
+  const rowsError = rowsData || rowsResult.isLoading
+    ? null
+    : viewingInitialRows ? rowsResult.error ?? initialView.error : rowsResult.error;
+  const counts = summaryData?.counts;
+  const filterMetas = summaryData?.filters ?? [];
+  const summaryLoading = initialView.isLoading || summary.isLoading;
+  const rowsLoading = viewingInitialRows ? initialView.isLoading || rowsResult.isLoading : rowsResult.isLoading;
+  const rows = rowsData?.rows ?? [];
+  const pageInfo = rowsData?.pageInfo;
+
+  // Trust signals (Task 4) --------------------------------------------------
+  // The universe is truncated by the display cap whenever the true post-gate
+  // total exceeds the returned/displayed count. We disclose the hidden tail
+  // honestly rather than silently dropping it. (Under keyword-universe-full the
+  // total can include rank-evidence beyond the value-ceiling, so the copy is a
+  // generic "N more keywords below the cap" — accurate for both cases.)
+  const rawEvidenceTotal = summaryData?.rawEvidenceTotal ?? 0;
+  const rawEvidenceReturned = summaryData?.rawEvidenceReturned ?? 0;
+  const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
+  const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
+
+  // Summary error band (KCC :461-468 parity) — non-null when the summary fetch fails.
+  const summaryErrorMessage = summary.error instanceof Error
+    ? summary.error.message
+    : summary.error
+      ? 'Keyword summary metrics could not load. Row data remains available.'
+      : null;
 
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);
   const rowAction = useKeywordCommandCenterAction(workspaceId);
@@ -250,7 +281,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   // Deferred local panel mount: fires after the first rows response arrives.
   // Falls back to setTimeout(0) when requestIdleCallback is absent (jsdom/test).
   useEffect(() => {
-    if (!rowsResult.data) return;
+    if (!rowsData) return;
     if (localPanelEnabled) return;
     const idle = 'requestIdleCallback' in window
       ? (window as Window & {
@@ -264,7 +295,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     }
     const timer = window.setTimeout(() => setLocalPanelEnabled(true), 0);
     return () => window.clearTimeout(timer);
-  }, [localPanelEnabled, rowsResult.data]);
+  }, [localPanelEnabled, rowsData]);
 
   // WebSocket: invalidate on rank/strategy mutations (both-halves contract).
   const wsHandlers = useMemo(
@@ -588,7 +619,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             segments={segments}
             active={hub.segment}
             onChange={hub.setSegment}
-            isLoading={summary.isLoading}
+            isLoading={summaryLoading}
           />
           <div className="ml-auto">
             <HubAdvancedFilters
@@ -627,8 +658,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           workspaceId={workspaceId}
           rows={rows}
           pageInfo={pageInfo}
-          isLoading={rowsResult.isLoading}
-          isError={rowsResult.isError}
+          isLoading={rowsLoading}
+          isError={Boolean(rowsError)}
           sort={hub.sort}
           onSort={hub.setSort}
           selectedKeys={hub.selectedKeys}

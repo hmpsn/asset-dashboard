@@ -39,6 +39,7 @@ const getMock = vi.fn();
 
 // Mock all Hub data hooks. rowAction.mutate is the call-under-test.
 vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: vi.fn(), isPending: false }),

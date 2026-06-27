@@ -2,77 +2,58 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import type { KeywordCommandCenterDetailResponse } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking.js';
-import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
 import {
   buildLocalSeoKeywordVisibilityForKeyword,
   listLocalSeoMarkets,
 } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from '../../outcome-tracking.js';
-import { listPageKeywordsLite } from '../../page-keywords.js';
-import { getLatestSnapshotRanks, getTrackedKeywords } from '../../rank-tracking.js';
-import { getWorkspace } from '../../workspaces.js';
 import {
   filterMapByKeys,
   filterStrategyForSingleKeyword,
   pageMatchesKeyword,
 } from './bundle-filters.js';
-import { gateDiscoveryGaps } from './candidate-boundary.js';
-import { readFeedback } from './feedback-store.js';
 import {
   buildValueScoringConfig,
   ensureLocalVisibilityRows,
   finalizeDraftRow,
   populateDraftRows,
   safeLostVisibilityKeys,
-  safeLostVisibilityRows,
 } from './read-model.js';
 import type { DraftRow } from './types.js';
-import { mergeTrackedKeywordProvenance, withResolvedSiteKeywordMetrics } from './tracked-keyword-provenance.js';
+import {
+  buildKeywordCommandCenterSourceSnapshot,
+  type KeywordCommandCenterSourceSnapshot,
+} from './source-snapshot.js';
 
 const log = createLogger('keyword-command-center');
 
 export async function buildKeywordCommandCenterDetail(
   workspaceId: string,
   keyword: string,
-  options: { includeLocalSeo?: boolean } = {},
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot } = {},
 ): Promise<KeywordCommandCenterDetailResponse | null> {
   const startedAt = Date.now();
   const normalized = keywordComparisonKey(keyword);
   if (!normalized) return null;
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return null;
-  const pageMap = listPageKeywordsLite(workspace.id).filter(page => pageMatchesKeyword(page, normalized));
-  // contentGaps + keywordGaps via the single assembler (#2), filtered to the
-  // requested keyword; pageMap keeps the Lite page_keywords path above.
-  const detailAssembled = assembleStoredKeywordStrategy(workspace.id);
-  // F2 fix: gate the discovery gaps (Tier-1 + Tier-2) BEFORE narrowing to the
-  // requested keyword, so /detail on a junk gap keyword finds no base source and
-  // returns null — consistent with the gated rows/summary universe.
-  const gatedDetailGaps = gateDiscoveryGaps({
-    contentGaps: detailAssembled?.contentGaps ?? [],
-    keywordGaps: detailAssembled?.keywordGaps ?? [],
-  });
-  const contentGaps = gatedDetailGaps.contentGaps.filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
-  const keywordGaps = gatedDetailGaps.keywordGaps.filter(gap => keywordComparisonKey(gap.keyword) === normalized);
-  // Wave 3d-i/3d-ii: merge sourceGapKey + strategyOwned back from the table read
-  // (getTrackedKeywords strips them) so the admin detail drawer exposes accurate
-  // provenance, ownership, and protected-state UI. Read-time inference retired.
-  const trackedKeywords = mergeTrackedKeywordProvenance(
-    workspace.id,
-    getTrackedKeywords(workspace.id, { includeInactive: true }),
-  ).filter(entry => keywordComparisonKey(entry.query) === normalized);
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId);
+  if (!snapshot) return null;
+  const { workspace } = snapshot;
+  const pageMap = snapshot.pageMap.filter(page => pageMatchesKeyword(page, normalized));
+  const contentGaps = snapshot.contentGaps.filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
+  const keywordGaps = snapshot.keywordGaps.filter(gap => keywordComparisonKey(gap.keyword) === normalized);
+  const trackedKeywords = snapshot.trackedKeywords.filter(entry => keywordComparisonKey(entry.query) === normalized);
   // Load all ranks for variant aggregation — populateDraftRows uses variantParentMap to
   // cluster GSC query variants (e.g. "teeth whitening san antonio") under their canonical
   // keyword. Filtering to exact matches here would prevent variant metrics from rolling up.
   // Use the filtered set only for the hasBaseSource check below.
-  const allLatestRanks = getLatestSnapshotRanks(workspace.id);
+  const allLatestRanks = snapshot.latestRanks;
   const latestRanks = allLatestRanks.filter(rank => keywordComparisonKey(rank.query) === normalized);
-  const feedback = filterMapByKeys(readFeedback(workspace.id), new Set([normalized]));
-  const lostVisibilityRows = safeLostVisibilityRows(workspace.id).filter(row => keywordComparisonKey(row.query) === normalized);
+  const feedback = filterMapByKeys(snapshot.feedback, new Set([normalized]));
+  const lostVisibilityRows = snapshot.lostVisibilityRows.filter(row => keywordComparisonKey(row.query) === normalized);
   // #19b: resolve siteKeywordMetrics table-first (blob fallback) before filtering.
   const strategy = filterStrategyForSingleKeyword(
-    withResolvedSiteKeywordMetrics(workspace.id, workspace.keywordStrategy),
+    snapshot.strategy,
     normalized,
   );
   const localVisibility = options.includeLocalSeo

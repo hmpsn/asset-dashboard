@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildKeywordCommandCenterDetail as facadeBuildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterInitialView as facadeBuildKeywordCommandCenterInitialView,
   buildKeywordCommandCenterRows as facadeBuildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary as facadeBuildKeywordCommandCenterSummary,
 } from '../../server/keyword-command-center.js';
 import { buildKeywordCommandCenterDetail } from '../../server/domains/keyword-command-center/detail-service.js';
+import { buildKeywordCommandCenterInitialView } from '../../server/domains/keyword-command-center/initial-view-service.js';
 import { buildKeywordCommandCenterRows } from '../../server/domains/keyword-command-center/rows-service.js';
 import { buildKeywordCommandCenterSummary } from '../../server/domains/keyword-command-center/summary-service.js';
 
@@ -79,6 +81,7 @@ describe('keyword command center domain boundary', () => {
     const feedbackStore = readRepoFile('server/domains/keyword-command-center/feedback-store.ts');
     const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
     const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
+    const sourceSnapshot = readRepoFile('server/domains/keyword-command-center/source-snapshot.ts');
 
     for (const helper of [
       'readFeedbackRows',
@@ -90,8 +93,9 @@ describe('keyword command center domain boundary', () => {
       expect(feedbackStore).toMatch(new RegExp(`function ${helper}\\b`));
     }
 
-    expect(rowsService).toContain("from './feedback-store.js'");
-    expect(detailService).toContain("from './feedback-store.js'");
+    expect(rowsService).toContain("from './source-snapshot.js'");
+    expect(detailService).toContain("from './source-snapshot.js'");
+    expect(sourceSnapshot).toContain("from './feedback-store.js'");
     expect(feedbackStore).toContain('keyword_feedback');
     expect(feedbackStore).toContain('createStmtCache');
   });
@@ -255,6 +259,7 @@ describe('keyword command center domain boundary', () => {
     expect(summaryService).toContain('isSuspiciousPlannerGroupedVolume');
     expect(summaryService).toContain('trackedKeywordMatchesFilter');
     expect(summaryService).toContain('buildFilterFacetsFromCounts');
+    expect(summaryService).toContain("from './source-snapshot.js'");
   });
 
   it('keeps detail assembly in the domain service with compatibility re-export from the facade', () => {
@@ -269,11 +274,13 @@ describe('keyword command center domain boundary', () => {
     expect(detailService).toContain('getScoredOutcomeReadbacks');
     expect(detailService).toContain('filterStrategyForSingleKeyword');
     expect(detailService).toContain('finalizeDraftRow');
+    expect(detailService).toContain("from './source-snapshot.js'");
   });
 
-  it('keeps rows and full-model read assembly in domain services with facade re-export only', () => {
+  it('keeps rows, initial view, and full-model read assembly in domain services with facade re-export only', () => {
     const facade = readRepoFile('server/keyword-command-center.ts');
     const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
+    const initialViewService = readRepoFile('server/domains/keyword-command-center/initial-view-service.ts');
     const modelService = readRepoFile('server/domains/keyword-command-center/model-service.ts');
 
     for (const helper of [
@@ -282,25 +289,55 @@ describe('keyword command center domain boundary', () => {
       'buildKeywordCommandCenterRowsViaModel',
       'buildFilteredBundle',
       'localVisibilityByFilter',
+      'buildKeywordCommandCenterInitialView',
     ]) {
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
     }
     expect(facade).not.toMatch(/createLogger\('keyword-command-center'\)/);
     expect(facade).toContain('  buildKeywordCommandCenterRows,');
+    expect(facade).toContain('  buildKeywordCommandCenterInitialView,');
     expect(facade).toContain("from './domains/keyword-command-center/rows-service.js'");
+    expect(facade).toContain("from './domains/keyword-command-center/initial-view-service.js'");
     expect(rowsService).toMatch(/export async function buildKeywordCommandCenterRows\b/);
     expect(rowsService).toContain('buildKeywordCommandCenterModel');
+    expect(rowsService).toContain("from './source-snapshot.js'");
     expect(rowsService).toContain('rowCandidateKeysForQuery');
     expect(rowsService).toContain('filterBundleToKeys');
+    expect(initialViewService).toMatch(/export async function buildKeywordCommandCenterInitialView\b/);
+    expect(initialViewService).toContain('buildKeywordCommandCenterSourceSnapshot');
+    expect(initialViewService).toContain('buildKeywordCommandCenterSummary');
+    expect(initialViewService).toContain('buildKeywordCommandCenterRows');
+    expect(initialViewService).not.toContain('buildKeywordCommandCenterModel');
     expect(modelService).toMatch(/export async function buildKeywordCommandCenterModel\b/);
     expect(modelService).toContain('buildLocalSeoKeywordCandidates');
     expect(modelService).toContain('LOCAL_CANDIDATE_ROW_LIMIT');
     expect(modelService).toContain('finalizeDraftRows');
   });
 
+  it('keeps shared source loading in the domain source snapshot', () => {
+    const sourceSnapshot = readRepoFile('server/domains/keyword-command-center/source-snapshot.ts');
+    const summaryService = readRepoFile('server/domains/keyword-command-center/summary-service.ts');
+    const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
+    const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
+    const initialViewService = readRepoFile('server/domains/keyword-command-center/initial-view-service.ts');
+
+    expect(sourceSnapshot).toMatch(/export function buildKeywordCommandCenterSourceSnapshot\b/);
+    expect(sourceSnapshot).toContain('assembleStoredKeywordStrategy');
+    expect(sourceSnapshot).toContain('listPageKeywordsLite');
+    expect(sourceSnapshot).toContain('getTrackedKeywords');
+    expect(sourceSnapshot).toContain('getLatestSnapshotRanks');
+    expect(sourceSnapshot).toContain('safeLostVisibilityRows');
+    expect(sourceSnapshot).toContain('safeLostVisibilityCount');
+    expect(sourceSnapshot).not.toContain('buildKeywordCommandCenterModel');
+    for (const service of [summaryService, rowsService, detailService, initialViewService]) {
+      expect(service).toContain("from './source-snapshot.js'");
+    }
+  });
+
   it('keeps facade read exports as direct domain service re-exports', () => {
     expect(facadeBuildKeywordCommandCenterRows).toBe(buildKeywordCommandCenterRows);
     expect(facadeBuildKeywordCommandCenterSummary).toBe(buildKeywordCommandCenterSummary);
     expect(facadeBuildKeywordCommandCenterDetail).toBe(buildKeywordCommandCenterDetail);
+    expect(facadeBuildKeywordCommandCenterInitialView).toBe(buildKeywordCommandCenterInitialView);
   });
 });
