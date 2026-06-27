@@ -92,7 +92,9 @@ describe('cycle-kill boundary contracts', () => {
     const consumers = [
       'server/keyword-strategy-ai-synthesis.ts',
       'server/keyword-strategy-universe.ts',
+      'server/keyword-strategy-enrichment.ts',
       'server/keyword-strategy-synthesis/context.ts',
+      'server/seo-target-geo.ts',
       'server/intelligence/seo-context-slice.ts',
       'server/domains/keyword-command-center/source-snapshot.ts',
       'server/domains/keyword-command-center/detail-service.ts',
@@ -103,6 +105,28 @@ describe('cycle-kill boundary contracts', () => {
     for (const file of consumers) {
       const source = readSource(file);
       expect(source).not.toMatch(/from ['"](?:\.\.?\/)+local-seo\.js['"]/);
+    }
+  });
+
+  it('keeps local SEO intelligence assembly on the narrow read boundary', () => {
+    const slice = readSource('server/intelligence/local-seo-slice.ts');
+    const readModel = readSource('server/domains/local-seo/intelligence-read-model.ts');
+
+    expect(readModel).toContain('export async function loadLocalSeoIntelligenceInputs');
+    expect(slice).toContain("import('../domains/local-seo/intelligence-read-model.js')");
+    expect(slice).not.toContain("from '../local-seo.js'");
+    expect(slice).not.toContain("import('../local-seo.js')");
+
+    for (const forbidden of [
+      './refresh-runner.js',
+      './configuration-actions.js',
+      '../../local-seo.js',
+      '../../routes/local-seo.js',
+      '../../providers/',
+      'runLocalSeoRefreshJob',
+      'runLocationBackfillJob',
+    ]) {
+      expect(readModel).not.toContain(forbidden);
     }
   });
 
@@ -200,5 +224,19 @@ describe('cycle-kill boundary contracts', () => {
     expect(contentBrief).not.toContain("from './workspace-intelligence.js'");
     expect(contentPostsAi).toContain("from '../shared/types/content.js'");
     expect(contentPostsAi).not.toContain("from './content-brief.js'");
+  });
+
+  it('keeps content brief generation from statically importing workspace intelligence builders', () => {
+    const contentBrief = readSource('server/content-brief.ts');
+
+    expect(contentBrief).toContain("intelligenceModulePath('generation-context-builders')");
+    expect(contentBrief).not.toContain("from './intelligence/generation-context-builders.js'");
+  });
+
+  it('keeps keyword synthesis context off the public synthesis facade static import path', () => {
+    const synthesisFacade = readSource('server/keyword-strategy-ai-synthesis.ts');
+
+    expect(synthesisFacade).toContain("synthesisModulePath('context')");
+    expect(synthesisFacade).not.toContain("from './keyword-strategy-synthesis/context.js'");
   });
 });

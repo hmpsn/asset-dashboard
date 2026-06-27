@@ -1,7 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { formatPageMapForPrompt } from './intelligence/formatters.js';
-import { buildContentGenerationContext } from './intelligence/generation-context-builders.js';
 import {
   getBrief as readBrief,
   listBriefs as readBriefs,
@@ -11,6 +10,7 @@ import { callAI } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { IntelligenceOptions, IntelligenceSlice, LearningsSlice, PromptVerbosity, WorkspaceIntelligence } from '../shared/types/intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { sanitizeQueryForPrompt } from './utils/text.js';
 
@@ -34,6 +34,49 @@ import {
 import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
 
 const log = createLogger('content-brief');
+
+type ContentGenerationLearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
+
+interface ContentGenerationContextOptions {
+  pagePath?: string;
+  verbosity?: PromptVerbosity;
+  tokenBudget?: number;
+  learningsDomain?: ContentGenerationLearningsDomain;
+  slices?: readonly IntelligenceSlice[];
+  enrichWithBacklinks?: boolean;
+  includeLocalSeo?: boolean;
+  includeRankMovers?: boolean;
+}
+
+interface ContentGenerationContextResult {
+  intelligence: WorkspaceIntelligence;
+  slices: readonly IntelligenceSlice[];
+  promptContext: string;
+  pagePath?: string;
+  learningsDomain: ContentGenerationLearningsDomain;
+  learningsAvailability: LearningsSlice['availability'] | 'not_requested';
+}
+
+interface GenerationContextBuildersModule {
+  buildContentGenerationContext(
+    workspaceId: string,
+    opts?: ContentGenerationContextOptions,
+  ): Promise<ContentGenerationContextResult>;
+}
+
+function intelligenceModulePath(name: string): string {
+  return `./intelligence/${name}.js`;
+}
+
+const generationContextBuildersModule = intelligenceModulePath('generation-context-builders');
+
+async function buildContentGenerationContext(
+  workspaceId: string,
+  opts?: ContentGenerationContextOptions,
+): Promise<ContentGenerationContextResult> {
+  const { buildContentGenerationContext: build } = await import(generationContextBuildersModule) as GenerationContextBuildersModule; // dynamic-import-ok - content brief generation lazily reads workspace intelligence to avoid import-cycle fan-in.
+  return build(workspaceId, opts);
+}
 
 // ── Analytics Intelligence for brief enrichment ──
 

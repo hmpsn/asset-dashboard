@@ -2,7 +2,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './utils/page-address.js';
 import { z } from 'zod';
-import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
+import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './domains/local-seo/configuration-service.js';
 import { workspaceProviderGeo } from './seo-target-geo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';

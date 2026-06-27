@@ -20,7 +20,7 @@ const PROMPT_BLOCK_LOCATION_LIST_CAP = PROMPT_BLOCK_MARKET_LIST_CAP;
  *
  * Returned shape:
  *   - `candidates` is the full bounded universe (capped upstream at
- *     LOCAL_CANDIDATE_HARD_CAP in server/local-seo.ts — currently 1000).
+   *     LOCAL_CANDIDATE_HARD_CAP in the local SEO candidate service — currently 1000).
  *     MCP consumers receive this entire array.
  *   - `effectiveLocalSeoBlock` is a pre-formatted prompt block that samples
  *     `candidates` internally (stratified per active market, capped at
@@ -56,17 +56,15 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
         stateOrRegion: location.stateOrRegion,
         pageTargetPath: location.pageTargetPath,
       }));
-    const localSeoModule = await import('../local-seo.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { loadLocalSeoIntelligenceInputs } = await import('../domains/local-seo/intelligence-read-model.js'); // dynamic-import-ok - local SEO intelligence reads are narrow but still DB-heavy; keep them off the synchronous slice import path.
     const {
-      listLocalSeoMarkets,
-      buildLocalSeoKeywordCandidates,
-      buildLocalSeoKeywordVisibilitySummaryByKey,
-      listLatestLocalVisibilitySnapshots,
-      getLocalSeoServiceGaps,
-      getLocalSeoCompetitorBrands,
-    } = localSeoModule;
-
-    const rawMarkets = listLocalSeoMarkets(workspaceId);
+      markets: rawMarkets,
+      candidates: rawCandidates,
+      visibilityByKey,
+      latestSnapshots,
+      serviceGaps: rawServiceGaps,
+      competitorBrands: rawCompetitorBrands,
+    } = await loadLocalSeoIntelligenceInputs(workspaceId);
     if (rawMarkets.length === 0) return { ...baseline, locations };
 
     const markets: LocalSeoSlice['markets'] = rawMarkets.map(m => ({
@@ -81,7 +79,6 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     // Cheap default is the right contract for AdminChat, content gen, recommendation
     // gen, MCP — and the upcoming local SEO recommendations layer. The Evaluated
     // variant remains opt-in for callers that genuinely need scoreDelta+reasons.
-    const rawCandidates = buildLocalSeoKeywordCandidates(workspaceId);
     const candidates: LocalSeoSlice['candidates'] = rawCandidates.map(c => ({
       keyword: c.keyword,
       source: c.source,
@@ -99,7 +96,6 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     }));
 
     const visibility = { visible: 0, possibleMatch: 0, notVisible: 0, notChecked: 0, providerDegraded: 0 };
-    const visibilityByKey = buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId);
     const activeMarketIds = new Set(markets.filter(m => m.status === 'active').map(m => m.id));
     for (const summary of visibilityByKey.values()) {
       // Each summary's `markets` array contains per-market visibility entries.
@@ -129,40 +125,25 @@ export async function assembleLocalSeo(workspaceId: string): Promise<LocalSeoSli
     }
 
     let latestSnapshotAt: string | null = null;
-    try {
-      const snapshots = listLatestLocalVisibilitySnapshots(workspaceId);
-      for (const s of snapshots) {
-        if (!latestSnapshotAt || s.capturedAt > latestSnapshotAt) latestSnapshotAt = s.capturedAt;
-      }
-    } catch (err) {
-      log.debug({ err, workspaceId }, 'latest snapshot lookup failed; leaving null');
+    for (const s of latestSnapshots) {
+      if (!latestSnapshotAt || s.capturedAt > latestSnapshotAt) latestSnapshotAt = s.capturedAt;
     }
 
     // SEO Gen-Quality P7.1 — surface the local service-gap + competitor-brand readers (the
     // local_service_gap / local_visibility rec spines) so AdminChat can reason about them. Each
     // read is best-effort: a failure degrades to an empty list, never blocking the slice.
-    let serviceGaps: LocalSeoSlice['serviceGaps'] = [];
-    try {
-      serviceGaps = getLocalSeoServiceGaps(workspaceId).map(g => ({
-        serviceId: g.serviceId,
-        serviceLabel: g.serviceLabel,
-        starterKeywords: g.starterKeywords,
-      }));
-    } catch (err) {
-      log.debug({ err, workspaceId }, 'service gaps unavailable for local SEO slice; leaving empty');
-    }
-    let competitorBrands: LocalSeoSlice['competitorBrands'] = [];
-    try {
-      competitorBrands = getLocalSeoCompetitorBrands(workspaceId).map(c => ({
-        title: c.title,
-        domain: c.domain,
-        totalAppearances: c.totalAppearances,
-        winsAgainstClient: c.winsAgainstClient,
-        markets: c.markets,
-      }));
-    } catch (err) {
-      log.debug({ err, workspaceId }, 'competitor brands unavailable for local SEO slice; leaving empty');
-    }
+    const serviceGaps: LocalSeoSlice['serviceGaps'] = rawServiceGaps.map(g => ({
+      serviceId: g.serviceId,
+      serviceLabel: g.serviceLabel,
+      starterKeywords: g.starterKeywords,
+    }));
+    const competitorBrands: LocalSeoSlice['competitorBrands'] = rawCompetitorBrands.map(c => ({
+      title: c.title,
+      domain: c.domain,
+      totalAppearances: c.totalAppearances,
+      winsAgainstClient: c.winsAgainstClient,
+      markets: c.markets,
+    }));
 
     // SEO Decision Engine P7 (GBP + reviews) — aggregates-only review/GBP summary so AdminChat +
     // AI context can reason about the client's listing vs the strongest local competitor. Best-effort:

@@ -13,8 +13,8 @@ import { getPagesNeedingAnalysis, isSuspiciousPlannerGroupedVolume, STRATEGY_CON
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 import type { KeywordCandidate } from '../shared/types/keyword-universe.js';
+import type { WorkspaceIntelligence } from '../shared/types/intelligence.js';
 import { callKeywordStrategyAI, callNamedStrategyAI } from './keyword-strategy-synthesis/ai-callers.js';
-import { assembleSynthesisContext } from './keyword-strategy-synthesis/context.js';
 import { validatePageMappingsWithProvider } from './keyword-strategy-synthesis/provider-validation.js';
 import {
   buildKeywordPoolSection,
@@ -76,6 +76,27 @@ export type {
 } from './keyword-strategy-synthesis/types.js';
 
 const log = createLogger('keyword-strategy:synthesis');
+
+function synthesisModulePath(name: string): string {
+  return `./keyword-strategy-synthesis/${name}.js`;
+}
+
+const synthesisContextModule = synthesisModulePath('context');
+
+interface SynthesisContextModule {
+  assembleSynthesisContext(options: {
+    ws: Workspace;
+    businessContext: string;
+  }): Promise<{
+    businessSection: string;
+    strategyIntel: WorkspaceIntelligence;
+    declinedKeywords: string[];
+    requestedKeywords: string[];
+    approvedKeywords: string[];
+    includeLocalUniverse: boolean;
+    keywordEvaluationContext: KeywordEvaluationContext;
+  }>;
+}
 
 export interface SynthesizeKeywordStrategyOptions {
   ws: Workspace;
@@ -139,6 +160,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
   // Keyword pool — declared outside try so enrichment code can access it after batching
   const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
 
+  const { assembleSynthesisContext } = await import(synthesisContextModule) as SynthesisContextModule; // dynamic-import-ok - context reads workspace intelligence; keep it off the synthesis facade's static import path.
   const {
     businessSection,
     strategyIntel,
