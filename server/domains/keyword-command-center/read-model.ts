@@ -20,8 +20,8 @@ import {
   computeKeywordValueComponents,
   keywordValueReasons,
 } from '../../scoring/keyword-value-score.js';
+import { buildKeywordValueScoringContext } from '../../scoring/keyword-value-context.js';
 import { keywordDollarValue } from '../../scoring/keyword-value-money.js';
-import { getLocalSeoPosture, listLocalSeoMarkets } from '../../local-seo.js';
 import {
   KEYWORD_UNIVERSE_FULL_FLAG,
   RAW_EVIDENCE_ROW_LIMIT,
@@ -71,12 +71,7 @@ const log = createLogger('keyword-command-center');
 export function buildValueScoringConfig(workspace: Workspace): ValueScoringConfig {
   return {
     on: true,
-    ctx: {
-      posture: getLocalSeoPosture(workspace.id),
-      markets: listLocalSeoMarkets(workspace.id),
-      city: workspace.businessProfile?.address?.city?.toLowerCase(),
-      state: workspace.businessProfile?.address?.state?.toLowerCase(),
-    },
+    ctx: buildKeywordValueScoringContext(workspace),
   };
 }
 

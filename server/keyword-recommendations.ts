@@ -12,6 +12,7 @@ import { getQueryPageData } from './search-console.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { buildKeywordValueScoringContext, computeKeywordValueScoreWithFallback } from './scoring/keyword-value-context.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { checkKeywordCannibalization, type CannibalizationConflict } from './cannibalization-detection.js';
 import { createLogger } from './logger.js';
@@ -24,6 +25,7 @@ import type {
 } from '../shared/types/content.ts';
 import type { ClientSignalsSlice, LearningsSlice, SeoContextSlice } from '../shared/types/intelligence.ts';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
+import type { ScoringContext } from './scoring/keyword-value-score.js';
 import { sanitizeQueryForPrompt, stripCodeFences } from './utils/text.js';
 import {
   evaluateKeywordCandidate,
@@ -72,6 +74,7 @@ interface CandidateScoringContext {
   excludedConflictIdentifiers: string[];
   workspaceId: string;
   businessTerms: string[];
+  valueScoring?: ScoringContext;
 }
 
 function getStrongestConflictSeverity(conflicts: CannibalizationConflict[]): ConflictSeverity | null {
@@ -118,6 +121,7 @@ function buildScoringContext(
   learnings: LearningsSlice | undefined,
   clientSignals: ClientSignalsSlice | undefined,
   excludedConflictIdentifiers: string[],
+  valueScoring?: ScoringContext,
 ): CandidateScoringContext {
   return {
     workspaceId,
@@ -142,6 +146,7 @@ function buildScoringContext(
       ...(clientSignals?.effectiveBusinessPriorities ?? []),
       ...(clientSignals?.recentChatTopics ?? []),
     ],
+    valueScoring,
   };
 }
 
@@ -167,7 +172,12 @@ function dedupeCandidates(candidates: KeywordCandidate[]): KeywordCandidate[] {
 function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScoringContext): ScoredCandidate | null {
   if (!shouldIncludeKeywordCandidate(candidate.source, candidate.volume)) return null;
 
-  let score = opportunityScore(candidate.volume, candidate.difficulty, candidate.cpc);
+  let score = computeKeywordValueScoreWithFallback({
+    keyword: candidate.keyword,
+    volume: candidate.volume,
+    difficulty: candidate.difficulty,
+    cpc: candidate.cpc,
+  }, ctx.valueScoring, opportunityScore(candidate.volume, candidate.difficulty, candidate.cpc));
   const reasons: string[] = [];
   const penaltyReasons: string[] = [];
   const fitSignals: string[] = [];
@@ -372,6 +382,7 @@ export async function getKeywordRecommendations(
     learnings,
     clientSignals,
     [...(options.excludeConflictIdentifiers ?? [])],
+    ws ? buildKeywordValueScoringContext(ws) : undefined,
   );
   const outcomeLearningStatusNote = buildOutcomeLearningStatusNote(
     recommendationContext?.learningsAvailability,
