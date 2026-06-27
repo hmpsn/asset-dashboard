@@ -15,6 +15,7 @@ import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
 import type { SchemaDeliveryDecision } from '../../../shared/types/schema-generation';
 import type { SchemaPageSuggestion, SchemaSuggestion } from './schemaSuggesterTypes';
+import { SCHEMA_PAGE_TYPE_OPTIONS } from './schemaPageTypeOptions';
 import {
   ExistingSchemasSection,
   GenerationDiagnosticsSection,
@@ -139,33 +140,7 @@ export function SchemaPageCard({
             value={pageType}
             onChange={value => onPageTypeChange(page.pageId, value)}
             onClick={e => e.stopPropagation()}
-            options={[
-              { value: 'auto', label: 'Auto-detect' },
-              { value: 'homepage', label: 'Homepage' },
-              { value: 'pillar', label: 'Pillar / Product Page' },
-              { value: 'service', label: 'Service Page' },
-              { value: 'audience', label: 'Audience / Use Case' },
-              { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
-              { value: 'blog', label: 'Blog Post' },
-              { value: 'about', label: 'About / Team' },
-              { value: 'contact', label: 'Contact' },
-              { value: 'location', label: 'Location' },
-              { value: 'product', label: 'Product' },
-              { value: 'partnership', label: 'Partnership' },
-              { value: 'faq', label: 'FAQ' },
-              { value: 'case-study', label: 'Case Study' },
-              { value: 'comparison', label: 'Comparison' },
-              { value: 'author', label: 'Author Profile' },
-              { value: 'howto', label: 'How-To / Tutorial' },
-              { value: 'video', label: 'Video Page' },
-              { value: 'job-posting', label: 'Job Posting' },
-              { value: 'course', label: 'Course / Training' },
-              { value: 'event', label: 'Event' },
-              { value: 'review', label: 'Review' },
-              { value: 'pricing', label: 'Pricing Page' },
-              { value: 'recipe', label: 'Recipe' },
-              { value: 'generic', label: 'General Page' },
-            ]}
+            options={SCHEMA_PAGE_TYPE_OPTIONS}
             className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
             title="Page type hint for schema generation"
           />

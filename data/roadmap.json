@@ -311,7 +311,7 @@
           "priority": "P3",
           "status": "pending",
           "createdAt": "2026-06-11",
-          "notes": "Incl. setup-hero flash, Workflow Guide dead ends, header action row layout, sub-tab bar → TabBar, page-type triplication, vocabulary/token drift, dead context fields. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3. Framing is correct. Highest-value sub-items: adopt TabBar for the sub-tab bar (fixes a11y + ?tab= deep-link contract in one move) and consolidate the triplicated page-type option lists into the single SCHEMA_PAGE_TYPE_OPTIONS source (kills a known drift hazard and aligns with the schema-context intelligence-slice rules). Delete the dead SchemaContext fields in the same PR."
+          "notes": "Incl. setup-hero flash, Workflow Guide dead ends, header action row layout, sub-tab bar → TabBar, page-type triplication, vocabulary/token drift, dead context fields. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3. Framing is correct. Highest-value sub-items: adopt TabBar for the sub-tab bar (fixes a11y + ?tab= deep-link contract in one move) and consolidate the triplicated page-type option lists into the single SCHEMA_PAGE_TYPE_OPTIONS source (kills a known drift hazard and aligns with the schema-context intelligence-slice rules). Delete the dead SchemaContext fields in the same PR. || PARTIAL 2026-06-27: converted SchemaSuggester to PageHeader + TabBar with ?tab=guide receiver support, consolidated SchemaPageCard/initial picker/site-plan role controls onto the shared schema page-type option source, and removed dead SchemaContext prompt-only fields (businessContext/searchIntent/knowledgeBase/_personasBlock) from schema generation while keeping schema-plan businessContext behavior intact. Remaining delta: re-audit setup-hero flash, Workflow Guide dead ends, and broader vocabulary/token drift with screenshots."
         },
         {
           "id": "awp-content-sweep",
@@ -340,9 +340,10 @@
           "source": "Deferred from awp-shell-sweep on 2026-06-27",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-27",
-          "notes": "Follow-up from the admin shell polish sweep. Convert SchemaSuggester's local schemaSubTab/header shell to the canonical PageHeader + TabBar pattern without changing scan/generator/guide/publish behavior. Because this is visual shell work around a complex page with extracted generation/CMS/publishing workflows, do it as a focused UI PR with screenshots at desktop and narrow widths, plus existing SchemaSuggester workflow tests. Preserve literal tab ordering, guide/generator behavior, fixContext auto-generation, and bulk publish controls."
+          "shippedAt": "2026-06-27",
+          "notes": "Follow-up from the admin shell polish sweep. Convert SchemaSuggester's local schemaSubTab/header shell to the canonical PageHeader + TabBar pattern without changing scan/generator/guide/publish behavior. Because this is visual shell work around a complex page with extracted generation/CMS/publishing workflows, do it as a focused UI PR with screenshots at desktop and narrow widths, plus existing SchemaSuggester workflow tests. Preserve literal tab ordering, guide/generator behavior, fixContext auto-generation, and bulk publish controls. || DONE 2026-06-27: SchemaSuggester now uses shared PageHeader + TabBar, supports direct ?tab=guide links, keeps generator/guide ordering and workflow behavior, and has component/source-contract coverage for the shell boundary. This PR also completed the adjacent page-type option consolidation and dead SchemaContext field cleanup from awp-schema-sweep."
         }
       ]
     },
