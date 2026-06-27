@@ -50,9 +50,29 @@ export type VerificationGovernanceReport = {
   pass: boolean;
 };
 
-export const DELETED_VERIFICATION_REFERENCES = [
+export const DELETED_SCRIPT_REFERENCES = [
   'scripts/verify-styleguide-parity.ts',
   'verify-styleguide-parity.ts',
+  'scripts/codemods/phase5-buttons.ts',
+  'phase5-buttons.ts',
+  'scripts/codemods/phase5-forms.ts',
+  'phase5-forms.ts',
+  'scripts/codemods/phase5-icons.ts',
+  'phase5-icons.ts',
+  'scripts/codemods/phase5-layout.ts',
+  'phase5-layout.ts',
+  'scripts/codemods/phase5-overlays.ts',
+  'phase5-overlays.ts',
+  'scripts/codemods/phase5-typography.ts',
+  'phase5-typography.ts',
+  'scripts/diagnose-h1.ts',
+  'diagnose-h1.ts',
+  'scripts/poc-lean-schema.ts',
+  'poc-lean-schema.ts',
+  'scripts/sync-staging-data.sh',
+  'sync-staging-data.sh',
+  'scripts/validate-endpoints-precise.js',
+  'validate-endpoints-precise.js',
 ] as const;
 
 export const VERIFICATION_GOVERNANCE_REGISTRY = {
@@ -258,8 +278,8 @@ export function buildVerificationGovernanceReport(
     .filter(scriptName => workflowRunsScript(workflowSources, scriptName));
 
   const deletedReferenceMatches: DeletedReferenceMatch[] = [];
-  for (const file of activeDocSources) {
-    for (const reference of DELETED_VERIFICATION_REFERENCES) {
+  for (const file of [...activeDocSources, ...workflowSources]) {
+    for (const reference of DELETED_SCRIPT_REFERENCES) {
       if (file.source.includes(reference)) {
         deletedReferenceMatches.push({ path: file.path, reference });
       }
