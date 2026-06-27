@@ -1139,6 +1139,17 @@
           "shippedAt": "2026-06-26"
         },
         {
+          "id": "simp-delta-0627-recommendation-producer-family-split",
+          "title": "Split recommendation generation producers by family",
+          "source": "Deferred from simp-audit-0624-god-module-decompose",
+          "est": "S",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-06-27",
+          "shippedAt": "2026-06-27",
+          "notes": "DONE 2026-06-27: split server/domains/recommendations/generation-producers.ts into producer-family modules for audit, strategy/orphan, local visibility, and maintenance/diagnostic/freshness producers, plus shared producer contexts. Kept generation-producers.ts as the compatibility barrel so generation-service imports and public recommendation behavior remain unchanged. Updated the recommendation domain boundary contract to assert the new family ownership. Circular-dependency ratchet stayed at server 28/28 and largest component 37/37."
+        },
+        {
           "id": "simp-audit-0624-import-cycle-scc-review",
           "title": "Review import-cycle SCC map after decomposition sprint",
           "source": "Side audit 2026-06-26",

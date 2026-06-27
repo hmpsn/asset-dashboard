@@ -170,6 +170,9 @@ describe('recommendations domain boundary', () => {
   it('keeps read-only recommendation producer stages outside the facade', () => {
     const facade = readRepoFile('server/recommendations.ts');
     const producers = readRepoFile('server/domains/recommendations/generation-producers.ts');
+    const strategyProducers = readRepoFile('server/domains/recommendations/strategy-producers.ts');
+    const maintenanceProducers = readRepoFile('server/domains/recommendations/maintenance-producers.ts');
+    const localVisibilityProducers = readRepoFile('server/domains/recommendations/local-visibility-producers.ts');
     const generation = readRepoFile('server/domains/recommendations/generation-service.ts');
 
     for (const helper of [
@@ -181,20 +184,20 @@ describe('recommendations domain boundary', () => {
       'appendFreshnessRecommendations',
       'appendLocalVisibilityRecommendations',
     ]) {
-      expect(producers).toMatch(new RegExp(`function ${helper}\\b`));
+      expect(producers).toContain(helper);
       expect(generation).toContain(helper);
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
     }
 
     expect(generation).toContain("from './generation-producers.js'");
-    expect(producers).toContain('Keyword gaps unavailable for recommendations');
+    expect(strategyProducers).toContain('Keyword gaps unavailable for recommendations');
     expect(facade).not.toContain('Keyword gaps unavailable for recommendations');
-    expect(producers).toContain("failedCategories.add('cannibalization')");
-    expect(producers).toContain('Content decay data unavailable for recommendations');
+    expect(strategyProducers).toContain("failedCategories.add('cannibalization')");
+    expect(maintenanceProducers).toContain('Content decay data unavailable for recommendations');
     expect(facade).not.toContain('Content decay data unavailable for recommendations');
-    expect(producers).toContain("failedCategories.add('insight:freshness_alert')");
-    expect(producers).toContain('Local service gaps unavailable for recommendations');
-    expect(producers).toContain('GBP + reviews listings unavailable for recommendations');
+    expect(maintenanceProducers).toContain("failedCategories.add('insight:freshness_alert')");
+    expect(localVisibilityProducers).toContain('Local service gaps unavailable for recommendations');
+    expect(localVisibilityProducers).toContain('GBP + reviews listings unavailable for recommendations');
     expect(facade).not.toContain('Local service gaps unavailable for recommendations');
     expect(facade).not.toContain('GBP + reviews listings unavailable for recommendations');
   });
