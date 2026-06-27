@@ -374,6 +374,12 @@ describe('TabBar', () => {
     const { container } = render(<TabBar tabs={tabs} active="overview" onChange={vi.fn()} className="my-tabs" />);
     expect((container.firstChild as HTMLElement).className).toContain('my-tabs');
   });
+
+  it('keeps narrow tab bars scroll-safe instead of clipping labels', () => {
+    const { container } = render(<TabBar tabs={tabs} active="overview" onChange={vi.fn()} />);
+    expect((container.firstChild as HTMLElement).className).toContain('overflow-x-auto');
+    expect(screen.getByRole('tab', { name: 'Overview' }).className).toContain('shrink-0');
+  });
 });
 
 // ─── DataList ─────────────────────────────────────────────────────────────────
@@ -534,6 +540,14 @@ describe('WorkflowStepper', () => {
     const connectors = container.querySelectorAll('.h-px');
     // 3 steps → 2 connectors
     expect(connectors.length).toBe(2);
+  });
+
+  it('uses a vertical narrow layout before switching to the horizontal desktop stepper', () => {
+    const { container } = render(<WorkflowStepper steps={steps} compact />);
+    const list = container.querySelector('ol');
+    expect(list?.className).toContain('flex-col');
+    expect(list?.className).toContain('sm:flex-row');
+    expect(screen.getByText('Configure').className).toContain('sm:whitespace-nowrap');
   });
 });
 

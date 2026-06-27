@@ -53,4 +53,13 @@ describe('BulkPublishPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /publish all/i }));
     expect(onPublishAll).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps bulk actions stackable at constrained widths', () => {
+    render(<BulkPublishPanel {...baseProps} graphValidation={graph('errors')} />);
+
+    expect(screen.getByText(/site graph errors/i).closest('div[class*="w-full"]')?.className).toContain('w-full');
+    expect(screen.getByRole('button', { name: /publish all/i }).className).toContain('max-sm:w-full');
+    expect(screen.getByRole('button', { name: /send to client/i }).className).toContain('max-sm:w-full');
+    expect(screen.getByPlaceholderText(/add a note for your client/i).className).toContain('sm:w-56');
+  });
 });
