@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SeoEditor } from './SeoEditor';
 import { CmsEditor } from './CmsEditor';
 import { PendingApprovals } from './PendingApprovals';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { useCmsEditor, useSeoEditor } from '../hooks/admin';
 import { pageEditStatesKey } from '../hooks/usePageEditStates';
 import { resolveSeoEditorWriteTargets } from './editor/seoWriteTargetResolver';

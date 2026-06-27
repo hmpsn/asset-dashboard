@@ -14,19 +14,9 @@ import type {
   MatrixDimension,
 } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
-import { PAGE_TYPE_SCHEMA_MAP, type SchemaPageType } from './schema-suggester.js';
 import { queueSchemaPreGeneration, markSchemaStale } from './schema-queue.js';
 import { validateTransition, MATRIX_CELL_TRANSITIONS } from './state-machines.js';
-
-/**
- * Resolve the combined primary + secondary Schema.org types for a template's pageType.
- * Used by D2 (template→schema binding) and downstream D7 (pre-generation).
- */
-export function getSchemaTypesForTemplate(templatePageType: string): string[] {
-  const mapped = PAGE_TYPE_SCHEMA_MAP[templatePageType as SchemaPageType];
-  if (!mapped) return [];
-  return [...mapped.primary, ...mapped.secondary];
-}
+export { getSchemaTypesForTemplate } from './schema/template-schema-types.js';
 
 const log = createLogger('content-matrices');
 

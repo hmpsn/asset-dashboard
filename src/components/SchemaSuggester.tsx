@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { put } from '../api/client';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus,

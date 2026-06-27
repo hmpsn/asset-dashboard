@@ -3,7 +3,7 @@ import type { Workspace } from '../../shared/types/workspace.js';
 import type { KeywordEvaluationContext } from '../keyword-intelligence/index.js';
 import { buildStrategyKeywordEvaluationContext } from '../keyword-strategy-context.js';
 import { getRequestedKeywords, getDeclinedKeywords } from '../keyword-feedback.js';
-import { getLocalSeoPosture } from '../local-seo.js';
+import { getLocalSeoPosture } from '../domains/local-seo/configuration-service.js';
 import { createLogger } from '../logger.js';
 import { buildOutcomeLearningStatusNote } from '../outcome-learning-default-path.js';
 import {

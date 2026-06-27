@@ -7,10 +7,8 @@ import {
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
-import {
-  countLocalSeoKeywordCandidates,
-  getPrimaryMarketLocationCode,
-} from '../../local-seo.js';
+import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
+import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
 import { isFeatureEnabled } from '../../feature-flags.js';
 import {

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { seoSuggestions } from '../api/seo';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { queryKeys } from '../lib/queryKeys';

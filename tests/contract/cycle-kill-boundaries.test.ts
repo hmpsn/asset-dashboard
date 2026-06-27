@@ -64,4 +64,73 @@ describe('cycle-kill boundary contracts', () => {
     expect(backingQueueSource).toContain("from '../cockpitTypes'");
     expect(strategyCockpitSource).toContain("export type { CockpitActions } from './cockpitTypes'");
   });
+
+  it('keeps admin fix context on a leaf type module instead of App.tsx', () => {
+    const appSource = readSource('src/App.tsx');
+    const fixContextSource = readSource('src/types/fix-context.ts');
+    const consumers = [
+      'src/components/ContentBriefs.tsx',
+      'src/components/ContentPipeline.tsx',
+      'src/components/PageIntelligence.tsx',
+      'src/components/SchemaSuggester.tsx',
+      'src/components/SeoEditor.tsx',
+      'src/components/SeoEditorWrapper.tsx',
+      'src/components/editor/useSeoEditorSessionState.ts',
+    ];
+
+    expect(fixContextSource).toContain('export interface FixContext');
+    expect(appSource).not.toContain('export interface FixContext');
+    expect(appSource).toContain("from './types/fix-context'");
+    for (const file of consumers) {
+      const source = readSource(file);
+      expect(source).toContain('types/fix-context');
+      expect(source).not.toMatch(/from ['"](?:\.\.\/)+App['"]/);
+    }
+  });
+
+  it('keeps cycle-sensitive local SEO consumers off the broad facade', () => {
+    const consumers = [
+      'server/keyword-strategy-ai-synthesis.ts',
+      'server/keyword-strategy-universe.ts',
+      'server/keyword-strategy-synthesis/context.ts',
+      'server/intelligence/seo-context-slice.ts',
+      'server/domains/keyword-command-center/source-snapshot.ts',
+      'server/domains/keyword-command-center/detail-service.ts',
+      'server/domains/keyword-command-center/rows-service.ts',
+      'server/domains/keyword-command-center/summary-service.ts',
+    ];
+
+    for (const file of consumers) {
+      const source = readSource(file);
+      expect(source).not.toMatch(/from ['"](?:\.\.?\/)+local-seo\.js['"]/);
+    }
+  });
+
+  it('keeps schema template type resolution in a schema leaf utility', () => {
+    const templateTypes = readSource('server/schema/template-schema-types.ts');
+    const matrices = readSource('server/content-matrices.ts');
+    const templates = readSource('server/content-templates.ts');
+    const queue = readSource('server/schema-queue.ts');
+
+    expect(templateTypes).toContain('export function getSchemaTypesForTemplate');
+    expect(templateTypes).toContain("from './role-type-registry.js'");
+    expect(matrices).not.toContain("from './schema-suggester.js'");
+    expect(matrices).toContain("export { getSchemaTypesForTemplate } from './schema/template-schema-types.js'");
+    expect(templates).toContain("from './schema/template-schema-types.js'");
+    expect(queue).toContain("from './schema/template-schema-types.js'");
+  });
+
+  it('keeps CWV helper modules off the SEO audit orchestrator for types', () => {
+    const cwvTypes = readSource('server/seo-audit-cwv-types.ts');
+    const cwv = readSource('server/seo-audit-cwv.ts');
+    const siteChecks = readSource('server/seo-audit-site-checks.ts');
+    const audit = readSource('server/seo-audit.ts');
+
+    expect(cwvTypes).toContain('export interface CwvSummary');
+    expect(cwv).toContain("from './seo-audit-cwv-types.js'");
+    expect(siteChecks).toContain("from './seo-audit-cwv-types.js'");
+    expect(cwv).not.toContain("from './seo-audit.js'");
+    expect(siteChecks).not.toContain("from './seo-audit.js'");
+    expect(audit).toContain("export type { CwvMetricSummary, CwvStrategyResult, CwvSummary } from './seo-audit-cwv-types.js'");
+  });
 });

@@ -2,10 +2,8 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import type { KeywordCommandCenterDetailResponse } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking.js';
-import {
-  buildLocalSeoKeywordVisibilityForKeyword,
-  listLocalSeoMarkets,
-} from '../../local-seo.js';
+import { listLocalSeoMarkets } from '../local-seo/configuration-service.js';
+import { buildLocalSeoKeywordVisibilityForKeyword } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from '../../outcome-tracking.js';
 import {
