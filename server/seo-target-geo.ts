@@ -1,5 +1,5 @@
 import { isFeatureEnabled } from './feature-flags.js';
-import { resolveWorkspaceTargetGeo } from './local-seo.js';
+import { resolveWorkspaceTargetGeo } from './domains/local-seo/configuration-service.js';
 
 /**
  * Provider geo params (`location_code` / `language_code`) for a workspace's

@@ -39,6 +39,7 @@ import {
   loadRecommendations,
 } from '../../server/recommendations.js';
 import * as localSeoModule from '../../server/local-seo.js';
+import * as localSeoIntelligenceReadModel from '../../server/domains/local-seo/intelligence-read-model.js';
 import { computeOpportunityValue } from '../../server/scoring/opportunity-value.js';
 import { ACTION_TYPE_LABELS } from '../../src/components/admin/outcomes/outcomeConstants.js';
 import { LOCAL_SEO_POSTURE, LOCAL_SEO_VISIBILITY_POSTURE } from '../../shared/types/local-seo.js';
@@ -145,6 +146,16 @@ function installLocalSpies(opts: {
   vi.spyOn(localSeoModule, 'listLocalSeoMarkets').mockReturnValue([
     { id: 'market-austin', workspaceId: 'x', label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', source: 'admin_override', status: 'active', isPrimary: true, createdAt: '', updatedAt: '' } as never,
   ]);
+  vi.spyOn(localSeoIntelligenceReadModel, 'loadLocalSeoIntelligenceInputs').mockResolvedValue({
+    markets: [
+      { id: 'market-austin', workspaceId: 'x', label: 'Austin, TX', city: 'Austin', stateOrRegion: 'TX', country: 'US', source: 'admin_override', status: 'active', isPrimary: true, createdAt: '', updatedAt: '' } as never,
+    ],
+    candidates: [],
+    visibilityByKey: opts.summaries ?? visibilitySummaries(),
+    latestSnapshots: [],
+    serviceGaps: opts.gaps ?? serviceGaps(),
+    competitorBrands: opts.brands ?? competitorBrands(),
+  });
 }
 
 function cleanupRecs(workspaceId: string): void {
