@@ -185,7 +185,7 @@ export async function runSchemaPlanGenerationJob(
       workspaceId: workspace.id,
       siteUrl: schemaIntel?.baseUrl ?? (ctx.liveDomain ? `https://${ctx.liveDomain}` : ''),
       companyName: ctx.companyName,
-      businessContext: ctx.businessContext,
+      businessContext: schemaIntel?.seoContext?.businessContext,
       strategy: schemaIntel?.seoContext?.strategy,
       architectureResult,
       competitorDomains: workspace.competitorDomains,

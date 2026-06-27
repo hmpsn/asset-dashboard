@@ -3,7 +3,6 @@ import { createLogger } from '../logger.js';
 import { getWorkspaceBySiteId } from '../workspaces.js';
 import { getDeclinedKeywords } from '../keyword-feedback.js';
 import { listSites } from '../webflow-pages.js';
-import { formatPersonasForPrompt } from '../intelligence/persona-format.js';
 import { buildSchemaIntelligence } from '../schema-intelligence.js';
 
 const log = createLogger('schema-context-builder');
@@ -57,7 +56,6 @@ export async function buildSchemaContext(
         ctx.siteKeywords = rawSiteKeywords;
       }
     }
-    ctx.businessContext = schemaIntel?.seoContext?.businessContext;
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
@@ -68,12 +66,6 @@ export async function buildSchemaContext(
       const matched = sites.find(s => s.id === siteId);
       if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
-
-    const rawKB = schemaIntel?.seoContext?.knowledgeBase ?? '';
-    if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
-
-    const personasBlock = formatPersonasForPrompt(schemaIntel?.seoContext?.personas);
-    if (personasBlock) ctx._personasBlock = personasBlock;
 
     const profile = schemaIntel?.seoContext?.businessProfile;
     if (profile) {

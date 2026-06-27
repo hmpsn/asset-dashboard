@@ -303,16 +303,12 @@ export interface SchemaContext {
   companyName?: string;
   liveDomain?: string;
   logoUrl?: string;
-  businessContext?: string;
   pageKeywords?: { primary: string; secondary: string[] };
-  searchIntent?: string;
   siteKeywords?: string[];
   workspaceId?: string;
-  knowledgeBase?: string;
   pageType?: SchemaPageType;
   _siteId?: string;  // Internal: passed through for site template storage
   _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
-  _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
   _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
