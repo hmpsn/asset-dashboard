@@ -4,6 +4,7 @@ export type PageEditStatus = 'clean' | 'issue-detected' | 'fix-proposed' | 'in-r
 export type StatusBadgeDomain =
   | 'page-edit'
   | 'content'
+  | 'content-admin'
   | 'approval'
   | 'client-action'
   | 'request'
@@ -60,6 +61,24 @@ export const STATUS_BADGE_REGISTRY: Record<StatusBadgeDomain, Record<string, Sta
     approved: { label: 'Approved', tone: 'emerald' },
     delivered: { label: 'Delivered', tone: 'emerald' },
     published: { label: 'Published', tone: 'emerald' },
+    failed: { label: 'Failed', tone: 'red' },
+    cancelled: { label: 'Cancelled', tone: 'zinc' },
+  },
+  'content-admin': {
+    draft: { label: 'Draft', tone: 'zinc' },
+    generating: { label: 'Generating...', tone: 'amber' },
+    pending_payment: { label: 'Awaiting Payment', tone: 'amber' },
+    requested: { label: 'Awaiting Review', tone: 'amber' },
+    brief_generated: { label: 'Brief Ready', tone: 'blue' },
+    client_review: { label: 'Client Review', tone: 'teal' },
+    approved: { label: 'Approved', tone: 'emerald' },
+    changes_requested: { label: 'Changes Requested', tone: 'orange' },
+    in_progress: { label: 'In Progress', tone: 'amber' },
+    post_review: { label: 'Post Review', tone: 'teal' },
+    delivered: { label: 'Delivered', tone: 'emerald' },
+    published: { label: 'Published', tone: 'emerald' },
+    declined: { label: 'Declined', tone: 'zinc' },
+    review: { label: 'In Review', tone: 'teal' },
     failed: { label: 'Failed', tone: 'red' },
     cancelled: { label: 'Cancelled', tone: 'zinc' },
   },

@@ -5,7 +5,7 @@ import {
   Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { SectionCard, Icon, Button, FormInput, FormSelect, FormTextarea } from '../ui';
+import { SectionCard, Icon, Button, FormInput, FormSelect, FormTextarea, StatusBadge } from '../ui';
 import {
   CONTENT_GENERATION_STYLE_OPTIONS,
   type ContentBrief,
@@ -117,21 +117,20 @@ export function RequestList({
     >
       <div className="space-y-2">
         {clientRequests.map(req => {
-          const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
-            pending_payment: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Payment' },
-            requested: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Review' },
-            brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
-            client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
-            approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved' },
-            changes_requested: { icon: Clock, color: 'text-accent-orange', label: 'Changes Requested' },
-            in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
-            post_review: { icon: Eye, color: 'text-cyan-400', label: 'Client Review' },
-            delivered: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Delivered' },
-            published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
-            declined: { icon: XCircle, color: 'text-[var(--brand-text-muted)]', label: 'Declined' },
+          const statusIcons: Record<string, typeof Clock> = {
+            pending_payment: Clock,
+            requested: Clock,
+            brief_generated: FileText,
+            client_review: Clock,
+            approved: CheckCircle2,
+            changes_requested: Clock,
+            in_progress: Zap,
+            post_review: Eye,
+            delivered: CheckCircle2,
+            published: CheckCircle2,
+            declined: XCircle,
           };
-          const sc = statusConfig[req.status] || statusConfig.requested;
-          const StatusIcon = sc.icon;
+          const StatusIcon = statusIcons[req.status] || Clock;
           const isGenerating = generatingBriefFor === req.id;
           const hasBrief = !!req.briefId;
           const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
@@ -154,7 +153,10 @@ export function RequestList({
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                    <span className={`flex items-center gap-1 t-caption-sm ${sc.color}`}><Icon as={StatusIcon} size="sm" /> {sc.label}</span>
+                    <span className="flex items-center gap-1">
+                      <Icon as={StatusIcon} size="sm" className="text-teal-400" />
+                      <StatusBadge status={req.status} domain="content-admin" fallback="neutral" variant="outline" />
+                    </span>
                     <div className="flex items-center gap-1 flex-wrap justify-end">
                       {hasBrief && req.status !== 'requested' && (
                         <Button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} variant="ghost" size="sm" className={`rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-teal-600/30 border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
@@ -184,10 +186,10 @@ export function RequestList({
                         <Button onClick={() => { setSendNoteFor(req.id); setSendNote(''); }} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
                       )}
                       {req.status === 'client_review' && (
-                        <span className="t-caption-sm text-cyan-400/60 italic">Awaiting client feedback</span>
+                        <span className="t-caption-sm text-teal-400/70 italic">Awaiting client feedback</span>
                       )}
                       {req.status === 'post_review' && (
-                        <span className="t-caption-sm text-cyan-400/60 italic">Post sent — awaiting client approval</span>
+                        <span className="t-caption-sm text-teal-400/70 italic">Post sent — awaiting client approval</span>
                       )}
                       {req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);

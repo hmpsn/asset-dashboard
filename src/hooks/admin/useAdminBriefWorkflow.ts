@@ -15,7 +15,10 @@ const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
 type BriefRoute = typeof BRIEF_ROUTES[number];
 
 export type BriefSortField = 'date' | 'keyword' | 'difficulty';
-export type BriefDeleteTarget = { type: 'brief' | 'request'; id: string; label: string };
+export type BriefDeleteTarget =
+  | { type: 'brief'; id: string; label: string; item: ContentBrief; originalIndex: number }
+  | { type: 'request'; id: string; label: string; item: ContentTopicRequest; originalIndex: number };
+export type PendingBriefDelete = Pick<BriefDeleteTarget, 'type' | 'id' | 'label'>;
 export interface BriefWorkflowFixContext {
   targetRoute: string;
   pageId?: string;
@@ -124,6 +127,7 @@ export function useAdminBriefWorkflow({
   const [regenOutlineJobId, setRegenOutlineJobId] = useState<{ jobId: string; briefId: string } | null>(null);
   const [briefSort, setBriefSort] = useState<BriefSortField>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<BriefDeleteTarget | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingBriefDelete | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
@@ -141,8 +145,14 @@ export function useAdminBriefWorkflow({
   const requestsQ = useAdminRequestsList(workspaceId);
   const postsQ = useAdminPostsList(workspaceId);
   const templateCrossrefQ = useAdminBriefTemplateCrossref(workspaceId, deferredKeyword);
-  const briefs = (briefsQ.data ?? []) as ContentBrief[];
-  const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
+  const rawBriefs = (briefsQ.data ?? []) as ContentBrief[];
+  const rawClientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
+  const briefs = pendingDelete?.type === 'brief'
+    ? rawBriefs.filter(brief => brief.id !== pendingDelete.id)
+    : rawBriefs;
+  const clientRequests = pendingDelete?.type === 'request'
+    ? rawClientRequests.filter(request => request.id !== pendingDelete.id)
+    : rawClientRequests;
   const posts = (postsQ.data ?? []) as PostSummary[];
   const templateCrossref = templateCrossrefQ.data ?? null;
   const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
@@ -155,6 +165,7 @@ export function useAdminBriefWorkflow({
   const fixContextRef = useRef<BriefWorkflowFixContext | null | undefined>(null);
   const fixConsumed = useRef(false);
   const autoGenTriggered = useRef(false);
+  const pendingDeleteRef = useRef<(BriefDeleteTarget & { timerId: number }) | null>(null);
 
   const startBriefGenerationJob = async (params: Record<string, unknown>): Promise<string | null> => {
     try {
@@ -313,14 +324,7 @@ export function useAdminBriefWorkflow({
   };
 
   const deleteRequest = async (reqId: string) => {
-    try {
-      await del(`/api/content-requests/${workspaceId}/${reqId}`);
-      queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).filter(r => r.id !== reqId));
-      if (expandedRequest === reqId) setExpandedRequest(null);
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-      toast(err instanceof Error ? err.message : 'Failed to delete request', 'error');
-    }
+    await del(`/api/content-requests/${workspaceId}/${reqId}`);
   };
 
   const copyAsMarkdown = (b: ContentBrief) => {
@@ -395,27 +399,116 @@ export function useAdminBriefWorkflow({
 
   const deleteBrief = async (briefId: string) => {
     await del(`/api/content-briefs/${workspaceId}/${briefId}`);
-    queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).filter(b => b.id !== briefId));
-    if (expanded === briefId) setExpanded(null);
-    setDeleteConfirm(null);
   };
 
   const confirmDeleteBrief = (brief: ContentBrief) => {
-    setDeleteConfirm({ type: 'brief', id: brief.id, label: brief.targetKeyword });
+    if (pendingDeleteRef.current) {
+      toast('Finish or undo the current delete before deleting another item.', 'info');
+      return;
+    }
+    const originalIndex = rawBriefs.findIndex(item => item.id === brief.id);
+    setDeleteConfirm({ type: 'brief', id: brief.id, label: brief.targetKeyword, item: brief, originalIndex: Math.max(originalIndex, 0) });
   };
 
   const confirmDeleteRequest = (req: ContentTopicRequest) => {
-    setDeleteConfirm({ type: 'request', id: req.id, label: req.topic });
+    if (pendingDeleteRef.current) {
+      toast('Finish or undo the current delete before deleting another item.', 'info');
+      return;
+    }
+    const originalIndex = rawClientRequests.findIndex(item => item.id === req.id);
+    setDeleteConfirm({ type: 'request', id: req.id, label: req.topic, item: req, originalIndex: Math.max(originalIndex, 0) });
+  };
+
+  const removeDeletedFromCache = (target: BriefDeleteTarget) => {
+    if (target.type === 'brief') {
+      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).filter(b => b.id !== target.id));
+      if (expanded === target.id) setExpanded(null);
+      return;
+    }
+    queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).filter(r => r.id !== target.id));
+    if (expandedRequest === target.id) setExpandedRequest(null);
+  };
+
+  const restoreDeletedToCache = (target: BriefDeleteTarget) => {
+    if (target.type === 'brief') {
+      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => {
+        const list = old ?? [];
+        if (list.some(b => b.id === target.id)) return list;
+        const next = [...list];
+        next.splice(Math.min(target.originalIndex, next.length), 0, target.item);
+        return next;
+      });
+      return;
+    }
+    queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => {
+      const list = old ?? [];
+      if (list.some(r => r.id === target.id)) return list;
+      const next = [...list];
+      next.splice(Math.min(target.originalIndex, next.length), 0, target.item);
+      return next;
+    });
+  };
+
+  const clearPendingDeleteIfCurrent = (target: BriefDeleteTarget) => {
+    if (pendingDeleteRef.current?.type === target.type && pendingDeleteRef.current.id === target.id) {
+      pendingDeleteRef.current = null;
+      setPendingDelete(null);
+    }
+  };
+
+  const commitDelete = async (target: BriefDeleteTarget) => {
+    try {
+      if (target.type === 'brief') {
+        await deleteBrief(target.id);
+      } else {
+        await deleteRequest(target.id);
+      }
+      removeDeletedFromCache(target);
+      clearPendingDeleteIfCurrent(target);
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      restoreDeletedToCache(target);
+      clearPendingDeleteIfCurrent(target);
+      toast(
+        err instanceof Error
+          ? err.message
+          : `Failed to delete ${target.type === 'brief' ? 'brief' : 'request'}`,
+        'error',
+      );
+    }
   };
 
   const executeDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.type === 'brief') {
-      await deleteBrief(deleteConfirm.id);
-    } else {
-      await deleteRequest(deleteConfirm.id);
+    if (pendingDeleteRef.current) {
+      toast('Finish or undo the current delete before deleting another item.', 'info');
+      setDeleteConfirm(null);
+      return;
     }
+    const target = deleteConfirm;
+    await queryClient.cancelQueries({
+      queryKey: target.type === 'brief'
+        ? queryKeys.admin.briefs(workspaceId)
+        : queryKeys.admin.requests(workspaceId),
+    });
+    removeDeletedFromCache(target);
     setDeleteConfirm(null);
+    const timerId = window.setTimeout(() => {
+      void commitDelete(target);
+    }, 6000);
+    pendingDeleteRef.current = { ...target, timerId };
+    setPendingDelete({ type: target.type, id: target.id, label: target.label });
+    toast(`${target.type === 'brief' ? 'Brief' : 'Request'} deleted. Undo is available for a few seconds.`, 'info');
+  };
+
+  const undoDelete = () => {
+    const pending = pendingDeleteRef.current;
+    if (!pending) return;
+    window.clearTimeout(pending.timerId);
+    restoreDeletedToCache(pending);
+    pendingDeleteRef.current = null;
+    setPendingDelete(null);
+    toast(`${pending.type === 'brief' ? 'Brief' : 'Request'} restored.`);
   };
 
   const closePostEditor = () => {
@@ -545,6 +638,7 @@ export function useAdminBriefWorkflow({
     businessCtx,
     clientRequests,
     deleteConfirm,
+    pendingDelete,
     deliveringReqId,
     deliveryNotes,
     deliveryUrl,
@@ -602,6 +696,7 @@ export function useAdminBriefWorkflow({
     setRefUrls,
     setShowAdvanced,
     toggleRequestBrief,
+    undoDelete,
     updateRequestStatus,
   };
 }
