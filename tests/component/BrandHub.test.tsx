@@ -156,6 +156,7 @@ describe('BrandHub', () => {
     renderBrandHub();
     // TabBar renders tabs with role="tab", not role="button"
     expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /context/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /brandscript/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /discovery/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /voice/i })).toBeInTheDocument();
@@ -165,13 +166,13 @@ describe('BrandHub', () => {
     expect(screen.queryByRole('tab', { name: /locations/i })).not.toBeInTheDocument();
   });
 
-  it('defaults to overview tab showing summary cards and current context sections', async () => {
+  it('defaults to overview tab showing summary cards without editor sections', async () => {
     renderBrandHub();
     expect(screen.getByTestId('brand-overview-tab')).toBeInTheDocument();
-    expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
-    expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
-    expect(screen.getByText('Audience Personas')).toBeInTheDocument();
-    expect(screen.getByText('Page Strategy')).toBeInTheDocument();
+    expect(screen.queryByText('Brand Voice & Style')).not.toBeInTheDocument();
+    expect(screen.queryByText('Knowledge Base')).not.toBeInTheDocument();
+    expect(screen.queryByText('Audience Personas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Page Strategy')).not.toBeInTheDocument();
   });
 
   it('overview tab does NOT render sub-tab stubs', () => {
@@ -181,6 +182,23 @@ describe('BrandHub', () => {
     expect(screen.queryByTestId('voice-tab')).not.toBeInTheDocument();
     expect(screen.queryByTestId('identity-tab')).not.toBeInTheDocument();
     expect(screen.queryByTestId('business-footprint-tab')).not.toBeInTheDocument();
+  });
+
+  it('switches to Context tab and renders editor sections', async () => {
+    renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
+    expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
+    expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
+    expect(screen.getByText('Audience Personas')).toBeInTheDocument();
+    expect(screen.getByText('Page Strategy')).toBeInTheDocument();
+  });
+
+  it('opens directly to Context from ?tab=context deep links', () => {
+    renderBrandHub(undefined, { initialEntries: ['/ws/ws-test/brand?tab=context'] });
+    expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
+    expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
+    expect(screen.getByText('Audience Personas')).toBeInTheDocument();
+    expect(screen.queryByTestId('brand-overview-tab')).not.toBeInTheDocument();
   });
 
   it('switches to Brandscript tab and renders stub', async () => {
@@ -224,16 +242,18 @@ describe('BrandHub', () => {
     expect(screen.getByTestId('business-footprint-tab')).toHaveAttribute('data-legacy-section', 'locations');
   });
 
-  it('switching back to Overview tab restores overview content', () => {
+  it('switching back to Overview tab restores read-only overview content', () => {
     renderBrandHub();
     fireEvent.click(screen.getByRole('tab', { name: /brandscript/i }));
     fireEvent.click(screen.getByRole('tab', { name: /overview/i }));
-    expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
+    expect(screen.getByTestId('brand-overview-tab')).toBeInTheDocument();
+    expect(screen.queryByText('Brand Voice & Style')).not.toBeInTheDocument();
     expect(screen.queryByTestId('brandscript-tab')).not.toBeInTheDocument();
   });
 
   it('populates brand voice textarea once workspace data loads', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(
         screen.getByText('Professional and approachable.')
@@ -243,6 +263,7 @@ describe('BrandHub', () => {
 
   it('shows (configured) badge next to Brand Voice when brandVoice is set', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(screen.getAllByText('(configured)').length).toBeGreaterThan(0);
     });
@@ -250,12 +271,14 @@ describe('BrandHub', () => {
 
   it('renders Save Brand Voice and Generate from Website buttons', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     expect(screen.getByRole('button', { name: /save brand voice/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /generate from website/i }).length).toBeGreaterThan(0);
   });
 
   it('Generate from Website button is disabled when no webflowSiteId', () => {
     renderBrandHub({ workspaceId: 'ws-test', webflowSiteId: undefined });
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     // All "Generate from Website" buttons should be disabled (brand voice + KB + personas)
     const generateButtons = screen.getAllByRole('button', { name: /generate from website/i });
     generateButtons.forEach(btn => {
@@ -265,6 +288,7 @@ describe('BrandHub', () => {
 
   it('Generate from Website button is enabled when webflowSiteId is provided', () => {
     renderBrandHub({ workspaceId: 'ws-test', webflowSiteId: 'site-abc' });
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     const generateButtons = screen.getAllByRole('button', { name: /generate from website/i });
     generateButtons.forEach(btn => {
       expect(btn).not.toBeDisabled();
@@ -274,6 +298,7 @@ describe('BrandHub', () => {
   it('Save Brand Voice calls workspace update mutation', async () => {
     mockUpdate.mockResolvedValue({});
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(screen.getByText('Professional and approachable.')).toBeInTheDocument();
     });
@@ -289,6 +314,7 @@ describe('BrandHub', () => {
   it('shows toast on successful Save Brand Voice', async () => {
     mockUpdate.mockResolvedValue({});
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => screen.getByText('Professional and approachable.'));
     fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
     await waitFor(() => {
@@ -299,6 +325,7 @@ describe('BrandHub', () => {
   it('shows error toast when Save Brand Voice fails', async () => {
     mockUpdate.mockRejectedValueOnce(new Error('Network error'));
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => screen.getByText('Professional and approachable.'));
     fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
     await waitFor(() => {
@@ -308,6 +335,7 @@ describe('BrandHub', () => {
 
   it('shows knowledge base textarea populated from workspace data', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(screen.getByText('We do plumbing and HVAC.')).toBeInTheDocument();
     });
@@ -315,11 +343,13 @@ describe('BrandHub', () => {
 
   it('Audience Personas section shows Manage button when collapsed', () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     expect(screen.getByRole('button', { name: /manage/i })).toBeInTheDocument();
   });
 
   it('clicking Manage opens persona manager with Add Persona button', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => screen.getByRole('button', { name: /manage/i }));
     fireEvent.click(screen.getByRole('button', { name: /manage/i }));
     expect(screen.getByRole('button', { name: /add persona/i })).toBeInTheDocument();
@@ -327,6 +357,7 @@ describe('BrandHub', () => {
 
   it('collapsed personas section shows persona chips when personas exist', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(screen.getByText(/Homeowner Harry/)).toBeInTheDocument();
     });
@@ -335,6 +366,7 @@ describe('BrandHub', () => {
   it('shows "No personas defined" when workspace has no personas', async () => {
     mockGetById.mockResolvedValue({ ...mockWorkspace, personas: [] });
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => {
       expect(
         screen.getByText(/No personas defined — AI will use generic audience targeting/i),
@@ -344,6 +376,7 @@ describe('BrandHub', () => {
 
   it('opening persona manager shows Save Personas button', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => screen.getByRole('button', { name: /manage/i }));
     fireEvent.click(screen.getByRole('button', { name: /manage/i }));
     expect(screen.getByRole('button', { name: /save personas/i })).toBeInTheDocument();
@@ -351,6 +384,7 @@ describe('BrandHub', () => {
 
   it('Add Persona creates a new persona entry in edit mode', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     await waitFor(() => screen.getByRole('button', { name: /manage/i }));
     fireEvent.click(screen.getByRole('button', { name: /manage/i }));
     fireEvent.click(screen.getByRole('button', { name: /add persona/i }));
@@ -358,13 +392,15 @@ describe('BrandHub', () => {
     expect(screen.getAllByDisplayValue('New Persona').length).toBeGreaterThan(0);
   });
 
-  it('renders PageStrategyTab stub on the overview tab', () => {
+  it('renders PageStrategyTab stub on the context tab', () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     expect(screen.getByTestId('page-strategy-tab')).toBeInTheDocument();
   });
 
   it('selecting a blueprint shows BlueprintDetail instead of PageStrategyTab', () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     fireEvent.click(screen.getByText('Select Blueprint'));
     expect(screen.getByTestId('blueprint-detail')).toBeInTheDocument();
     expect(screen.getByTestId('blueprint-version-history')).toBeInTheDocument();
@@ -373,6 +409,7 @@ describe('BrandHub', () => {
 
   it('clicking Back in BlueprintDetail returns to PageStrategyTab', () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     fireEvent.click(screen.getByText('Select Blueprint'));
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByTestId('page-strategy-tab')).toBeInTheDocument();
@@ -387,12 +424,14 @@ describe('BrandHub', () => {
       return undefined;
     });
     renderBrandHub({ workspaceId: 'ws-test', webflowSiteId: 'site-abc' });
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     // The generate button should show the running label
     expect(screen.getAllByText(/Crawling site\.\.\./i).length).toBeGreaterThan(0);
   });
 
-  it('shows informational footer on overview tab', () => {
+  it('shows informational footer on context tab', () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     expect(screen.getByText(/How it works:/i)).toBeInTheDocument();
     expect(
       screen.getByText(/These three sources — brand voice, knowledge base, and personas/i),
@@ -405,11 +444,13 @@ describe('BrandHub', () => {
     renderBrandHub();
     // Should still render the shell without crashing
     expect(screen.getByText('Brand & AI Context')).toBeInTheDocument();
-    expect(screen.getByText('Brand Voice & Style')).toBeInTheDocument();
+    expect(screen.getByTestId('brand-overview-tab')).toBeInTheDocument();
+    expect(screen.queryByText('Brand Voice & Style')).not.toBeInTheDocument();
   });
 
   it('persona count label pluralizes correctly', async () => {
     renderBrandHub();
+    fireEvent.click(screen.getByRole('tab', { name: /context/i }));
     // Wait for ws data to arrive so ws?.personas has 1 entry before clicking Manage
     await waitFor(() => screen.getByText(/Homeowner Harry/));
     fireEvent.click(screen.getByRole('button', { name: /manage/i }));
