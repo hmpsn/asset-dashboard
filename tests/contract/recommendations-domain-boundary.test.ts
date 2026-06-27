@@ -241,6 +241,9 @@ describe('recommendations domain boundary', () => {
     const storage = readRepoFile('server/domains/recommendations/storage.ts');
     const statusService = readRepoFile('server/domains/recommendations/status-service.ts');
     const resolution = readRepoFile('server/domains/recommendations/resolution-service.ts');
+    const routeMutations = readRepoFile('server/domains/recommendations/route-mutations.ts');
+    const routeMutationCompat = readRepoFile('server/recommendation-route-mutations.ts');
+    const recommendationRoutes = readRepoFile('server/routes/recommendations.ts');
 
     expect(storage).toContain('recommendation_items');
     expect(storage).toMatch(/function loadRecommendationSet\b/);
@@ -262,6 +265,14 @@ describe('recommendations domain boundary', () => {
       expect(facade).not.toMatch(new RegExp(`function ${helper}\\b`));
     }
     expect(facade).toContain("from './domains/recommendations/resolution-service.js'");
+    expect(routeMutations).toContain("from './rules.js'");
+    expect(routeMutations).toContain("from './status-service.js'");
+    expect(routeMutations).not.toContain("from './recommendations.js'");
+    expect(routeMutations).not.toContain("from '../../recommendations.js'");
+    expect(routeMutationCompat).toContain("from './domains/recommendations/route-mutations.js'");
+    expect(routeMutationCompat).not.toMatch(/function\s+(applyBulkRecommendationAction|mintCompetitorRecommendation|mintManualRecommendation)\b/);
+    expect(recommendationRoutes).toContain("from '../domains/recommendations/route-mutations.js'");
+    expect(recommendationRoutes).not.toContain("from '../recommendation-route-mutations.js'");
 
     const resolverHelpers = [
       'resolveRecommendationsForChange',

@@ -51,7 +51,7 @@ import {
   applyBulkRecommendationAction,
   mintCompetitorRecommendation,
   mintManualRecommendation,
-} from '../recommendation-route-mutations.js';
+} from '../domains/recommendations/route-mutations.js';
 import {
   buildClientRecommendationResponsesView,
   buildClientRecommendationSetView,
