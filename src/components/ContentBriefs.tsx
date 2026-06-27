@@ -21,6 +21,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     businessCtx,
     clientRequests,
     deleteConfirm,
+    pendingDelete,
     deliveringReqId,
     deliveryNotes,
     deliveryUrl,
@@ -78,6 +79,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     setRefUrls,
     setShowAdvanced,
     toggleRequestBrief,
+    undoDelete,
     updateRequestStatus,
   } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext });
 
@@ -128,7 +130,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
                   <Icon as={AlertTriangle} size="lg" className="text-accent-danger" />
                 </div>
                 <div className="min-w-0">
-                  <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">This action cannot be undone.</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">You can undo this for a few seconds after deleting.</p>
                   <p className="t-caption-sm text-[var(--brand-text)]">
                     <span className="text-[var(--brand-text-bright)] font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
                   </p>
@@ -142,6 +144,20 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
           </>
         )}
       </Modal>
+
+      {pendingDelete && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0" />
+            <span className="t-caption-sm text-[var(--brand-text)] truncate">
+              Deleted <span className="font-medium text-[var(--brand-text-bright)]">&ldquo;{pendingDelete.label}&rdquo;</span>
+            </span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={undoDelete} className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+            Undo
+          </Button>
+        </div>
+      )}
 
       {/* Active Post Editor */}
       {activePostId && (

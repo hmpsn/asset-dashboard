@@ -418,8 +418,7 @@ describe('ContentBriefs', () => {
     const deleteBtn = screen.getByTestId('brief-delete-brief-1');
     await act(async () => { fireEvent.click(deleteBtn); });
     expect(screen.getByText('Delete Brief?')).toBeInTheDocument();
-    // Modal body contains the warning text about the action being irreversible
-    expect(screen.getByText('This action cannot be undone.')).toBeInTheDocument();
+    expect(screen.getByText('You can undo this for a few seconds after deleting.')).toBeInTheDocument();
   });
 
   it('closes delete modal when Cancel is clicked', async () => {
@@ -432,7 +431,8 @@ describe('ContentBriefs', () => {
     expect(screen.queryByText('Delete Brief?')).not.toBeInTheDocument();
   });
 
-  it('calls del API and removes brief when Delete is confirmed', async () => {
+  it('delays deleting a brief so the action can be undone', async () => {
+    vi.useFakeTimers();
     mocks.delFn.mockResolvedValue(undefined);
     renderComponent();
     const deleteBtn = screen.getByTestId('brief-delete-brief-1');
@@ -441,9 +441,16 @@ describe('ContentBriefs', () => {
     const allDeleteBtns = screen.getAllByRole('button', { name: 'Delete' });
     const confirmDeleteBtn = allDeleteBtns[allDeleteBtns.length - 1];
     await act(async () => { fireEvent.click(confirmDeleteBtn); });
+    expect(mocks.delFn).not.toHaveBeenCalled();
+    expect(screen.getByText('Undo')).toBeInTheDocument();
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+      await Promise.resolve();
+    });
     expect(mocks.delFn).toHaveBeenCalledWith(
       expect.stringContaining('/api/content-briefs/ws-1/brief-1')
     );
+    vi.useRealTimers();
   });
 
   // 11. Brief generate flow
