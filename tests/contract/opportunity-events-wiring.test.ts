@@ -32,7 +32,12 @@ describe('apply tail → opportunity regen', () => {
   const src = readFileSync('server/recommendations.ts', 'utf-8'); // readFile-ok - wiring contract
   const generationSrc = readFileSync('server/domains/recommendations/generation-service.ts', 'utf-8'); // readFile-ok - wiring contract
   const resolutionSrc = readFileSync('server/domains/recommendations/resolution-service.ts', 'utf-8'); // readFile-ok - wiring contract
-  const producerSrc = readFileSync('server/domains/recommendations/generation-producers.ts', 'utf-8'); // readFile-ok - wiring contract
+  const producerSrc = [
+    'server/domains/recommendations/audit-producers.ts',
+    'server/domains/recommendations/strategy-producers.ts',
+    'server/domains/recommendations/local-visibility-producers.ts',
+    'server/domains/recommendations/maintenance-producers.ts',
+  ].map(file => readFileSync(file, 'utf-8')).join('\n'); // readFile-ok - wiring contract across producer family modules
 
   it('triggers a debounced regen on resolveRecommendationsForChange', () => {
     const fnStart = resolutionSrc.indexOf('export function resolveRecommendationsForChange');
