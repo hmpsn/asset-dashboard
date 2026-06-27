@@ -1334,9 +1334,9 @@
           "source": "Deferred from simp-audit-0624-deadcode-sweep",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "deferred",
           "createdAt": "2026-06-26",
-          "notes": "OWNER/SEMANTIC DECISION: outcome-learning-default-path.ts keeps DIFFICULTY_MULTIPLIER_ENABLED=false, so getDifficultyRangeLabel/difficultyMultiplier and the difficulty adjustment block are threaded but inert. Decide whether to fix the bin-unit mismatch and enable the multiplier with tests, or delete the difficulty path entirely. Do not bundle with behavior-free dead-code cleanup."
+          "notes": "OWNER/SEMANTIC DECISION: outcome-learning-default-path.ts keeps DIFFICULTY_MULTIPLIER_ENABLED=false, so getDifficultyRangeLabel/difficultyMultiplier and the difficulty adjustment block are threaded but inert. Decide whether to fix the bin-unit mismatch and enable the multiplier with tests, or delete the difficulty path entirely. Do not bundle with behavior-free dead-code cleanup. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the next step is an owner semantic decision, not autonomous implementation. Re-entry: owner explicitly chooses enable-with-unit-fix or delete-the-path."
         },
         {
           "id": "simp-audit-0624-sqlite-readpath-tuning",
@@ -1372,14 +1372,25 @@
           "notes": "DONE 2026-06-26: completed the safe first pass from the sprint closeout cycle-kill item. Moved ImpactBand ownership to the impact-band leaf while preserving fix-catalog compatibility re-export, moved briefing TemplateContext to a leaf context module, split audit suppression projection from audit snapshot read views, moved schema scrubBrandSuffix into schema-text-sanitizer with helper compatibility re-export, and moved small frontend SeverityFilter/ViewMode and CockpitActions types into leaf modules. Lowered data/circular-dependency-baseline.json from server 36/src 10 to server 28/src 7 and lowered the largest server component baseline from 52 to 37. Added tests/contract/cycle-kill-boundaries.test.ts. Deferred high-risk intelligence/keyword/local-SEO, inbox adapter, and App.tsx root cycles as intended; they require dedicated characterization before further cuts."
         },
         {
+          "id": "simp-delta-0627-close-gated-simplification-tail",
+          "title": "Close gated Platform Simplification tail as deferred",
+          "source": "Platform Simplification autonomous closeout 2026-06-27",
+          "est": "S",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-06-27",
+          "shippedAt": "2026-06-27",
+          "notes": "DONE 2026-06-27: reclassified the remaining non-actionable Platform Simplification tail from pending to deferred without deleting the underlying work. Outcome-learning difficulty multiplier now waits on an owner semantic decision, multi-node readiness waits on an actual second-instance roadmap need, and reserved-flag stub cleanup waits for the segment-inserts feature to ship. This keeps autonomous agents from repeatedly selecting explicitly gated items while preserving re-entry criteria."
+        },
+        {
           "id": "simp-audit-0624-multinode-readiness",
           "title": "Multi-node readiness checklist (DO NOT ACT until a 2nd instance is needed)",
           "source": "Complexity audit 2026-06-24",
           "est": "L",
           "priority": "P4",
-          "status": "pending",
+          "status": "deferred",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT high-confidence but CONDITIONAL — every item is correct on a single node TODAY; this is a future migration checklist, not a present defect. Gate behind \"a 2nd instance is actually on the roadmap.\" Then: WS fan-out is in-process only (websocket.ts) — needs a shared bus; 16 schedulers start unconditionally on every node (startup.ts:20-39) → duplicate AI spend + emails — need leader election; background jobs run unbounded on the single event loop with no global concurrency cap and aren’t durable (restart marks in-flight \"error\") — need a durable queue; rate limiter + DataForSEO credit guard + SERP L2 file-cache are per-process — need shared state; single SQLite writer is the throughput ceiling — plan the Postgres/LiteFS path. Keep as the gating dependency doc behind any horizontal-scaling work."
+          "notes": "AUDIT high-confidence but CONDITIONAL — every item is correct on a single node TODAY; this is a future migration checklist, not a present defect. Gate behind \"a 2nd instance is actually on the roadmap.\" Then: WS fan-out is in-process only (websocket.ts) — needs a shared bus; 16 schedulers start unconditionally on every node (startup.ts:20-39) → duplicate AI spend + emails — need leader election; background jobs run unbounded on the single event loop with no global concurrency cap and aren’t durable (restart marks in-flight \"error\") — need a durable queue; rate limiter + DataForSEO credit guard + SERP L2 file-cache are per-process — need shared state; single SQLite writer is the throughput ceiling — plan the Postgres/LiteFS path. Keep as the gating dependency doc behind any horizontal-scaling work. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the item explicitly says DO NOT ACT until horizontal scaling is actually needed. Re-entry: a second runtime instance or horizontal-scaling migration is scheduled."
         },
         {
           "id": "simp-delta-0624-seo-refresh-extraction",
@@ -1449,9 +1460,9 @@
           "source": "Delta audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "deferred",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before."
+          "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the note explicitly ties implementation to the segment-inserts ship point. Re-entry: segment-inserts ships or the owner cancels it and asks to remove the reserved stubs."
         }
       ]
     },
