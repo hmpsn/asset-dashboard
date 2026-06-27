@@ -43,5 +43,6 @@ Do not reintroduce local synthesis-only type aliases such as `PageMapping` into 
 Current stage owners:
 
 - `page-assignment.ts` owns OP1 page batching, retry/repair validation, post-processing, deterministic page fallback, parse-error filtering, and incremental preserved-page merge.
+- `site-synthesis-context.ts` owns OP2 evidence block assembly for GSC, GA4, audit, provider, and intelligence/feedback-loop context.
 - `site-synthesis.ts` owns OP2 site-level prompt selection, retry/repair validation, legacy invalid-JSON throw behavior, closed-set content-gap validation, conflict detection, and conflict-fix application.
 - `provider-validation.ts` stays after OP1 and before OP2 so provider metrics are validated before conflict detection and site synthesis.

@@ -6,6 +6,7 @@ const prompts = readFileSync('server/keyword-strategy-synthesis/prompts.ts', 'ut
 const types = readFileSync('server/keyword-strategy-synthesis/types.ts', 'utf8'); // readFile-ok: source-boundary contract for stage type ownership
 const pageAssignment = readFileSync('server/keyword-strategy-synthesis/page-assignment.ts', 'utf8'); // readFile-ok: source-boundary contract for OP1 stage ownership
 const siteSynthesis = readFileSync('server/keyword-strategy-synthesis/site-synthesis.ts', 'utf8'); // readFile-ok: source-boundary contract for OP2 stage ownership
+const siteSynthesisContext = readFileSync('server/keyword-strategy-synthesis/site-synthesis-context.ts', 'utf8'); // readFile-ok: source-boundary contract for OP2 context ownership
 
 describe('keyword strategy synthesis decomposition boundaries', () => {
   it('keeps synthesis-only stage types out of the public facade', () => {
@@ -46,5 +47,18 @@ describe('keyword strategy synthesis decomposition boundaries', () => {
     expect(siteSynthesis).toContain('siteSynthesisResponseSchema.safeParse');
     expect(siteSynthesis).toContain('keyword-site-synthesis');
     expect(siteSynthesis).toContain('AI returned invalid JSON in master synthesis');
+  });
+
+  it('keeps OP2 evidence/context assembly outside the public facade', () => {
+    expect(facade).toContain('buildSiteSynthesisContext');
+    expect(facade).not.toContain('Top GSC queries (last 90 days)');
+    expect(facade).not.toContain('GA4 ORGANIC LANDING PAGES not in keyword map');
+    expect(facade).not.toContain('SEO AUDIT: HIGH-TRAFFIC PAGES WITH ERRORS');
+    expect(facade).not.toContain('STRATEGY SIGNALS (analytics feedback loop');
+    expect(siteSynthesisContext).toContain('export async function buildSiteSynthesisContext');
+    expect(siteSynthesisContext).toContain('Top GSC queries (last 90 days)');
+    expect(siteSynthesisContext).toContain('GA4 ORGANIC LANDING PAGES not in keyword map');
+    expect(siteSynthesisContext).toContain('SEO AUDIT: HIGH-TRAFFIC PAGES WITH ERRORS');
+    expect(siteSynthesisContext).toContain('STRATEGY SIGNALS (analytics feedback loop');
   });
 });
