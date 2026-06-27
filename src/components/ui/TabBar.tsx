@@ -15,7 +15,7 @@ interface TabBarProps {
 
 export function TabBar({ tabs, active, onChange, className }: TabBarProps) {
   return (
-    <div role="tablist" className={`flex items-center gap-1 border-b border-[var(--brand-border)] ${className ?? ''}`}>
+    <div role="tablist" className={`flex min-w-0 items-center gap-1 overflow-x-auto border-b border-[var(--brand-border)] ${className ?? ''}`}>
       {tabs.map(t => {
         const Icon = t.icon;
         const isActive = active === t.id;
@@ -32,7 +32,7 @@ export function TabBar({ tabs, active, onChange, className }: TabBarProps) {
               if (e.key === 'ArrowRight' && idx < tabs.length - 1) { onChange(tabs[idx + 1].id); e.preventDefault(); }
               if (e.key === 'ArrowLeft' && idx > 0) { onChange(tabs[idx - 1].id); e.preventDefault(); }
             }}
-            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] t-caption font-medium border-b-2 transition-colors -mb-px ${
+            className={`flex min-h-[44px] shrink-0 items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px ${
               isActive
                 ? 'border-[var(--teal)] text-[var(--teal)]'
                 : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'

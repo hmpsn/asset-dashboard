@@ -22,7 +22,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
 
   return (
     <nav aria-label="Workflow steps" className="w-full">
-      <ol role="list" className="flex items-start w-full">
+      <ol role="list" className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-0 sm:w-full">
         {steps.map((step, index) => {
           const isLast = index === steps.length - 1;
           const isClickable = !!step.onClick;
@@ -49,7 +49,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
           }
 
           const stepContent = (
-            <div className={`flex flex-col items-center ${gap}`}>
+            <div className={`flex flex-row items-center ${gap} sm:flex-col`}>
               <div className="relative">
                 <div
                   className={`${circleSize} rounded-full flex items-center justify-center flex-shrink-0 ${circleClasses} ${ringClasses}`}
@@ -62,7 +62,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
                 </div>
               </div>
               <span
-                className={`${labelSize} ${labelClasses} text-center leading-tight max-w-[4rem] whitespace-nowrap`}
+                className={`${labelSize} ${labelClasses} leading-tight sm:max-w-[4rem] sm:text-center sm:whitespace-nowrap`}
               >
                 {step.label}
               </span>
@@ -72,7 +72,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
           return (
             <li
               key={step.number}
-              className="flex flex-1 items-start min-w-0"
+              className="flex items-start min-w-0 sm:flex-1"
             >
               {isClickable ? (
                 <button
@@ -93,7 +93,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
               )}
 
               {!isLast && (
-                <div className={`flex-1 flex items-start ${compact ? 'pt-2' : 'pt-3'} mx-1 min-w-[8px]`}>
+                <div className={`hidden flex-1 items-start ${compact ? 'pt-2' : 'pt-3'} mx-1 min-w-[8px] sm:flex`}>
                   <div className={`w-full h-px ${compact ? 'mt-0' : 'mt-1'} bg-[var(--brand-border-strong)]`} aria-hidden="true" />
                 </div>
               )}

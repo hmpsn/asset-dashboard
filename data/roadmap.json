@@ -1290,9 +1290,10 @@
           "source": "Deferred visual QA from awp-schema-sweep closeout review 2026-06-27",
           "est": "S",
           "priority": "P4",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-27",
-          "notes": "Follow-up only; do not treat as blocking the completed deterministic awp-schema-sweep. The saved-snapshot setup-hero flash was fixed in the 2026-06-27 closeout PR. Re-open Schema with desktop and narrow screenshots and verify the remaining visual-only audit claims: header/action wrapping and broad vocabulary/token drift. If no live issue reproduces, close with screenshot notes. If visual drift exists, fix in a dedicated UI PR after reading BRAND_DESIGN_LANGUAGE.md."
+          "shippedAt": "2026-06-27",
+          "notes": "DONE 2026-06-27: completed the visual/token recheck on the saved-schema state with desktop, tablet/narrow-admin, and 390px screenshots. Desktop showed no broad vocabulary/token drift after the prior PageHeader/TabBar cleanup. The recheck did find narrow-width label/action squeeze in the Schema workflow controls, so this PR made WorkflowStepper switch to a vertical pre-sm layout, made TabBar horizontally scroll-safe, and tightened Schema bulk-action controls so publish/send/note/add/regenerate actions stack without clipping. Screenshot caveat: at 390px the fixed admin sidebar leaves only ~190px of content width, which is a broader shell limitation; within that constraint, Schema-specific tab/action/step labels no longer overlap. Added primitive/component contract coverage for the narrow layout classes."
         },
         {
           "id": "simp-audit-0624-deadcode-sweep",
