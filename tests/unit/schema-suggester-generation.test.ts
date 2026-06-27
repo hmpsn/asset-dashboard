@@ -7,6 +7,9 @@ describe('SchemaSuggester generation workflow extraction', () => {
     const hook = readFileSync('src/components/schema/useSchemaSuggesterGeneration.ts', 'utf-8'); // readFile-ok — intentional background job ownership guard
 
     expect(component).toContain('useSchemaSuggesterGeneration');
+    expect(component).toContain('snapshotLoading');
+    expect(component).toContain('Checking saved schema results');
+    expect(component).toContain('if (!started && snapshotLoading)');
     expect(component).not.toContain('useBackgroundTasks');
     expect(component).not.toContain("startJob('schema-generator'");
     expect(hook).toContain('useBackgroundTasks');
@@ -19,6 +22,8 @@ describe('SchemaSuggester generation workflow extraction', () => {
     const hook = readFileSync('src/components/schema/useSchemaSuggesterGeneration.ts', 'utf-8'); // readFile-ok — intentional behavior preservation guard
 
     expect(hook).toContain('useSchemaSnapshot(siteId, workspaceId)');
+    expect(hook).toContain('isLoading: snapshotLoading');
+    expect(hook).toContain('snapshotLoading');
     expect(hook).toContain('/api/webflow/all-pages/');
     expect(hook).toContain('fetchAllPageOptions');
     expect(hook).toContain("fixContext?.targetRoute !== 'seo-schema'");

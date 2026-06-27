@@ -202,7 +202,8 @@ export interface LocalSeoWorkspaceSettings {
    * Bounded server-side to [LOCAL_SEO_MIN_KEYWORDS_PER_REFRESH,
    * LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP]. Higher values give better
    * local-pack coverage on local-first workspaces (multi-market service
-   * businesses) at a small marginal DataForSEO cost (~$0.002/keyword).
+   * businesses) at a small marginal DataForSEO cost (see
+   * `LOCAL_SEO_DATAFORSEO_KEYWORD_COST_USD`).
    */
   keywordsPerRefresh: number | null;
 }
@@ -228,6 +229,13 @@ export const LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP = 300;
  * coverage than the old 50-keyword default.
  */
 export const LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH = 100;
+
+/**
+ * Approximate DataForSEO local visibility cost per keyword/market refresh.
+ * Kept as a shared constant so UI estimates and platform observability do not
+ * drift when provider pricing assumptions change.
+ */
+export const LOCAL_SEO_DATAFORSEO_KEYWORD_COST_USD = 0.002;
 
 export interface LocalVisibilityBusinessResult {
   title: string;

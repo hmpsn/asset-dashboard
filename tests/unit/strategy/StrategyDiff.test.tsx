@@ -41,7 +41,9 @@ describe('StrategyDiff', () => {
     await waitFor(() => expect(screen.getByText('What Changed')).toBeInTheDocument());
 
     // Expand to reveal the "Why these matter" explanations.
+    expect(screen.getByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByText('What Changed'));
+    expect(screen.getByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'true');
     expect(await screen.findByText('Optimize page')).toBeInTheDocument();
 
     // optimize_page badge is wrapped in a clickable button → navigates with fixContext.

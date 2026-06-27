@@ -306,6 +306,26 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     expect(screen.getByText('Not Found')).toBeInTheDocument();
   });
 
+  it('surfaces provider-degraded result counts when refreshes partially fail', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        degradedCount: 2,
+      },
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Degraded')).toBeInTheDocument();
+    expect(screen.getByText('provider warnings')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
   it('renders the per-market visibility trend when the read model includes a series with >= 2 points', () => {
     localSeoData = makeReadResponse({
       report: {

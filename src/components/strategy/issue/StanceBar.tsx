@@ -14,7 +14,7 @@
  *
  * Tokens: src/tokens.css only. Typography: .t-caption-sm + .t-label.
  * Color law: teal=action, blue=data, emerald=wins. Per-archetype fills use
- * accent hue tokens to distinguish buckets — NOT purple, NOT new tokens.
+ * allowed hue utilities to distinguish buckets — NOT purple, NOT new tokens.
  */
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { Archetype } from '../../../../shared/types/strategy-archetype';
@@ -26,14 +26,14 @@ import { deriveStance, type StanceResult } from '../../../lib/recStance';
 //     dot, just at ~70% opacity so the proportional fill reads as a tint of its
 //     legend dot. Kept as STATIC literals (not runtime-concatenated) so the
 //     Tailwind v4 JIT scanner emits every class. Hue-for-hue identical to
-//     ARCHETYPE_ACCENT (teal/blue/amber/emerald/sky/orange) — the authority_bet
+//     ARCHETYPE_ACCENT (teal/blue/amber/emerald/orange) — the authority_bet
 //     teal/blue swap is gone. No new tokens, no purple.
 const ARCHETYPE_BAR_FILL: Record<Archetype, string> = {
   authority_bet: 'bg-teal-400/70',     // action hue — new content bets (matches ARCHETYPE_ACCENT)
   refresh_reclaim: 'bg-blue-400/70',   // data hue — reclaim work
   defend: 'bg-amber-400/70',           // amber — risk / defend
   quick_win: 'bg-emerald-400/70',      // emerald — wins / quick gains
-  technical: 'bg-sky-400/70',          // sky — technical / infra
+  technical: 'bg-blue-300/70',         // blue — technical / infra
   local: 'bg-orange-400/70',           // orange — local
 };
 

@@ -37,6 +37,17 @@ describe('StrategySettings', () => {
     expect(setSettingsOpen).toHaveBeenCalledWith(false); // settingsOpen=true → toggles to false
   });
 
+  it('exposes disclosure and pressed state without color-only selection', () => {
+    render(<StrategySettings {...defaultProps} />);
+
+    expect(screen.getByRole('button', { name: /Strategy Settings/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: /SEO data mode/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /quick/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /full/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('group', { name: /Page analysis limit/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /200/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('calls setMaxPages when a Page Limit option is clicked', () => {
     const setMaxPages = vi.fn();
     render(<StrategySettings {...defaultProps} setMaxPages={setMaxPages} />);

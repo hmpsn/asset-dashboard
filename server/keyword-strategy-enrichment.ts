@@ -92,10 +92,9 @@ export interface EnrichKeywordStrategyOptions {
   provider: SeoDataProvider | null;
   seoDataMode: KeywordStrategySeoDataMode;
   /**
-   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
-   * Computed once per generation and threaded in. On flag-ON the page-coverage
-   * prune uses token-subset containment instead of substring `.includes()`.
-   * Flag-OFF (default false) is byte-identical to today.
+   * SEO Generation Quality P2 is now the canonical synthesis path.
+   * Computed once per generation and threaded in. When enabled, page-coverage
+   * pruning uses token-subset containment instead of substring `.includes()`.
    */
   relaxConservatism?: boolean;
   sendProgress: (step: string, detail: string, progress: number) => void;

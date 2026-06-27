@@ -12,7 +12,7 @@ export function StrategyHowItWorks({ displayedSeoDataMode, hasAnyRanking }: Stra
           in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
           Use <strong className="text-accent-brand">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
           {displayedSeoDataMode && displayedSeoDataMode !== 'none' && (
-            <span className="block mt-1 text-accent-orange">
+            <span className="block mt-1 text-blue-300">
               DataForSEO data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
             </span>
           )}

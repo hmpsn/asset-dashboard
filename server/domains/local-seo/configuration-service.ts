@@ -111,7 +111,7 @@ const stmts = createStmtCache(() => ({
     "SELECT COUNT(*) AS count FROM local_seo_markets WHERE workspace_id = ? AND is_primary = 1 AND status = 'active' AND provider_location_code IS NOT NULL",
   ),
   firstEligibleActiveMarket: db.prepare(
-    "SELECT * FROM local_seo_markets WHERE workspace_id = ? AND status = 'active' AND provider_location_code IS NOT NULL ORDER BY created_at ASC, id ASC LIMIT 1",
+    "SELECT * FROM local_seo_markets WHERE workspace_id = ? AND status = 'active' AND provider_location_code IS NOT NULL ORDER BY label COLLATE NOCASE ASC, id ASC LIMIT 1",
   ),
   clearPrimary: db.prepare(
     'UPDATE local_seo_markets SET is_primary = 0 WHERE workspace_id = @workspaceId',

@@ -126,6 +126,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setPageTypes,
     setSinglePageTypeOverrides,
     snapshotDate,
+    snapshotLoading,
     filteredInitialPages,
     runScan,
     stopScan,
@@ -275,6 +276,18 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   if (schemaSubTab === 'guide') {
     return <div className="space-y-8">{schemaHeader}<SchemaWorkflowGuide /></div>;
+  }
+
+  if (!started && snapshotLoading) {
+    return (
+      <div className="space-y-8">
+        {schemaHeader}
+        <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 px-4 py-3">
+          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
+          <span className="t-caption text-blue-300">Checking saved schema results...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!started) {
