@@ -68,10 +68,9 @@ export function OnboardingWizard({
   const prev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); };
 
   return (
-    /* z-index-ok — onboarding wizard above modal scale */
     <div
       className={
-        'fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Welcome tour is a dismissible full-screen overlay, not a reusable dialog.
+        'fixed inset-0 bg-black/70 backdrop-blur-sm z-[var(--z-takeover)] flex items-center justify-center p-4' // fixed-inset-ok -- Welcome tour is a dismissible full-screen overlay, not a reusable dialog.
       }
       onClick={onDismiss}
     >

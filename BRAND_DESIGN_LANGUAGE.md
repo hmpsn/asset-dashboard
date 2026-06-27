@@ -580,6 +580,10 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 - Escape key handler calls `onClose()`
 - Background: `bg-black/80 backdrop-blur-sm`
 - Token: `--z-modal-fullscreen: 55` (defined in `src/tokens.css`)
+
+**Z-index token scale** (defined in `src/tokens.css` and mirrored to `public/tokens.css`):
+`--z-sticky: 10`, `--z-dropdown: 20`, `--z-tooltip: 30`, `--z-modal-backdrop: 40`, `--z-modal: 50`, `--z-modal-fullscreen: 55`, `--z-toast: 60`, `--z-commerce-backdrop: 60`, `--z-commerce-drawer: 61`, `--z-takeover: 70`, `--z-client-toast: 80`, `--z-command-palette: 100`, `--z-system-toast: 200`, `--z-critical-system: 9999`.
+Use named z-index token classes such as `z-[var(--z-modal)]` rather than raw numeric z-index values; new layers need a named token and a concrete stacking rationale.
 | Page transition | `ScannerReveal` — muted teal beam sweeps top-to-bottom on navigation (850ms, ease-out) |
 | Card entrance | Stagger-fade: `staggerFadeIn` 0.4s + 60ms delay per sibling. Use `staggerIndex` prop on `SectionCard`/`StatCard` |
 | MetricRing entrance | Charge-up: ring sweep → number fade at 0.8s → glow bloom at 2s. Disabled with `noAnimation` prop |

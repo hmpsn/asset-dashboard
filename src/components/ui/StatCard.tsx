@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 /* ── Stat Card: Default ── */
@@ -10,8 +11,11 @@ interface StatCardProps {
   sub?: string;
   delta?: number;
   deltaLabel?: string;
+  /** When true, renders an explicit zero delta such as "+0 pts". */
+  showZeroDelta?: boolean;
   /** When true, negative delta = green (improvement), positive = red (regression). Use for metrics like bounce rate, avg position. */
   invertDelta?: boolean;
+  trailing?: ReactNode;
   onClick?: () => void;
   className?: string;
   /** Display size: 'default' for standard, 'hero' for top-of-page impact metrics */
@@ -22,7 +26,7 @@ interface StatCardProps {
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
-  delta, deltaLabel, invertDelta, onClick, className,
+  delta, deltaLabel, showZeroDelta, invertDelta, trailing, onClick, className,
   size = 'default', staggerIndex,
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
@@ -46,20 +50,25 @@ export function StatCard({
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
         <span className="inline-flex items-center gap-0.5 t-label text-[var(--brand-text-muted)]">{label}</span>
       </div>
-      <div className="flex items-baseline gap-1.5">
-        <div
-          className={`${isHero ? 't-stat-lg' : 't-stat'} ${valueColor ?? 'text-[var(--brand-text-bright)]'}`}
-          style={valueColor?.startsWith('#') ? { color: valueColor } : undefined}
-        >
-          {value}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <div
+              className={`${isHero ? 't-stat-lg' : 't-stat'} ${valueColor ?? 'text-[var(--brand-text-bright)]'}`}
+              style={valueColor?.startsWith('#') ? { color: valueColor } : undefined}
+            >
+              {value}
+            </div>
+            {delta !== undefined && (delta !== 0 || showZeroDelta) && (
+              <span className={`t-caption-sm font-medium ${delta === 0 || (invertDelta ? delta < 0 : delta > 0) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                {delta >= 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
+              </span>
+            )}
+          </div>
+          {sub && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{sub}</div>}
         </div>
-        {delta !== undefined && delta !== 0 && (
-          <span className={`t-caption-sm font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-            {delta > 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
-          </span>
-        )}
+        {trailing && <div className="flex-shrink-0">{trailing}</div>}
       </div>
-      {sub && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{sub}</div>}
     </Tag>
   );
 }

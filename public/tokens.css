@@ -137,6 +137,13 @@
   --z-modal: 50;
   --z-modal-fullscreen: 55; /* Full-screen takeover modals (above chat widgets / standard modals) */
   --z-toast: 60;
+  --z-commerce-backdrop: 60; /* Client cart checkout backdrop, intentionally at toast height */
+  --z-commerce-drawer: 61; /* Client cart drawer sits one layer above its backdrop */
+  --z-takeover: 70; /* Full-screen onboarding/payment flows above standard modals */
+  --z-client-toast: 80; /* Client toast layer above checkout/takeover flows */
+  --z-command-palette: 100; /* Admin command palette overlay */
+  --z-system-toast: 200; /* Admin/system toasts above command palette */
+  --z-critical-system: 9999; /* Last-resort system guard banners */
 }
 
 /* ─── Light mode token overrides ─── */

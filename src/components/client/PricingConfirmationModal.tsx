@@ -43,11 +43,10 @@ export function PricingConfirmationModal({
         // to null. The CTA below picks the no-price branch automatically.
         const displayPrice = isExternal ? null : (isUpgrade ? upgradePrice : price);
         const fmt = fmtPrice;
-        // z-index-ok — pricing modal above standard modal scale
         return (
           <div
             className={
-              'fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
+              'fixed inset-0 bg-black/70 backdrop-blur-md z-[var(--z-takeover)] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
             }
             onClick={() => !pricingConfirming && setPricingModal(null)}
           >

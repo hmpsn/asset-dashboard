@@ -329,9 +329,20 @@
           "source": "Admin surface audit 2026-06-11 — docs/audits/2026-06-11-admin-surface-audit.md",
           "est": "3-5h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Incl. tab naming drift, SchemaSuggester PageHeader/TabBar adoption, WorkspaceHome hand-rolled stat card, ad-hoc z-index scale, palette no-workspace no-ops, ?tab= cleanup comment fix, duplicate sidebar icons. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3. Re-scope: drop the '?tab= cleanup comment fix' line (resolved) and keep the rest. Quick wins: de-duplicate the 4 sidebar icon collisions in navRegistry.tsx (pure icon swaps), convert WorkspaceHome's two hand-rolled cards to StatCard, and fix the CommandPalette no-workspace guard (hide/disable workspace-scoped items + don't addRecent on no-op). The z-index token consolidation (add --z-overlay/--z-system tiers + migrate 7 hatched raw values) is a slightly larger but worthwhile platform-foundation cleanup."
+          "shippedAt": "2026-06-27",
+          "notes": "Incl. tab naming drift, SchemaSuggester PageHeader/TabBar adoption, WorkspaceHome hand-rolled stat card, ad-hoc z-index scale, palette no-workspace no-ops, ?tab= cleanup comment fix, duplicate sidebar icons. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3. Re-scope: drop the '?tab= cleanup comment fix' line (resolved) and keep the rest. Quick wins: de-duplicate the 4 sidebar icon collisions in navRegistry.tsx (pure icon swaps), convert WorkspaceHome's two hand-rolled cards to StatCard, and fix the CommandPalette no-workspace guard (hide/disable workspace-scoped items + don't addRecent on no-op). The z-index token consolidation (add --z-overlay/--z-system tiers + migrate 7 hatched raw values) is a slightly larger but worthwhile platform-foundation cleanup. || DONE 2026-06-27: completed the deterministic shell cleanup subset. De-duplicated nav registry icon collisions without changing labels/routes/gating, made CommandPalette hide workspace-scoped nav entries when no workspace is selected so they cannot become no-op recents, moved WorkspaceHome Site Health metric rendering onto StatCard via a small trailing slot for the existing MetricRing, and replaced the audited raw overlay z-index hatch values with named tokens mirrored in src/public token files and documented in BRAND_DESIGN_LANGUAGE.md. Added contract/primitive coverage for nav icon uniqueness, palette availability, WorkspaceHome primitive usage, z-index token migration, and StatCard trailing content. Deferred recommendation: SchemaSuggester PageHeader/TabBar adoption remains a separate visual polish pass because its current schemaSubTab shell is entangled with guide/generator rendering and should be verified with screenshots rather than bundled into this behavior-preserving shell sweep."
+        },
+        {
+          "id": "awp-shell-schemasuggester-pageheader-tabbar",
+          "title": "SchemaSuggester PageHeader/TabBar visual polish pass",
+          "source": "Deferred from awp-shell-sweep on 2026-06-27",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-27",
+          "notes": "Follow-up from the admin shell polish sweep. Convert SchemaSuggester's local schemaSubTab/header shell to the canonical PageHeader + TabBar pattern without changing scan/generator/guide/publish behavior. Because this is visual shell work around a complex page with extracted generation/CMS/publishing workflows, do it as a focused UI PR with screenshots at desktop and narrow widths, plus existing SchemaSuggester workflow tests. Preserve literal tab ordering, guide/generator behavior, fixContext auto-generation, and bulk publish controls."
         }
       ]
     },

@@ -79,6 +79,18 @@ describe('navRegistry completeness', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('registry icons are unique enough for sidebar scanning', () => {
+    const seen = new Map<unknown, string>();
+    const duplicates: string[] = [];
+    for (const entry of NAV_REGISTRY) {
+      const prior = seen.get(entry.icon);
+      if (prior) duplicates.push(`${prior}/${entry.id}`);
+      else seen.set(entry.icon, entry.id);
+    }
+
+    expect(duplicates).toEqual([]);
+  });
+
   it('NAV_REGISTRY_BY_ID resolves every entry', () => {
     for (const entry of NAV_REGISTRY) {
       expect(NAV_REGISTRY_BY_ID[entry.id]).toBe(entry);
