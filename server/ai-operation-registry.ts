@@ -25,6 +25,32 @@ export interface AIOperationContract {
   defaultResearchMode?: boolean;
 }
 
+export type AIOperationRuntimeDefaults = Pick<
+  AIOperationContract,
+  | 'feature'
+  | 'defaultProvider'
+  | 'defaultModel'
+  | 'defaultResponseFormat'
+  | 'defaultMaxRetries'
+  | 'defaultTimeoutMs'
+  | 'defaultResearchMode'
+>;
+
+export type AIOperationPolicyMetadata = Pick<
+  AIOperationContract,
+  | 'id'
+  | 'domain'
+  | 'feature'
+  | 'providerIntent'
+  | 'modelIntent'
+  | 'outputMode'
+  | 'parserExpectation'
+  | 'researchMode'
+  | 'executionMode'
+  | 'retryPolicy'
+  | 'timeoutProfile'
+>;
+
 export const AI_OPERATION_REGISTRY = {
   'content-brief-regenerate': {
     id: 'content-brief-regenerate',
@@ -620,4 +646,34 @@ export function isAIOperationId(value: string): value is AIOperationId {
 
 export function getAIOperationContract(operationId: AIOperationId): AIOperationContract {
   return AI_OPERATION_REGISTRY[operationId];
+}
+
+export function getAIOperationRuntimeDefaults(operationId: AIOperationId): AIOperationRuntimeDefaults {
+  const contract = getAIOperationContract(operationId);
+  return {
+    feature: contract.feature,
+    defaultProvider: contract.defaultProvider,
+    defaultModel: contract.defaultModel,
+    defaultResponseFormat: contract.defaultResponseFormat,
+    defaultMaxRetries: contract.defaultMaxRetries,
+    defaultTimeoutMs: contract.defaultTimeoutMs,
+    defaultResearchMode: contract.defaultResearchMode,
+  };
+}
+
+export function getAIOperationPolicyMetadata(operationId: AIOperationId): AIOperationPolicyMetadata {
+  const contract = getAIOperationContract(operationId);
+  return {
+    id: contract.id,
+    domain: contract.domain,
+    feature: contract.feature,
+    providerIntent: contract.providerIntent,
+    modelIntent: contract.modelIntent,
+    outputMode: contract.outputMode,
+    parserExpectation: contract.parserExpectation,
+    researchMode: contract.researchMode,
+    executionMode: contract.executionMode,
+    retryPolicy: contract.retryPolicy,
+    timeoutProfile: contract.timeoutProfile,
+  };
 }

@@ -6,6 +6,10 @@ Use this rule when an AI path returns structured data or when a caller needs sta
 
 - Register high-value AI operations in `server/ai-operation-registry.ts` before wiring new callers.
 - Prefer `callAI({ operation: '...' })` over hand-passing `feature`, `model`, `responseFormat`, `timeoutMs`, and retry posture when the call maps cleanly to a named operation.
+- Treat registry fields as two layers:
+  - runtime defaults consumed by `callAI()` through `getAIOperationRuntimeDefaults()` only: `feature`, `defaultProvider`, `defaultModel`, `defaultResponseFormat`, `defaultMaxRetries`, `defaultTimeoutMs`, `defaultResearchMode`
+  - policy metadata consumed by docs/tests/reviews through `getAIOperationPolicyMetadata()`: `domain`, `providerIntent`, `modelIntent`, `outputMode`, `parserExpectation`, `researchMode`, `executionMode`, `retryPolicy`, `timeoutProfile`
+- Do not make dispatcher behavior depend on policy metadata names. If a policy field needs runtime force, add an explicit `default*` field or a dedicated dispatcher option and test that boundary.
 - Structured-output callers must validate after boundary cleanup:
   - `parseAIJson()` is only boundary cleanup for fences/wrappers.
   - trust the payload only after Zod or equivalent schema validation.

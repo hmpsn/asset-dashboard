@@ -1395,9 +1395,10 @@
           "source": "Deferred from simp-audit-0624-overengineering-sweep",
           "est": "S",
           "priority": "P4",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Deferred recommendation from the overengineering sweep. Initial audit found defaultProvider/defaultModel/defaultMaxRetries/defaultTimeoutMs/defaultResponseFormat/defaultResearchMode are runtime-consumed by server/ai.ts, while descriptive fields such as providerIntent/outputMode/executionMode/researchMode are contract-tested and documented policy metadata. Any cleanup should first define the registry's authoritative runtime-vs-policy contract, then remove or relocate fields with tests and docs updated in the same PR."
+          "shippedAt": "2026-06-27",
+          "notes": "DONE 2026-06-27: defined the AI operation registry runtime-vs-policy contract without changing AI behavior. Added explicit runtime defaults and policy metadata accessors; callAI now consumes only getAIOperationRuntimeDefaults(), while descriptive fields remain audit/review metadata behind getAIOperationPolicyMetadata(). Updated docs/rules/ai-operation-contracts.md and added unit/contract tests so dispatcher code cannot drift back to reading policy-only fields."
         },
         {
           "id": "simp-delta-0626-roadmap-noise-reduction",

@@ -2,6 +2,15 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 
 describe('AI operation registry usage contracts', () => {
+  it('keeps callAI wired to runtime defaults instead of descriptive policy metadata', () => {
+    const source = readFileSync('server/ai.ts', 'utf-8'); // readFile-ok — operation registry boundary contract
+    expect(source).toContain('getAIOperationRuntimeDefaults');
+    expect(source).not.toContain('getAIOperationContract');
+    expect(source).not.toContain('getAIOperationPolicyMetadata');
+    expect(source).not.toMatch(/operation\w*\?\.(providerIntent|outputMode|executionMode|researchMode|retryPolicy|timeoutProfile)/);
+    expect(source).not.toMatch(/\bpolicy(?:Metadata)?\.(providerIntent|outputMode|executionMode|researchMode|retryPolicy|timeoutProfile)/);
+  });
+
   it('keeps representative callAI paths wired to explicit operation ids', () => {
     const expectations: Array<{ path: string; operation: string }> = [
       { path: 'server/content-brief.ts', operation: "operation: 'content-brief-regenerate'" },
