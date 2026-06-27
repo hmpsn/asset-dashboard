@@ -47,17 +47,29 @@ describe('verification governance wiring', () => {
     expect(ci).toContain('npm run verify:governance');
   });
 
-  it('keeps the deleted styleguide parity script out of active docs/tooling references', () => {
+  it('keeps deleted script paths out of active docs/tooling references', () => {
     const activeFiles = [
       'CLAUDE.md',
       'docs/rules/design-system-enforcement.md',
+      'docs/rules/verification-governance.md',
       'scripts/pr-check.ts',
       '.github/workflows/ci.yml',
       'package.json',
     ];
+    const deletedScriptReferences = [
+      'verify-styleguide-parity.ts',
+      'scripts/codemods/phase5-',
+      'scripts/diagnose-h1.ts',
+      'scripts/poc-lean-schema.ts',
+      'scripts/sync-staging-data.sh',
+      'scripts/validate-endpoints-precise.js',
+    ];
 
     for (const path of activeFiles) {
-      expect(readText(path)).not.toContain('verify-styleguide-parity.ts');
+      const source = readText(path);
+      for (const reference of deletedScriptReferences) {
+        expect(source).not.toContain(reference);
+      }
     }
   });
 

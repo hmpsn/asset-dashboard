@@ -1414,9 +1414,20 @@
           "source": "Complexity audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-24",
-          "notes": "AUDIT med (bundle). (a) Two deprecated decision-adapters (normalizeClientAction, normalizeApprovalBatch) + itemCountForAction — dead in prod, alive only via ~50 test assertions giving false coverage; remove both + tests. (b) Register roi-attribution.ts (203 LOC, superseded by outcome-tracking, scheduled Q3 removal) in deprecation-lifecycle.ts. (c) TaskPanel.tsx (9-line stub kept alive only for a test import) — remove. (d) ~10 spent one-off scripts (poc-lean-schema.ts, diagnose-h1.ts, validate-endpoints-precise.js, sync-staging-data.sh, completed backfills, codemods/phase5-*). (e) Inert @deprecated props (AnnotatedTrendChart.maxActiveLines, three on PricingConfirmationModal). (f) Two unused LEGACY_ROADMAP keys (outcome, schema). (g) Dead difficulty-multiplier path in outcome-learning-default-path.ts (DIFFICULTY_MULTIPLIER_ENABLED=false gates getDifficultyRangeLabel/difficultyMultiplier + a 15-line block; difficulty input threaded but never fires) — fix the bin-unit mismatch and flip, or delete + file an item. (h) Keyword Hub 'Not Checked' filter facet: shows a permanently-0 chip in the skinny read path (server/keyword-command-center.ts hardcodes notChecked:0) while the full path computes it. DECIDE: compute notChecked in the skinny counts path, or remove the filter from the FILTERS union (shared/types/keyword-command-center.ts), both facet builders, SkinnyFilterCounts, routes (routes/keyword-command-center.ts), and frontend (kccDisplayHelpers.ts, HubAdvancedFilters). Do NOT touch the separate KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.NOT_CHECKED or the live local-SEO visibility notChecked. Progress 2026-06-26: removed legacy decision adapters and false-coverage assertions, deleted the retired TaskPanel stub and active test scaffolding, registered roi-attribution.ts in the deprecation lifecycle, removed inert chart/pricing modal props, and removed unused LEGACY_ROADMAP outcome/schema keys. Deferred recommendation: keep spent-script deletion as a separate audited cleanup because backfill scripts are mixed with live integration-test coverage; leave difficulty multiplier and Keyword Hub Not Checked for explicit owner/semantic decisions."
+          "shippedAt": "2026-06-26",
+          "notes": "DONE 2026-06-26: completed the behavior-free dead-code sweep. Earlier batch removed legacy decision adapters and false-coverage assertions, deleted the retired TaskPanel stub and active test scaffolding, registered roi-attribution.ts in the deprecation lifecycle, removed inert chart/pricing modal props, and removed unused LEGACY_ROADMAP outcome/schema keys. This batch deleted spent one-off scripts with no active package/CI/doc callers: scripts/codemods/phase5-*, scripts/poc-lean-schema.ts, scripts/diagnose-h1.ts, scripts/validate-endpoints-precise.js, and scripts/sync-staging-data.sh; also removed the orphaned codemod-hardening unit test and extended verification governance so active docs/tooling/workflows cannot reference the deleted script paths. Completed backfill scripts were intentionally retained because they remain mixed with live integration-test coverage. Deferred semantic/product decisions are preserved as simp-delta-0626-outcome-learning-difficulty-multiplier-decision and existing Keyword Hub health item kh-health-05-filter-facet-correctness-and-scar-tissue."
+        },
+        {
+          "id": "simp-delta-0626-outcome-learning-difficulty-multiplier-decision",
+          "title": "Outcome learning difficulty multiplier owner decision",
+          "source": "Deferred from simp-audit-0624-deadcode-sweep",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-06-26",
+          "notes": "OWNER/SEMANTIC DECISION: outcome-learning-default-path.ts keeps DIFFICULTY_MULTIPLIER_ENABLED=false, so getDifficultyRangeLabel/difficultyMultiplier and the difficulty adjustment block are threaded but inert. Decide whether to fix the bin-unit mismatch and enable the multiplier with tests, or delete the difficulty path entirely. Do not bundle with behavior-free dead-code cleanup."
         },
         {
           "id": "simp-audit-0624-sqlite-readpath-tuning",

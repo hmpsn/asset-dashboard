@@ -32,7 +32,7 @@ describe('verification governance report', () => {
     expect(report.unclassifiedScripts).toEqual(['verify:new']);
   });
 
-  it('fails when active docs reference a deleted verifier', () => {
+  it('fails when active docs reference a deleted script', () => {
     const report = buildVerificationGovernanceReport(
       {
         scripts: {
@@ -50,6 +50,53 @@ describe('verification governance report', () => {
     expect(report.deletedReferenceMatches).toEqual([
       { path: 'CLAUDE.md', reference: 'scripts/verify-styleguide-parity.ts' },
       { path: 'CLAUDE.md', reference: 'verify-styleguide-parity.ts' },
+    ]);
+  });
+
+  it('fails when active docs reference a retired one-off script', () => {
+    const report = buildVerificationGovernanceReport(
+      {
+        scripts: {
+          'verify:known': 'tsx scripts/known.ts',
+        },
+      },
+      [{ path: '.github/workflows/ci.yml', source: 'run: npm run verify:known' }],
+      [{ path: 'docs/workflows/example.md', source: 'Run npx tsx scripts/poc-lean-schema.ts' }],
+      {
+        'verify:known': knownEntry,
+      },
+    );
+
+    expect(report.pass).toBe(false);
+    expect(report.deletedReferenceMatches).toEqual([
+      { path: 'docs/workflows/example.md', reference: 'scripts/poc-lean-schema.ts' },
+      { path: 'docs/workflows/example.md', reference: 'poc-lean-schema.ts' },
+    ]);
+  });
+
+  it('fails when a workflow references a retired one-off script', () => {
+    const report = buildVerificationGovernanceReport(
+      {
+        scripts: {
+          'verify:known': 'tsx scripts/known.ts',
+        },
+      },
+      [
+        {
+          path: '.github/workflows/ci.yml',
+          source: 'run: npx tsx scripts/validate-endpoints-precise.js && npm run verify:known',
+        },
+      ],
+      [],
+      {
+        'verify:known': knownEntry,
+      },
+    );
+
+    expect(report.pass).toBe(false);
+    expect(report.deletedReferenceMatches).toEqual([
+      { path: '.github/workflows/ci.yml', reference: 'scripts/validate-endpoints-precise.js' },
+      { path: '.github/workflows/ci.yml', reference: 'validate-endpoints-precise.js' },
     ]);
   });
 
