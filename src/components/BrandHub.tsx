@@ -64,8 +64,8 @@ interface Props {
 }
 
 type BrandHubLegacyTab = 'business-profile' | 'locations';
-type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-footprint' | 'eeat-assets' | 'intelligence-profile';
-const VALID_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'brandscript', 'discovery', 'voice', 'identity', 'business-footprint', 'eeat-assets', 'intelligence-profile'];
+type BrandHubTab = 'overview' | 'context' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-footprint' | 'eeat-assets' | 'intelligence-profile';
+const VALID_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'context', 'brandscript', 'discovery', 'voice', 'identity', 'business-footprint', 'eeat-assets', 'intelligence-profile'];
 const BRAND_TAB_ALIASES: Record<BrandHubLegacyTab, BrandHubTab> = {
   'business-profile': 'business-footprint',
   locations: 'business-footprint',
@@ -505,6 +505,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         onChange={(id) => setActiveTab(id as BrandHubTab)}
         tabs={[
           { id: 'overview', label: 'Overview', icon: Sparkles },
+          { id: 'context', label: 'Context', icon: MessageSquare },
           { id: 'brandscript', label: 'Brandscript', icon: BookOpen },
           { id: 'discovery', label: 'Discovery', icon: Upload },
           { id: 'voice', label: 'Voice', icon: Mic },
@@ -547,17 +548,19 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           }}
         />
       )}
-      {activeTab === 'overview' && <>
-      <BrandOverviewTab
-        workspaceId={workspaceId}
-        brandVoice={ws?.brandVoice}
-        knowledgeBase={ws?.knowledgeBase}
-        personasCount={ws?.personas?.length ?? 0}
-        businessContext={ws?.keywordStrategy?.businessContext}
-        intelligenceProfile={ws?.intelligenceProfile}
-        businessProfile={ws?.businessProfile}
-      />
+      {activeTab === 'overview' && (
+        <BrandOverviewTab
+          workspaceId={workspaceId}
+          brandVoice={ws?.brandVoice}
+          knowledgeBase={ws?.knowledgeBase}
+          personasCount={ws?.personas?.length ?? 0}
+          businessContext={ws?.keywordStrategy?.businessContext}
+          intelligenceProfile={ws?.intelligenceProfile}
+          businessProfile={ws?.businessProfile}
+        />
+      )}
 
+      {activeTab === 'context' && (
       <div id="brand-hub-current-context" className="space-y-8">
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard
@@ -1010,7 +1013,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         </div>
       </div>
       </div>
-      </>}
+      )}
     </div>
 
     <ConfirmDialog

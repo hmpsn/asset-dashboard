@@ -1384,9 +1384,10 @@
           "source": "Deferred from simp-audit-0624-overengineering-sweep",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-26",
-          "notes": "Deferred recommendation from the overengineering sweep. BrandHub overview appears to duplicate voice, knowledge-base, and persona editing flows owned by dedicated tabs. Before deleting or redirecting inline overview logic, run a field-by-field parity audit against the dedicated tabs, then consolidate only the duplicated edit/mutation paths while preserving overview scan/read behavior."
+          "shippedAt": "2026-06-26",
+          "notes": "DONE 2026-06-26: completed parity audit and deduped overview ownership without deleting non-equivalent editor behavior. The dedicated Voice/Identity/Discovery tabs do not fully replace the legacy workspace-level brandVoice, knowledgeBase, personas, and page strategy editors, so those flows were moved out of Overview into a first-class Context tab. Overview is now scan/read-only summary cards with links into canonical edit surfaces, including the new Context tab. Focused BrandHub/BrandOverview component tests pin the boundary."
         },
         {
           "id": "simp-delta-0626-ai-operation-registry-policy",

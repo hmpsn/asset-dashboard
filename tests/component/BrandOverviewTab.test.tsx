@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { BrandOverviewTab } from '../../src/components/brand/BrandOverviewTab';
 import { useLocalSeoLocations } from '../../src/hooks/admin/useLocalSeoLocations';
@@ -44,13 +44,7 @@ describe('BrandOverviewTab', () => {
     expect(screen.getByRole('link', { name: /manage locations/i })).toHaveAttribute('href', '/ws/ws-1/brand?tab=business-footprint&focus=locations-section');
   });
 
-  it('scrolls to the current-context section when review below is clicked', () => {
-    const scrollIntoView = vi.fn();
-    const anchor = document.createElement('div');
-    anchor.id = 'brand-hub-current-context';
-    anchor.scrollIntoView = scrollIntoView;
-    document.body.appendChild(anchor);
-
+  it('links current context to the dedicated context tab', () => {
     render(
       <MemoryRouter>
         <BrandOverviewTab
@@ -60,9 +54,6 @@ describe('BrandOverviewTab', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /review below/i }));
-    expect(scrollIntoView).toHaveBeenCalled();
-
-    document.body.removeChild(anchor);
+    expect(screen.getByRole('link', { name: /open context/i })).toHaveAttribute('href', '/ws/ws-1/brand?tab=context');
   });
 });
