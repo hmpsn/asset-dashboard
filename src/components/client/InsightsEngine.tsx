@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
   TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
@@ -13,7 +13,7 @@ import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.ts';
 import { STUDIO_NAME } from '../../constants';
-import { get, post, patch, del } from '../../api/client';
+import { post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
@@ -21,6 +21,7 @@ import { Icon } from '../ui/Icon';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { useToast } from '../Toast';
+import { useClientRecommendationSetView } from '../../hooks/client/useClientInsightViewModel';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -160,12 +161,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
   // queryFn returns RecommendationSet — same shape cached by useRecommendations,
   // which uses select to project to Recommendation[]. Both must cache the same type.
   // Uses get() (throws on non-200) so HTTP errors surface via isError, not silent null.
-  const { data, isLoading, isError } = useQuery<RecommendationSet>({
-    queryKey: queryKeys.shared.recommendations(workspaceId),
-    queryFn: (): Promise<RecommendationSet> =>
-      get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
-    staleTime: 60_000,
-  });
+  const { data, isLoading, isError } = useClientRecommendationSetView(workspaceId);
 
   // Re-generate
   const handleRegenerate = async () => {
