@@ -47,6 +47,9 @@ vi.mock('../../server/content-brief.js', () => ({
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn().mockResolvedValue({ seoContext: null }),
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatForPrompt: vi.fn().mockReturnValue(''),
   formatKeywordsForPrompt: vi.fn().mockReturnValue(''),
   formatPageMapForPrompt: vi.fn().mockReturnValue(''),
@@ -105,9 +108,11 @@ import { listDeliverables } from '../../server/brand-identity.js';
 import { generateBrief, getPageTypeConfig } from '../../server/content-brief.js';
 import {
   buildWorkspaceIntelligence,
+} from '../../server/workspace-intelligence.js';
+import {
   formatKeywordsForPrompt,
   formatKnowledgeBaseForPrompt,
-} from '../../server/workspace-intelligence.js';
+} from '../../server/intelligence/formatters.js';
 import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
 import { getActivePatterns } from '../../server/copy-intelligence.js';
 import { getSectionsForEntry } from '../../server/copy-review.js';

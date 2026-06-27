@@ -15,16 +15,22 @@ import type { IntelligenceSlice } from '../../shared/types/intelligence.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatForPrompt: vi.fn().mockReturnValue(''),
   formatKeywordsForPrompt: vi.fn().mockReturnValue(''),
   formatKnowledgeBaseForPrompt: vi.fn().mockReturnValue(''),
   formatPageMapForPrompt: vi.fn().mockReturnValue(''),
+}));
+
+vi.mock('../../server/intelligence/persona-format.js', () => ({
   formatPersonasForPrompt: vi.fn().mockReturnValue(''),
 }));
 
 const listLocalSeoMarketsMock = vi.fn(() => []);
 
-vi.mock('../../server/local-seo.js', () => ({
+vi.mock('../../server/domains/local-seo/configuration-service.js', () => ({
   listLocalSeoMarkets: (...args: unknown[]) => listLocalSeoMarketsMock(...args),
 }));
 

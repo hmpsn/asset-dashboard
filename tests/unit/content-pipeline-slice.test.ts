@@ -33,6 +33,10 @@ vi.mock('../../server/content-brief.js', () => ({
   listBriefs: mocks.listBriefs,
 }));
 
+vi.mock('../../server/content-brief-read-model.js', () => ({
+  listBriefs: mocks.listBriefs,
+}));
+
 vi.mock('../../server/content-subscriptions.js', () => ({
   listContentSubscriptions: mocks.listContentSubscriptions,
 }));
@@ -54,6 +58,10 @@ vi.mock('../../server/cannibalization-detection.js', () => ({
 }));
 
 vi.mock('../../server/content-decay.js', () => ({
+  loadDecayAnalysis: mocks.loadDecayAnalysis,
+}));
+
+vi.mock('../../server/content-decay-read-model.js', () => ({
   loadDecayAnalysis: mocks.loadDecayAnalysis,
 }));
 

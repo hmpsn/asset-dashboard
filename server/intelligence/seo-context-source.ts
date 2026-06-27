@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getWorkspace } from '../workspaces.js';
 import { getUploadRoot } from '../data-dir.js';
-import { getVoiceProfile } from '../voice-calibration.js';
+import { getVoiceProfile } from '../voice-profile-read-model.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from '../voice-dna-render.js';

@@ -6,7 +6,14 @@ import type {
   SeoContextSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
-import { buildWorkspaceIntelligence, formatForPrompt, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
+import { listLocalSeoMarkets } from '../domains/local-seo/configuration-service.js';
+import {
+  formatForPrompt,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
+  formatPageMapForPrompt,
+} from './formatters.js';
 import { formatPersonasForPrompt } from './persona-format.js';
 
 type LearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
@@ -90,15 +97,11 @@ async function buildGenerationContext(
  * Returns true when the workspace has at least one active local SEO market configured.
  * Used to gate localSeo slice inclusion in generation context — workspaces without
  * active markets don't pay token cost for an empty slice.
- *
- * Dynamic import keeps the local-seo subsystem off the synchronous import path of
- * generation-context-builders, which is consistent with the lazy-load pattern other
- * slice consumers use.
  */
 async function hasActiveLocalMarkets(workspaceId: string): Promise<boolean> {
   try {
-    const { listLocalSeoMarkets } = await import('../local-seo.js'); // dynamic-import-ok - lazy-load local SEO module to keep generation builders light
-    return listLocalSeoMarkets(workspaceId).some(m => m.status === 'active');
+    const markets = listLocalSeoMarkets(workspaceId);
+    return Array.isArray(markets) && markets.some(m => m.status === 'active');
   } catch { // catch-ok: gating check, missing module or DB error should fall back to "no markets" rather than fail the whole build
     return false;
   }
