@@ -33,7 +33,7 @@ export {
  *   - refresh_reclaim→ blue  (Law 2: data hue — reclaiming earned positions)
  *   - quick_win      → emerald(Law 3: success/wins hue)
  *   - defend         → amber (risk / defend)
- *   - technical      → sky   (technical / infra)
+ *   - technical      → blue  (technical / infra, non-action operational signal)
  *   - local          → orange(local visibility)
  * No purple, no violet/indigo, no new hue families. Tailwind utility classes only
  * (no new tokens). Callers that need a lighter BAR FILL apply their own opacity.
@@ -43,6 +43,6 @@ export const ARCHETYPE_ACCENT: Record<Archetype, string> = {
   refresh_reclaim: 'bg-blue-400',
   defend: 'bg-amber-400',
   quick_win: 'bg-emerald-400',
-  technical: 'bg-sky-400',
+  technical: 'bg-blue-300',
   local: 'bg-orange-400',
 };

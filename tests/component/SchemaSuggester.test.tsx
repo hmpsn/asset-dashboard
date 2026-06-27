@@ -256,6 +256,7 @@ function makeGenerationHook(overrides: Record<string, unknown> = {}) {
     setPageTypes: vi.fn(),
     setSinglePageTypeOverrides: vi.fn(),
     snapshotDate: null,
+    snapshotLoading: false,
     filteredInitialPages: [],
     runScan: runScanMock,
     stopScan: stopScanMock,
@@ -311,6 +312,18 @@ describe('SchemaSuggester', () => {
     render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
     expect(screen.getByTestId('schema-generator-hero')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /generate schema/i })).toBeInTheDocument();
+  });
+
+  it('does not flash the generator hero while saved schema results hydrate', async () => {
+    const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+    vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(
+      makeGenerationHook({ started: false, snapshotLoading: true }) as ReturnType<typeof genMod.useSchemaSuggesterGeneration>,
+    );
+
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    expect(screen.getByText(/checking saved schema results/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('schema-generator-hero')).not.toBeInTheDocument();
   });
 
   it('calls runScan when Generate Schema button is clicked', () => {

@@ -3,7 +3,7 @@
  * Rendered as a sub-tab inside the Schema tab.
  */
 import {
-  Sparkles, CheckCircle, BarChart3, Globe, Users, Layers,
+  Sparkles, CheckCircle, BarChart3, Globe, Layers,
   ArrowRight, Target, Eye, Zap, TrendingUp, FileText,
 } from 'lucide-react';
 import { Icon } from '../ui';
@@ -17,7 +17,7 @@ const STEPS = [
     bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'AI analyzes all your published pages + keyword strategy to assign page roles and identify canonical entities.',
     actions: [
-      'Click "Generate Schema Plan" in the Plan panel at the top',
+      'Click "Generate Site Plan" in the Plan panel at the top',
       'Review page roles — fix any misassigned ones with the dropdown',
       'Check canonical entities (Organization, Products, Services)',
       'Save → Send to Client for approval → Activate when approved',
@@ -32,7 +32,7 @@ const STEPS = [
     bg: 'bg-blue-500/10 border-blue-500/20',
     description: 'See which pages have schema markup and which don\'t — coverage percentage by page role.',
     actions: [
-      'Review the coverage dashboard to understand your starting point',
+      'Review the schema completeness and results summaries to understand your starting point',
       'Identify page roles with low coverage (e.g., "Services: 3/10 covered")',
     ],
     tip: 'If a site already has some manual schema, you\'ll see it reflected here before you generate anything new.',
@@ -45,7 +45,7 @@ const STEPS = [
     bg: 'bg-amber-500/10 border-amber-500/20',
     description: 'Pages without schema, ranked by internal link health. Higher-traffic, better-linked pages should get schema first.',
     actions: [
-      'Check the priority queue for critical/high priority pages',
+      'Use Page Intelligence → Architecture when you need deeper page-priority context',
       'Start with these — they\'ll have the most SEO impact',
     ],
     tip: 'For sites with 100+ pages, batch your work. Do critical/high first, then medium/low in follow-up rounds.',
@@ -61,7 +61,7 @@ const STEPS = [
       'Single page: Select a page → click "Generate" → review the JSON-LD',
       'Bulk: Click "Generate All Pages" to process the entire site as a background job',
       'Set page types before generating for more accurate schemas',
-      'Review and edit generated JSON-LD as needed → "Save to Snapshot"',
+      'Review and edit generated JSON-LD as needed before publishing or sending to the client',
     ],
     tip: 'Generation uses your active schema plan, saved page type mappings, site architecture, CMS field evidence, and business profile context.',
   },
@@ -82,27 +82,13 @@ const STEPS = [
   },
   {
     number: 6,
-    title: 'Check Competitors',
-    icon: Users,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10 border-amber-500/20',
-    description: 'Crawl competitor sites to see what schema types they use. Identify gaps in your coverage.',
-    actions: [
-      'Run competitor schema analysis from the Competitors tab',
-      'Compare: what schema types do they have that you don\'t?',
-      'Use findings in client conversations to justify schema work',
-    ],
-    tip: '"Your top competitor has Product schema on every service page — we should match that."',
-  },
-  {
-    number: 7,
     title: 'Monitor Impact',
     icon: TrendingUp,
     color: 'text-emerald-400',
     bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'Track GSC metrics before vs after each schema deployment. See clicks, impressions, CTR, and position deltas.',
     actions: [
-      'Check the Schema Impact panel (collapsible, below the main view)',
+      'Check the Schema Impact panel below the generated results',
       'Wait 2-4 weeks after deployment for meaningful data',
       'Use per-deployment breakdown to see which pages improved most',
     ],
@@ -226,9 +212,9 @@ export function SchemaWorkflowGuide() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {[
-            'Discovery → Generate Plan + Competitor Analysis',
+            'Discovery → Generate site plan',
             'Strategy → Review roles, send to client',
-            'Prioritize → Coverage dashboard + Priority queue',
+            'Prioritize → Completeness summary + Page Intelligence',
             'Execute → Bulk generate → Review → Publish',
             'Expand → Generate remaining pages in batches',
             'Measure → Check Impact panel after 2-4 weeks',

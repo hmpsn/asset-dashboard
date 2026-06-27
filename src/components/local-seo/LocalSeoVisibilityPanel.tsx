@@ -193,7 +193,10 @@ function LocalSeoSetupCallout({
 }
 
 function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mode: 'strategy' | 'keywords' }) {
-  const columns = mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
+  const hasDegradedResults = report.degradedCount > 0;
+  const columns = hasDegradedResults
+    ? mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-6'
+    : mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
   return (
     <div className={`grid ${columns} gap-3`}>
       <StatCard label="Markets" value={report.activeMarketCount} icon={MapPin} iconColor="#60a5fa" valueColor="text-blue-400" sub={`${report.configuredMarketCount} configured`} />
@@ -206,6 +209,9 @@ function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mod
         </>
       ) : (
         <StatCard label="Needs Review" value={report.possibleMatchCount + report.notVisibleCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub={`${report.localPackPresentCount} local packs`} />
+      )}
+      {hasDegradedResults && (
+        <StatCard label="Degraded" value={report.degradedCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="provider warnings" />
       )}
     </div>
   );

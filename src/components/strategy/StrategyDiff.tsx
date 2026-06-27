@@ -42,6 +42,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
       <ClickableRow
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
       >
         <div className="flex items-center gap-2">

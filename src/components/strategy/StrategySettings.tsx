@@ -33,6 +33,7 @@ export function StrategySettings({
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
         <ClickableRow
           onClick={() => setSettingsOpen(!settingsOpen)}
+          aria-expanded={settingsOpen}
           className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 text-left"
         >
           <div className="flex items-center gap-2">
@@ -78,17 +79,18 @@ export function StrategySettings({
             {seoDataAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="md" className="text-accent-orange" />
+                  <Icon as={BarChart3} size="md" className="text-accent-brand" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Mode</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3" role="group" aria-label="SEO data mode">
                   {(['none', 'quick', 'full'] as const).map(mode => (
                     <ClickableRow
                       key={mode}
                       onClick={() => setSeoDataMode(mode)}
+                      aria-pressed={seoDataMode === mode}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         seoDataMode === mode
-                          ? 'border-orange-500/50 bg-orange-500/10 text-accent-orange'
+                          ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
                           : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
                     >
@@ -114,7 +116,7 @@ export function StrategySettings({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <Icon as={Users} size="md" className="text-accent-orange" />
+                    <Icon as={Users} size="md" className="text-accent-brand" />
                     <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
                   <Button
@@ -122,9 +124,9 @@ export function StrategySettings({
                     disabled={discoveringCompetitors}
                     variant="ghost"
                     size="sm"
-                    className="px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-accent-orange font-medium hover:bg-orange-500/20"
+                    className="px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 t-micro text-accent-brand font-medium hover:bg-teal-500/20"
                   >
-                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-accent-orange" />}
+                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-accent-brand" />}
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
                   </Button>
                 </div>
@@ -146,11 +148,12 @@ export function StrategySettings({
                 <Icon as={FileText} size="md" className="text-accent-brand" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-3" role="group" aria-label="Page analysis limit">
                 {([200, 500, 1000, 0] as const).map(cap => (
                   <ClickableRow
                     key={cap}
                     onClick={() => setMaxPages(cap)}
+                    aria-pressed={maxPages === cap}
                     className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                       maxPages === cap
                         ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
@@ -180,6 +183,7 @@ export function StrategySettings({
                 onClick={() => setContextOpen(!contextOpen)}
                 variant="ghost"
                 size="sm"
+                aria-expanded={contextOpen}
                 className="flex items-center gap-1.5 mb-1 px-0 py-0 h-auto min-h-0"
               >
                 <Icon as={Briefcase} size="md" className="text-accent-brand" />
