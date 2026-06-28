@@ -4,6 +4,7 @@ import { publicCopyReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type { ClientAction } from '../../../shared/types/client-actions';
+import type { ClientDiagnosticSummary } from '../../../shared/types/diagnostics';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
@@ -60,6 +61,16 @@ export function useClientAnomalies(wsId: string, enabled: boolean) {
     queryFn: () => getSafe<AnomalyItem[]>(`/api/public/anomalies/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
+  });
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────
+export function useClientDiagnostics(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.diagnostics(wsId),
+    queryFn: () => getSafe<{ reports: ClientDiagnosticSummary[] }>(`/api/public/diagnostics/${wsId}`, { reports: [] }),
+    enabled,
+    select: (d) => (Array.isArray(d?.reports) ? d.reports : []),
   });
 }
 

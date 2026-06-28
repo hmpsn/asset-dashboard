@@ -699,6 +699,9 @@ function clientDashboardInvalidationKeys(
       return [queryKeys.client.annotations(workspaceId)] as const;
     case WS_EVENTS.ANOMALIES_UPDATE:
       return [queryKeys.client.anomalies(workspaceId)] as const;
+    case WS_EVENTS.DIAGNOSTIC_COMPLETE:
+    case WS_EVENTS.DIAGNOSTIC_FAILED:
+      return [queryKeys.client.diagnostics(workspaceId)] as const;
     case WS_EVENTS.SCHEMA_PLAN_SENT:
     case WS_EVENTS.SCHEMA_PLAN_UPDATED:
       return [queryKeys.client.schemaPlan(workspaceId)] as const;

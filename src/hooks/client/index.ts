@@ -22,6 +22,7 @@ export {
   useClientLatestRanks,
   useClientAnnotations,
   useClientAnomalies,
+  useClientDiagnostics,
   useClientApprovals,
   useClientRequests,
   useClientContentRequests,

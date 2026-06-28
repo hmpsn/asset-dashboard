@@ -19,6 +19,18 @@ export interface DiagnosticReport {
   completedAt: string | null;
 }
 
+export interface ClientDiagnosticSummary {
+  id: string;
+  insightId: string | null;
+  anomalyType: string;
+  affectedPages: string[];
+  clientSummary: string;
+  rootCauses: Pick<RootCause, 'rank' | 'title' | 'confidence'>[];
+  remediationActions: Pick<RemediationAction, 'priority' | 'title'>[];
+  createdAt: string;
+  completedAt: string;
+}
+
 export interface RootCause {
   rank: number;
   title: string;

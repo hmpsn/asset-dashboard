@@ -381,6 +381,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.POST_UPDATED]: () => invalidateClientEvent(WS_EVENTS.POST_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.AUDIT_COMPLETE]: () => invalidateClientEvent(WS_EVENTS.AUDIT_COMPLETE),
+    // ws-invalidation-ok — client dashboard keeps diagnostic summaries fresh after background analysis completes
+    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => invalidateClientEvent(WS_EVENTS.DIAGNOSTIC_COMPLETE),
+    // ws-invalidation-ok — client dashboard clears stale diagnostic loading/error-adjacent data after terminal failure
+    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => invalidateClientEvent(WS_EVENTS.DIAGNOSTIC_FAILED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.WORKSPACE_UPDATED]: () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });

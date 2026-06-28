@@ -61,6 +61,8 @@ import { useClientTheIssue } from './useClientTheIssue';
 import { useActOnRecommendation } from '../../../hooks/client/useActOnRecommendation';
 import { useClientRecResponses } from '../../../hooks/client/useClientRecResponses';
 import { ISSUE_SECTION_TITLES } from './evergreenCopy';
+import { DiagnosticRootCauseCards } from '../DiagnosticRootCauseCards';
+import type { ClientDiagnosticSummary } from '../../../../shared/types/diagnostics';
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
@@ -99,6 +101,8 @@ export interface TheIssueClientPageProps {
   segmentProfile?: ResolvedSegmentProfile | null;
   /** Test override for the spine flag. When provided, overrides useFeatureFlag (Rules-of-Hooks-safe). */
   theIssueClientSpine?: boolean;
+  /** Completed client-safe diagnostic summaries shown on the Overview surface. */
+  diagnosticReports?: ClientDiagnosticSummary[];
   /** P1b (Lane C) — test override for the return-hook flag (export bar + your-leads). When provided,
    *  overrides useFeatureFlag (Rules-of-Hooks-safe). Flag-OFF → neither P1b surface mounts. */
   theIssueReturnHook?: boolean;
@@ -125,6 +129,7 @@ export function TheIssueClientPage({
   outcomeCount,
   segmentProfile,
   theIssueClientSpine,
+  diagnosticReports = [],
   theIssueReturnHook,
   iaV2,
 }: TheIssueClientPageProps) {
@@ -225,6 +230,8 @@ export function TheIssueClientPage({
           {!previewMode && (
             <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
           )}
+
+          <DiagnosticRootCauseCards workspaceId={workspaceId} reports={diagnosticReports} />
 
           {/* 1. Verdict — the dollar/outcome lead (no ring). */}
           <ErrorBoundary label="Verdict">
@@ -380,6 +387,8 @@ export function TheIssueClientPage({
         {!previewMode && (
           <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
         )}
+
+        <DiagnosticRootCauseCards workspaceId={workspaceId} reports={diagnosticReports} />
 
         {/* 2. Narrated status headline (health chip lives in the ring) + the "curated by your
             strategist" byline sub-line — makes the human-curation moat visible at the top. */}

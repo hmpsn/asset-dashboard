@@ -37,13 +37,14 @@ vi.mock('../../server/email.js', () => ({ sendEmail: vi.fn() }));
 
 // ─── Imports (after mock registration) ───────────────────────────────────────
 
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
-import { createDiagnosticReport } from '../../server/diagnostic-store.js';
+import { completeDiagnosticReport, createDiagnosticReport } from '../../server/diagnostic-store.js';
 import db from '../../server/db/index.js';
+import { signClientSession } from '../../server/middleware.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
-import type { DiagnosticReport } from '../../shared/types/diagnostics.js';
+import type { ClientDiagnosticSummary, DiagnosticContext, DiagnosticReport } from '../../shared/types/diagnostics.js';
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
 
@@ -74,6 +75,14 @@ function api(path: string, opts?: RequestInit): Promise<Response> {
   return fetch(`${baseUrl}${path}`, opts);
 }
 
+function clientApi(path: string, workspaceId: string): Promise<Response> {
+  return api(path, {
+    headers: {
+      Cookie: `client_session_${workspaceId}=${signClientSession(workspaceId)}`,
+    },
+  });
+}
+
 function putJson(path: string, body: unknown): Promise<Response> {
   return api(path, {
     method: 'PUT',
@@ -86,6 +95,33 @@ function putJson(path: string, body: unknown): Promise<Response> {
 
 let wsId = '';
 let otherWsId = '';
+
+const diagnosticContext: DiagnosticContext = {
+  anomaly: {
+    type: 'traffic_drop',
+    severity: 'critical',
+    metric: 'clicks',
+    currentValue: 100,
+    expectedValue: 500,
+    deviationPercent: -80,
+    firstDetected: '2026-06-01T00:00:00.000Z',
+  },
+  positionHistory: [],
+  queryBreakdown: [],
+  redirectProbe: { chain: [], finalStatus: 200, canonical: null, isSoftFourOhFour: false },
+  internalLinks: { count: 4, siteMedian: 8, topLinkingPages: ['/'], deficit: 4 },
+  backlinks: { totalBacklinks: 10, referringDomains: 3, topDomains: [], recentlyLost: 0 },
+  siteBaselines: { avgInternalLinks: 8, medianPosition: 12, totalBacklinks: 10 },
+  recentActivity: [],
+  concurrentAnomalies: [],
+  existingInsights: [],
+  periodComparison: {
+    current: { clicks: 100, impressions: 1000, ctr: 10, position: 8 },
+    previous: { clicks: 500, impressions: 2000, ctr: 25, position: 4 },
+    changePercent: { clicks: -80, impressions: -50, ctr: -60, position: 100 },
+  },
+  unavailableSources: [],
+};
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -393,6 +429,96 @@ describe('GET /api/workspaces/:workspaceId/diagnostics', () => {
     const body = await res.json() as { reports: DiagnosticReport[] };
     const leaked = body.reports.find(r => r.id === otherReport.id);
     expect(leaked).toBeUndefined();
+  });
+});
+
+// ─── Client diagnostics: safe projection ─────────────────────────────────────
+
+describe('GET /api/public/diagnostics/:workspaceId', () => {
+  it('returns only completed client-safe diagnostic summaries', async () => {
+    const insight = seedCriticalInsight(wsId);
+    const completed = createDiagnosticReport(wsId, insight.id, 'traffic_drop', ['/pricing']);
+    completeDiagnosticReport(completed.id, {
+      diagnosticContext,
+      rootCauses: [
+        { rank: 1, title: 'Ranking loss', confidence: 'high', explanation: 'Admin detail', evidence: ['raw GSC evidence'] },
+      ],
+      remediationActions: [
+        { priority: 'P1', title: 'Refresh pricing page', description: 'Admin detail', effort: 'medium', impact: 'high', owner: 'content', pageUrls: ['/pricing'] },
+      ],
+      adminReport: 'Admin-only markdown',
+      clientSummary: 'Traffic dropped because the pricing page lost visibility.',
+    });
+
+    const running = createDiagnosticReport(wsId, insight.id, 'ranking_drop', ['/blog']);
+    const otherInsight = seedCriticalInsight(otherWsId);
+    const otherReport = createDiagnosticReport(otherWsId, otherInsight.id, 'traffic_drop', ['/other']);
+    completeDiagnosticReport(otherReport.id, {
+      diagnosticContext,
+      rootCauses: [{ rank: 1, title: 'Other workspace cause', confidence: 'high', explanation: 'No leak', evidence: ['secret'] }],
+      remediationActions: [{ priority: 'P1', title: 'Other workspace action', description: 'No leak', effort: 'low', impact: 'high', owner: 'seo' }],
+      adminReport: 'Other admin report',
+      clientSummary: 'Other workspace summary',
+    });
+
+    const res = await clientApi(`/api/public/diagnostics/${wsId}`, wsId);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { reports: ClientDiagnosticSummary[] };
+
+    expect(body.reports).toHaveLength(1);
+    expect(body.reports[0]).toMatchObject({
+      id: completed.id,
+      anomalyType: 'traffic_drop',
+      affectedPages: ['/pricing'],
+      clientSummary: 'Traffic dropped because the pricing page lost visibility.',
+      rootCauses: [{ rank: 1, title: 'Ranking loss', confidence: 'high' }],
+      remediationActions: [{ priority: 'P1', title: 'Refresh pricing page' }],
+    });
+    expect(body.reports.find(report => report.id === running.id)).toBeUndefined();
+    expect(body.reports.find(report => report.id === otherReport.id)).toBeUndefined();
+    expect(body.reports[0]).not.toHaveProperty('adminReport');
+    expect(body.reports[0]).not.toHaveProperty('diagnosticContext');
+    expect(body.reports[0].rootCauses[0]).not.toHaveProperty('evidence');
+    expect(body.reports[0].rootCauses[0]).not.toHaveProperty('explanation');
+  });
+
+  it('returns an empty list when no completed client summaries exist', async () => {
+    const fresh = createWorkspace('Client Diagnostics Empty WS');
+    try {
+      const insight = seedCriticalInsight(fresh.id);
+      createDiagnosticReport(fresh.id, insight.id, 'traffic_drop', ['/pending']);
+
+      const res = await clientApi(`/api/public/diagnostics/${fresh.id}`, fresh.id);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { reports: ClientDiagnosticSummary[] };
+      expect(body.reports).toEqual([]);
+    } finally {
+      db.prepare('DELETE FROM diagnostic_reports WHERE workspace_id = ?').run(fresh.id);
+      db.prepare('DELETE FROM analytics_insights WHERE workspace_id = ?').run(fresh.id);
+      deleteWorkspace(fresh.id);
+    }
+  });
+
+  it('requires a valid client portal session for the requested workspace', async () => {
+    const unauthenticated = await api(`/api/public/diagnostics/${wsId}`);
+    expect(unauthenticated.status).toBe(401);
+
+    const wrongWorkspaceSession = await clientApi(`/api/public/diagnostics/${wsId}`, otherWsId);
+    expect(wrongWorkspaceSession.status).toBe(401);
+  });
+
+  it('returns 403 when the client portal is disabled', async () => {
+    const disabled = createWorkspace('Client Diagnostics Disabled Portal WS');
+    updateWorkspace(disabled.id, { clientPortalEnabled: false });
+
+    try {
+      const res = await clientApi(`/api/public/diagnostics/${disabled.id}`, disabled.id);
+      expect(res.status).toBe(403);
+    } finally {
+      db.prepare('DELETE FROM diagnostic_reports WHERE workspace_id = ?').run(disabled.id);
+      db.prepare('DELETE FROM analytics_insights WHERE workspace_id = ?').run(disabled.id);
+      deleteWorkspace(disabled.id);
+    }
   });
 });
 
