@@ -29,7 +29,10 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('../../../src/components/client/BetaContext', () => ({ useBetaMode: () => false }));
-vi.mock('../../../src/hooks/client', () => ({ useClientIntelligence: () => ({ data: undefined }) }));
+vi.mock('../../../src/hooks/client', () => ({
+  useClientIntelligence: () => ({ data: undefined }),
+  useClientDiagnostics: () => ({ data: [] }),
+}));
 vi.mock('../../../src/hooks/useRecommendations', () => ({ useRecommendationSet: () => ({ data: undefined }) }));
 
 // Stub TheIssueClientPage to render the REAL OutcomeCountBand from the outcomeCount prop OverviewTab

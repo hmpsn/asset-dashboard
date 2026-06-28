@@ -8,7 +8,7 @@ import { HealthScoreCard } from './HealthScoreCard';
 import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import OutcomeSummary from './OutcomeSummary';
 import { WinsSurface } from './Briefing/WinsSurface';
-import { useClientIntelligence } from '../../hooks/client';
+import { useClientDiagnostics, useClientIntelligence } from '../../hooks/client';
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,7 @@ import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
+import { DiagnosticRootCauseCards } from './DiagnosticRootCauseCards';
 import { themeColor } from '../ui/constants';
 import type { ClientGA4Data } from '../../hooks/client/useClientGA4';
 import type { IssueOutcomeCount, OutcomeType, OutcomeTypeBreakdown } from '../../../shared/types/the-issue';
@@ -115,6 +116,7 @@ export function OverviewTab({
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const { data: clientIntel } = useClientIntelligence(workspaceId);
+  const { data: diagnosticReports = [] } = useClientDiagnostics(workspaceId, Boolean(workspaceId));
   // useRecommendationSet shares the same React Query cache key as InsightsEngine
   // so loading the Health tab first means this is already warm — no extra fetch.
   const { data: recSet } = useRecommendationSet(workspaceId);
@@ -235,6 +237,7 @@ export function OverviewTab({
           setToast={setToast}
           outcomeCount={outcomeCount}
           segmentProfile={segmentProfile}
+          diagnosticReports={diagnosticReports}
         />
       </ErrorBoundary>
     );
@@ -346,6 +349,8 @@ export function OverviewTab({
         </div>
       );
     })()}
+
+    <DiagnosticRootCauseCards workspaceId={workspaceId} reports={diagnosticReports} />
 
     {/* Action-needed banner — full-width, above content grid */}
     {(() => {

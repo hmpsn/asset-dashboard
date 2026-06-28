@@ -297,6 +297,7 @@ export const queryKeys = {
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
     intelligence: (wsId: string) => ['client-intelligence', wsId] as const,
+    diagnostics: (wsId: string) => ['client-diagnostics', wsId] as const,
 
     // Client Copy Review
     copyEntries: (wsId: string) => ['client-copy-entries', wsId] as const,

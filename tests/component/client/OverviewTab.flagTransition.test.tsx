@@ -26,7 +26,10 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 vi.mock('../../../src/components/client/BetaContext', () => ({ useBetaMode: () => false }));
-vi.mock('../../../src/hooks/client', () => ({ useClientIntelligence: () => ({ data: undefined }) }));
+vi.mock('../../../src/hooks/client', () => ({
+  useClientIntelligence: () => ({ data: undefined }),
+  useClientDiagnostics: () => ({ data: [] }),
+}));
 vi.mock('../../../src/hooks/useRecommendations', () => ({ useRecommendationSet: () => ({ data: undefined }) }));
 
 // NOTE: useFeatureFlag is intentionally NOT mocked — the real hook (useQuery) is what makes this a

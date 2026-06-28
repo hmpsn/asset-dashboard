@@ -319,9 +319,10 @@
           "source": "Client dashboard audit 2026-06-11 — docs/audits/client-dashboard-2026-06/02-significant-changes.md §1",
           "est": "2-3d",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-11",
-          "notes": "Diagnostic reports exist server-side (server/diagnostic-store.ts) and never reach clients. Surface completed diagnostics as narrative cards; aligns with roadmap #33 anomaly detection. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep — still valid and HIGH-leverage; foundation is even more complete than the note states (clientSummary already authored per report). Re-frame as a thin surfacing task: add a public route serializing completed diagnostics' clientSummary + top RootCause titles, plus a client narrative card. Correct the stale path from server/diagnostics.ts to server/diagnostic-store.ts / server/routes/diagnostics.ts."
+          "notes": "Diagnostic reports exist server-side (server/diagnostic-store.ts) and never reach clients. Surface completed diagnostics as narrative cards; aligns with roadmap #33 anomaly detection. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep — still valid and HIGH-leverage; foundation is even more complete than the note states (clientSummary already authored per report). Re-frame as a thin surfacing task: add a public route serializing completed diagnostics' clientSummary + top RootCause titles, plus a client narrative card. Correct the stale path from server/diagnostics.ts to server/diagnostic-store.ts / server/routes/diagnostics.ts. || Done 2026-06-28 in codex/client-diagnostics-rootcause: added a client-safe diagnostics projection and public route for completed report summaries, wired client React Query + diagnostic completion invalidation, and mounted Overview narrative cards showing clientSummary, top root-cause titles, and remediation priorities without exposing admin reports, raw diagnostic context, or evidence arrays.",
+          "completedAt": "2026-06-28"
         },
         {
           "id": "cda-sc6-attention-badge",

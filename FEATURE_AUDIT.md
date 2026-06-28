@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **533 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **534 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 534. Client diagnostic root-cause cards
+
+**What it does:** Surfaces completed deep diagnostic reports in the client Overview as plain-language "what changed" cards. The cards use the report's client-safe summary, top root-cause titles, affected page, and remediation priorities while excluding admin reports, raw diagnostic context, evidence arrays, provider internals, and failed/running diagnostics.
+
+**Why it matters to the agency:** Turns a hidden admin investigation into a client-visible explanation, making it easier to answer "why did traffic drop?" without manually rewriting diagnostic findings.
+
+**Why it matters to clients:** Replaces vague traffic anxiety with a concise explanation and a clear path back to the Health tab for next steps.
 
 ---
 
