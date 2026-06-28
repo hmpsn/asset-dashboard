@@ -25,7 +25,7 @@ import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-co
 // Constants
 // ---------------------------------------------------------------------------
 
-/** The 6 segment filters that are already surfaced as primary pills. */
+/** The segment filters that are already surfaced as primary pills. */
 const PRIMARY_FILTER_IDS = new Set<KeywordCommandCenterFilter>([
   KEYWORD_COMMAND_CENTER_FILTERS.ALL,
   KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY,
@@ -33,6 +33,7 @@ const PRIMARY_FILTER_IDS = new Set<KeywordCommandCenterFilter>([
   KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW,
   KEYWORD_COMMAND_CENTER_FILTERS.RETIRED,
   KEYWORD_COMMAND_CENTER_FILTERS.LOCAL,
+  KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE,
 ]);
 
 // ---------------------------------------------------------------------------

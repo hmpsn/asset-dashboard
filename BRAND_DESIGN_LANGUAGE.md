@@ -441,8 +441,8 @@ The admin Keywords surface (the Keyword Hub, the sole keyword surface after the 
 | Bulk action bar | `bg-[var(--surface-2)] border-[var(--brand-border)]` with Button primitives | Operational control surface, not a marketing card |
 | Bulk add-to-strategy | Primary Button (`from-teal-600 to-emerald-600`) | Strategy action |
 | Bulk track | Secondary Button | Lifecycle action with lower emphasis than strategy add |
-| Bulk pause / retire | Ghost Button, destructive confirmation for retire | Pause is reversible; retire needs confirmation |
-| Bulk decline | Danger Button | Decline is a destructive strategy feedback action |
+| Bulk pause / retire | Ghost Button; retire uses amber caution semantics | Pause is reversible; retire preserves rank history and needs confirmation |
+| Bulk decline | Amber Ghost Button | Decline is reversible strategy feedback, not an irreversible delete |
 | Lifecycle badges | `StatusBadge domain="keyword-command-center"` | Keeps keyword, local lifecycle, and feedback status semantics centralized |
 | Detail drawer | Fixed right slide-over desktop, bottom sheet mobile; `bg-[var(--surface-2)]`, token z-index, token shadow | Matches StrategyKeywordDrawer pattern while preserving table width |
 | Drawer mini-panels | `KeywordDetailPanel` local helper with tokenized surface/border variants | Prevents repeated hand-rolled panel classes inside the drawer |
@@ -481,6 +481,8 @@ The admin Keywords surface (the Keyword Hub, the sole keyword surface after the 
 ### Keyword Hub action affordances (`KeywordActionMenu.tsx`)
 
 The Keyword Hub (Wave 4) introduces a deliberate **action-tone reconciliation** that frees **red exclusively for the one irreversible affordance — permanent Delete.** The shared server `buildNextActions` still emits `tone:'red'` for retire/decline; the Hub remaps those to amber locally in `KeywordActionMenu` rather than changing the server. (Post-cutover the `keyword-hub` flag is retired and the Hub is the only renderer — there is no longer a flag-OFF legacy path.)
+
+The bulk action bar follows the same tone contract as row actions: Retire and Decline are amber ghost actions, not red danger buttons. Red remains reserved for permanent Delete only.
 
 | Affordance | Tone | Rationale |
 |------------|------|-----------|
@@ -801,6 +803,7 @@ When shipping UI changes that affect color or design patterns:
 ### The Issue — Operator steering (§11/§12, June 2026)
 Three operator-facing, admin-only curation verbs, all theIssueEnabled-gated (byte-identical OFF). No purple, no TierGate.
 - **Inline rec-wording editor** (`src/components/strategy/CockpitRow.tsx`) — an OPTIONAL `onEditWording` prop adds a `Pencil` `<IconButton>` (`variant="ghost"`) to the row's idle action cluster (before "Send to client"). Toggling it reveals an inline editor panel — `bg-[var(--surface-1)]` inset (one tier below the row's `--surface-2`, so the `--surface-3` `FormInput`/`FormTextarea` controls read as nested) with a `--brand-border`, `--radius-lg`. Title via `<FormInput commitOnBlur>` (cap `REC_WORDING_TITLE_MAX`=160), insight via `<FormTextarea commitOnBlur rows={3}>` (cap `REC_WORDING_INSIGHT_MAX`=600); field labels are `t-label text-[var(--brand-text-muted)] uppercase`. When the prop is ABSENT (flag-OFF / command-center / StrategyCockpit consumers) the row renders byte-identically — no pencil, no editor.
+- **Cockpit row parking** (`src/components/strategy/CockpitRow.tsx`) — the recommendation row exposes the defer/strike chooser as an explicit secondary `<Button icon={Clock}>` labelled "Park", not an unlabeled overflow affordance. "Park" opens the existing throttle picker (7/30/90 days) plus "Strike instead"; staged rows show "Unstage" as the active toggle state so the operator can reverse staging without decoding a passive "Staged" label.
 - **Add-a-recommendation modal** (`src/components/strategy/issue/AddRecommendationModal.tsx`) — ConfirmDialog-style overlay (`z-[var(--z-modal)]`, `--brand-overlay` scrim, `bg-[var(--surface-2)]` panel, `--radius-xl`). Mounted in `KeywordStrategy.tsx` issueOverviewEl; opened by a `<Button variant="secondary" icon={Plus}>` "Add a recommendation" above `BackingMovesQueue`. Body composes `<FormField>` + `FormSelect` (type = `MANUAL_REC_ALLOWED_TYPES`, human labels), `FormInput` (title, required), `FormTextarea` (insight, required), `FormSelect` (priority, default `fix_soon`), optional `FormInput` (target keyword). Primary `<Button variant="primary">` "Add recommendation" (Law 1 teal), `loading` while pending, disabled until title+insight non-empty.
 - **Client running order panel** (`src/components/strategy/issue/ClientRunningOrder.tsx`) — `<SectionCard title="Client running order">` with `ListOrdered` titleIcon (`text-accent-brand`), mounted after `BackingMovesQueue`. Lists only the curated/sent recs (`clientStatus` ∈ {sent, approved, discussing} AND not struck) as an `<ol>`; each `<li>` is a `bg-[var(--surface-2)]` row (`--radius-lg`, `--brand-border`) with a tabular-nums position index (`t-caption-sm text-[var(--brand-text-muted)]`), the rec title (`t-ui text-[var(--brand-text)]` truncated), and `ChevronUp`/`ChevronDown` ghost `<IconButton>`s (first row's up + last row's down disabled). `<EmptyState icon={ListOrdered}>` ("Nothing sent yet") when none are in front of the client.
 

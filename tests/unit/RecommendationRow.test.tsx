@@ -33,8 +33,9 @@ describe('RecommendationRow', () => {
 
   it('shows a Fix CTA when onFixCta is provided and fires it without toggling expand', () => {
     const onFixCta = vi.fn();
-    render(<RecommendationRow rec={makeRec()} onFixCta={onFixCta} />);
+    const { container } = render(<RecommendationRow rec={makeRec()} onFixCta={onFixCta} />);
     expect(screen.queryByText('expanded-description')).not.toBeInTheDocument();
+    expect(container.querySelector('button button')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^fix$/i }));
     expect(onFixCta).toHaveBeenCalledOnce();
     // stopPropagation: the row did not expand

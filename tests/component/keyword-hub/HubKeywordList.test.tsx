@@ -206,11 +206,14 @@ describe('HubKeywordList — loading state', () => {
 // Error state
 // ---------------------------------------------------------------------------
 describe('HubKeywordList — error state', () => {
-  it('renders ErrorState when isError=true', () => {
-    render(<HubKeywordList {...defaultProps({ isError: true, rows: [] })} />);
+  it('renders ErrorState with a retry action when isError=true', () => {
+    const onRetry = vi.fn();
+    render(<HubKeywordList {...defaultProps({ isError: true, rows: [], onRetry })} />);
     // ErrorState should be rendered (not the keyword table)
     expect(screen.queryByTestId('keyword-table')).toBeNull();
     expect(screen.queryByTestId('keyword-table-loading')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -241,9 +244,10 @@ describe('HubKeywordList — empty state', () => {
 
   // A3 blocker 9: unfiltered empty → action-oriented CTA; filtered empty → "adjust filters"
   it('unfiltered empty: shows "No keywords yet" title (not "No keywords match your filters") when isFiltered=false', () => {
+    const onFocusAddKeyword = vi.fn();
     render(
       <HubKeywordList
-        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: false })}
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: false, onFocusAddKeyword })}
       />,
     );
     const emptyEl = screen.getByTestId('keyword-table-empty');
@@ -254,6 +258,8 @@ describe('HubKeywordList — empty state', () => {
     expect(emptyEl.textContent).not.toContain('No keywords match your filters');
     // And should show an action-oriented title
     expect(emptyEl.textContent).toMatch(/no keywords yet|add.*keyword|get started/i);
+    fireEvent.click(screen.getByRole('button', { name: /add a keyword/i }));
+    expect(onFocusAddKeyword).toHaveBeenCalledTimes(1);
   });
 
   it('filtered empty: shows "No keywords match your filters" and Clear filters button when isFiltered=true', () => {

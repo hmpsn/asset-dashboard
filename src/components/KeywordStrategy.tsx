@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Target, FileText, HelpCircle, Plus, Search, ArrowRight, AlertTriangle } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow } from './ui';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow, Badge, type BadgeTone } from './ui';
 import { isCuratedForClient } from '../../shared/recommendation-predicates';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
@@ -90,6 +90,8 @@ interface Props {
   workspaceId: string;
   siteId?: string;
 }
+
+type SupportingDetailBadge = { label: string; tone: BadgeTone };
 
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
@@ -599,6 +601,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     localMarketLabel: primaryMarket?.label,
     onOpenLocalSeoSetup: () => setLocalSeoSetupOpen(true),
   };
+  const supportingDetailBadges: SupportingDetailBadge[] = [
+    measuredCapture && (capturedLeadsTotal ?? 0) > 0
+      ? { label: `${capturedLeadsTotal} lead${capturedLeadsTotal === 1 ? '' : 's'}`, tone: 'blue' }
+      : null,
+    (strategy?.contentGaps?.length ?? 0) > 0
+      ? { label: `${strategy?.contentGaps?.length ?? 0} content gap${(strategy?.contentGaps?.length ?? 0) === 1 ? '' : 's'}`, tone: 'blue' }
+      : null,
+    (strategy?.cannibalization?.length ?? 0) > 0
+      ? { label: `${strategy?.cannibalization?.length ?? 0} cannibalization`, tone: 'amber' }
+      : null,
+    cockpitRecs.length > 0
+      ? { label: `${cockpitRecs.length} backing move${cockpitRecs.length === 1 ? '' : 's'}`, tone: 'zinc' }
+      : null,
+  ].filter((badge): badge is SupportingDetailBadge => badge !== null);
   const issueOverviewEl = (theIssueEnabled && isRealStrategy && strategy) ? (
     // Blocker 4 — the 5-beat SPINE above the fold (IssueHeader [config + the canonical Send-issue
     // button] → StanceBar → DraftedPovEditor → BackingMovesQueue), then everything else collapsed
@@ -683,7 +699,19 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           here so the cockpit opens to the decision, not a wall. ── */}
       <details className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
         <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 t-ui font-medium text-[var(--brand-text)] select-none">
-          <span>Supporting detail</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <span>Supporting detail</span>
+            {supportingDetailBadges.map((badge) => (
+              <Badge
+                key={`${badge.tone}-${badge.label}`}
+                label={badge.label}
+                tone={badge.tone}
+                variant="soft"
+                size="sm"
+                shape="pill"
+              />
+            ))}
+          </span>
           <Icon
             as={ArrowRight}
             size="sm"

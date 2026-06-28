@@ -89,64 +89,67 @@ export function RecommendationRow({ rec, showUndismiss, onUndismiss, onFixCta }:
   return (
     <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)] border border-[var(--brand-border)]/60">
       {/* Header row */}
-      <ClickableRow
-        onClick={() => setExpanded(e => !e)}
-        className="flex items-start gap-3 p-3"
-        aria-expanded={expanded}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <Badge
-              label={PRIORITY_LABELS[rec.priority]}
-              tone={PRIORITY_TONES[rec.priority]}
-              size="sm"
-              shape="pill"
-            />
-            {rec.status !== 'dismissed' && (
+      <div className="flex items-start">
+        <ClickableRow
+          onClick={() => setExpanded(e => !e)}
+          className="flex min-w-0 flex-1 items-start gap-3 p-3"
+          aria-expanded={expanded}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <Badge
-                label={STATUS_LABELS[rec.status]}
-                tone={STATUS_TONES[rec.status]}
+                label={PRIORITY_LABELS[rec.priority]}
+                tone={PRIORITY_TONES[rec.priority]}
                 size="sm"
-                variant="outline"
                 shape="pill"
               />
-            )}
-            {rec.opportunity && (
-              <Badge
-                label={`OV ${Math.round(ovScore)}`}
-                tone="blue"
-                size="sm"
-                variant="outline"
-                shape="pill"
-              />
-            )}
-            {rec.opportunity?.emvPerWeek != null && rec.opportunity.emvPerWeek > 0 && (
-              <span className={`t-caption font-medium ${scoreColorClass(rec.impactScore)}`}>
-                {formatEmv(rec.opportunity.emvPerWeek)}
-              </span>
-            )}
+              {rec.status !== 'dismissed' && (
+                <Badge
+                  label={STATUS_LABELS[rec.status]}
+                  tone={STATUS_TONES[rec.status]}
+                  size="sm"
+                  variant="outline"
+                  shape="pill"
+                />
+              )}
+              {rec.opportunity && (
+                <Badge
+                  label={`OV ${Math.round(ovScore)}`}
+                  tone="blue"
+                  size="sm"
+                  variant="outline"
+                  shape="pill"
+                />
+              )}
+              {rec.opportunity?.emvPerWeek != null && rec.opportunity.emvPerWeek > 0 && (
+                <span className={`t-caption font-medium ${scoreColorClass(rec.impactScore)}`}>
+                  {formatEmv(rec.opportunity.emvPerWeek)}
+                </span>
+              )}
+            </div>
+            <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{rec.title}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] line-clamp-1 mt-0.5">{rec.insight}</div>
           </div>
-          <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{rec.title}</div>
-          <div className="t-caption-sm text-[var(--brand-text-muted)] line-clamp-1 mt-0.5">{rec.insight}</div>
-        </div>
-        {onFixCta && (
-          <Button
+          <Icon
+            as={expanded ? ChevronDown : ChevronRight}
             size="sm"
-            variant="primary"
-            icon={ArrowUpRight}
-            iconPosition="right"
-            className="flex-shrink-0"
-            onClick={(e) => { e.stopPropagation(); onFixCta(rec); }}
-          >
-            Fix
-          </Button>
+            className="text-[var(--brand-text-muted)] flex-shrink-0 mt-0.5"
+          />
+        </ClickableRow>
+        {onFixCta && (
+          <div className="flex-shrink-0 p-3 pl-0">
+            <Button
+              size="sm"
+              variant="primary"
+              icon={ArrowUpRight}
+              iconPosition="right"
+              onClick={() => onFixCta(rec)}
+            >
+              Fix
+            </Button>
+          </div>
         )}
-        <Icon
-          as={expanded ? ChevronDown : ChevronRight}
-          size="sm"
-          className="text-[var(--brand-text-muted)] flex-shrink-0 mt-0.5"
-        />
-      </ClickableRow>
+      </div>
 
       {/* Expanded detail */}
       {expanded && (

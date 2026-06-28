@@ -25,7 +25,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Eye, MapPin, RefreshCw, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
 
-import { Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
+import { Badge, Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
@@ -108,6 +108,26 @@ function hubSortToKccSort(key: HubSortKey): KeywordCommandCenterSort {
     default:
       return 'priority';
   }
+}
+
+const SORT_LABELS: Record<HubSortKey, string> = {
+  opportunity: 'opportunity value',
+  keyword: 'keyword',
+  position: 'rank',
+  change: 'change',
+  clicks: 'clicks',
+  volume: 'volume',
+  difficulty: 'difficulty',
+  date: 'date',
+};
+
+function sortSummary(key: HubSortKey, direction: 'asc' | 'desc'): string {
+  if (key === 'opportunity') {
+    return direction === 'desc'
+      ? 'Sorted by opportunity value'
+      : 'Sorted by lowest opportunity';
+  }
+  return `Sorted by ${SORT_LABELS[key]} ${direction === 'desc' ? 'descending' : 'ascending'}`;
 }
 
 function rowsQuerySignature(query: {
@@ -247,6 +267,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
 
   // Add-keyword input state (local — not a filter, not hub state).
   const [addKeywordValue, setAddKeywordValue] = useState('');
+  const addKeywordInputRef = useRef<HTMLInputElement>(null);
 
   // The selected row for the drawer: the freshly-fetched detail row when it
   // arrives, otherwise the list row as an instant preview (mirrors KCC).
@@ -453,6 +474,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     hub.setAdvancedFilter(null);
   };
 
+  const handleRetryRows = () => {
+    void (viewingInitialRows ? initialView.refetch() : rowsResult.refetch());
+  };
+
+  const handleFocusAddKeyword = () => {
+    addKeywordInputRef.current?.focus();
+  };
+
   const visibleKeys = useMemo(
     () => rows.map((r) => r.normalizedKeyword),
     [rows],
@@ -490,7 +519,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
       : null;
 
   return (
-    <div className={`space-y-4${hub.someSelected ? ' pb-24' : ''}`}>
+    <div className={`space-y-4${hub.someSelected ? ' pb-40 sm:pb-24' : ''}`}>
       <PageHeader
         title="Keyword Hub"
         subtitle="One surface for every keyword — strategy, tracking, rank, and local visibility."
@@ -500,6 +529,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             {/* Add-keyword input (B1): writes through the existing rank-tracking add path. */}
             <div className="flex items-center gap-1.5">
               <FormInput
+                ref={addKeywordInputRef}
                 value={addKeywordValue}
                 onChange={setAddKeywordValue}
                 placeholder="Add keyword..."
@@ -621,6 +651,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             onChange={hub.setSegment}
             isLoading={summaryLoading}
           />
+          <Badge
+            label={sortSummary(hub.sort.key, hub.sort.direction)}
+            ariaLabel={sortSummary(hub.sort.key, hub.sort.direction)}
+            tone="blue"
+            variant="soft"
+            size="sm"
+            shape="pill"
+          />
           <div className="ml-auto">
             <HubAdvancedFilters
               activeAdvancedFilter={hub.advancedFilter}
@@ -676,6 +714,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           isRowActionPending={rowAction.isPending || hardDelete.isPending}
           onClearSelection={hub.clearSelection}
           onResetFilters={handleResetFilters}
+          onRetry={handleRetryRows}
+          onFocusAddKeyword={handleFocusAddKeyword}
           onRowClick={(row) => setSelectedKey(row.normalizedKeyword)}
           activeKeyword={selectedKey}
           showLocalSeo={showLocalSeo}
