@@ -3,7 +3,7 @@
  * Saves per-site schema snapshots to SQLite.
  */
 import { randomUUID } from 'crypto';
-import type { SchemaPageSuggestion } from './schema-suggester.js';
+import type { SchemaPageSuggestion } from './schema/suggestion-types.js';
 import {
   SCHEMA_ROLE_PRIMARY_TYPE,
   SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES,

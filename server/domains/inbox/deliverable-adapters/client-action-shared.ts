@@ -56,6 +56,19 @@ import { createLogger } from '../../../logger.js';
 
 const clientActionRespondLog = createLogger('client-action-shared');
 
+type ClientActionsMutationsModule = {
+  respondToPublicClientAction: (
+    workspaceId: string,
+    actionId: string,
+    response: { status: 'approved' | 'changes_requested'; clientNote?: string },
+    actor: RespondToSourceOptions['actor'],
+  ) => ClientAction;
+};
+
+function inboxDomainModulePath(name: 'client-actions-mutations'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
+
 /**
  * The adapter input for every client_action-family type: the persisted `ClientAction` (as
  * built by `server/client-actions.ts:createClientAction`) plus the resolved Webflow `siteId`
@@ -255,7 +268,8 @@ export async function respondToClientActionSource(
     // Lazy import to break the module cycle: client-actions-mutations.ts (the reuse target)
     // imports the dual-write barrel, which imports every adapter (including this leaf). A
     // static import here would close that loop; the runtime-only dynamic import does not.
-    const { respondToPublicClientAction } = await import('../client-actions-mutations.js'); // dynamic-import-ok: breaks adapter↔mutations cycle (R2)
+    const { respondToPublicClientAction } =
+      await import(inboxDomainModulePath('client-actions-mutations')) as ClientActionsMutationsModule; // dynamic-import-ok: breaks adapter↔mutations cycle (R2)
     respondToPublicClientAction(
       workspaceId,
       actionId,

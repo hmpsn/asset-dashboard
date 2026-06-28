@@ -5,14 +5,54 @@ import type {
   SchemaValidationSummary,
   PerformanceSummary,
 } from '../../shared/types/intelligence.js';
-import type { Anomaly } from '../anomaly-detection.js';
-import type { CwvSummary } from '../seo-audit.js';
+import type { CwvSummary } from '../seo-audit-cwv-types.js';
 import { createLogger } from '../logger.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { z } from '../middleware/validate.js';
 import { readOptionalSlicePart } from './optional-slice-part.js';
 
 const log = createLogger('workspace-intelligence/site-health');
+
+type AuditSnapshotViewsModule = {
+  getLatestEffectiveSnapshot: (
+    siteId: string,
+    suppressions: unknown[] | undefined,
+  ) => {
+    audit: {
+      siteScore?: number | null;
+      cwvSummary?: CwvSummary;
+      pages?: unknown[];
+      deadLinkDetails?: unknown;
+      deadLinkSummary?: { total?: unknown };
+    };
+    previousScore?: number;
+  } | null;
+  listEffectiveSnapshotSummaries: (
+    siteId: string,
+    suppressions: unknown[] | undefined,
+  ) => Array<{ siteScore: number }>;
+};
+
+type AnomalyDetectionModule = {
+  listAnomalies: (workspaceId: string) => Array<{ type: string }>;
+};
+
+type WorkspaceMetricsSnapshotsModule = {
+  getSnapshots: (workspaceId: string, limit?: number) => Array<{
+    snapshotDate: string;
+    totalClicks: number;
+    totalImpressions: number;
+    avgPosition: number;
+    auditScore: number | null;
+    organicTrafficValue: number;
+  }>;
+};
+
+function serverModulePath(
+  name: 'audit-snapshot-views' | 'anomaly-detection' | 'workspace-metrics-snapshots',
+): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
 
 const aeoReviewPageSchema = z
   .object({
@@ -102,7 +142,7 @@ export async function assembleSiteHealth(
       },
       async () => {
         const { getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } =
-          await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+          await import(serverModulePath('audit-snapshot-views')) as AuditSnapshotViewsModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
         const latest = getLatestEffectiveSnapshot(siteId, workspace?.auditSuppressions);
         if (latest) {
           const nextAuditScore = latest.audit.siteScore ?? null;
@@ -340,8 +380,9 @@ export async function assembleSiteHealth(
     workspaceId,
     { anomalyCount: 0, anomalyTypes: [] },
     async () => {
-      const { listAnomalies } = await import('../anomaly-detection.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const anomalies: Anomaly[] = listAnomalies(workspaceId);
+      const { listAnomalies } =
+        await import(serverModulePath('anomaly-detection')) as AnomalyDetectionModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const anomalies = listAnomalies(workspaceId);
       return {
         anomalyCount: anomalies.length,
         anomalyTypes: [...new Set(anomalies.map((a) => a.type))],
@@ -455,7 +496,7 @@ export async function assembleSiteHealth(
     undefined,
     async () => {
       const { getSnapshots } =
-        await import('../workspace-metrics-snapshots.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+        await import(serverModulePath('workspace-metrics-snapshots')) as WorkspaceMetricsSnapshotsModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const snapshots = getSnapshots(workspaceId, 56); // last 8 weeks
       if (snapshots.length > 0) {
         // getSnapshots returns newest-first

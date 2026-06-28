@@ -30,8 +30,10 @@ vi.mock('../../server/db/stmt-cache.js', () => ({
 vi.mock('../../server/db/json-validation.js', () => ({
   parseJsonFallback: vi.fn((_raw: unknown, fallback: unknown) => fallback),
 }));
-vi.mock('../../server/content-matrices.js', () => ({
+vi.mock('../../server/content-matrix-read-model.js', () => ({
   getMatrix: vi.fn(() => null),
+}));
+vi.mock('../../server/schema/template-schema-types.js', () => ({
   getSchemaTypesForTemplate: vi.fn((pageType: string) => {
     const map: Record<string, string[]> = {
       blog: ['BlogPosting', 'BreadcrumbList'],

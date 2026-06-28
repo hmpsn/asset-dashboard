@@ -239,4 +239,81 @@ describe('cycle-kill boundary contracts', () => {
     expect(synthesisFacade).toContain("synthesisModulePath('context')");
     expect(synthesisFacade).not.toContain("from './keyword-strategy-synthesis/context.js'");
   });
+
+  it('keeps schema suggestion contracts on schema leaf types', () => {
+    const typeLeaf = readSource('server/schema/suggestion-types.ts');
+    const schemaStore = readSource('server/schema-store.ts');
+    const serializer = readSource('server/serializers/client-safe.ts');
+    const graphValidator = readSource('server/schema/whole-site-graph-validator.ts');
+    const contextBuilder = readSource('server/schema/context-builder.ts');
+    const generationJob = readSource('server/schema-generation-job.ts');
+    const suggester = readSource('server/schema-suggester.ts');
+
+    expect(typeLeaf).toContain('export interface SchemaPageSuggestion');
+    expect(typeLeaf).toContain('export interface SchemaContext');
+    for (const source of [schemaStore, serializer, graphValidator, contextBuilder, generationJob]) {
+      expect(source).toContain('suggestion-types.js');
+      expect(source).not.toContain("type SchemaPageSuggestion } from './schema-suggester.js'");
+      expect(source).not.toContain("type SchemaPageSuggestion } from '../schema-suggester.js'");
+    }
+    for (const source of [schemaStore, serializer, graphValidator, contextBuilder]) {
+      expect(source).not.toContain("from './schema-suggester.js'");
+      expect(source).not.toContain("from '../schema-suggester.js'");
+    }
+    expect(suggester).toContain("export type { SchemaContext, SchemaPageSuggestion, SchemaSuggestion } from './schema/suggestion-types.js'");
+  });
+
+  it('keeps schema queue reads below the content matrix CRUD module', () => {
+    const readModel = readSource('server/content-matrix-read-model.ts');
+    const matrices = readSource('server/content-matrices.ts');
+    const queue = readSource('server/schema-queue.ts');
+
+    expect(readModel).toContain('export function getMatrix');
+    expect(readModel).toContain('export function listMatrices');
+    expect(matrices).toContain("from './content-matrix-read-model.js'");
+    expect(queue).toContain("from './content-matrix-read-model.js'");
+    expect(queue).not.toContain("from './content-matrices.js'");
+  });
+
+  it('keeps inbox adapter source propagation off static mutation/lifecycle imports', () => {
+    const clientActionShared = readSource('server/domains/inbox/deliverable-adapters/client-action-shared.ts');
+    const approvalBatchShared = readSource('server/domains/inbox/deliverable-adapters/approval-batch-shared.ts');
+    const schemaPlanAdapter = readSource('server/domains/inbox/deliverable-adapters/schema-plan.ts');
+    const approvalRespond = readSource('server/domains/inbox/approval-batch-respond.ts');
+    const approvalItemRespond = readSource('server/domains/inbox/approval-batch-item-respond.ts');
+    const dualWrite = readSource('server/domains/inbox/approval-batch-dual-write.ts');
+    const mirrorSync = readSource('server/domains/inbox/approval-batch-mirror-sync.ts');
+
+    expect(clientActionShared).toContain("inboxDomainModulePath('client-actions-mutations')");
+    expect(clientActionShared).not.toContain("import('../client-actions-mutations.js')");
+    expect(approvalBatchShared).toContain("inboxDomainModulePath('approval-batch-response-lifecycle')");
+    expect(approvalBatchShared).not.toContain("from '../approval-batch-response-lifecycle.js'");
+    expect(schemaPlanAdapter).toContain("schemaDomainModulePath('schema-plan-feedback')");
+    expect(schemaPlanAdapter).not.toContain("from '../../schema/schema-plan-feedback.js'");
+    expect(approvalRespond).toContain("from './approval-batch-mirror-sync.js'");
+    expect(approvalItemRespond).toContain("from './approval-batch-mirror-sync.js'");
+    expect(dualWrite).toContain("from './approval-batch-mirror-sync.js'");
+    expect(mirrorSync).not.toContain("from './deliverable-adapters/index.js'");
+  });
+
+  it('keeps intelligence slices from statically importing cycle-heavy optional read paths', () => {
+    const seoContext = readSource('server/intelligence/seo-context-slice.ts');
+    const siteHealth = readSource('server/intelligence/site-health-slice.ts');
+    const pageProfile = readSource('server/intelligence/page-profile-slice.ts');
+    const resolutionService = readSource('server/domains/recommendations/resolution-service.ts');
+
+    expect(seoContext).toContain("serverModulePath('keyword-strategy-assembler')");
+    expect(seoContext).not.toContain("import('../keyword-strategy-assembler.js')");
+    expect(siteHealth).toContain("serverModulePath('audit-snapshot-views')");
+    expect(siteHealth).toContain("serverModulePath('anomaly-detection')");
+    expect(siteHealth).toContain("serverModulePath('workspace-metrics-snapshots')");
+    expect(siteHealth).not.toContain("from '../seo-audit.js'");
+    expect(siteHealth).not.toContain("import('../audit-snapshot-views.js')");
+    expect(siteHealth).not.toContain("import('../anomaly-detection.js')");
+    expect(siteHealth).not.toContain("import('../workspace-metrics-snapshots.js')");
+    expect(pageProfile).toContain("serverModulePath('audit-snapshot-views')");
+    expect(pageProfile).not.toContain("import('../audit-snapshot-views.js')");
+    expect(resolutionService).toContain("from '../../scoring/opportunity-regen.js'");
+    expect(readSource('server/scoring/opportunity-regen.ts')).not.toContain("from '../recommendation-regen-scheduler.js'");
+  });
 });

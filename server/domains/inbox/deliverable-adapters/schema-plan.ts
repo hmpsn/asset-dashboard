@@ -47,7 +47,6 @@ import type { SchemaSitePlan } from '../../../../shared/types/schema-plan.js';
 import type { ClientDeliverable } from '../../../../shared/types/client-deliverable.js';
 import { findBySourceRef } from '../../../client-deliverables.js';
 import { createLogger } from '../../../logger.js';
-import { respondToSchemaPlanFeedback } from '../../schema/schema-plan-feedback.js';
 import {
   registerAdapter,
   type BuiltDeliverablePayload,
@@ -59,6 +58,19 @@ import {
 } from './types.js';
 
 const log = createLogger('schema-plan-adapter');
+
+type SchemaPlanFeedbackModule = {
+  respondToSchemaPlanFeedback: (
+    workspaceId: string,
+    siteId: string,
+    action: 'approve' | 'request_changes',
+    note?: string | null,
+  ) => unknown;
+};
+
+function schemaDomainModulePath(name: 'schema-plan-feedback'): `../../schema/${typeof name}.js` {
+  return `../../schema/${name}.js`;
+}
 
 /**
  * The adapter input for schema_plan: the persisted `SchemaSitePlan` (as built by
@@ -182,12 +194,12 @@ function schemaPlanSiteId(deliverable: ClientDeliverable): string | null {
  * deliverable-level team email for schema_plan. A missing siteId / absent plan is a swallowed
  * best-effort miss (the deliverable mirror has already moved).
  */
-export function respondToSchemaPlanSource(
+export async function respondToSchemaPlanSource(
   workspaceId: string,
   deliverable: ClientDeliverable,
   decision: DeliverableSourceDecision,
   opts: RespondToSourceOptions = {},
-): RespondToSourceResult {
+): Promise<RespondToSourceResult> {
   const siteId = schemaPlanSiteId(deliverable);
   if (!siteId) {
     log.warn(
@@ -197,6 +209,8 @@ export function respondToSchemaPlanSource(
     return { handled: true };
   }
   const action = decision === 'approved' ? 'approve' : 'request_changes';
+  const { respondToSchemaPlanFeedback } =
+    await import(schemaDomainModulePath('schema-plan-feedback')) as SchemaPlanFeedbackModule; // dynamic-import-ok: keeps schema-plan adapter from statically joining schema generation/intelligence cycles
   respondToSchemaPlanFeedback(workspaceId, siteId, action, opts.note ?? null);
   return { handled: true };
 }

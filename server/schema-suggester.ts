@@ -22,13 +22,13 @@ import {
 import { getPageTypes, getSchemaPlan } from './schema-store.js';
 import type { PageKind } from './schema/classifier.js';
 import type { SchemaPageRole } from '../shared/types/schema-plan.js';
-import type { SchemaGenerationDiagnostics, SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
+import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
 import { isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
 import type { WebflowPage } from './webflow-pages.js';
 import { ENTITY_SURFACES } from '../shared/types/entity-resolution.js';
 import type { EntityResolutionSlice, ResolvedEntity } from '../shared/types/entity-resolution.js';
-import type { EeatAsset } from '../shared/types/eeat-assets.js';
+import type { SchemaContext, SchemaPageSuggestion } from './schema/suggestion-types.js';
 
 /**
  * AI budget allocation for the page-element AI extractors.
@@ -44,33 +44,7 @@ function allocateElementAiBudget(): AiBudget {
 // import between schema-suggester.ts and the schema/ package.
 export { checkRichResultsEligibility } from './schema/rich-results.js';
 export type { RichResultEligibility } from './schema/rich-results.js';
-import type { RichResultEligibility } from './schema/rich-results.js';
-import type { ValidationFinding } from '../shared/types/schema-validation.js';
-
-export interface SchemaPageSuggestion {
-  pageId: string;
-  pageTitle: string;
-  slug: string;
-  publishedPath?: string | null;
-  url: string;
-  existingSchemas: string[];
-  existingSchemaJson?: Record<string, unknown>[];
-  suggestedSchemas: SchemaSuggestion[];
-  validationErrors?: string[];
-  validationFindings?: ValidationFinding[];
-  richResultsEligibility?: RichResultEligibility[];
-  generationDiagnostics?: SchemaGenerationDiagnostics;
-  collectionIdentity?: SchemaCollectionIdentity;
-  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
-  savedPageType?: string;  // Persisted page type from DB
-}
-
-export interface SchemaSuggestion {
-  type: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-  template: Record<string, unknown>;
-}
+export type { SchemaContext, SchemaPageSuggestion, SchemaSuggestion } from './schema/suggestion-types.js';
 
 export { PAGE_TYPE_LABELS, PAGE_TYPE_SCHEMA_MAP, SCHEMA_ROLE_TO_PAGE_KIND };
 export type { SchemaPageType };
@@ -297,39 +271,6 @@ function resolveRoleOverride(opts: {
 
 // (RICH_RESULTS_ELIGIBLE + checkRichResultsEligibility moved to ./schema/rich-results.ts
 //  to break circular import. Re-exports near the top of this file preserve the public API.)
-
-// Context from the workspace/strategy for richer schema generation
-export interface SchemaContext {
-  companyName?: string;
-  liveDomain?: string;
-  logoUrl?: string;
-  pageKeywords?: { primary: string; secondary: string[] };
-  siteKeywords?: string[];
-  workspaceId?: string;
-  pageType?: SchemaPageType;
-  _siteId?: string;  // Internal: passed through for site template storage
-  _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
-  _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
-  _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
-  _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
-    phone?: string;
-    email?: string;
-    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
-    socialProfiles?: string[];
-    openingHours?: string;
-    foundedDate?: string;
-    numberOfEmployees?: string;
-  };
-  /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
-  _defaultLocale?: string;
-  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted.
-   *  Source: Workspace.siteHasSearch DB column. PR1 always reads as undefined
-   *  (DB column defaults to 0 / false); PR2 ships the admin toggle UI. */
-  _siteHasSearch?: boolean;
-  /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
-  _existingErrors?: Array<{ message: string }>;
-  _eeatAssets?: EeatAsset[];
-}
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
 interface EeatData {

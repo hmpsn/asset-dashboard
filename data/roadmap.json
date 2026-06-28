@@ -1372,6 +1372,17 @@
           "notes": "DONE 2026-06-26: completed the safe first pass from the sprint closeout cycle-kill item. Moved ImpactBand ownership to the impact-band leaf while preserving fix-catalog compatibility re-export, moved briefing TemplateContext to a leaf context module, split audit suppression projection from audit snapshot read views, moved schema scrubBrandSuffix into schema-text-sanitizer with helper compatibility re-export, and moved small frontend SeverityFilter/ViewMode and CockpitActions types into leaf modules. Lowered data/circular-dependency-baseline.json from server 36/src 10 to server 28/src 7 and lowered the largest server component baseline from 52 to 37. Added tests/contract/cycle-kill-boundaries.test.ts. Deferred high-risk intelligence/keyword/local-SEO, inbox adapter, and App.tsx root cycles as intended; they require dedicated characterization before further cuts."
         },
         {
+          "id": "simp-delta-0627-cycle-zero-ratchet",
+          "title": "Lower circular-dependency ratchet to zero",
+          "source": "Follow-up from final circular-dependency cleanup review 2026-06-27",
+          "est": "M",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-06-27",
+          "shippedAt": "2026-06-27",
+          "notes": "DONE 2026-06-27: removed the remaining backend circular dependency graph and lowered data/circular-dependency-baseline.json from server 9/largest 10 to server 0/largest 0 while src stayed 0. Cut schema suggestion contracts to a schema leaf type module, moved schema-queue matrix reads below the content-matrix CRUD module, split approval-batch mirror sync into a leaf, converted inbox adapter source propagation and recommendation regen trigger imports to typed lazy boundaries, and moved intelligence slice optional reads off static cycle-heavy imports. Added cycle-kill boundary contracts for schema types, matrix reads, inbox adapters, and intelligence optional read boundaries."
+        },
+        {
           "id": "simp-delta-0627-close-gated-simplification-tail",
           "title": "Close gated Platform Simplification tail as deferred",
           "source": "Platform Simplification autonomous closeout 2026-06-27",

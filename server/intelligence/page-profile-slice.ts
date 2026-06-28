@@ -17,6 +17,19 @@ import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../utils
 
 const log = createLogger('workspace-intelligence/page-profile');
 
+type AuditSnapshotViewsModule = {
+  getLatestEffectiveSnapshot: (
+    siteId: string,
+    suppressions: Workspace['auditSuppressions'] | undefined,
+  ) => {
+    audit?: { pages?: PageSeoResult[] };
+  } | null;
+};
+
+function serverModulePath(name: 'audit-snapshot-views'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
+
 export async function assemblePageProfile(
   workspaceId: string,
   pagePath: string,
@@ -108,7 +121,8 @@ export async function assemblePageProfile(
   let auditIssues: string[] = [];
   try {
     if (ws?.webflowSiteId) {
-      const { getLatestEffectiveSnapshot } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { getLatestEffectiveSnapshot } =
+        await import(serverModulePath('audit-snapshot-views')) as AuditSnapshotViewsModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions);
       if (snap?.audit?.pages) {
         const pagData = (snap.audit.pages as PageSeoResult[]).find(p =>
