@@ -43,6 +43,7 @@ describe('apply tail → opportunity regen', () => {
     const fnStart = resolutionSrc.indexOf('export function resolveRecommendationsForChange');
     expect(fnStart).toBeGreaterThan(0);
     const fnSrc = resolutionSrc.slice(fnStart, resolutionSrc.indexOf('export function resolveRecommendationsForPageIds'));
+    expect(resolutionSrc).toContain("from '../../scoring/opportunity-regen.js'");
     expect(fnSrc).toContain('triggerOpportunityRegen(workspaceId)');
     expect(src).toContain("from './domains/recommendations/resolution-service.js'");
   });
@@ -82,7 +83,8 @@ describe('opportunity-regen breaks the recommendations cycle', () => {
     expect(regenSrc).toContain("debounceBridge('opportunity-value-events'");
   });
   it('routes the debounced event path through the shared single-flight scheduler', () => {
-    expect(regenSrc).toContain("from '../recommendation-regen-scheduler.js'");
+    expect(regenSrc).toContain('schedulerModulePath()');
+    expect(regenSrc).not.toContain("from '../recommendation-regen-scheduler.js'");
     expect(regenSrc).toContain("runRecommendationRegen(workspaceId, 'opportunity_value_event')");
   });
 });

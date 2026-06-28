@@ -5,8 +5,9 @@ import { createLogger } from './logger.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { prepareBulkSchemaGenerationContext } from './schema-generation-context.js';
 import { saveSchemaSnapshot, pruneSchemaSnapshotOrphans } from './schema-store.js';
-import { generateSchemaSuggestions, type SchemaPageSuggestion } from './schema-suggester.js';
+import { generateSchemaSuggestions } from './schema-suggester.js';
 import { WS_EVENTS } from './ws-events.js';
+import type { SchemaPageSuggestion } from './schema/suggestion-types.js';
 
 const log = createLogger('schema-generation-job');
 

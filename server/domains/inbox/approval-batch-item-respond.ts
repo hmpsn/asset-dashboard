@@ -1,6 +1,6 @@
 import { addActivity } from '../../activity-log.js';
 import { getBatch, updateItem } from '../../approvals.js';
-import { syncApprovalBatchDeliverableStatus } from './approval-batch-dual-write.js';
+import { syncApprovalBatchDeliverableStatus } from './approval-batch-mirror-sync.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../../email.js';
 import { createLogger } from '../../logger.js';

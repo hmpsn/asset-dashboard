@@ -1,7 +1,7 @@
 import type { ApprovalBatch, ApprovalItem } from '../../shared/types/approvals.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
-import type { SchemaPageSuggestion } from '../schema-suggester.js';
+import type { SchemaPageSuggestion } from '../schema/suggestion-types.js';
 import type { SchemaSnapshot } from '../schema-store.js';
 import type { Workspace } from '../workspaces.js';
 import type { ResolvedSegmentProfile } from '../../shared/types/workspace.js';

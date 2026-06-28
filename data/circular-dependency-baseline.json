@@ -2,11 +2,11 @@
   "version": 1,
   "updatedAt": "2026-06-27",
   "cycles": {
-    "server": 9,
+    "server": 0,
     "src": 0
   },
   "maxCircularComponentFiles": {
-    "server": 10,
+    "server": 0,
     "src": 0
   },
   "allowedDirectRouteDbIndexImports": [

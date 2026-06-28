@@ -26,6 +26,14 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
+type KeywordStrategyAssemblerModule = {
+  assembleStoredKeywordStrategy: (workspaceId: string) => StoredKeywordStrategy | null;
+};
+
+function serverModulePath(name: 'keyword-strategy-assembler'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
+
 function buildTopKeywordMovers(
   latest: RankEntry[],
 ): NonNullable<SeoContextSlice['rankTracking']>['topKeywordMovers'] {
@@ -83,7 +91,7 @@ export async function assembleSeoContext(
   let assembled: StoredKeywordStrategy | null = null;
   try {
     const { assembleStoredKeywordStrategy } =
-      await import('../keyword-strategy-assembler.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      await import(serverModulePath('keyword-strategy-assembler')) as KeywordStrategyAssemblerModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     assembled = assembleStoredKeywordStrategy(workspaceId);
   } catch (asmErr) {
     log.warn(

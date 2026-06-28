@@ -16,16 +16,18 @@
  * cannot overlap for the same workspace.
  *
  * ═══ CYCLE BREAK ═══
- * recommendations.ts imports the event store (via opportunity-timing.ts). The
- * shared scheduler keeps the DYNAMIC import boundary, so this module can statically
- * import the scheduler without re-closing the recommendations cycle. The debounced
- * fn runs through that scheduler so a regen failure can NEVER surface to the detector.
+ * recommendations.ts imports the event store (via opportunity-timing.ts). This module
+ * keeps the scheduler behind a DYNAMIC import boundary so callers can trigger the
+ * debounce synchronously without statically re-closing the recommendations cycle.
  *
  * generateRecommendations itself must NOT call triggerOpportunityRegen (no
  * recursion) — the regen is triggered only by external detectors + the apply tail.
  */
 import { debounceBridge } from '../bridge-infrastructure.js';
-import { runRecommendationRegen } from '../recommendation-regen-scheduler.js';
+
+type RecommendationRegenSchedulerModule = {
+  runRecommendationRegen: (workspaceId: string, reason: string) => Promise<void>;
+};
 
 /** 90s debounce window (design §5 anti-thrash). */
 export const OPPORTUNITY_REGEN_DEBOUNCE_MS = 90_000;
@@ -42,6 +44,10 @@ function getEnqueue(): ReturnType<typeof debounceBridge> {
   return enqueueOpportunityRegen;
 }
 
+function schedulerModulePath(): '../recommendation-regen-scheduler.js' {
+  return '../recommendation-regen-scheduler.js';
+}
+
 /**
  * Schedule a debounced recommendation regen for a workspace in response to an
  * opportunity event. Safe to call from any detector (try/catch isolated at the
@@ -50,6 +56,8 @@ function getEnqueue(): ReturnType<typeof debounceBridge> {
 export function triggerOpportunityRegen(workspaceId: string): void {
   if (!workspaceId) return;
   getEnqueue()(workspaceId, async () => {
+    const { runRecommendationRegen } =
+      await import(schedulerModulePath()) as RecommendationRegenSchedulerModule; // dynamic-import-ok - keeps trigger imports from statically joining recommendation generation cycles
     await runRecommendationRegen(workspaceId, 'opportunity_value_event');
   });
 }

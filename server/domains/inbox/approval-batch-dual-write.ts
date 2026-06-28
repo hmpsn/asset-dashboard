@@ -27,8 +27,8 @@
  * the pre-existing client-action-family cycle. Do not add module-init side effects here.
  */
 import type { ApprovalBatch } from '../../../shared/types/approvals.js';
-import type { ClientDeliverable, DeliverableStatus, DeliverableType } from '../../../shared/types/client-deliverable.js';
-import { findBySourceRef, upsertDeliverable } from '../../client-deliverables.js';
+import type { ClientDeliverable, DeliverableType } from '../../../shared/types/client-deliverable.js';
+import { upsertDeliverable } from '../../client-deliverables.js';
 import { getAdapter } from './deliverable-adapters/index.js';
 import {
   classifyApprovalBatch,
@@ -36,8 +36,11 @@ import {
 } from './deliverable-adapters/approval-batch-classifier.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
-import { getDeliverableTransitions } from '../../state-machines.js';
 import { createLogger } from '../../logger.js';
+export {
+  cancelApprovalBatchDeliverable,
+  syncApprovalBatchDeliverableStatus,
+} from './approval-batch-mirror-sync.js';
 
 const log = createLogger('approval-batch-dual-write');
 
@@ -131,139 +134,6 @@ function safeBroadcast(workspaceId: string, event: string, deliverable: ClientDe
     });
   } catch (err) {
     log.warn({ err, workspaceId, deliverableId: deliverable.id, event }, 'deliverable broadcast failed (swallowed)');
-  }
-}
-
-/** Locate the mirror row for a legacy batch via the same classifier + adapter the send used. */
-function findBatchMirror(
-  workspaceId: string,
-  batch: ApprovalBatch,
-): { existing: ClientDeliverable; type: DeliverableType } | null {
-  const type = classifyApprovalBatch(batch);
-  const sourceRef = getAdapter(type).sourceRef(batch);
-  if (!sourceRef) return null;
-  const existing = findBySourceRef(workspaceId, type, sourceRef);
-  return existing ? { existing, type } : null;
-}
-
-/** Re-upsert the mirror with a new status, preserving every other field (cancel/sync template). */
-function moveMirrorStatus(
-  existing: ClientDeliverable,
-  status: DeliverableStatus,
-  opts: { decidedAt?: string | null; clientResponseNote?: string | null } = {},
-): ClientDeliverable {
-  return upsertDeliverable({
-    id: existing.id,
-    workspaceId: existing.workspaceId,
-    type: existing.type,
-    kind: existing.kind,
-    status,
-    title: existing.title,
-    summary: existing.summary,
-    payload: existing.payload,
-    note: existing.note,
-    clientResponseNote: opts.clientResponseNote !== undefined ? opts.clientResponseNote : existing.clientResponseNote,
-    externalRef: existing.externalRef,
-    parentDeliverableId: existing.parentDeliverableId,
-    sentAt: existing.sentAt,
-    decidedAt: opts.decidedAt !== undefined ? opts.decidedAt : existing.decidedAt,
-    dueAt: existing.dueAt,
-    appliedAt: existing.appliedAt,
-    generatedAt: existing.generatedAt,
-    source: existing.source,
-    sourceRef: existing.sourceRef,
-  });
-}
-
-/** Project a legacy batch decision status onto the deliverable status space. */
-function deliverableStatusForBatch(batch: ApprovalBatch): DeliverableStatus | null {
-  switch (batch.status) {
-    case 'approved': return 'approved';
-    case 'rejected': return 'changes_requested';
-    case 'partial': return 'partial';
-    default: return null; // pending/applied: send-time state / owned by markDeliverableApplied
-  }
-}
-
-/**
- * Sync the mirror's status to the legacy batch after a respond (R2/R3) driven through the
- * LEGACY public routes. Idempotent: when the unified respondToDeliverable path already moved
- * the mirror (it calls the same respond services), the target status matches and this is a
- * no-op. Illegal moves (e.g. onto a cancelled mirror) are skipped, not thrown — the legacy
- * source write already committed and must not be failed by mirror bookkeeping.
- * Returns the mirror row (moved or not) or null when there is nothing to sync.
- */
-export function syncApprovalBatchDeliverableStatus(
-  workspaceId: string,
-  batch: ApprovalBatch,
-  opts: { clientResponseNote?: string | null } = {},
-): ClientDeliverable | null {
-  try {
-    const target = deliverableStatusForBatch(batch);
-    if (!target) return null;
-    const found = findBatchMirror(workspaceId, batch);
-    if (!found) return null;
-    const { existing, type } = found;
-    if (existing.status === target) return existing;
-
-    // Non-throwing legality check. An ILLEGAL move here is almost always the expected
-    // unified-path echo, not a bug: respondToDeliverable moves the mirror FIRST (e.g. to
-    // 'declined', or to 'approved' on an R3 subset-approve whose batch recalcs to
-    // 'partial') and then drives this same respond service. The mirror is authoritative
-    // in those flows — leave it, at debug level. warn is reserved for the impossible
-    // combinations (e.g. a decided batch with a still-draft mirror).
-    const allowed = getDeliverableTransitions(type)[existing.status];
-    if (!allowed?.includes(target)) {
-      const mirrorAlreadyDecided = existing.status === 'declined'
-        || existing.status === 'approved'
-        || existing.status === 'applied'
-        || existing.status === 'cancelled'
-        || existing.status === 'expired';
-      log[mirrorAlreadyDecided ? 'debug' : 'warn'](
-        { workspaceId, batchId: batch.id, from: existing.status, to: target },
-        mirrorAlreadyDecided
-          ? 'mirror status sync skipped: mirror already decided (unified-path echo)'
-          : 'mirror status sync skipped: unexpected illegal deliverable transition',
-      );
-      return existing;
-    }
-
-    const deliverable = moveMirrorStatus(existing, target, {
-      decidedAt: existing.decidedAt ?? new Date().toISOString(),
-      ...(opts.clientResponseNote != null ? { clientResponseNote: opts.clientResponseNote } : {}),
-    });
-    safeBroadcast(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, deliverable);
-    return deliverable;
-  } catch (err) {
-    log.error({ err, workspaceId, batchId: batch.id }, 'mirror status sync failed (swallowed)');
-    return null;
-  }
-}
-
-/**
- * Cancel the mirror when the admin deletes/withdraws the legacy batch. Without this the
- * orphaned row stays awaiting_client in the client Inbox FOREVER (and a client response to
- * the orphan would silently no-op against the missing batch). Mirrors the
- * cancelSchemaPlanDeliverable template; 'cancelled' is excluded from CLIENT_FACING_STATUSES
- * so the already-subscribed DELIVERABLE_UPDATED removes the card live.
- */
-export function cancelApprovalBatchDeliverable(
-  workspaceId: string,
-  batch: ApprovalBatch,
-): ClientDeliverable | null {
-  try {
-    const found = findBatchMirror(workspaceId, batch);
-    if (!found) return null;
-    if (found.existing.status === 'cancelled') return found.existing;
-    // Deliberately NOT transition-guarded (matching cancelSchemaPlanDeliverable): an admin
-    // withdrawal is authoritative and must clear the card even from decided/terminal
-    // states — the legacy batch it mirrored no longer exists.
-    const deliverable = moveMirrorStatus(found.existing, 'cancelled');
-    safeBroadcast(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, deliverable);
-    return deliverable;
-  } catch (err) {
-    log.error({ err, workspaceId, batchId: batch.id }, 'mirror cancel failed (swallowed)');
-    return null;
   }
 }
 

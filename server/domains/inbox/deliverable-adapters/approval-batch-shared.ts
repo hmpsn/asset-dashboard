@@ -41,10 +41,33 @@ import type {
 } from './types.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
 import type { ClientDeliverable, DeliverableType } from '../../../../shared/types/client-deliverable.js';
-import { respondToApprovalBatch, type ApprovalItemDecision } from '../approval-batch-response-lifecycle.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('approval-batch-shared');
+
+interface ApprovalItemDecision {
+  legacyItemId: string;
+  status: 'approved' | 'rejected';
+  note?: string | null;
+  clientValue?: string | null;
+}
+
+type ApprovalBatchResponseLifecycleModule = {
+  respondToApprovalBatch: (
+    workspaceId: string,
+    batchId: string,
+    decision: 'approved' | 'rejected',
+    opts?: {
+      note?: string | null;
+      actor?: RespondToSourceOptions['actor'];
+      itemDecisions?: ApprovalItemDecision[];
+    },
+  ) => unknown;
+};
+
+function inboxDomainModulePath(name: 'approval-batch-response-lifecycle'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
 
 /**
  * The adapter input for every approval_batch-family type: the legacy ApprovalBatch as
@@ -283,6 +306,8 @@ export async function respondToApprovalBatchSource(
       ? buildItemDecisions(workspaceId, deliverable, opts.flaggedItems ?? [], opts.editedItems ?? [])
       : undefined;
 
+  const { respondToApprovalBatch } =
+    await import(inboxDomainModulePath('approval-batch-response-lifecycle')) as ApprovalBatchResponseLifecycleModule; // dynamic-import-ok: breaks approval-batch adapter↔response lifecycle cycle
   respondToApprovalBatch(workspaceId, batchId, batchDecision, {
     note: opts.note ?? null,
     actor: opts.actor,

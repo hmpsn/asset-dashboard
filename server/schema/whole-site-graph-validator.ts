@@ -1,4 +1,4 @@
-import type { SchemaPageSuggestion } from '../schema-suggester.js';
+import type { SchemaPageSuggestion } from './suggestion-types.js';
 import type { SchemaSiteTemplate } from '../schema-store.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 import type {

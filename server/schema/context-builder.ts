@@ -1,4 +1,4 @@
-import type { SchemaContext } from '../schema-suggester.js';
+import type { SchemaContext } from './suggestion-types.js';
 import { createLogger } from '../logger.js';
 import { getWorkspaceBySiteId } from '../workspaces.js';
 import { getDeclinedKeywords } from '../keyword-feedback.js';
