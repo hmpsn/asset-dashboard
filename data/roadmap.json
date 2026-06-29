@@ -136,11 +136,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "S",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "server/mcp/server.ts:36 passes no third Server() arg; SDK supports instructions?:string since v1.29.0. The instructions string is the only guidance every connecting agent gets before its first call. Draft text already written in the audit §3 (workspace-id-first, handle pipeline lifecycle, paid-tool list, casing split, destructive ops)."
+          "notes": "Done (split from the .describe() pass into its own PR). New server/mcp/instructions.ts exports MCP_SERVER_INSTRUCTIONS, wired into server.ts new Server() options ({capabilities, instructions}). Workflow+gotcha orientation: workspace-id-first (+ workspace_id/workspaceId casing split), the prepare_*→save_*→send_to_client handle pipeline (single-use, ~15-min TTL, workspace+kind-scoped), optimistic-concurrency editing (expected_revision/expectedVersion), the paid-tool + destructive-tool lists. Every concrete claim verified against schemas/handlers. Tests: tests/unit/mcp-instructions.test.ts (content contract) + a wiring assertion in mcp-server-routing.test.ts (Server constructed with instructions). Uses STUDIO_NAME constant (pr-check).",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-schema-describe-properties",
