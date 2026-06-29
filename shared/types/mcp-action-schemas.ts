@@ -518,6 +518,12 @@ export const getWorkspaceIntelligenceInputSchema = z.object({
   include_site_inventory: z.boolean().optional(),
 });
 
+export const getBrandIdentityInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  includeDeliverables: z.boolean().optional(),
+});
+export type GetBrandIdentityInput = z.infer<typeof getBrandIdentityInputSchema>;
+
 // --- Job tool input schemas -------------------------------------------------
 
 export const startKeywordStrategyGenerationInputSchema = z.object({
