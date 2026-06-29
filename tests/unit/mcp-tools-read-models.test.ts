@@ -29,6 +29,7 @@ const h = vi.hoisted(() => ({
   handleContentPerformance: vi.fn(),
   buildWorkspaceIntelligence: vi.fn(),
   getPrimaryMarketLocationCode: vi.fn(),
+  listDeliverables: vi.fn(),
   loggerError: vi.fn(),
   loggerDebug: vi.fn(),
 }));
@@ -111,6 +112,10 @@ vi.mock('../../server/local-seo.js', () => ({
   getPrimaryMarketLocationCode: h.getPrimaryMarketLocationCode,
 }));
 
+vi.mock('../../server/brand-deliverable-read-model.js', () => ({
+  listDeliverables: h.listDeliverables,
+}));
+
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ error: h.loggerError, debug: h.loggerDebug, info: vi.fn(), warn: vi.fn() }),
 }));
@@ -120,6 +125,7 @@ import { handleClientTool } from '../../server/mcp/tools/clients.js';
 import { handleInsightTool } from '../../server/mcp/tools/insights.js';
 import { handleContentTool } from '../../server/mcp/tools/content.js';
 import { handleIntelligenceTool } from '../../server/mcp/tools/intelligence.js';
+import { handleBrandTool } from '../../server/mcp/tools/brand.js';
 
 function parseContent(result: { content: Array<{ text: string }> }) {
   return JSON.parse(result.content[0]?.text ?? 'null');
@@ -233,7 +239,24 @@ describe('mcp read-model tools', () => {
       clientSignals: { sentiment: 'healthy' },
       seoContext: { domain: 'example.com' },
       requestedSlices: ['insights'],
+      brand: {
+        availability: 'ready',
+        identity: { mission: 'Make SEO simple', tagline: 'Grow with clarity' },
+        voice: { status: 'calibrated' },
+        voicePromptBlock: 'voice block — should NOT leak',
+        voiceDnaBlock: 'voice DNA — should NOT leak',
+        identityPromptBlock: 'IDENTITY: Make SEO simple',
+      },
     });
+
+    h.listDeliverables.mockImplementation((workspaceId: string) => (
+      workspaceId === 'ws-1'
+        ? [
+            { id: 'd1', deliverableType: 'mission', content: 'Make SEO simple', status: 'approved', version: 2, tier: 'core', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', workspaceId: 'ws-1' },
+            { id: 'd2', deliverableType: 'tagline', content: 'Grow with clarity', status: 'draft', version: 1, tier: 'core', createdAt: '2026-01-03T00:00:00.000Z', updatedAt: '2026-01-03T00:00:00.000Z', workspaceId: 'ws-1' },
+          ]
+        : []
+    ));
   });
 
   it('workspace tools provide pending counts, overview, and error branches', async () => {
@@ -450,5 +473,75 @@ describe('mcp read-model tools', () => {
     const caught = await handleIntelligenceTool('get_workspace_intelligence', { workspaceId: 'ws-1' });
     expect(caught.isError).toBe(true);
     expect(caught.content[0]?.text).toContain('Intelligence assembly failed: assembly failed');
+  });
+
+  it('brand tool returns identity + voice status without deliverables by default', async () => {
+    const result = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1' });
+    expect(result.isError).toBeUndefined();
+
+    const payload = parseContent(result) as {
+      availability: string;
+      identity: Record<string, string>;
+      voice_status: string;
+      identity_prompt_block: string;
+      deliverables?: unknown;
+    };
+    expect(payload.availability).toBe('ready');
+    expect(payload.identity).toEqual({ mission: 'Make SEO simple', tagline: 'Grow with clarity' });
+    expect(payload.voice_status).toBe('calibrated');
+    expect(payload.identity_prompt_block).toBe('IDENTITY: Make SEO simple');
+    expect(payload).not.toHaveProperty('deliverables');
+    // Voice content must NOT leak from this identity-scoped tool.
+    expect(payload).not.toHaveProperty('voicePromptBlock');
+    expect(payload).not.toHaveProperty('voiceDnaBlock');
+    expect(h.buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-1', { slices: ['brand'] });
+    expect(h.listDeliverables).not.toHaveBeenCalled();
+  });
+
+  it('brand tool returns full deliverable list (draft + approved) when includeDeliverables is true', async () => {
+    const result = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1', includeDeliverables: true });
+    expect(result.isError).toBeUndefined();
+
+    const payload = parseContent(result) as {
+      deliverables: Array<{ id: string; deliverableType: string; status: string; version: number; tier: string }>;
+    };
+    expect(h.listDeliverables).toHaveBeenCalledWith('ws-1');
+    expect(payload.deliverables).toHaveLength(2);
+    expect(payload.deliverables.map(d => d.status)).toEqual(['approved', 'draft']);
+    expect(payload.deliverables[0]).toEqual({
+      id: 'd1', deliverableType: 'mission', content: 'Make SEO simple',
+      status: 'approved', version: 2, tier: 'core',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+  });
+
+  it('brand tool falls back to no_data / empty identity when slice is absent', async () => {
+    h.buildWorkspaceIntelligence.mockResolvedValueOnce({ requestedSlices: ['brand'] });
+    const result = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1' });
+    const payload = parseContent(result) as {
+      availability: string; identity: Record<string, string>; voice_status: string; identity_prompt_block: string;
+    };
+    expect(payload.availability).toBe('no_data');
+    expect(payload.identity).toEqual({});
+    expect(payload.voice_status).toBe('none');
+    expect(payload.identity_prompt_block).toBe('');
+  });
+
+  it('brand tool errors on unknown tool, missing workspace, invalid args, and assembly throw', async () => {
+    const unknown = await handleBrandTool('unknown_brand_tool', { workspaceId: 'ws-1' });
+    expect(unknown.isError).toBe(true);
+
+    const notFound = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-missing' });
+    expect(notFound.isError).toBe(true);
+    expect(notFound.content[0]?.text).toContain('Workspace not found: ws-missing');
+
+    const invalid = await handleBrandTool('get_brand_identity', {});
+    expect(invalid.isError).toBe(true);
+    expect(invalid.content[0]?.text).toContain('Validation failed');
+
+    h.buildWorkspaceIntelligence.mockRejectedValueOnce(new Error('brand assembly boom'));
+    const caught = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1' });
+    expect(caught.isError).toBe(true);
+    expect(caught.content[0]?.text).toContain('Tool error: brand assembly boom');
   });
 });
