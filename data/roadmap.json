@@ -56,10 +56,10 @@
           "source": "Owner GBP planning thread 2026-06-29",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "Start only after Phase 2A is merged and green on staging. Add raw review storage with idempotent per-location sync, per-location summaries (average rating, count, newest review, unanswered, low-rating, freshness), explicit AI/copy usage guardrails for review text, and Local Presence review triage. Keep response drafting/publishing out of scope."
+          "notes": "Completed 2026-06-29: added `gbp-auth-reviews` (default OFF) dependent on `gbp-auth-connection`; normalized authenticated GBP review storage and sync status tables; bounded per-location review sync from Google `accounts.locations.reviews.list`; Local Presence Reviews authenticated triage with aggregate/per-location rating, count, newest-review, unanswered, low-rating, freshness, and recent excerpt summaries; workspace broadcasts/query invalidation for review sync changes; and explicit copy-policy guardrails (`aiUseAllowed: false`) so raw authenticated review text is admin-triage-only. No response drafting, client approval loop, Google reply publishing, sentiment extraction, AI/copy reuse of raw review text, or background review sync job in this phase."
         },
         {
           "id": "gbp-review-response-approval-phase-2c",

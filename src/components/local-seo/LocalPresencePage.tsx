@@ -10,6 +10,7 @@ import { GbpReviewsPanel } from './GbpReviewsPanel';
 import { LocalSeoVisibilityPanel } from './LocalSeoVisibilityPanel';
 import { FeatureFlag } from '../ui/FeatureFlag';
 import { GbpMappingStatusBlock } from '../google-business-profile/GbpMappingStatusBlock';
+import { GbpAuthenticatedReviewsPanel } from '../google-business-profile/GbpAuthenticatedReviewsPanel';
 
 type LocalPresenceTab = 'overview' | 'visibility' | 'reviews' | 'setup';
 
@@ -214,6 +215,9 @@ export function LocalPresencePage({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-4">
           <FeatureFlag flag="gbp-auth-connection">
             <GbpMappingStatusBlock workspaceId={workspaceId} />
+          </FeatureFlag>
+          <FeatureFlag flag="gbp-auth-reviews">
+            <GbpAuthenticatedReviewsPanel workspaceId={workspaceId} />
           </FeatureFlag>
           <GbpReviewsPanel workspaceId={workspaceId} />
         </div>

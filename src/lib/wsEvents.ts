@@ -120,6 +120,8 @@ export const WS_EVENTS = {
   LOCAL_GBP_SNAPSHOTS_REFRESHED: 'local-gbp:snapshots_refreshed',
   // Authenticated Google Business Profile connection + workspace-location mapping.
   GBP_CONNECTION_UPDATED: 'gbp:connection_updated',
+  // Authenticated Google Business Profile review sync + read model.
+  GBP_REVIEWS_UPDATED: 'gbp:reviews_updated',
   // AI visibility (P8 / ai-visibility) — fired after a llm-mentions-refresh job upserts a
   // llm_mention_snapshots row; invalidates the AI-visibility KPI + strategy/intelligence.
   LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'llm-mentions:snapshots_refreshed',

@@ -93,3 +93,88 @@ export interface GbpSyncResponse {
   locationCount: number;
   syncedAt: string;
 }
+
+export const GBP_REVIEW_SYNC_STATUSES = {
+  NOT_SYNCED: 'not_synced',
+  SYNCED: 'synced',
+  PARTIAL: 'partial',
+  FAILED: 'failed',
+} as const;
+
+export type GbpReviewSyncStatus =
+  (typeof GBP_REVIEW_SYNC_STATUSES)[keyof typeof GBP_REVIEW_SYNC_STATUSES];
+
+export const GBP_REVIEW_RATINGS = {
+  UNSPECIFIED: 'STAR_RATING_UNSPECIFIED',
+  ONE: 'ONE',
+  TWO: 'TWO',
+  THREE: 'THREE',
+  FOUR: 'FOUR',
+  FIVE: 'FIVE',
+} as const;
+
+export type GbpReviewRating =
+  (typeof GBP_REVIEW_RATINGS)[keyof typeof GBP_REVIEW_RATINGS];
+
+export interface GbpReviewSummary {
+  id: string;
+  googleLocationId: string;
+  clientLocationId?: string;
+  reviewResourceName: string;
+  reviewId: string;
+  rating: GbpReviewRating;
+  ratingValue?: number;
+  commentExcerpt?: string;
+  reviewerDisplayName?: string;
+  reviewerIsAnonymous: boolean;
+  createTime?: string;
+  updateTime?: string;
+  hasReply: boolean;
+  replyUpdateTime?: string;
+  syncedAt: string;
+}
+
+export interface GbpLocationReviewSummary {
+  googleLocationId: string;
+  clientLocationId: string;
+  isPrimary: boolean;
+  location: GbpLocationSummary;
+  syncStatus: GbpReviewSyncStatus;
+  lastSyncedAt?: string;
+  lastError?: string;
+  averageRating?: number;
+  totalReviewCount?: number;
+  storedReviewCount: number;
+  newestReviewAt?: string;
+  unansweredCount: number;
+  lowRatingCount: number;
+}
+
+export interface GbpAuthenticatedReviewsRead {
+  connection: GbpConnectionSafe;
+  mappedLocationCount: number;
+  locations: GbpLocationReviewSummary[];
+  recentReviews: GbpReviewSummary[];
+  aggregate: {
+    averageRating?: number;
+    totalReviewCount: number;
+    storedReviewCount: number;
+    unansweredCount: number;
+    lowRatingCount: number;
+    newestReviewAt?: string;
+    lastSyncedAt?: string;
+  };
+  copyPolicy: {
+    rawReviewTextStored: boolean;
+    aiUseAllowed: boolean;
+    guidance: string;
+  };
+}
+
+export interface GbpReviewSyncResponse {
+  workspaceId: string;
+  locationCount: number;
+  reviewCount: number;
+  syncedAt: string;
+  partial: boolean;
+}

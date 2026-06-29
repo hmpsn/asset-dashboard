@@ -1,8 +1,10 @@
 import { get, post, put } from './client';
 import type {
   GbpAccountSummary,
+  GbpAuthenticatedReviewsRead,
   GbpConnectionSafe,
   GbpLocationSummary,
+  GbpReviewSyncResponse,
   GbpSyncResponse,
   WorkspaceGbpMappingRead,
   WorkspaceGbpMappingsUpdateRequest,
@@ -41,4 +43,10 @@ export const googleBusinessProfile = {
 
   updateWorkspaceMappings: (workspaceId: string, body: WorkspaceGbpMappingsUpdateRequest) =>
     put<WorkspaceGbpMappingRead>(`/api/google-business-profile/workspaces/${workspaceId}/mappings`, body),
+
+  authenticatedReviews: (workspaceId: string) =>
+    get<GbpAuthenticatedReviewsRead>(`/api/google-business-profile/workspaces/${workspaceId}/reviews`),
+
+  syncAuthenticatedReviews: (workspaceId: string) =>
+    post<GbpReviewSyncResponse>(`/api/google-business-profile/workspaces/${workspaceId}/reviews/sync`),
 };

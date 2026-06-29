@@ -446,7 +446,13 @@ function adminInvalidationKeys(
         queryKeys.admin.gbpAccounts(),
         queryKeys.admin.gbpLocations(),
         queryKeys.admin.gbpWorkspaceMappings(workspaceId),
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
         queryKeys.admin.localSeoLocations(workspaceId),
+      ] as const;
+    case WS_EVENTS.GBP_REVIEWS_UPDATED:
+      return [
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+        queryKeys.admin.localGbpReviews(workspaceId),
       ] as const;
     case WS_EVENTS.LLM_MENTIONS_SNAPSHOTS_REFRESHED:
       // P8 ai-visibility: a llm-mentions refresh upserted llm_mention_snapshots → re-pull the

@@ -174,6 +174,85 @@ vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
     isLoading: false,
     isError: false,
   }),
+  useGbpAuthenticatedReviews: () => ({
+    data: {
+      connection: {
+        configured: true,
+        connected: true,
+        status: 'connected',
+        scopes: ['https://www.googleapis.com/auth/business.manage'],
+        accountCount: 1,
+        locationCount: 2,
+        mappedLocationCount: 1,
+        needsReconnect: false,
+      },
+      mappedLocationCount: 1,
+      locations: [
+        {
+          googleLocationId: 'locations/1',
+          clientLocationId: 'loc-1',
+          isPrimary: true,
+          location: {
+            id: 'locations/1',
+            connectionId: 'conn-1',
+            accountId: 'accounts/1',
+            accountResourceName: 'accounts/1',
+            resourceName: 'locations/1',
+            title: 'Acme Austin',
+            addressLines: [],
+            syncStatus: 'available',
+            syncedAt: '2026-06-29T12:00:00.000Z',
+          },
+          syncStatus: 'synced',
+          lastSyncedAt: '2026-06-29T12:00:00.000Z',
+          averageRating: 4.8,
+          totalReviewCount: 42,
+          storedReviewCount: 2,
+          newestReviewAt: '2026-06-29T12:00:00.000Z',
+          unansweredCount: 1,
+          lowRatingCount: 1,
+        },
+      ],
+      recentReviews: [
+        {
+          id: 'review-1',
+          googleLocationId: 'locations/1',
+          clientLocationId: 'loc-1',
+          reviewResourceName: 'accounts/1/locations/1/reviews/review-1',
+          reviewId: 'review-1',
+          rating: 'TWO',
+          ratingValue: 2,
+          commentExcerpt: 'Service was slow but helpful.',
+          reviewerIsAnonymous: false,
+          updateTime: '2026-06-29T12:00:00.000Z',
+          hasReply: false,
+          syncedAt: '2026-06-29T12:00:00.000Z',
+        },
+      ],
+      aggregate: {
+        averageRating: 4.8,
+        totalReviewCount: 42,
+        storedReviewCount: 2,
+        unansweredCount: 1,
+        lowRatingCount: 1,
+        newestReviewAt: '2026-06-29T12:00:00.000Z',
+        lastSyncedAt: '2026-06-29T12:00:00.000Z',
+      },
+      copyPolicy: {
+        rawReviewTextStored: true,
+        aiUseAllowed: false,
+        guidance: 'Authenticated review text is stored for admin triage only in Phase 2B.',
+      },
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+  useSyncGbpAuthenticatedReviews: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
 }));
 
 function renderPage(initialEntry = '/ws/ws-1/local-seo') {
@@ -217,8 +296,10 @@ describe('LocalPresencePage', () => {
     expect(screen.getByRole('tab', { name: /reviews/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Authenticated GBP')).toBeInTheDocument();
     expect(screen.getByText(/1 of 2 discovered Google Business Profile locations/)).toBeInTheDocument();
+    expect(screen.getByText('Authenticated reviews')).toBeInTheDocument();
+    expect(screen.getByText('Service was slow but helpful.')).toBeInTheDocument();
     expect(screen.getByText('Reviews vs competitors')).toBeInTheDocument();
-    expect(screen.getByText('Acme Austin')).toBeInTheDocument();
+    expect(screen.getAllByText('Acme Austin').length).toBeGreaterThanOrEqual(1);
   });
 
   it('switches to the existing workspace-level visibility workflow', () => {

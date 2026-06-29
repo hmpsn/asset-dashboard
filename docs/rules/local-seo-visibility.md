@@ -78,7 +78,7 @@ If local visibility feeds prompts, recommendations, or strategy scoring, add a `
 
 Local SEO reporting now has two admin surfaces with distinct ownership. Local Presence is the workspace-level operating shell; Keyword Hub remains the keyword lifecycle and evidence surface.
 
-- **Local Presence:** primary admin surface for workspace-level posture, market setup, local-pack visibility workflow, and aggregate GBP/review readouts. It must not become a keyword lifecycle manager.
+- **Local Presence:** primary admin surface for workspace-level posture, market setup, local-pack visibility workflow, aggregate GBP/review benchmark readouts, and authenticated GBP per-location review triage when `gbp-auth-reviews` is enabled. It must not become a keyword lifecycle manager.
 - **Keyword Hub:** primary admin surface for keyword-level local visibility, local evidence posture, local filters, drawer evidence, and safe keyword actions.
 - **Keyword Strategy:** may show market visibility summaries, but must not imply local visibility changes the selected strategy unless a later scoring PR explicitly does that work.
 - **Page Intelligence:** may annotate local-intent page keywords with local visibility evidence when stored snapshots exist.
@@ -89,4 +89,4 @@ Reporting copy must distinguish "raw local evidence" from "recommended action". 
 
 ## Deferred Work
 
-Authenticated Google Business Profile OAuth, raw review storage/sync, review reply publishing, client approval workflows for review responses, geo-grid tracking, and local SEO recommendation automation are separate follow-up roadmap items. Do not fold them into the Local Presence IA shell or first local-pack visibility foundation unless a later plan explicitly expands scope.
+Authenticated Google Business Profile OAuth and authenticated raw review storage/sync are owned by the separate GBP Phase 2A/2B flags and contracts (`gbp-auth-connection`, `gbp-auth-reviews`). Review reply publishing, client approval workflows for review responses, geo-grid tracking, and local SEO recommendation automation remain separate follow-up roadmap items. Do not fold them into the Local Presence IA shell or first local-pack visibility foundation unless a later plan explicitly expands scope.
