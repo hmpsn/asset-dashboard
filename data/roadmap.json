@@ -67,10 +67,58 @@
           "source": "Owner GBP planning thread 2026-06-29",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "Start only after Phase 2B is merged and green on staging. Generate review response drafts from synced reviews, route drafts through explicit client/admin approval, publish approved replies through Google, and track reply status, published timestamps, errors, and activity history. No auto-publish without explicit approval."
+          "notes": "Completed 2026-06-29: added `gbp-review-responses` (default OFF) dependent on `gbp-auth-connection` and `gbp-auth-reviews`; normalized review response workflow/event/publish-attempt tables; an explicit draft/client-awaiting/approval/publishing/published/failure state machine; AI operation `gbp-review-response-draft` with JSON validation and public-reply constraints; Google `accounts.locations.reviews.updateReply` publishing via background job `gbp-review-reply-publish`; admin Local Presence Reviews triage; client Inbox review-response approval cards; deliverable type `gbp_review_response`; and workspace broadcasts/query invalidation. Existing replied reviews remain read-only. No auto-publish, scheduled auto-responder, bulk generation, or general AI/copy reuse of raw review text was added."
+        },
+        {
+          "id": "gbp-review-response-existing-reply-updates",
+          "title": "GBP follow-on — update existing Google review replies",
+          "source": "GBP Phase 2C deferred scope 2026-06-29",
+          "est": "M",
+          "priority": "P3",
+          "status": "deferred",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Phase 2C intentionally keeps existing Google replies read-only. Add an explicit update workflow only after reply publishing has been validated on staging: load current Google/local reply state, draft a replacement, require client/admin reapproval, preserve activity/history, publish through Google's updateReply endpoint, and prevent silent overwrites or publish without fresh approval."
+        },
+        {
+          "id": "gbp-review-response-bulk-drafting",
+          "title": "GBP follow-on — bulk review response drafting queue",
+          "source": "GBP Phase 2C deferred scope 2026-06-29",
+          "est": "M",
+          "priority": "P3",
+          "status": "deferred",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Batch-generate drafts for multiple unanswered reviews only after the single-review approval workflow proves safe. Must use the background job platform, cost/rate caps, per-review draft validation, and admin review before any send or publish. No auto-send, no auto-publish, and raw review text remains limited to the per-review drafting operation."
+        },
+        {
+          "id": "gbp-review-auto-responder-approval-loop",
+          "title": "GBP follow-on — scheduled review auto-responder approval loop",
+          "source": "GBP Phase 2C deferred scope 2026-06-29",
+          "est": "L",
+          "priority": "P3",
+          "status": "deferred",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Turn new synced reviews into scheduled or event-triggered draft responses with explicit client/admin approval before publishing. Must be opt-in per workspace/client, include notification cadence and escalation rules, throttle generation, route low-rating reviews for human attention, and preserve the no-auto-publish guarantee."
+        },
+        {
+          "id": "gbp-review-response-effectiveness-reporting",
+          "title": "GBP follow-on — review response effectiveness reporting",
+          "source": "GBP Phase 2C deferred scope 2026-06-29",
+          "est": "M",
+          "priority": "P4",
+          "status": "deferred",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "analytics-intelligence",
+          "notes": "Add reporting for unanswered review aging, response SLA, published replies, failed publishes, low-rating handling, and client approval turnaround. Feed Local Presence and client proof surfaces with aggregate metrics only; do not introduce general copy/intelligence reuse of raw review text."
         },
         {
           "id": "seo-engine-deferred-revenue-grounding",

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { listGbpReviewsFromGoogle } from '../../server/google-business-profile-client.js';
+import { listGbpReviewsFromGoogle, updateGbpReviewReply } from '../../server/google-business-profile-client.js';
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -66,5 +66,31 @@ describe('Google Business Profile review client', () => {
 
     expect(result.reviews.map(review => review.reviewId)).toEqual(['a', 'b']);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('publishes replies with the v4 review reply endpoint and comment body', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      comment: 'Thanks for visiting.',
+      updateTime: '2026-06-29T13:00:00Z',
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateGbpReviewReply(
+      'access-token',
+      'accounts/123/locations/456/reviews/rev-1',
+      'Thanks for visiting.',
+    );
+
+    expect(result.comment).toBe('Thanks for visiting.');
+    expect(result.updateTime).toBe('2026-06-29T13:00:00Z');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://mybusiness.googleapis.com/v4/accounts/123/locations/456/reviews/rev-1/reply');
+    expect(init.method).toBe('PUT');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-token');
+    expect(String(init.body)).toBe('{"comment":"Thanks for visiting."}');
   });
 });

@@ -155,6 +155,32 @@ export const BACKGROUND_JOB_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled';
 
+// ── Google Business Profile Review Response ──
+// Drafts can be sent to the client or approved internally by an admin. Publishing is only legal
+// after explicit approval metadata is recorded by the GBP response service.
+export const GBP_REVIEW_RESPONSE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft: ['awaiting_client', 'approved', 'cancelled'],
+  awaiting_client: ['awaiting_client', 'approved', 'changes_requested', 'declined', 'cancelled'],
+  changes_requested: ['draft', 'awaiting_client', 'cancelled'],
+  declined: [],
+  approved: ['publishing', 'cancelled'],
+  publishing: ['published', 'publish_failed'],
+  published: [],
+  publish_failed: ['publishing', 'cancelled'],
+  cancelled: [],
+};
+
+export type GbpReviewResponseStateStatus =
+  | 'draft'
+  | 'awaiting_client'
+  | 'changes_requested'
+  | 'declined'
+  | 'approved'
+  | 'publishing'
+  | 'published'
+  | 'publish_failed'
+  | 'cancelled';
+
 // ── Client Deliverable (unified send-to-client spine) ──
 // One canonical status vocabulary across the five bespoke send-to-client pipelines
 // (design §4.2). Base map:

@@ -699,6 +699,16 @@
       "tier": "free",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 71,
+      "title": "Google Review Response Approval",
+      "oneLiner": "Draft, client-approve, and publish Google Business Profile review replies with explicit approval and a full activity trail",
+      "category": "client",
+      "painPoints": ["approval-workflow", "client-transparency", "local-seo"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

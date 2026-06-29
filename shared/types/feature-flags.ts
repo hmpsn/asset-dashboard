@@ -68,6 +68,10 @@ export const FEATURE_FLAGS = {
   // OFF = no raw authenticated review sync/read UI.
   'gbp-auth-reviews': false,
 
+  // GBP OAuth Phase 2C — review response drafting, explicit approval, and Google reply publishing.
+  // Separate from authenticated review sync; OFF = no draft/reply workflow and no Google writes.
+  'gbp-review-responses': false,
+
   // SEO Decision Engine P8 (FINAL): ai-visibility — the LLM-citation measurement layer. Reads
   // DataForSEO's LLM-mentions database for the client's domain → an AI-visibility KPI (share-of-
   // voice vs co-mentioned competitors + mention volume + before/after trend + source domains LLMs
@@ -342,6 +346,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-29',
     },
   },
+  'gbp-review-responses': {
+    label: 'Google Business Profile — review response approval + publishing',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-29',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once reply drafting, client/admin approval, and Google reply publishing are validated on staging with Google API approval; then remove after authenticated GBP workflows are default-on.',
+      linkedRoadmapItemId: 'gbp-review-response-approval-phase-2c',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-29',
+    },
+  },
   'ai-visibility': {
     label: 'AI visibility — LLM citation share-of-voice vs competitors',
     group: 'SEO Decision Engine',
@@ -597,7 +614,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'ai-visibility'],
+    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'gbp-review-responses', 'ai-visibility'],
   },
   {
     label: 'Strategy',

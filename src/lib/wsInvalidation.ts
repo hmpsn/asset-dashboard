@@ -454,6 +454,12 @@ function adminInvalidationKeys(
         queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
         queryKeys.admin.localGbpReviews(workspaceId),
       ] as const;
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
+      return [
+        queryKeys.admin.gbpReviewResponses(workspaceId),
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+        queryKeys.admin.workspaceDeliverables(workspaceId),
+      ] as const;
     case WS_EVENTS.LLM_MENTIONS_SNAPSHOTS_REFRESHED:
       // P8 ai-visibility: a llm-mentions refresh upserted llm_mention_snapshots → re-pull the
       // AI-visibility KPI's OWN query key (distinct prefix; must be listed explicitly) + the
@@ -597,6 +603,7 @@ function clientDashboardInvalidationKeys(
       return [queryKeys.client.contentSubscription(workspaceId)] as const;
     case WS_EVENTS.DELIVERABLE_SENT:
     case WS_EVENTS.DELIVERABLE_UPDATED:
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
       // strategy-the-issue (Phase 2): a rec→deliverable send / response surfaces in the
       // evergreen curated feed + the loop footer — refresh both halves of the loop.
       return [
@@ -757,6 +764,7 @@ function clientUnifiedInboxInvalidationKeys(
     case WS_EVENTS.CONTENT_REQUEST_UPDATE:
     case WS_EVENTS.POST_UPDATED:
     case WS_EVENTS.WORK_ORDER_UPDATE:
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
       return [queryKeys.client.unifiedInbox(workspaceId)] as const;
     case WS_EVENTS.WORK_ORDER_COMMENT: {
       const orderId = readStringField(data, 'id');

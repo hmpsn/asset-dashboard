@@ -77,6 +77,7 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   copy_section:          'Copy',
   content_request:       'Content',
   recommendation:        'Recommendation',
+  gbp_review_response:   'Google Review',
 };
 
 export function deliverableTypeBadge(type: DeliverableType | string): string {

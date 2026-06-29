@@ -253,6 +253,35 @@ vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
     isPending: false,
     error: null,
   }),
+  useGbpReviewResponses: () => ({
+    data: {
+      connection: {
+        configured: true,
+        connected: true,
+        status: 'connected',
+        scopes: ['https://www.googleapis.com/auth/business.manage'],
+        accountCount: 1,
+        locationCount: 2,
+        mappedLocationCount: 1,
+        needsReconnect: false,
+      },
+      eligibleReviews: [],
+      responses: [],
+      policy: {
+        rawReviewTextUsedForDraftingOnly: true,
+        guidance: 'Raw authenticated review text may be used only to draft a response for that review.',
+      },
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useDraftGbpReviewResponse: () => ({ mutate: vi.fn(), isPending: false, variables: null }),
+  useUpdateGbpReviewResponse: () => ({ mutate: vi.fn(), isPending: false }),
+  useSendGbpReviewResponseToClient: () => ({ mutate: vi.fn(), isPending: false }),
+  useApproveAndPublishGbpReviewResponse: () => ({ mutate: vi.fn(), isPending: false }),
+  useRetryGbpReviewResponsePublish: () => ({ mutate: vi.fn(), isPending: false, variables: null }),
 }));
 
 function renderPage(initialEntry = '/ws/ws-1/local-seo') {

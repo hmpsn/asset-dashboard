@@ -44,6 +44,9 @@ import './briefing.js';
 // (D-apply). The canonical client decision flows through the public act-on route, not the
 // deliverable respond path.
 import './recommendation.js';
+// Google Business Profile review response approval artifact. Source of truth remains
+// google_business_review_responses; this adapter only mirrors client decisions back to it.
+import './gbp-review-response.js';
 
 export {
   registerAdapter,

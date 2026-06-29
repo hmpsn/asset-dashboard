@@ -2,6 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { googleBusinessProfile } from '../../api/googleBusinessProfile';
 import { queryKeys } from '../../lib/queryKeys';
 import type { WorkspaceGbpMappingsUpdateRequest } from '../../../shared/types/google-business-profile';
+import type {
+  GbpReviewResponseDraftRequest,
+  GbpReviewResponseSendToClientRequest,
+  GbpReviewResponseUpdateRequest,
+} from '../../../shared/types/google-business-profile';
 
 export function useGbpConnectionStatus() {
   return useQuery({
@@ -103,5 +108,65 @@ export function useSyncGbpAuthenticatedReviews(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.gbpAuthenticatedReviews(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.localGbpReviews(workspaceId) });
     },
+  });
+}
+
+export function useGbpReviewResponses(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.gbpReviewResponses(workspaceId),
+    queryFn: () => googleBusinessProfile.reviewResponses(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 30 * 1000,
+  });
+}
+
+function invalidateGbpReviewResponses(queryClient: ReturnType<typeof useQueryClient>, workspaceId: string) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.admin.gbpReviewResponses(workspaceId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.admin.gbpAuthenticatedReviews(workspaceId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceDeliverables(workspaceId) });
+}
+
+export function useDraftGbpReviewResponse(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GbpReviewResponseDraftRequest) =>
+      googleBusinessProfile.draftReviewResponse(workspaceId, body),
+    onSettled: () => invalidateGbpReviewResponses(queryClient, workspaceId),
+  });
+}
+
+export function useUpdateGbpReviewResponse(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ responseId, body }: { responseId: string; body: GbpReviewResponseUpdateRequest }) =>
+      googleBusinessProfile.updateReviewResponse(workspaceId, responseId, body),
+    onSettled: () => invalidateGbpReviewResponses(queryClient, workspaceId),
+  });
+}
+
+export function useSendGbpReviewResponseToClient(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ responseId, body }: { responseId: string; body?: GbpReviewResponseSendToClientRequest }) =>
+      googleBusinessProfile.sendReviewResponseToClient(workspaceId, responseId, body ?? {}),
+    onSettled: () => invalidateGbpReviewResponses(queryClient, workspaceId),
+  });
+}
+
+export function useApproveAndPublishGbpReviewResponse(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (responseId: string) =>
+      googleBusinessProfile.approveAndPublishReviewResponse(workspaceId, responseId),
+    onSettled: () => invalidateGbpReviewResponses(queryClient, workspaceId),
+  });
+}
+
+export function useRetryGbpReviewResponsePublish(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (responseId: string) =>
+      googleBusinessProfile.retryReviewResponsePublish(workspaceId, responseId),
+    onSettled: () => invalidateGbpReviewResponses(queryClient, workspaceId),
   });
 }

@@ -1,9 +1,15 @@
-import { get, post, put } from './client';
+import { get, patch, post, put } from './client';
 import type {
   GbpAccountSummary,
   GbpAuthenticatedReviewsRead,
   GbpConnectionSafe,
   GbpLocationSummary,
+  GbpReviewResponseDraftRequest,
+  GbpReviewResponsePublishResponse,
+  GbpReviewResponseSendToClientRequest,
+  GbpReviewResponseSummary,
+  GbpReviewResponseUpdateRequest,
+  GbpReviewResponseWorkflowRead,
   GbpReviewSyncResponse,
   GbpSyncResponse,
   WorkspaceGbpMappingRead,
@@ -49,4 +55,22 @@ export const googleBusinessProfile = {
 
   syncAuthenticatedReviews: (workspaceId: string) =>
     post<GbpReviewSyncResponse>(`/api/google-business-profile/workspaces/${workspaceId}/reviews/sync`),
+
+  reviewResponses: (workspaceId: string) =>
+    get<GbpReviewResponseWorkflowRead>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses`),
+
+  draftReviewResponse: (workspaceId: string, body: GbpReviewResponseDraftRequest) =>
+    post<GbpReviewResponseSummary>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses/draft`, body),
+
+  updateReviewResponse: (workspaceId: string, responseId: string, body: GbpReviewResponseUpdateRequest) =>
+    patch<GbpReviewResponseSummary>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses/${responseId}`, body),
+
+  sendReviewResponseToClient: (workspaceId: string, responseId: string, body: GbpReviewResponseSendToClientRequest = {}) =>
+    post<{ response: GbpReviewResponseSummary }>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses/${responseId}/send-to-client`, body),
+
+  approveAndPublishReviewResponse: (workspaceId: string, responseId: string) =>
+    post<GbpReviewResponsePublishResponse>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses/${responseId}/approve-and-publish`),
+
+  retryReviewResponsePublish: (workspaceId: string, responseId: string) =>
+    post<GbpReviewResponsePublishResponse>(`/api/google-business-profile/workspaces/${workspaceId}/review-responses/${responseId}/retry-publish`),
 };

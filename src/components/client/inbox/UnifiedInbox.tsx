@@ -8,6 +8,7 @@ import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
+import { GbpReviewResponseApprovalCard } from './GbpReviewResponseApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { RequestsTab } from '../RequestsTab';
 import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
@@ -544,6 +545,20 @@ export function UnifiedInbox({
     const decision: NormalizedDecision = normalizeDeliverable(d);
     const projected = isProjectedDeliverable(d.type);
     const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
+    if (d.type === 'gbp_review_response') {
+      return (
+        <div key={d.id} id={`unified-decision-${d.id}`}>
+          <GbpReviewResponseApprovalCard
+            deliverable={d}
+            ageLabel={ageLabel(d.sentAt)}
+            submitting={submittingId === d.id}
+            onApprove={() => void handleRespond(d, 'approved')}
+            onRequestChanges={(note) => void handleRespond(d, 'changes_requested', note || undefined)}
+            onDecline={(note) => void handleRespond(d, 'declined', note || undefined)}
+          />
+        </div>
+      );
+    }
 
     return (
       <div key={d.id} id={`unified-decision-${d.id}`}>

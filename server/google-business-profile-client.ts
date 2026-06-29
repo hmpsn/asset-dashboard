@@ -122,6 +122,11 @@ interface GbpReviewsApiResponse {
   nextPageToken?: string;
 }
 
+interface GbpReviewReplyApiResponse {
+  comment?: string;
+  updateTime?: string;
+}
+
 function googleClientConfig(): { clientId: string; clientSecret: string; redirectUri: string } {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -376,6 +381,20 @@ export async function listGbpReviewsFromGoogle(
     if (!pageToken) break;
   }
   return { reviews, averageRating, totalReviewCount, nextPageToken };
+}
+
+export async function updateGbpReviewReply(
+  accessToken: string,
+  reviewResourceName: string,
+  comment: string,
+): Promise<GbpReviewReplyApiResponse> {
+  return googleJson<GbpReviewReplyApiResponse>({
+    endpoint: `${GBP_V4_BASE}/${reviewResourceName}/reply`,
+    source: 'gbp',
+    token: accessToken,
+    method: 'PUT',
+    body: { comment },
+  });
 }
 
 export async function syncGbpAccountsAndLocations(): Promise<GbpSyncResponse> {
