@@ -158,6 +158,14 @@ export interface SeoContextSlice {
    *    - otherwise → legacy workspace.brandVoice + brand-docs block
    *
    *  Empty string means "no brand voice configured" — render nothing.
+   *
+   *  INVARIANT: this field is byte-identical to `BrandSlice.voicePromptBlock` — both are
+   *  sourced from the same `buildEffectiveBrandVoiceBlock(workspaceId)`. The value lives on
+   *  TWO slices on purpose, not by accident: this copy is load-bearing for the prompt
+   *  formatter (`formatSeoContextSection` receives only the seoContext slice), while the
+   *  brand-slice copy serves on-demand brand-context (MCP) consumers. Do NOT "consolidate"
+   *  by deleting one — re-converge the sources if they ever diverge. Enforced by
+   *  tests/contract/voice-block-slice-parity.test.ts (brand-slice P4, Option A).
    */
   effectiveBrandVoiceBlock: string;
   businessContext: string;
@@ -702,7 +710,11 @@ export interface BrandSlice {
   };
   /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
   voice: { status: 'calibrated' | 'legacy' | 'none' };
-  /** Authority-resolved voice block — identical to `seoContext.effectiveBrandVoiceBlock`. Inject directly; never re-derive from structured fields. */
+  /** Authority-resolved voice block — inject directly; never re-derive from structured fields.
+   *  INVARIANT: byte-identical to `SeoContextSlice.effectiveBrandVoiceBlock` (both sourced from
+   *  `buildEffectiveBrandVoiceBlock(workspaceId)`). The duplication across two slices is
+   *  intentional — see the note on `effectiveBrandVoiceBlock`. Enforced by
+   *  tests/contract/voice-block-slice-parity.test.ts (brand-slice P4, Option A). */
   voicePromptBlock: string;
   /** Layer-2 voice DNA + guardrails (semantic rules). Populated ONLY for calibrated profiles — non-calibrated already carry DNA in voicePromptBlock. Inject directly; do not combine with voicePromptBlock. */
   voiceDnaBlock: string;

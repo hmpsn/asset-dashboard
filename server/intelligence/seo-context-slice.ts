@@ -132,6 +132,9 @@ export async function assembleSeoContext(
     // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is authoritative.
     // Intelligence-path callers inject this DIRECTLY — it already carries the emphatic
     // BRAND VOICE header when non-empty.
+    // INVARIANT: must stay byte-identical to BrandSlice.voicePromptBlock (brand-slice.ts),
+    // which calls the SAME buildEffectiveBrandVoiceBlock(). Enforced by
+    // tests/contract/voice-block-slice-parity.test.ts — don't change one source without the other.
     effectiveBrandVoiceBlock: buildEffectiveBrandVoiceBlock(workspaceId),
     businessContext: workspace?.keywordStrategy?.businessContext ?? '',
     personas: workspace?.personas ?? [],
