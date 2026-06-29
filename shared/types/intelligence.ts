@@ -685,6 +685,26 @@ export interface GenerationQualitySlice {
   latest: StoredGenerationQuality | null;
 }
 
+export interface BrandSlice {
+  /** 'ready' when any approved identity field or a non-empty voice block exists. */
+  availability: 'ready' | 'no_data';
+  /** Structured, approved-only brand identity (each a single content blob). */
+  identity: {
+    mission?: string;
+    vision?: string;
+    values?: string;
+    tagline?: string;
+    elevatorPitch?: string;
+    positioning?: string;
+  };
+  /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
+  voice: { status: 'calibrated' | 'legacy' | 'none' };
+  /** Authority-resolved voice block — identical to `seoContext.effectiveBrandVoiceBlock`. Inject directly; never re-derive from structured fields. */
+  voicePromptBlock: string;
+  /** Pre-formatted approved-identity block for prompt injection. Inject directly. */
+  identityPromptBlock: string;
+}
+
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────
 // Scrubbed, tier-gated view of WorkspaceIntelligence for client portal consumption.
 // NEVER expose: knowledgeBase, brandVoice, churnRisk, impact_score, operational slice,
