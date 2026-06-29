@@ -1,6 +1,36 @@
 {
   "sprints": [
     {
+      "id": "sprint-brand-intelligence-slice-2026-06-29",
+      "name": "Brand Intelligence Slice — unify voice + identity into workspace intelligence",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "Surface a single authority-correct brand context (voice + approved identity) through the workspace intelligence facade so AI/recommendation consumers stop re-deriving it. P1 ships the read-only, behavior-neutral slice (registration + assembler + read-model extraction) behind the zero circular-dependency ratchet; P2 wires it into prompts (formatter case + PROMPT_FORMATTABLE + baseSlices). Plan: docs/superpowers/plans/2026-06-29-brand-slice-p1.md. Audit: docs/superpowers/audits/2026-06-29-brand-slice-p1-audit.md.",
+      "items": [
+        {
+          "id": "brand-intelligence-slice-p1-read-only",
+          "title": "Brand intelligence slice P1 — read-only, behavior-neutral registration + assembler",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p1.md",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "Registered the `brand` slice (BrandSlice interface, INTELLIGENCE_SLICES entry, WorkspaceIntelligence.brand?, registry entry) and assembler server/intelligence/brand-slice.ts. Voice read via the unchanged buildEffectiveBrandVoiceBlock (seo-context-source.ts); identity read via a newly-extracted leaf read-model server/brand-deliverable-read-model.ts (brand-identity.ts re-exports listDeliverables/getDeliverable for back-compat). Behavior-neutral: NOT added to PROMPT_FORMATTABLE_INTELLIGENCE_SLICES, no formatters.ts case, in no baseSlices — exactly like generationQuality. Cycle-kill boundary test guards the leaf-import contract; circular-deps stays server 0/0. P2 (prompt wiring) is the next phase."
+        },
+        {
+          "id": "brand-intelligence-slice-p2-prompt-wiring",
+          "title": "Brand intelligence slice P2 — wire into prompts (formatter + PROMPT_FORMATTABLE + baseSlices)",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p1.md (non-goals)",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "Deferred from P1. Add the `brand` formatter case in server/intelligence/formatters.ts, add `brand` to PROMPT_FORMATTABLE_INTELLIGENCE_SLICES, and include it in the appropriate default baseSlices sets (generation-context-builders.ts, recommendation, admin-chat-context-builder.ts) so brand voice + identity actually reach generated prompts/content. This is the behavior-changing phase — not started until P1 is merged and green on staging."
+        }
+      ]
+    },
+    {
       "id": "sprint-seo-decision-engine-2026-06-23",
       "name": "SEO Decision Engine — close the data→decision gap (8-phase program)",
       "hours": "TBD — phased, one PR per phase, staging-first",

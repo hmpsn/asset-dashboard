@@ -39,6 +39,7 @@ export const INTELLIGENCE_SLICES = [
   'entityResolution',
   'eeatAssets',
   'generationQuality',
+  'brand',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -131,6 +132,8 @@ export interface WorkspaceIntelligence {
   eeatAssets?: EeatAssetsSlice;
   /** Latest internal generation-quality telemetry for workspace-scoped AI generation health. */
   generationQuality?: GenerationQualitySlice;
+  /** Unified brand voice (authority-resolved block) + approved identity. Read-only; non-formattable; assembled on request. */
+  brand?: BrandSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -683,6 +686,26 @@ export interface EeatAssetsSlice {
 export interface GenerationQualitySlice {
   /** Latest persisted generation-quality row, or null when the workspace has no observations yet. */
   latest: StoredGenerationQuality | null;
+}
+
+export interface BrandSlice {
+  /** 'ready' when any approved identity field or a non-empty voice block exists. */
+  availability: 'ready' | 'no_data';
+  /** Structured, approved-only brand identity (each a single content blob). */
+  identity: {
+    mission?: string;
+    vision?: string;
+    values?: string;
+    tagline?: string;
+    elevatorPitch?: string;
+    positioning?: string;
+  };
+  /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
+  voice: { status: 'calibrated' | 'legacy' | 'none' };
+  /** Authority-resolved voice block — identical to `seoContext.effectiveBrandVoiceBlock`. Inject directly; never re-derive from structured fields. */
+  voicePromptBlock: string;
+  /** Pre-formatted approved-identity block for prompt injection. Inject directly. */
+  identityPromptBlock: string;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────

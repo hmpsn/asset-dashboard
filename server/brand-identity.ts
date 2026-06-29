@@ -11,76 +11,25 @@ import { listExtractions } from './discovery-ingestion.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type {
-  BrandDeliverable, DeliverableVersion, DeliverableType, DeliverableTier, DeliverableStatus,
+  BrandDeliverable, DeliverableType, DeliverableTier,
   VoiceSampleContext,
 } from '../shared/types/brand-engine.js';
 import { DEFAULT_TIER_MAP } from '../shared/types/brand-engine.js';
+import { rowToDeliverable, listDeliverables, getDeliverable, type DeliverableRow } from './brand-deliverable-read-model.js';
 import { isProgrammingError } from './errors.js';
+
+export { listDeliverables, getDeliverable };
 
 const log = createLogger('brand-identity');
 
-interface DeliverableRow {
-  id: string; workspace_id: string; deliverable_type: string;
-  content: string; status: string; version: number; tier: string;
-  created_at: string; updated_at: string;
-}
-interface VersionRow {
-  id: string; deliverable_id: string; content: string;
-  steering_notes: string | null; version: number; created_at: string;
-}
-
 const stmts = createStmtCache(() => ({
-  listByWorkspace: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? ORDER BY tier, deliverable_type`),
-  listByTier: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND tier = ? ORDER BY deliverable_type`),
   getById: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE id = ? AND workspace_id = ?`),
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
   updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
-  // Defense in depth: scope by workspace via a join on the parent deliverable
-  // even though `deliverable_id` is already a scoped FK. A bug in getDeliverable
-  // (or a future caller) that leaks a cross-workspace id shouldn't yield version
-  // rows. `brand_identity_versions` has no `workspace_id` column of its own.
-  listVersions: db.prepare(`SELECT v.* FROM brand_identity_versions v INNER JOIN brand_identity_deliverables d ON v.deliverable_id = d.id WHERE v.deliverable_id = ? AND d.workspace_id = ? ORDER BY v.version DESC`),
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
-
-function rowToDeliverable(row: DeliverableRow): BrandDeliverable {
-  return {
-    id: row.id, workspaceId: row.workspace_id,
-    deliverableType: row.deliverable_type as DeliverableType,
-    content: row.content,
-    status: row.status as DeliverableStatus,
-    version: row.version,
-    tier: row.tier as DeliverableTier,
-    createdAt: row.created_at, updatedAt: row.updated_at,
-  };
-}
-
-function rowToVersion(row: VersionRow): DeliverableVersion {
-  return {
-    id: row.id, deliverableId: row.deliverable_id,
-    content: row.content, steeringNotes: row.steering_notes ?? undefined,
-    version: row.version, createdAt: row.created_at,
-  };
-}
-
-// ── Public API
-
-export function listDeliverables(workspaceId: string, tier?: DeliverableTier): BrandDeliverable[] {
-  const rows = tier
-    ? stmts().listByTier.all(workspaceId, tier) as DeliverableRow[]
-    : stmts().listByWorkspace.all(workspaceId) as DeliverableRow[];
-  return rows.map(rowToDeliverable);
-}
-
-export function getDeliverable(workspaceId: string, id: string): (BrandDeliverable & { versions: DeliverableVersion[] }) | null {
-  const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
-  if (!row) return null;
-  const deliverable = rowToDeliverable(row);
-  const versions = (stmts().listVersions.all(id, workspaceId) as VersionRow[]).map(rowToVersion);
-  return { ...deliverable, versions };
-}
 
 function buildBrandContext(workspaceId: string): string {
   const parts: string[] = [];

@@ -201,6 +201,12 @@ describe('cycle-kill boundary contracts', () => {
     expect(siteArchitecture).not.toContain("from '../internal-links.js'");
   });
 
+  it('keeps brand-slice reads on leaf modules (no brand-identity facade import)', () => {
+    const brandSlice = readSource('server/intelligence/brand-slice.ts');
+    expect(brandSlice).toContain("from '../brand-deliverable-read-model.js'");
+    expect(brandSlice).not.toContain("from '../brand-identity.js'");
+  });
+
   it('keeps voice profile reads on a leaf read model for intelligence context', () => {
     const voiceReadModel = readSource('server/voice-profile-read-model.ts');
     const voiceCalibration = readSource('server/voice-calibration.ts');

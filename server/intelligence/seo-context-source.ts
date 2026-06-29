@@ -11,7 +11,7 @@ import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../../shared/ty
 const log = createLogger('workspace-intelligence/seo-context-source');
 const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
 
-function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
+export function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
   try {
     return fn();
   } catch (err) {
