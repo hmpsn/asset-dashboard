@@ -15,6 +15,7 @@ import { clientTools, handleClientTool } from './tools/clients.js';
 import { keywordActionTools, handleKeywordActionTool } from './tools/keyword-actions.js';
 import { contentActionTools, handleContentActionTool } from './tools/content-actions.js';
 import { jobActionTools, handleJobActionTool } from './tools/job-actions.js';
+import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
 
 const log = createLogger('mcp-server');
 
@@ -37,7 +38,7 @@ const ALL_TOOLS = [
 function createMcpServer() {
   const mcpServer = new Server(
     { name: 'hmpsn-studio', version: '1.0.0' },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions: MCP_SERVER_INSTRUCTIONS },
   );
 
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({

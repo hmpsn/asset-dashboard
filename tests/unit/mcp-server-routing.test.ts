@@ -24,7 +24,7 @@ const h = vi.hoisted(() => {
     });
     close = vi.fn(async () => {});
 
-    constructor(_meta: unknown, _capabilities: unknown) {
+    constructor(public meta: unknown, public options: unknown) {
       serverInstances.push(this);
     }
 
@@ -111,6 +111,7 @@ vi.mock('../../server/mcp/tools/job-actions.js', () => ({
 
 import { handleMcpRequest } from '../../server/mcp/server.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types';
+import { MCP_SERVER_INSTRUCTIONS } from '../../server/mcp/instructions.js';
 
 describe('mcp server routing', () => {
   beforeEach(() => {
@@ -118,6 +119,18 @@ describe('mcp server routing', () => {
     h.transportInstances.length = 0;
     h.state.throwOnHandle = false;
     for (const fn of Object.values(h.mockHandlers)) fn.mockClear();
+  });
+
+  it('constructs the Server with the agent instructions string in its options', async () => {
+    await handleMcpRequest({ body: {} } as never, {} as never);
+
+    const server = h.serverInstances.at(-1);
+    expect(server).toBeDefined();
+    const options = server.options as { instructions?: string; capabilities?: unknown };
+    expect(options.instructions).toBe(MCP_SERVER_INSTRUCTIONS);
+    expect(options.instructions!.length).toBeGreaterThan(0);
+    // capabilities must still be present (instructions is additive, not a replacement).
+    expect(options.capabilities).toBeDefined();
   });
 
   it('registers list + call handlers and dispatches each tool family', async () => {
