@@ -524,6 +524,20 @@ export const getBrandIdentityInputSchema = z.object({
 });
 export type GetBrandIdentityInput = z.infer<typeof getBrandIdentityInputSchema>;
 
+export const updateBrandDeliverableInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  deliverableId: z.string().min(1),
+  content: z.string().min(1),
+  /**
+   * Optional optimistic-concurrency guard. Pass the `version` returned by
+   * `get_brand_identity(includeDeliverables:true)`; if it no longer matches the
+   * stored version the write is rejected as a conflict (re-fetch and retry).
+   * Omit for last-write-wins.
+   */
+  expectedVersion: z.number().int().positive().optional(),
+});
+export type UpdateBrandDeliverableInput = z.infer<typeof updateBrandDeliverableInputSchema>;
+
 // --- Job tool input schemas -------------------------------------------------
 
 export const startKeywordStrategyGenerationInputSchema = z.object({
