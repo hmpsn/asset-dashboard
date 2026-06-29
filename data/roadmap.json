@@ -235,11 +235,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "M",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "The three Express limiters apply only to /api/public/ (app.ts:205-208); /mcp mounts unlimited at app.ts:215. Paid-call counter is informational-only and only research_keywords increments it — start_keyword_strategy_generation + start_local_seo_refresh hit paid providers uncounted. Add a /mcp limiter + a budget that covers the paid jobs (no circuit breaker exists today)."
+          "notes": "Done. (1) Rate-limit /mcp: new mcpLimiter=rateLimit(60s,120) [per-path, NOT global — global would share globalPublicLimiter's  bucket and cross-contaminate /mcp with /api/public/] in server/middleware.ts, applied via a top-level req.path===/mcp check (mirrors publicWriteLimiter) so the bucket key is  (/mcp was unthrottled — the 3 public limiters only cover /api/public/). 120 req/min/IP — generous for a normal agent workflow, bounds a runaway loop / leaked-key abuser; 429 + Retry-After on exceed. (2) Paid-call counting parity: start_keyword_strategy_generation + start_local_seo_refresh now call recordPaidCall(1) and surface the warning (previously only research_keywords counted); both tool descriptions tagged [Paid API]. Tests: mcp-rate-limit.test.ts (120 allowed / 429 after) + extended mcp-tools-job-actions.test.ts (paid jobs count, seo_audit does not). DEFERRED: hard paid-call ENFORCEMENT (circuit breaker that refuses calls over a budget) is intentionally NOT here — the counter is a per-instance module-global let, so real per-workspace durable budgets belong with the P1 durable-handle-store item (mcp-durable-handle-store). The rate limiter is the request-level circuit breaker; this completes the informational paid-call signal.",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-publish-post-advance-status",

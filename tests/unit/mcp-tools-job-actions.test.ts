@@ -26,9 +26,14 @@ const h = vi.hoisted(() => {
     hasActiveKeywordStrategyGeneration: vi.fn(),
     runSeoAudit: vi.fn(),
     getTokenForSite: vi.fn(),
+    recordPaidCall: vi.fn(() => ({ count: 1 })),
     KeywordStrategyGenerationError,
   };
 });
+
+vi.mock('../../server/mcp/paid-call-counter.js', () => ({
+  recordPaidCall: h.recordPaidCall,
+}));
 
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: h.getWorkspace,
@@ -95,6 +100,20 @@ describe('mcp job action tools', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('records a paid call for the two paid jobs, but not for the unpaid seo audit', async () => {
+    await handleJobActionTool('start_keyword_strategy_generation', { workspace_id: 'ws-1' });
+    expect(h.recordPaidCall).toHaveBeenCalledTimes(1);
+
+    h.recordPaidCall.mockClear();
+    await handleJobActionTool('start_local_seo_refresh', { workspace_id: 'ws-1', refresh_body: {} });
+    expect(h.recordPaidCall).toHaveBeenCalledTimes(1);
+
+    // start_seo_audit is NOT in the audit's paid-tool list → must not count.
+    h.recordPaidCall.mockClear();
+    await handleJobActionTool('start_seo_audit', { workspace_id: 'ws-1', site_id: 'site-1' });
+    expect(h.recordPaidCall).not.toHaveBeenCalled();
   });
 
   it('starts keyword strategy job and transitions to done with progress updates', async () => {
