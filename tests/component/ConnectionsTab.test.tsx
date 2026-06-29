@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   flowTokenError: '',
   flowFetchSites: vi.fn(),
   flowReset: vi.fn(),
+  featureFlags: {} as Record<string, boolean>,
+  gbpAuthMutateAsync: vi.fn(),
+  gbpSyncMutate: vi.fn(),
+  gbpDisconnectMutate: vi.fn(),
 }));
 
 vi.mock('../../src/hooks/admin/useWorkspaces', () => ({
@@ -42,6 +46,42 @@ vi.mock('../../src/hooks/useLinkSiteFlow', () => ({
 
 vi.mock('../../src/hooks/admin/useIntegrationHealth', () => ({
   useIntegrationHealth: () => ({ data: undefined, isLoading: false }),
+}));
+
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (flag: string) => mocks.featureFlags[flag] ?? false,
+}));
+
+vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
+  useGbpConnectionStatus: () => ({
+    data: {
+      configured: true,
+      connected: true,
+      status: 'connected',
+      scopes: ['https://www.googleapis.com/auth/business.manage'],
+      accountCount: 1,
+      locationCount: 2,
+      mappedLocationCount: 1,
+      needsReconnect: false,
+    },
+    isLoading: false,
+    isError: false,
+  }),
+  useGbpAuthUrl: () => ({
+    mutateAsync: mocks.gbpAuthMutateAsync,
+    isPending: false,
+    isError: false,
+  }),
+  useGbpSync: () => ({
+    mutate: mocks.gbpSyncMutate,
+    isPending: false,
+    isError: false,
+  }),
+  useGbpDisconnect: () => ({
+    mutate: mocks.gbpDisconnectMutate,
+    isPending: false,
+    isError: false,
+  }),
 }));
 
 const defaultProps = {
@@ -78,11 +118,22 @@ describe('ConnectionsTab — site linking', () => {
     mocks.flowTokenError = '';
     mocks.flowShowToken = false;
     mocks.linkSiteIsPending = false;
+    mocks.featureFlags = {};
   });
 
   it('shows the token input when no site is linked', () => {
     renderTab({ webflowSiteId: undefined });
     expect(screen.getByPlaceholderText(/paste webflow api token/i)).toBeInTheDocument();
+  });
+
+  it('shows Google Business Profile connection only when the feature flag is enabled', () => {
+    renderTab();
+    expect(screen.queryByText('Google Business Profile')).not.toBeInTheDocument();
+
+    mocks.featureFlags = { 'gbp-auth-connection': true };
+    renderTab();
+    expect(screen.getByText('Google Business Profile')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('does NOT show the token input when a site is already linked', () => {

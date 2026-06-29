@@ -112,6 +112,70 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
+vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
+  useWorkspaceGbpMappings: () => ({
+    data: {
+      connection: {
+        configured: true,
+        connected: true,
+        status: 'connected',
+        scopes: ['https://www.googleapis.com/auth/business.manage'],
+        accountCount: 1,
+        locationCount: 2,
+        mappedLocationCount: 1,
+        needsReconnect: false,
+      },
+      locations: [
+        {
+          id: 'locations/1',
+          connectionId: 'conn-1',
+          accountId: 'accounts/1',
+          accountResourceName: 'accounts/1',
+          resourceName: 'locations/1',
+          title: 'Acme Austin',
+          addressLines: [],
+          syncStatus: 'available',
+          syncedAt: '2026-06-29T12:00:00.000Z',
+        },
+        {
+          id: 'locations/2',
+          connectionId: 'conn-1',
+          accountId: 'accounts/1',
+          accountResourceName: 'accounts/1',
+          resourceName: 'locations/2',
+          title: 'Acme Round Rock',
+          addressLines: [],
+          syncStatus: 'available',
+          syncedAt: '2026-06-29T12:00:00.000Z',
+        },
+      ],
+      mappings: [
+        {
+          workspaceId: 'ws-1',
+          clientLocationId: 'loc-1',
+          googleLocationId: 'locations/1',
+          isPrimary: true,
+          createdAt: '2026-06-29T12:00:00.000Z',
+          updatedAt: '2026-06-29T12:00:00.000Z',
+          location: {
+            id: 'locations/1',
+            connectionId: 'conn-1',
+            accountId: 'accounts/1',
+            accountResourceName: 'accounts/1',
+            resourceName: 'locations/1',
+            title: 'Acme Austin',
+            addressLines: [],
+            syncStatus: 'available',
+            syncedAt: '2026-06-29T12:00:00.000Z',
+          },
+        },
+      ],
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 function renderPage(initialEntry = '/ws/ws-1/local-seo') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -151,6 +215,8 @@ describe('LocalPresencePage', () => {
     renderPage('/ws/ws-1/local-seo?tab=reviews');
 
     expect(screen.getByRole('tab', { name: /reviews/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Authenticated GBP')).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 discovered Google Business Profile locations/)).toBeInTheDocument();
     expect(screen.getByText('Reviews vs competitors')).toBeInTheDocument();
     expect(screen.getByText('Acme Austin')).toBeInTheDocument();
   });
@@ -164,10 +230,11 @@ describe('LocalPresencePage', () => {
     expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
   });
 
-  it('keeps location CRUD in Business Footprint during Phase 1 setup', () => {
+  it('keeps location CRUD in Business Footprint while surfacing Phase 2A GBP mapping status', () => {
     renderPage('/ws/ws-1/local-seo?tab=setup');
 
-    expect(screen.getByText('Location records still live in Brand & AI for this phase. GBP account linking comes in the OAuth foundation phase.')).toBeInTheDocument();
+    expect(screen.getByText('Authenticated GBP')).toBeInTheDocument();
+    expect(screen.getByText(/Authenticated GBP locations map to those records/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open location records/i })).toBeInTheDocument();
   });
 });

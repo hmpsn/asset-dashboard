@@ -25,6 +25,7 @@ import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
 import { sanitizeErrorMessage } from './utils/text.js';
+import { assertIntegrationEncryptionConfigured } from './integration-encryption.js';
 
 const log = createLogger('app');
 
@@ -36,6 +37,7 @@ import workspacesRoutes from './routes/workspaces.js';
 import settingsRoutes from './routes/settings.js';
 import reportsRoutes from './routes/reports.js';
 import googleRoutes from './routes/google.js';
+import googleBusinessProfileRoutes from './routes/google-business-profile.js';
 import aiRoutes from './routes/ai.js';
 import keywordStrategyRoutes from './routes/keyword-strategy.js';
 import keywordCommandCenterRoutes from './routes/keyword-command-center.js';
@@ -123,6 +125,10 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 /** Create and configure the Express application with all middleware and routes. */
 export function createApp(): express.Express {
   const app = express();
+
+  if (IS_PROD) {
+    assertIntegrationEncryptionConfigured();
+  }
 
   // Ensure data directories exist
   for (const dir of [getUploadRoot(), getOptRoot()]) {
@@ -253,6 +259,7 @@ export function createApp(): express.Express {
       if (req.path === '/api/feature-flags' && req.method === 'GET') return next();
       // Allow Google OAuth callback (Google redirects here without our auth token)
       if (req.path === '/api/google/callback') return next();
+      if (req.path === '/api/google-business-profile/callback') return next();
       // Allow public report and client routes
       if (req.path.startsWith('/report/') || req.path.startsWith('/client/')) return next();
       if (req.path.startsWith('/api/public/')) return next();
@@ -312,6 +319,7 @@ export function createApp(): express.Express {
   registerWebflowRoutes(app);
   app.use(reportsRoutes);
   app.use(googleRoutes);
+  app.use(googleBusinessProfileRoutes);
   app.use(aiRoutes);
   app.use(keywordStrategyRoutes);
   app.use(keywordCommandCenterRoutes);

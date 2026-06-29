@@ -170,6 +170,8 @@ export const WS_EVENTS = {
   // GBP + reviews (SEO Decision Engine P7 / local-gbp) — fired after a local-gbp-refresh
   // job upserts business_listing_snapshots; refreshes the local-SEO panel + command center.
   LOCAL_GBP_SNAPSHOTS_REFRESHED: 'local-gbp:snapshots_refreshed',
+  // Authenticated Google Business Profile connection + workspace-location mapping (Phase 2A).
+  GBP_CONNECTION_UPDATED: 'gbp:connection_updated',
   // AI visibility (SEO Decision Engine P8 / ai-visibility) — fired after a llm-mentions-refresh
   // job upserts a llm_mention_snapshots row; refreshes the AI-visibility KPI + intelligence.
   LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'llm-mentions:snapshots_refreshed',

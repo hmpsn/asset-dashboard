@@ -7,6 +7,7 @@ import { FeatureFlag } from '../ui/FeatureFlag';
 import { BusinessProfileTab } from './BusinessProfileTab';
 import { LocationsTab } from './LocationsTab';
 import { TargetGeoEditor } from './TargetGeoEditor';
+import { GbpLocationMappingPanel } from './GbpLocationMappingPanel';
 import type { TargetGeo } from '../../../shared/types/workspace';
 
 type LegacyBusinessFootprintSection = 'business-profile' | 'locations';
@@ -128,6 +129,11 @@ export function BusinessFootprintTab({
           businessProfile={businessProfile}
           toast={toast}
         />
+        <FeatureFlag flag="gbp-auth-connection">
+          <div className="mt-6">
+            <GbpLocationMappingPanel workspaceId={workspaceId} />
+          </div>
+        </FeatureFlag>
       </div>
     </div>
   );
