@@ -1,36 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-brand-intelligence-slice-2026-06-29",
-      "name": "Brand Intelligence Slice — unify voice + identity into workspace intelligence",
-      "hours": "TBD — phased, one PR per phase, staging-first",
-      "rationale": "Surface a single authority-correct brand context (voice + approved identity) through the workspace intelligence facade so AI/recommendation consumers stop re-deriving it. P1 ships the read-only, behavior-neutral slice (registration + assembler + read-model extraction) behind the zero circular-dependency ratchet; P2 wires it into prompts (formatter case + PROMPT_FORMATTABLE + baseSlices). Plan: docs/superpowers/plans/2026-06-29-brand-slice-p1.md. Audit: docs/superpowers/audits/2026-06-29-brand-slice-p1-audit.md.",
-      "items": [
-        {
-          "id": "brand-intelligence-slice-p1-read-only",
-          "title": "Brand intelligence slice P1 — read-only, behavior-neutral registration + assembler",
-          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p1.md",
-          "est": "M",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-06-29",
-          "owner": "workspace-intelligence",
-          "notes": "Registered the `brand` slice (BrandSlice interface, INTELLIGENCE_SLICES entry, WorkspaceIntelligence.brand?, registry entry) and assembler server/intelligence/brand-slice.ts. Voice read via the unchanged buildEffectiveBrandVoiceBlock (seo-context-source.ts); identity read via a newly-extracted leaf read-model server/brand-deliverable-read-model.ts (brand-identity.ts re-exports listDeliverables/getDeliverable for back-compat). Behavior-neutral: NOT added to PROMPT_FORMATTABLE_INTELLIGENCE_SLICES, no formatters.ts case, in no baseSlices — exactly like generationQuality. Cycle-kill boundary test guards the leaf-import contract; circular-deps stays server 0/0. P2 (prompt wiring) is the next phase."
-        },
-        {
-          "id": "brand-intelligence-slice-p2-prompt-wiring",
-          "title": "Brand intelligence slice P2 — wire into prompts (formatter + PROMPT_FORMATTABLE + baseSlices)",
-          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p1.md (non-goals)",
-          "est": "M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-06-29",
-          "owner": "workspace-intelligence",
-          "notes": "Deferred from P1. Add the `brand` formatter case in server/intelligence/formatters.ts, add `brand` to PROMPT_FORMATTABLE_INTELLIGENCE_SLICES, and include it in the appropriate default baseSlices sets (generation-context-builders.ts, recommendation, admin-chat-context-builder.ts) so brand voice + identity actually reach generated prompts/content. This is the behavior-changing phase — not started until P1 is merged and green on staging."
-        }
-      ]
-    },
-    {
       "id": "sprint-seo-decision-engine-2026-06-23",
       "name": "SEO Decision Engine — close the data→decision gap (8-phase program)",
       "hours": "TBD — phased, one PR per phase, staging-first",
@@ -1507,6 +1477,37 @@
           "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the note explicitly ties implementation to the segment-inserts ship point. Re-entry: segment-inserts ships or the owner cancels it and asks to remove the reserved stubs."
         }
       ]
+    },
+    {
+      "id": "sprint-brand-intelligence-slice-2026-06-29",
+      "name": "✅ SHIPPED — Brand Intelligence Slice — unify voice + identity into workspace intelligence",
+      "hours": "TBD — phased, one PR per phase, staging-first",
+      "rationale": "Surface a single authority-correct brand context (voice + approved identity) through the workspace intelligence facade so AI/recommendation consumers stop re-deriving it. P1 ships the read-only, behavior-neutral slice (registration + assembler + read-model extraction) behind the zero circular-dependency ratchet; P2 wires brand into the MCP content path (prepare_*_context) so agents get full voice DNA + identity — NOT a formatter/baseSlices change (server-side gen already gets full voice via buildSystemPrompt; contract #4). Plans: docs/superpowers/plans/2026-06-29-brand-slice-p1.md, docs/superpowers/plans/2026-06-29-brand-slice-p2.md. Design: docs/designs/2026-06-26-brand-intelligence-slice.md.",
+      "items": [
+        {
+          "id": "brand-intelligence-slice-p1-read-only",
+          "title": "Brand intelligence slice P1 — read-only, behavior-neutral registration + assembler",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p1.md",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "Registered the `brand` slice (BrandSlice interface, INTELLIGENCE_SLICES entry, WorkspaceIntelligence.brand?, registry entry) and assembler server/intelligence/brand-slice.ts. Voice read via the unchanged buildEffectiveBrandVoiceBlock (seo-context-source.ts); identity read via a newly-extracted leaf read-model server/brand-deliverable-read-model.ts (brand-identity.ts re-exports listDeliverables/getDeliverable for back-compat). Behavior-neutral: NOT added to PROMPT_FORMATTABLE_INTELLIGENCE_SLICES, no formatters.ts case, in no baseSlices — exactly like generationQuality. Cycle-kill boundary test guards the leaf-import contract; circular-deps stays server 0/0. P2 (prompt wiring) is the next phase."
+        },
+        {
+          "id": "brand-intelligence-slice-p2-mcp-wiring",
+          "title": "Brand intelligence slice P2 — wire brand into MCP prepare_*_context (voice DNA + identity to agents)",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p2.md",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "Shipped the design-note P2 (MCP wiring), NOT the formatter/baseSlices path (server-side gen already gets full voice via buildSystemPrompt — adding brand to baseSlices/PROMPT_FORMATTABLE was explicitly out of scope, contract #4). (1) Extracted voiceDNAToPromptInstructions + guardrailsToPromptInstructions verbatim into a cycle-safe types-only leaf server/voice-dna-layer2.ts; prompt-assembly re-exports them (buildSystemPrompt output byte-identical). (2) Added BrandSlice.voiceDnaBlock — Layer-2 DNA+guardrails populated ONLY for calibrated profiles (non-calibrated already carry DNA in voicePromptBlock → would double-inject); brand-slice imports the renderers from the leaf, never voice-calibration.js (cycle guard). (3) prepare_brief_context/prepare_post_context fetch the brand slice separately (buildWorkspaceIntelligence(ws,{slices:['brand']})) and append ONLY voiceDnaBlock+identityPromptBlock to prompt_context (voicePromptBlock already in context.promptContext — no double-voice) plus surface structured brand_identity + voice_status payload keys. Unit+integration tests assert the brand payload, DNA/identity injection, and the Layer-2 voice header appears exactly once. circular-deps server 0/0; cycle-kill + voice-authority guards extended. Next: P3 get_brand_identity read tool; P4 consumer migration → retire shim."
+        }
+      ],
+      "shippedAt": "2026-06-29"
     },
     {
       "id": "sprint-keyword-hub-health-2026-06-26",
