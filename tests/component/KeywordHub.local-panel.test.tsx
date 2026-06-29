@@ -1,17 +1,16 @@
 /**
- * KeywordHub.local-panel.test.tsx — A1 contracts
+ * KeywordHub.local-panel.test.tsx — Local Presence handoff contracts
  *
  * Verifies:
- *   1. LocalSeoVisibilityPanel mounts in Hub after idle-callback flush, with
- *      market-drawer trigger reachable ("Configure market" / "Edit markets" button).
- *   2. onOpenKeywords sets the Hub's segment to 'local'.
+ *   1. Keyword Hub renders the compact Local Presence handoff after idle-callback flush.
+ *   2. Keyword-level local annotations stay enabled in the Hub row list.
  *   3. 5 KPI summary cards render from a summary fixture
  *      (In Strategy / Tracked / Local / Needs Review / Retired).
  *   4. Summary-level fetch error renders a role="status" error band.
  *   5. KPI skeleton placeholders show while summary data is absent.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { KeywordHub } from '../../src/components/KeywordHub';
@@ -50,12 +49,14 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: () => ({ send: vi.fn() }),
 }));
 
-// Mock HubKeywordList to avoid full table rendering noise.
+// Mock HubKeywordList to avoid full table rendering noise while pinning the
+// keyword-level local annotation contract.
 vi.mock('../../src/components/keyword-hub/HubKeywordList', () => ({
   HubKeywordList: (props: { isLoading: boolean; rows: unknown[]; showLocalSeo: boolean }) => (
     <div data-testid="hub-keyword-list">
       <span data-testid="list-loading">{props.isLoading ? 'loading' : 'ready'}</span>
       <span data-testid="list-row-count">{props.rows.length}</span>
+      <span data-testid="list-show-local-seo">{props.showLocalSeo ? 'true' : 'false'}</span>
     </div>
   ),
 }));
@@ -241,14 +242,14 @@ describe('KeywordHub — A1 local panel + KPI cards', () => {
     vi.useRealTimers();
   });
 
-  // --- 1. Panel deferred mount + market-drawer trigger reachable ----------------
+  // --- 1. Compact Local Presence handoff --------------------------------------
 
-  it('defers LocalSeoVisibilityPanel until after the first rows render, then shows it', () => {
+  it('defers the Local Presence handoff until after the first rows render, then shows it', () => {
     renderHub();
 
     // Before idle callback fires, the placeholder is shown.
     expect(
-      screen.getByText('Local visibility summary will load after the keyword rows are ready.'),
+      screen.getByText('Local presence summary will load after the keyword rows are ready.'),
     ).toBeInTheDocument();
 
     // Flush the idle callback (falls through to setTimeout in test env).
@@ -256,46 +257,20 @@ describe('KeywordHub — A1 local panel + KPI cards', () => {
       vi.runOnlyPendingTimers();
     });
 
-    // Panel is now mounted; placeholder is gone.
+    // Handoff is now mounted; placeholder is gone.
     expect(
-      screen.queryByText('Local visibility summary will load after the keyword rows are ready.'),
+      screen.queryByText('Local presence summary will load after the keyword rows are ready.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Local Keyword Visibility')).toBeInTheDocument();
+    expect(screen.getByText('Workspace-level local SEO now lives in Local Presence.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open local presence/i })).toBeInTheDocument();
   });
 
-  it('market-drawer trigger is reachable after panel mounts', () => {
+  // --- 2. Keyword-level local annotations remain in Hub -----------------------
+
+  it('keeps keyword-level local annotations enabled in the Hub row list', () => {
     renderHub();
 
-    act(() => {
-      vi.runOnlyPendingTimers();
-    });
-
-    // The "Edit markets" (or "Configure market") button opens the setup drawer.
-    // Either label is acceptable depending on whether markets are configured.
-    const marketButton =
-      screen.queryByRole('button', { name: /edit markets/i }) ??
-      screen.queryByRole('button', { name: /configure market/i });
-    expect(marketButton).not.toBeNull();
-    expect(marketButton).toBeInTheDocument();
-  });
-
-  // --- 2. onOpenKeywords wires to Hub 'local' segment -------------------------
-
-  it('onOpenKeywords sets Hub segment to local', () => {
-    renderHub();
-
-    act(() => {
-      vi.runOnlyPendingTimers();
-    });
-
-    // "View local keywords" button invokes onOpenKeywords.
-    // getAllByRole handles the case where multiple instances exist (e.g. RepeatCompetitorList).
-    const viewBtns = screen.getAllByRole('button', { name: /view local keywords/i });
-    fireEvent.click(viewBtns[0]);
-
-    // The Hub's segment bar should now show 'Local' as active.
-    const localPill = screen.getByLabelText(/Local segment/i);
-    expect(localPill).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('list-show-local-seo').textContent).toBe('true');
   });
 
   // --- 3. KPI summary cards render from summary fixture -----------------------

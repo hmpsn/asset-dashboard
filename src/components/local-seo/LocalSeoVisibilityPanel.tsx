@@ -17,6 +17,7 @@ interface LocalSeoVisibilityPanelProps {
   workspaceId: string;
   mode?: LocalSeoVisibilityPanelMode;
   onOpenKeywords?: () => void;
+  showGbpReviews?: boolean;
 }
 
 const POSTURE_TONE: Record<LocalSeoVisibilityPosture, 'blue' | 'emerald' | 'amber' | 'red' | 'zinc'> = {
@@ -302,7 +303,7 @@ function LocalSeoPageAnnotationPanel({
   );
 }
 
-export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpenKeywords }: LocalSeoVisibilityPanelProps) {
+export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpenKeywords, showGbpReviews = true }: LocalSeoVisibilityPanelProps) {
   const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, isError, error, refetch } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
@@ -454,7 +455,7 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
     {/* SEO Decision Engine P7 (local-gbp): GBP + reviews readout. Self-gates on data presence
         (server returns an empty payload when the flag is off), so this renders nothing until a
         GBP refresh has captured listings. */}
-    {mode === 'keywords' && <GbpReviewsPanel workspaceId={workspaceId} />}
+    {mode === 'keywords' && showGbpReviews && <GbpReviewsPanel workspaceId={workspaceId} />}
     </>
   );
 }

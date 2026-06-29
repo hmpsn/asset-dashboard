@@ -44,7 +44,7 @@ const PALETTE_GROUP_LABELS: Record<NavGroupKey, string> = {
   home: '',
   monitoring: 'Monitoring',
   'site-health': 'Site Health',
-  'seo-strategy': 'SEO Strategy',
+  'seo-strategy': 'Strategy',
   optimization: 'Optimization',
   content: 'Content',
   admin: 'Admin',
