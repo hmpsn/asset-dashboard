@@ -1,12 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **536 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **537 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 536. Local Presence IA shell
+### 537. MCP analytics-loop closure (`resolve_insight` + `bulk_resolve_insights`)
+
+**What it does:** Adds two MCP write tools — `resolve_insight(workspaceId, insightId, status, note?)` and `bulk_resolve_insights(workspaceId, insightIds[], status, note?)` — that let a Claude agent mark analytics insights `resolved` or `in_progress` after acting on them. Before this, the MCP analytics surface was read-only: an agent could see `get_unresolved_insights` but never close the loop, so the same queue re-surfaced every pass with no way to reach a terminal state (the audit's "stateless analytics loop"). Both tools wrap the existing `resolveInsight` store function, tag the resolution `source: 'mcp-chat'`, fire the `INSIGHT_RESOLVED` broadcast + activity log, and — on `resolved` — record an outcome-learning baseline snapshot via a newly-extracted shared helper (`recordInsightResolutionOutcome` in `server/outcome-tracking.ts`) that the admin resolve route now also uses, so agent-driven and operator-driven resolutions feed the learning system identically. From the 2026-06-26 MCP surface audit (P0).
+
+**Why it matters to the agency:** Closes the highest-value gap for autonomous operation — an agent triaging analytics can now actually *clear* what it has handled instead of re-reporting it, and (via `bulk_*`) sweep a batch at once. Because resolutions are tagged `mcp-chat` and recorded for outcome learning, chat-driven triage is fully auditable and contributes to the "did this action improve metrics?" measurement loop rather than being invisible to it.
+
+**Why it matters to clients:** Faster, more consistent follow-through on the issues the platform surfaces — work an agent resolves is tracked and measured the same as work an operator resolves, so outcome reporting stays complete regardless of who did the closing.
 
 **What it does:** Adds a dedicated admin **Local Presence** page at `/ws/:workspaceId/local-seo` under the visible **Strategy** nav group. The page re-homes the workspace-level local SEO operating surface into four tabs: Overview (posture, markets, freshness, GBP review aggregates), Visibility (the existing local visibility workflow), Reviews (the existing `local-gbp` aggregate reviews panel), and Setup (entry points back to existing Business Footprint location management). Keyword Hub now shows a compact Local Presence handoff while preserving keyword-level local annotations, filters, row data, and drawer evidence. This is an IA foundation only: no GBP OAuth, raw review sync, reply publishing, provider expansion, tables, migrations, jobs, or new Google scopes.
 

@@ -25,6 +25,7 @@ import type {
   OutcomeReadback,
 } from '../shared/types/outcome-tracking.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
+import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -427,6 +428,43 @@ export function getActionsByPage(workspaceId: string, pageUrl: string): TrackedA
 export function getActionBySource(sourceType: string, sourceId: string): TrackedAction | null {
   const row = stmts().getBySourceTypeAndId.get(sourceType, sourceId) as TrackedActionRow | undefined;
   return row ? rowToTrackedAction(row) : null;
+}
+
+/**
+ * Record the outcome-tracking baseline snapshot when an insight is resolved, so
+ * the outcome-learning system can later measure whether resolving it improved the
+ * page's metrics. Idempotent (one action per insight) and never throws.
+ *
+ * Shared single source of truth for the admin resolve route
+ * (`server/routes/insights.ts`) AND the MCP `resolve_insight` tool, so an
+ * agent-driven resolution feeds learning identically to an operator-driven one.
+ * Call ONLY when the new status is `'resolved'`.
+ */
+export function recordInsightResolutionOutcome(workspaceId: string, insight: AnalyticsInsight): void {
+  try {
+    if (!workspaceId) return;
+    if (getActionBySource('insight', insight.id)) return;
+    const insightData = insight.data as Record<string, unknown> | undefined;
+    recordAction({ // recordAction-ok: workspaceId guarded by the early return above
+      workspaceId,
+      actionType: 'insight_acted_on',
+      sourceType: 'insight',
+      sourceId: insight.id,
+      pageUrl: insight.pageId ?? null,
+      targetKeyword: (insightData?.query as string) ?? (insightData?.keyword as string) ?? null,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+        position: insightData?.currentPosition as number | undefined,
+        clicks: insightData?.clicks as number | undefined,
+        impressions: insightData?.impressions as number | undefined,
+        ctr: insightData?.ctr as number | undefined,
+        page_health_score: insightData?.score as number | undefined,
+      },
+      attribution: 'platform_executed',
+    });
+  } catch (err) {
+    log.warn({ err, insightId: insight.id }, 'Failed to record insight resolution outcome');
+  }
 }
 
 export function getActionByWorkspaceAndSource(workspaceId: string, sourceType: string, sourceId: string): TrackedAction | null {
