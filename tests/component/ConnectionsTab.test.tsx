@@ -18,8 +18,16 @@ const mocks = vi.hoisted(() => ({
   flowReset: vi.fn(),
   featureFlags: {} as Record<string, boolean>,
   gbpAuthMutateAsync: vi.fn(),
+  gbpAuthIsError: false,
+  gbpAuthError: null as Error | null,
   gbpSyncMutate: vi.fn(),
+  gbpSyncIsError: false,
+  gbpSyncError: null as Error | null,
   gbpDisconnectMutate: vi.fn(),
+  gbpDisconnectIsError: false,
+  gbpDisconnectError: null as Error | null,
+  gbpStatusIsError: false,
+  gbpStatusError: null as Error | null,
 }));
 
 vi.mock('../../src/hooks/admin/useWorkspaces', () => ({
@@ -65,22 +73,26 @@ vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
       needsReconnect: false,
     },
     isLoading: false,
-    isError: false,
+    isError: mocks.gbpStatusIsError,
+    error: mocks.gbpStatusError,
   }),
   useGbpAuthUrl: () => ({
     mutateAsync: mocks.gbpAuthMutateAsync,
     isPending: false,
-    isError: false,
+    isError: mocks.gbpAuthIsError,
+    error: mocks.gbpAuthError,
   }),
   useGbpSync: () => ({
     mutate: mocks.gbpSyncMutate,
     isPending: false,
-    isError: false,
+    isError: mocks.gbpSyncIsError,
+    error: mocks.gbpSyncError,
   }),
   useGbpDisconnect: () => ({
     mutate: mocks.gbpDisconnectMutate,
     isPending: false,
-    isError: false,
+    isError: mocks.gbpDisconnectIsError,
+    error: mocks.gbpDisconnectError,
   }),
 }));
 
@@ -119,6 +131,14 @@ describe('ConnectionsTab — site linking', () => {
     mocks.flowShowToken = false;
     mocks.linkSiteIsPending = false;
     mocks.featureFlags = {};
+    mocks.gbpAuthIsError = false;
+    mocks.gbpAuthError = null;
+    mocks.gbpSyncIsError = false;
+    mocks.gbpSyncError = null;
+    mocks.gbpDisconnectIsError = false;
+    mocks.gbpDisconnectError = null;
+    mocks.gbpStatusIsError = false;
+    mocks.gbpStatusError = null;
   });
 
   it('shows the token input when no site is linked', () => {
@@ -134,6 +154,16 @@ describe('ConnectionsTab — site linking', () => {
     renderTab();
     expect(screen.getByText('Google Business Profile')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('surfaces the safe Google Business Profile sync error returned by the API', () => {
+    mocks.featureFlags = { 'gbp-auth-connection': true };
+    mocks.gbpSyncIsError = true;
+    mocks.gbpSyncError = new Error('Google says a required My Business API is disabled for this OAuth project.');
+
+    renderTab();
+
+    expect(screen.getByText(/required My Business API is disabled/i)).toBeInTheDocument();
   });
 
   it('does NOT show the token input when a site is already linked', () => {

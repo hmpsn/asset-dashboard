@@ -15,6 +15,8 @@ export function GbpConnectionCard({ workspaceId }: { workspaceId: string }) {
   const data = status.data;
   const connected = data?.connected;
   const reconnectNeeded = data?.needsReconnect;
+  const actionError = [status.error, authUrl.error, sync.error, disconnect.error]
+    .find((error): error is Error => error instanceof Error);
 
   const handleConnect = async () => {
     const result = await authUrl.mutateAsync({
@@ -96,7 +98,7 @@ export function GbpConnectionCard({ workspaceId }: { workspaceId: string }) {
 
         {(status.isError || authUrl.isError || sync.isError || disconnect.isError) && (
           <p className="t-caption-sm text-red-400">
-            Google Business Profile connection could not be updated. Check OAuth credentials and API access.
+            {actionError?.message ?? 'Google Business Profile connection could not be updated. Check OAuth credentials and API access.'}
           </p>
         )}
       </div>
