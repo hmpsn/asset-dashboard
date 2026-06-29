@@ -161,11 +161,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "S",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "analytics-intelligence",
-          "notes": "Wraps resolveInsight (analytics-insights-store.ts:290; returns undefined on workspace mismatch → clean 404). Today no resolveInsight anywhere in server/mcp/ → after acting the agent cannot mark anything resolved and re-surfaces the same queue every pass. Follow MCP write discipline (service fn + addActivity + broadcast)."
+          "notes": "Done. Added resolve_insight + bulk_resolve_insights MCP tools in server/mcp/tools/insights.ts (auto-routed via insightTools.some → no server.ts change). Each calls resolveInsight(...,'mcp-chat') + addActivity(source:mcp-chat) + broadcast(INSIGHT_RESOLVED), and on resolved calls the NEW shared helper recordInsightResolutionOutcome (extracted verbatim from server/routes/insights.ts into server/outcome-tracking.ts so agent + operator resolutions feed outcome-learning identically; route refactored to use it — behavior-preserving, verified by audit-insight-resolution + insights-queue-diagnostics-lifecycle integration tests). Schemas resolveInsightInputSchema/bulkResolveInsightsInputSchema. Real-DB test tests/unit/mcp-insights-resolve.test.ts (resolve/in_progress/not-found/cross-workspace/bulk/invalid). circular-deps 0/0. Closes the stateless analytics loop.",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-inbox-decision-tools",

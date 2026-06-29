@@ -507,6 +507,22 @@ export const getAnomaliesInputSchema = z.object({
   resolved: z.boolean().optional(),
 });
 
+export const resolveInsightInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  insightId: z.string().min(1),
+  status: z.enum(['in_progress', 'resolved']),
+  note: z.string().max(500).optional(),
+});
+export type ResolveInsightInput = z.infer<typeof resolveInsightInputSchema>;
+
+export const bulkResolveInsightsInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  insightIds: z.array(z.string().min(1)).min(1).max(100),
+  status: z.enum(['in_progress', 'resolved']),
+  note: z.string().max(500).optional(),
+});
+export type BulkResolveInsightsInput = z.infer<typeof bulkResolveInsightsInputSchema>;
+
 export const getWorkspaceIntelligenceInputSchema = z.object({
   workspaceId: z.string().min(1),
   slices: z.array(z.string()).optional(),

@@ -28,9 +28,17 @@ describe('PR 2B Bridge Wiring Verification', () => {
   });
 
   describe('Bridge #4: insight resolved → tracked action (pre-existing)', () => {
-    it('insights.ts calls recordAction on resolution', () => {
+    // The resolve route delegates the tracked-action recording to the shared
+    // recordInsightResolutionOutcome helper (so the MCP resolve_insight tool feeds
+    // outcome learning identically). Verify both halves of the wiring survive.
+    it('insights.ts route wires resolution to the shared outcome helper', () => {
       const src = readProjectFile('server/routes/insights.ts');
-      expectContainsAll(src, ['recordAction', 'getActionBySource', 'insight_acted_on']);
+      expect(src).toContain('recordInsightResolutionOutcome');
+    });
+
+    it('outcome-tracking.ts records the tracked action for resolved insights', () => {
+      const src = readProjectFile('server/outcome-tracking.ts');
+      expectContainsAll(src, ['recordInsightResolutionOutcome', 'recordAction', 'getActionBySource', 'insight_acted_on']);
     });
   });
 
