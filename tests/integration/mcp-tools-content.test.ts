@@ -211,6 +211,7 @@ describe('MCP content tools (integration)', () => {
       // Layer-2 DNA + identity blocks are injected into the prompt context.
       expect(payload.prompt_context).toContain('BRAND VOICE RULES');
       expect(payload.prompt_context).toContain('synergy'); // forbidden-word guardrail token
+      expect(payload.prompt_context.match(/synergy/g)?.length).toBe(1); // DNA token appears exactly once — no double-inject
       expect(payload.prompt_context).toContain('Help solo founders win their market.');
       // NO double-voice: the Layer-2 block header appears exactly once.
       expect(payload.prompt_context.match(/BRAND VOICE RULES/g)?.length).toBe(1);

@@ -635,7 +635,7 @@ async function handlePrepareBriefContext(
     // context.promptContext (via seoContext), so injecting it again would double-voice.
     const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
     const brand = brandIntel.brand;
-    const brandIdentity = brand?.availability === 'ready' ? brand.identity : null;
+    const brandIdentity = brand?.availability === 'ready' && Object.keys(brand.identity).length > 0 ? brand.identity : null;
     const targetBlock = buildBriefTargetPromptBlock(safeTopic, safeTargetKeyword, safeTargetPagePath);
     const briefId = `brief_${randomUUID()}`;
     const handle = issueHandle('brief-request', workspaceId, {
@@ -791,7 +791,7 @@ async function handlePreparePostContext(
     // is already inside context.promptContext (avoid double-voice).
     const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
     const brand = brandIntel.brand;
-    const brandIdentity = brand?.availability === 'ready' ? brand.identity : null;
+    const brandIdentity = brand?.availability === 'ready' && Object.keys(brand.identity).length > 0 ? brand.identity : null;
     const postId = `post_${randomUUID()}`;
     const handle = issueHandle('post-request', workspaceId, {
       briefId,
