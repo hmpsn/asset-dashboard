@@ -12,7 +12,7 @@ import {
 import { isGoogleProviderError } from './google-provider-client.js';
 import { createJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
-import { markDeliverableApplied } from './domains/inbox/send-to-client.js';
+import { markDeliverableApplied } from './domains/inbox/deliverable-apply-state.js';
 import { WS_EVENTS } from './ws-events.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { GBP_REVIEW_RESPONSE_STATUSES } from '../shared/types/google-business-profile.js';

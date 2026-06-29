@@ -3,7 +3,7 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { findBySourceRef } from '../../client-deliverables.js';
 import { classifyApprovalBatch } from './deliverable-adapters/approval-batch-classifier.js';
-import { markDeliverableApplied } from './send-to-client.js';
+import { markDeliverableApplied } from './deliverable-apply-state.js';
 import { normalizePageUrl } from '../../utils/page-address.js';
 import { createLogger } from '../../logger.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
