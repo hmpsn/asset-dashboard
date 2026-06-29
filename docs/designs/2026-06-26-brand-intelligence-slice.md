@@ -1,6 +1,8 @@
 # Design Note — Unified Brand Intelligence Slice (additive rollout)
 
-> **Status:** P1 + P2 + P3 + P5 BUILT (2026-06-29). P4 remains (shipped last by owner choice). See §8 phasing.
+> **Status:** COMPLETE — P1 + P2 + P3 + P5 BUILT, P4 resolved via **Option A** (2026-06-29). See §8 phasing.
+>
+> **P4 resolution (2026-06-29):** The planned "retire `effectiveBrandVoiceBlock`" was reframed after grounding. The field is **not a shim** — it is load-bearing for the prompt formatter (`formatSeoContextSection` receives only the seoContext slice) and its value already comes from the same single function (`buildEffectiveBrandVoiceBlock`) as `brand.voicePromptBlock`. A physical retirement would force `brand` into `baseSlices` (assembling identity on every prompt build) and refactor the most AI-sensitive code for **zero** correctness gain. Owner chose **Option A**: lock the single-source invariant with a contract test (`tests/contract/voice-block-slice-parity.test.ts`) + cross-reference docs on both slice fields, behavior-neutral. This captures P4's actual intent (one source of voice, no silent drift) without the formatter/baseSlices risk.
 > **Date:** 2026-06-26 · **Author:** owner + Claude (audit follow-up)
 > **Origin:** [2026-06-26 MCP surface audit](../audits/2026-06-26-mcp-surface-audit.md) → brand-coverage discussion.
 > **Decision owner:** Joshua. Decisions below marked **[DECIDED]** / **[OPEN]**.

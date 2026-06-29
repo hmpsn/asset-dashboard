@@ -19,6 +19,10 @@ const TYPE_TO_KEY: Record<string, keyof BrandSlice['identity']> = {
 };
 
 export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
+  // INVARIANT: voicePromptBlock must stay byte-identical to SeoContextSlice.effectiveBrandVoiceBlock
+  // (seo-context-slice.ts) — both call the SAME buildEffectiveBrandVoiceBlock(). The safeBrandEngineRead
+  // wrapper only diverges on a thrown error (→ ''). Enforced by
+  // tests/contract/voice-block-slice-parity.test.ts — don't change one source without the other.
   const voicePromptBlock = safeBrandEngineRead('brand.voiceBlock', workspaceId, () => buildEffectiveBrandVoiceBlock(workspaceId), '');
   const profile = safeBrandEngineRead('brand.voiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
   const legacyVoice = safeBrandEngineRead('brand.rawVoice', workspaceId, () => getRawBrandVoice(workspaceId), '');
