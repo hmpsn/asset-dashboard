@@ -165,9 +165,11 @@ describe('voice authority consumer inventory', () => {
 
   it('prevents manual voice DNA prompt assembly outside canonical brand-engine authority helpers', () => {
     const allowed = new Set([
+      'server/intelligence/brand-slice.ts',
       'server/intelligence/seo-context-source.ts',
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
+      'server/voice-dna-layer2.ts',
       'server/voice-dna-render.ts',
     ]);
 

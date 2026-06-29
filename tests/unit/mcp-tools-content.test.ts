@@ -7,6 +7,9 @@ vi.mock('../../server/workspaces.js', () => ({
 vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
   buildContentGenerationContext: vi.fn(),
 }));
+vi.mock('../../server/workspace-intelligence.js', () => ({
+  buildWorkspaceIntelligence: vi.fn(),
+}));
 vi.mock('../../server/content-brief.js', () => ({
   deleteBrief: vi.fn(),
   getBrief: vi.fn(),
@@ -38,6 +41,7 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
+import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
 import { deletePost, getPost, listPostVersions, listPosts, revertToVersion, savePost, updatePostField } from '../../server/content-posts-db.js';
 import { createContentRequest, getContentRequest, listContentRequests, updateContentRequest } from '../../server/content-requests.js';
@@ -55,6 +59,16 @@ describe('mcp content action tools', () => {
     });
     (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockResolvedValue({
       promptContext: 'intel-context',
+    });
+    (buildWorkspaceIntelligence as ReturnType<typeof vi.fn>).mockResolvedValue({
+      brand: {
+        availability: 'ready',
+        identity: { mission: 'Help homeowners', values: 'Be bold' },
+        voice: { status: 'calibrated' },
+        voicePromptBlock: '\n\nBRAND VOICE PROFILE:\nsamples',
+        voiceDnaBlock: '\n\nBRAND VOICE RULES (you MUST follow these — do not deviate):\nVoice profile for this client:',
+        identityPromptBlock: '\n\nBRAND IDENTITY (ground the brand\'s positioning in these):\nMission: Help homeowners',
+      },
     });
     (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([]);
     (updateBrief as ReturnType<typeof vi.fn>).mockImplementation((_: string, __: string, updates: unknown) => ({
@@ -602,10 +616,87 @@ describe('mcp content action tools', () => {
     expect(result.isError).toBeUndefined();
     const payload = JSON.parse(result.content[0].text) as { brief_request_handle: string; prompt_context: string };
     expect(payload.brief_request_handle).toMatch(/^brief-request_/);
-    expect(payload.prompt_context).toBe('intel-context');
+    expect(payload.prompt_context).toContain('intel-context');
     expect(buildContentGenerationContext).toHaveBeenCalledWith('ws-1', {
       learningsDomain: 'content',
     });
+  });
+
+  it('prepare_brief_context surfaces brand identity + voice status and injects DNA + identity blocks once', async () => {
+    const result = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    expect(result.isError).toBeUndefined();
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-1', { slices: ['brand'] });
+    const payload = JSON.parse(result.content[0].text) as {
+      brand_identity: { mission?: string; values?: string } | null;
+      voice_status: string;
+      prompt_context: string;
+    };
+    // Structured identity surfaced for per-page-type emphasis.
+    expect(payload.brand_identity).toEqual({ mission: 'Help homeowners', values: 'Be bold' });
+    expect(payload.voice_status).toBe('calibrated');
+    // Layer-1 voice (intel-context) present; Layer-2 DNA + identity blocks appended.
+    expect(payload.prompt_context).toContain('intel-context');
+    expect(payload.prompt_context).toContain('BRAND VOICE RULES');
+    expect(payload.prompt_context).toContain('BRAND IDENTITY');
+    // NO double-voice: voicePromptBlock must NOT be injected again (it already lives in intel-context).
+    expect(payload.prompt_context).not.toContain('BRAND VOICE PROFILE');
+  });
+
+  it('prepare_brief_context tolerates a no_data brand (null identity, voice_status none)', async () => {
+    (buildWorkspaceIntelligence as ReturnType<typeof vi.fn>).mockResolvedValue({
+      brand: {
+        availability: 'no_data',
+        identity: {},
+        voice: { status: 'none' },
+        voicePromptBlock: '',
+        voiceDnaBlock: '',
+        identityPromptBlock: '',
+      },
+    });
+    const result = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+    expect(result.isError).toBeUndefined();
+    const payload = JSON.parse(result.content[0].text) as {
+      brand_identity: unknown;
+      voice_status: string;
+      prompt_context: string;
+    };
+    expect(payload.brand_identity).toBeNull();
+    expect(payload.voice_status).toBe('none');
+    expect(payload.prompt_context).toContain('intel-context');
+    expect(payload.prompt_context).not.toContain('BRAND VOICE RULES');
+  });
+
+  it('prepare_post_context surfaces brand identity + voice status and injects DNA + identity blocks once', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+    });
+    const result = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-1', { slices: ['brand'] });
+    const payload = JSON.parse(result.content[0].text) as {
+      brand_identity: { mission?: string } | null;
+      voice_status: string;
+      prompt_context: string;
+    };
+    expect(payload.brand_identity).toEqual({ mission: 'Help homeowners', values: 'Be bold' });
+    expect(payload.voice_status).toBe('calibrated');
+    expect(payload.prompt_context).toContain('intel-context');
+    expect(payload.prompt_context).toContain('BRAND VOICE RULES');
+    expect(payload.prompt_context).toContain('BRAND IDENTITY');
+    expect(payload.prompt_context).not.toContain('BRAND VOICE PROFILE');
   });
 
   it('prepare_brief_context threads target keyword and page path into context', async () => {

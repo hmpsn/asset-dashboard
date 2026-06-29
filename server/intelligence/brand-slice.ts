@@ -2,6 +2,7 @@ import type { BrandSlice } from '../../shared/types/intelligence.js';
 import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, safeBrandEngineRead } from './seo-context-source.js';
 import { getVoiceProfile } from '../voice-profile-read-model.js';
 import { listDeliverables } from '../brand-deliverable-read-model.js';
+import { voiceDNAToPromptInstructions, guardrailsToPromptInstructions } from '../voice-dna-layer2.js';
 
 const IDENTITY_FIELDS = [
   ['mission', 'Mission'], ['vision', 'Vision'], ['values', 'Values'],
@@ -27,6 +28,19 @@ export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
   const status: BrandSlice['voice']['status'] =
     profile?.status === 'calibrated' ? 'calibrated' : (legacyVoice.trim() ? 'legacy' : 'none');
 
+  // Layer-2 voice DNA + guardrails — populated ONLY for calibrated profiles.
+  // For non-calibrated profiles the DNA is already inside voicePromptBlock
+  // (via buildEffectiveBrandVoiceBlock), so emitting it here would double-inject.
+  let voiceDnaBlock = '';
+  if (profile?.status === 'calibrated') {
+    const parts: string[] = [];
+    if (profile.voiceDNA) parts.push(voiceDNAToPromptInstructions(profile.voiceDNA));
+    if (profile.guardrails) parts.push(guardrailsToPromptInstructions(profile.guardrails));
+    if (parts.length) {
+      voiceDnaBlock = `\n\nBRAND VOICE RULES (you MUST follow these — do not deviate):\n${parts.join('\n\n')}`;
+    }
+  }
+
   const approved = safeBrandEngineRead('brand.identity', workspaceId, () => listDeliverables(workspaceId), [])
     .filter(d => d.status === 'approved');
   const identity: BrandSlice['identity'] = {};
@@ -48,5 +62,5 @@ export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
   const availability: BrandSlice['availability'] =
     (idLines.length > 0 || voicePromptBlock.trim()) ? 'ready' : 'no_data';
 
-  return { availability, identity, voice: { status }, voicePromptBlock, identityPromptBlock };
+  return { availability, identity, voice: { status }, voicePromptBlock, voiceDnaBlock, identityPromptBlock };
 }

@@ -205,6 +205,10 @@ describe('cycle-kill boundary contracts', () => {
     const brandSlice = readSource('server/intelligence/brand-slice.ts');
     expect(brandSlice).toContain("from '../brand-deliverable-read-model.js'");
     expect(brandSlice).not.toContain("from '../brand-identity.js'");
+    // Layer-2 voice DNA renders come from the cycle-safe leaf, NEVER from the
+    // cycle-heavy voice-calibration facade (which would reintroduce a hard cycle).
+    expect(brandSlice).toContain("from '../voice-dna-layer2.js'");
+    expect(brandSlice).not.toContain("from '../voice-calibration.js'");
   });
 
   it('keeps voice profile reads on a leaf read model for intelligence context', () => {
