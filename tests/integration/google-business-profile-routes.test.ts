@@ -3,13 +3,15 @@ import db from '../../server/db/index.js';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import type { GbpAuthenticatedReviewsRead, WorkspaceGbpMappingRead } from '../../shared/types/google-business-profile.js';
+import type { GbpAuthenticatedReviewsRead, GbpReviewResponseWorkflowRead, WorkspaceGbpMappingRead } from '../../shared/types/google-business-profile.js';
 import { markGbpReviewSyncFailed } from '../../server/google-business-profile-reviews-store.js';
+import { upsertGbpReviewResponseDraft } from '../../server/google-business-profile-review-responses-store.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, {
   env: {
     FEATURE_GBP_AUTH_CONNECTION: 'true',
     FEATURE_GBP_AUTH_REVIEWS: 'true',
+    FEATURE_GBP_REVIEW_RESPONSES: 'true',
     GOOGLE_CLIENT_ID: 'gbp-client-id',
     GOOGLE_CLIENT_SECRET: 'gbp-client-secret',
     GOOGLE_OAUTH_ENCRYPTION_KEY: 'test-google-oauth-encryption-key',
@@ -37,6 +39,9 @@ let clientLocationId = '';
 let otherClientLocationId = '';
 
 function clearGbpTables() {
+  db.prepare('DELETE FROM google_business_review_reply_publish_attempts').run();
+  db.prepare('DELETE FROM google_business_review_response_events').run();
+  db.prepare('DELETE FROM google_business_review_responses').run();
   db.prepare('DELETE FROM google_business_review_sync_status').run();
   db.prepare('DELETE FROM google_business_reviews').run();
   db.prepare('DELETE FROM workspace_google_business_locations').run();
@@ -289,6 +294,35 @@ describe('Google Business Profile routes', () => {
       hasReply: false,
     }));
     expect(body.copyPolicy.aiUseAllowed).toBe(false);
+  });
+
+  it('lists review response workflows for eligible unanswered reviews', async () => {
+    db.prepare('DELETE FROM google_business_review_responses WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM google_business_review_sync_status WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM google_business_reviews WHERE workspace_id = ?').run(workspaceId);
+    seedAuthenticatedReview();
+    const draft = upsertGbpReviewResponseDraft({
+      workspaceId,
+      reviewResourceName: 'accounts/123/locations/456/reviews/rev-1',
+      draftText: 'Thank you for the kind words. We appreciate the chance to help.',
+      actor: { type: 'admin' },
+    });
+
+    const res = await ctx.api(`/api/google-business-profile/workspaces/${workspaceId}/review-responses`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as GbpReviewResponseWorkflowRead;
+    expect(body.policy.rawReviewTextUsedForDraftingOnly).toBe(true);
+    expect(body.eligibleReviews[0]).toEqual(expect.objectContaining({
+      reviewResourceName: 'accounts/123/locations/456/reviews/rev-1',
+      commentExcerpt: 'Fantastic local service and fast follow-up.',
+    }));
+    expect(body.eligibleReviews[0]).not.toHaveProperty('commentText');
+    expect(body.responses[0]).toEqual(expect.objectContaining({
+      id: draft.id,
+      status: 'draft',
+      draftText: 'Thank you for the kind words. We appreciate the chance to help.',
+    }));
   });
 
   it('does not return old review excerpts after a GBP location is unmapped', async () => {

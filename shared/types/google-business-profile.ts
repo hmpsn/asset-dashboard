@@ -134,6 +134,112 @@ export interface GbpReviewSummary {
   syncedAt: string;
 }
 
+export const GBP_REVIEW_RESPONSE_STATUSES = {
+  DRAFT: 'draft',
+  AWAITING_CLIENT: 'awaiting_client',
+  CHANGES_REQUESTED: 'changes_requested',
+  DECLINED: 'declined',
+  APPROVED: 'approved',
+  PUBLISHING: 'publishing',
+  PUBLISHED: 'published',
+  PUBLISH_FAILED: 'publish_failed',
+  CANCELLED: 'cancelled',
+} as const;
+
+export type GbpReviewResponseStatus =
+  (typeof GBP_REVIEW_RESPONSE_STATUSES)[keyof typeof GBP_REVIEW_RESPONSE_STATUSES];
+
+export const GBP_REVIEW_RESPONSE_ACTOR_TYPES = {
+  ADMIN: 'admin',
+  CLIENT: 'client',
+  SYSTEM: 'system',
+} as const;
+
+export type GbpReviewResponseActorType =
+  (typeof GBP_REVIEW_RESPONSE_ACTOR_TYPES)[keyof typeof GBP_REVIEW_RESPONSE_ACTOR_TYPES];
+
+export const GBP_REVIEW_RESPONSE_EVENT_TYPES = {
+  DRAFT_GENERATED: 'draft_generated',
+  DRAFT_EDITED: 'draft_edited',
+  SENT_TO_CLIENT: 'sent_to_client',
+  CLIENT_APPROVED: 'client_approved',
+  ADMIN_APPROVED: 'admin_approved',
+  CHANGES_REQUESTED: 'changes_requested',
+  DECLINED: 'declined',
+  PUBLISH_STARTED: 'publish_started',
+  PUBLISH_SUCCEEDED: 'publish_succeeded',
+  PUBLISH_FAILED: 'publish_failed',
+  PUBLISH_RETRIED: 'publish_retried',
+} as const;
+
+export type GbpReviewResponseEventType =
+  (typeof GBP_REVIEW_RESPONSE_EVENT_TYPES)[keyof typeof GBP_REVIEW_RESPONSE_EVENT_TYPES];
+
+export interface GbpReviewResponseReviewContext extends GbpReviewSummary {
+  commentText?: string;
+  locationTitle?: string;
+}
+
+export interface GbpReviewResponseSummary {
+  id: string;
+  workspaceId: string;
+  reviewResourceName: string;
+  googleLocationId: string;
+  clientLocationId?: string;
+  status: GbpReviewResponseStatus;
+  draftText: string;
+  editedText?: string;
+  sentDeliverableId?: string;
+  approvedAt?: string;
+  approvedByType?: GbpReviewResponseActorType;
+  approvedById?: string;
+  publishedAt?: string;
+  googleReplyUpdateTime?: string;
+  publishJobId?: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+  review: GbpReviewResponseReviewContext;
+}
+
+export interface GbpReviewResponseEvent {
+  id: string;
+  responseId: string;
+  workspaceId: string;
+  type: GbpReviewResponseEventType;
+  actorType: GbpReviewResponseActorType;
+  actorId?: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface GbpReviewResponseWorkflowRead {
+  connection: GbpConnectionSafe;
+  eligibleReviews: GbpReviewResponseReviewContext[];
+  responses: GbpReviewResponseSummary[];
+  policy: {
+    rawReviewTextUsedForDraftingOnly: boolean;
+    guidance: string;
+  };
+}
+
+export interface GbpReviewResponseDraftRequest {
+  reviewResourceName: string;
+}
+
+export interface GbpReviewResponseUpdateRequest {
+  draftText: string;
+}
+
+export interface GbpReviewResponseSendToClientRequest {
+  note?: string;
+}
+
+export interface GbpReviewResponsePublishResponse {
+  response: GbpReviewResponseSummary;
+  jobId: string;
+}
+
 export interface GbpLocationReviewSummary {
   googleLocationId: string;
   clientLocationId: string;

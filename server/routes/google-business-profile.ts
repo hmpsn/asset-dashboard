@@ -1,8 +1,8 @@
 /**
  * Google Business Profile integration routes.
  *
- * @reads google_oauth_connections, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, client_locations
- * @writes google_oauth_connections, google_business_profile_oauth_states, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, activities
+ * @reads google_oauth_connections, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, google_business_review_responses, client_locations
+ * @writes google_oauth_connections, google_business_profile_oauth_states, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, google_business_review_responses, google_business_review_response_events, google_business_review_reply_publish_attempts, client_deliverable, activities
  */
 import { Router } from 'express';
 
@@ -32,6 +32,19 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import {
   getWorkspaceGbpAuthenticatedReviews,
 } from '../google-business-profile-reviews-store.js';
+import { generateGbpReviewResponseDraft } from '../google-business-profile-review-response-ai.js';
+import { startPublishForApprovedResponse } from '../google-business-profile-review-response-publish-job.js';
+import {
+  assertGbpReviewResponseSendable,
+  GbpReviewResponseError,
+  getGbpReviewContextForDraft,
+  getGbpReviewResponse,
+  listGbpReviewResponseWorkflow,
+  markGbpReviewResponseSent,
+  recordGbpReviewResponseDecision,
+  updateGbpReviewResponseDraft,
+  upsertGbpReviewResponseDraft,
+} from '../google-business-profile-review-responses-store.js';
 import {
   googleBusinessProfileProviderErrorMessage as googleProviderMessage,
   googleBusinessProfileProviderResponseStatus as googleProviderStatus,
@@ -40,6 +53,7 @@ import { isGoogleProviderError } from '../google-provider-client.js';
 import { createLogger } from '../logger.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { validate, z } from '../middleware/validate.js';
+import { sendToClient } from '../domains/inbox/send-to-client.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { type WorkspaceGbpMappingsUpdateRequest } from '../../shared/types/google-business-profile.js';
 
@@ -60,8 +74,43 @@ const mappingBodySchema = z.object({
   }).strict()).max(100),
 }).strict();
 
+const reviewResponseDraftSchema = z.object({
+  reviewResourceName: z.string().min(1).max(500),
+}).strict();
+
+const reviewResponseUpdateSchema = z.object({
+  draftText: z.string().trim().min(20).max(1500),
+}).strict();
+
+const reviewResponseSendSchema = z.object({
+  note: z.string().max(1000).optional(),
+}).strict();
+
 function featureEnabled(workspaceId?: string): boolean {
   return isFeatureEnabled(FLAG, workspaceId);
+}
+
+function responseFeatureEnabled(workspaceId: string): boolean {
+  return featureEnabled(workspaceId)
+    && isFeatureEnabled('gbp-auth-reviews', workspaceId)
+    && isFeatureEnabled('gbp-review-responses', workspaceId);
+}
+
+function broadcastGbpReviewResponseChange(workspaceId: string, action: string, responseId?: string): void {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED, {
+    workspaceId,
+    action,
+    ...(responseId ? { responseId } : {}),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function handleReviewResponseError(error: unknown, res: import('express').Response): boolean {
+  if (error instanceof GbpReviewResponseError) {
+    res.status(error.status).json({ error: error.message });
+    return true;
+  }
+  return false;
 }
 
 function safeReturnTo(returnTo?: string, workspaceId?: string): string {
@@ -219,6 +268,179 @@ router.post(
           ...(typeof error.status === 'number' ? { providerStatus: error.status } : {}),
         });
       }
+      next(error);
+    }
+  },
+);
+
+router.get(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    res.json(listGbpReviewResponseWorkflow(workspaceId));
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/draft',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  validate(reviewResponseDraftSchema),
+  async (req, res, next) => {
+    const { workspaceId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    const body = req.body as { reviewResourceName: string };
+    try {
+      const review = getGbpReviewContextForDraft(workspaceId, body.reviewResourceName);
+      const draftText = await generateGbpReviewResponseDraft({ workspaceId, review });
+      const response = upsertGbpReviewResponseDraft({
+        workspaceId,
+        reviewResourceName: body.reviewResourceName,
+        draftText,
+        actor: { type: 'admin' },
+      });
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review reply drafted',
+        'A draft response was generated for an unanswered Google Business Profile review.',
+        { source: 'google_business_profile', responseId: response.id },
+      );
+      broadcastGbpReviewResponseChange(workspaceId, 'drafted', response.id);
+      res.json(response);
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.patch(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/:responseId',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  validate(reviewResponseUpdateSchema),
+  (req, res, next) => {
+    const { workspaceId, responseId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    const body = req.body as { draftText: string };
+    try {
+      const response = updateGbpReviewResponseDraft({
+        workspaceId,
+        responseId,
+        draftText: body.draftText,
+        actor: { type: 'admin' },
+      });
+      broadcastGbpReviewResponseChange(workspaceId, 'draft_edited', response.id);
+      res.json(response);
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/:responseId/send-to-client',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  validate(reviewResponseSendSchema),
+  async (req, res, next) => {
+    const { workspaceId, responseId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    const body = req.body as { note?: string };
+    try {
+      const current = assertGbpReviewResponseSendable(workspaceId, responseId);
+      const deliverable = await sendToClient(
+        workspaceId,
+        'gbp_review_response',
+        { response: current },
+        { note: body.note ?? null, source: 'google_business_profile' },
+      );
+      const response = markGbpReviewResponseSent({
+        workspaceId,
+        responseId,
+        deliverableId: deliverable.id,
+        actor: { type: 'admin' },
+        note: body.note,
+      });
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review reply sent',
+        'A Google Business Profile review response was sent to the client for approval.',
+        { source: 'google_business_profile', responseId, deliverableId: deliverable.id },
+      );
+      broadcastGbpReviewResponseChange(workspaceId, 'sent_to_client', responseId);
+      res.json({ response, deliverable });
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/:responseId/approve-and-publish',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  (req, res, next) => {
+    const { workspaceId, responseId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    try {
+      const response = recordGbpReviewResponseDecision({
+        workspaceId,
+        responseId,
+        status: 'approved',
+        actor: { type: 'admin' },
+      });
+      const { jobId } = startPublishForApprovedResponse(workspaceId, responseId);
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review reply approved',
+        'An admin approved a Google Business Profile review response for publishing.',
+        { source: 'google_business_profile', responseId, jobId },
+      );
+      broadcastGbpReviewResponseChange(workspaceId, 'admin_approved', responseId);
+      res.json({ response, jobId });
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/:responseId/retry-publish',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  (req, res, next) => {
+    const { workspaceId, responseId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    try {
+      const response = getGbpReviewResponse(workspaceId, responseId);
+      if (!response) return res.status(404).json({ error: 'Review response not found' });
+      const { jobId } = startPublishForApprovedResponse(workspaceId, responseId);
+      broadcastGbpReviewResponseChange(workspaceId, 'publish_retried', responseId);
+      res.json({ response, jobId });
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
       next(error);
     }
   },

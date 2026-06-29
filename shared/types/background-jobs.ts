@@ -35,6 +35,7 @@ export const BACKGROUND_JOB_TYPES = {
   INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
   NATIONAL_SERP_REFRESH: 'national-serp-refresh',
   LOCAL_GBP_REFRESH: 'local-gbp-refresh',
+  GBP_REVIEW_REPLY_PUBLISH: 'gbp-review-reply-publish',
   LLM_MENTIONS_REFRESH: 'llm-mentions-refresh',
 } as const;
 
@@ -293,6 +294,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     label: 'Refreshing GBP + reviews',
     description: 'Reads Google Business Profile health + review counts for the client and local competitors.',
     cancellable: true,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.GBP_REVIEW_REPLY_PUBLISH]: {
+    label: 'Publishing GBP review reply',
+    description: 'Publishes an explicitly approved Google Business Profile review response.',
+    cancellable: false,
     resultBehavior: 'domain-store',
   },
   [BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH]: {

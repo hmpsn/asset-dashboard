@@ -9,7 +9,7 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 21
+- `correct`: 22
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 18
@@ -59,6 +59,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/copy-voice-feedback.ts` | correct | Voice-feedback operations are operation-backed and system-prompted. |
 | `server/diagnostic-orchestrator.ts` | correct | Uses diagnostic builder evidence and `buildSystemPrompt()` for synthesis. |
 | `server/discovery-ingestion.ts` | documented-exception | Extracts source evidence for brand engine; no existing brand voice should bias extraction. |
+| `server/google-business-profile-review-response-ai.ts` | correct | Uses `buildSystemPrompt()` for public Google review response drafts. |
 | `server/internal-links.ts` | correct | Uses `effectiveBrandVoiceBlock` and `buildSystemPrompt()`. |
 | `server/keyword-recommendations.ts` | builder-backed | Uses recommendation context; raw voice appears only as business-fit text. |
 | `server/keyword-strategy-ai-synthesis.ts` | correct | Wraps strategy messages with `buildSystemPrompt()`. |

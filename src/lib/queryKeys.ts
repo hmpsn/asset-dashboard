@@ -119,6 +119,7 @@ export const queryKeys = {
     gbpLocations: () => ['admin-gbp-locations'] as const,
     gbpWorkspaceMappings: (wsId: string) => ['admin-gbp-workspace-mappings', wsId] as const,
     gbpAuthenticatedReviews: (wsId: string) => ['admin-gbp-authenticated-reviews', wsId] as const,
+    gbpReviewResponses: (wsId: string) => ['admin-gbp-review-responses', wsId] as const,
     aiVisibility: (wsId: string) => ['admin-ai-visibility', wsId] as const,
     eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,

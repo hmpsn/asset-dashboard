@@ -37,6 +37,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/copy-refresh.ts', classification: 'documented-exception' },
   { file: 'server/diagnostic-orchestrator.ts', classification: 'correct' },
   { file: 'server/discovery-ingestion.ts', classification: 'documented-exception' },
+  { file: 'server/google-business-profile-review-response-ai.ts', classification: 'correct' },
   { file: 'server/internal-links.ts', classification: 'correct' },
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },
   { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'correct' },

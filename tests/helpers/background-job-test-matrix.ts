@@ -218,6 +218,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/local-gbp-routes.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.GBP_REVIEW_REPLY_PUBLISH]: entry(
+    'GBP_REVIEW_REPLY_PUBLISH',
+    {
+      expectedLabel: 'Publishing GBP review reply',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/unit/google-business-profile-review-responses-store.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL]: entry(
     'LOCAL_SEO_LOCATION_BACKFILL',
     {

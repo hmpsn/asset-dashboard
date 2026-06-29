@@ -32,6 +32,7 @@ import {
   remindDeliverable,
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
+import { GbpReviewResponseError } from '../google-business-profile-review-responses-store.js';
 import { applyApprovedBatchItems } from '../domains/inbox/approval-batch-apply.js';
 import { SchemaPlanFeedbackConflictError } from '../domains/schema/schema-plan-feedback.js';
 import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
@@ -227,6 +228,9 @@ router.patch(
       res.json(updated);
     } catch (err) {
       if (err instanceof SendToClientError) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      if (err instanceof GbpReviewResponseError) {
         return res.status(err.status).json({ error: err.message });
       }
       if (err instanceof SchemaPlanFeedbackConflictError) {

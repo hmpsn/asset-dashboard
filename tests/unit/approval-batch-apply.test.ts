@@ -45,7 +45,7 @@ vi.mock('../../server/domains/inbox/deliverable-adapters/approval-batch-classifi
   classifyApprovalBatch: mockClassifyApprovalBatch,
 }));
 
-vi.mock('../../server/domains/inbox/send-to-client.js', () => ({
+vi.mock('../../server/domains/inbox/deliverable-apply-state.js', () => ({
   markDeliverableApplied: mockMarkDeliverableApplied,
 }));
 

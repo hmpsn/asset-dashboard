@@ -174,6 +174,8 @@ export const WS_EVENTS = {
   GBP_CONNECTION_UPDATED: 'gbp:connection_updated',
   // Authenticated Google Business Profile review sync + read model (Phase 2B).
   GBP_REVIEWS_UPDATED: 'gbp:reviews_updated',
+  // Authenticated Google Business Profile review response draft/approval/publish workflow (Phase 2C).
+  GBP_REVIEW_RESPONSES_UPDATED: 'gbp:review_responses_updated',
   // AI visibility (SEO Decision Engine P8 / ai-visibility) — fired after a llm-mentions-refresh
   // job upserts a llm_mention_snapshots row; refreshes the AI-visibility KPI + intelligence.
   LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'llm-mentions:snapshots_refreshed',
