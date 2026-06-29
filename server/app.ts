@@ -14,6 +14,7 @@ import {
   publicApiLimiter,
   publicWriteLimiter,
   globalPublicLimiter,
+  mcpLimiter,
   verifyAdminToken,
   verifyClientSession,
   internalJwtCanAccessWorkspace,
@@ -218,6 +219,21 @@ export function createApp(): express.Express {
   });
 
   // ─── MCP server (own Bearer-token auth, not behind APP_PASSWORD gate) ───
+  // Per-IP rate limit in front of the router — /mcp is otherwise unthrottled
+  // (the three public limiters above only cover /api/public/). Applied as a
+  // top-level path check (not `app.use('/mcp', mcpLimiter, ...)`) so req.path stays
+  // the full '/mcp' and the limiter keys a dedicated `${ip}:/mcp` bucket — a mount
+  // would strip the prefix and risk a bucket collision. Mirrors publicWriteLimiter.
+  // Skipped under NODE_ENV=test: high-volume MCP integration tests hit one server from
+  // one IP and legitimately exceed the cap (the limiter itself is unit-tested directly).
+  if (process.env.NODE_ENV !== 'test') {
+    app.use((req, res, next) => {
+      if (req.path === '/mcp' || req.path.startsWith('/mcp/')) {
+        return mcpLimiter(req, res, next);
+      }
+      next();
+    });
+  }
   app.use('/mcp', mcpRouter);
 
   // --- Populate req.user from JWT when present (non-blocking) ---

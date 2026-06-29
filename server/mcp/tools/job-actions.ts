@@ -14,6 +14,7 @@ import { broadcastToWorkspace } from '../../broadcast.js';
 import { cancelJob, createJob, getJob, getJobCancellationError, hasActiveJob, listJobs, updateJob } from '../../jobs.js';
 import type { Job } from '../../jobs.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../local-seo.js';
+import { recordPaidCall } from '../paid-call-counter.js';
 import { createLogger } from '../../logger.js';
 import {
   generateKeywordStrategy,
@@ -40,7 +41,7 @@ const log = createLogger('mcp-tools-job-actions');
 export const jobActionTools: Tool[] = [
   {
     name: 'start_keyword_strategy_generation',
-    description: 'Start the background keyword strategy generation job for a workspace.',
+    description: '[Paid API] Start the background keyword strategy generation job for a workspace (calls paid SEO providers). Returns a job_id — poll get_job_status.',
     inputSchema: toMcpJsonSchema(startKeywordStrategyGenerationInputSchema),
   },
   {
@@ -50,7 +51,7 @@ export const jobActionTools: Tool[] = [
   },
   {
     name: 'start_local_seo_refresh',
-    description: 'Start the background local SEO refresh job for a workspace.',
+    description: '[Paid API] Start the background local SEO refresh job for a workspace (calls paid SERP/visibility providers). Returns a job_id — poll get_job_status.',
     inputSchema: toMcpJsonSchema(startLocalSeoRefreshInputSchema),
   },
   {
@@ -173,11 +174,15 @@ async function handleStartKeywordStrategyGeneration(
   });
   runKeywordStrategyJob(job.id, workspaceId, options);
 
+  // Paid provider work runs inside the job — count it so the paid-call signal
+  // covers all paid MCP triggers, not just research_keywords.
+  const { warning } = recordPaidCall(1);
   return mcpSuccess({
     ok: true,
     job_id: job.id,
     job_type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
     dashboard_url: buildDashboardUrl(workspaceId),
+    ...(warning ? { warning } : {}),
   });
 }
 
@@ -304,6 +309,8 @@ async function handleStartLocalSeoRefresh(
     });
   });
 
+  // Paid provider work runs inside the job — count it (see keyword-strategy above).
+  const { warning } = recordPaidCall(1);
   return mcpSuccess({
     ok: true,
     job_id: job.id,
@@ -311,6 +318,7 @@ async function handleStartLocalSeoRefresh(
     selected_market_count: plan.markets.length,
     selected_keyword_count: plan.keywords.length,
     dashboard_url: buildDashboardUrl(workspaceId, 'local-seo'),
+    ...(warning ? { warning } : {}),
   });
 }
 
