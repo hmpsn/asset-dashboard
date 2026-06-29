@@ -249,4 +249,24 @@ describe('CommandPalette', () => {
       expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
     });
   });
+
+  describe('Local Presence nav', () => {
+    function open() {
+      render(<CommandPalette workspaces={[wsWithSite]} selectedWorkspace={wsWithSite} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    }
+
+    it('groups Local Presence under Strategy and navigates to the dedicated page', () => {
+      open();
+
+      const input = screen.getByPlaceholderText('Search tools, workspaces, actions...');
+      fireEvent.change(input, { target: { value: 'Local Presence' } });
+
+      expect(screen.getByText('Local Presence')).toBeInTheDocument();
+      expect(screen.getByText('Strategy')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Local Presence'));
+      expect(navigateMock).toHaveBeenCalledWith(adminPath('ws-1', 'local-seo'));
+    });
+  });
 });

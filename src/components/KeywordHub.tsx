@@ -29,7 +29,7 @@ import { Badge, Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
-import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
+import { LocalPresenceHandoff } from './local-seo/LocalPresenceHandoff';
 import { AiVisibilityPanel } from './strategy/AiVisibilityPanel';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
 import { isServerAction } from './keyword-command-center/kccDisplayHelpers';
@@ -619,22 +619,15 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         </div>
       )}
 
-      {/* Local SEO visibility panel — deferred via requestIdleCallback after first rows
-          render (same pattern as KCC :224-240). onOpenKeywords wires to Hub's local segment. */}
+      {/* Local Presence handoff — deferred via requestIdleCallback after first rows
+          render (same pattern as KCC :224-240). Keyword-level local evidence remains in Hub. */}
       {localPanelEnabled ? (
-        <LocalSeoVisibilityPanel
-          workspaceId={workspaceId}
-          mode="keywords"
-          onOpenKeywords={() => {
-            hub.setSegment('local');
-            hub.setPage(1);
-          }}
-        />
+        <LocalPresenceHandoff workspaceId={workspaceId} />
       ) : (
-        <SectionCard title="Local Keyword Visibility" variant="subtle">
+        <SectionCard title="Local Presence" variant="subtle">
           <div className="flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
             <span className="inline-block h-2 w-2 rounded-[var(--radius-sm)] bg-blue-400 animate-pulse" />
-            Local visibility summary will load after the keyword rows are ready.
+            Local presence summary will load after the keyword rows are ready.
           </div>
         </SectionCard>
       )}

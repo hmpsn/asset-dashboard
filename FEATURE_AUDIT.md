@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **535 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **536 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 536. Local Presence IA shell
+
+**What it does:** Adds a dedicated admin **Local Presence** page at `/ws/:workspaceId/local-seo` under the visible **Strategy** nav group. The page re-homes the workspace-level local SEO operating surface into four tabs: Overview (posture, markets, freshness, GBP review aggregates), Visibility (the existing local visibility workflow), Reviews (the existing `local-gbp` aggregate reviews panel), and Setup (entry points back to existing Business Footprint location management). Keyword Hub now shows a compact Local Presence handoff while preserving keyword-level local annotations, filters, row data, and drawer evidence. This is an IA foundation only: no GBP OAuth, raw review sync, reply publishing, provider expansion, tables, migrations, jobs, or new Google scopes.
+
+**Why it matters to the agency:** Gives operators a clean home for local market visibility and GBP aggregate review context without turning Keyword Hub into a second workspace settings page. It also fixes the previously-dead MCP local SEO job link to `/local-seo`.
+
+**Why it matters to clients:** No direct client-facing change in Phase 1; it prepares a clearer admin workflow for future authenticated GBP connection, review storage, and approval-based review-response automation.
 
 ---
 

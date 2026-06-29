@@ -28,6 +28,7 @@ import {
   Pencil, Target, Code2, Link2, MessageSquare,
   LayoutDashboard, Activity, Sparkles, Layers, FileSearch, Map, ListChecks,
   DollarSign, Trophy, BriefcaseBusiness, ChartSpline, Stethoscope, WandSparkles,
+  MapPinned,
 } from 'lucide-react';
 import type { Page } from '../routes';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
@@ -130,13 +131,15 @@ export const NAV_REGISTRY: NavEntry[] = [
   { id: 'media', label: 'Assets', icon: Image, group: 'site-health',
     description: 'Images, alt text, and media optimization' },
 
-  // ── SEO Strategy ──
+  // ── Strategy ──
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'seo-strategy', needsSite: true,
     description: 'Keyword strategy with page-keyword mapping' },
   { id: 'seo-keywords', label: 'Keyword Hub', icon: ListChecks, group: 'seo-strategy', needsSite: true,
     description: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' },
   { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'seo-strategy', needsSite: true,
     description: 'Per-page keyword analysis, metrics, and optimization' },
+  { id: 'local-seo', label: 'Local Presence', icon: MapPinned, group: 'seo-strategy', needsSite: true,
+    description: 'Local markets, local-pack visibility, GBP review aggregates, and setup' },
 
   // ── Optimization ──
   { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'optimization', needsSite: true,

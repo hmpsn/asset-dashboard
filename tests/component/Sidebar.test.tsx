@@ -69,7 +69,8 @@ describe('Sidebar', () => {
     renderSidebar();
     expect(screen.getByText('MONITORING')).toBeInTheDocument();
     expect(screen.getByText('SITE HEALTH')).toBeInTheDocument();
-    expect(screen.getByText('SEO STRATEGY')).toBeInTheDocument();
+    expect(screen.getByText('STRATEGY')).toBeInTheDocument();
+    expect(screen.queryByText('SEO STRATEGY')).not.toBeInTheDocument();
     expect(screen.getByText('OPTIMIZATION')).toBeInTheDocument();
     expect(screen.getByText('CONTENT')).toBeInTheDocument();
     expect(screen.getByText('ADMIN')).toBeInTheDocument();
