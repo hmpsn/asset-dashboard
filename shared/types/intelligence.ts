@@ -39,6 +39,7 @@ export const INTELLIGENCE_SLICES = [
   'entityResolution',
   'eeatAssets',
   'generationQuality',
+  'brand',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -131,6 +132,8 @@ export interface WorkspaceIntelligence {
   eeatAssets?: EeatAssetsSlice;
   /** Latest internal generation-quality telemetry for workspace-scoped AI generation health. */
   generationQuality?: GenerationQualitySlice;
+  /** Unified brand voice (authority-resolved block) + approved identity. Read-only; non-formattable; assembled on request. */
+  brand?: BrandSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────

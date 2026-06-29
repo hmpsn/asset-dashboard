@@ -10,6 +10,7 @@ import {
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const serverRoot = path.join(repoRoot, 'server');
 const sliceModules = [
+  'brand-slice',
   'client-signals-slice',
   'content-pipeline-slice',
   'eeat-assets-slice',

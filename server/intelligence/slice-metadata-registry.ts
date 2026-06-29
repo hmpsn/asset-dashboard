@@ -147,6 +147,12 @@ export const INTELLIGENCE_SLICE_METADATA_REGISTRY = {
       return { generationQuality: await assembleGenerationQuality(workspaceId) };
     },
   },
+  brand: {
+    assemble: async (workspaceId) => {
+      const { assembleBrand } = await import('./brand-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { brand: await assembleBrand(workspaceId) };
+    },
+  },
 } as const satisfies Record<IntelligenceSlice, IntelligenceSliceMetadataEntry>;
 
 export function canAssembleIntelligenceSlice(
