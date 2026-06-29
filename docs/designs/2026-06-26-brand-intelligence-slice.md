@@ -1,6 +1,6 @@
 # Design Note — Unified Brand Intelligence Slice (additive rollout)
 
-> **Status:** P1 + P2 + P3 BUILT (2026-06-29). P4–P5 remain. See §8 phasing.
+> **Status:** P1 + P2 + P3 + P5 BUILT (2026-06-29). P4 remains (shipped last by owner choice). See §8 phasing.
 > **Date:** 2026-06-26 · **Author:** owner + Claude (audit follow-up)
 > **Origin:** [2026-06-26 MCP surface audit](../audits/2026-06-26-mcp-surface-audit.md) → brand-coverage discussion.
 > **Decision owner:** Joshua. Decisions below marked **[DECIDED]** / **[OPEN]**.
