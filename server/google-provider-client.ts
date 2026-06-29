@@ -1,4 +1,4 @@
-export type GoogleProviderSource = 'ga4' | 'gsc' | 'google-oauth';
+export type GoogleProviderSource = 'ga4' | 'gsc' | 'google-oauth' | 'gbp';
 
 export type GoogleProviderFailureKind = 'http' | 'network' | 'timeout' | 'invalid-json';
 

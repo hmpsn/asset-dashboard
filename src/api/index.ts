@@ -21,3 +21,4 @@ export { diagnostics } from './diagnostics.js';
 export { clientActions } from './clientActions';
 export { publicDeliverables } from './deliverables';
 export { workOrders, publicWorkOrders } from './work-orders';
+export { googleBusinessProfile } from './googleBusinessProfile';

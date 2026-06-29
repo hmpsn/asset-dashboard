@@ -8483,3 +8483,16 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Verification:** typecheck clean; vite build ok; full `vitest` green; pr-check 0; lint:hooks 0; verify:feature-flags ok; coverage-ratchet 0 failing. Plan: `docs/superpowers/plans/2026-06-21-client-ia-p4-export-gate-d.md`.
 
 **IA v2 single-site track (P1–P4) COMPLETE on staging behind the dark `client-ia-v2` flag.** Remaining: owner validates flag-ON on staging → release to main; **P5 (multi-location)** is a separate deferred session (owner). Tournament `docs/superpowers/audits/2026-06-21-client-ia-tournament.md`.
+
+---
+
+### 602. Google Business Profile Phase 2A — authenticated connection + location mapping 2026-06-29
+**Status:** Built behind `gbp-auth-connection` (default OFF) as the first authenticated GBP phase. `local-gbp` remains the separate DataForSEO aggregate competitor/review benchmark layer.
+
+**What it does:** Adds encrypted first-party Google Business Profile OAuth foundation (`business.manage`), signed single-use OAuth state, account/location discovery via Google Business Profile APIs, normalized storage for connections/accounts/locations/workspace mappings, and admin routes under `/api/google-business-profile/*`. Workspace Settings is the connection source; Business Footprint maps discovered GBP locations to existing `client_locations`; Local Presence Setup/Reviews shows connection and mapping health.
+
+**Boundary:** No raw review sync/storage, no review text, no response drafting, no client approval flow, no reply publishing, no review reply scopes, and no background sync job in Phase 2A. Existing DataForSEO aggregate GBP review panel remains in Local Presence Reviews for benchmark context.
+
+**Tests:** Unit coverage for integration encryption, production missing-key failure, OAuth state tamper/expiry/replay/wrong-intent rejection, and refresh-token preserve/rotate behavior. Integration coverage for auth URL scope/state, invalid callback safety, stored discovery reads, workspace mapping, and cross-workspace access enforcement. Component coverage for Workspace Settings GBP flag-gated connection UI and Local Presence authenticated mapping health.
+
+**Files:** `shared/types/google-business-profile.ts`; `shared/types/feature-flags.ts`; `server/db/migrations/159-google-business-profile-oauth.sql`; `server/integration-encryption.ts`; `server/google-business-profile-oauth-state.ts`; `server/google-business-profile-store.ts`; `server/google-business-profile-client.ts`; `server/routes/google-business-profile.ts`; `server/app.ts`; `server/ws-events.ts`; `src/api/googleBusinessProfile.ts`; `src/hooks/admin/useGoogleBusinessProfile.ts`; `src/components/google-business-profile/*`; `src/components/settings/ConnectionsTab.tsx`; `src/components/settings/BusinessFootprintTab.tsx`; `src/components/local-seo/LocalPresencePage.tsx`; `tests/unit/google-business-profile-security.test.ts`; `tests/integration/google-business-profile-routes.test.ts`; `tests/component/ConnectionsTab.test.tsx`; `tests/component/LocalPresencePage.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

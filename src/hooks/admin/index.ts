@@ -35,6 +35,7 @@ export { useAdminMeetingBrief } from './useAdminMeetingBrief';
 export { useOvDivergence } from './useOvDivergence';
 export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate, useSetPrimaryMarket, useGbpReviews, useLocalGbpRefresh } from './useLocalSeo';
 export { useLocalSeoLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from './useLocalSeoLocations';
+export * from './useGoogleBusinessProfile';
 export { useEeatAssets, useCreateEeatAsset, useUpdateEeatAsset, useDeleteEeatAsset } from './useEeatAssets';
 export { useBlueprints, useBlueprint, useBlueprintVersions } from './useBlueprints';
 export * from './useCopyPipeline';

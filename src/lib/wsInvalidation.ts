@@ -440,6 +440,14 @@ function adminInvalidationKeys(
         queryKeys.admin.localSeo(workspaceId),
         queryKeys.admin.keywordCommandCenter(workspaceId),
       ] as const;
+    case WS_EVENTS.GBP_CONNECTION_UPDATED:
+      return [
+        queryKeys.admin.gbpConnection(),
+        queryKeys.admin.gbpAccounts(),
+        queryKeys.admin.gbpLocations(),
+        queryKeys.admin.gbpWorkspaceMappings(workspaceId),
+        queryKeys.admin.localSeoLocations(workspaceId),
+      ] as const;
     case WS_EVENTS.LLM_MENTIONS_SNAPSHOTS_REFRESHED:
       // P8 ai-visibility: a llm-mentions refresh upserted llm_mention_snapshots → re-pull the
       // AI-visibility KPI's OWN query key (distinct prefix; must be listed explicitly) + the

@@ -37,7 +37,40 @@
           "status": "pending",
           "plannedSprint": "deferred",
           "owner": "integrations",
-          "notes": "FOLLOW-ON to P7 (seo-engine-p7-gbp-reviews-local-layer), which benchmarks PUBLIC GBP data via DataForSEO business_listings_search (rating, review count, public completeness signals — no auth, read-only, advisory recs). This item is the AUTHENTICATED connection via the Google Business Profile API (My Business Account Management + Business Information + Reviews + Performance APIs): (a) READ owner-only metrics not in public data — profile views/searches, call/direction/website/booking action counts, query discovery; and (b) WRITE — reply to reviews, publish GBP posts, edit hours/attributes/categories/photos, all from inside the platform, turning P7's advisory review-gap/GBP-completeness recs into one-click executable actions. Requires: a Google Cloud OAuth client + GBP API access APPROVAL (Google gates this behind an application/allowlist — non-trivial lead time and the biggest risk), a per-location encrypted OAuth token store (mirror the Stripe AES-256-GCM config-on-disk pattern), a 'Connect Google Business Profile' flow in the locations editor (server/local-seo locations CRUD already stores gbp_place_id), token refresh, and activity/audit logging for write actions. Distinct from intel-quality-google-business-profile-health (read-only PUBLIC health signals). Until GBP API access is approved, P7's public benchmarking stands as the read-only product."
+          "notes": "PROGRAM parent for authenticated Google Business Profile work. Follow-on to P7 (seo-engine-p7-gbp-reviews-local-layer), which benchmarks PUBLIC GBP data via DataForSEO business_listings_search (rating, review count, public completeness signals — no auth, read-only, advisory recs). Split into one PR per phase: 2A connection + mapping, 2B authenticated reviews read model, 2C review response approval + publish. Distinct from intel-quality-google-business-profile-health (read-only PUBLIC health signals). Until GBP API access is approved, P7's public benchmarking stands as the read-only product."
+        },
+        {
+          "id": "gbp-auth-connection-phase-2a",
+          "title": "GBP Phase 2A — encrypted OAuth connection, account/location discovery, workspace mapping",
+          "source": "Owner GBP planning thread 2026-06-29",
+          "est": "L",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Completed 2026-06-29: added `gbp-auth-connection` (default OFF) separate from `local-gbp`; encrypted Google OAuth token storage using dedicated integration encryption; signed single-use OAuth state; Google Business Profile account/location discovery; normalized connection/account/location/workspace mapping tables; admin routes under `/api/google-business-profile/*`; Workspace Settings connection UI; Business Footprint location mapping UI; and Local Presence Setup/Reviews connection/mapping status. Explicitly no raw review sync/storage, review text, response generation, reply publishing, background jobs, or Google review scopes in this phase. Also fixed post-merge staging CI checkout permissions by granting `contents: read` to checkout jobs."
+        },
+        {
+          "id": "gbp-reviews-read-model-phase-2b",
+          "title": "GBP Phase 2B — authenticated reviews sync + per-location read model",
+          "source": "Owner GBP planning thread 2026-06-29",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Start only after Phase 2A is merged and green on staging. Add raw review storage with idempotent per-location sync, per-location summaries (average rating, count, newest review, unanswered, low-rating, freshness), explicit AI/copy usage guardrails for review text, and Local Presence review triage. Keep response drafting/publishing out of scope."
+        },
+        {
+          "id": "gbp-review-response-approval-phase-2c",
+          "title": "GBP Phase 2C — review response drafting, approval, and Google reply publishing",
+          "source": "Owner GBP planning thread 2026-06-29",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Start only after Phase 2B is merged and green on staging. Generate review response drafts from synced reviews, route drafts through explicit client/admin approval, publish approved replies through Google, and track reply status, published timestamps, errors, and activity history. No auto-publish without explicit approval."
         },
         {
           "id": "seo-engine-deferred-revenue-grounding",

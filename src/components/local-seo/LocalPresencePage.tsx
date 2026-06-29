@@ -8,6 +8,8 @@ import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { Badge, Button, EmptyState, Icon, PageHeader, SectionCard, StatCard, TabBar } from '../ui';
 import { GbpReviewsPanel } from './GbpReviewsPanel';
 import { LocalSeoVisibilityPanel } from './LocalSeoVisibilityPanel';
+import { FeatureFlag } from '../ui/FeatureFlag';
+import { GbpMappingStatusBlock } from '../google-business-profile/GbpMappingStatusBlock';
 
 type LocalPresenceTab = 'overview' | 'visibility' | 'reviews' | 'setup';
 
@@ -126,53 +128,58 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }) {
 function SetupPanel({ workspaceId, onOpenVisibility }: { workspaceId: string; onOpenVisibility: () => void }) {
   const navigate = useNavigate();
   return (
-    <SectionCard
-      title="Setup"
-      titleExtra={<Badge label="Phase 1" tone="zinc" variant="soft" shape="pill" />}
-      variant="subtle"
-    >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
-          <div className="flex items-start gap-3">
-            <Icon as={Settings2} size="md" className="text-teal-400" />
-            <div>
-              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Markets and refresh settings</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                Use the Visibility tab to configure local markets, refresh budgets, and local-pack checks.
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-3"
-                onClick={onOpenVisibility}
-              >
-                Open visibility setup
-              </Button>
+    <div className="space-y-4">
+      <SectionCard
+        title="Setup"
+        titleExtra={<Badge label="Phase 2A" tone="zinc" variant="soft" shape="pill" />}
+        variant="subtle"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
+            <div className="flex items-start gap-3">
+              <Icon as={Settings2} size="md" className="text-teal-400" />
+              <div>
+                <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Markets and refresh settings</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
+                  Use the Visibility tab to configure local markets, refresh budgets, and local-pack checks.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={onOpenVisibility}
+                >
+                  Open visibility setup
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
-          <div className="flex items-start gap-3">
-            <Icon as={ClipboardList} size="md" className="text-teal-400" />
-            <div>
-              <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Client locations</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                Location records still live in Brand & AI for this phase. GBP account linking comes in the OAuth foundation phase.
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-3"
-                onClick={() => navigate(`${adminPath(workspaceId, 'brand')}?tab=business-footprint&focus=locations-section`)}
-              >
-                Open location records
-              </Button>
+          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/35 p-4">
+            <div className="flex items-start gap-3">
+              <Icon as={ClipboardList} size="md" className="text-teal-400" />
+              <div>
+                <p className="t-caption font-semibold text-[var(--brand-text-bright)]">Client locations</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
+                  Location records remain in Brand & AI. Authenticated GBP locations map to those records for later review sync and intelligence.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => navigate(`${adminPath(workspaceId, 'brand')}?tab=business-footprint&focus=locations-section`)}
+                >
+                  Open location records
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </SectionCard>
+      </SectionCard>
+      <FeatureFlag flag="gbp-auth-connection">
+        <GbpMappingStatusBlock workspaceId={workspaceId} />
+      </FeatureFlag>
+    </div>
   );
 }
 
@@ -203,7 +210,14 @@ export function LocalPresencePage({ workspaceId }: { workspaceId: string }) {
 
       {activeTab === 'overview' && <OverviewPanel workspaceId={workspaceId} />}
       {activeTab === 'visibility' && <LocalSeoVisibilityPanel workspaceId={workspaceId} mode="keywords" showGbpReviews={false} />}
-      {activeTab === 'reviews' && <GbpReviewsPanel workspaceId={workspaceId} />}
+      {activeTab === 'reviews' && (
+        <div className="space-y-4">
+          <FeatureFlag flag="gbp-auth-connection">
+            <GbpMappingStatusBlock workspaceId={workspaceId} />
+          </FeatureFlag>
+          <GbpReviewsPanel workspaceId={workspaceId} />
+        </div>
+      )}
       {activeTab === 'setup' && <SetupPanel workspaceId={workspaceId} onOpenVisibility={() => setTab('visibility')} />}
     </div>
   );

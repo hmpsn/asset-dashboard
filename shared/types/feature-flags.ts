@@ -58,6 +58,11 @@ export const FEATURE_FLAGS = {
   // rating extraction — ships UNFLAGGED, P3 precedent.)
   'local-gbp': false,
 
+  // GBP OAuth Phase 2A — first-party Google Business Profile connection + account/location
+  // mapping. Separate from `local-gbp`, which remains the DataForSEO aggregate competitor/
+  // review benchmark layer. OFF = no authenticated GBP connection UI.
+  'gbp-auth-connection': false,
+
   // SEO Decision Engine P8 (FINAL): ai-visibility — the LLM-citation measurement layer. Reads
   // DataForSEO's LLM-mentions database for the client's domain → an AI-visibility KPI (share-of-
   // voice vs co-mentioned competitors + mention volume + before/after trend + source domains LLMs
@@ -304,6 +309,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'seo-engine-p7-gbp-reviews-local-layer',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-24',
+    },
+  },
+  'gbp-auth-connection': {
+    label: 'Google Business Profile — authenticated connection + location mapping',
+    group: 'SEO Decision Engine',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      createdAt: '2026-06-29',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Promote to default once authenticated GBP OAuth, discovery, and workspace-location mapping are validated on staging; then remove the flag before review sync phases depend on it.',
+      linkedRoadmapItemId: 'integrations-gbp-direct-oauth',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-06-29',
     },
   },
   'ai-visibility': {
@@ -561,7 +579,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'ai-visibility'],
+    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'ai-visibility'],
   },
   {
     label: 'Strategy',

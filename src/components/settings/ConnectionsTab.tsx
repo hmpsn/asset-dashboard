@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { Badge, SectionCard, Icon, Button, IconButton, FormInput, ClickableRow, type BadgeTone } from '../ui';
+import { FeatureFlag } from '../ui/FeatureFlag';
+import { GbpConnectionCard } from '../google-business-profile/GbpConnectionCard';
 import { useIntegrationHealth } from '../../hooks/admin/useIntegrationHealth';
 import { useLinkSiteFlow } from '../../hooks/useLinkSiteFlow';
 import { useLinkSite } from '../../hooks/admin/useWorkspaces';
@@ -250,6 +252,10 @@ export function ConnectionsTab({
           )}
         </div>
       </SectionCard>
+
+      <FeatureFlag flag="gbp-auth-connection">
+        <GbpConnectionCard workspaceId={workspaceId} />
+      </FeatureFlag>
 
       {/* Integration Health Center */}
       <SectionCard noPadding>
