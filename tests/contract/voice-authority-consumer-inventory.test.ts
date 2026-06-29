@@ -168,6 +168,7 @@ describe('voice authority consumer inventory', () => {
       'server/intelligence/seo-context-source.ts',
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
+      'server/voice-dna-layer2.ts',
       'server/voice-dna-render.ts',
     ]);
 
