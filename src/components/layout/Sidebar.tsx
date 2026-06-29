@@ -57,7 +57,7 @@ interface SidebarProps {
   onExitHidden?: () => void;
 }
 
-const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
+const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
 /**
  * Sidebar-local PRESENTATION for each registry group: the uppercase label,
@@ -78,7 +78,7 @@ const GROUP_PRESENTATION: Array<{
     activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300' },
   { key: 'site-health', label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
     activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300' },
-  { key: 'seo-strategy', label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
+  { key: 'seo-strategy', label: 'STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
     activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },
   { key: 'optimization', label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
     activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },

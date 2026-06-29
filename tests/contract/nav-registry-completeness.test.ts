@@ -22,6 +22,8 @@ import type { Page } from '../../src/routes';
 
 const ROOT = join(__dirname, '../..');
 const ROUTES_FILE = join(ROOT, 'src/routes.ts');
+const APP_FILE = join(ROOT, 'src/App.tsx');
+const MCP_JOB_ACTIONS_FILE = join(ROOT, 'server/mcp/tools/job-actions.ts');
 
 /** Parse the `Page` union string-literal members out of src/routes.ts. */
 function parsePageUnion(): string[] {
@@ -120,5 +122,21 @@ describe('navRegistry completeness', () => {
     const registered = new Set(NAV_REGISTRY.map((e) => e.id as string));
     expect(registered.has('seo-briefs')).toBe(false);
     expect(registered.has('content')).toBe(false);
+  });
+
+  it('local-seo is a real Local Presence admin page under the Strategy group', () => {
+    expect(pageUnion).toContain('local-seo');
+
+    const entry = NAV_REGISTRY_BY_ID['local-seo'];
+    expect(entry).toBeDefined();
+    expect(entry.label).toBe('Local Presence');
+    expect(entry.group).toBe('seo-strategy');
+
+    const appSource = readFileSync(APP_FILE, 'utf8'); // readFile-ok — static route branch contract.
+    expect(appSource).toContain("tab === 'local-seo'");
+    expect(appSource).toContain('LocalPresencePage');
+
+    const mcpJobSource = readFileSync(MCP_JOB_ACTIONS_FILE, 'utf8'); // readFile-ok — MCP job result URL contract.
+    expect(mcpJobSource).toContain("buildDashboardUrl(workspaceId, 'local-seo')");
   });
 });

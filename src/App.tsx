@@ -47,6 +47,7 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
+const LocalPresencePage = lazyWithRetry(() => import('./components/local-seo/LocalPresencePage').then(m => ({ default: m.LocalPresencePage })));
 const CompetitorsPage = lazyWithRetry(() => import('./components/competitors/CompetitorsPage').then(m => ({ default: m.CompetitorsPage })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
@@ -356,7 +357,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'seo-schema', 'seo-briefs', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'local-seo', 'seo-schema', 'seo-briefs', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -397,6 +398,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
     if (tab === 'seo-keywords') return <KeywordHub key={`hub-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'local-seo') return <LocalPresencePage key={`local-presence-${selected.id}`} workspaceId={selected.id} />;
     // The Issue Phase 6 — dedicated Competitors page. NON_REGISTRY (no global nav); reachable by URL,
     // entered via a flag-ON deep-link from The Issue cockpit.
     if (tab === 'competitors') return <CompetitorsPage key={`competitors-${selected.id}`} workspaceId={selected.id} />;

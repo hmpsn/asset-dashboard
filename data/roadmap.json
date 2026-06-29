@@ -48,6 +48,17 @@
           "notes": "Surface the P8 AI-visibility KPI to the CLIENT (Overview/Results tab) as before/after proof ('you're cited in AI answers N times — X% share of voice in your category, up since we started'). P8 shipped the ADMIN measurement panel + the SeoContextSlice.aiVisibility summary; the client surface was deferred because the 'up since we started' framing only becomes meaningful once weekly snapshots accrue. Needs: a ClientIntelligence projection field (Growth+ gated, aggregates only) in server/routes/client-intelligence.ts + a compact KPI block in the client OverviewTab. Do once a few workspaces have accrued AI-visibility snapshots on staging. (Also a fast-follow: weekly cron to auto-accrue snapshots instead of manual trigger.)"
         },
         {
+          "id": "local-presence-ia-shell-phase-1",
+          "title": "Local Presence Phase 1 — dedicated admin IA shell under Strategy",
+          "source": "Owner GBP planning thread 2026-06-29",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "seo-health",
+          "notes": "Completed 2026-06-29: added `/ws/:workspaceId/local-seo` as the admin Local Presence page under the visible Strategy nav group while keeping the internal group key `seo-strategy`. Re-homed workspace-level local posture, markets, local visibility workflow, and aggregate GBP review readouts into Overview/Visibility/Reviews/Setup tabs. Keyword Hub now shows a compact Local Presence handoff while preserving keyword-level local filters, annotations, row data, and drawer evidence. No OAuth/token storage, raw review sync, reply publishing, new provider calls, tables, migrations, jobs, or Google scopes were added; authenticated GBP remains Phase 2+."
+        },
+        {
           "id": "integrations-gbp-direct-oauth",
           "title": "Direct Google Business Profile integration (OAuth) — owner-authenticated read + write actions",
           "source": "P7 GBP+reviews follow-on (owner request 2026-06-24)",
