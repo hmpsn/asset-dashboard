@@ -3,11 +3,13 @@ import db from '../../server/db/index.js';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { seedAuthData, type SeededAuth } from '../fixtures/auth-seed.js';
-import type { WorkspaceGbpMappingRead } from '../../shared/types/google-business-profile.js';
+import type { GbpAuthenticatedReviewsRead, WorkspaceGbpMappingRead } from '../../shared/types/google-business-profile.js';
+import { markGbpReviewSyncFailed } from '../../server/google-business-profile-reviews-store.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, {
   env: {
     FEATURE_GBP_AUTH_CONNECTION: 'true',
+    FEATURE_GBP_AUTH_REVIEWS: 'true',
     GOOGLE_CLIENT_ID: 'gbp-client-id',
     GOOGLE_CLIENT_SECRET: 'gbp-client-secret',
     GOOGLE_OAUTH_ENCRYPTION_KEY: 'test-google-oauth-encryption-key',
@@ -35,11 +37,49 @@ let clientLocationId = '';
 let otherClientLocationId = '';
 
 function clearGbpTables() {
+  db.prepare('DELETE FROM google_business_review_sync_status').run();
+  db.prepare('DELETE FROM google_business_reviews').run();
   db.prepare('DELETE FROM workspace_google_business_locations').run();
   db.prepare('DELETE FROM google_business_locations').run();
   db.prepare('DELETE FROM google_business_accounts').run();
   db.prepare('DELETE FROM google_oauth_connections').run();
   db.prepare('DELETE FROM google_business_profile_oauth_states').run();
+}
+
+function seedAuthenticatedReview() {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO google_business_review_sync_status (
+      google_location_id, workspace_id, client_location_id, sync_status,
+      average_rating, total_review_count, last_synced_at, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run('locations/456', workspaceId, clientLocationId, 'synced', 4.5, 2, now, now, now);
+  db.prepare(`
+    INSERT INTO google_business_reviews (
+      id, workspace_id, google_location_id, client_location_id, review_resource_name,
+      review_id, star_rating, rating_value, comment, reviewer_display_name,
+      reviewer_is_anonymous, create_time, update_time, synced_at, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'accounts_123_locations_456_reviews_rev_1',
+    workspaceId,
+    'locations/456',
+    clientLocationId,
+    'accounts/123/locations/456/reviews/rev-1',
+    'rev-1',
+    'FIVE',
+    5,
+    'Fantastic local service and fast follow-up.',
+    'Jane Reviewer',
+    0,
+    '2026-06-29T12:00:00.000Z',
+    '2026-06-29T12:30:00.000Z',
+    now,
+    now,
+    now,
+  );
 }
 
 function seedStoredGbpDiscovery() {
@@ -226,6 +266,68 @@ describe('Google Business Profile routes', () => {
       clientLocationId,
       googleLocationId: 'locations/456',
       isPrimary: true,
+    }));
+  });
+
+  it('returns authenticated review summaries for mapped workspace locations', async () => {
+    seedAuthenticatedReview();
+
+    const res = await ctx.api(`/api/google-business-profile/workspaces/${workspaceId}/reviews`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as GbpAuthenticatedReviewsRead;
+    expect(body.mappedLocationCount).toBe(1);
+    expect(body.locations[0]).toEqual(expect.objectContaining({
+      googleLocationId: 'locations/456',
+      storedReviewCount: 1,
+      totalReviewCount: 2,
+      averageRating: 4.5,
+    }));
+    expect(body.recentReviews[0]).toEqual(expect.objectContaining({
+      reviewId: 'rev-1',
+      commentExcerpt: 'Fantastic local service and fast follow-up.',
+      hasReply: false,
+    }));
+    expect(body.copyPolicy.aiUseAllowed).toBe(false);
+  });
+
+  it('does not return old review excerpts after a GBP location is unmapped', async () => {
+    db.prepare('DELETE FROM workspace_google_business_locations WHERE workspace_id = ?').run(workspaceId);
+
+    const res = await ctx.api(`/api/google-business-profile/workspaces/${workspaceId}/reviews`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as GbpAuthenticatedReviewsRead;
+    expect(body.mappedLocationCount).toBe(0);
+    expect(body.recentReviews).toHaveLength(0);
+
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO workspace_google_business_locations (
+        workspace_id, client_location_id, google_location_id, is_primary, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(workspaceId, clientLocationId, 'locations/456', 1, now, now);
+  });
+
+  it('preserves last-known review metadata when sync status fails', async () => {
+    markGbpReviewSyncFailed({
+      workspaceId,
+      googleLocationId: 'locations/456',
+      clientLocationId,
+      status: 'failed',
+      lastError: 'Quota unavailable',
+    });
+
+    const res = await ctx.api(`/api/google-business-profile/workspaces/${workspaceId}/reviews`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as GbpAuthenticatedReviewsRead;
+    expect(body.locations[0]).toEqual(expect.objectContaining({
+      syncStatus: 'failed',
+      averageRating: 4.5,
+      totalReviewCount: 2,
+      lastError: 'Quota unavailable',
     }));
   });
 

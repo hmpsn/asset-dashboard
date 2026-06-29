@@ -1,8 +1,8 @@
 /**
  * Google Business Profile integration routes.
  *
- * @reads google_oauth_connections, google_business_accounts, google_business_locations, workspace_google_business_locations, client_locations
- * @writes google_oauth_connections, google_business_profile_oauth_states, google_business_accounts, google_business_locations, workspace_google_business_locations, activities
+ * @reads google_oauth_connections, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, client_locations
+ * @writes google_oauth_connections, google_business_profile_oauth_states, google_business_accounts, google_business_locations, workspace_google_business_locations, google_business_reviews, google_business_review_sync_status, activities
  */
 import { Router } from 'express';
 
@@ -14,6 +14,7 @@ import {
   disconnectGbp,
   exchangeGbpOAuthCode,
   syncGbpAccountsAndLocations,
+  syncWorkspaceGbpReviews,
 } from '../google-business-profile-client.js';
 import {
   getGbpConnectionSafe,
@@ -29,8 +30,11 @@ import {
 } from '../google-business-profile-oauth-state.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import {
-  googleBusinessProfileProviderErrorMessage,
-  googleBusinessProfileProviderResponseStatus,
+  getWorkspaceGbpAuthenticatedReviews,
+} from '../google-business-profile-reviews-store.js';
+import {
+  googleBusinessProfileProviderErrorMessage as googleProviderMessage,
+  googleBusinessProfileProviderResponseStatus as googleProviderStatus,
 } from '../google-business-profile-errors.js';
 import { isGoogleProviderError } from '../google-provider-client.js';
 import { createLogger } from '../logger.js';
@@ -56,8 +60,8 @@ const mappingBodySchema = z.object({
   }).strict()).max(100),
 }).strict();
 
-function featureEnabled(): boolean {
-  return isFeatureEnabled(FLAG);
+function featureEnabled(workspaceId?: string): boolean {
+  return isFeatureEnabled(FLAG, workspaceId);
 }
 
 function safeReturnTo(returnTo?: string, workspaceId?: string): string {
@@ -141,8 +145,8 @@ router.post('/api/google-business-profile/sync', requireAdminAuth, requireWorksp
   } catch (error) {
     if (isGoogleProviderError(error)) {
       log.error({ err: error }, 'Google Business Profile discovery sync failed');
-      return res.status(googleBusinessProfileProviderResponseStatus(error)).json({
-        error: googleBusinessProfileProviderErrorMessage(error),
+      return res.status(googleProviderStatus(error)).json({
+        error: googleProviderMessage(error),
         providerKind: error.kind,
         ...(typeof error.status === 'number' ? { providerStatus: error.status } : {}),
       });
@@ -150,6 +154,75 @@ router.post('/api/google-business-profile/sync', requireAdminAuth, requireWorksp
     next(error);
   }
 });
+
+router.get(
+  '/api/google-business-profile/workspaces/:workspaceId/reviews',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const { workspaceId } = req.params;
+    if (!featureEnabled(workspaceId)) return res.status(404).json({ error: 'Google Business Profile connection is not enabled' });
+    if (!isFeatureEnabled('gbp-auth-reviews', req.params.workspaceId)) {
+      return res.status(404).json({ error: 'Authenticated Google Business Profile reviews are not enabled' });
+    }
+    res.json(getWorkspaceGbpAuthenticatedReviews(workspaceId));
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/reviews/sync',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  async (req, res, next) => {
+    const { workspaceId } = req.params;
+    if (!featureEnabled(workspaceId)) return res.status(404).json({ error: 'Google Business Profile connection is not enabled' });
+    if (!isFeatureEnabled('gbp-auth-reviews', workspaceId)) {
+      return res.status(404).json({ error: 'Authenticated Google Business Profile reviews are not enabled' });
+    }
+    try {
+      const payload = await syncWorkspaceGbpReviews(workspaceId);
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile reviews synced',
+        `${payload.reviewCount} authenticated GBP review${payload.reviewCount === 1 ? '' : 's'} synced across ${payload.locationCount} mapped location${payload.locationCount === 1 ? '' : 's'}`,
+        { source: 'google_business_profile', reviewCount: payload.reviewCount, locationCount: payload.locationCount },
+      );
+      broadcastToWorkspace(workspaceId, WS_EVENTS.GBP_REVIEWS_UPDATED, {
+        workspaceId,
+        action: 'reviews_synced',
+        updatedAt: payload.syncedAt,
+      });
+      res.json(payload);
+    } catch (error) {
+      const updatedAt = new Date().toISOString();
+      const safeErrorMessage = isGoogleProviderError(error)
+        ? googleProviderMessage(error)
+        : 'Authenticated GBP review sync could not complete';
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review sync failed',
+        'Authenticated GBP review sync could not complete. Check Google API access and connection health.',
+        { source: 'google_business_profile', error: safeErrorMessage },
+      );
+      broadcastToWorkspace(workspaceId, WS_EVENTS.GBP_REVIEWS_UPDATED, {
+        workspaceId,
+        action: 'reviews_sync_failed',
+        updatedAt,
+      });
+      if (isGoogleProviderError(error)) {
+        log.error({ err: error }, 'Google Business Profile review sync failed');
+        return res.status(googleProviderStatus(error)).json({
+          error: googleProviderMessage(error),
+          providerKind: error.kind,
+          ...(typeof error.status === 'number' ? { providerStatus: error.status } : {}),
+        });
+      }
+      next(error);
+    }
+  },
+);
 
 router.post('/api/google-business-profile/disconnect', requireAdminAuth, requireWorkspaceAccessFromQuery('workspaceId'), async (req, res, next) => {
   if (!featureEnabled()) return res.status(404).json({ error: 'Google Business Profile connection is not enabled' });

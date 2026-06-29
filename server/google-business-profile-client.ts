@@ -4,6 +4,7 @@ import {
   GBP_LOCATION_SYNC_STATUSES,
   type GbpAccountSummary,
   type GbpLocationSummary,
+  type GbpReviewSyncResponse,
   type GbpSyncResponse,
 } from '../shared/types/google-business-profile.js';
 import {
@@ -19,6 +20,14 @@ import {
   updateGbpConnectionTokens,
   upsertGbpDiscovery,
 } from './google-business-profile-store.js';
+import {
+  markGbpReviewSyncFailed,
+  normalizeGbpReviewRating,
+  upsertGbpReviewsForLocation,
+  getWorkspaceGbpReviewSyncTargets,
+  type GbpReviewUpsertInput,
+} from './google-business-profile-reviews-store.js';
+import { googleBusinessProfileProviderErrorMessage } from './google-business-profile-errors.js';
 
 export const GBP_SCOPE = 'https://www.googleapis.com/auth/business.manage';
 
@@ -27,6 +36,9 @@ const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const ACCOUNT_MANAGEMENT_BASE = 'https://mybusinessaccountmanagement.googleapis.com/v1';
 const BUSINESS_INFORMATION_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
+const GBP_V4_BASE = 'https://mybusiness.googleapis.com/v4';
+const GBP_REVIEW_PAGE_SIZE = 50;
+const GBP_REVIEW_MAX_PAGES_PER_SYNC = 1;
 const LOCATION_READ_MASK = [
   'name',
   'title',
@@ -82,6 +94,31 @@ interface GbpLocationApiRow {
 
 interface GbpLocationsApiResponse {
   locations?: GbpLocationApiRow[];
+  nextPageToken?: string;
+}
+
+interface GbpReviewApiRow {
+  name: string;
+  reviewId?: string;
+  reviewer?: {
+    displayName?: string;
+    isAnonymous?: boolean;
+  };
+  starRating?: string;
+  comment?: string;
+  createTime?: string;
+  updateTime?: string;
+  reviewReply?: {
+    comment?: string;
+    updateTime?: string;
+    reviewReplyState?: string;
+  };
+}
+
+interface GbpReviewsApiResponse {
+  reviews?: GbpReviewApiRow[];
+  averageRating?: number;
+  totalReviewCount?: number;
   nextPageToken?: string;
 }
 
@@ -280,6 +317,67 @@ export async function listGbpLocationsFromGoogle(
   return locations;
 }
 
+function normalizeReview(row: GbpReviewApiRow, target: {
+  workspaceId: string;
+  googleLocationId: string;
+  clientLocationId: string;
+}): GbpReviewUpsertInput {
+  const rating = normalizeGbpReviewRating(row.starRating);
+  return {
+    workspaceId: target.workspaceId,
+    googleLocationId: target.googleLocationId,
+    clientLocationId: target.clientLocationId,
+    reviewResourceName: row.name,
+    reviewId: row.reviewId ?? row.name.split('/').at(-1) ?? row.name,
+    rating,
+    comment: row.comment,
+    reviewerDisplayName: row.reviewer?.isAnonymous ? undefined : row.reviewer?.displayName,
+    reviewerIsAnonymous: row.reviewer?.isAnonymous === true,
+    createTime: row.createTime,
+    updateTime: row.updateTime,
+    replyComment: row.reviewReply?.comment,
+    replyUpdateTime: row.reviewReply?.updateTime,
+    replyState: row.reviewReply?.reviewReplyState,
+  };
+}
+
+export async function listGbpReviewsFromGoogle(
+  accessToken: string,
+  parentResourceName: string,
+  options: { maxPages?: number } = {},
+): Promise<{
+  reviews: GbpReviewApiRow[];
+  averageRating?: number;
+  totalReviewCount?: number;
+  nextPageToken?: string;
+}> {
+  const reviews: GbpReviewApiRow[] = [];
+  let pageToken: string | undefined;
+  let nextPageToken: string | undefined;
+  let averageRating: number | undefined;
+  let totalReviewCount: number | undefined;
+  const maxPages = options.maxPages ?? GBP_REVIEW_MAX_PAGES_PER_SYNC;
+  for (let page = 0; page < maxPages; page += 1) {
+    const params = new URLSearchParams({
+      pageSize: String(GBP_REVIEW_PAGE_SIZE),
+      orderBy: 'updateTime desc',
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    const response = await googleJson<GbpReviewsApiResponse>({
+      endpoint: `${GBP_V4_BASE}/${parentResourceName}/reviews?${params.toString()}`,
+      source: 'gbp',
+      token: accessToken,
+    });
+    reviews.push(...(response.reviews ?? []));
+    if (typeof response.averageRating === 'number') averageRating = response.averageRating;
+    if (typeof response.totalReviewCount === 'number') totalReviewCount = response.totalReviewCount;
+    pageToken = response.nextPageToken;
+    nextPageToken = response.nextPageToken;
+    if (!pageToken) break;
+  }
+  return { reviews, averageRating, totalReviewCount, nextPageToken };
+}
+
 export async function syncGbpAccountsAndLocations(): Promise<GbpSyncResponse> {
   const { connectionId, accessToken } = await getValidGbpAccessToken();
   const syncedAt = new Date().toISOString();
@@ -288,6 +386,50 @@ export async function syncGbpAccountsAndLocations(): Promise<GbpSyncResponse> {
   const locations = await listGbpLocationsFromGoogle(accessToken, connectionId, accounts);
   upsertGbpDiscovery({ connectionId, accounts, locations, syncedAt });
   return { accountCount: accounts.length, locationCount: locations.length, syncedAt };
+}
+
+export async function syncWorkspaceGbpReviews(workspaceId: string): Promise<GbpReviewSyncResponse> {
+  const { accessToken } = await getValidGbpAccessToken();
+  const targets = getWorkspaceGbpReviewSyncTargets(workspaceId);
+  const syncedAt = new Date().toISOString();
+  let reviewCount = 0;
+  let partial = false;
+
+  for (const target of targets) {
+    const parentResourceName = `${target.accountResourceName}/${target.locationResourceName}`;
+    try {
+      const result = await listGbpReviewsFromGoogle(accessToken, parentResourceName);
+      upsertGbpReviewsForLocation({
+        workspaceId,
+        googleLocationId: target.googleLocationId,
+        clientLocationId: target.clientLocationId,
+        reviews: result.reviews.map(review => normalizeReview(review, target)),
+        averageRating: result.averageRating,
+        totalReviewCount: result.totalReviewCount,
+        nextPageToken: result.nextPageToken,
+        syncedAt,
+      });
+      reviewCount += result.reviews.length;
+      partial = partial || Boolean(result.nextPageToken);
+    } catch (error) {
+      markGbpReviewSyncFailed({
+        workspaceId,
+        googleLocationId: target.googleLocationId,
+        clientLocationId: target.clientLocationId,
+        status: 'failed',
+        lastError: googleBusinessProfileProviderErrorMessage(error),
+      });
+      throw error;
+    }
+  }
+
+  return {
+    workspaceId,
+    locationCount: targets.length,
+    reviewCount,
+    syncedAt,
+    partial,
+  };
 }
 
 export async function disconnectGbp(): Promise<void> {

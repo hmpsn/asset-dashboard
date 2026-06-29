@@ -85,3 +85,23 @@ export function useUpdateWorkspaceGbpMappings(workspaceId: string) {
     },
   });
 }
+
+export function useGbpAuthenticatedReviews(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+    queryFn: () => googleBusinessProfile.authenticatedReviews(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useSyncGbpAuthenticatedReviews(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => googleBusinessProfile.syncAuthenticatedReviews(workspaceId),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.gbpAuthenticatedReviews(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localGbpReviews(workspaceId) });
+    },
+  });
+}
