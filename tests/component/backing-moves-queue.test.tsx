@@ -236,10 +236,10 @@ describe('BackingMovesQueue', () => {
       />,
     );
 
-    // Open the "more actions" panel → "Strike instead" → confirm
+    // Open the "Park" panel → "Strike instead" → confirm
     // Note: CockpitThrottlePicker + "Strike instead" reveals CockpitStrikeConfirm
     // CockpitStrikeConfirm has a "Confirm" button (not "Confirm strike")
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^park$/i }));
     fireEvent.click(screen.getByRole('button', { name: /strike instead/i }));
     // The confirm button in CockpitStrikeConfirm is labeled "Confirm"
     fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));

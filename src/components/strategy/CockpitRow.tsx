@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Pencil } from 'lucide-react';
+import { Clock, Pencil } from 'lucide-react';
 import { Button, IconButton, Checkbox, FormInput, FormTextarea } from '../ui';
 import { CockpitSendPanel } from './CockpitSendPanel';
 import { CockpitThrottlePicker } from './CockpitThrottlePicker';
@@ -146,7 +146,7 @@ export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWordi
                 aria-pressed={staged}
                 onClick={() => onStage(rec.id)}
               >
-                {staged ? 'Staged' : sendLabel}
+                {staged ? 'Unstage' : sendLabel}
               </Button>
             ) : (
               <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
@@ -161,14 +161,16 @@ export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWordi
             >
               Fix
             </Button>
-            <IconButton
-              icon={MoreHorizontal}
-              label="More actions"
+            <Button
+              icon={Clock}
               size="sm"
               variant="ghost"
               disabled={actions.isPending}
+              title="Park this recommendation for later"
               onClick={() => setMode('throttle')}
-            />
+            >
+              Park
+            </Button>
           </div>
         )}
         {isStruck && (

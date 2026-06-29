@@ -37,11 +37,11 @@ describe('CockpitRow', () => {
     expect(screen.getByText('Write the pricing post')).toBeInTheDocument();
   });
 
-  it('shows Send + Fix + ⋯ actions in idle state', () => {
+  it('shows Send + Fix + Park actions in idle state', () => {
     render(<CockpitRow rec={makeRec()} actions={makeActions()} />);
     expect(screen.getByRole('button', { name: /send to client/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^fix$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^park$/i })).toBeInTheDocument();
   });
 
   it('opens send panel when Send is clicked; Enter key fires send', () => {
@@ -67,9 +67,9 @@ describe('CockpitRow', () => {
     expect(screen.getByRole('button', { name: /send to client/i })).toBeInTheDocument();
   });
 
-  it('shows throttle picker when ⋯ is clicked', () => {
+  it('shows throttle picker when Park is clicked', () => {
     render(<CockpitRow rec={makeRec()} actions={makeActions()} />);
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^park$/i }));
     expect(screen.getByText('7 days')).toBeInTheDocument();
     expect(screen.getByText('30 days')).toBeInTheDocument();
     expect(screen.getByText('90 days')).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('CockpitRow', () => {
   it('fires throttle action with correct days', () => {
     const actions = makeActions();
     render(<CockpitRow rec={makeRec()} actions={actions} />);
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^park$/i }));
     fireEvent.click(screen.getByRole('button', { name: /30 days/i }));
     expect(actions.throttle).toHaveBeenCalledWith('r1', 30);
   });
@@ -87,7 +87,7 @@ describe('CockpitRow', () => {
     const actions = makeActions();
     render(<CockpitRow rec={makeRec()} actions={actions} />);
     // Open throttle picker
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^park$/i }));
     // Click "Strike instead"
     fireEvent.click(screen.getByText(/strike instead/i));
     // Strike confirm panel shown — Confirm button present
@@ -99,7 +99,7 @@ describe('CockpitRow', () => {
     expect(actions.strike).toHaveBeenCalledWith('r1');
   });
 
-  it('struck row shows Undo button (not Send/Fix/⋯), is muted (opacity-60)', () => {
+  it('struck row shows Undo button (not Send/Fix/Park), is muted (opacity-60)', () => {
     const actions = makeActions();
     const { container } = render(
       <CockpitRow rec={makeRec({ lifecycle: 'struck' })} actions={actions} />,
