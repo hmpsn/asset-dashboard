@@ -49,7 +49,8 @@ import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createBatch, getBatch } from '../../server/approvals.js';
 import { getDeliverable } from '../../server/client-deliverables.js';
 import { mirrorApprovalBatchToDeliverable } from '../../server/domains/inbox/approval-batch-dual-write.js';
-import { markDeliverableApplied, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
+import { markDeliverableApplied } from '../../server/domains/inbox/deliverable-apply-state.js';
+import { respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
