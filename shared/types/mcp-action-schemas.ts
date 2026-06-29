@@ -6,9 +6,12 @@ import {
 
 // --- Shared building blocks -------------------------------------------------
 
-const workspaceIdSchema = z.string().min(1, 'workspace_id is required');
-const revisionSchema = z.string().trim().min(1, 'expected_revision is required');
-const pageTypeSchema = z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']);
+const workspaceIdSchema = z.string().min(1, 'workspace_id is required')
+  .describe('The workspace (client) ID this operation targets. Get IDs from list_workspaces.');
+const revisionSchema = z.string().trim().min(1, 'expected_revision is required')
+  .describe('Optimistic-concurrency token from the matching get_brief/get_post call. The write is rejected with a conflict if the stored record changed since you read it — re-fetch and retry.');
+const pageTypeSchema = z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'])
+  .describe('Page type: one of blog, landing, service, location, product, pillar, resource.');
 const contentRequestStatusSchema = z.enum([
   'pending_payment',
   'requested',
@@ -21,8 +24,9 @@ const contentRequestStatusSchema = z.enum([
   'delivered',
   'published',
   'declined',
-]);
-const postStatusSchema = z.enum(['generating', 'draft', 'review', 'approved', 'error']);
+]).describe('Content request lifecycle status: pending_payment, requested, brief_generated, client_review, approved, changes_requested, in_progress, post_review, delivered, published, or declined.');
+const postStatusSchema = z.enum(['generating', 'draft', 'review', 'approved', 'error'])
+  .describe('Post lifecycle status: generating, draft, review, approved, or error.');
 const insightTypeSchema = z.enum([
   'page_health',
   'ranking_opportunity',
@@ -42,12 +46,12 @@ const insightTypeSchema = z.enum([
   'competitor_alert',
   'freshness_alert',
   'milestone_attribution',
-]);
+]).describe('Insight category to filter by, e.g. page_health, ranking_opportunity, content_decay, cannibalization, keyword_cluster, competitor_gap, ctr_opportunity, anomaly_digest, audit_finding, or site_health.');
 
 const handleIdSchema = z.string().regex(
   /^(keyword-research|keyword-research-bulk|brief-request|brief|post-request|post)_[0-9a-f-]{36}$/,
   'must be a valid handle id of the form `<kind>_<uuid>`',
-);
+).describe('A short-lived handle of the form `<kind>_<uuid>` issued by a prepare_*/research call (e.g. prepare_brief_context, prepare_post_context, research_keywords). Pass it to the matching save/mutation tool.');
 
 // --- Layout schemas ---------------------------------------------------------
 
@@ -80,14 +84,18 @@ export const layoutSchema = z.discriminatedUnion('type', [
 
 export const researchKeywordsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  terms: z.array(z.string().min(1)).min(1).max(50, 'max 50 terms per call'),
-  market: z.string().optional(),
+  terms: z.array(z.string().min(1)).min(1).max(50, 'max 50 terms per call')
+    .describe('[Paid API] Seed keyword terms to research (1-50 per call). Each call hits paid SEO providers and returns reusable research handles.'),
+  market: z.string().optional()
+    .describe('Optional market/locale for metrics (e.g. a country or location code). Defaults to the workspace primary market when omitted.'),
 });
 
 export const addKeywordToStrategyInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  research_handle: handleIdSchema.optional(),
-  term: z.string().min(1).optional(),
+  research_handle: handleIdSchema.optional()
+    .describe('Optional handle from a prior research_keywords call to attach researched metrics to this keyword. Provide either research_handle OR term.'),
+  term: z.string().min(1).optional()
+    .describe('The keyword phrase to target, used when no research_handle is supplied. Provide either research_handle OR term.'),
   target: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('existing_page'), page_url: z.string().url() }),
     z.object({
@@ -95,7 +103,7 @@ export const addKeywordToStrategyInputSchema = z.object({
       topic: z.string().min(1),
       intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']).optional(),
     }),
-  ]),
+  ]).describe("Where this keyword is assigned. Discriminated by `kind`: `existing_page` requires `page_url` (the live page to target); `new_page` requires `topic` (the planned page subject) and accepts an optional `intent` of informational/commercial/transactional/navigational."),
 }).refine(
   (data) => data.research_handle != null || data.term != null,
   { message: 'must provide either research_handle or term' },
@@ -105,10 +113,14 @@ export const addKeywordToStrategyInputSchema = z.object({
 
 export const prepareBriefContextInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  topic: z.string().min(1),
-  target_keyword: z.string().trim().min(1).optional(),
-  target_page_path: z.string().trim().min(1).optional(),
-  layout: layoutSchema,
+  topic: z.string().min(1)
+    .describe('The subject/topic of the brief to write context for.'),
+  target_keyword: z.string().trim().min(1).optional()
+    .describe('Optional primary keyword the brief should target.'),
+  target_page_path: z.string().trim().min(1).optional()
+    .describe('Optional path of an existing page this brief is for (e.g. /blog/my-post).'),
+  layout: layoutSchema
+    .describe("Output layout, discriminated by `type`: `cms` (requires `collection_id` for a Webflow CMS collection) or `outline` (requires a typed `structure` of heading sections)."),
 });
 
 const briefContentSchema = z.object({
@@ -134,14 +146,18 @@ const briefContentSchema = z.object({
 
 export const saveBriefInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_request_handle: handleIdSchema,
-  content: briefContentSchema,
-  parent_request_id: z.string().optional(),
+  brief_request_handle: handleIdSchema
+    .describe('The brief-request handle returned by prepare_brief_context. Persists the brief against that prepared context.'),
+  content: briefContentSchema
+    .describe('The full brief content payload — build it from the structured context returned by prepare_brief_context (targetKeyword, suggestedTitle, outline, wordCountTarget, intent, audience, etc.).'),
+  parent_request_id: z.string().optional()
+    .describe('Optional id of an existing content request this brief fulfills (links the brief to the request pipeline).'),
 });
 
 export const preparePostContextInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_id: z.string().min(1),
+  brief_id: z.string().min(1)
+    .describe('The id of the saved brief to draft a post from. Returns structured drafting context plus a handle for save_post.'),
 });
 
 const postContentSchema = z.object({
@@ -167,9 +183,12 @@ const postContentSchema = z.object({
 
 export const savePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_request_handle: handleIdSchema,
-  content: postContentSchema,
-  parent_request_id: z.string().optional(),
+  post_request_handle: handleIdSchema
+    .describe('The post-request handle returned by prepare_post_context. Persists the generated post against that prepared context.'),
+  content: postContentSchema
+    .describe('The full generated post payload — build it from the structured context returned by prepare_post_context (briefId, title, metaDescription, introduction, sections, conclusion, word counts).'),
+  parent_request_id: z.string().optional()
+    .describe('Optional id of an existing content request this post fulfills (links the post to the request pipeline).'),
 });
 
 const briefPatchContentSchema = z.object({
@@ -238,23 +257,31 @@ const postReplaceContentSchema = z.object({
 
 export const listBriefsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  limit: z.number().int().positive().max(200).optional(),
-  status: contentRequestStatusSchema.optional(),
-  page_type: pageTypeSchema.optional(),
+  limit: z.number().int().positive().max(200).optional()
+    .describe('Optional max number of briefs to return (1-200).'),
+  status: contentRequestStatusSchema.optional()
+    .describe('Optional filter to briefs at a specific content request lifecycle status.'),
+  page_type: pageTypeSchema.optional()
+    .describe('Optional filter to briefs of a specific page type (blog, landing, service, location, product, pillar, resource).'),
 });
 
 export const getBriefInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_id: z.string().min(1),
+  brief_id: z.string().min(1)
+    .describe('The id of the brief to fetch. The response includes a revision token for safe optimistic write-back via update_brief.'),
 });
 
 export const updateBriefInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_id: z.string().min(1),
+  brief_id: z.string().min(1)
+    .describe('The id of the brief to update.'),
   expected_revision: revisionSchema,
-  mode: z.enum(['patch', 'replace']),
-  updates: briefPatchContentSchema.optional(),
-  content: briefContentSchema.optional(),
+  mode: z.enum(['patch', 'replace'])
+    .describe("Update mode: `patch` merges only the fields in `updates` into the existing brief (requires `updates`, forbids `content`); `replace` overwrites the whole brief with `content` (requires `content`, forbids `updates`)."),
+  updates: briefPatchContentSchema.optional()
+    .describe('Partial brief fields to merge when mode is `patch`. At least one editable field must be present.'),
+  content: briefContentSchema.optional()
+    .describe('The full replacement brief payload when mode is `replace`.'),
 }).strict().superRefine((data, ctx) => {
   if (data.mode === 'patch') {
     if (!data.updates) {
@@ -292,23 +319,31 @@ export const updateBriefInputSchema = z.object({
 
 export const listPostsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  limit: z.number().int().positive().max(200).optional(),
-  status: postStatusSchema.optional(),
-  page_type: pageTypeSchema.optional(),
+  limit: z.number().int().positive().max(200).optional()
+    .describe('Optional max number of posts to return (1-200).'),
+  status: postStatusSchema.optional()
+    .describe('Optional filter to posts at a specific lifecycle status (generating, draft, review, approved, error).'),
+  page_type: pageTypeSchema.optional()
+    .describe('Optional filter to posts of a specific page type (blog, landing, service, location, product, pillar, resource).'),
 });
 
 export const getPostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_id: z.string().min(1),
+  post_id: z.string().min(1)
+    .describe('The id of the post to fetch. The response includes a revision token for safe optimistic write-back via update_post.'),
 });
 
 export const updatePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_id: z.string().min(1),
+  post_id: z.string().min(1)
+    .describe('The id of the post to update.'),
   expected_revision: revisionSchema,
-  mode: z.enum(['patch', 'replace']),
-  updates: postPatchContentSchema.optional(),
-  content: postReplaceContentSchema.optional(),
+  mode: z.enum(['patch', 'replace'])
+    .describe("Update mode: `patch` merges only the fields in `updates` into the existing post (requires `updates`, forbids `content`); `replace` overwrites the whole post with `content` (requires `content`, forbids `updates`)."),
+  updates: postPatchContentSchema.optional()
+    .describe('Partial post fields to merge when mode is `patch`. At least one editable field must be present.'),
+  content: postReplaceContentSchema.optional()
+    .describe('The full replacement post payload when mode is `replace`.'),
 }).strict().superRefine((data, ctx) => {
   if (data.mode === 'patch') {
     if (!data.updates) {
@@ -346,11 +381,16 @@ export const updatePostInputSchema = z.object({
 
 export const sendToClientInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_handle: handleIdSchema.optional(),
-  post_handle: handleIdSchema.optional(),
-  brief_id: z.string().min(1).optional(),
-  post_id: z.string().min(1).optional(),
-  note: z.string().optional(),
+  brief_handle: handleIdSchema.optional()
+    .describe('Target a brief by its save_brief handle. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+  post_handle: handleIdSchema.optional()
+    .describe('Target a post by its save_post handle. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+  brief_id: z.string().min(1).optional()
+    .describe('Target an already-saved brief by id. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+  post_id: z.string().min(1).optional()
+    .describe('Target an already-saved post by id. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+  note: z.string().optional()
+    .describe('Optional note to the client included with the content request.'),
 }).refine(
   (data) => [data.brief_handle, data.post_handle, data.brief_id, data.post_id].filter(Boolean).length === 1,
   { message: 'must provide exactly one target: brief_handle, post_handle, brief_id, or post_id' },
@@ -358,35 +398,53 @@ export const sendToClientInputSchema = z.object({
 
 export const listContentRequestsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  limit: z.number().int().positive().max(200).optional(),
+  limit: z.number().int().positive().max(200).optional()
+    .describe('Optional max number of content topic requests to return (1-200).'),
 });
 
 export const getContentRequestInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  request_id: z.string().min(1),
+  request_id: z.string().min(1)
+    .describe('The id of the content topic request to fetch.'),
 });
 
 export const createContentRequestInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  topic: z.string().trim().min(1).max(500),
-  target_keyword: z.string().trim().min(1).max(200),
-  intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']).optional(),
-  priority: z.enum(['high', 'medium', 'low']).optional(),
-  rationale: z.string().trim().max(5000).optional(),
-  client_note: z.string().trim().max(5000).optional(),
-  source: z.enum(['strategy', 'client']).optional(),
-  service_type: z.enum(['brief_only', 'full_post']).optional(),
-  page_type: pageTypeSchema.optional(),
-  initial_status: z.enum(['pending_payment', 'requested', 'brief_generated', 'in_progress']).optional(),
-  target_page_id: z.string().trim().min(1).max(200).optional(),
-  target_page_slug: z.string().trim().min(1).max(200).optional(),
-  dedupe: z.boolean().optional(),
+  topic: z.string().trim().min(1).max(500)
+    .describe('The subject of the content topic request (what should be written).'),
+  target_keyword: z.string().trim().min(1).max(200)
+    .describe('The primary keyword the requested content should target.'),
+  intent: z.enum(['informational', 'commercial', 'transactional', 'navigational']).optional()
+    .describe('Optional search intent: informational, commercial, transactional, or navigational.'),
+  priority: z.enum(['high', 'medium', 'low']).optional()
+    .describe('Optional priority of the request: high, medium, or low.'),
+  rationale: z.string().trim().max(5000).optional()
+    .describe('Optional internal rationale explaining why this content is being requested.'),
+  client_note: z.string().trim().max(5000).optional()
+    .describe('Optional note from/to the client surfaced in the request pipeline.'),
+  source: z.enum(['strategy', 'client']).optional()
+    .describe('Optional origin of the request: `strategy` (created from SEO strategy) or `client` (client-initiated).'),
+  service_type: z.enum(['brief_only', 'full_post']).optional()
+    .describe('Optional deliverable scope: `brief_only` (just a brief) or `full_post` (brief plus drafted post).'),
+  page_type: pageTypeSchema.optional()
+    .describe('Optional page type for the requested content (blog, landing, service, location, product, pillar, resource).'),
+  initial_status: z.enum(['pending_payment', 'requested', 'brief_generated', 'in_progress']).optional()
+    .describe('Optional starting lifecycle status: pending_payment, requested, brief_generated, or in_progress.'),
+  target_page_id: z.string().trim().min(1).max(200).optional()
+    .describe('Optional id of an existing page the content targets.'),
+  target_page_slug: z.string().trim().min(1).max(200).optional()
+    .describe('Optional slug of an existing page the content targets.'),
+  dedupe: z.boolean().optional()
+    .describe('When true, skip creating a duplicate request if a matching topic/keyword request already exists.'),
 }).strict();
 
 export const createWorkspaceInputSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  webflow_site_id: z.string().trim().min(1).max(200).optional(),
-  webflow_site_name: z.string().trim().min(1).max(200).optional(),
+  name: z.string().trim().min(1).max(200)
+    .describe('Display name for the new workspace (client).'),
+  webflow_site_id: z.string().trim().min(1).max(200).optional()
+    .describe('Optional Webflow site ID to connect to this workspace at creation.'),
+  webflow_site_name: z.string().trim().min(1).max(200).optional()
+    .describe('Optional human-readable Webflow site name shown alongside the connected site.'),
 }).strict();
 
 const businessProfileContactSchema = z.object({
@@ -456,78 +514,106 @@ export const updateWorkspaceInputSchema = z.object({
   }).strict().refine(
     (body) => Object.values(body).some((value) => value !== undefined),
     { message: 'At least one update field is required' },
-  ),
+  ).describe('The fields to update (an allowlist of safe operational fields: name, Webflow site, live_domain, gsc_property_url, ga4_property_id, client_email, tier, trial_ends_at, client-portal toggles, onboarding flags, publish_target, seo_data_provider, business_profile, intelligence_profile). At least one field is required; only the keys you pass are changed.'),
 }).strict();
 
 export const deleteWorkspaceInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  confirm: z.literal('delete_workspace'),
+  confirm: z.literal('delete_workspace')
+    .describe('Safety confirmation. Must be exactly the string "delete_workspace" or the deletion is rejected.'),
 }).strict();
 
 export const getContentPerformanceInputSchema = z.object({
-  workspaceId: z.string().min(1),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID whose post/request content performance (GSC + GA4 metrics, publish age, brief coverage) to fetch.'),
 });
 
 export const deleteBriefInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  brief_id: z.string().min(1),
+  brief_id: z.string().min(1)
+    .describe('The id of the content brief to permanently delete.'),
 }).strict();
 
 export const deletePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_id: z.string().min(1),
+  post_id: z.string().min(1)
+    .describe('The id of the generated post to permanently delete.'),
 }).strict();
 
 export const listPostVersionsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_id: z.string().min(1),
-  limit: z.number().int().positive().max(200).optional(),
+  post_id: z.string().min(1)
+    .describe('The id of the post whose historical versions to list.'),
+  limit: z.number().int().positive().max(200).optional()
+    .describe('Optional max number of versions to return (1-200).'),
 }).strict();
 
 export const revertPostVersionInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  post_id: z.string().min(1),
-  version_id: z.string().min(1),
+  post_id: z.string().min(1)
+    .describe('The id of the post to revert.'),
+  version_id: z.string().min(1)
+    .describe('The id of the historical version to revert the post back to (from list_post_versions).'),
 }).strict();
 
 export const getUnresolvedInsightsInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  limit: z.number().int().positive().max(500).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID whose unresolved insight queue (ordered by impact) to fetch.'),
+  limit: z.number().int().positive().max(500).optional()
+    .describe('Optional max number of unresolved insights to return (1-500).'),
 });
 
 export const getInsightsInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  type: insightTypeSchema.optional(),
-  domain: z.enum(['search', 'traffic', 'cross']).optional(),
-  limit: z.number().int().positive().max(500).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID whose stored insights to fetch.'),
+  type: insightTypeSchema.optional()
+    .describe('Optional filter to a single insight type (e.g. content_decay, ranking_opportunity, page_health).'),
+  domain: z.enum(['search', 'traffic', 'cross']).optional()
+    .describe('Optional filter by insight domain: `search` (rankings/SERP), `traffic` (GA4/sessions), or `cross` (spans both).'),
+  limit: z.number().int().positive().max(500).optional()
+    .describe('Optional max number of insights to return (1-500).'),
 });
 
 export const getAnomaliesInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  resolved: z.boolean().optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID whose detected anomalies (traffic drops, rank changes, indexation issues) to fetch.'),
+  resolved: z.boolean().optional()
+    .describe('When true, include resolved anomalies; when false or omitted, only unresolved anomalies are returned.'),
 });
 
 export const resolveInsightInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  insightId: z.string().min(1),
-  status: z.enum(['in_progress', 'resolved']),
-  note: z.string().max(500).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID that owns the insight.'),
+  insightId: z.string().min(1)
+    .describe('The id of the insight to resolve (from get_insights / get_unresolved_insights). Must belong to this workspace.'),
+  status: z.enum(['in_progress', 'resolved'])
+    .describe("New resolution status: `resolved` (acted on / done — records an outcome baseline) or `in_progress` (being worked)."),
+  note: z.string().max(500).optional()
+    .describe('Optional note explaining the resolution (max 500 chars).'),
 });
 export type ResolveInsightInput = z.infer<typeof resolveInsightInputSchema>;
 
 export const bulkResolveInsightsInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  insightIds: z.array(z.string().min(1)).min(1).max(100),
-  status: z.enum(['in_progress', 'resolved']),
-  note: z.string().max(500).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID that owns the insights.'),
+  insightIds: z.array(z.string().min(1)).min(1).max(100)
+    .describe('Array of insight ids to resolve in one call (1-100). Ids not found in this workspace are returned under `notFound`.'),
+  status: z.enum(['in_progress', 'resolved'])
+    .describe("Status to apply to every listed insight: `resolved` (done) or `in_progress` (being worked)."),
+  note: z.string().max(500).optional()
+    .describe('Optional note applied to all resolved insights (max 500 chars).'),
 });
 export type BulkResolveInsightsInput = z.infer<typeof bulkResolveInsightsInputSchema>;
 
 export const respondToClientActionInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  actionId: z.string().min(1),
-  status: z.enum(['approved', 'changes_requested', 'completed', 'archived', 'pending']),
-  clientNote: z.string().max(2000).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID that owns the client action.'),
+  actionId: z.string().min(1)
+    .describe("The id of the client action to update (from get_pending_work's clientActions)."),
+  status: z.enum(['approved', 'changes_requested', 'completed', 'archived', 'pending'])
+    .describe("New status: `completed` (done), `archived` (dismiss), `approved`, `changes_requested`, or `pending` (reopen). Resolving (completed/approved) also updates the linked insight + outcome learning. An illegal status transition is rejected."),
+  clientNote: z.string().max(2000).optional()
+    .describe('Optional note recorded with the status change (max 2000 chars).'),
 });
 export type RespondToClientActionMcpInput = z.infer<typeof respondToClientActionInputSchema>;
 
@@ -536,41 +622,59 @@ export type RespondToClientActionMcpInput = z.infer<typeof respondToClientAction
 // decision and triggers "approved" team emails). So this tool takes no status — it
 // always rejects/requests-changes.
 export const respondToApprovalItemInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  batchId: z.string().min(1),
-  itemId: z.string().min(1),
-  clientNote: z.string().max(2000).optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID that owns the approval item.'),
+  batchId: z.string().min(1)
+    .describe("The approval batch id containing the item (from get_pending_work's approvalBatches)."),
+  itemId: z.string().min(1)
+    .describe('The id of the specific approval item to decline / request changes on.'),
+  clientNote: z.string().max(2000).optional()
+    .describe('Recommended: the requested changes communicated to the team (max 2000 chars). This tool only declines/requests-changes — it can never approve on the client\'s behalf.'),
 });
 export type RespondToApprovalItemMcpInput = z.infer<typeof respondToApprovalItemInputSchema>;
 
 export const getWorkspaceIntelligenceInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  slices: z.array(z.string()).optional(),
-  pagePath: z.string().optional(),
-  siteId: z.string().optional(),
-  siteBaseUrl: z.string().optional(),
-  enrich_with_backlinks: z.boolean().optional(),
-  resolve_entity_references: z.boolean().optional(),
-  include_site_inventory: z.boolean().optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID to assemble the intelligence bundle for.'),
+  slices: z.array(z.string()).optional()
+    .describe('Optional list of intelligence slice names to assemble (omit to return the full default set). Valid slices: seoContext, insights, learnings, pageProfile, contentPipeline, siteHealth, clientSignals, operational, pageElements, siteInventory, localSeo, entityResolution, eeatAssets, generationQuality, brand. Pass a subset to reduce response size.'),
+  pagePath: z.string().optional()
+    .describe('Optional page path (e.g. /blog/post) to scope page-level slices like pageProfile and pageElements.'),
+  siteId: z.string().optional()
+    .describe('Optional Webflow site id to scope the siteInventory slice (defaults to the workspace site when include_site_inventory is set).'),
+  siteBaseUrl: z.string().optional()
+    .describe('Optional base URL for the site; bare hosts are auto-prefixed with https://. Used by inventory/inspection slices.'),
+  enrich_with_backlinks: z.boolean().optional()
+    .describe('When true, enrich the bundle with backlink data (may call paid providers).'),
+  resolve_entity_references: z.boolean().optional()
+    .describe('When true, run entity resolution (Wikidata disambiguation) for the entityResolution slice.'),
+  include_site_inventory: z.boolean().optional()
+    .describe('When true, force-include the siteInventory slice and use the workspace Webflow site/domain to populate it.'),
 });
 
 export const getBrandIdentityInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  includeDeliverables: z.boolean().optional(),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID whose brand identity (mission, vision, values, tagline, positioning, voice status) to fetch.'),
+  includeDeliverables: z.boolean().optional()
+    .describe('When true, also return every brand deliverable with its draft/approved status and version (needed to get deliverable ids/versions for update_brand_deliverable).'),
 });
 export type GetBrandIdentityInput = z.infer<typeof getBrandIdentityInputSchema>;
 
 export const updateBrandDeliverableInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  deliverableId: z.string().min(1),
-  content: z.string().min(1),
+  workspaceId: z.string().min(1)
+    .describe('The workspace ID that owns the brand deliverable.'),
+  deliverableId: z.string().min(1)
+    .describe('The id of the existing brand deliverable to update (from get_brand_identity with includeDeliverables:true). Updates the existing row only — does not create new deliverables.'),
+  content: z.string().min(1)
+    .describe('The new content for the deliverable. Saving resets the deliverable to draft status.'),
   /**
    * Optional optimistic-concurrency guard. Pass the `version` returned by
    * `get_brand_identity(includeDeliverables:true)`; if it no longer matches the
    * stored version the write is rejected as a conflict (re-fetch and retry).
    * Omit for last-write-wins.
    */
-  expectedVersion: z.number().int().positive().optional(),
+  expectedVersion: z.number().int().positive().optional()
+    .describe('Optional optimistic-concurrency guard — the `version` from get_brand_identity(includeDeliverables:true). A mismatch is rejected as a conflict (re-fetch and retry); omit for last-write-wins.'),
 });
 export type UpdateBrandDeliverableInput = z.infer<typeof updateBrandDeliverableInputSchema>;
 
@@ -583,15 +687,18 @@ export const startKeywordStrategyGenerationInputSchema = z.object({
     seoDataProvider: z.literal('dataforseo').optional(),
     competitorDomains: z.array(z.string()).optional(),
     maxPages: z.number().int().positive().optional(),
-  }).optional(),
+  }).optional()
+    .describe('[Paid API] Optional generation options: `mode` (`full` or `incremental`), `seoDataProvider` (`dataforseo`), `competitorDomains` (array of competitor domains to mine), and `maxPages` (cap on pages processed).'),
 });
 
 export const startSeoAuditInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  site_id: z.string().min(1, 'site_id (Webflow site) is required'),
+  site_id: z.string().min(1, 'site_id (Webflow site) is required')
+    .describe('The Webflow site id to audit. Required.'),
   options: z.object({
     skip_link_check: z.boolean().optional(),
-  }).optional(),
+  }).optional()
+    .describe('Optional audit options: `skip_link_check` (when true, skip the broken-link crawl for a faster audit).'),
 });
 
 export const startLocalSeoRefreshInputSchema = z.object({
@@ -601,23 +708,28 @@ export const startLocalSeoRefreshInputSchema = z.object({
     keywords: z.array(z.string().min(1).max(200)).max(LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP).optional(),
     device: z.enum([LOCAL_SEO_DEVICE.DESKTOP, LOCAL_SEO_DEVICE.MOBILE]).optional(),
     languageCode: z.string().min(2).max(8).optional(),
-  }).strict(),
+  }).strict()
+    .describe(`[Paid API] Local SEO refresh scope: \`marketIds\` (up to 3 markets to refresh), \`keywords\` (terms to track, up to ${LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP}), \`device\` (\`${LOCAL_SEO_DEVICE.DESKTOP}\` or \`${LOCAL_SEO_DEVICE.MOBILE}\`), and \`languageCode\` (e.g. "en"). Calls paid SERP/visibility providers.`),
 });
 
 export const getJobStatusInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  job_id: z.string().min(1),
+  job_id: z.string().min(1)
+    .describe('The id of the background job to poll (returned by a start_* job tool).'),
 });
 
 export const listJobsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  status: z.enum(['pending', 'running', 'done', 'error', 'cancelled']).optional(),
-  limit: z.number().int().positive().max(200).optional(),
+  status: z.enum(['pending', 'running', 'done', 'error', 'cancelled']).optional()
+    .describe('Optional filter by job status: pending, running, done, error, or cancelled.'),
+  limit: z.number().int().positive().max(200).optional()
+    .describe('Optional max number of recent jobs to return (1-200).'),
 });
 
 export const cancelJobInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  job_id: z.string().min(1),
+  job_id: z.string().min(1)
+    .describe('The id of the running background job to cancel.'),
 });
 
 const pageKeywordEntrySchema = z.object({
@@ -635,22 +747,26 @@ const pageKeywordEntrySchema = z.object({
 
 export const getKeywordStrategyInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  lite: z.boolean().optional(),
+  lite: z.boolean().optional()
+    .describe('When true, return a slimmer strategy payload (omits heavier per-page metric detail) for cheaper reads.'),
 });
 
 export const removePageKeywordInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  page_path: z.string().min(1),
+  page_path: z.string().min(1)
+    .describe('The page path (e.g. /services/seo) whose keyword targeting should be removed.'),
 });
 
 export const addKeywordsBatchInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  entries: z.array(pageKeywordEntrySchema).min(1).max(500),
+  entries: z.array(pageKeywordEntrySchema).min(1).max(500)
+    .describe('Page-keyword entries to upsert (1-500). Each entry sets pagePath, pageTitle, primaryKeyword, secondaryKeywords, and optional metrics; existing pages are updated, new ones added.'),
 });
 
 export const replaceKeywordStrategyInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  entries: z.array(pageKeywordEntrySchema).max(500),
+  entries: z.array(pageKeywordEntrySchema).max(500)
+    .describe('The complete page-keyword set that REPLACES the entire existing strategy (0-500 entries). Pages not present in this array are removed — pass an empty array to clear the strategy.'),
 });
 
 // --- Type exports -----------------------------------------------------------

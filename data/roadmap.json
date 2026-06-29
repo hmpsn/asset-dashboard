@@ -197,11 +197,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "S",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "grep -c .describe( = 0 today. toMcpJsonSchema (zod-to-json-schema) propagates .describe() into JSON Schema description → reaches discovery free, zero handler changes. Most damaging opaque params: getWorkspaceIntelligenceInputSchema.slices (no enum), addKeywordToStrategyInputSchema.target (discriminated union), sendToClientInputSchema four exactly-one targets, update_brief/post mode + expected_revision."
+          "notes": "Done (top-level scope, owner decision). Added 121 .describe() calls in shared/types/mcp-action-schemas.ts (was 0): 7 shared building blocks (workspaceIdSchema, revisionSchema, pageTypeSchema, contentRequestStatusSchema, postStatusSchema, insightTypeSchema, handleIdSchema — propagate to every consuming tool) + 114 top-level properties across all ~40 *InputSchema. Propagates to tool-discovery JSON Schema via zod-to-json-schema (no handler changes). Audit high-value params described well: slices (lists all valid slice names incl brand + optional/default), addKeywordToStrategy.target (discriminated union variants), sendToClient four targets (surfaces the exactly-one .refine rule), update_brief/post mode (patch vs replace + field requirements), expected_revision (optimistic-concurrency token), [Paid API] on research_keywords/start_* params. NESTED content/layout/outline inner fields deliberately NOT described (agents build those from prepare_*_context). ENFORCING contract test added in tests/contract/mcp-tool-input-schema-properties.test.ts: every top-level tool-input property must have a non-empty description (names any missing). Behavior-neutral (.describe() is metadata-only). circular-deps unaffected. COMPLETES the MCP P0 batch (PRs #1403/#1404/#1406/#1407 + this).",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-resolve-insight-tool",
