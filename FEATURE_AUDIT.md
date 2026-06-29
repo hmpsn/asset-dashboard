@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **534 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **535 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 535. Brand intelligence slice (P1 — read-only, behavior-neutral)
+
+**What it does:** Registers a new `brand` workspace-intelligence slice (`BrandSlice` in `shared/types/intelligence.ts`, assembled by `server/intelligence/brand-slice.ts`) that unifies the brand's authority-resolved voice block and approved brand-identity deliverables (mission, vision, values, tagline, elevator pitch, positioning) into one structured, prompt-ready shape retrievable via `buildWorkspaceIntelligence(ws, { slices: ['brand'] })`. P1 is deliberately **dark/behavior-neutral**: the slice is registered and assembled-on-request only — it is NOT added to `PROMPT_FORMATTABLE_INTELLIGENCE_SLICES`, has no `formatters.ts` case, and is in no default `baseSlices` set, so no generated prompt or content changes (mirroring the precedent `generationQuality` slice). Voice is read by importing the unchanged `buildEffectiveBrandVoiceBlock` (`seo-context-source.ts`); identity is read through a newly-extracted pure read-model (`server/brand-deliverable-read-model.ts`) so the slice imports only leaf modules and never `brand-identity.ts` — keeping the zero circular-dependency ratchet intact. A cycle-kill boundary test guards the leaf-import contract.
+
+**Why it matters to the agency:** Gives downstream AI/recommendation surfaces a single, authority-correct source for brand voice + identity instead of each consumer re-deriving it, and lays the cycle-safe foundation for P2 to wire brand context into prompts without a risky refactor later.
+
+**Why it matters to clients:** No user-visible change in P1; it is the groundwork for more on-brand AI output (copy, briefs, recommendations) in subsequent phases.
 
 ---
 
