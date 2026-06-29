@@ -704,6 +704,8 @@ export interface BrandSlice {
   voice: { status: 'calibrated' | 'legacy' | 'none' };
   /** Authority-resolved voice block — identical to `seoContext.effectiveBrandVoiceBlock`. Inject directly; never re-derive from structured fields. */
   voicePromptBlock: string;
+  /** Layer-2 voice DNA + guardrails (semantic rules). Populated ONLY for calibrated profiles — non-calibrated already carry DNA in voicePromptBlock. Inject directly; do not combine with voicePromptBlock. */
+  voiceDnaBlock: string;
   /** Pre-formatted approved-identity block for prompt injection. Inject directly. */
   identityPromptBlock: string;
 }

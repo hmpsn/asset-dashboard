@@ -69,6 +69,45 @@ describe('assembleBrand', () => {
     expect(result.availability).toBe('ready');
   });
 
+  it('populates voiceDnaBlock from Layer-2 DNA + guardrails for a calibrated profile', async () => {
+    mocks.buildEffectiveBrandVoiceBlock.mockReturnValue('\n\nBRAND VOICE PROFILE:\nsamples');
+    mocks.getVoiceProfile.mockReturnValue({
+      status: 'calibrated',
+      voiceDNA: {
+        personalityTraits: ['Witty', 'Direct'],
+        toneSpectrum: { formal_casual: 8, serious_playful: 8, technical_accessible: 8 },
+        sentenceStyle: 'Short punchy lines',
+        vocabularyLevel: 'Conversational',
+        humorStyle: 'Dry',
+      },
+      guardrails: {
+        forbiddenWords: ['synergy'],
+        requiredTerminology: [],
+        toneBoundaries: ['Never condescending'],
+        antiPatterns: [],
+      },
+    });
+
+    const result = await assembleBrand('ws-calibrated-dna');
+
+    expect(result.voiceDnaBlock).not.toBe('');
+    // Contains a guardrail token (forbidden word) and a DNA-derived directive.
+    expect(result.voiceDnaBlock).toContain('synergy');
+    expect(result.voiceDnaBlock).toContain('Never condescending');
+    expect(result.voiceDnaBlock).toContain('Voice profile for this client:');
+  });
+
+  it('leaves voiceDnaBlock empty for a non-calibrated profile (DNA already in voicePromptBlock)', async () => {
+    mocks.getVoiceProfile.mockReturnValue(null);
+    mocks.getRawBrandVoice.mockReturnValue('We sound friendly and direct.');
+    mocks.buildEffectiveBrandVoiceBlock.mockReturnValue('\n\nBRAND VOICE & STYLE:\nWe sound friendly and direct.');
+
+    const result = await assembleBrand('ws-legacy-dna');
+
+    expect(result.voice.status).toBe('legacy');
+    expect(result.voiceDnaBlock).toBe('');
+  });
+
   it('reports legacy voice when no calibrated profile but raw voice text exists', async () => {
     mocks.getVoiceProfile.mockReturnValue(null);
     mocks.getRawBrandVoice.mockReturnValue('We sound friendly and direct.');
