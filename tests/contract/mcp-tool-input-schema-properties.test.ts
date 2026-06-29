@@ -4,6 +4,7 @@ import { workspaceTools } from '../../server/mcp/tools/workspaces.js';
 import { intelligenceTools } from '../../server/mcp/tools/intelligence.js';
 import { insightTools } from '../../server/mcp/tools/insights.js';
 import { contentTools } from '../../server/mcp/tools/content.js';
+import { brandTools } from '../../server/mcp/tools/brand.js';
 import { clientTools } from '../../server/mcp/tools/clients.js';
 import { keywordActionTools } from '../../server/mcp/tools/keyword-actions.js';
 import { contentActionTools } from '../../server/mcp/tools/content-actions.js';
@@ -14,6 +15,7 @@ const ALL_TOOLS: Tool[] = [
   ...intelligenceTools,
   ...insightTools,
   ...contentTools,
+  ...brandTools,
   ...clientTools,
   ...keywordActionTools,
   ...contentActionTools,

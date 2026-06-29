@@ -10,6 +10,7 @@ import { workspaceTools, handleWorkspaceTool } from './tools/workspaces.js';
 import { intelligenceTools, handleIntelligenceTool } from './tools/intelligence.js';
 import { insightTools, handleInsightTool } from './tools/insights.js';
 import { contentTools, handleContentTool } from './tools/content.js';
+import { brandTools, handleBrandTool } from './tools/brand.js';
 import { clientTools, handleClientTool } from './tools/clients.js';
 import { keywordActionTools, handleKeywordActionTool } from './tools/keyword-actions.js';
 import { contentActionTools, handleContentActionTool } from './tools/content-actions.js';
@@ -22,6 +23,7 @@ const ALL_TOOLS = [
   ...intelligenceTools,
   ...insightTools,
   ...contentTools,
+  ...brandTools,
   ...clientTools,
   ...keywordActionTools,
   ...contentActionTools,
@@ -59,6 +61,9 @@ function createMcpServer() {
     }
     if (contentTools.some(t => t.name === name)) {
       return handleContentTool(name, safeArgs);
+    }
+    if (brandTools.some(t => t.name === name)) {
+      return handleBrandTool(name, safeArgs);
     }
     if (clientTools.some(t => t.name === name)) {
       return handleClientTool(name, safeArgs);

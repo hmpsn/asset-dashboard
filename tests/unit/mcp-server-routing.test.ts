@@ -10,6 +10,7 @@ const h = vi.hoisted(() => {
     intelligence: vi.fn(async () => ({ content: [{ type: 'text', text: 'intelligence' }] })),
     insight: vi.fn(async () => ({ content: [{ type: 'text', text: 'insight' }] })),
     content: vi.fn(async () => ({ content: [{ type: 'text', text: 'content' }] })),
+    brand: vi.fn(async () => ({ content: [{ type: 'text', text: 'brand' }] })),
     client: vi.fn(async () => ({ content: [{ type: 'text', text: 'client' }] })),
     keywordAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'keyword' }] })),
     contentAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-action' }] })),
@@ -83,6 +84,11 @@ vi.mock('../../server/mcp/tools/content.js', () => ({
   handleContentTool: h.mockHandlers.content,
 }));
 
+vi.mock('../../server/mcp/tools/brand.js', () => ({
+  brandTools: [{ name: 'brand_tool' }],
+  handleBrandTool: h.mockHandlers.brand,
+}));
+
 vi.mock('../../server/mcp/tools/clients.js', () => ({
   clientTools: [{ name: 'client_tool' }],
   handleClientTool: h.mockHandlers.client,
@@ -132,6 +138,7 @@ describe('mcp server routing', () => {
       'intelligence_tool',
       'insight_tool',
       'content_tool',
+      'brand_tool',
       'client_tool',
       'keyword_action_tool',
       'content_action_tool',
@@ -142,6 +149,7 @@ describe('mcp server routing', () => {
     await callHandler({ params: { name: 'intelligence_tool', arguments: { b: 1 } } } as never);
     await callHandler({ params: { name: 'insight_tool', arguments: { c: 1 } } } as never);
     await callHandler({ params: { name: 'content_tool', arguments: { d: 1 } } } as never);
+    await callHandler({ params: { name: 'brand_tool', arguments: { h: 1 } } } as never);
     await callHandler({ params: { name: 'client_tool', arguments: { e: 1 } } } as never);
     await callHandler({ params: { name: 'keyword_action_tool', arguments: { f: 1 } } } as never);
     await callHandler({ params: { name: 'content_action_tool', arguments: { g: 1 } } } as never);
@@ -151,6 +159,7 @@ describe('mcp server routing', () => {
     expect(h.mockHandlers.intelligence).toHaveBeenCalledWith('intelligence_tool', { b: 1 });
     expect(h.mockHandlers.insight).toHaveBeenCalledWith('insight_tool', { c: 1 });
     expect(h.mockHandlers.content).toHaveBeenCalledWith('content_tool', { d: 1 });
+    expect(h.mockHandlers.brand).toHaveBeenCalledWith('brand_tool', { h: 1 });
     expect(h.mockHandlers.client).toHaveBeenCalledWith('client_tool', { e: 1 });
     expect(h.mockHandlers.keywordAction).toHaveBeenCalledWith('keyword_action_tool', { f: 1 });
     expect(h.mockHandlers.contentAction).toHaveBeenCalledWith('content_action_tool', { g: 1 });

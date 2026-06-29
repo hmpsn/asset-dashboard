@@ -1,6 +1,6 @@
 # Design Note — Unified Brand Intelligence Slice (additive rollout)
 
-> **Status:** P1 + P2 BUILT (2026-06-29). P3–P5 remain. See §8 phasing.
+> **Status:** P1 + P2 + P3 BUILT (2026-06-29). P4–P5 remain. See §8 phasing.
 > **Date:** 2026-06-26 · **Author:** owner + Claude (audit follow-up)
 > **Origin:** [2026-06-26 MCP surface audit](../audits/2026-06-26-mcp-surface-audit.md) → brand-coverage discussion.
 > **Decision owner:** Joshua. Decisions below marked **[DECIDED]** / **[OPEN]**.
@@ -105,13 +105,15 @@ Retire the shim only after the last consumer moves.
 |---|---|---|---|
 | **P1** ✅ delivered | `brand` slice + `assembleBrand` source + delegating shim; identity structured + both prompt blocks; facade/registry wiring; tests | M | Brand visible to AdminChat + content-gen context; foundation |
 | **P2** ✅ delivered | Point MCP `prepare_*_context` at the brand slice (+ Layer-2 `voiceDnaBlock` from the new `voice-dna-layer2.ts` leaf) | S | **Agents get full voice + identity** (closes the verified gap) |
-| **P3** | `get_brand_identity` MCP read tool | S | Agent/inspection read of structured identity |
+| **P3** ✅ delivered | `get_brand_identity` MCP read tool | S | Agent/inspection read of structured identity |
 | **P4** | Opportunistic consumer migration → retire shim | S (spread) | Removes the two-homes-for-voice debt |
 | **P5** *(separate)* | `update_brand_deliverable` write tool | M | Agent-authored brand identity w/ versioning |
 
 Each phase is one PR (phase-per-PR rule). P2 is where the value lands — do not stall before it.
 
 **P2 as delivered (2026-06-29):** Implemented as MCP-only wiring per §7 Phase A — NOT a formatter/`baseSlices`/`PROMPT_FORMATTABLE` change (server-side generation already gets full voice via `buildSystemPrompt`; only the external MCP/agent path was brand-blind). The two Layer-2 renderers (`voiceDNAToPromptInstructions`, `guardrailsToPromptInstructions`) were moved verbatim from `prompt-assembly.ts` into a new cycle-safe types-only leaf `server/voice-dna-layer2.ts` (single source of truth; `prompt-assembly` re-exports them — `buildSystemPrompt` output byte-identical). `BrandSlice` gained `voiceDnaBlock` (calibrated-only). `prepare_brief_context`/`prepare_post_context` fetch the brand slice separately and append **only** `voiceDnaBlock` + `identityPromptBlock` (never `voicePromptBlock` — already inside `context.promptContext` via `seoContext`; double-voice guard), plus surface structured `brand_identity` + `voice_status` payload keys. Plan: `docs/superpowers/plans/2026-06-29-brand-slice-p2.md`.
+
+**P3 as delivered (2026-06-29):** Implemented per §7 Phase B as a new domain-scoped `server/mcp/tools/brand.ts` exposing one read tool `get_brand_identity(workspaceId, includeDeliverables?)`. It reads the same `brand` slice via `buildWorkspaceIntelligence(ws, { slices: ['brand'] })` and returns an **identity-focused** payload `{ availability, identity (`BrandSlice.identity` verbatim — no re-derivation), voice_status, identity_prompt_block }`; with `includeDeliverables: true` it appends the full deliverable list (draft + approved, all types) via the P1 leaf `brand-deliverable-read-model.listDeliverables` for deeper inspection. It deliberately does **not** dump `voicePromptBlock`/`voiceDnaBlock` (voice content is delivered via the P2 content path; this tool is identity-scoped). Pure DB read — no paid-call counter, no broadcast, no activity log, no flag, no HTTP route; admin/MCP-auth gated (same posture as `get_workspace_intelligence`; never reaches a client-facing endpoint). Input schema `getBrandIdentityInputSchema` mirrors `getWorkspaceIntelligenceInputSchema`'s camelCase `workspaceId`. Lockstep-registered in `ALL_TOOLS`, the dispatch branch, and the contract/routing test tool sets. Plan: `docs/superpowers/plans/2026-06-29-brand-slice-p3.md`.
 
 ## 8a. Lift estimate (baseline — 2026-06-26)
 
