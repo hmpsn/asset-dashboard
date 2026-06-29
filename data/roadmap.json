@@ -125,6 +125,202 @@
       ]
     },
     {
+      "id": "sprint-mcp-surface-upgrade-2026-06-26",
+      "name": "MCP Surface Upgrade — close the stateless loops + agent instruction quality",
+      "hours": "TBD — phased, P0 first, one PR per coherent batch, staging-first",
+      "rationale": "From the 2026-06-26 MCP surface audit (45 tools; Q1 agent-instructions D, Q2 coverage C+, Q3 scale C). Two end-to-end agent loops are stateless and can't reach a terminal state: content→published and analytics→resolved. Agent guidance is near-absent (no server instructions string, zero .describe()) and the server is single-instance-only (in-memory handle store, no /mcp rate limit, one shared key). The brand-slice effort already closed the Outcomes/Brand coverage row (get_brand_identity read + update_brand_deliverable write + voice/identity to agents); the rest of the audit's prioritized roadmap is captured here. Audit: docs/audits/2026-06-26-mcp-surface-audit.md. Each P0–P1 tool wraps a verified, workspace-scoped existing service fn and must follow MCP write discipline (route through service fn, addActivity source:'mcp-chat', broadcastToWorkspace).",
+      "items": [
+        {
+          "id": "mcp-server-instructions-string",
+          "title": "P0 — add server-level instructions string (single highest-impact agent-guidance fix)",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "S",
+          "priority": "P0",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "server/mcp/server.ts:36 passes no third Server() arg; SDK supports instructions?:string since v1.29.0. The instructions string is the only guidance every connecting agent gets before its first call. Draft text already written in the audit §3 (workspace-id-first, handle pipeline lifecycle, paid-tool list, casing split, destructive ops)."
+        },
+        {
+          "id": "mcp-schema-describe-properties",
+          "title": "P0 — add .describe() to every property in mcp-action-schemas.ts",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "S",
+          "priority": "P0",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "grep -c .describe( = 0 today. toMcpJsonSchema (zod-to-json-schema) propagates .describe() into JSON Schema description → reaches discovery free, zero handler changes. Most damaging opaque params: getWorkspaceIntelligenceInputSchema.slices (no enum), addKeywordToStrategyInputSchema.target (discriminated union), sendToClientInputSchema four exactly-one targets, update_brief/post mode + expected_revision."
+        },
+        {
+          "id": "mcp-resolve-insight-tool",
+          "title": "P0 — resolve_insight (+ bulk): closes the stateless analytics loop",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "S",
+          "priority": "P0",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "analytics-intelligence",
+          "notes": "Wraps resolveInsight (analytics-insights-store.ts:290; returns undefined on workspace mismatch → clean 404). Today no resolveInsight anywhere in server/mcp/ → after acting the agent cannot mark anything resolved and re-surfaces the same queue every pass. Follow MCP write discipline (service fn + addActivity + broadcast)."
+        },
+        {
+          "id": "mcp-inbox-decision-tools",
+          "title": "P0 — inbox decision tools (update approval item / respond to client action)",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P0",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "analytics-intelligence",
+          "notes": "Wraps updateItem (approvals.ts:164) + updateClientAction (client-actions.ts:252) — both already call validateTransition internally, so the tool adds broadcast + activity only, NOT re-validation. Makes the read-only inbox (get_pending_work) closeable."
+        },
+        {
+          "id": "mcp-rate-limit-paid-budget",
+          "title": "P0 — rate-limit /mcp + real paid-call budget covering the two paid jobs",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P0",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "The three Express limiters apply only to /api/public/ (app.ts:205-208); /mcp mounts unlimited at app.ts:215. Paid-call counter is informational-only and only research_keywords increments it — start_keyword_strategy_generation + start_local_seo_refresh hit paid providers uncounted. Add a /mcp limiter + a budget that covers the paid jobs (no circuit breaker exists today)."
+        },
+        {
+          "id": "mcp-publish-post-advance-status",
+          "title": "P1 — publish_post + advance_content_status (close the content loop)",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "content-pipeline",
+          "notes": "Content loop dead-ends at client_review today (send_to_client only ever sets client_review; no content background job is exposed). publish_post wraps publishPostToWebflow (domains/content/publish-post-to-webflow.ts:139) / CONTENT_PUBLISH job; advance_content_status routes through updateContentRequest (content-requests.ts:294, already validates). Reaches approved/changes_requested/post_review/delivered/published."
+        },
+        {
+          "id": "mcp-durable-handle-store",
+          "title": "P1 — durable shared handle store + paid counter (TTL sweeper, MAX_HANDLES) — unblocks multi-instance",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "L",
+          "priority": "P1",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Single biggest scaling blocker. handles.ts:20 is a process-local Map + 15-min lazy TTL: handles from instance A are invisible to B (silent HandleNotFoundError), vanish on restart, no eviction sweeper, no cap (research_keywords issues up to 50/call → slow leak). Move handle store + paid-call counter to a shared SQLite/Redis store with a TTL sweeper + MAX_HANDLES cap (mirror jobs.ts durability)."
+        },
+        {
+          "id": "mcp-content-jobs-schema-recs-tools",
+          "title": "P1 — grounded content jobs + schema tools (gen/validate/publish) + recommendations (gen/read/lifecycle)",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "L",
+          "priority": "P1",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "content-pipeline",
+          "notes": "Schema is a zero-presence context (no MCP tools): generateSchemaForPage (schema-suggester.ts; wrapper resolves Webflow site+token internally). Recommendations exposes Strategy v3: generateRecommendations + applyBulkRecommendationAction (send/throttle/strike); generate is AI-backed → route via job platform. Grounded content jobs let the agent delegate to the server pipeline (server-side retry, downstream review/voice-score, no agent token spend) — note prepare_* is already grounded via buildContentGenerationContext(); the win is WHO runs the model."
+        },
+        {
+          "id": "mcp-auth-perkey-scoping",
+          "title": "P1 — per-key workspace scoping + caller identity + multi-key rotation",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "Today one static shared MCP_API_KEY (auth.ts:9-24); any holder can touch any workspace + any tool (create/delete workspace, send_to_client, paid research). No per-workspace scoping, no caller identity (all tagged source:mcp-chat), rotation is a hard env+restart cutover. (The timing-safe compare itself is correct/fail-closed — do not rebuild it.)"
+        },
+        {
+          "id": "mcp-raw-gsc-ga4-daterange",
+          "title": "P2 — raw GSC/GA4 read tool with date-range/period-comparison params",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "analytics-intelligence",
+          "notes": "Zero days/dateRange/startDate on any read schema today → caps diagnosis quality. Wrap getSearchOverview/getPerformanceTrend/getSearchPeriodComparison (search-console.ts) so the agent can compute its own trends."
+        },
+        {
+          "id": "mcp-widen-brief-schema",
+          "title": "P2 — widen save_brief/update_brief schema to persist the full ContentBrief",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "content-pipeline",
+          "notes": "buildBriefEntity (content-actions.ts:658-684) maps only 12 of ~35 ContentBrief fields and briefPatchContentSchema is .strict() so updates REJECT the rich fields → silent loss of ~20 fields. Widen the schema + mapper."
+        },
+        {
+          "id": "mcp-hardening-bounds-errors-observability",
+          "title": "P2 — bound get_anomalies + paginate cross-workspace sweeps + unify error shape + observability + idempotency keys",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "get_anomalies returns JSON.stringify with no .slice()/limit (insights.ts:89-102) unlike its capped siblings; get_pending_work + list_workspaces do unbounded N+1 sweeps. Plus: unify the MCP {isError,content} envelope vs router {error} 500 (index.ts:13-16); add request-level structured logging/metrics/tracing at the MCP boundary (only log.debug({tool}) today); idempotency keys on create_* (create_workspace/create_content_request duplicate on retry)."
+        },
+        {
+          "id": "mcp-readme",
+          "title": "P2 — server/mcp/README.md (handle pipeline, revision protocol, paid-tool list, casing split)",
+          "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
+          "est": "S",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "No README in server/mcp/ today; CLAUDE.md mentions MCP only architecturally. Document the prepare_*→save_* handle pipeline (single-use, 15-min TTL, workspace/kind-scoped), the get_*→expected_revision protocol, the paid-tool list, and the workspace_id vs workspaceId casing split."
+        }
+      ]
+    },
+    {
+      "id": "sprint-brand-voice-followons-2026-06-29",
+      "name": "Brand & voice — deferred follow-ons",
+      "hours": "TBD — deferred backlog, owner may remove",
+      "rationale": "Two follow-ons surfaced during the brand-slice effort (sprint-brand-intelligence-slice-2026-06-29). Both are deliberately deferred (owner may end up removing them); captured so the reasoning + revisit triggers are recoverable. Origin: owner discussion 2026-06-29.",
+      "items": [
+        {
+          "id": "brand-identity-server-side-generation-wiring",
+          "title": "Wire brand identity into server-side generators + AdminChat (beyond the agent/MCP path)",
+          "source": "Brand slice P1–P5 follow-on (owner thread 2026-06-29)",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "After P1–P5, brand IDENTITY (mission/values/tagline/positioning) is first-class only on the agent/MCP content path (prepare_brief/post_context inject identityPromptBlock). The in-app server-side generators (admin generate-brief/post via buildIntelPrompt / generation-context-builders) and AdminChat still get brand VOICE but not deliverable IDENTITY. To close: add the 'brand' slice to the shared generation-context builders (server/intelligence/generation-context-builders.ts) and inject identityPromptBlock. NOT behavior-neutral — changes existing in-app generation output, so needs a deliberate before/after review (likely a flag). OPEN DECISION: identity in every server-side generation vs only specific surfaces (about/brand copy). Owner may remove."
+        },
+        {
+          "id": "voice-sample-deliverable-reapproval-dedup",
+          "title": "Voice-sample dedup on deliverable edit/re-approval (provenance-aware)",
+          "source": "Brand slice P5 follow-on (owner thread 2026-06-29)",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "content-pipeline",
+          "notes": "setDeliverableStatus auto-creates a voice_sample (source 'identity_approved', 500-char snapshot, no link back to the deliverable) when a tagline/elevator_pitch/tone_examples deliverable is approved. Editing (now cheap via update_brand_deliverable) resets to draft; re-approving creates a FRESH sample rather than updating the prior one → stale/near-dup samples can accumulate and dilute voice calibration. DECISION 2026-06-29: LEAVE AS-IS — the sample/deliverable decoupling is deliberate (samples are independently curatable; revert-to-draft intentionally doesn't delete the sample), frequency is low, impact mild, and a proper fix fights that design. REVISIT TRIGGER: agent-driven edits churn these 3 types frequently and the VoiceTab fills with near-dup samples. Then: add source_deliverable_id to voice_samples + non-destructive 'update-if-unedited' logic (don't clobber curator edits). Cheap interim option: idempotency guard skipping an auto-sample when an identical-content 'identity_approved' sample already exists. Owner may remove."
+        }
+      ]
+    },
+    {
       "id": "sprint-the-issue-client-redesign-2026-06-20",
       "name": "The Issue (Client) — Verdict-First Trust Spine",
       "hours": "TBD — phased, one PR per phase, staging-first",
@@ -1524,7 +1720,7 @@
     },
     {
       "id": "sprint-brand-intelligence-slice-2026-06-29",
-      "name": "✅ SHIPPED — Brand Intelligence Slice — unify voice + identity into workspace intelligence",
+      "name": "✅ SHIPPED — Brand Intelligence Slice — unify voice + identity (P1–P5)",
       "hours": "TBD — phased, one PR per phase, staging-first",
       "rationale": "Surface a single authority-correct brand context (voice + approved identity) through the workspace intelligence facade so AI/recommendation consumers stop re-deriving it. P1 ships the read-only, behavior-neutral slice (registration + assembler + read-model extraction) behind the zero circular-dependency ratchet; P2 wires brand into the MCP content path (prepare_*_context) so agents get full voice DNA + identity — NOT a formatter/baseSlices change (server-side gen already gets full voice via buildSystemPrompt; contract #4). Plans: docs/superpowers/plans/2026-06-29-brand-slice-p1.md, docs/superpowers/plans/2026-06-29-brand-slice-p2.md. Design: docs/designs/2026-06-26-brand-intelligence-slice.md.",
       "items": [
@@ -1560,6 +1756,28 @@
           "createdAt": "2026-06-29",
           "owner": "workspace-intelligence",
           "notes": "Added a read-only MCP tool get_brand_identity(workspaceId, includeDeliverables?) in a new domain-scoped server/mcp/tools/brand.ts. Reads the existing brand slice via buildWorkspaceIntelligence(ws,{slices:['brand']}) and returns { availability, identity (BrandSlice.identity verbatim — no re-derivation), voice_status, identity_prompt_block }; with includeDeliverables:true it also returns the full deliverable list (draft + approved, all types) via the P1 leaf brand-deliverable-read-model.listDeliverables for admin inspection. Identity-scoped: deliberately does NOT expose voicePromptBlock/voiceDnaBlock (voice content stays on the P2 content path). Pure DB read — no paid call, no broadcast, no activity log, no flag, no HTTP route; admin/MCP-auth gated (same posture as get_workspace_intelligence; not exposed to any client-facing endpoint). Input schema getBrandIdentityInputSchema mirrors getWorkspaceIntelligenceInputSchema's camelCase workspaceId. Lockstep registration in all three spots: server.ts ALL_TOOLS, server.ts dispatch branch, and the contract test's ALL_TOOLS array (plus the mcp-server-routing test's mocked tool set). TDD: failing unit test in mcp-tools-read-models.test.ts first (default no deliverables; includeDeliverables returns draft+approved; missing workspace/invalid args/assembly-throw → isError; no voice leakage), then implementation. circular-deps server 0/0. Next: P4 consumer migration → retire shim."
+        },
+        {
+          "id": "brand-intelligence-slice-p5-write-tool",
+          "title": "Brand intelligence slice P5 — update_brand_deliverable MCP write tool",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p5.md",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "PR #1399. New MCP write tool update_brand_deliverable(workspaceId, deliverableId, content, expectedVersion?) in server/mcp/tools/brand.ts wrapping transactional updateDeliverableContent (snapshots prior version, bumps version, resets status→draft). Optional expectedVersion optimistic-concurrency guard mirroring update_brief; full data-flow contract (addActivity source:'mcp-chat' + broadcast BRAND_IDENTITY_UPDATED + invalidateIntelligenceCache) suppressed on no-op; update-only + workspace-scoped. handleBrandTool refactored into a name dispatcher (auto-routed via brandTools.some → no server.ts change). Real-DB test tests/unit/mcp-brand-write.test.ts (9). Adversarial review SHIP. Closes the read+write loop of the original ask."
+        },
+        {
+          "id": "brand-intelligence-slice-p4-voice-invariant-lock",
+          "title": "Brand intelligence slice P4 (Option A) — lock voice-block slice-parity invariant",
+          "source": "docs/designs/2026-06-26-brand-intelligence-slice.md §8",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "PR #1400. Reframed from the planned 'retire effectiveBrandVoiceBlock': that field is NOT a shim — it is load-bearing for the prompt formatter (formatSeoContextSection receives only the seoContext slice) and its value already comes from the SAME buildEffectiveBrandVoiceBlock() as brand.voicePromptBlock, so the single source of truth already exists at the function level. Physical retirement would force brand into baseSlices (identity assembled on every prompt build) + refactor the most AI-sensitive code for zero gain. Option A (behavior-neutral): contract test tests/contract/voice-block-slice-parity.test.ts asserts the two slice fields stay byte-identical across voice states via the real buildWorkspaceIntelligence, + cross-ref JSDoc on both fields + producer-site comments. No formatter/baseSlices/consumer changes. Completes the brand-slice effort (P1–P5)."
         }
       ],
       "shippedAt": "2026-06-29"
