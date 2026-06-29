@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **537 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **538 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 538. MCP inbox-loop closure (`respond_to_client_action` + `respond_to_approval_item`)
+
+**What it does:** Adds two MCP write tools that let a Claude agent *act on* the pending work `get_pending_work` surfaces, instead of only reading it. `respond_to_client_action(workspaceId, actionId, status, clientNote?)` updates a client action's status (completed / archived / approved / changes_requested / pending) — routed through the admin `updateAdminClientAction` service so it validates the transition, logs activity, broadcasts, and feeds the insight + outcome learning loop. `respond_to_approval_item(workspaceId, batchId, itemId, clientNote?)` is **decline-only by design**: it always requests changes (status `rejected`) on an approval item and attributes the action honestly to the agent (`actor: 'MCP agent'`), notifying the team. The agent **cannot** approve approval items on the client's behalf — approval is the client's own review decision (and triggers "approved" client emails), so that path is deliberately withheld. From the 2026-06-26 MCP surface audit (P0).
+
+**Why it matters to the agency:** Closes the second of the two stateless agent loops (the first being analytics insights). An operator driving Claude can now sweep the inbox — mark client actions done/archived, request changes on proposed SEO items — so the queue actually shrinks instead of re-surfacing every pass. The decline-only guardrail on approvals is the safety design: autonomous agents can triage and push back, but the irreversible, client-facing "approve" decision stays with a human, preventing an agent from silently auto-approving live-site changes on a client's behalf.
+
+**Why it matters to clients:** The client's review authority is protected — an agent can never approve changes *as* the client, only request revisions (clearly attributed to the agency's agent). Combined with faster operator follow-through on the inbox, clients get more responsive service without surrendering their approval gate.
 
 ---
 

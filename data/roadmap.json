@@ -174,11 +174,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "M",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "analytics-intelligence",
-          "notes": "Wraps updateItem (approvals.ts:164) + updateClientAction (client-actions.ts:252) — both already call validateTransition internally, so the tool adds broadcast + activity only, NOT re-validation. Makes the read-only inbox (get_pending_work) closeable."
+          "notes": "Done. Two MCP tools in server/mcp/tools/clients.ts (alongside get_pending_work; auto-routed via clientTools.some): (1) respond_to_client_action — routes through the admin service updateAdminClientAction (transition guard + activity + broadcast + insight/outcome feedback loop); status approved/changes_requested/completed/archived/pending. (2) respond_to_approval_item — DECLINE-ONLY by owner decision: routes through respondToApprovalBatchItem with status hardcoded to rejected (request changes) + actor {name:MCP agent} (honest attribution, not Client). An agent CANNOT approve approval items on the client behalf (approval is the client review decision + sends approved team emails). Schemas respondToClientActionInputSchema/respondToApprovalItemInputSchema (no status field on the approval one). Routes through domain services that already broadcast (mcp-action-must-broadcast mutationFnRe does not match them — no double broadcast). Test tests/unit/mcp-inbox-tools.test.ts (10) incl. the decline-only + honest-actor contract. circular-deps 0/0. Closes the read-only inbox loop (client-action half fully; approval half decline-only).",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-rate-limit-paid-budget",

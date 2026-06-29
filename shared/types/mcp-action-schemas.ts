@@ -523,6 +523,26 @@ export const bulkResolveInsightsInputSchema = z.object({
 });
 export type BulkResolveInsightsInput = z.infer<typeof bulkResolveInsightsInputSchema>;
 
+export const respondToClientActionInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  actionId: z.string().min(1),
+  status: z.enum(['approved', 'changes_requested', 'completed', 'archived', 'pending']),
+  clientNote: z.string().max(2000).optional(),
+});
+export type RespondToClientActionMcpInput = z.infer<typeof respondToClientActionInputSchema>;
+
+// Decline-only by design: an MCP agent may request changes on (decline) an approval
+// item but may NOT approve one on the client's behalf (approval is the client's review
+// decision and triggers "approved" team emails). So this tool takes no status — it
+// always rejects/requests-changes.
+export const respondToApprovalItemInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  batchId: z.string().min(1),
+  itemId: z.string().min(1),
+  clientNote: z.string().max(2000).optional(),
+});
+export type RespondToApprovalItemMcpInput = z.infer<typeof respondToApprovalItemInputSchema>;
+
 export const getWorkspaceIntelligenceInputSchema = z.object({
   workspaceId: z.string().min(1),
   slices: z.array(z.string()).optional(),
