@@ -45,6 +45,7 @@ import { sendPostToClientForReview, PostNotFoundError } from '../../domains/cont
 import { sanitizeInlinePromptText } from '../../utils/text.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
+import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { createLogger } from '../../logger.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { consumeHandle, issueHandle } from '../handles.js';
@@ -129,7 +130,7 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'prepare_brief_context',
-    description: 'Build structured context for brief writing and return a short-lived handle for save_brief.',
+    description: 'Build structured context for brief writing — including brand voice rules and identity — and return a short-lived handle for save_brief.',
     inputSchema: toMcpJsonSchema(prepareBriefContextInputSchema),
   },
   {
@@ -139,7 +140,7 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'prepare_post_context',
-    description: 'Build structured context for post drafting from a saved brief and return a handle for save_post.',
+    description: 'Build structured context for post drafting from a saved brief — including brand voice rules and identity — and return a handle for save_post.',
     inputSchema: toMcpJsonSchema(preparePostContextInputSchema),
   },
   {
@@ -628,6 +629,13 @@ async function handlePrepareBriefContext(
       learningsDomain: 'content',
       ...(safeTargetPagePath ? { pagePath: safeTargetPagePath } : {}),
     });
+    // Brand identity + Layer-2 voice DNA — fetched separately (the brand slice is
+    // NOT part of the content-generation baseSlices). Inject ONLY voiceDnaBlock +
+    // identityPromptBlock: the Layer-1 voicePromptBlock already lives inside
+    // context.promptContext (via seoContext), so injecting it again would double-voice.
+    const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
+    const brand = brandIntel.brand;
+    const brandIdentity = brand?.availability === 'ready' ? brand.identity : null;
     const targetBlock = buildBriefTargetPromptBlock(safeTopic, safeTargetKeyword, safeTargetPagePath);
     const briefId = `brief_${randomUUID()}`;
     const handle = issueHandle('brief-request', workspaceId, {
@@ -645,7 +653,10 @@ async function handlePrepareBriefContext(
       layout,
       layout_schema: toMcpJsonSchema(layoutSchema),
       brief_schema: toMcpJsonSchema(briefContentSchema),
-      prompt_context: [targetBlock, context.promptContext].filter(Boolean).join('\n\n'),
+      prompt_context: [targetBlock, context.promptContext, brand?.voiceDnaBlock, brand?.identityPromptBlock]
+        .filter(Boolean).join('\n\n'),
+      brand_identity: brandIdentity,
+      voice_status: brand?.voice.status ?? 'none',
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {
@@ -775,6 +786,12 @@ async function handlePreparePostContext(
     const context = await buildContentGenerationContext(workspaceId, {
       learningsDomain: 'content',
     });
+    // Brand identity + Layer-2 voice DNA (workspace-scoped — uses workspaceId, not
+    // the brief's). Inject ONLY voiceDnaBlock + identityPromptBlock; voicePromptBlock
+    // is already inside context.promptContext (avoid double-voice).
+    const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
+    const brand = brandIntel.brand;
+    const brandIdentity = brand?.availability === 'ready' ? brand.identity : null;
     const postId = `post_${randomUUID()}`;
     const handle = issueHandle('post-request', workspaceId, {
       briefId,
@@ -785,7 +802,10 @@ async function handlePreparePostContext(
       post_request_handle: handle,
       brief,
       post_schema: toMcpJsonSchema(postContentSchema),
-      prompt_context: context.promptContext,
+      prompt_context: [context.promptContext, brand?.voiceDnaBlock, brand?.identityPromptBlock]
+        .filter(Boolean).join('\n\n'),
+      brand_identity: brandIdentity,
+      voice_status: brand?.voice.status ?? 'none',
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {
