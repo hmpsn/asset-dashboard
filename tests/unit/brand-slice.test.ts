@@ -15,6 +15,8 @@ vi.mock('../../server/logger.js', () => ({
 vi.mock('../../server/intelligence/seo-context-source.js', () => ({
   buildEffectiveBrandVoiceBlock: mocks.buildEffectiveBrandVoiceBlock,
   getRawBrandVoice: mocks.getRawBrandVoice,
+  // Pass-through: the slice wraps its reads in safeBrandEngineRead; the mock just invokes fn().
+  safeBrandEngineRead: (_ctx: string, _ws: string, fn: () => unknown) => fn(),
 }));
 
 vi.mock('../../server/voice-profile-read-model.js', () => ({

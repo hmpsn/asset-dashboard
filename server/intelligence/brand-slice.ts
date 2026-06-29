@@ -1,39 +1,33 @@
 import type { BrandSlice } from '../../shared/types/intelligence.js';
-import { buildEffectiveBrandVoiceBlock, getRawBrandVoice } from './seo-context-source.js';
+import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, safeBrandEngineRead } from './seo-context-source.js';
 import { getVoiceProfile } from '../voice-profile-read-model.js';
 import { listDeliverables } from '../brand-deliverable-read-model.js';
-import { createLogger } from '../logger.js';
-
-const log = createLogger('workspace-intelligence/brand');
-const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
-
-function safeRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
-  try { return fn(); } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!MISSING_SCHEMA_ERROR_RE.test(message)) throw err;
-    log.warn({ context, workspaceId, error: message }, 'brand read degraded to fallback');
-    return fallback;
-  }
-}
 
 const IDENTITY_FIELDS = [
   ['mission', 'Mission'], ['vision', 'Vision'], ['values', 'Values'],
   ['tagline', 'Tagline'], ['elevator_pitch', 'Elevator pitch'], ['positioning_matrix', 'Positioning'],
 ] as const;
-// deliverableType → BrandSlice.identity key
+// deliverableType → BrandSlice.identity key. Intentionally surfaces only the 6 core
+// identity deliverables as structured fields. Voice/messaging deliverable types
+// (voice_guidelines, messaging_pillars, differentiators, brand_story, personas, …) are
+// deliberately omitted: voice is carried by voicePromptBlock, the rest are deferred to a
+// later phase. Unmapped types are skipped (key === undefined) — expected, not a bug.
 const TYPE_TO_KEY: Record<string, keyof BrandSlice['identity']> = {
   mission: 'mission', vision: 'vision', values: 'values',
   tagline: 'tagline', elevator_pitch: 'elevatorPitch', positioning_matrix: 'positioning',
 };
 
 export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
-  const voicePromptBlock = safeRead('brand.voiceBlock', workspaceId, () => buildEffectiveBrandVoiceBlock(workspaceId), '');
-  const profile = safeRead('brand.voiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
-  const legacyVoice = safeRead('brand.rawVoice', workspaceId, () => getRawBrandVoice(workspaceId), '');
+  const voicePromptBlock = safeBrandEngineRead('brand.voiceBlock', workspaceId, () => buildEffectiveBrandVoiceBlock(workspaceId), '');
+  const profile = safeBrandEngineRead('brand.voiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
+  const legacyVoice = safeBrandEngineRead('brand.rawVoice', workspaceId, () => getRawBrandVoice(workspaceId), '');
+  // Coarse hint only (calibrated vs raw-legacy-text vs none). A configured-but-not-calibrated
+  // profile can still yield a non-empty voicePromptBlock while this reports 'none' — treat
+  // voicePromptBlock / availability, not voice.status, as authoritative for "is there voice".
   const status: BrandSlice['voice']['status'] =
     profile?.status === 'calibrated' ? 'calibrated' : (legacyVoice.trim() ? 'legacy' : 'none');
 
-  const approved = safeRead('brand.identity', workspaceId, () => listDeliverables(workspaceId), [])
+  const approved = safeBrandEngineRead('brand.identity', workspaceId, () => listDeliverables(workspaceId), [])
     .filter(d => d.status === 'approved');
   const identity: BrandSlice['identity'] = {};
   for (const d of approved) {

@@ -96,7 +96,7 @@ export interface BrandSlice {
 ```
 
 **Identity read rules (verified):** `BrandDeliverable.content` is a single `string`; `status` is binary `'draft'|'approved'` (NOT a state machine); UNIQUE `(workspace_id, deliverable_type)` → one row per type. **Slice surfaces approved-only** content; missing → `''`. `values` is a `string`, not `string[]`.
-**Authority guardrail:** prompt consumers inject `voicePromptBlock`/`identityPromptBlock` directly; never re-format the structured fields (CLAUDE.md authority-layered-fields). Use `safeBrandEngineRead` (pr-check enforced) for the reads.
+**Authority guardrail:** prompt consumers inject `voicePromptBlock`/`identityPromptBlock` directly; never re-format the structured fields (CLAUDE.md authority-layered-fields). Wrap brand-engine reads in the canonical `safeBrandEngineRead` (now exported from `seo-context-source.ts` and shared). NOTE: the pr-check rule of that name is hard-scoped to `seo-context-source.ts` only — it does NOT enforce the wrapper inside `brand-slice.ts`; using the shared helper there is by convention, not mechanized.
 
 ---
 
