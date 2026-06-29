@@ -38,5 +38,29 @@ describe('mcp-tool-input-schema-properties', () => {
       expect(Array.isArray(properties), `${tool.name} properties cannot be an array`).toBe(false);
     }
   });
+
+  it('every top-level tool-input property has a description (for agent discovery)', () => {
+    // Descriptions come from `.describe()` on the Zod schema and propagate to the
+    // discovery JSON Schema via zod-to-json-schema. Every param an agent passes
+    // directly must be documented so the tool is usable without reading source.
+    // (Scope: TOP-LEVEL properties only — nested content/layout fields are exempt;
+    // an agent builds those from prepare_*_context, not from param descriptions.)
+    const missing: string[] = [];
+    for (const tool of ALL_TOOLS) {
+      const schema = tool.inputSchema as { properties?: Record<string, { description?: unknown }> } | undefined;
+      const properties = schema?.properties;
+      if (!properties) continue;
+      for (const [propName, propSchema] of Object.entries(properties)) {
+        const desc = (propSchema as { description?: unknown })?.description;
+        if (typeof desc !== 'string' || desc.trim().length === 0) {
+          missing.push(`${tool.name}.${propName}`);
+        }
+      }
+    }
+    expect(
+      missing,
+      `These top-level tool-input properties lack a .describe() — add one in shared/types/mcp-action-schemas.ts:\n  ${missing.join('\n  ')}`,
+    ).toEqual([]);
+  });
 });
 
