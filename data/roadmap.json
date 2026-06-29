@@ -1516,6 +1516,17 @@
           "createdAt": "2026-06-29",
           "owner": "workspace-intelligence",
           "notes": "Shipped the design-note P2 (MCP wiring), NOT the formatter/baseSlices path (server-side gen already gets full voice via buildSystemPrompt — adding brand to baseSlices/PROMPT_FORMATTABLE was explicitly out of scope, contract #4). (1) Extracted voiceDNAToPromptInstructions + guardrailsToPromptInstructions verbatim into a cycle-safe types-only leaf server/voice-dna-layer2.ts; prompt-assembly re-exports them (buildSystemPrompt output byte-identical). (2) Added BrandSlice.voiceDnaBlock — Layer-2 DNA+guardrails populated ONLY for calibrated profiles (non-calibrated already carry DNA in voicePromptBlock → would double-inject); brand-slice imports the renderers from the leaf, never voice-calibration.js (cycle guard). (3) prepare_brief_context/prepare_post_context fetch the brand slice separately (buildWorkspaceIntelligence(ws,{slices:['brand']})) and append ONLY voiceDnaBlock+identityPromptBlock to prompt_context (voicePromptBlock already in context.promptContext — no double-voice) plus surface structured brand_identity + voice_status payload keys. Unit+integration tests assert the brand payload, DNA/identity injection, and the Layer-2 voice header appears exactly once. circular-deps server 0/0; cycle-kill + voice-authority guards extended. Next: P3 get_brand_identity read tool; P4 consumer migration → retire shim."
+        },
+        {
+          "id": "brand-intelligence-slice-p3-read-tool",
+          "title": "Brand intelligence slice P3 — get_brand_identity MCP read tool (identity + voice status, opt-in deliverables)",
+          "source": "docs/superpowers/plans/2026-06-29-brand-slice-p3.md",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-06-29",
+          "owner": "workspace-intelligence",
+          "notes": "Added a read-only MCP tool get_brand_identity(workspaceId, includeDeliverables?) in a new domain-scoped server/mcp/tools/brand.ts. Reads the existing brand slice via buildWorkspaceIntelligence(ws,{slices:['brand']}) and returns { availability, identity (BrandSlice.identity verbatim — no re-derivation), voice_status, identity_prompt_block }; with includeDeliverables:true it also returns the full deliverable list (draft + approved, all types) via the P1 leaf brand-deliverable-read-model.listDeliverables for admin inspection. Identity-scoped: deliberately does NOT expose voicePromptBlock/voiceDnaBlock (voice content stays on the P2 content path). Pure DB read — no paid call, no broadcast, no activity log, no flag, no HTTP route; admin/MCP-auth gated (same posture as get_workspace_intelligence; not exposed to any client-facing endpoint). Input schema getBrandIdentityInputSchema mirrors getWorkspaceIntelligenceInputSchema's camelCase workspaceId. Lockstep registration in all three spots: server.ts ALL_TOOLS, server.ts dispatch branch, and the contract test's ALL_TOOLS array (plus the mcp-server-routing test's mocked tool set). TDD: failing unit test in mcp-tools-read-models.test.ts first (default no deliverables; includeDeliverables returns draft+approved; missing workspace/invalid args/assembly-throw → isError; no voice leakage), then implementation. circular-deps server 0/0. Next: P4 consumer migration → retire shim."
         }
       ],
       "shippedAt": "2026-06-29"
