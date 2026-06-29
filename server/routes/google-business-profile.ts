@@ -28,6 +28,11 @@ import {
   createGbpOAuthState,
 } from '../google-business-profile-oauth-state.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import {
+  googleBusinessProfileProviderErrorMessage,
+  googleBusinessProfileProviderResponseStatus,
+} from '../google-business-profile-errors.js';
+import { isGoogleProviderError } from '../google-provider-client.js';
 import { createLogger } from '../logger.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { validate, z } from '../middleware/validate.js';
@@ -134,6 +139,14 @@ router.post('/api/google-business-profile/sync', requireAdminAuth, requireWorksp
     broadcastGbpConnectionChange('discovery_synced', workspaceId);
     res.json(payload);
   } catch (error) {
+    if (isGoogleProviderError(error)) {
+      log.error({ err: error }, 'Google Business Profile discovery sync failed');
+      return res.status(googleBusinessProfileProviderResponseStatus(error)).json({
+        error: googleBusinessProfileProviderErrorMessage(error),
+        providerKind: error.kind,
+        ...(typeof error.status === 'number' ? { providerStatus: error.status } : {}),
+      });
+    }
     next(error);
   }
 });
