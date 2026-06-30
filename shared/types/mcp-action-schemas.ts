@@ -408,6 +408,26 @@ export const getContentRequestInputSchema = z.object({
     .describe('The id of the content topic request to fetch.'),
 });
 
+export const advanceContentStatusInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  request_id: z.string().min(1)
+    .describe('The content request id (from list_content_requests / get_content_request).'),
+  status: z.enum(['in_progress', 'delivered'])
+    .describe("Operator-workflow status to advance the request to: 'in_progress' (production started) or 'delivered' (delivered to the client). Only these two operator states are settable via MCP — client-review states (client_review / post_review) go through send_to_client (which notifies the client), client decisions (approved / changes_requested) are made by the client in their portal, and publishing is a separate publish_post call."),
+  internal_note: z.string().max(2000).optional()
+    .describe('Optional internal note recorded on the request (not shown to the client).'),
+});
+export type AdvanceContentStatusInput = z.infer<typeof advanceContentStatusInputSchema>;
+
+export const publishPostInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  post_id: z.string().min(1)
+    .describe("The id of the post to publish to the live Webflow site (from list_posts / get_post). The post must be status 'approved' — un-reviewed drafts cannot be published via MCP."),
+  generate_image: z.boolean().optional()
+    .describe('Generate + attach the featured image during publish (only has an effect when the publish target maps a featuredImage field). Default false.'),
+});
+export type PublishPostInput = z.infer<typeof publishPostInputSchema>;
+
 export const createContentRequestInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   topic: z.string().trim().min(1).max(500)

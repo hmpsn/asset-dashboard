@@ -1,12 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **538 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **539 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 538. MCP inbox-loop closure (`respond_to_client_action` + `respond_to_approval_item`)
+### 539. MCP content-loop closure (`advance_content_status` + `publish_post`)
+
+**What it does:** Adds the two MCP tools that close the content production loop — the third stateless agent loop (after analytics and inbox). `advance_content_status(workspaceId, requestId, status)` moves a content request through the operator workflow (`in_progress` → `delivered`) via the transition-validated `updateContentRequest`. `publish_post(workspaceId, postId)` publishes a post to the client's **live Webflow site** via the shared `publishPostToWebflow` service (the same path the operator UI uses — it owns the field map, `CONTENT_PUBLISHED` broadcast, activity log, and outcome tracking). Both tag their activity `source: 'mcp-chat'`. From the 2026-06-26 MCP surface audit (P1). Before this, an agent could draft and send content but could never take it past `client_review` or publish it.
+
+**The trust guardrails (owner decisions):** `publish_post` is **approved-only** — it refuses unless the post is status `approved`, so an autonomous agent can never push an un-reviewed draft to a client's live site (even though the underlying service permits draft/review for an admin override). And `advance_content_status` is restricted to the two operator-workflow states that have no client-facing side effects — it deliberately **cannot** set `client_review`/`post_review` (those email the client and go through `send_to_client`), `approved`/`changes_requested` (the client's own decisions, made in their portal), or `published` (that's `publish_post`). So the agent drives production forward without impersonating client decisions or sending surprise client emails.
+
+**Why it matters to the agency:** Completes the autonomous content pipeline — an operator driving Claude can now take content all the way from research → brief → post → review → **published**, with the irreversible live-publish step gated to reviewed-only content. Combined with the analytics and inbox loops (also closed), the agent can run a workspace end-to-end rather than handing off at each terminal step.
+
+**Why it matters to clients:** The client's review authority and live site are protected: only content the client (or operator) has approved can be published by an agent, and the agent can never make the client's approve/decline decision for them. Faster delivery without surrendering the approval gate.
 
 **What it does:** Adds two MCP write tools that let a Claude agent *act on* the pending work `get_pending_work` surfaces, instead of only reading it. `respond_to_client_action(workspaceId, actionId, status, clientNote?)` updates a client action's status (completed / archived / approved / changes_requested / pending) — routed through the admin `updateAdminClientAction` service so it validates the transition, logs activity, broadcasts, and feeds the insight + outcome learning loop. `respond_to_approval_item(workspaceId, batchId, itemId, clientNote?)` is **decline-only by design**: it always requests changes (status `rejected`) on an approval item and attributes the action honestly to the agent (`actor: 'MCP agent'`), notifying the team. The agent **cannot** approve approval items on the client's behalf — approval is the client's own review decision (and triggers "approved" client emails), so that path is deliberately withheld. From the 2026-06-26 MCP surface audit (P0).
 

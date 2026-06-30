@@ -29,10 +29,10 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
-import { buildClientInboxReviewsUrl, getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
+import { buildClientInboxReviewsUrl, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { normalizePageUrl, resolvePagePath } from '../utils/page-address.js';
 import { listPageKeywords } from '../page-keywords.js';
-import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
+import { onContentRequestLive } from '../domains/content/on-content-request-live.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
@@ -130,36 +130,15 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       });
     }
   }
-  // When content is delivered/published and has a target page, update page state
-  // to live. Either transition makes a new/updated page live, so it changes the
-  // page inventory the recommendation engine ranks on — enqueue the debounced
-  // post-update follow-ons (recs regen + llms.txt) just like content-publish.ts
-  // and the keyword-strategy paths. Guarded in its own try/catch so a follow-on
-  // failure can never abort the request update (response is sent below).
-  let contentWentLive = false;
-  if (status === 'delivered' && updated.targetPageId) {
-    updatePageState(req.params.workspaceId, updated.targetPageId, {
-      status: 'live',
-      source: 'content-delivery',
-      contentRequestId: updated.id,
-    });
-    contentWentLive = true;
-  }
-  // When content is marked as published and has a target page, update page state to live
-  if (status === 'published' && updated.targetPageId) {
-    updatePageState(req.params.workspaceId, updated.targetPageId, {
-      status: 'live',
-      source: 'content-delivery',
-      contentRequestId: updated.id,
-    });
-    contentWentLive = true;
-  }
-  if (contentWentLive) {
-    try {
-      queueKeywordStrategyPostUpdateFollowOns({ workspaceId: req.params.workspaceId }); // rec-refresh-ok
-    } catch (err) {
-      log.warn({ err, workspaceId: req.params.workspaceId }, 'Failed to enqueue follow-ons after content delivery');
-    }
+  // When content is delivered/published and has a target page, mark the page live
+  // and enqueue the debounced post-update follow-ons (recs regen + llms.txt) —
+  // a new/updated live page changes the inventory the recommendation engine ranks
+  // on, just like content-publish.ts and the keyword-strategy paths. Shared with
+  // the MCP advance_content_status tool via onContentRequestLive so both paths
+  // stay in lockstep (no-op when there's no target page; follow-on enqueue is
+  // self-guarded so a failure can never abort the request update).
+  if (status === 'delivered' || status === 'published') {
+    onContentRequestLive(req.params.workspaceId, updated);
   }
   // Notify client when content is published
   if (status === 'published') {

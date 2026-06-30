@@ -38,8 +38,25 @@ vi.mock('../../server/broadcast.js', () => ({
 vi.mock('../../server/activity-log.js', () => ({
   addActivity: vi.fn(),
 }));
+vi.mock('../../server/domains/content/publish-post-to-webflow.js', () => {
+  class PublishPostError extends Error {
+    code: string;
+    httpStatus: number;
+    constructor(code: string, message: string, httpStatus = 400) {
+      super(message);
+      this.code = code;
+      this.httpStatus = httpStatus;
+    }
+  }
+  return { publishPostToWebflow: vi.fn(), PublishPostError };
+});
+vi.mock('../../server/domains/content/on-content-request-live.js', () => ({
+  onContentRequestLive: vi.fn(),
+}));
 
 import { getWorkspace } from '../../server/workspaces.js';
+import { publishPostToWebflow, PublishPostError } from '../../server/domains/content/publish-post-to-webflow.js';
+import { onContentRequestLive } from '../../server/domains/content/on-content-request-live.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
@@ -141,6 +158,8 @@ describe('mcp content action tools', () => {
       'list_content_requests',
       'get_content_request',
       'create_content_request',
+      'advance_content_status',
+      'publish_post',
       'delete_brief',
       'delete_post',
       'list_post_versions',
@@ -1674,5 +1693,102 @@ describe('mcp content action tools', () => {
     });
     expect(sendFailure.isError).toBe(true);
     expect(sendFailure.content[0].text).toContain('send-to-client-exploded');
+  });
+
+  // ── advance_content_status (operator workflow) ──────────────────────────────
+  describe('advance_content_status', () => {
+    it('advances to a valid operator status and fires activity + broadcast', async () => {
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'req_1', status: 'delivered' });
+      const res = await handleContentActionTool('advance_content_status', {
+        workspace_id: 'ws-1', request_id: 'req_1', status: 'delivered', internal_note: 'shipped',
+      });
+      expect(res.isError).toBeFalsy();
+      expect(updateContentRequest).toHaveBeenCalledWith('ws-1', 'req_1', { status: 'delivered', internalNote: 'shipped' });
+      expect(addActivity).toHaveBeenCalledWith('ws-1', 'content_updated', expect.stringContaining('delivered'), undefined, expect.objectContaining({ source: 'mcp-chat', requestId: 'req_1', status: 'delivered' }));
+      // Broadcast payload uses the `id` key (workspace convention), not `requestId`.
+      expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'content-request:update', { id: 'req_1', status: 'delivered' });
+    });
+
+    it('runs the live-page side effects on delivered (parity with the admin route)', async () => {
+      const updated = { id: 'req_1', status: 'delivered' };
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(updated);
+      const res = await handleContentActionTool('advance_content_status', {
+        workspace_id: 'ws-1', request_id: 'req_1', status: 'delivered',
+      });
+      expect(res.isError).toBeFalsy();
+      // delivered makes the target page live → must trigger the shared follow-on helper.
+      expect(onContentRequestLive).toHaveBeenCalledWith('ws-1', updated);
+    });
+
+    it('does NOT run live-page side effects on in_progress', async () => {
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'req_1', status: 'in_progress' });
+      const res = await handleContentActionTool('advance_content_status', {
+        workspace_id: 'ws-1', request_id: 'req_1', status: 'in_progress',
+      });
+      expect(res.isError).toBeFalsy();
+      expect(onContentRequestLive).not.toHaveBeenCalled();
+    });
+
+    it('rejects client-facing / decision statuses (only in_progress + delivered allowed)', async () => {
+      for (const status of ['approved', 'changes_requested', 'client_review', 'post_review', 'published', 'declined']) {
+        const res = await handleContentActionTool('advance_content_status', { workspace_id: 'ws-1', request_id: 'req_1', status });
+        expect(res.isError, `status ${status} should be rejected`).toBe(true);
+      }
+      expect(updateContentRequest).not.toHaveBeenCalled();
+    });
+
+    it('surfaces an invalid transition error', async () => {
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        const e = new Error('invalid transition'); e.name = 'InvalidTransitionError'; throw e;
+      });
+      const res = await handleContentActionTool('advance_content_status', { workspace_id: 'ws-1', request_id: 'req_1', status: 'delivered' });
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('Cannot advance');
+    });
+
+    it('returns not found when the request is missing', async () => {
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      const res = await handleContentActionTool('advance_content_status', { workspace_id: 'ws-1', request_id: 'gone', status: 'in_progress' });
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('not found');
+    });
+  });
+
+  // ── publish_post (live publish — APPROVED-ONLY) ─────────────────────────────
+  describe('publish_post', () => {
+    it('publishes an approved post via the shared service tagged mcp-chat', async () => {
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status: 'approved' });
+      (publishPostToWebflow as ReturnType<typeof vi.fn>).mockResolvedValue({ itemId: 'wf_1', slug: 'my-post', isUpdate: false, post: { id: 'post_1' } });
+      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+      expect(res.isError).toBeFalsy();
+      expect(publishPostToWebflow).toHaveBeenCalledWith('ws-1', 'post_1', { generateImage: false, activitySource: 'mcp-chat' });
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ ok: true, item_id: 'wf_1', slug: 'my-post' });
+    });
+
+    it('REFUSES to publish a non-approved post (draft/review) and never calls the publish service', async () => {
+      for (const status of ['draft', 'review', 'generating', 'error']) {
+        (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status });
+        const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+        expect(res.isError, `status ${status} must be refused`).toBe(true);
+        expect(res.content[0].text).toContain("only 'approved'");
+      }
+      expect(publishPostToWebflow).not.toHaveBeenCalled();
+    });
+
+    it('returns not found when the post is missing', async () => {
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'gone' });
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('not found');
+      expect(publishPostToWebflow).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a PublishPostError message cleanly', async () => {
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status: 'approved' });
+      (publishPostToWebflow as ReturnType<typeof vi.fn>).mockRejectedValue(new PublishPostError('no_publish_target', 'No publish target configured.', 400));
+      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+      expect(res.isError).toBe(true);
+      expect(res.content[0].text).toContain('No publish target configured');
+    });
   });
 });

@@ -89,8 +89,9 @@ export interface PublishPostToWebflowOptions {
    * effect when the publish target maps a `featuredImage` field.
    */
   generateImage?: boolean;
-  /** Activity-log/source distinction. Default 'manual'. */
-  activitySource?: 'manual' | 'auto-publish';
+  /** Activity-log/source distinction. Default 'manual'. 'mcp-chat' tags an
+   *  agent-driven publish via the MCP publish_post tool (behaves like 'manual'). */
+  activitySource?: 'manual' | 'auto-publish' | 'mcp-chat';
 }
 
 export interface PublishPostToWebflowResult {
