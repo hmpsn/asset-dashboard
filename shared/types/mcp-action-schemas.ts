@@ -3,6 +3,7 @@ import {
   LOCAL_SEO_DEVICE,
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
+import { CONTENT_GENERATION_STYLES } from './content.js';
 
 // --- Shared building blocks -------------------------------------------------
 
@@ -458,6 +459,68 @@ export const createContentRequestInputSchema = z.object({
     .describe('When true, skip creating a duplicate request if a matching topic/keyword request already exists.'),
 }).strict();
 
+// --- Recommendation lifecycle tool input schemas ---------------------------
+
+export const listRecommendationsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  filter: z.enum(['active', 'all']).optional()
+    .describe("Which recommendations to return: 'active' (default — only the live, surfaceable set: not completed/dismissed/struck/throttled and not already sent to the client) or 'all' (every recommendation regardless of lifecycle/clientStatus)."),
+}).strict();
+export type ListRecommendationsInput = z.infer<typeof listRecommendationsInputSchema>;
+
+export const applyRecommendationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  recommendation_id: z.string().min(1)
+    .describe('The id of the recommendation to act on (from list_recommendations).'),
+  action: z.enum(['send', 'throttle', 'strike'])
+    .describe("Lifecycle action: 'send' (deliver the curated rec to the client — clientStatus → sent), 'throttle' (hide it for a fixed window — lifecycle → throttled; requires throttle_days), or 'strike' (permanently suppress it so it is never re-suggested — lifecycle → struck)."),
+  throttle_days: z.union([z.literal(7), z.literal(30), z.literal(90)]).optional()
+    .describe('Required when action is `throttle`: how many days to hide the recommendation (7, 30, or 90). The rec auto-resurfaces on-read once the window passes. Ignored for send/strike.'),
+}).strict();
+export type ApplyRecommendationInput = z.infer<typeof applyRecommendationInputSchema>;
+// --- Schema (JSON-LD) tool input schemas ------------------------------------
+
+const schemaJsonSchema = z.record(z.unknown())
+  .describe('A JSON-LD object (typically a unified `@graph` of schema.org nodes) to validate or publish. Get this from generate_schema (the `schema` field of the response).');
+
+// Schema "page type" is the schema-role vocabulary (homepage, service, pillar, blog,
+// audience, lead-gen, …), distinct from the content page_type enum. It only STEERS
+// auto-detection, so a free-form trimmed string is accepted and unknown values fall
+// back to auto-detect server-side.
+const schemaPageTypeHintSchema = z.string().trim().min(1)
+  .describe('Optional schema-role hint to steer schema-type detection (e.g. homepage, service, pillar, blog, audience, lead-gen). Omit to auto-detect — unknown values are ignored and auto-detection is used.');
+
+export const generateSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1)
+    .describe("The Webflow page id (static page) or CMS item pageId to generate structured-data (JSON-LD schema) for. Get page ids from get_workspace_intelligence (siteInventory) or the schema snapshot."),
+  page_type: schemaPageTypeHintSchema.optional(),
+}).strict();
+export type GenerateSchemaInput = z.infer<typeof generateSchemaInputSchema>;
+
+export const validateSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1).optional()
+    .describe('The page id whose freshly-generated schema to validate. Provide EITHER page_id (generates + validates) OR schema_json (validates a raw object).'),
+  schema_json: schemaJsonSchema.optional()
+    .describe('A raw JSON-LD object to validate directly. Provide EITHER schema_json OR page_id.'),
+  page_type: schemaPageTypeHintSchema.optional(),
+}).strict().refine(
+  (data) => (data.page_id != null) !== (data.schema_json != null),
+  { message: 'must provide exactly one of page_id or schema_json' },
+);
+export type ValidateSchemaInput = z.infer<typeof validateSchemaInputSchema>;
+
+export const publishSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1)
+    .describe("The Webflow page id to publish structured-data (JSON-LD schema) to on the LIVE site. The freshly-generated schema is VALIDATED first — publish is REFUSED if validation has errors."),
+  page_type: schemaPageTypeHintSchema.optional(),
+  publish_after: z.boolean().optional()
+    .describe('When true, also publish the Webflow site/CMS item so the schema goes live immediately. Default false (schema is written but the site is not republished).'),
+}).strict();
+export type PublishSchemaInput = z.infer<typeof publishSchemaInputSchema>;
+
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(1).max(200)
     .describe('Display name for the new workspace (client).'),
@@ -752,6 +815,32 @@ export const cancelJobInputSchema = z.object({
     .describe('The id of the running background job to cancel.'),
 });
 
+// --- Grounded content generation job schemas --------------------------------
+
+export const startBriefGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  target_keyword: z.string().trim().min(1).max(300).optional()
+    .describe('[Paid API] The primary keyword to build the brief around. Required for a standalone brief; omit only when request_id is supplied (the brief is then keyed off that content request\'s keyword).'),
+  request_id: z.string().trim().min(1).optional()
+    .describe('Optional id of an existing content request to generate the brief for. When supplied, the brief is generated from that request (pulling its keyword, intent, and page type) and the request is advanced to brief_generated. Omit for a standalone brief driven by target_keyword.'),
+  business_context: z.string().trim().max(4000).optional()
+    .describe('Optional extra business context to ground the brief (services, audience, differentiators). Ignored on the request path. Falls back to the workspace strategy business context when omitted.'),
+  page_type: pageTypeSchema.optional()
+    .describe('Optional page type the brief targets (blog, landing, service, location, product, pillar, resource). Shapes the outline and structure. Ignored on the request path (the request\'s own page type wins).'),
+  reference_urls: z.array(z.string().url()).max(5).optional()
+    .describe('Optional list of up to 5 reference URLs (http/https) to scrape for grounding evidence. Standalone path only.'),
+  generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
+    .describe('Optional writing style for the brief and downstream post: standard, concise, or hybrid.'),
+}).strict();
+
+export const startPostGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  brief_id: z.string().trim().min(1)
+    .describe('[Paid API] The id of the saved content brief to generate a full post from. The brief\'s outline, keyword, and target word count drive grounded section-by-section generation. Required.'),
+  generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
+    .describe('Optional writing style override for the post: standard, concise, or hybrid. Defaults to the brief\'s own style.'),
+}).strict();
+
 const pageKeywordEntrySchema = z.object({
   pagePath: z.string().min(1),
   pageTitle: z.string().min(1),
@@ -825,6 +914,8 @@ export type StartLocalSeoRefreshInput = z.infer<typeof startLocalSeoRefreshInput
 export type GetJobStatusInput = z.infer<typeof getJobStatusInputSchema>;
 export type ListJobsInput = z.infer<typeof listJobsInputSchema>;
 export type CancelJobInput = z.infer<typeof cancelJobInputSchema>;
+export type StartBriefGenerationInput = z.infer<typeof startBriefGenerationInputSchema>;
+export type StartPostGenerationInput = z.infer<typeof startPostGenerationInputSchema>;
 export type GetKeywordStrategyInput = z.infer<typeof getKeywordStrategyInputSchema>;
 export type RemovePageKeywordInput = z.infer<typeof removePageKeywordInputSchema>;
 export type AddKeywordsBatchInput = z.infer<typeof addKeywordsBatchInputSchema>;

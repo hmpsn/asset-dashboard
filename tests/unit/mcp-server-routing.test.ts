@@ -14,6 +14,9 @@ const h = vi.hoisted(() => {
     client: vi.fn(async () => ({ content: [{ type: 'text', text: 'client' }] })),
     keywordAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'keyword' }] })),
     contentAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-action' }] })),
+    recommendationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'recommendation-action' }] })),
+    contentGenerationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-generation-action' }] })),
+    schemaAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'schema-action' }] })),
     jobAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'job' }] })),
   };
 
@@ -104,6 +107,21 @@ vi.mock('../../server/mcp/tools/content-actions.js', () => ({
   handleContentActionTool: h.mockHandlers.contentAction,
 }));
 
+vi.mock('../../server/mcp/tools/recommendation-actions.js', () => ({
+  recommendationActionTools: [{ name: 'recommendation_action_tool' }],
+  handleRecommendationActionTool: h.mockHandlers.recommendationAction,
+}));
+
+vi.mock('../../server/mcp/tools/content-generation-actions.js', () => ({
+  contentGenerationActionTools: [{ name: 'content_generation_action_tool' }],
+  handleContentGenerationActionTool: h.mockHandlers.contentGenerationAction,
+}));
+
+vi.mock('../../server/mcp/tools/schema-actions.js', () => ({
+  schemaActionTools: [{ name: 'schema_action_tool' }],
+  handleSchemaActionTool: h.mockHandlers.schemaAction,
+}));
+
 vi.mock('../../server/mcp/tools/job-actions.js', () => ({
   jobActionTools: [{ name: 'job_action_tool' }],
   handleJobActionTool: h.mockHandlers.jobAction,
@@ -155,6 +173,9 @@ describe('mcp server routing', () => {
       'client_tool',
       'keyword_action_tool',
       'content_action_tool',
+      'recommendation_action_tool',
+      'content_generation_action_tool',
+      'schema_action_tool',
       'job_action_tool',
     ]);
 
@@ -166,6 +187,9 @@ describe('mcp server routing', () => {
     await callHandler({ params: { name: 'client_tool', arguments: { e: 1 } } } as never);
     await callHandler({ params: { name: 'keyword_action_tool', arguments: { f: 1 } } } as never);
     await callHandler({ params: { name: 'content_action_tool', arguments: { g: 1 } } } as never);
+    await callHandler({ params: { name: 'recommendation_action_tool', arguments: { r: 1 } } } as never);
+    await callHandler({ params: { name: 'content_generation_action_tool', arguments: { i: 1 } } } as never);
+    await callHandler({ params: { name: 'schema_action_tool', arguments: { s: 1 } } } as never);
     await callHandler({ params: { name: 'job_action_tool' } } as never);
 
     expect(h.mockHandlers.workspace).toHaveBeenCalledWith('workspace_tool', { a: 1 });
@@ -176,6 +200,9 @@ describe('mcp server routing', () => {
     expect(h.mockHandlers.client).toHaveBeenCalledWith('client_tool', { e: 1 });
     expect(h.mockHandlers.keywordAction).toHaveBeenCalledWith('keyword_action_tool', { f: 1 });
     expect(h.mockHandlers.contentAction).toHaveBeenCalledWith('content_action_tool', { g: 1 });
+    expect(h.mockHandlers.recommendationAction).toHaveBeenCalledWith('recommendation_action_tool', { r: 1 });
+    expect(h.mockHandlers.contentGenerationAction).toHaveBeenCalledWith('content_generation_action_tool', { i: 1 });
+    expect(h.mockHandlers.schemaAction).toHaveBeenCalledWith('schema_action_tool', { s: 1 });
     expect(h.mockHandlers.jobAction).toHaveBeenCalledWith('job_action_tool', {});
 
     const unknown = await callHandler({ params: { name: 'unknown_tool', arguments: { z: 1 } } } as never) as {
