@@ -112,7 +112,7 @@ async function handleResearchKeywords(
       undefined,
       parseMarketLocationCode(market),
     );
-    const { warning } = recordPaidCall(terms.length);
+    const { warning } = recordPaidCall(terms.length, workspaceId);
 
     const results = metrics.map((item) => {
       const researchHandle = issueHandle('keyword-research', workspaceId, {

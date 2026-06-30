@@ -176,7 +176,7 @@ async function handleStartKeywordStrategyGeneration(
 
   // Paid provider work runs inside the job — count it so the paid-call signal
   // covers all paid MCP triggers, not just research_keywords.
-  const { warning } = recordPaidCall(1);
+  const { warning } = recordPaidCall(1, workspaceId);
   return mcpSuccess({
     ok: true,
     job_id: job.id,
@@ -310,7 +310,7 @@ async function handleStartLocalSeoRefresh(
   });
 
   // Paid provider work runs inside the job — count it (see keyword-strategy above).
-  const { warning } = recordPaidCall(1);
+  const { warning } = recordPaidCall(1, workspaceId);
   return mcpSuccess({
     ok: true,
     job_id: job.id,

@@ -102,7 +102,7 @@ async function handleStartBriefGeneration(
 
   // Paid provider work runs inside the job — count it so the paid-call signal covers all
   // paid MCP triggers (mirrors start_keyword_strategy_generation in job-actions.ts).
-  const { warning } = recordPaidCall(1);
+  const { warning } = recordPaidCall(1, workspaceId);
   return mcpSuccess({
     ok: true,
     job_id: started.jobId,
@@ -155,7 +155,7 @@ async function handleStartPostGeneration(
   });
 
   // Paid provider/AI work runs inside the job — count it (see start_brief_generation).
-  const { warning } = recordPaidCall(1);
+  const { warning } = recordPaidCall(1, workspaceId);
   return mcpSuccess({
     ok: true,
     job_id: started.jobId,
