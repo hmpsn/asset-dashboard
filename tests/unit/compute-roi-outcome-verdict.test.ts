@@ -54,6 +54,32 @@ describe('computeROI outcomeVerdict (flag-gated, estimate_ga4)', () => {
     expect(v?.baseline.state).toBeDefined();
   });
 
+  it('populates per-type priorPeriod (MoM) on outcomeTypeBreakdown when measured-capture is on with a prior snapshot', () => {
+    setWorkspaceFlagOverride('the-issue-client-spine', wsId, true);
+    setWorkspaceFlagOverride('the-issue-client-measured-capture', wsId, true);
+    // A prior-window snapshot (~30d before the latest) so per-type month-over-month can compute.
+    // Regression guard: the per-type cards must NOT read "establishing your baseline" while the
+    // aggregate headline shows a real delta — per-type baseline/prior must mirror the aggregate.
+    saveGa4Snapshot({
+      workspaceId: wsId,
+      capturedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      totalConversions: 8, totalUsers: 120,
+      byEvent: [{ eventName: 'phone_call', conversions: 8, users: 120, rate: 6.67 }],
+    });
+    const v = computeROI(wsId)?.outcomeVerdict;
+    const call = v?.outcomeTypeBreakdown?.find((t) => t.outcomeType === 'call');
+    expect(call?.current).toBe(14);
+    expect(call?.priorPeriod).toBe(8);
+    // Invariant: the per-type breakdown must reconcile with the aggregate it sits under —
+    // per-type currents sum to outcomeCount, and per-type priorPeriods sum to priorPeriodCount.
+    const sum = (key: 'current' | 'priorPeriod') =>
+      (v?.outcomeTypeBreakdown ?? []).reduce((s, t) => s + (t[key] ?? 0), 0);
+    expect(sum('current')).toBe(v?.outcomeCount);
+    expect(sum('priorPeriod')).toBe(v?.priorPeriodCount);
+    // Clear the measured-capture override so it doesn't leak into later tests.
+    setWorkspaceFlagOverride('the-issue-client-measured-capture', wsId, null);
+  });
+
   it('clears the per-workspace override at the end (no leakage)', () => {
     setWorkspaceFlagOverride('the-issue-client-spine', wsId, null);
     expect(computeROI(wsId)?.outcomeVerdict).toBeUndefined();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react';
+import { Lock, Sun, Moon, Calendar, LogOut, Sparkles, Bell } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
 import { Badge, Button, FormInput, Icon, IconButton, Popover } from '../ui';
@@ -40,6 +40,8 @@ interface ClientHeaderProps {
   hasAnalytics: boolean;
   hasAnyData: boolean;
   effectiveTier: 'free' | 'growth' | 'premium';
+  /** client-ia-v2: gates the single cross-tab "needs your attention" header badge. */
+  clientIaV2: boolean;
 }
 
 export function ClientHeader({
@@ -71,6 +73,7 @@ export function ClientHeader({
   hasAnalytics,
   hasAnyData,
   effectiveTier,
+  clientIaV2,
 }: ClientHeaderProps) {
   const [customStartDraft, setCustomStartDraft] = React.useState(customDateRange?.startDate || MODULE_DEFAULT_START);
   const [customEndDraft, setCustomEndDraft] = React.useState(customDateRange?.endDate || MODULE_TODAY);
@@ -80,6 +83,16 @@ export function ClientHeader({
     setCustomStartDraft(customDateRange?.startDate || MODULE_DEFAULT_START);
     setCustomEndDraft(customDateRange?.endDate || MODULE_TODAY);
   }, [customDateRange, showDatePicker]);
+
+  // Actionable counts — computed once and reused by the per-tab Inbox badge below and
+  // the single cross-tab "needs your attention" header badge (cda-sc6, client-ia-v2).
+  const pendingReviews = contentRequests.filter(
+    r => r.status === 'client_review' || r.status === 'post_review',
+  ).length;
+  const copyReviewCount = hasCopyEntries ? 1 : 0;
+  const inboxCount = pendingApprovals + pendingReviews + unreadTeamNotes + copyReviewCount;
+  // Single aggregate the global badge surfaces: inbox items + content-plan cells awaiting the client.
+  const attentionCount = inboxCount + (contentPlanSummary?.reviewCells ?? 0);
 
   return (
     <header className="border-b border-[var(--brand-border)]">
@@ -104,6 +117,28 @@ export function ClientHeader({
           </div>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap sm:justify-end">
+          {/* cda-sc6: single cross-tab "needs your attention" badge (client-ia-v2). One aggregate
+              count of everything awaiting the client (inbox decisions/reviews/conversations +
+              content-plan cells); deep-links into the Inbox. Count + link only — not an action strip. */}
+          {clientIaV2 && effectiveTier !== 'free' && attentionCount > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => setTab('inbox')}
+              aria-label={`${attentionCount} ${attentionCount === 1 ? 'item needs' : 'items need'} your attention — open inbox`}
+              title={`${attentionCount} ${attentionCount === 1 ? 'item needs' : 'items need'} your attention`}
+              className="relative inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--brand-text-bright)] transition-colors"
+            >
+              <Icon as={Bell} size="md" />
+              <Badge
+                label={attentionCount > 99 ? '99+' : `${attentionCount}`}
+                tone="teal"
+                variant="solid"
+                shape="pill"
+                size="sm"
+                className="absolute -top-1 -right-1 min-w-[18px] justify-center leading-tight pointer-events-none"
+              />
+            </Button>
+          )}
           {/* Client user menu */}
           {clientUser && (
             <Popover
@@ -250,11 +285,6 @@ export function ClientHeader({
             const TabIcon = t.icon as import('lucide-react').LucideIcon;
             const active = tab === t.id;
             const tabHasData = hasData(t.id);
-            const pendingReviews = contentRequests.filter(
-              r => r.status === 'client_review' || r.status === 'post_review',
-            ).length;
-            const copyReviewCount = hasCopyEntries ? 1 : 0;
-            const inboxCount = pendingApprovals + pendingReviews + unreadTeamNotes + copyReviewCount;
             return (
               <Button key={t.id} variant="ghost" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
