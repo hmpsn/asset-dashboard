@@ -561,14 +561,13 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     label: 'The Issue (Client) — next-bets $-forecast (P1)',
     group: 'The Issue (Client)',
     lifecycle: {
-      status: 'reserved',
       owner: 'analytics-intelligence',
       createdAt: '2026-06-20',
       rolloutTarget: 'pilot-clients',
       removalCondition: 'Promote to default once the next-bets $-forecast reframe from recommendation estimatedGain is validated with pilot clients on staging.',
       linkedRoadmapItemId: 'the-issue-client-redesign-p1-next-bets',
       staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
+      lastReviewedAt: '2026-06-29',
     },
   },
   'client-ia-v2': {

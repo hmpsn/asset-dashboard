@@ -55,6 +55,7 @@ import { OutcomeCountBand } from './OutcomeCountBand';
 import { IssueExportBar } from './IssueExportBar';
 import { IssueYourLeadsSection } from './IssueYourLeadsSection';
 import { IssueContentPlanSection } from './IssueContentPlanSection';
+import { IssueNextBetsSection } from './IssueNextBetsSection';
 import { IssueAlsoOnPlanSection } from './IssueAlsoOnPlanSection';
 import { IssueLoopFooter } from './IssueLoopFooter';
 import { useClientTheIssue } from './useClientTheIssue';
@@ -109,6 +110,9 @@ export interface TheIssueClientPageProps {
   /** P1 (IA v2) — test override for the client-ia-v2 flag. When provided, overrides useFeatureFlag
    *  (Rules-of-Hooks-safe). Flag-OFF → MoM/typed hero clauses absent + leads stay under-the-hood. */
   iaV2?: boolean;
+  /** P1 — test override for the next-bets flag. When provided, overrides useFeatureFlag
+   *  (Rules-of-Hooks-safe). Flag-OFF → the next-bets forecast band never mounts. */
+  theIssueNextBets?: boolean;
 }
 
 export function TheIssueClientPage({
@@ -132,6 +136,7 @@ export function TheIssueClientPage({
   diagnosticReports = [],
   theIssueReturnHook,
   iaV2,
+  theIssueNextBets,
 }: TheIssueClientPageProps) {
   const navigate = useNavigate();
 
@@ -157,6 +162,10 @@ export function TheIssueClientPage({
   // wins for deterministic component tests. Flag-OFF → every iaV2-gated change is byte-identical.
   const iaV2Flag = useFeatureFlag('client-ia-v2');
   const iaV2Enabled = iaV2 ?? iaV2Flag;
+  // P1 — next-bets $-forecast band flag. Read unconditionally at the top (Rules of Hooks);
+  // an explicit prop override wins for deterministic component tests. Flag-OFF → band never mounts.
+  const nextBetsFlag = useFeatureFlag('the-issue-client-next-bets');
+  const nextBetsEnabled = theIssueNextBets ?? nextBetsFlag;
   // Verdict source: explicit prop wins; otherwise the public ROI payload (deduped React Query).
   const resolvedVerdict = outcomeVerdict !== undefined ? outcomeVerdict : (roiData?.outcomeVerdict ?? null);
   // Count-band source: prefer the server verdict's snapshot-based typed breakdown so each per-type
@@ -299,6 +308,20 @@ export function TheIssueClientPage({
               <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact />
             </div>
           </ErrorBoundary>
+
+          {/* 3.5 Next bets — forward $-forecast of the top recommended moves (the-issue-client-next-bets). */}
+          {nextBetsEnabled && (
+            <ErrorBoundary label="Your next bets">
+              <div data-testid="slot-next-bets">
+                <IssueNextBetsSection
+                  recs={recs}
+                  valuePerOutcome={resolvedVerdict?.valuePerOutcome ?? null}
+                  outcomeUnitLabel={resolvedVerdict?.outcomeUnitLabel ?? null}
+                  onReviewPlan={openStrategy}
+                />
+              </div>
+            </ErrorBoundary>
+          )}
 
           {/* 4. What needs me — the full pending-decisions queue / loop. */}
           {previewMode ? (
