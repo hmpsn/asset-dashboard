@@ -10,6 +10,7 @@ import { keywordActionTools } from '../../server/mcp/tools/keyword-actions.js';
 import { contentActionTools } from '../../server/mcp/tools/content-actions.js';
 import { recommendationActionTools } from '../../server/mcp/tools/recommendation-actions.js';
 import { contentGenerationActionTools } from '../../server/mcp/tools/content-generation-actions.js';
+import { analyticsReadActionTools } from '../../server/mcp/tools/analytics-read-actions.js';
 import { jobActionTools } from '../../server/mcp/tools/job-actions.js';
 
 const ALL_TOOLS: Tool[] = [
@@ -23,6 +24,7 @@ const ALL_TOOLS: Tool[] = [
   ...contentActionTools,
   ...recommendationActionTools,
   ...contentGenerationActionTools,
+  ...analyticsReadActionTools,
   ...jobActionTools,
 ];
 

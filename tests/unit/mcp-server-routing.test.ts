@@ -17,6 +17,7 @@ const h = vi.hoisted(() => {
     recommendationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'recommendation-action' }] })),
     contentGenerationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-generation-action' }] })),
     schemaAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'schema-action' }] })),
+    analyticsReadAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'analytics-read-action' }] })),
     jobAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'job' }] })),
   };
 
@@ -122,6 +123,11 @@ vi.mock('../../server/mcp/tools/schema-actions.js', () => ({
   handleSchemaActionTool: h.mockHandlers.schemaAction,
 }));
 
+vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({
+  analyticsReadActionTools: [{ name: 'analytics_read_action_tool' }],
+  handleAnalyticsReadActionTool: h.mockHandlers.analyticsReadAction,
+}));
+
 vi.mock('../../server/mcp/tools/job-actions.js', () => ({
   jobActionTools: [{ name: 'job_action_tool' }],
   handleJobActionTool: h.mockHandlers.jobAction,
@@ -176,6 +182,7 @@ describe('mcp server routing', () => {
       'recommendation_action_tool',
       'content_generation_action_tool',
       'schema_action_tool',
+      'analytics_read_action_tool',
       'job_action_tool',
     ]);
 
@@ -190,6 +197,7 @@ describe('mcp server routing', () => {
     await callHandler({ params: { name: 'recommendation_action_tool', arguments: { r: 1 } } } as never);
     await callHandler({ params: { name: 'content_generation_action_tool', arguments: { i: 1 } } } as never);
     await callHandler({ params: { name: 'schema_action_tool', arguments: { s: 1 } } } as never);
+    await callHandler({ params: { name: 'analytics_read_action_tool', arguments: { a: 2 } } } as never);
     await callHandler({ params: { name: 'job_action_tool' } } as never);
 
     expect(h.mockHandlers.workspace).toHaveBeenCalledWith('workspace_tool', { a: 1 });
@@ -203,6 +211,7 @@ describe('mcp server routing', () => {
     expect(h.mockHandlers.recommendationAction).toHaveBeenCalledWith('recommendation_action_tool', { r: 1 });
     expect(h.mockHandlers.contentGenerationAction).toHaveBeenCalledWith('content_generation_action_tool', { i: 1 });
     expect(h.mockHandlers.schemaAction).toHaveBeenCalledWith('schema_action_tool', { s: 1 });
+    expect(h.mockHandlers.analyticsReadAction).toHaveBeenCalledWith('analytics_read_action_tool', { a: 2 });
     expect(h.mockHandlers.jobAction).toHaveBeenCalledWith('job_action_tool', {});
 
     const unknown = await callHandler({ params: { name: 'unknown_tool', arguments: { z: 1 } } } as never) as {

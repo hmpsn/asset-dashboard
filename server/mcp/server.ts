@@ -17,6 +17,7 @@ import { contentActionTools, handleContentActionTool } from './tools/content-act
 import { recommendationActionTools, handleRecommendationActionTool } from './tools/recommendation-actions.js';
 import { contentGenerationActionTools, handleContentGenerationActionTool } from './tools/content-generation-actions.js';
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
+import { analyticsReadActionTools, handleAnalyticsReadActionTool } from './tools/analytics-read-actions.js';
 import { jobActionTools, handleJobActionTool } from './tools/job-actions.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
 import type { McpAuthContext } from './auth.js';
@@ -52,6 +53,7 @@ const ALL_TOOLS = [
   ...recommendationActionTools,
   ...contentGenerationActionTools,
   ...schemaActionTools,
+  ...analyticsReadActionTools,
   ...jobActionTools,
 ];
 
@@ -141,6 +143,9 @@ function createMcpServer(auth: McpAuthContext) {
     }
     if (schemaActionTools.some(t => t.name === name)) {
       return handleSchemaActionTool(name, safeArgs);
+    }
+    if (analyticsReadActionTools.some(t => t.name === name)) {
+      return handleAnalyticsReadActionTool(name, safeArgs);
     }
     if (jobActionTools.some(t => t.name === name)) {
       return handleJobActionTool(name, safeArgs);

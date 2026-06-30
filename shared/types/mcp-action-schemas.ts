@@ -581,6 +581,26 @@ export const listRecommendationsInputSchema = z.object({
 }).strict();
 export type ListRecommendationsInput = z.infer<typeof listRecommendationsInputSchema>;
 
+// --- Analytics read tool input schemas --------------------------------------
+
+// ISO date (YYYY-MM-DD). GSC/GA4 date ranges are inclusive calendar days. We accept
+// a strict YYYY-MM-DD string so a malformed value fails validation rather than
+// silently producing an empty window downstream.
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');
+
+export const getSearchPerformanceInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  days: z.number().int().positive().max(490).optional()
+    .describe('Trailing window length in days, counting back from the most recent GSC-available day (GSC lags ~3 days). Ignored when both start_date and end_date are provided. Defaults to 28.'),
+  start_date: isoDateSchema.optional()
+    .describe('Explicit window start (YYYY-MM-DD, inclusive). Must be paired with end_date; when both are set they override days.'),
+  end_date: isoDateSchema.optional()
+    .describe('Explicit window end (YYYY-MM-DD, inclusive). Must be paired with start_date; when both are set they override days.'),
+  compare_previous: z.boolean().optional()
+    .describe('When true, also return a period-over-period delta vs the immediately preceding window of the same length (e.g. last 28 days vs the 28 days before that). Defaults to false.'),
+}).strict();
+export type GetSearchPerformanceInput = z.infer<typeof getSearchPerformanceInputSchema>;
+
 export const applyRecommendationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   recommendation_id: z.string().min(1)

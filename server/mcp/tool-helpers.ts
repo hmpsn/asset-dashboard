@@ -21,6 +21,19 @@ export function mcpSuccess(payload: unknown): McpToolSuccessResponse {
   };
 }
 
+/**
+ * Type predicate that narrows a `T | McpToolErrorResponse` union to the error
+ * branch. `CallToolResult` carries a passthrough index signature, so a bare
+ * `'isError' in value` check does NOT narrow the success branch back to `T`
+ * (TS keeps it as the union). Use this guard when the success value's fields
+ * are accessed afterward (e.g. requireWorkspace → workspace.webflowSiteId).
+ */
+export function isMcpError<T>(value: T | McpToolErrorResponse): value is McpToolErrorResponse {
+  return typeof value === 'object'
+    && value !== null
+    && (value as McpToolErrorResponse).isError === true;
+}
+
 export function requireWorkspace(workspaceId: string): Workspace | McpToolErrorResponse {
   const ws = getWorkspace(workspaceId);
   if (!ws) {
