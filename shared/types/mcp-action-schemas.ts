@@ -478,6 +478,48 @@ export const applyRecommendationInputSchema = z.object({
     .describe('Required when action is `throttle`: how many days to hide the recommendation (7, 30, or 90). The rec auto-resurfaces on-read once the window passes. Ignored for send/strike.'),
 }).strict();
 export type ApplyRecommendationInput = z.infer<typeof applyRecommendationInputSchema>;
+// --- Schema (JSON-LD) tool input schemas ------------------------------------
+
+const schemaJsonSchema = z.record(z.unknown())
+  .describe('A JSON-LD object (typically a unified `@graph` of schema.org nodes) to validate or publish. Get this from generate_schema (the `schema` field of the response).');
+
+// Schema "page type" is the schema-role vocabulary (homepage, service, pillar, blog,
+// audience, lead-gen, …), distinct from the content page_type enum. It only STEERS
+// auto-detection, so a free-form trimmed string is accepted and unknown values fall
+// back to auto-detect server-side.
+const schemaPageTypeHintSchema = z.string().trim().min(1)
+  .describe('Optional schema-role hint to steer schema-type detection (e.g. homepage, service, pillar, blog, audience, lead-gen). Omit to auto-detect — unknown values are ignored and auto-detection is used.');
+
+export const generateSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1)
+    .describe("The Webflow page id (static page) or CMS item pageId to generate structured-data (JSON-LD schema) for. Get page ids from get_workspace_intelligence (siteInventory) or the schema snapshot."),
+  page_type: schemaPageTypeHintSchema.optional(),
+}).strict();
+export type GenerateSchemaInput = z.infer<typeof generateSchemaInputSchema>;
+
+export const validateSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1).optional()
+    .describe('The page id whose freshly-generated schema to validate. Provide EITHER page_id (generates + validates) OR schema_json (validates a raw object).'),
+  schema_json: schemaJsonSchema.optional()
+    .describe('A raw JSON-LD object to validate directly. Provide EITHER schema_json OR page_id.'),
+  page_type: schemaPageTypeHintSchema.optional(),
+}).strict().refine(
+  (data) => (data.page_id != null) !== (data.schema_json != null),
+  { message: 'must provide exactly one of page_id or schema_json' },
+);
+export type ValidateSchemaInput = z.infer<typeof validateSchemaInputSchema>;
+
+export const publishSchemaInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  page_id: z.string().min(1)
+    .describe("The Webflow page id to publish structured-data (JSON-LD schema) to on the LIVE site. The freshly-generated schema is VALIDATED first — publish is REFUSED if validation has errors."),
+  page_type: schemaPageTypeHintSchema.optional(),
+  publish_after: z.boolean().optional()
+    .describe('When true, also publish the Webflow site/CMS item so the schema goes live immediately. Default false (schema is written but the site is not republished).'),
+}).strict();
+export type PublishSchemaInput = z.infer<typeof publishSchemaInputSchema>;
 
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(1).max(200)
