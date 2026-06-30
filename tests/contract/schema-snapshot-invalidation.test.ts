@@ -30,13 +30,17 @@ describe('schema snapshot invalidation contract', () => {
   it('broadcasts snapshot updates from every route path that mutates persisted schema snapshots', () => {
     const routeSource = readProjectFile('server/routes/webflow-schema.ts');
     const adminMutationSource = readProjectFile('server/domains/schema/schema-plan-admin-mutations.ts');
+    const publishService = readProjectFile('server/domains/schema/publish-schema-to-live.ts');
     const routeCalls = routeSource.match(/broadcastSchemaSnapshotUpdated\([^;]+;/g) ?? [];
     const adminCalls = adminMutationSource.match(/broadcastSchemaSnapshotDeleted\([^;]+;/g) ?? [];
 
     expect(routeSource).toContain('function broadcastSchemaSnapshotUpdated');
     expect(adminMutationSource).toContain('function broadcastSchemaSnapshotDeleted');
-    expect(routeCalls.some(call => call.includes('cmsWs?.id') && call.includes("'published'"))).toBe(true);
-    expect(routeCalls.some(call => call.includes('pubWsForHistory?.id') && call.includes("'published'"))).toBe(true);
+    // C2: the publish ('published') snapshot broadcast moved into the shared
+    // publishSchemaToLive service so both the admin route and the MCP publish_schema
+    // tool emit it from one place (the route keeps retract/rollback/generate).
+    expect(publishService).toContain('WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED');
+    expect(publishService).toContain("action: 'published'");
     expect(adminCalls.some(call => call.includes('plan.workspaceId'))).toBe(true);
     expect(routeCalls.some(call => call.includes('ws?.id') && call.includes("'retracted'"))).toBe(true);
     expect(routeCalls.some(call => call.includes('ws?.id') && call.includes("'rolled_back'"))).toBe(true);

@@ -13,6 +13,7 @@ const publishService = readFileSync(join(import.meta.dirname, '../../server/doma
 const webflowKeywordsRoute = readFileSync(join(import.meta.dirname, '../../server/routes/webflow-keywords.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for keyword intelligence context.
 const schemaGenerator = readFileSync(join(import.meta.dirname, '../../server/schema/generator.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for lean schema suggestions.
 const schemaSuggester = readFileSync(join(import.meta.dirname, '../../server/schema-suggester.ts'), 'utf-8'); // readFile-ok — canonical page-address contract guard for schema suggestion publishing paths.
+const schemaPublishService = readFileSync(join(import.meta.dirname, '../../server/domains/schema/publish-schema-to-live.ts'), 'utf-8'); // readFile-ok — C2: schema publish canonical-path + seo-change/outcome logic moved into the shared service consumed by both the admin route and the MCP publish_schema tool.
 const schemaPublishingHook = readFileSync(join(import.meta.dirname, '../../src/components/schema/useSchemaSuggesterPublishingWorkflow.ts'), 'utf-8'); // readFile-ok — frontend must forward canonical publishedPath for schema publishes.
 const seoDerived = readFileSync(join(import.meta.dirname, '../../src/components/editor/seoEditorDerived.ts'), 'utf-8'); // readFile-ok — SEO approvals must persist canonical path metadata.
 
@@ -30,14 +31,17 @@ describe('canonical page-address route wiring', () => {
 
   it('schema publish paths receive and use publishedPath before pageSlug fallback', () => {
     expect(schemaPublishingHook).toContain('publishedPath: pageData?.publishedPath');
-    expect(schemaRoute).toContain('const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug ||');
-    expect(schemaRoute).toContain('normalizePageUrl(rawCmsPublishedPath)');
-    expect(schemaRoute).toContain('const rawPublishedPath = req.body.publishedPath || req.body.pageSlug ||');
-    expect(schemaRoute).toContain('normalizePageUrl(rawPublishedPath)');
+    // C2: the publish handler resolves publishedPath-before-pageSlug from the request and
+    // forwards it to the shared publishSchemaToLive service, which normalizes it and uses
+    // the canonical path for recordSeoChange + outcome tracking (logic moved out of the route).
+    expect(schemaRoute).toContain('publishedPath: req.body.publishedPath || req.body.pageSlug ||');
+    expect(schemaPublishService).toContain("const normalizedPath = input.publishedPath ? normalizePageUrl(input.publishedPath) : ''");
+    expect(schemaPublishService).toContain('recordSeoChange(workspaceId, input.pageId, normalizedPath');
     expect(schemaGenerator).toContain('publishedPath: input.pageMeta.publishedPath');
     expect(schemaSuggester).toContain('publishedPath: lean.publishedPath');
     expect(schemaRoute).not.toContain('pageUrl: req.body.pageSlug ? `/${req.body.pageSlug}` : null');
-    expect(schemaRoute).not.toContain('captureBaselineFromGsc(schemaAction.id, pubWs.id, `/${req.body.pageSlug}`)');
+    // The service must never fall back to a raw leaf pageSlug for the canonical path.
+    expect(schemaPublishService).not.toContain('req.body.pageSlug');
   });
 
   it('SEO approval payloads carry the canonical page path', () => {
