@@ -159,6 +159,27 @@ export function TheIssueClientPage({
   const iaV2Enabled = iaV2 ?? iaV2Flag;
   // Verdict source: explicit prop wins; otherwise the public ROI payload (deduped React Query).
   const resolvedVerdict = outcomeVerdict !== undefined ? outcomeVerdict : (roiData?.outcomeVerdict ?? null);
+  // Count-band source: prefer the server verdict's snapshot-based typed breakdown so each per-type
+  // card carries the SAME baseline/prior month-over-month as the headline. The `outcomeCount` prop
+  // is assembled client-side from LIVE GA4 (which has no history), so its per-type cards otherwise
+  // read "establishing your baseline" even when the verdict shows a real delta — a contradiction.
+  // Falls back to the prop when the verdict carries no typed breakdown (measured-capture OFF / none).
+  const verdictBreakdown = resolvedVerdict?.outcomeTypeBreakdown;
+  const resolvedOutcomeCount: IssueOutcomeCount | null =
+    verdictBreakdown && verdictBreakdown.length > 0
+      ? {
+          units: verdictBreakdown.map((t) => ({
+            label: t.label,
+            current: t.current,
+            baseline: t.baseline,
+            priorPeriod: t.priorPeriod,
+            outcomeType: t.outcomeType,
+          })),
+          byType: verdictBreakdown,
+          provenance: resolvedVerdict?.provenance ?? 'estimate_ga4',
+          namedRecordsAvailable: outcomeCount?.namedRecordsAvailable ?? false,
+        }
+      : (outcomeCount ?? null);
   // Default-visible preserves the current surface when the segment is unresolved.
   const showCompetitor = segmentProfile?.showCompetitorAuthority ?? true;
 
@@ -253,10 +274,10 @@ export function TheIssueClientPage({
           )}
 
           {/* 2. Outcome count — outcomes in human units (only when there are pinned events). */}
-          {outcomeCount && (
+          {resolvedOutcomeCount && (
             <ErrorBoundary label="Outcome count">
               <div data-testid="slot-outcome-count">
-                <OutcomeCountBand count={outcomeCount} />
+                <OutcomeCountBand count={resolvedOutcomeCount} />
               </div>
             </ErrorBoundary>
           )}

@@ -129,7 +129,12 @@ export async function getSafe<T>(url: string, fallback: T, signal?: AbortSignal)
     if (!res.ok) return fallback;
     return await res.json() as T;
   } catch (err) {
+    // Aborted requests are expected — React Query cancels in-flight fetches on
+    // unmount/refetch. Don't log them as errors (noise in console + Sentry); the
+    // fallback return is unchanged so behavior is identical.
+    if ((err as { name?: string } | null)?.name !== 'AbortError') {
       console.error('client operation failed:', err);
+    }
     return fallback;
   }
 }

@@ -652,6 +652,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         hasAnalytics={!!(overview || ga4Overview)}
         hasAnyData={!!(overview || audit || ga4Overview)}
         effectiveTier={effectiveTier}
+        clientIaV2={clientIaV2}
       />
 
       <main className="max-w-6xl mx-auto px-6 py-6">
